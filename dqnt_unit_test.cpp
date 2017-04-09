@@ -293,6 +293,29 @@ void dqnt_random_test() {
 	printf("dqnt_random_test(): Completed successfully\n");
 }
 
+void dqnt_math_test()
+{
+	{ // Lerp
+		{
+			f32 start = 10;
+			f32 t     = 0.5f;
+			f32 end   = 20;
+			DQNT_ASSERT(dqnt_lerp(start, t, end) == 15);
+		}
+
+		{
+			f32 start = 10;
+			f32 t     = 2.0f;
+			f32 end   = 20;
+			DQNT_ASSERT(dqnt_lerp(start, t, end) == 30);
+		}
+
+		printf("dqnt_math_test(): lerp: Completed successfully\n");
+	}
+
+	printf("dqnt_math_test(): Completed successfully\n");
+}
+
 void dqnt_vec_test()
 {
 	{ // V2
@@ -438,7 +461,12 @@ int main(void)
 {
 	dqnt_strings_test();
 	dqnt_random_test();
+	dqnt_math_test();
 	dqnt_vec_test();
 	dqnt_other_test();
+
+	printf("\nPress Any Key to Exit\n");
+	getchar();
+
 	return 0;
 }
