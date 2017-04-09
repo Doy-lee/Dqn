@@ -262,8 +262,8 @@ void dqnt_strings_test()
 void dqnt_other_test()
 {
 	{ // Test Win32 Sleep
-		// NOTE: Win32 Sleep is not granular to a certain point so sleep excessively to meet 
-		u32 sleepInMs = 100;
+		// NOTE: Win32 Sleep is not granular to a certain point so sleep excessively
+		u32 sleepInMs = 1000;
 		f64 startInMs = dqnt_time_now_in_ms();
 		Sleep(sleepInMs);
 		f64 endInMs = dqnt_time_now_in_ms();
@@ -296,22 +296,49 @@ void dqnt_random_test() {
 void dqnt_vec_test()
 {
 	{ // V2
+
+		// V2 Creating
 		{
-			dqnt_v2 vec = dqnt_vec2(5.5f, 5.0f);
+			DqntV2 vec = dqnt_v2(5.5f, 5.0f);
 			DQNT_ASSERT(vec.x == 5.5f && vec.y == 5.0f);
 			DQNT_ASSERT(vec.w == 5.5f && vec.h == 5.0f);
 		}
 
+		// V2i Creating
 		{
-			dqnt_v2 vec = dqnt_vec2i(3, 5);
+			DqntV2 vec = dqnt_v2i(3, 5);
 			DQNT_ASSERT(vec.x == 3 && vec.y == 5.0f);
 			DQNT_ASSERT(vec.w == 3 && vec.h == 5.0f);
 		}
 
+		// V2 Arithmetic
+		{
+			DqntV2 vecA = dqnt_v2(5, 10);
+			DqntV2 vecB = dqnt_v2i(2, 3);
+			DQNT_ASSERT(dqnt_v2_equals(vecA, vecB) == false);
+			DQNT_ASSERT(dqnt_v2_equals(vecA, dqnt_v2(5, 10)) == true);
+			DQNT_ASSERT(dqnt_v2_equals(vecB, dqnt_v2(2, 3)) == true);
+
+			DqntV2 result = dqnt_v2_add(vecA, dqnt_v2(5, 10));
+			DQNT_ASSERT(dqnt_v2_equals(result, dqnt_v2(10, 20)) == true);
+
+			result = dqnt_v2_sub(result, dqnt_v2(5, 10));
+			DQNT_ASSERT(dqnt_v2_equals(result, dqnt_v2(5, 10)) == true);
+
+			result = dqnt_v2_scale(result, 5);
+			DQNT_ASSERT(dqnt_v2_equals(result, dqnt_v2(25, 50)) == true);
+
+			result = dqnt_v2_hadamard(result, dqnt_v2(10, 0.5f));
+			DQNT_ASSERT(dqnt_v2_equals(result, dqnt_v2(250, 25)) == true);
+
+			f32 dotResult = dqnt_v2_dot(dqnt_v2(5, 10), dqnt_v2(3, 4));
+			DQNT_ASSERT(dotResult == 55);
+		}
+
 		{ // constrain_to_ratio
-			dqnt_v2 ratio  = dqnt_vec2(16, 9);
-			dqnt_v2 dim    = dqnt_vec2(2000, 1080);
-			dqnt_v2 result = dqnt_vec2_constrain_to_ratio(dim, ratio);
+			DqntV2 ratio  = dqnt_v2(16, 9);
+			DqntV2 dim    = dqnt_v2(2000, 1080);
+			DqntV2 result = dqnt_v2_constrain_to_ratio(dim, ratio);
 			DQNT_ASSERT(result.w == 1920 && result.h == 1080);
 		}
 
@@ -319,33 +346,87 @@ void dqnt_vec_test()
 	}
 
 	{ // V3
+
+		// V3i Creating
 		{
-			dqnt_v3 vec = dqnt_vec3(5.5f, 5.0f, 5.875f);
+			DqntV3 vec = dqnt_v3(5.5f, 5.0f, 5.875f);
 			DQNT_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f);
 			DQNT_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f);
 		}
 
+		// V3i Creating
 		{
-			dqnt_v3 vec = dqnt_vec3(3, 4, 5);
+			DqntV3 vec = dqnt_v3i(3, 4, 5);
 			DQNT_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5);
 			DQNT_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5);
+		}
+
+		// V3 Arithmetic
+		{
+			DqntV3 vecA = dqnt_v3(5, 10, 15);
+			DqntV3 vecB = dqnt_v3(2, 3, 6);
+			DQNT_ASSERT(dqnt_v3_equals(vecA, vecB) == false);
+			DQNT_ASSERT(dqnt_v3_equals(vecA, dqnt_v3(5, 10, 15)) == true);
+			DQNT_ASSERT(dqnt_v3_equals(vecB, dqnt_v3(2, 3, 6)) == true);
+
+			DqntV3 result = dqnt_v3_add(vecA, dqnt_v3(5, 10, 15));
+			DQNT_ASSERT(dqnt_v3_equals(result, dqnt_v3(10, 20, 30)) == true);
+
+			result = dqnt_v3_sub(result, dqnt_v3(5, 10, 15));
+			DQNT_ASSERT(dqnt_v3_equals(result, dqnt_v3(5, 10, 15)) == true);
+
+			result = dqnt_v3_scale(result, 5);
+			DQNT_ASSERT(dqnt_v3_equals(result, dqnt_v3(25, 50, 75)) == true);
+
+			result = dqnt_v3_hadamard(result, dqnt_v3(10.0f, 0.5f, 10.0f));
+			DQNT_ASSERT(dqnt_v3_equals(result, dqnt_v3(250, 25, 750)) == true);
+
+			f32 dotResult = dqnt_v3_dot(dqnt_v3(5, 10, 2), dqnt_v3(3, 4, 6));
+			DQNT_ASSERT(dotResult == 67);
 		}
 
 		printf("dqnt_vec_test(): vec3: Completed successfully\n");
 	}
 
 	{ // V4
+
+		// V4 Creating
 		{
-			dqnt_v4 vec = dqnt_vec4(5.5f, 5.0f, 5.875f, 5.928f);
+			DqntV4 vec = dqnt_v4(5.5f, 5.0f, 5.875f, 5.928f);
 			DQNT_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f && vec.w == 5.928f);
 			DQNT_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f && vec.a == 5.928f);
 		}
 
+		// V4i Creating
 		{
-			dqnt_v4 vec = dqnt_vec4i(3, 4, 5, 6);
+			DqntV4 vec = dqnt_v4i(3, 4, 5, 6);
 		    DQNT_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5 && vec.w == 6);
 		    DQNT_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5 && vec.a == 6);
 	    }
+
+		// V4 Arithmetic
+		{
+			DqntV4 vecA = dqnt_v4(5, 10, 15, 20);
+			DqntV4 vecB = dqnt_v4i(2, 3, 6, 8);
+			DQNT_ASSERT(dqnt_v4_equals(vecA, vecB) == false);
+			DQNT_ASSERT(dqnt_v4_equals(vecA, dqnt_v4(5, 10, 15, 20)) == true);
+			DQNT_ASSERT(dqnt_v4_equals(vecB, dqnt_v4(2, 3, 6, 8)) == true);
+
+			DqntV4 result = dqnt_v4_add(vecA, dqnt_v4(5, 10, 15, 20));
+			DQNT_ASSERT(dqnt_v4_equals(result, dqnt_v4(10, 20, 30, 40)) == true);
+
+			result = dqnt_v4_sub(result, dqnt_v4(5, 10, 15, 20));
+			DQNT_ASSERT(dqnt_v4_equals(result, dqnt_v4(5, 10, 15, 20)) == true);
+
+			result = dqnt_v4_scale(result, 5);
+			DQNT_ASSERT(dqnt_v4_equals(result, dqnt_v4(25, 50, 75, 100)) == true);
+
+			result = dqnt_v4_hadamard(result, dqnt_v4(10, 0.5f, 10, 0.25f));
+			DQNT_ASSERT(dqnt_v4_equals(result, dqnt_v4(250, 25, 750, 25)) == true);
+
+			f32 dotResult = dqnt_v4_dot(dqnt_v4(5, 10, 2, 8), dqnt_v4(3, 4, 6, 5));
+			DQNT_ASSERT(dotResult == 107);
+		}
 
 		printf("dqnt_vec_test(): vec4: Completed successfully\n");
 	}

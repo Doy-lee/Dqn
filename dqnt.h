@@ -19,6 +19,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 #include "stdint.h"
+#include "math.h"
 
 #define LOCAL_PERSIST static
 #define FILE_SCOPE    static
@@ -39,67 +40,115 @@ typedef float  f32;
 #define DQNT_ARRAY_COUNT(array) (sizeof(array) / sizeof(array[0]))
 #define DQNT_ASSERT(expr) if (!(expr)) { (*((i32 *)0)) = 0; }
 
-#define DQNT_MATH_PI 3.14159265359f
-#define DQNT_MATH_ABS(x) (((x) < 0) ? (-(x)) : (x))
-#define DQNT_MATH_DEGREES_TO_RADIANS(x) ((x * (MATH_PI / 180.0f)))
-#define DQNT_MATH_RADIANS_TO_DEGREES(x) ((x * (180.0f / MATH_PI)))
-#define DQNT_MATH_MAX(a, b) ((a) < (b) ? (b) : (a))
-#define DQNT_MATH_MIN(a, b) ((a) < (b) ? (a) : (b))
-#define DQNT_MATH_SQUARED(x) ((x) * (x))
-#define DQNT_MATH_SQRT(x) (sqrtf(x))
+#define DQNT_PI 3.14159265359f
+#define DQNT_ABS(x) (((x) < 0) ? (-(x)) : (x))
+#define DQNT_DEGREES_TO_RADIANS(x) ((x * (MATH_PI / 180.0f)))
+#define DQNT_RADIANS_TO_DEGREES(x) ((x * (180.0f / MATH_PI)))
+#define DQNT_MAX(a, b) ((a) < (b) ? (b) : (a))
+#define DQNT_MIN(a, b) ((a) < (b) ? (a) : (b))
+#define DQNT_SQUARED(x) ((x) * (x))
+#define DQNT_SQRT(x) (sqrtf(x))
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec2
 ////////////////////////////////////////////////////////////////////////////////
-typedef union dqnt_v2 {
+typedef union DqntV2 {
 	struct { f32 x, y; };
 	struct { f32 w, h; };
 	struct { f32 min, max; };
 	f32 e[2];
-} dqnt_v2;
+} DqntV2;
 
-DQNT_FILE_SCOPE dqnt_v2 V2(f32 x, f32 y);
-// Create a 2d-vector using ints and typecast to floats
-DQNT_FILE_SCOPE dqnt_v2 V2i(i32 x, i32 y);
+// Create a vector using ints and typecast to floats
+DQNT_FILE_SCOPE DqntV2 dqnt_v2i(i32 x, i32 y);
+DQNT_FILE_SCOPE DqntV2 dqnt_v2 (f32 x, f32 y);
 
+DQNT_FILE_SCOPE DqntV2 dqnt_v2_add     (DqntV2 a, DqntV2 b);
+DQNT_FILE_SCOPE DqntV2 dqnt_v2_sub     (DqntV2 a, DqntV2 b);
+DQNT_FILE_SCOPE DqntV2 dqnt_v2_scale   (DqntV2 a, f32 b);
+DQNT_FILE_SCOPE DqntV2 dqnt_v2_hadamard(DqntV2 a, DqntV2 b);
+DQNT_FILE_SCOPE f32    dqnt_v2_dot     (DqntV2 a, DqntV2 b);
+DQNT_FILE_SCOPE bool   dqnt_v2_equals  (DqntV2 a, DqntV2 b);
+
+// Resize the dimension to fit the aspect ratio provided. Downscale only.
+DQNT_FILE_SCOPE DqntV2 dqnt_v2_constrain_to_ratio(DqntV2 dim, DqntV2 ratio);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec3
 ////////////////////////////////////////////////////////////////////////////////
-typedef union dqnt_v3
+typedef union DqntV3
 {
 	struct { f32 x, y, z; };
     struct { f32 r, g, b; };
 	f32 e[3];
-} dqnt_v3;
+} DqntV3;
 
-DQNT_FILE_SCOPE dqnt_v3 V3i(i32 x, i32 y, i32 z);
-DQNT_FILE_SCOPE dqnt_v3 V3(f32 x, f32 y, f32 z);
+// Create a vector using ints and typecast to floats
+DQNT_FILE_SCOPE DqntV3 dqnt_v3i(i32 x, i32 y, i32 z);
+DQNT_FILE_SCOPE DqntV3 dqnt_v3 (f32 x, f32 y, f32 z);
 
+DQNT_FILE_SCOPE DqntV3 dqnt_v3_add     (DqntV3 a, DqntV3 b);
+DQNT_FILE_SCOPE DqntV3 dqnt_v3_sub     (DqntV3 a, DqntV3 b);
+DQNT_FILE_SCOPE DqntV3 dqnt_v3_scale   (DqntV3 a, f32 b);
+DQNT_FILE_SCOPE DqntV3 dqnt_v3_hadamard(DqntV3 a, DqntV3 b);
+DQNT_FILE_SCOPE f32    dqnt_v3_dot     (DqntV3 a, DqntV3 b);
+DQNT_FILE_SCOPE bool   dqnt_v3_equals  (DqntV3 a, DqntV3 b);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Vec3
+// Vec4
 ////////////////////////////////////////////////////////////////////////////////
-typedef union dqnt_v4
+typedef union DqntV4
 {
 	struct { f32 x, y, z, w; };
 	struct { f32 r, g, b, a; };
 	f32 e[4];
-	dqnt_v2 vec2[2];
-} dqnt_v4;
+	DqntV2 v2[2];
+} DqntV4;
 
-DQNT_FILE_SCOPE dqnt_v3 V3i(i32 x, i32 y, i32 z);
-DQNT_FILE_SCOPE dqnt_v4 V4(f32 x, f32 y, f32 z, f32 w);
+// Create a vector using ints and typecast to floats
+DQNT_FILE_SCOPE DqntV4 dqnt_v4i(i32 x, i32 y, i32 z);
+DQNT_FILE_SCOPE DqntV4 dqnt_v4 (f32 x, f32 y, f32 z, f32 w);
+
+DQNT_FILE_SCOPE DqntV4 dqnt_v4_add     (DqntV4 a, DqntV4 b);
+DQNT_FILE_SCOPE DqntV4 dqnt_v4_sub     (DqntV4 a, DqntV4 b);
+DQNT_FILE_SCOPE DqntV4 dqnt_v4_scale   (DqntV4 a, f32 b);
+DQNT_FILE_SCOPE DqntV4 dqnt_v4_hadamard(DqntV4 a, DqntV4 b);
+DQNT_FILE_SCOPE f32    dqnt_v4_dot     (DqntV4 a, DqntV4 b);
+DQNT_FILE_SCOPE bool   dqnt_v4_equals  (DqntV4 a, DqntV4 b);
+
+////////////////////////////////////////////////////////////////////////////////
+// 4D Matrix Mat4
+////////////////////////////////////////////////////////////////////////////////
+typedef union DqntMat4
+{
+	DqntV4 col[4];
+	// Column/row
+	f32 e[4][4];
+} DqntMat4;
+
+DQNT_FILE_SCOPE DqntMat4 dqnt_mat4_identity ();
+DQNT_FILE_SCOPE DqntMat4 dqnt_mat4_ortho    (f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar);
+DQNT_FILE_SCOPE DqntMat4 dqnt_mat4_translate(f32 x, f32 y, f32 z);
+DQNT_FILE_SCOPE DqntMat4 dqnt_mat4_rotate   (f32 radians, f32 x, f32 y, f32 z);
+DQNT_FILE_SCOPE DqntMat4 dqnt_mat4_scale    (f32 x, f32 y, f32 z);
+DQNT_FILE_SCOPE DqntMat4 dqnt_mat4_mul      (DqntMat4 a, DqntMat4 b);
+DQNT_FILE_SCOPE DqntV4   dqnt_mat4_mul_vec4 (DqntMat4 a, DqntV4 b);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Other Math
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct Rect
+typedef struct DqntRect
 {
-	dqnt_v2 min;
-	dqnt_v2 max;
-} dqnt_rect;
+	DqntV2 min;
+	DqntV2 max;
+} DqntRect;
 
+DQNT_FILE_SCOPE DqntRect dqnt_rect            (DqntV2 origin, DqntV2 size);
+DQNT_FILE_SCOPE void     dqnt_rect_get_size_2f(DqntRect rect, f32 *width, f32 *height);
+DQNT_FILE_SCOPE DqntV2   dqnt_rect_get_size_v2(DqntRect rect);
+DQNT_FILE_SCOPE DqntV2   dqnt_rect_get_centre (DqntRect rect);
+DQNT_FILE_SCOPE DqntRect dqnt_rect_move       (DqntRect rect, DqntV2 shift);
+DQNT_FILE_SCOPE bool     dqnt_rect_contains_p (DqntRect rect, DqntV2 p);
 ////////////////////////////////////////////////////////////////////////////////
 // String Ops
 ////////////////////////////////////////////////////////////////////////////////
@@ -117,9 +166,9 @@ DQNT_FILE_SCOPE bool  dqnt_str_reverse(char *buf, const i32 bufSize);
 DQNT_FILE_SCOPE i32   dqnt_str_to_i32 (char *const buf, const i32 bufSize);
 DQNT_FILE_SCOPE void  dqnt_i32_to_str (i32 value, char *buf, i32 bufSize);
 
-DQNT_FILE_SCOPE i32     dqnt_wstrcmp(const wchar_t *a, const wchar_t *b);
-DQNT_FILE_SCOPE void    dqnt_wstrcat(const wchar_t *a, i32 lenA, const wchar_t *b, i32 lenB, wchar_t *out, i32 outLen);
-DQNT_FILE_SCOPE i32     dqnt_wstrlen(const wchar_t *a);
+DQNT_FILE_SCOPE i32  dqnt_wstrcmp(const wchar_t *a, const wchar_t *b);
+DQNT_FILE_SCOPE void dqnt_wstrcat(const wchar_t *a, i32 lenA, const wchar_t *b, i32 lenB, wchar_t *out, i32 outLen);
+DQNT_FILE_SCOPE i32  dqnt_wstrlen(const wchar_t *a);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
@@ -165,33 +214,94 @@ DQNT_FILE_SCOPE i32  dqnt_rnd_pcg_range(DqntRandPCGState *pcg, i32 min, i32 max)
 	#define WIN32_LEAN_AND_MEAN
 #endif
 
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Vec2
 ////////////////////////////////////////////////////////////////////////////////
-DQNT_FILE_SCOPE inline dqnt_v2 dqnt_vec2(f32 x, f32 y)
+DQNT_FILE_SCOPE inline DqntV2 dqnt_v2(f32 x, f32 y)
 {
-	dqnt_v2 result = {};
+	DqntV2 result = {};
 	result.x  = x;
 	result.y  = y;
 
 	return result;
 }
 
-DQNT_FILE_SCOPE inline dqnt_v2 dqnt_vec2i(i32 x, i32 y)
+DQNT_FILE_SCOPE inline DqntV2 dqnt_v2i(i32 x, i32 y)
 {
-	dqnt_v2 result = dqnt_vec2((f32)x, (f32)y);
+	DqntV2 result = dqnt_v2((f32)x, (f32)y);
 	return result;
 }
 
-DQNT_FILE_SCOPE dqnt_v2 dqnt_vec2_constrain_to_ratio(dqnt_v2 dim,
-                                                     dqnt_v2 ratio)
+DQNT_FILE_SCOPE inline DqntV2 dqnt_v2_add(DqntV2 a, DqntV2 b)
 {
-	dqnt_v2 result = {};
+	DqntV2 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] + b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV2 dqnt_v2_sub(DqntV2 a, DqntV2 b)
+{
+	DqntV2 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] - b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV2 dqnt_v2_scale(DqntV2 a, f32 b)
+{
+	DqntV2 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b;
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV2 dqnt_v2_hadamard(DqntV2 a, DqntV2 b)
+{
+	DqntV2 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline f32 dqnt_v2_dot(DqntV2 a, DqntV2 b)
+{
+	/*
+	   DOT PRODUCT
+	   Two vectors with dot product equals |a||b|cos(theta)
+	   |a|   |d|
+	   |b| . |e| = (ad + be + cf)
+	   |c|   |f|
+	 */
+	f32 result = 0;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result += (a.e[i] * b.e[i]);
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline bool dqnt_v2_equals(DqntV2 a, DqntV2 b)
+{
+	bool result = TRUE;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		if (a.e[i] != b.e[i]) result = FALSE;
+	return result;
+}
+
+DQNT_FILE_SCOPE DqntV2 dqnt_v2_constrain_to_ratio(DqntV2 dim, DqntV2 ratio)
+{
+	DqntV2 result                  = {};
 	f32 numRatioIncrementsToWidth  = (f32)(dim.w / ratio.w);
 	f32 numRatioIncrementsToHeight = (f32)(dim.h / ratio.h);
 
 	f32 leastIncrementsToSide =
-	    DQNT_MATH_MIN(numRatioIncrementsToHeight, numRatioIncrementsToWidth);
+	    DQNT_MIN(numRatioIncrementsToHeight, numRatioIncrementsToWidth);
 
 	result.w = (f32)(ratio.w * leastIncrementsToSide);
 	result.h = (f32)(ratio.h * leastIncrementsToSide);
@@ -201,33 +311,313 @@ DQNT_FILE_SCOPE dqnt_v2 dqnt_vec2_constrain_to_ratio(dqnt_v2 dim,
 ////////////////////////////////////////////////////////////////////////////////
 // Vec3
 ////////////////////////////////////////////////////////////////////////////////
-DQNT_FILE_SCOPE inline dqnt_v3 dqnt_vec3(f32 x, f32 y, f32 z)
+DQNT_FILE_SCOPE inline DqntV3 dqnt_v3(f32 x, f32 y, f32 z)
 {
-	dqnt_v3 result = {};
+	DqntV3 result = {};
 	result.x       = x;
 	result.y       = y;
 	result.z       = z;
 	return result;
 }
 
-DQNT_FILE_SCOPE inline dqnt_v3 dqnt_vec3i(i32 x, i32 y, i32 z)
+DQNT_FILE_SCOPE inline DqntV3 dqnt_v3i(i32 x, i32 y, i32 z)
 {
-	dqnt_v3 result = dqnt_vec3((f32)x, (f32)y, (f32)z);
+	DqntV3 result = dqnt_v3((f32)x, (f32)y, (f32)z);
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV3 dqnt_v3_add(DqntV3 a, DqntV3 b)
+{
+	DqntV3 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] + b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV3 dqnt_v3_sub(DqntV3 a, DqntV3 b)
+{
+	DqntV3 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] - b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV3 dqnt_v3_scale(DqntV3 a, f32 b)
+{
+	DqntV3 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b;
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV3 dqnt_v3_hadamard(DqntV3 a, DqntV3 b)
+{
+	DqntV3 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline f32 dqnt_v3_dot(DqntV3 a, DqntV3 b)
+{
+	/*
+	   DOT PRODUCT
+	   Two vectors with dot product equals |a||b|cos(theta)
+	   |a|   |d|
+	   |b| . |e| = (ad + be + cf)
+	   |c|   |f|
+	 */
+	f32 result = 0;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result += (a.e[i] * b.e[i]);
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline bool dqnt_v3_equals(DqntV3 a, DqntV3 b)
+{
+	bool result = TRUE;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		if (a.e[i] != b.e[i]) result = FALSE;
 	return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec4
 ////////////////////////////////////////////////////////////////////////////////
-DQNT_FILE_SCOPE inline dqnt_v4 dqnt_vec4(f32 x, f32 y, f32 z, f32 w)
+DQNT_FILE_SCOPE inline DqntV4 dqnt_v4(f32 x, f32 y, f32 z, f32 w)
 {
-	dqnt_v4 result = {x, y, z, w};
+	DqntV4 result = {x, y, z, w};
 	return result;
 }
 
-DQNT_FILE_SCOPE inline dqnt_v4 dqnt_vec4i(i32 x, i32 y, i32 z, i32 w) {
-	dqnt_v4 result = dqnt_vec4((f32)x, (f32)y, (f32)z, (f32)w);
+DQNT_FILE_SCOPE inline DqntV4 dqnt_v4i(i32 x, i32 y, i32 z, i32 w) {
+	DqntV4 result = dqnt_v4((f32)x, (f32)y, (f32)z, (f32)w);
 	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV4 dqnt_v4_add(DqntV4 a, DqntV4 b)
+{
+	DqntV4 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] + b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV4 dqnt_v4_sub(DqntV4 a, DqntV4 b)
+{
+	DqntV4 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] - b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV4 dqnt_v4_scale(DqntV4 a, f32 b)
+{
+	DqntV4 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b;
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV4 dqnt_v4_hadamard(DqntV4 a, DqntV4 b)
+{
+	DqntV4 result;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b.e[i];
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline f32 dqnt_v4_dot(DqntV4 a, DqntV4 b)
+{
+	/*
+	   DOT PRODUCT
+	   Two vectors with dot product equals |a||b|cos(theta)
+	   |a|   |d|
+	   |b| . |e| = (ad + be + cf)
+	   |c|   |f|
+	 */
+	f32 result = 0;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		result += (a.e[i] * b.e[i]);
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline bool dqnt_v4_equals(DqntV4 a, DqntV4 b)
+{
+	bool result = TRUE;
+	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
+		if (a.e[i] != b.e[i]) result = FALSE;
+	return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// 4D Matrix Mat4
+////////////////////////////////////////////////////////////////////////////////
+DQNT_FILE_SCOPE inline DqntMat4 dqnt_mat4_identity()
+{
+	DqntMat4 result    = {0};
+	result.e[0][0] = 1;
+	result.e[1][1] = 1;
+	result.e[2][2] = 1;
+	result.e[3][3] = 1;
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntMat4
+dqnt_mat4_ortho(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar)
+{
+	DqntMat4 result = dqnt_mat4_identity();
+	result.e[0][0] = +2.0f   / (right - left);
+	result.e[1][1] = +2.0f   / (top   - bottom);
+	result.e[2][2] = -2.0f   / (zFar  - zNear);
+
+	result.e[3][0] = -(right + left)   / (right - left);
+	result.e[3][1] = -(top   + bottom) / (top   - bottom);
+	result.e[3][2] = -(zFar  + zNear)  / (zFar  - zNear);
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntMat4 dqnt_mat4_translate(f32 x, f32 y, f32 z)
+{
+	DqntMat4 result = dqnt_mat4_identity();
+	result.e[3][0] = x;
+	result.e[3][1] = y;
+	result.e[3][2] = z;
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntMat4 dqnt_mat4_rotate(f32 radians, f32 x, f32 y, f32 z)
+{
+	DqntMat4 result = dqnt_mat4_identity();
+	f32 sinVal = sinf(radians);
+	f32 cosVal = cosf(radians);
+
+	result.e[0][0] = (cosVal + (DQNT_SQUARED(x) * (1.0f - cosVal)));
+	result.e[0][1] = ((y * z * (1.0f - cosVal)) + (z * sinVal));
+	result.e[0][2] = ((z * x * (1.0f - cosVal)) - (y * sinVal));
+
+	result.e[1][0] = ((x * y * (1.0f - cosVal)) - (z * sinVal));
+	result.e[1][1] = (cosVal + (DQNT_SQUARED(y) * (1.0f - cosVal)));
+	result.e[1][2] = ((z * y * (1.0f - cosVal)) + (x * sinVal));
+
+	result.e[2][0] = ((x * z * (1.0f - cosVal)) + (y * sinVal));
+	result.e[2][1] = ((y * z * (1.0f - cosVal)) - (x * sinVal));
+	result.e[2][2] = (cosVal + (DQNT_SQUARED(z) * (1.0f - cosVal)));
+
+	result.e[3][3] = 1;
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntMat4 dqnt_mat4_scale(f32 x, f32 y, f32 z)
+{
+	DqntMat4 result = {0};
+	result.e[0][0] = x;
+	result.e[1][1] = y;
+	result.e[2][2] = z;
+	result.e[3][3] = 1;
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntMat4 dqnt_mat4_mul(DqntMat4 a, DqntMat4 b)
+{
+	DqntMat4 result = {0};
+	for (i32 j = 0; j < 4; j++) {
+		for (i32 i = 0; i < 4; i++) {
+			result.e[j][i] = a.e[0][i] * b.e[j][0]
+			               + a.e[1][i] * b.e[j][1]
+			               + a.e[2][i] * b.e[j][2]
+			               + a.e[3][i] * b.e[j][3];
+		}
+	}
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV4 dqnt_mat4_mul_vec4(DqntMat4 a, DqntV4 b)
+{
+	DqntV4 result = {0};
+
+	result.x = (a.e[0][0] * b.x) + (a.e[1][0] * b.y) + (a.e[2][0] * b.z) +
+	           (a.e[3][0] * b.w);
+	result.y = (a.e[0][1] * b.x) + (a.e[1][1] * b.y) + (a.e[2][1] * b.z) +
+	           (a.e[3][1] * b.w);
+	result.z = (a.e[0][2] * b.x) + (a.e[1][2] * b.y) + (a.e[2][2] * b.z) +
+	           (a.e[3][2] * b.w);
+	result.w = (a.e[0][3] * b.x) + (a.e[1][3] * b.y) + (a.e[2][3] * b.z) +
+	           (a.e[3][3] * b.w);
+
+	return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Rect
+////////////////////////////////////////////////////////////////////////////////
+DQNT_FILE_SCOPE inline DqntRect dqnt_rect(DqntV2 origin, DqntV2 size)
+{
+	DqntRect result = {};
+	result.min      = origin;
+	result.max      = dqnt_v2_add(origin, size);
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline void dqnt_rect_get_size_2f(DqntRect rect, f32 *width, f32 *height)
+{
+	*width  = DQNT_ABS(rect.max.x - rect.min.x);
+	*height = DQNT_ABS(rect.max.y - rect.min.y);
+}
+
+DQNT_FILE_SCOPE inline DqntV2 dqnt_rect_get_size_v2(DqntRect rect)
+{
+	f32 width     = DQNT_ABS(rect.max.x - rect.min.x);
+	f32 height    = DQNT_ABS(rect.max.y - rect.min.y);
+	DqntV2 result = dqnt_v2(width, height);
+	return result;
+}
+
+
+DQNT_FILE_SCOPE inline DqntV2 dqnt_rect_get_centre(DqntRect rect)
+{
+	f32 sumX  = rect.min.x + rect.max.x;
+	f32 sumY  = rect.min.y + rect.max.y;
+	DqntV2 result = dqnt_v2_scale(dqnt_v2(sumX, sumY), 0.5f);
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntRect dqnt_rect_move(DqntRect rect, DqntV2 shift)
+{
+	DqntRect result = {0};
+	result.min       = dqnt_v2_add(rect.min, shift);
+	result.max       = dqnt_v2_add(rect.max, shift);
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline bool dqnt_rect_contains_p(DqntRect rect, DqntV2 p)
+{
+	bool outsideOfRectX = false;
+	if (p.x < rect.min.x || p.x > rect.max.w)
+		outsideOfRectX = true;
+
+	bool outsideOfRectY = false;
+	if (p.y < rect.min.y || p.y > rect.max.h)
+		outsideOfRectY = true;
+
+	if (outsideOfRectX || outsideOfRectY) return false;
+
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -353,7 +743,7 @@ DQNT_FILE_SCOPE void dqnt_i32_to_str(i32 value, char *buf, i32 bufSize)
 
 	if (negative) buf[charIndex++] = '-';
 
-	i32 val = DQNT_MATH_ABS(value);
+	i32 val = DQNT_ABS(value);
 	while (val != 0 && charIndex < bufSize)
 	{
 		i32 rem          = val % 10;
