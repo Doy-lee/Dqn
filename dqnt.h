@@ -162,6 +162,7 @@ DQNT_FILE_SCOPE DqntV2   dqnt_rect_get_size_v2(DqntRect rect);
 DQNT_FILE_SCOPE DqntV2   dqnt_rect_get_centre (DqntRect rect);
 DQNT_FILE_SCOPE DqntRect dqnt_rect_move       (DqntRect rect, DqntV2 shift);
 DQNT_FILE_SCOPE bool     dqnt_rect_contains_p (DqntRect rect, DqntV2 p);
+
 ////////////////////////////////////////////////////////////////////////////////
 // String Ops
 ////////////////////////////////////////////////////////////////////////////////
@@ -179,9 +180,24 @@ DQNT_FILE_SCOPE bool  dqnt_str_reverse(char *buf, const i32 bufSize);
 DQNT_FILE_SCOPE i32   dqnt_str_to_i32 (char *const buf, const i32 bufSize);
 DQNT_FILE_SCOPE void  dqnt_i32_to_str (i32 value, char *buf, i32 bufSize);
 
-DQNT_FILE_SCOPE i32  dqnt_wstrcmp(const wchar_t *a, const wchar_t *b);
-DQNT_FILE_SCOPE void dqnt_wstrcat(const wchar_t *a, i32 lenA, const wchar_t *b, i32 lenB, wchar_t *out, i32 outLen);
-DQNT_FILE_SCOPE i32  dqnt_wstrlen(const wchar_t *a);
+// Both return the number of bytes read, return 0 if invalid codepoint or UTF8
+DQNT_FILE_SCOPE u32 dqnt_ucs_to_utf8(u32 *dest, u32 character);
+DQNT_FILE_SCOPE u32 dqnt_utf8_to_ucs(u32 *dest, u32 character);
+////////////////////////////////////////////////////////////////////////////////
+// File Operations
+////////////////////////////////////////////////////////////////////////////////
+typedef struct DqntFile
+{
+	void *handle;
+	u64   size;
+} DqntFile;
+
+#if 0
+bool platform_open_file (char *const file, PlatformFile *platformFile);
+// Return the number of bytes read
+u32  platform_read_file (PlatformFile file, void *buffer, u32 numBytesToRead);
+void platform_close_file(PlatformFile *file);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
@@ -728,7 +744,7 @@ DQNT_FILE_SCOPE inline bool dqnt_rect_contains_p(DqntRect rect, DqntV2 p)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// String Ops
+// String Operations
 ////////////////////////////////////////////////////////////////////////////////
 DQNT_FILE_SCOPE bool dqnt_char_is_digit(char c)
 {
@@ -870,27 +886,166 @@ DQNT_FILE_SCOPE void dqnt_i32_to_str(i32 value, char *buf, i32 bufSize)
 	}
 }
 
-DQNT_FILE_SCOPE i32 dqnt_wstrcmp(const wchar_t *a, const wchar_t *b)
-{
-	if (!a && !b) return -1;
-	if (!a) return -1;
-	if (!b) return -1;
+/*
+	Encoding
+	The following byte sequences are used to represent a character. The sequence
+	to be used depends on the UCS code number of the character:
 
-	while ((*a) == (*b))
+	The extra 1's are the headers used to identify the string as a UTF-8 string.
+	UCS [0x00000000, 0x0000007F] -> UTF-8 0xxxxxxx
+	UCS [0x00000080, 0x000007FF] -> UTF-8 110xxxxx 10xxxxxx
+	UCS [0x00000800, 0x0000FFFF] -> UTF-8 1110xxxx 10xxxxxx 10xxxxxx
+	UCS [0x00010000, 0x001FFFFF] -> UTF-8 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+	UCS [0x00200000, 0x03FFFFFF] -> N/A   111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+	UCS [0x04000000, 0x7FFFFFFF] -> N/A   1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+
+	The xxx bit positions are filled with the bits of the character code number
+	in binary representation. Only the shortest possible multibyte sequence
+	which can represent the code number of the character can be used.
+
+	The UCS code values 0xd800–0xdfff (UTF-16 surrogates) as well as 0xfffe and
+	0xffff (UCS noncharacters) should not appear in conforming UTF-8 streams.
+*/
+DQNT_FILE_SCOPE u32 dqnt_ucs_to_utf8(u32 *dest, u32 character)
+{
+	if (!dest) return 0;
+
+	u8 *bytePtr = (u8 *)dest;
+
+	// Character is within ASCII range, so it's an ascii character
+	// UTF Bit Arrangement: 0xxxxxxx
+	// Character          : 0xxxxxxx
+	if (character >= 0 && character < 0x80)
 	{
-		if (!(*a)) return 0;
-		a++;
-		b++;
+		bytePtr[0] = (u8)character;
+		return 1;
 	}
 
-	return (((*a) < (*b)) ? -1 : 1);
+	// UTF Header Bits    : 11000000 00xxxxxx
+	// UTF Bit Arrangement: 000xxxxx 00xxxxxx
+	// Character          : 00000xxx xxxxxxxx
+	if (character < 0x800)
+	{
+		// Add the 2nd byte, 6 bits, OR the 0xC0 (11000000) header bits
+		bytePtr[1] = (u8)((character >> 6) | 0xC0);
+
+		// Add the 1st byte, 6 bits, plus the 0x80 (10000000) header bits
+		bytePtr[0] = (u8)((character & 0x3F) | 0x80);
+
+		return 2;
+	}
+
+	// UTF Header Bits     : 11100000 10000000 10000000
+	// UTF Bit Arrangement : 0000xxxx 00xxxxxx 00xxxxxx
+	// Character           : 00000000 xxxxxxxx xxxxxxxx
+	if (character < 0x10000)
+	{
+		// Add the 3rd byte, 4 bits, OR the 0xE0 (11100000) header bits
+		bytePtr[2] = (u8)((character >> 12) | 0xE0);
+
+		// Add the 2nd byte, 6 bits, OR the 0x80 (10000000) header bits
+		bytePtr[1] = (u8)((character >> 6) | 0x80);
+
+		// Add the 1st byte, 6 bits, plus the 0x80 (10000000) header bits
+		bytePtr[0] = (u8)((character & 0x3F) | 0x80);
+
+		return 3;
+	}
+
+	// UTF Header Bits     : 11110000 10000000 10000000 10000000
+	// UTF Bit Arrangement : 00000xxx 00xxxxxx 00xxxxxx 00xxxxxx
+	// Character           : 00000000 00000xxx xxxxxxxx xxxxxxxx
+	if (character < 0x110000)
+	{
+		// Add the 4th byte, 3 bits, OR the 0xF0 (11110000) header bits
+		bytePtr[3] = (u8)((character >> 18) | 0xF0);
+
+		// Add the 3rd byte, 6 bits, OR the 0x80 (10000000) header bits
+		bytePtr[2] = (u8)(((character >> 12) & 0x3F) | 0x80);
+
+		// Add the 2nd byte, 6 bits, plus the 0x80 (10000000) header bits
+		bytePtr[1] = (u8)(((character >> 6) & 0x3F) | 0x80);
+
+		// Add the 2nd byte, 6 bits, plus the 0x80 (10000000) header bits
+		bytePtr[0] = (u8)((character & 0x3F) | 0x80);
+
+		return 4;
+	}
+
+	return 0;
 }
 
-DQNT_FILE_SCOPE i32 dqnt_wstrlen(const wchar_t *a)
+DQNT_FILE_SCOPE u32 dqnt_utf8_to_ucs(u32 *dest, u32 character)
 {
-	i32 result = 0;
-	while (a && a[result]) result++;
-	return result;
+	if (!dest) return 0;
+
+	// UTF Header Bits     : 11110000 10000000 10000000 10000000
+	// UTF Bit Arrangement : 00000xxx 00xxxxxx 00xxxxxx 00xxxxxx
+	// UCS                 : 00000000 00000xxx xxxxxxxx xxxxxxxx
+	const u32 headerBits4Bytes = 0xF0808080;
+	if ((character & headerBits4Bytes) == headerBits4Bytes)
+	{
+		u32 utfWithoutHeader = headerBits4Bytes ^ character;
+
+		u32 firstByte  = utfWithoutHeader & 0x3F;
+		u32 secondByte = (utfWithoutHeader >> 8)  & 0x3F;
+		u32 thirdByte  = (utfWithoutHeader >> 16) & 0x3F;
+		u32 fourthByte = utfWithoutHeader >> 24;
+
+		u32 result =
+		    (fourthByte << 18 | thirdByte << 12 | secondByte << 6 | firstByte);
+		*dest = result;
+
+		return 4;
+	}
+
+	// UTF Header Bits     : 11100000 10000000 10000000
+	// UTF Bit Arrangement : 0000xxxx 00xxxxxx 00xxxxxx
+	// UCS                 : 00000000 xxxxxxxx xxxxxxxx
+	const u32 headerBits3Bytes = 0xE08080;
+	if ((character & headerBits3Bytes)  == headerBits3Bytes)
+	{
+		u32 utfWithoutHeader = headerBits3Bytes ^ character;
+
+		u32 firstByte  = utfWithoutHeader & 0x3F;
+		u32 secondByte = (utfWithoutHeader >> 8) & 0x3F;
+		u32 thirdByte  = utfWithoutHeader >> 16;
+
+		u32 result = (thirdByte << 12 | secondByte << 6 | firstByte);
+		*dest = result;
+
+		return 3;
+	}
+
+	// UTF Header Bits    : 11000000 00xxxxxx
+	// UTF Bit Arrangement: 000xxxxx 00xxxxxx
+	// UCS                : 00000xxx xxxxxxxx
+	const u32 headerBits2Bytes = 0xC000;
+	if ((character & headerBits2Bytes) == headerBits2Bytes)
+	{
+		u32 utfWithoutHeader = headerBits2Bytes ^ character;
+
+		u32 firstByte  = utfWithoutHeader & 0x3F;
+		u32 secondByte = utfWithoutHeader >> 8;
+
+		u32 result = (secondByte << 6 | firstByte);
+		*dest = result;
+
+		return 2;
+	}
+
+	// Character is within ASCII range, so it's an ascii character
+	// UTF Bit Arrangement: 0xxxxxxx
+	// UCS                : 0xxxxxxx
+	if (character >= 0x0 && character < 0x80)
+	{
+		u32 firstByte = (character & 0x3F);
+		*dest         = firstByte;
+
+		return 1;
+	}
+
+	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

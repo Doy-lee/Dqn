@@ -206,54 +206,79 @@ void dqnt_strings_test()
 
 			printf("dqnt_strings_test(): str_to_i32: Completed successfully\n");
 		}
-    }
+	}
 
-	// Wide String Checks
-	{
-		// wstrcmp
-		{
-			wchar_t *a = L"str_a";
-
-			// Check simple compares
-			{
-				DQNT_ASSERT(dqnt_wstrcmp(a, L"str_a") == +0);
-				DQNT_ASSERT(dqnt_wstrcmp(a, L"str_b") == -1);
-				DQNT_ASSERT(dqnt_wstrcmp(L"str_b", a) == +1);
-				DQNT_ASSERT(dqnt_wstrcmp(a, L"") == +1);
-				DQNT_ASSERT(dqnt_wstrcmp(L"", L"") == 0);
-
-				// NOTE: Check that the string has not been trashed.
-				DQNT_ASSERT(dqnt_wstrcmp(a, L"str_a") == +0);
-			}
-
-			// Check ops against null
-			{
-				DQNT_ASSERT(dqnt_wstrcmp(NULL, NULL) != +0);
-				DQNT_ASSERT(dqnt_wstrcmp(a, NULL) != +0);
-				DQNT_ASSERT(dqnt_wstrcmp(NULL, a) != +0);
-			}
-
-			printf("dqnt_strings_test(): wstrcmp: Completed successfully\n");
-		}
-
-	    // wstrlen
+    // UCS <-> UTF8 Checks
+    {
+	    // Test ascii characters
 	    {
-		    wchar_t *a = L"str_a";
-		    DQNT_ASSERT(dqnt_wstrlen(a) == 5);
-		    DQNT_ASSERT(dqnt_wstrlen(L"") == 0);
-		    DQNT_ASSERT(dqnt_wstrlen(L"   a  ") == 6);
-		    DQNT_ASSERT(dqnt_wstrlen(L"a\n") == 2);
+		    u32 codepoint = '@';
+		    u32 string[1] = {};
 
-		    // NOTE: Check that the string has not been trashed.
-		    DQNT_ASSERT(dqnt_wstrcmp(a, L"str_a") == 0);
+		    u32 bytesUsed = dqnt_ucs_to_utf8(&string[0], codepoint);
+		    DQNT_ASSERT(bytesUsed == 1);
+		    DQNT_ASSERT(string[0] == '@');
 
-		    DQNT_ASSERT(dqnt_wstrlen(NULL) == 0);
-
-		    printf("dqnt_strings_test(): wstrlen: Completed successfully\n");
+		    bytesUsed = dqnt_utf8_to_ucs(&string[0], codepoint);
+		    DQNT_ASSERT(string[0] >= 0 && string[0] < 0x80);
+		    DQNT_ASSERT(bytesUsed == 1);
 	    }
+
+	    // Test 2 byte characters
+		{
+		    u32 codepoint = 0x278;
+		    u32 string[1] = {};
+
+		    u32 bytesUsed = dqnt_ucs_to_utf8(&string[0], codepoint);
+		    DQNT_ASSERT(bytesUsed == 2);
+		    DQNT_ASSERT(string[0] == 0xC9B8);
+
+		    bytesUsed = dqnt_utf8_to_ucs(&string[0], string[0]);
+		    DQNT_ASSERT(string[0] == codepoint);
+		    DQNT_ASSERT(bytesUsed == 2);
+	    }
+
+	    // Test 3 byte characters
+		{
+		    u32 codepoint = 0x0A0A;
+		    u32 string[1] = {};
+
+			u32 bytesUsed = dqnt_ucs_to_utf8(&string[0], codepoint);
+		    DQNT_ASSERT(bytesUsed == 3);
+			DQNT_ASSERT(string[0] == 0xE0A88A);
+
+		    bytesUsed = dqnt_utf8_to_ucs(&string[0], string[0]);
+		    DQNT_ASSERT(string[0] == codepoint);
+		    DQNT_ASSERT(bytesUsed == 3);
+	    }
+
+	    // Test 4 byte characters
+		{
+		    u32 codepoint = 0x10912;
+		    u32 string[1] = {};
+			u32 bytesUsed = dqnt_ucs_to_utf8(&string[0], codepoint);
+
+		    DQNT_ASSERT(bytesUsed == 4);
+		    DQNT_ASSERT(string[0] == 0xF090A492);
+
+		    bytesUsed = dqnt_utf8_to_ucs(&string[0], string[0]);
+		    DQNT_ASSERT(string[0] == codepoint);
+		    DQNT_ASSERT(bytesUsed == 4);
+	    }
+
+		{
+		    u32 codepoint = 0x10912;
+			u32 bytesUsed = dqnt_ucs_to_utf8(NULL, codepoint);
+		    DQNT_ASSERT(bytesUsed == 0);
+
+		    bytesUsed = dqnt_utf8_to_ucs(NULL, codepoint);
+		    DQNT_ASSERT(bytesUsed == 0);
+	    }
+
+	    printf("dqnt_strings_test(): ucs <-> utf8: Completed successfully\n");
     }
 
-	printf("dqnt_strings_test(): Completed successfully\n");
+    printf("dqnt_strings_test(): Completed successfully\n");
 }
 
 #include "Windows.h"
