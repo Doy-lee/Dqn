@@ -512,6 +512,20 @@ void dqnt_vec_test()
 	printf("dqnt_vec_test(): Completed successfully\n");
 }
 
+void dqnt_file_test()
+{
+	DqntFile file = {};
+	DQNT_ASSERT(dqnt_file_open(".clang-format", &file));
+	DQNT_ASSERT(file.size == 1320);
+
+	u8 *buffer = (u8 *)calloc(1, file.size * sizeof(u8));
+	DQNT_ASSERT(dqnt_file_read(file, buffer, (u32)file.size) == file.size);
+	free(buffer);
+
+	dqnt_file_close(&file);
+	DQNT_ASSERT(!file.handle && file.size == 0);
+}
+
 int main(void)
 {
 	dqnt_strings_test();
@@ -519,6 +533,7 @@ int main(void)
 	dqnt_math_test();
 	dqnt_vec_test();
 	dqnt_other_test();
+	dqnt_file_test();
 
 	printf("\nPress 'Enter' Key to Exit\n");
 	getchar();

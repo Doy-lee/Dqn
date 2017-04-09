@@ -183,6 +183,7 @@ DQNT_FILE_SCOPE void  dqnt_i32_to_str (i32 value, char *buf, i32 bufSize);
 // Both return the number of bytes read, return 0 if invalid codepoint or UTF8
 DQNT_FILE_SCOPE u32 dqnt_ucs_to_utf8(u32 *dest, u32 character);
 DQNT_FILE_SCOPE u32 dqnt_utf8_to_ucs(u32 *dest, u32 character);
+
 ////////////////////////////////////////////////////////////////////////////////
 // File Operations
 ////////////////////////////////////////////////////////////////////////////////
@@ -192,12 +193,12 @@ typedef struct DqntFile
 	u64   size;
 } DqntFile;
 
-#if 0
-bool platform_open_file (char *const file, PlatformFile *platformFile);
+// Open a handle to the file
+DQNT_FILE_SCOPE bool dqnt_file_open(char *const file, DqntFile *fileHandle);
+
 // Return the number of bytes read
-u32  platform_read_file (PlatformFile file, void *buffer, u32 numBytesToRead);
-void platform_close_file(PlatformFile *file);
-#endif
+DQNT_FILE_SCOPE u32  dqnt_file_read (DqntFile file, void *buffer, u32 numBytesToRead);
+DQNT_FILE_SCOPE void dqnt_file_close(DqntFile *file);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
@@ -1047,6 +1048,84 @@ DQNT_FILE_SCOPE u32 dqnt_utf8_to_ucs(u32 *dest, u32 character)
 
 	return 0;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// File Operations
+////////////////////////////////////////////////////////////////////////////////
+#ifdef DQNT_WIN32
+#define dqnt_win32_error_box(text, title) MessageBoxA(NULL, text, title, MB_OK);
+#endif
+
+DQNT_FILE_SCOPE bool dqnt_file_open(char *const filePath, DqntFile *file)
+{
+	if (!file || !filePath) return false;
+
+#ifdef DQNT_WIN32
+	wchar_t widePath[MAX_PATH] = {};
+	MultiByteToWideChar(CP_UTF8, 0, filePath, -1, widePath, MAX_PATH - 1);
+	HANDLE handle = CreateFileW(widePath, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+	                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (handle == INVALID_HANDLE_VALUE)
+	{
+		dqnt_win32_error_box("CreateFile() failed.", NULL);
+		return false;
+	}
+
+	LARGE_INTEGER size;
+	if (GetFileSizeEx(handle, &size) == 0)
+	{
+		dqnt_win32_error_box("GetFileSizeEx() failed.", NULL);
+		return false;
+	}
+
+	file->handle = handle;
+	file->size   = size.QuadPart;
+
+#else
+	return false;
+#endif
+
+	return true;
+}
+
+DQNT_FILE_SCOPE u32 dqnt_file_read(DqntFile file, u8 *buffer, u32 numBytesToRead)
+{
+	u32 numBytesRead = 0;
+#ifdef DQNT_WIN32
+	if (file.handle && buffer)
+	{
+		DWORD bytesRead    = 0;
+		HANDLE win32Handle = file.handle;
+
+		BOOL result = ReadFile(win32Handle, (void *)buffer, numBytesToRead,
+		                       &bytesRead, NULL);
+
+		// TODO(doyle): 0 also means it is completing async, but still valid
+		if (result == 0)
+		{
+			dqnt_win32_error_box("ReadFile() failed.", NULL);
+		}
+
+		numBytesRead = (u32)bytesRead;
+	}
+#endif
+
+	return numBytesRead;
+}
+
+DQNT_FILE_SCOPE inline void dqnt_file_close(DqntFile *file)
+{
+#ifdef DQNT_WIN32
+	if (file && file->handle)
+	{
+		CloseHandle(file->handle);
+		file->handle = NULL;
+		file->size   = 0;
+	}
+#endif
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
