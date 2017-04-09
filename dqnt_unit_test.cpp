@@ -1,5 +1,4 @@
 #define DQNT_IMPLEMENTATION
-#define DQNT_MAKE_STATIC
 #include "dqnt.h"
 
 #include "stdio.h"
@@ -300,17 +299,22 @@ void dqnt_math_test()
 			f32 start = 10;
 			f32 t     = 0.5f;
 			f32 end   = 20;
-			DQNT_ASSERT(dqnt_lerp(start, t, end) == 15);
+			DQNT_ASSERT(dqnt_math_lerp(start, t, end) == 15);
 		}
 
 		{
 			f32 start = 10;
 			f32 t     = 2.0f;
 			f32 end   = 20;
-			DQNT_ASSERT(dqnt_lerp(start, t, end) == 30);
+			DQNT_ASSERT(dqnt_math_lerp(start, t, end) == 30);
 		}
 
 		printf("dqnt_math_test(): lerp: Completed successfully\n");
+	}
+
+	{ // sqrtf
+		DQNT_ASSERT(dqnt_math_sqrtf(4.0f) == 2.0f);
+		printf("dqnt_math_test(): sqrtf: Completed successfully\n");
 	}
 
 	printf("dqnt_math_test(): Completed successfully\n");
@@ -356,6 +360,29 @@ void dqnt_vec_test()
 
 			f32 dotResult = dqnt_v2_dot(dqnt_v2(5, 10), dqnt_v2(3, 4));
 			DQNT_ASSERT(dotResult == 55);
+		}
+
+		// V2 Properties
+		{
+			DqntV2 a = dqnt_v2(0, 0);
+			DqntV2 b = dqnt_v2(3, 4);
+
+			f32 lengthSq = dqnt_v2_length_squared(a, b);
+			DQNT_ASSERT(lengthSq == 25);
+
+			f32 length = dqnt_v2_length(a, b);
+			DQNT_ASSERT(length == 5);
+
+			DqntV2 normalised = dqnt_v2_normalise(b);
+			DQNT_ASSERT(normalised.x == (b.x / 5.0f));
+			DQNT_ASSERT(normalised.y == (b.y / 5.0f));
+
+			DqntV2 c = dqnt_v2(3.5f, 8.0f);
+			DQNT_ASSERT(dqnt_v2_overlaps(b, c) == true);
+			DQNT_ASSERT(dqnt_v2_overlaps(b, a) == false);
+
+			DqntV2 d = dqnt_v2_perpendicular(c);
+			DQNT_ASSERT(dqnt_v2_dot(c, d) == 0);
 		}
 
 		{ // constrain_to_ratio
@@ -406,6 +433,9 @@ void dqnt_vec_test()
 
 			f32 dotResult = dqnt_v3_dot(dqnt_v3(5, 10, 2), dqnt_v3(3, 4, 6));
 			DQNT_ASSERT(dotResult == 67);
+
+			DqntV3 cross = dqnt_v3_cross(vecA, vecB);
+			DQNT_ASSERT(dqnt_v3_equals(cross, dqnt_v3(15, 0, -5)) == true);
 		}
 
 		printf("dqnt_vec_test(): vec3: Completed successfully\n");
@@ -465,7 +495,7 @@ int main(void)
 	dqnt_vec_test();
 	dqnt_other_test();
 
-	printf("\nPress Any Key to Exit\n");
+	printf("\nPress 'Enter' Key to Exit\n");
 	getchar();
 
 	return 0;

@@ -47,12 +47,12 @@ typedef float  f32;
 #define DQNT_MAX(a, b) ((a) < (b) ? (b) : (a))
 #define DQNT_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define DQNT_SQUARED(x) ((x) * (x))
-#define DQNT_SQRT(x) (sqrtf(x))
 
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
-DQNT_FILE_SCOPE f32 dqnt_lerp(f32 a, f32 t, f32 b);
+DQNT_FILE_SCOPE f32 dqnt_math_lerp(f32 a, f32 t, f32 b);
+DQNT_FILE_SCOPE f32 dqnt_math_sqrtf(f32 a);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec2
@@ -74,6 +74,12 @@ DQNT_FILE_SCOPE DqntV2 dqnt_v2_scale   (DqntV2 a, f32 b);
 DQNT_FILE_SCOPE DqntV2 dqnt_v2_hadamard(DqntV2 a, DqntV2 b);
 DQNT_FILE_SCOPE f32    dqnt_v2_dot     (DqntV2 a, DqntV2 b);
 DQNT_FILE_SCOPE bool   dqnt_v2_equals  (DqntV2 a, DqntV2 b);
+
+DQNT_FILE_SCOPE f32    dqnt_v2_length_squared(DqntV2 a, DqntV2 b);
+DQNT_FILE_SCOPE f32    dqnt_v2_length        (DqntV2 a, DqntV2 b);
+DQNT_FILE_SCOPE DqntV2 dqnt_v2_normalise     (DqntV2 a);
+DQNT_FILE_SCOPE bool   dqnt_v2_overlaps      (DqntV2 a, DqntV2 b);
+DQNT_FILE_SCOPE DqntV2 dqnt_v2_perpendicular (DqntV2 a);
 
 // Resize the dimension to fit the aspect ratio provided. Downscale only.
 DQNT_FILE_SCOPE DqntV2 dqnt_v2_constrain_to_ratio(DqntV2 dim, DqntV2 ratio);
@@ -98,6 +104,8 @@ DQNT_FILE_SCOPE DqntV3 dqnt_v3_scale   (DqntV3 a, f32 b);
 DQNT_FILE_SCOPE DqntV3 dqnt_v3_hadamard(DqntV3 a, DqntV3 b);
 DQNT_FILE_SCOPE f32    dqnt_v3_dot     (DqntV3 a, DqntV3 b);
 DQNT_FILE_SCOPE bool   dqnt_v3_equals  (DqntV3 a, DqntV3 b);
+
+DQNT_FILE_SCOPE DqntV3 dqnt_v3_cross(DqntV3 a, DqntV3 b);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec4
@@ -222,7 +230,7 @@ DQNT_FILE_SCOPE i32  dqnt_rnd_pcg_range(DqntRandPCGState *pcg, i32 min, i32 max)
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
-DQNT_FILE_SCOPE f32 dqnt_lerp(f32 a, f32 t, f32 b)
+DQNT_FILE_SCOPE f32 dqnt_math_lerp(f32 a, f32 t, f32 b)
 {
 	/*
 	    Linear blend between two values. We having a starting point "a", and
@@ -237,6 +245,12 @@ DQNT_FILE_SCOPE f32 dqnt_lerp(f32 a, f32 t, f32 b)
 	    a + (t * b) - (a * t) == (1 - t)a + t*b
 	*/
 	f32 result =  a + (b - a) * t;
+	return result;
+}
+
+DQNT_FILE_SCOPE f32 dqnt_math_sqrtf(f32 a)
+{
+	f32 result = sqrtf(a);
 	return result;
 }
 
@@ -317,6 +331,59 @@ DQNT_FILE_SCOPE inline bool dqnt_v2_equals(DqntV2 a, DqntV2 b)
 		if (a.e[i] != b.e[i]) result = FALSE;
 	return result;
 }
+
+DQNT_FILE_SCOPE inline f32 dqnt_v2_length_squared(DqntV2 a, DqntV2 b)
+{
+	f32 x      = b.x - a.x;
+	f32 y      = b.y - a.y;
+	f32 result = (DQNT_SQUARED(x) + DQNT_SQUARED(y));
+	return result;
+}
+
+DQNT_FILE_SCOPE inline f32 dqnt_v2_length(DqntV2 a, DqntV2 b)
+{
+	f32 lengthSq = dqnt_v2_length_squared(a, b);
+	f32 result   = dqnt_math_sqrtf(lengthSq);
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV2 dqnt_v2_normalise(DqntV2 a)
+{
+	f32 magnitude = dqnt_v2_length(dqnt_v2(0, 0), a);
+	DqntV2 result = dqnt_v2(a.x, a.y);
+	result        = dqnt_v2_scale(a, 1 / magnitude);
+	return result;
+}
+
+DQNT_FILE_SCOPE inline bool dqnt_v2_overlaps(DqntV2 a, DqntV2 b)
+{
+	bool result = false;
+	
+	f32 lenOfA = a.max - a.min;
+	f32 lenOfB = b.max - b.min;
+
+	if (lenOfA > lenOfB)
+	{
+		DqntV2 tmp = a;
+		a          = b;
+		b          = tmp;
+	}
+
+	if ((a.min >= b.min && a.min <= b.max) ||
+	    (a.max >= b.min && a.max <= b.max))
+	{
+		result = true;
+	}
+
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV2 dqnt_v2_perpendicular(DqntV2 a)
+{
+	DqntV2 result = {a.y, -a.x};
+	return result;
+}
+
 
 DQNT_FILE_SCOPE DqntV2 dqnt_v2_constrain_to_ratio(DqntV2 dim, DqntV2 ratio)
 {
@@ -407,6 +474,22 @@ DQNT_FILE_SCOPE inline bool dqnt_v3_equals(DqntV3 a, DqntV3 b)
 	bool result = TRUE;
 	for (i32 i = 0; i < DQNT_ARRAY_COUNT(a.e); i++)
 		if (a.e[i] != b.e[i]) result = FALSE;
+	return result;
+}
+
+DQNT_FILE_SCOPE inline DqntV3 dqnt_v3_cross(DqntV3 a, DqntV3 b)
+{
+	/*
+	   CROSS PRODUCT
+	   Generate a perpendicular vector to the 2 vectors
+	   |a|   |d|   |bf - ce|
+	   |b| x |e| = |cd - af|
+	   |c|   |f|   |ae - be|
+	 */
+	DqntV3 result = {};
+	result.e[0] = (a.e[1] * b.e[2]) - (a.e[2] * b.e[1]);
+	result.e[1] = (a.e[2] * b.e[0]) - (a.e[0] * b.e[2]);
+	result.e[2] = (a.e[0] * b.e[1]) - (a.e[1] * b.e[0]);
 	return result;
 }
 
