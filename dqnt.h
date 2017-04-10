@@ -42,12 +42,58 @@ typedef float  f32;
 
 #define DQNT_PI 3.14159265359f
 #define DQNT_ABS(x) (((x) < 0) ? (-(x)) : (x))
-#define DQNT_DEGREES_TO_RADIANS(x) ((x * (MATH_PI / 180.0f)))
-#define DQNT_RADIANS_TO_DEGREES(x) ((x * (180.0f / MATH_PI)))
+#define DQNT_DEGREES_TO_RADIANS(x) ((x * (DQNT_PI / 180.0f)))
+#define DQNT_RADIANS_TO_DEGREES(x) ((x * (180.0f / DQNT_PI)))
 #define DQNT_MAX(a, b) ((a) < (b) ? (b) : (a))
 #define DQNT_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define DQNT_SQUARED(x) ((x) * (x))
 
+////////////////////////////////////////////////////////////////////////////////
+// DArray - Dynamic Array
+////////////////////////////////////////////////////////////////////////////////
+// The DArray stores metadata in the header and returns you a pointer straight
+// to the data, to allow direct read/modify access. Adding elements should be
+// done using the provided functions since it manages internal state.
+
+/*
+	Example Usage:
+
+	uint32_t *uintArray = DQNT_DARRAY_INIT(uint32_t, 16);
+	uint32_t numberA = 48;
+	uint32_t numberB = 52;
+	DQNT_DARRAY_PUSH(&uintArray, &numberA);
+	DQNT_DARRAY_PUSH(&uintArray, &numberB);
+
+	for (uint32_t i = 0; i < dqnt_darray_get_num_items(uintArray); i++)
+	{
+	    printf(%d\n", uintArray[i]);
+	}
+
+	dqnt_darray_free(uintArray);
+ */
+
+// The init macro RETURNS a pointer to your type, you can index this as normal
+// with array notation [].
+// u32 type             - The data type to initiate a dynamic array with
+// u32 startingCapacity - Initial number of available slots
+#define DQNT_DARRAY_INIT(type, startingCapacity)                               \
+	(type *)dqnt_darray_init_internal(sizeof(type), startingCapacity)
+
+// Pass in the pointer returned by DQNT_DARRAY_INIT. If the pointer is not
+// a valid DArray pointer, this will return 0.
+DQNT_FILE_SCOPE u32 dqnt_darray_get_capacity(void *array);
+DQNT_FILE_SCOPE u32 dqnt_darray_get_num_items(void *array);
+
+// void **array - the address of the pointer returned by DQNT_DARRAY_INIT
+// void *item   - a pointer to the object to insert
+// The push macro RETURNS true/false if the push was successful or not.
+#define DQNT_DARRAY_PUSH(array, item)                                          \
+	dqnt_darray_push_internal((void **)array, (void *)item, sizeof(*item))
+
+// Pass in the pointer returned by DQNT_DARRAY_INIT. Returns if the free was
+// successful. This will return false if the array is not a valid DArray and
+// won't touch the pointer.
+DQNT_FILE_SCOPE bool dqnt_darray_free(void *array);
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
@@ -214,7 +260,7 @@ typedef struct DqntRandPCGState
 	u64 state[2];
 } DqntRandPCGState;
 
-// You can manually specify a seed by calling init_with_seed, otherwise it
+
 // automatically creates a seed using rdtsc. The generator is not valid until
 // it's been seeded.
 DQNT_FILE_SCOPE void dqnt_rnd_pcg_init_with_seed(DqntRandPCGState *pcg, u32 seed);
@@ -243,6 +289,122 @@ DQNT_FILE_SCOPE i32  dqnt_rnd_pcg_range(DqntRandPCGState *pcg, i32 min, i32 max)
 	#include "Windows.h"
 	#define WIN32_LEAN_AND_MEAN
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+// DArray - Dynamic Array
+////////////////////////////////////////////////////////////////////////////////
+#define DQNT_DARRAY_SIGNATURE_INTERNAL 0xAC83DB81
+typedef struct DqntDArrayInternal
+{
+	u32  index;
+	u32  itemSize;
+	u32  capacity;
+	u32  signature;
+
+	void *data;
+} DqntDArrayInternal;
+
+FILE_SCOPE void *dqnt_darray_init_internal(u32 itemSize, u32 startingCapacity)
+{
+	if (startingCapacity <= 0 || itemSize == 0) return NULL;
+
+	u32 metadataSize = sizeof(DqntDArrayInternal);
+	u32 storageSize  = itemSize * startingCapacity;
+
+	void *memory = calloc(1, metadataSize + storageSize);
+	if (!memory) return NULL;
+
+	DqntDArrayInternal *array = (DqntDArrayInternal *)memory;
+	array->signature  = DQNT_DARRAY_SIGNATURE_INTERNAL;
+	array->itemSize   = itemSize;
+	array->capacity   = startingCapacity;
+	array->data       = (u8 *)memory + metadataSize;
+
+	return array->data;
+}
+
+FILE_SCOPE DqntDArrayInternal *dqnt_darray_get_header_internal(void *array)
+{
+	if (!array) return NULL;
+
+	DqntDArrayInternal *result = (DqntDArrayInternal *)((u8 *)array - sizeof(DqntDArrayInternal));
+	if (result->signature != DQNT_DARRAY_SIGNATURE_INTERNAL) return 0;
+
+	return result;
+}
+
+DQNT_FILE_SCOPE u32 dqnt_darray_get_capacity(void *array)
+{
+	DqntDArrayInternal *header = dqnt_darray_get_header_internal(array);
+	if (!header) return 0;
+	return header->capacity;
+}
+
+DQNT_FILE_SCOPE u32 dqnt_darray_get_num_items(void *array)
+{
+	DqntDArrayInternal *header = dqnt_darray_get_header_internal(array);
+	if (!header) return 0;
+	return header->index;
+}
+
+bool dqnt_darray_push_internal(void **array, void *element, u32 itemSize)
+{
+	if (!element || !array) return false;
+
+	DqntDArrayInternal *header = dqnt_darray_get_header_internal(*array);
+	if (!header || header->itemSize != itemSize) return false;
+
+	if (header->index >= header->capacity)
+	{
+		const f32 GROWTH_FACTOR = 1.2f;
+		u32 newCapacity         = (i32)(header->capacity * GROWTH_FACTOR);
+		if (newCapacity == header->capacity) newCapacity++;
+
+		u32 metadataSize = sizeof(DqntDArrayInternal);
+		u32 storageSize  = header->itemSize * newCapacity;
+		void *newMem     = realloc(header, metadataSize + storageSize);
+		if (newMem)
+		{
+			header           = (DqntDArrayInternal *)newMem;
+			header->capacity = newCapacity;
+			header->data     = (u8 *)newMem + metadataSize;
+			*array           = header->data;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	u32 arrayOffset = header->itemSize * header->index++;
+	DQNT_ASSERT(header->index <= header->capacity);
+	u8 *dataPtr = (u8 *)header->data;
+
+	void *dest = (void *)&dataPtr[arrayOffset];
+	void *src  = element;
+	memcpy(dest, src, header->itemSize);
+
+	return true;
+}
+
+DQNT_FILE_SCOPE inline bool dqnt_darray_free(void *array)
+{
+	DqntDArrayInternal *header = dqnt_darray_get_header_internal(array);
+	if (header)
+	{
+		header->index     = 0;
+		header->itemSize  = 0;
+		header->capacity  = 0;
+		header->signature = 0;
+
+		free(header);
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Math
@@ -1053,29 +1215,60 @@ DQNT_FILE_SCOPE u32 dqnt_utf8_to_ucs(u32 *dest, u32 character)
 // File Operations
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef DQNT_WIN32
-#define dqnt_win32_error_box(text, title) MessageBoxA(NULL, text, title, MB_OK);
+	#define DQNT_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
+
+FILE_SCOPE bool dqnt_win32_utf8_to_wchar_internal(char *in, wchar_t *out,
+                                                  i32 outLen)
+{
+	u32 result = MultiByteToWideChar(CP_UTF8, 0, in, -1, out, outLen-1);
+
+	if (result == 0xFFFD || 0)
+	{
+		DQNT_WIN32_ERROR_BOX("WideCharToMultiByte() failed.", NULL);
+		return false;
+	}
+
+	return true;
+}
+
+FILE_SCOPE bool dqnt_win32_wchar_to_utf8_internal(wchar_t *in, char *out,
+                                                  i32 outLen)
+{
+	u32 result =
+	    WideCharToMultiByte(CP_UTF8, 0, in, -1, out, outLen, NULL, NULL);
+
+	if (result == 0xFFFD || 0)
+	{
+		DQNT_WIN32_ERROR_BOX("WideCharToMultiByte() failed.", NULL);
+		return false;
+	}
+
+	return true;
+}
 #endif
 
-DQNT_FILE_SCOPE bool dqnt_file_open(char *const filePath, DqntFile *file)
+DQNT_FILE_SCOPE bool dqnt_file_open(char *const path, DqntFile *file)
 {
-	if (!file || !filePath) return false;
+	if (!file || !path) return false;
 
 #ifdef DQNT_WIN32
 	wchar_t widePath[MAX_PATH] = {};
-	MultiByteToWideChar(CP_UTF8, 0, filePath, -1, widePath, MAX_PATH - 1);
+	dqnt_win32_utf8_to_wchar_internal(path, widePath,
+	                                  DQNT_ARRAY_COUNT(widePath));
+
 	HANDLE handle = CreateFileW(widePath, GENERIC_READ | GENERIC_WRITE, 0, NULL,
 	                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
 	if (handle == INVALID_HANDLE_VALUE)
 	{
-		dqnt_win32_error_box("CreateFile() failed.", NULL);
+		DQNT_WIN32_ERROR_BOX("CreateFile() failed.", NULL);
 		return false;
 	}
 
 	LARGE_INTEGER size;
 	if (GetFileSizeEx(handle, &size) == 0)
 	{
-		dqnt_win32_error_box("GetFileSizeEx() failed.", NULL);
+		DQNT_WIN32_ERROR_BOX("GetFileSizeEx() failed.", NULL);
 		return false;
 	}
 
@@ -1104,7 +1297,7 @@ DQNT_FILE_SCOPE u32 dqnt_file_read(DqntFile file, u8 *buffer, u32 numBytesToRead
 		// TODO(doyle): 0 also means it is completing async, but still valid
 		if (result == 0)
 		{
-			dqnt_win32_error_box("ReadFile() failed.", NULL);
+			DQNT_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
 		}
 
 		numBytesRead = (u32)bytesRead;
@@ -1126,6 +1319,80 @@ DQNT_FILE_SCOPE inline void dqnt_file_close(DqntFile *file)
 #endif
 }
 
+#include "stdio.h"
+DQNT_FILE_SCOPE char **dqnt_dir_read(char *dir, u32 *numFiles)
+{
+	if (!dir) return NULL;
+#ifdef DQNT_WIN32
+
+	u32 currNumFiles = 0;
+	wchar_t wideDir[MAX_PATH] = {};
+	dqnt_win32_utf8_to_wchar_internal(dir, wideDir, DQNT_ARRAY_COUNT(wideDir));
+
+	// Enumerate number of files first
+	{
+		WIN32_FIND_DATAW findData = {};
+		HANDLE findHandle = FindFirstFileW(wideDir, &findData);
+		if (findHandle == INVALID_HANDLE_VALUE)
+		{
+			DQNT_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
+			return NULL;
+		}
+
+		while (FindNextFileW(findHandle, &findData) != 0)
+			currNumFiles++;
+		FindClose(findHandle);
+	}
+
+	if (currNumFiles == 0) return NULL;
+
+	{
+		WIN32_FIND_DATAW initFind = {};
+		HANDLE findHandle = FindFirstFileW(wideDir, &initFind);
+		if (findHandle == INVALID_HANDLE_VALUE)
+		{
+			DQNT_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
+			return NULL;
+		}
+
+
+		char **list = (char **)calloc(1, sizeof(*list) * (currNumFiles));
+		if (!list)
+		{
+			DQNT_WIN32_ERROR_BOX("calloc() failed.", NULL);
+			return NULL;
+		}
+
+		for (u32 i = 0; i < currNumFiles; i++)
+		{
+			list[i] = (char *)calloc(1, sizeof(**list) * MAX_PATH);
+			if (!list[i])
+			{
+				for (u32 j = 0; j < i; j++)
+				{
+					free(list[j]);
+				}
+
+				DQNT_WIN32_ERROR_BOX("calloc() failed.", NULL);
+				return NULL;
+			}
+		}
+
+		i32 listIndex = 0;
+		WIN32_FIND_DATAW findData = {};
+		while (FindNextFileW(findHandle, &findData) != 0)
+		{
+			dqnt_win32_wchar_to_utf8_internal(
+			    findData.cFileName, list[listIndex++], MAX_PATH);
+		}
+
+		*numFiles = currNumFiles;
+		FindClose(findHandle);
+
+		return list;
+	}
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Timer

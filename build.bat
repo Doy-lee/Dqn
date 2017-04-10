@@ -34,7 +34,7 @@ REM wd4100 ignore: unused argument parameters
 REM wd4201 ignore: nonstandard extension used: nameless struct/union
 REM wd4189 ignore: local variable is initialised but not referenced
 
-set CompileFlags=-EHa- -GR- -Oi -MT -Z7 -W4 -WX -wd4100 -wd4201 -wd4189 -FC
+set CompileFlags=-EHa- -GR- -Oi -MT -Z7 -W4 -WX -wd4100 -wd4201 -wd4189 -FC -O2
 
 REM Include directories
 set IncludeFlags=

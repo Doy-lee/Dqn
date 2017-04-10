@@ -512,18 +512,135 @@ void dqnt_vec_test()
 	printf("dqnt_vec_test(): Completed successfully\n");
 }
 
+void dqnt_darray_test()
+{
+	{
+		DqntV2 *vecDArray = DQNT_DARRAY_INIT(DqntV2, 1);
+		DQNT_ASSERT(vecDArray);
+		DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 1);
+		DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 0);
+
+		// Test basic insert
+		{
+			DqntV2 va = dqnt_v2(5, 10);
+			DQNT_ASSERT(DQNT_DARRAY_PUSH(&vecDArray, &va));
+
+			DqntV2 vb = vecDArray[0];
+			DQNT_ASSERT(dqnt_v2_equals(va, vb));
+
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 1);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 1);
+
+			DqntV2 *empty = NULL;
+			DQNT_ASSERT(DQNT_DARRAY_PUSH(NULL, empty) == false);
+			DQNT_ASSERT(DQNT_DARRAY_PUSH(NULL, &va) == false);
+			DQNT_ASSERT(DQNT_DARRAY_PUSH(&vecDArray, empty) == false);
+		}
+
+		// Test array resizing and freeing
+		{
+			DqntV2 va = dqnt_v2(10, 15);
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+
+			DqntV2 vb = vecDArray[0];
+			DQNT_ASSERT(dqnt_v2_equals(va, vb) == false);
+
+			vb = vecDArray[1];
+			DQNT_ASSERT(dqnt_v2_equals(va, vb) == true);
+
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 2);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 2);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 3);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 3);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 4);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 4);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 5);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 5);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 6);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 6);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 7);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 7);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 8);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 8);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 9);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 9);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 10);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 10);
+
+			DQNT_DARRAY_PUSH(&vecDArray, &va);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 12);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 11);
+
+			DqntV2 vc = dqnt_v2(90, 100);
+			DQNT_DARRAY_PUSH(&vecDArray, &vc);
+			DQNT_ASSERT(dqnt_darray_get_capacity(vecDArray) == 12);
+			DQNT_ASSERT(dqnt_darray_get_num_items(vecDArray) == 12);
+			DQNT_ASSERT(dqnt_v2_equals(vc, vecDArray[11]));
+
+			DQNT_ASSERT(dqnt_darray_free(vecDArray) == true);
+		}
+	}
+
+	{
+		f32 *array = DQNT_DARRAY_INIT(f32, 1);
+		DQNT_ASSERT(array);
+		DQNT_ASSERT(dqnt_darray_get_capacity(array) == 1);
+		DQNT_ASSERT(dqnt_darray_get_num_items(array) == 0);
+
+		f32 *empty = NULL;
+		DQNT_ASSERT(DQNT_DARRAY_PUSH(NULL, empty) == false);
+		DQNT_ASSERT(DQNT_DARRAY_PUSH(&array, empty) == false);
+	}
+
+	printf("dqnt_darray_test(): Completed successfully\n");
+}
+
 void dqnt_file_test()
 {
-	DqntFile file = {};
-	DQNT_ASSERT(dqnt_file_open(".clang-format", &file));
-	DQNT_ASSERT(file.size == 1320);
+	// File i/o
+	{
+		DqntFile file = {};
+		DQNT_ASSERT(dqnt_file_open(".clang-format", &file));
+		DQNT_ASSERT(file.size == 1320);
 
-	u8 *buffer = (u8 *)calloc(1, file.size * sizeof(u8));
-	DQNT_ASSERT(dqnt_file_read(file, buffer, (u32)file.size) == file.size);
-	free(buffer);
+		u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
+		DQNT_ASSERT(dqnt_file_read(file, buffer, (u32)file.size) == file.size);
+		free(buffer);
 
-	dqnt_file_close(&file);
-	DQNT_ASSERT(!file.handle && file.size == 0);
+		dqnt_file_close(&file);
+		DQNT_ASSERT(!file.handle && file.size == 0);
+
+		printf("dqnt_file_test(): file_io: Completed successfully\n");
+	}
+
+	{
+		u32 numFiles;
+		char **filelist = dqnt_dir_read("*", &numFiles);
+		printf("dqnt_file_test(): dir_read: Display read files\n");
+
+		for (u32 i = 0; i < numFiles; i++)
+			printf("dqnt_file_test(): dir_read: %s\n", filelist[i]);
+
+		printf("dqnt_file_test(): dir_read: Completed successfully\n");
+	}
+
+	printf("dqnt_file_test(): Completed successfully\n");
 }
 
 int main(void)
@@ -533,6 +650,7 @@ int main(void)
 	dqnt_math_test();
 	dqnt_vec_test();
 	dqnt_other_test();
+	dqnt_darray_test();
 	dqnt_file_test();
 
 	printf("\nPress 'Enter' Key to Exit\n");
