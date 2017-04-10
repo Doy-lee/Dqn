@@ -509,6 +509,44 @@ void dqnt_vec_test()
 		printf("dqnt_vec_test(): vec4: Completed successfully\n");
 	}
 
+	// Rect
+	{
+		DqntRect rect = dqnt_rect(dqnt_v2(-10, -10), dqnt_v2(20, 20));
+		DQNT_ASSERT(dqnt_v2_equals(rect.min, dqnt_v2(-10, -10)));
+		DQNT_ASSERT(dqnt_v2_equals(rect.max, dqnt_v2(10, 10)));
+
+		f32 width, height;
+		dqnt_rect_get_size_2f(rect, &width, &height);
+		DQNT_ASSERT(width == 20);
+		DQNT_ASSERT(height == 20);
+
+		DqntV2 dim = dqnt_rect_get_size_v2(rect);
+		DQNT_ASSERT(dqnt_v2_equals(dim, dqnt_v2(20, 20)));
+
+		DqntV2 rectCenter = dqnt_rect_get_centre(rect);
+		DQNT_ASSERT(dqnt_v2_equals(rectCenter, dqnt_v2(0, 0)));
+
+		// Test shifting rect
+		DqntRect shiftedRect = dqnt_rect_move(rect, dqnt_v2(10, 0));
+		DQNT_ASSERT(dqnt_v2_equals(shiftedRect.min, dqnt_v2(0, -10)));
+		DQNT_ASSERT(dqnt_v2_equals(shiftedRect.max, dqnt_v2(20, 10)));
+
+		dqnt_rect_get_size_2f(shiftedRect, &width, &height);
+		DQNT_ASSERT(width == 20);
+		DQNT_ASSERT(height == 20);
+
+		dim = dqnt_rect_get_size_v2(shiftedRect);
+		DQNT_ASSERT(dqnt_v2_equals(dim, dqnt_v2(20, 20)));
+
+		// Test rect contains p
+		DqntV2 inP  = dqnt_v2(5, 5);
+		DqntV2 outP = dqnt_v2(100, 100);
+		DQNT_ASSERT(dqnt_rect_contains_p(shiftedRect, inP));
+		DQNT_ASSERT(!dqnt_rect_contains_p(shiftedRect, outP));
+
+		printf("dqnt_vec_test(): rect: Completed successfully\n");
+	}
+
 	printf("dqnt_vec_test(): Completed successfully\n");
 }
 
@@ -637,6 +675,7 @@ void dqnt_file_test()
 		for (u32 i = 0; i < numFiles; i++)
 			printf("dqnt_file_test(): dir_read: %s\n", filelist[i]);
 
+		dqnt_dir_read_free(filelist, numFiles);
 		printf("dqnt_file_test(): dir_read: Completed successfully\n");
 	}
 

@@ -1404,9 +1404,9 @@ DQNT_FILE_SCOPE inline void dqnt_dir_read_free(char **fileList, u32 numFiles)
 {
 	if (fileList)
 	{
-		for (i32 i = 0; i < numFiles; i++)
+		for (u32 i = 0; i < numFiles; i++)
 		{
-			if (fileList[i]) free(fileList);
+			if (fileList[i]) free(fileList[i]);
 			fileList[i] = NULL;
 		}
 
