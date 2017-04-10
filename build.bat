@@ -2,8 +2,8 @@
 @REM vcvarsall.bat to setup command-line compiler.
 
 @echo OFF
-set ProjectName=dqnt_unit_test
-set CompileEntryPoint=..\dqnt_unit_test.cpp
+set ProjectName=dqn_unit_test
+set CompileEntryPoint=..\dqn_unit_test.cpp
 
 REM Build tags file
 ctags -R
