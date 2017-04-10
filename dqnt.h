@@ -246,6 +246,13 @@ DQNT_FILE_SCOPE bool dqnt_file_open(char *const file, DqntFile *fileHandle);
 DQNT_FILE_SCOPE u32  dqnt_file_read (DqntFile file, void *buffer, u32 numBytesToRead);
 DQNT_FILE_SCOPE void dqnt_file_close(DqntFile *file);
 
+// Return an array of strings of the files in the directory in UTF-8. numFiles
+// returns the number of strings read.
+// This is allocated using malloc and MUST BE FREED! Can be done manually or
+// using the helper function.
+DQNT_FILE_SCOPE char **dqnt_dir_read     (char *dir, u32 *numFiles);
+DQNT_FILE_SCOPE void   dqnt_dir_read_free(char **fileList, u32 numFiles);
+
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
 ////////////////////////////////////////////////////////////////////////////////
@@ -260,9 +267,9 @@ typedef struct DqntRandPCGState
 	u64 state[2];
 } DqntRandPCGState;
 
-
-// automatically creates a seed using rdtsc. The generator is not valid until
-// it's been seeded.
+// Initialise the random number generator using a seed. If not given it is
+// automatically created by using rdtsc. The generator is not valid until it's
+// been seeded.
 DQNT_FILE_SCOPE void dqnt_rnd_pcg_init_with_seed(DqntRandPCGState *pcg, u32 seed);
 DQNT_FILE_SCOPE void dqnt_rnd_pcg_init(DqntRandPCGState *pcg);
 
@@ -1319,7 +1326,6 @@ DQNT_FILE_SCOPE inline void dqnt_file_close(DqntFile *file)
 #endif
 }
 
-#include "stdio.h"
 DQNT_FILE_SCOPE char **dqnt_dir_read(char *dir, u32 *numFiles)
 {
 	if (!dir) return NULL;
@@ -1392,6 +1398,20 @@ DQNT_FILE_SCOPE char **dqnt_dir_read(char *dir, u32 *numFiles)
 		return list;
 	}
 #endif
+}
+
+DQNT_FILE_SCOPE inline void dqnt_dir_read_free(char **fileList, u32 numFiles)
+{
+	if (fileList)
+	{
+		for (i32 i = 0; i < numFiles; i++)
+		{
+			if (fileList[i]) free(fileList);
+			fileList[i] = NULL;
+		}
+
+		free(fileList);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
