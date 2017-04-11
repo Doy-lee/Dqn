@@ -20,6 +20,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "stdint.h"
 #include "math.h"
+#define STB_SPRINTF_IMPLEMENTATION
+
+#ifdef _WIN32
+	#define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
+#endif
 
 #define LOCAL_PERSIST static
 #define FILE_SCOPE    static
@@ -51,88 +56,31 @@ typedef float  f32;
 ////////////////////////////////////////////////////////////////////////////////
 // DArray - Dynamic Array
 ////////////////////////////////////////////////////////////////////////////////
-// The DArray stores metadata in the header and returns you a pointer straight
-// to the data, to allow direct read/modify access. Adding elements should be
-// done using the provided functions since it manages internal state.
-
-/*
-	Example Usage:
-
-	uint32_t *uintArray = DQN_DARRAY_INIT(uint32_t, 16);
-	uint32_t numberA = 48;
-	uint32_t numberB = 52;
-	DQN_DARRAY_PUSH(&uintArray, &numberA);
-	DQN_DARRAY_PUSH(&uintArray, &numberB);
-
-	for (uint32_t i = 0; i < dqn_darray_get_num_items(uintArray); i++)
-	{
-	    printf(%d\n", uintArray[i]);
-	}
-
-	dqn_darray_free(uintArray);
- */
-
-// Typical operations should not require using the header directly, and it's
-// recommended to use the API, but it can be used to have a faster way to track
-// metadata.
-typedef struct DqnDArrayHeader
+template <typename T>
+struct DqnArray
 {
-	u32  index;
-	u32  itemSize;
-	u32  capacity;
-	u32  signature;
+	u64 count;
+	u64 capacity;
+	T *data;
+};
 
-	void *data;
-} DqnDArrayHeader;
+template <typename T>
+bool  dqn_darray_init (DqnArray<T> *array, size_t capacity);
+template <typename T>
+bool  dqn_darray_grow (DqnArray<T> *array);
+template <typename T>
+bool dqn_darray_push(DqnArray<T> *array, T item);
+template <typename T>
+T    *dqn_darray_get  (DqnArray<T> *array, u64 index);
+template <typename T>
+bool  dqn_darray_clear(DqnArray<T> *array);
+template <typename T>
+bool  dqn_darray_free (DqnArray<T> *array);
+template <typename T>
+bool  dqn_darray_remove(DqnArray<T> *array, u64 index);
+template <typename T>
+bool  dqn_darray_remove_stable(DqnArray<T> *array, u64 index);
 
-// Returns the DArray header IF is a valid DArray
-// Returns NULL              IF not a valid DArray
-DQN_FILE_SCOPE DqnDArrayHeader *dqn_darray_get_header(void *array);
-
-// The init macro RETURNS a pointer to your type, you can index this as normal
-// with array notation [].
-// u32 type             - The data type to initiate a dynamic array with
-// u32 startingCapacity - Initial number of available slots
-#define DQN_DARRAY_INIT(type, startingCapacity)                               \
-	(type *)dqn_darray_init_internal(sizeof(type), startingCapacity)
-
-// Pass in the pointer returned by DQN_DARRAY_INIT. If the pointer is not
-// a valid DArray pointer, this will return 0.
-DQN_FILE_SCOPE u32  dqn_darray_get_capacity(void *array);
-DQN_FILE_SCOPE u32  dqn_darray_get_num_items(void *array);
-
-// Returns true and array modified in-place IF
-//   - The capacity change was successful OR
-//   - The newCapacity is equal to current capacity (no changes).
-// Returns false and array is unmodified IF
-//   - Invalid DArray passed in OR realloc failed OR
-//   - More items in array than new capacity
-DQN_FILE_SCOPE bool dqn_darray_capacity_change(void **array, i32 newCapacity);
-
-// WARNING: This macro currently asserts if it's unable to push elements
-// void **array - the address of the pointer returned by DQN_DARRAY_INIT
-// void item    - the object to insert
-#define DQN_DARRAY_PUSH(array, item)                                           \
-	{                                                                          \
-		if (dqn_darray_capacity_grow_if_need_internal((void **)array))         \
-		{                                                                      \
-			DqnDArrayHeader *header = dqn_darray_get_header(*array);           \
-			*array[header->index++] = item;                                    \
-		}                                                                      \
-		else                                                                   \
-		{                                                                      \
-			DQN_ASSERT(DQN_INVALID_CODE_PATH);                                 \
-		}                                                                      \
-	}
-
-DQN_FILE_SCOPE bool dqn_darray_clear        (void *array);
-DQN_FILE_SCOPE bool dqn_darray_remove       (void *array, u32 index);
-DQN_FILE_SCOPE bool dqn_darray_remove_stable(void *array, u32 index);
-
-// Pass in the pointer returned by DQN_DARRAY_INIT. Returns if the free was
-// successful. This will return false if the array is not a valid DArray and
-// won't touch the pointer.
-DQN_FILE_SCOPE bool dqn_darray_free(void *array);
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
@@ -335,6 +283,9 @@ DQN_FILE_SCOPE i32  dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max);
 #ifdef DQN_IMPLEMENTATION
 #undef DQN_IMPLEMENTATION
 
+// Enable sprintf implementation only when we enable DQN implementation
+#define STB_SPRINTF_IMPLEMENTATION
+
 #ifdef _WIN32
 	#define DQN_WIN32
 
@@ -345,237 +296,138 @@ DQN_FILE_SCOPE i32  dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max);
 ////////////////////////////////////////////////////////////////////////////////
 // DArray - Dynamic Array
 ////////////////////////////////////////////////////////////////////////////////
-#define DQN_DARRAY_SIGNATURE_INTERNAL 0xAC83DB81
-FILE_SCOPE void *dqn_darray_init_internal(u32 itemSize, u32 startingCapacity)
+// Implementation taken from Milton, developed by Serge at
+// https://github.com/serge-rgb/milton#license
+template <typename T>
+bool dqn_darray_init(DqnArray<T> *array, size_t capacity)
 {
-	if (startingCapacity <= 0 || itemSize == 0) return NULL;
+	if (!array) return false;
 
-	u32 metadataSize = sizeof(DqnDArrayHeader);
-	u32 storageSize  = itemSize * startingCapacity;
+	array->data     = (T *)calloc((size_t)capacity, sizeof(T));
+	if (!array->data) return false;
 
-	void *memory = calloc(1, metadataSize + storageSize);
-	if (!memory) return NULL;
-
-	DqnDArrayHeader *array = (DqnDArrayHeader *)memory;
-	array->signature  = DQN_DARRAY_SIGNATURE_INTERNAL;
-	array->itemSize   = itemSize;
-	array->capacity   = startingCapacity;
-	array->data       = (u8 *)memory + metadataSize;
-
-	return array->data;
+	array->count    = 0;
+	array->capacity = capacity;
+	return true;
 }
 
-DQN_FILE_SCOPE DqnDArrayHeader *dqn_darray_get_header(void *array)
+template <typename T>
+bool dqn_darray_grow(DqnArray<T> *array)
 {
-	if (!array) return NULL;
+	if (!array || !array->data) return false;
 
-	DqnDArrayHeader *result = (DqnDArrayHeader *)((u8 *)array - sizeof(DqnDArrayHeader));
-	if (result->signature != DQN_DARRAY_SIGNATURE_INTERNAL) return NULL;
+	const f32 GROWTH_FACTOR = 1.2f;
+	size_t newCapacity         = (size_t)(array->capacity * GROWTH_FACTOR);
+	if (newCapacity == array->capacity) newCapacity++;
 
+	T *newMem = (T *)realloc(array->data, (size_t)(newCapacity * sizeof(T)));
+	if (newMem)
+	{
+		array->data     = newMem;
+		array->capacity = newCapacity;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <typename T>
+bool dqn_darray_push(DqnArray<T> *array, T item)
+{
+	if (!array) return false;
+
+	if (array->count >= array->capacity)
+	{
+		if (!dqn_darray_grow(array)) return false;
+	}
+
+	DQN_ASSERT(array->count < array->capacity);
+	array->data[array->count++] = item;
+
+	return true;
+}
+
+template <typename T>
+T *dqn_darray_get(DqnArray<T> *array, u64 index)
+{
+	T *result = NULL;
+	if (index >= 0 && index <= array->count) result = &array->data[index];
 	return result;
 }
 
-DQN_FILE_SCOPE u32 dqn_darray_get_capacity(void *array)
+template <typename T>
+bool dqn_darray_clear(DqnArray<T> *array)
 {
-	DqnDArrayHeader *header = dqn_darray_get_header(array);
-	if (!header) return 0;
-	return header->capacity;
-}
-
-DQN_FILE_SCOPE u32 dqn_darray_get_num_items(void *array)
-{
-	DqnDArrayHeader *header = dqn_darray_get_header(array);
-	if (!header) return 0;
-	return header->index;
-}
-
-DQN_FILE_SCOPE bool dqn_darray_capacity_change(void **array, u32 newCapacity)
-{
-	DqnDArrayHeader *header = dqn_darray_get_header(*array);
-	if (!header) return false;
-	if (header->capacity == newCapacity) return true;
-
-	if (newCapacity > header->index)
+	if (array)
 	{
-		u32 metadataSize = sizeof(DqnDArrayHeader);
-		u32 storageSize  = header->itemSize * newCapacity;
-		void *newMem     = realloc(header, metadataSize + storageSize);
-		if (newMem)
-		{
-			header           = (DqnDArrayHeader *)newMem;
-			header->capacity = newCapacity;
-			header->data     = (u8 *)newMem + metadataSize;
-			*array           = header->data;
-
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	else
-	{
-		return false;
-	}
-}
-
-FILE_SCOPE bool dqn_darray_capacity_grow_if_need_internal(void **array)
-{
-	DqnDArrayHeader *header = dqn_darray_get_header(*array);
-	if (!header) return false;
-
-	if (header->index >= header->capacity)
-	{
-		const f32 GROWTH_FACTOR = 1.2f;
-		u32 newCapacity         = (i32)(header->capacity * GROWTH_FACTOR);
-		if (newCapacity == header->capacity) newCapacity++;
-
-		return dqn_darray_capacity_change(array, newCapacity);
+		array->count = 0;
+		return true;
 	}
 
+	return false;
+}
+
+template <typename T>
+bool dqn_darray_free(DqnArray<T> *array)
+{
+	if (array && array->data)
+	{
+		free(array->data);
+		array->count    = 0;
+		array->capacity = 0;
+		return true;
+	}
+
+	return false;
+}
+
+template <typename T>
+bool dqn_darray_remove(DqnArray<T> *array, u64 index)
+{
+	if (!array) return false;
+	if (index >= array->count) return false;
+
+	bool firstElementAndOnlyElement = (index == 0 && array->count == 1);
+	bool isLastElement              = (index == (array->count - 1));
+	if (firstElementAndOnlyElement || isLastElement)
+	{
+		array->count--;
+		return true;
+	}
+
+	array->data[index] = array->data[array->count - 1];
+	array->count--;
 	return true;
 }
 
-bool dqn_darray_push_internal(void **array, void *element, u32 itemSize)
+template <typename T>
+bool dqn_darray_remove_stable(DqnArray<T> *array, u64 index)
 {
-	if (!element || !array) return false;
+	if (!array) return false;
+	if (index >= array->count) return false;
 
-	DqnDArrayHeader *header = dqn_darray_get_header(*array);
-	if (!header || header->itemSize != itemSize) return false;
+	bool firstElementAndOnlyElement = (index == 0 && array->count == 1);
+	bool isLastElement              = (index == (array->count - 1));
+	if (firstElementAndOnlyElement || isLastElement)
+	{
+		array->count--;
+		return true;
+	}
 
-	// NOTE: Array is grown before this step happens. If at this point it still
-	// doesn't fit then we've had a mem alloc problem.
-	if (header->index >= header->capacity)
-		return false;
+	size_t itemToRemoveByteOffset         = (size_t)(index * sizeof(T));
+	size_t oneAfterItemToRemoveByteOffset = (size_t)((index + 1) * sizeof(T));
+	size_t lastItemByteOffset = (size_t)(array->count * sizeof(T));
+	size_t numBytesToMove = lastItemByteOffset - oneAfterItemToRemoveByteOffset;
 
-	u32 arrayOffset = header->itemSize * header->index++;
-	DQN_ASSERT(header->index <= header->capacity);
-	u8 *dataPtr = (u8 *)header->data;
+	u8 *bytePtr = (u8 *)array->data;
+	u8 *dest    = &bytePtr[itemToRemoveByteOffset];
+	u8 *src     = &bytePtr[oneAfterItemToRemoveByteOffset];
+	memmove(dest, src, numBytesToMove);
 
-	void *dest = (void *)&dataPtr[arrayOffset];
-	void *src  = element;
-	memcpy(dest, src, header->itemSize);
-
+	array->count--;
 	return true;
-}
-
-DQN_FILE_SCOPE bool dqn_darray_clear(void *array)
-{
-	DqnDArrayHeader *header = dqn_darray_get_header(array);
-	if (header)
-	{
-		header->index = 0;
-		return true;
-	}
-
-	return false;
-}
-
-DQN_FILE_SCOPE bool dqn_darray_remove(void *array, u32 index)
-{
-	DqnDArrayHeader *header = dqn_darray_get_header(array);
-	if (header)
-	{
-		// NOTE: header->index is the index where the next entry will be push to
-		// Array is empty, or index is out of bounds
-		if (header->index == 0 || index >= header->index) return false;
-
-		// If it's the first entry we just need to decrement index
-		if (index == 0 && header->index == 1)
-		{
-			header->index--;
-			return true;
-		}
-
-		// If it's the last entry we just need to decrement index
-		if (index == (header->index - 1))
-		{
-			header->index--;
-			return true;
-		}
-
-		u32 lastEntryIndex        = header->index - 1;
-		u32 lastEntryByteOffset   = lastEntryIndex * header->itemSize;
-		u32 removeEntryIndex      = index;
-		u32 removeEntryByteOffset = removeEntryIndex * header->itemSize;
-
-		u8 *dataPtr = (u8 *)header->data;
-		void *dest  = (void *)&dataPtr[removeEntryByteOffset];
-		void *src   = (void *)&dataPtr[lastEntryByteOffset];
-		memcpy(dest, src, header->itemSize);
-
-		header->index--;
-
-		return true;
-	}
-
-	return false;
-}
-
-DQN_FILE_SCOPE bool dqn_darray_remove_stable(void *array, u32 index)
-{
-	DqnDArrayHeader *header = dqn_darray_get_header(array);
-	if (header)
-	{
-		// NOTE: header->index is the index where the next entry will be push to
-		// Array is empty, or index is out of bounds
-		if (header->index == 0 || index >= header->index) return false;
-
-		// If it's the last entry we just need to decrement index
-		if (index == (header->index - 1))
-		{
-			header->index--;
-			return true;
-		}
-
-		// If it's the first entry we just need to decrement index
-		if (index == 0 && header->index == 1)
-		{
-			header->index--;
-			return true;
-		}
-
-		u32 removeEntryIndex         = index;
-		u32 removeEntryByteOffset    = removeEntryIndex * header->itemSize;
-
-		u32 oneAfterRemove           = index + 1;
-		u32 oneAfterRemoveByteOffset = oneAfterRemove * header->itemSize;
-		u32 endOfListIndex           = header->index - 1;
-		u32 endOfListByteOffset      = endOfListIndex * header->itemSize;
-
-		u32 numBytesToShift = endOfListByteOffset - oneAfterRemoveByteOffset;
-		DQN_ASSERT(numBytesToShift <= (header->itemSize * header->capacity));
-
-		u8 *dataPtr = (u8 *)header->data;
-		void *dest  = (void *)&dataPtr[removeEntryByteOffset];
-		void *src   = (void *)&dataPtr[oneAfterRemoveByteOffset];
-		memmove(dest, src, endOfListByteOffset);
-
-		header->index--;
-		return true;
-	}
-
-	return false;
-}
-
-DQN_FILE_SCOPE inline bool dqn_darray_free(void *array)
-{
-	DqnDArrayHeader *header = dqn_darray_get_header(array);
-	if (header)
-	{
-		header->index     = 0;
-		header->itemSize  = 0;
-		header->capacity  = 0;
-		header->signature = 0;
-
-		free(header);
-		return true;
-	}
-	else
-	{
-		return false;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1387,7 +1239,6 @@ DQN_FILE_SCOPE u32 dqn_utf8_to_ucs(u32 *dest, u32 character)
 // File Operations
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_WIN32
-	#define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
 
 DQN_FILE_SCOPE bool dqn_win32_utf8_to_wchar(char *in, wchar_t *out, i32 outLen)
 {
@@ -1690,14 +1541,13 @@ DQN_FILE_SCOPE i32 dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max)
 	i32 const value = (i32)(dqn_rnd_pcg_nextf(pcg) * range);
 	return min + value;
 }
+#endif /* DQN_IMPLEMENTATION */
 
 ////////////////////////////////////////////////////////////////////////////////
 //
 // STB_Sprintf
 //
 ////////////////////////////////////////////////////////////////////////////////
-#define STB_SPRINTF_IMPLEMENTATION
-
 // stb_sprintf - v1.02 - public domain snprintf() implementation
 // originally by Jeff Roberts / RAD Game Tools, 2015/10/20
 // http://github.com/nothings/stb
@@ -2896,5 +2746,3 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
-
-#endif /* DQN_IMPLEMENTATION */

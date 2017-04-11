@@ -553,90 +553,89 @@ void dqn_vec_test()
 void dqn_darray_test()
 {
 	{
-		DqnV2 *vecDArray = DQN_DARRAY_INIT(DqnV2, 1);
-		DQN_ASSERT(vecDArray);
-		DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 1);
-		DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 0);
+		DqnArray<DqnV2> array = {};
+		DQN_ASSERT(dqn_darray_init(&array, 1));
+		DQN_ASSERT(array.capacity == 1);
+		DQN_ASSERT(array.count == 0);
 
 		// Test basic insert
 		{
 			DqnV2 va = dqn_v2(5, 10);
-			DQN_DARRAY_PUSH(&vecDArray, va);
+			DQN_ASSERT(dqn_darray_push(&array, va));
 
-			DqnV2 vb = vecDArray[0];
+			DqnV2 vb = array.data[0];
 			DQN_ASSERT(dqn_v2_equals(va, vb));
 
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 1);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 1);
+			DQN_ASSERT(array.capacity == 1);
+			DQN_ASSERT(array.count == 1);
 		}
 
 		// Test array resizing and freeing
 		{
 			DqnV2 va = dqn_v2(10, 15);
-			DQN_DARRAY_PUSH(&vecDArray, va);
+			DQN_ASSERT(dqn_darray_push(&array, va));
 
-			DqnV2 vb = vecDArray[0];
+			DqnV2 vb = array.data[0];
 			DQN_ASSERT(dqn_v2_equals(va, vb) == false);
 
-			vb = vecDArray[1];
+			vb = array.data[1];
 			DQN_ASSERT(dqn_v2_equals(va, vb) == true);
 
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 2);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 2);
+			DQN_ASSERT(array.capacity == 2);
+			DQN_ASSERT(array.count == 2);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 3);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 3);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 3);
+			DQN_ASSERT(array.count == 3);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 4);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 4);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 4);
+			DQN_ASSERT(array.count == 4);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 5);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 5);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 5);
+			DQN_ASSERT(array.count == 5);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 6);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 6);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 6);
+			DQN_ASSERT(array.count == 6);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 7);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 7);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 7);
+			DQN_ASSERT(array.count == 7);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 8);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 8);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 8);
+			DQN_ASSERT(array.count == 8);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 9);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 9);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 9);
+			DQN_ASSERT(array.count == 9);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 10);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 10);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 10);
+			DQN_ASSERT(array.count == 10);
 
-			DQN_DARRAY_PUSH(&vecDArray, va);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 12);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 11);
+			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(array.capacity == 12);
+			DQN_ASSERT(array.count == 11);
 
 			DqnV2 vc = dqn_v2(90, 100);
-			DQN_DARRAY_PUSH(&vecDArray, vc);
-			DQN_ASSERT(dqn_darray_get_capacity(vecDArray) == 12);
-			DQN_ASSERT(dqn_darray_get_num_items(vecDArray) == 12);
-			DQN_ASSERT(dqn_v2_equals(vc, vecDArray[11]));
+			DQN_ASSERT(dqn_darray_push(&array, vc));
+			DQN_ASSERT(array.capacity == 12);
+			DQN_ASSERT(array.count == 12);
+			DQN_ASSERT(dqn_v2_equals(vc, array.data[11]));
 
-			DQN_ASSERT(dqn_darray_free(vecDArray) == true);
+			DQN_ASSERT(dqn_darray_free(&array) == true);
 		}
 	}
 
 	{
-		f32 *array = DQN_DARRAY_INIT(f32, 1);
-		DQN_ASSERT(array);
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 1);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 0);
-
-		dqn_darray_free(array);
+		DqnArray<f32> array = {};
+		DQN_ASSERT(dqn_darray_init(&array, 1));
+		DQN_ASSERT(array.capacity == 1);
+		DQN_ASSERT(array.count == 0);
+		dqn_darray_free(&array);
 	}
 
 	{
@@ -645,47 +644,47 @@ void dqn_darray_test()
 		DqnV2 c = dqn_v2(5, 6);
 		DqnV2 d = dqn_v2(7, 8);
 
-		DqnV2 *array = DQN_DARRAY_INIT(DqnV2, 16);
-		DQN_ASSERT(array);
-		DQN_ASSERT(dqn_darray_remove(array, 0) == false);
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 0);
+		DqnArray<DqnV2> array = {};
+		DQN_ASSERT(dqn_darray_init(&array, 16));
+		DQN_ASSERT(dqn_darray_remove(&array, 0) == false);
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 0);
 
-		DQN_ASSERT(dqn_darray_clear(array));
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 0);
+		DQN_ASSERT(dqn_darray_clear(&array));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 0);
 
-		DQN_DARRAY_PUSH(&array, a);
-		DQN_DARRAY_PUSH(&array, b);
-		DQN_DARRAY_PUSH(&array, c);
-		DQN_DARRAY_PUSH(&array, d);
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 4);
+		DQN_ASSERT(dqn_darray_push(&array, a));
+		DQN_ASSERT(dqn_darray_push(&array, b));
+		DQN_ASSERT(dqn_darray_push(&array, c));
+		DQN_ASSERT(dqn_darray_push(&array, d));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 4);
 
-		DQN_ASSERT(dqn_darray_remove(array, 0));
-		DQN_ASSERT(dqn_v2_equals(array[0], d));
-		DQN_ASSERT(dqn_v2_equals(array[1], b));
-		DQN_ASSERT(dqn_v2_equals(array[2], c));
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 3);
+		DQN_ASSERT(dqn_darray_remove(&array, 0));
+		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
+		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
+		DQN_ASSERT(dqn_v2_equals(array.data[2], c));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 3);
 
-		DQN_ASSERT(dqn_darray_remove(array, 2));
-		DQN_ASSERT(dqn_v2_equals(array[0], d));
-		DQN_ASSERT(dqn_v2_equals(array[1], b));
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 2);
+		DQN_ASSERT(dqn_darray_remove(&array, 2));
+		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
+		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 2);
 
-		DQN_ASSERT(dqn_darray_remove(array, 100) == false);
-		DQN_ASSERT(dqn_v2_equals(array[0], d));
-		DQN_ASSERT(dqn_v2_equals(array[1], b));
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 2);
+		DQN_ASSERT(dqn_darray_remove(&array, 100) == false);
+		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
+		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 2);
 
-		DQN_ASSERT(dqn_darray_clear(array));
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 0);
+		DQN_ASSERT(dqn_darray_clear(&array));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 0);
 
-		dqn_darray_free(array);
+		dqn_darray_free(&array);
 	}
 
 	{
@@ -694,42 +693,35 @@ void dqn_darray_test()
 		DqnV2 c = dqn_v2(5, 6);
 		DqnV2 d = dqn_v2(7, 8);
 
-		DqnV2 *array = DQN_DARRAY_INIT(DqnV2, 16);
-		DQN_ASSERT(array);
+		DqnArray<DqnV2> array = {};
+		DQN_ASSERT(dqn_darray_init(&array, 16));
 
-		DQN_DARRAY_PUSH(&array, a);
-		DQN_DARRAY_PUSH(&array, b);
-		DQN_DARRAY_PUSH(&array, c);
-		DQN_DARRAY_PUSH(&array, d);
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 4);
+		DQN_ASSERT(dqn_darray_push(&array, a));
+		DQN_ASSERT(dqn_darray_push(&array, b));
+		DQN_ASSERT(dqn_darray_push(&array, c));
+		DQN_ASSERT(dqn_darray_push(&array, d));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 4);
 
-		dqn_darray_remove_stable(array, 0);
-		DQN_ASSERT(dqn_v2_equals(array[0], b));
-		DQN_ASSERT(dqn_v2_equals(array[1], c));
-		DQN_ASSERT(dqn_v2_equals(array[2], d));
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 3);
+		dqn_darray_remove_stable(&array, 0);
+		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
+		DQN_ASSERT(dqn_v2_equals(array.data[1], c));
+		DQN_ASSERT(dqn_v2_equals(array.data[2], d));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 3);
 
-		dqn_darray_remove_stable(array, 1);
-		DQN_ASSERT(dqn_v2_equals(array[0], b));
-		DQN_ASSERT(dqn_v2_equals(array[1], d));
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 2);
+		dqn_darray_remove_stable(&array, 1);
+		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
+		DQN_ASSERT(dqn_v2_equals(array.data[1], d));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 2);
 
-		dqn_darray_remove_stable(array, 1);
-		DQN_ASSERT(dqn_v2_equals(array[0], b));
-		DQN_ASSERT(dqn_darray_get_capacity(array) == 16);
-		DQN_ASSERT(dqn_darray_get_num_items(array) == 1);
-		dqn_darray_free(array);
+		dqn_darray_remove_stable(&array, 1);
+		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
+		DQN_ASSERT(array.capacity == 16);
+		DQN_ASSERT(array.count == 1);
+		dqn_darray_free(&array);
 	}
-
-	{
-		DQN_ASSERT(dqn_darray_clear(NULL) == false);
-		DQN_ASSERT(dqn_darray_clear(NULL) == false);
-		DQN_ASSERT(dqn_darray_free(NULL) == false);
-	}
-
 
 	printf("dqn_darray_test(): Completed successfully\n");
 }
