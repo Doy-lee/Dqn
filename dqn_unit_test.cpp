@@ -730,18 +730,34 @@ void dqn_file_test()
 {
 	// File i/o
 	{
-		DqnFile file = {};
-		DQN_ASSERT(dqn_file_open(".clang-format", &file));
-		DQN_ASSERT(file.size == 1320);
+		{
+			DqnFile file = {};
+			DQN_ASSERT(dqn_file_open(
+				".clang-format", &file,
+				(dqnfilepermissionflag_write | dqnfilepermissionflag_read),
+				dqnfileaction_open_only));
+			DQN_ASSERT(file.size == 1320);
 
-		u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
-		DQN_ASSERT(dqn_file_read(file, buffer, (u32)file.size) == file.size);
-		free(buffer);
+			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
+			DQN_ASSERT(dqn_file_read(file, buffer, (u32)file.size) == file.size);
+			free(buffer);
 
-		dqn_file_close(&file);
-		DQN_ASSERT(!file.handle && file.size == 0);
+			dqn_file_close(&file);
+	        DQN_ASSERT(!file.handle && file.size == 0 &&
+	                   file.permissionFlags == 0);
+        }
 
-		printf("dqn_file_test(): file_io: Completed successfully\n");
+		{
+			DqnFile file = {};
+			DQN_ASSERT(!dqn_file_open(
+				"asdljasdnel;kajdf", &file,
+				(dqnfilepermissionflag_write | dqnfilepermissionflag_read),
+				dqnfileaction_open_only));
+			DQN_ASSERT(file.size == 0);
+			DQN_ASSERT(file.permissionFlags == 0);
+			DQN_ASSERT(!file.handle);
+			printf("dqn_file_test(): file_io: Completed successfully\n");
+		}
 	}
 
 	{
