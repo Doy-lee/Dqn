@@ -18,12 +18,16 @@
 // HEADER
 //
 ////////////////////////////////////////////////////////////////////////////////
-#include "stdint.h"
-#include "math.h"
-#define STB_SPRINTF_IMPLEMENTATION
+#include "stdint.h" // For standard types
+#include "math.h"   // For trigonometry functions (for now)
+#include "stdlib.h" // For calloc, malloc, free
 
 #ifdef _WIN32
 	#define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
+	#define DQN_WIN32
+
+	#define WIN32_LEAN_AND_MEAN
+	#include <Windows.h>
 #endif
 
 #define LOCAL_PERSIST static
@@ -64,22 +68,158 @@ struct DqnArray
 	T *data;
 };
 
+#if 0
 template <typename T>
-bool dqn_darray_init(DqnArray<T> *array, size_t capacity);
+bool  dqn_darray_init         (DqnArray<T> *array, size_t capacity);
 template <typename T>
-bool  dqn_darray_grow (DqnArray<T> *array);
+bool  dqn_darray_grow         (DqnArray<T> *array);
 template <typename T>
-bool dqn_darray_push(DqnArray<T> *array, T item);
+bool  dqn_darray_push         (DqnArray<T> *array, T item);
 template <typename T>
-T    *dqn_darray_get  (DqnArray<T> *array, u64 index);
+T    *dqn_darray_get          (DqnArray<T> *array, u64 index);
 template <typename T>
-bool  dqn_darray_clear(DqnArray<T> *array);
+bool  dqn_darray_clear        (DqnArray<T> *array);
 template <typename T>
-bool  dqn_darray_free (DqnArray<T> *array);
+bool  dqn_darray_free         (DqnArray<T> *array);
 template <typename T>
-bool  dqn_darray_remove(DqnArray<T> *array, u64 index);
+bool  dqn_darray_remove       (DqnArray<T> *array, u64 index);
 template <typename T>
 bool  dqn_darray_remove_stable(DqnArray<T> *array, u64 index);
+#endif
+
+// Implementation taken from Milton, developed by Serge at
+// https://github.com/serge-rgb/milton#license
+template <typename T>
+bool dqn_darray_init(DqnArray<T> *array, size_t capacity)
+{
+	if (!array) return false;
+
+	array->data     = (T *)calloc((size_t)capacity, sizeof(T));
+	if (!array->data) return false;
+
+	array->count    = 0;
+	array->capacity = capacity;
+	return true;
+}
+
+template <typename T>
+bool dqn_darray_grow(DqnArray<T> *array)
+{
+	if (!array || !array->data) return false;
+
+	const f32 GROWTH_FACTOR = 1.2f;
+	size_t newCapacity         = (size_t)(array->capacity * GROWTH_FACTOR);
+	if (newCapacity == array->capacity) newCapacity++;
+
+	T *newMem = (T *)realloc(array->data, (size_t)(newCapacity * sizeof(T)));
+	if (newMem)
+	{
+		array->data     = newMem;
+		array->capacity = newCapacity;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <typename T>
+bool dqn_darray_push(DqnArray<T> *array, T item)
+{
+	if (!array) return false;
+
+	if (array->count >= array->capacity)
+	{
+		if (!dqn_darray_grow(array)) return false;
+	}
+
+	DQN_ASSERT(array->count < array->capacity);
+	array->data[array->count++] = item;
+
+	return true;
+}
+
+template <typename T>
+T *dqn_darray_get(DqnArray<T> *array, u64 index)
+{
+	T *result = NULL;
+	if (index >= 0 && index <= array->count) result = &array->data[index];
+	return result;
+}
+
+template <typename T>
+bool dqn_darray_clear(DqnArray<T> *array)
+{
+	if (array)
+	{
+		array->count = 0;
+		return true;
+	}
+
+	return false;
+}
+
+template <typename T>
+bool dqn_darray_free(DqnArray<T> *array)
+{
+	if (array && array->data)
+	{
+		free(array->data);
+		array->count    = 0;
+		array->capacity = 0;
+		return true;
+	}
+
+	return false;
+}
+
+template <typename T>
+bool dqn_darray_remove(DqnArray<T> *array, u64 index)
+{
+	if (!array) return false;
+	if (index >= array->count) return false;
+
+	bool firstElementAndOnlyElement = (index == 0 && array->count == 1);
+	bool isLastElement              = (index == (array->count - 1));
+	if (firstElementAndOnlyElement || isLastElement)
+	{
+		array->count--;
+		return true;
+	}
+
+	array->data[index] = array->data[array->count - 1];
+	array->count--;
+	return true;
+}
+
+template <typename T>
+bool dqn_darray_remove_stable(DqnArray<T> *array, u64 index)
+{
+	if (!array) return false;
+	if (index >= array->count) return false;
+
+	bool firstElementAndOnlyElement = (index == 0 && array->count == 1);
+	bool isLastElement              = (index == (array->count - 1));
+	if (firstElementAndOnlyElement || isLastElement)
+	{
+		array->count--;
+		return true;
+	}
+
+	size_t itemToRemoveByteOffset         = (size_t)(index * sizeof(T));
+	size_t oneAfterItemToRemoveByteOffset = (size_t)((index + 1) * sizeof(T));
+	size_t lastItemByteOffset = (size_t)(array->count * sizeof(T));
+	size_t numBytesToMove = lastItemByteOffset - oneAfterItemToRemoveByteOffset;
+
+	u8 *bytePtr = (u8 *)array->data;
+	u8 *dest    = &bytePtr[itemToRemoveByteOffset];
+	u8 *src     = &bytePtr[oneAfterItemToRemoveByteOffset];
+	memmove(dest, src, numBytesToMove);
+
+	array->count--;
+	return true;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Math
@@ -221,7 +361,6 @@ DQN_FILE_SCOPE u32 dqn_utf8_to_ucs(u32 *dest, u32 character);
 // Win32 Specific
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_WIN32
-
 // Out is a pointer to the buffer to receive the characters.
 // outLen is the length/capacity of the out buffer
 DQN_FILE_SCOPE bool dqn_win32_utf8_to_wchar (const char *const in, wchar_t *const out, const i32 outLen);
@@ -313,9 +452,10 @@ DQN_FILE_SCOPE u32  dqn_rnd_pcg_next (DqnRandPCGState *pcg);
 DQN_FILE_SCOPE f32  dqn_rnd_pcg_nextf(DqnRandPCGState *pcg);
 // Returns a random integer N between [min, max]
 DQN_FILE_SCOPE i32  dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max);
-
 #endif  /* DQN_H */
 
+#ifndef DQN_INI_H
+#define DQN_INI_H
 ////////////////////////////////////////////////////////////////////////////////
 // ini.h v1.1
 // Simple ini-file reader for C/C++.
@@ -391,9 +531,6 @@ int main()
 	return 0;
 }
 */
-
-#ifndef DQN_INI_H
-#define DQN_INI_H
 
 #define DQN_INI_GLOBAL_SECTION (0)
 #define DQN_INI_NOT_FOUND (-1)
@@ -836,167 +973,19 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 
 #endif // STB_SPRINTF_H_INCLUDE
 
-////////////////////////////////////////////////////////////////////////////////
-//
-// IMPLEMENTATION
-//
-////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_IMPLEMENTATION
-#undef DQN_IMPLEMENTATION
+////////////////////////////////////////////////////////////////////////////////
+//
+// DQN_IMPLEMENTATION
+//
+////////////////////////////////////////////////////////////////////////////////
 
-// Enable sprintf implementation only when we enable DQN implementation
-#define STB_SPRINTF_IMPLEMENTATION
+// NOTE: STB_SPRINTF modified to be included when DQN_IMPLEMENTATION defined
+// #define STB_SPRINTF_IMPLEMENTATION
 
-// NOTE: We are currently using a custom INI lib provided in the public domain,
-// hence it's separated from my main lib incase I want to implement my own
-// version for learning purposes.
-#define DQN_INI_IMPLEMENTATION
+// NOTE: DQN_INI_IMPLEMENTATION modified to be included when DQN_IMPLEMENTATION defined
+// #define DQN_INI_IMPLEMENTATION
 #define DQN_INI_STRLEN(s) dqn_strlen(s)
-
-#ifdef _WIN32
-	#define DQN_WIN32
-
-	#include "Windows.h"
-	#define WIN32_LEAN_AND_MEAN
-#endif
-
-////////////////////////////////////////////////////////////////////////////////
-// DArray - Dynamic Array
-////////////////////////////////////////////////////////////////////////////////
-// Implementation taken from Milton, developed by Serge at
-// https://github.com/serge-rgb/milton#license
-template <typename T>
-bool dqn_darray_init(DqnArray<T> *array, size_t capacity)
-{
-	if (!array) return false;
-
-	array->data     = (T *)calloc((size_t)capacity, sizeof(T));
-	if (!array->data) return false;
-
-	array->count    = 0;
-	array->capacity = capacity;
-	return true;
-}
-
-template <typename T>
-bool dqn_darray_grow(DqnArray<T> *array)
-{
-	if (!array || !array->data) return false;
-
-	const f32 GROWTH_FACTOR = 1.2f;
-	size_t newCapacity         = (size_t)(array->capacity * GROWTH_FACTOR);
-	if (newCapacity == array->capacity) newCapacity++;
-
-	T *newMem = (T *)realloc(array->data, (size_t)(newCapacity * sizeof(T)));
-	if (newMem)
-	{
-		array->data     = newMem;
-		array->capacity = newCapacity;
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-template <typename T>
-bool dqn_darray_push(DqnArray<T> *array, T item)
-{
-	if (!array) return false;
-
-	if (array->count >= array->capacity)
-	{
-		if (!dqn_darray_grow(array)) return false;
-	}
-
-	DQN_ASSERT(array->count < array->capacity);
-	array->data[array->count++] = item;
-
-	return true;
-}
-
-template <typename T>
-T *dqn_darray_get(DqnArray<T> *array, u64 index)
-{
-	T *result = NULL;
-	if (index >= 0 && index <= array->count) result = &array->data[index];
-	return result;
-}
-
-template <typename T>
-bool dqn_darray_clear(DqnArray<T> *array)
-{
-	if (array)
-	{
-		array->count = 0;
-		return true;
-	}
-
-	return false;
-}
-
-template <typename T>
-bool dqn_darray_free(DqnArray<T> *array)
-{
-	if (array && array->data)
-	{
-		free(array->data);
-		array->count    = 0;
-		array->capacity = 0;
-		return true;
-	}
-
-	return false;
-}
-
-template <typename T>
-bool dqn_darray_remove(DqnArray<T> *array, u64 index)
-{
-	if (!array) return false;
-	if (index >= array->count) return false;
-
-	bool firstElementAndOnlyElement = (index == 0 && array->count == 1);
-	bool isLastElement              = (index == (array->count - 1));
-	if (firstElementAndOnlyElement || isLastElement)
-	{
-		array->count--;
-		return true;
-	}
-
-	array->data[index] = array->data[array->count - 1];
-	array->count--;
-	return true;
-}
-
-template <typename T>
-bool dqn_darray_remove_stable(DqnArray<T> *array, u64 index)
-{
-	if (!array) return false;
-	if (index >= array->count) return false;
-
-	bool firstElementAndOnlyElement = (index == 0 && array->count == 1);
-	bool isLastElement              = (index == (array->count - 1));
-	if (firstElementAndOnlyElement || isLastElement)
-	{
-		array->count--;
-		return true;
-	}
-
-	size_t itemToRemoveByteOffset         = (size_t)(index * sizeof(T));
-	size_t oneAfterItemToRemoveByteOffset = (size_t)((index + 1) * sizeof(T));
-	size_t lastItemByteOffset = (size_t)(array->count * sizeof(T));
-	size_t numBytesToMove = lastItemByteOffset - oneAfterItemToRemoveByteOffset;
-
-	u8 *bytePtr = (u8 *)array->data;
-	u8 *dest    = &bytePtr[itemToRemoveByteOffset];
-	u8 *src     = &bytePtr[oneAfterItemToRemoveByteOffset];
-	memmove(dest, src, numBytesToMove);
-
-	array->count--;
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
@@ -1860,7 +1849,7 @@ DQN_FILE_SCOPE void dqn_win32_display_last_error(const char *const errorPrefix)
 #endif
 
 DQN_FILE_SCOPE bool dqn_file_open(const char *const path, DqnFile *const file,
-                                  const i32 permissionFlags,
+                                  const u32 permissionFlags,
                                   const enum DqnFileAction action)
 {
 	if (!file || !path) return false;
@@ -1971,7 +1960,7 @@ DQN_FILE_SCOPE u32 dqn_file_write(const DqnFile *const file,
 }
 
 
-DQN_FILE_SCOPE inline void dqn_file_close(DqnFile *const file)
+DQN_FILE_SCOPE void dqn_file_close(DqnFile *const file)
 {
 #ifdef DQN_WIN32
 	if (file && file->handle)
@@ -2186,8 +2175,6 @@ DQN_FILE_SCOPE i32 dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max)
 	i32 const value = (i32)(dqn_rnd_pcg_nextf(pcg) * range);
 	return min + value;
 }
-#endif /* DQN_IMPLEMENTATION */
-
 ////////////////////////////////////////////////////////////////////////////////
 // STB_Sprintf
 ////////////////////////////////////////////////////////////////////////////////
@@ -2240,8 +2227,6 @@ PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
 "%s%s%s" for 64 char strings (7.1x/7.3x faster)
 "...512 char string..." ( 35.0x/32.5x faster!)
 */
-
-#ifdef STB_SPRINTF_IMPLEMENTATION
 
 #include <stdlib.h>  // for va_arg()
 
@@ -3224,23 +3209,10 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 #undef stbsp__int64
 #undef STBSP__UNALIGNED
 
-#endif // STB_SPRINTF_IMPLEMENTATION
-
-
 ////////////////////////////////////////////////////////////////////////////////
-// ini.h v1.1
+// ini.h v1.1 | IMPLEMENTATION
 // Simple ini-file reader for C/C++.
 ////////////////////////////////////////////////////////////////////////////////
-
-/*
-----------------------
-    IMPLEMENTATION
-----------------------
-*/
-
-#ifdef DQN_INI_IMPLEMENTATION
-#undef DQN_INI_IMPLEMENTATION
-
 #define INITIAL_CAPACITY (256)
 
 #define _CRT_NONSTDC_NO_DEPRECATE
@@ -3877,4 +3849,5 @@ void dqn_ini_property_value_set(DqnIni *ini, int section, int property,
 	}
 }
 
-#endif /* DQN_INI_IMPLEMENTATION */
+#endif /* DQN_IMPLEMENTATION */
+
