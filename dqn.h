@@ -26,6 +26,7 @@
 	#define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
 	#define DQN_WIN32
 
+	// TODO(doyle): Our own windows.h?
 	#define WIN32_LEAN_AND_MEAN
 	#include <Windows.h>
 #endif
@@ -68,22 +69,18 @@ struct DqnArray
 	T *data;
 };
 
+// REMINDER: This can be used as a stack. So don't need to create a stack data
+// structure.
 #if 0
 template <typename T>
 bool  dqn_darray_init         (DqnArray<T> *array, size_t capacity);
-template <typename T>
 bool  dqn_darray_grow         (DqnArray<T> *array);
-template <typename T>
-bool  dqn_darray_push         (DqnArray<T> *array, T item);
-template <typename T>
+T    *dqn_darray_push         (DqnArray<T> *array, T item);
+T    *dqn_darray_pop          (DqnArray<T> *array)
 T    *dqn_darray_get          (DqnArray<T> *array, u64 index);
-template <typename T>
 bool  dqn_darray_clear        (DqnArray<T> *array);
-template <typename T>
 bool  dqn_darray_free         (DqnArray<T> *array);
-template <typename T>
 bool  dqn_darray_remove       (DqnArray<T> *array, u64 index);
-template <typename T>
 bool  dqn_darray_remove_stable(DqnArray<T> *array, u64 index);
 #endif
 
@@ -93,6 +90,12 @@ template <typename T>
 bool dqn_darray_init(DqnArray<T> *array, size_t capacity)
 {
 	if (!array) return false;
+
+	if (array->data)
+	{
+		// TODO(doyle): Logging? The array already exists
+		if (!dqn_darray_free(array)) return false;
+	}
 
 	array->data     = (T *)calloc((size_t)capacity, sizeof(T));
 	if (!array->data) return false;
@@ -125,19 +128,29 @@ bool dqn_darray_grow(DqnArray<T> *array)
 }
 
 template <typename T>
-bool dqn_darray_push(DqnArray<T> *array, T item)
+T *dqn_darray_push(DqnArray<T> *array, T item)
 {
-	if (!array) return false;
+	if (!array) return NULL;
 
 	if (array->count >= array->capacity)
 	{
-		if (!dqn_darray_grow(array)) return false;
+		if (!dqn_darray_grow(array)) return NULL;
 	}
 
 	DQN_ASSERT(array->count < array->capacity);
 	array->data[array->count++] = item;
 
-	return true;
+	return &array->data[array->count-1];
+}
+
+template <typename T>
+T *dqn_darray_pop(DqnArray<T> *array)
+{
+	if (!array) return NULL;
+	if (array->count == 0) return NULL;
+
+	T *result = &array->data[--array->count];
+	return result;
 }
 
 template <typename T>
@@ -224,7 +237,7 @@ bool dqn_darray_remove_stable(DqnArray<T> *array, u64 index)
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE f32 dqn_math_lerp(f32 a, f32 t, f32 b);
+DQN_FILE_SCOPE f32 dqn_math_lerp (f32 a, f32 t, f32 b);
 DQN_FILE_SCOPE f32 dqn_math_sqrtf(f32 a);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -351,7 +364,8 @@ DQN_FILE_SCOPE char *dqn_strncpy(char *dest, const char *src, i32 numChars);
 #define DQN_I32_TO_STR_MAX_BUF_SIZE 11
 DQN_FILE_SCOPE bool  dqn_str_reverse(char *buf, const i32 bufSize);
 DQN_FILE_SCOPE i32   dqn_str_to_i32 (const char *const buf, const i32 bufSize);
-DQN_FILE_SCOPE void  dqn_i32_to_str (i32 value, char *buf, i32 bufSize);
+// Return the len of the derived string
+DQN_FILE_SCOPE i32   dqn_i32_to_str (i32 value, char *buf, i32 bufSize);
 
 // Both return the number of bytes read, return 0 if invalid codepoint or UTF8
 DQN_FILE_SCOPE u32 dqn_ucs_to_utf8(u32 *dest, u32 character);
@@ -1592,14 +1606,14 @@ DQN_FILE_SCOPE i32 dqn_str_to_i32(const char *const buf, const i32 bufSize)
 	return result;
 }
 
-DQN_FILE_SCOPE void dqn_i32_to_str(i32 value, char *buf, i32 bufSize)
+DQN_FILE_SCOPE i32 dqn_i32_to_str(i32 value, char *buf, i32 bufSize)
 {
-	if (!buf || bufSize == 0) return;
+	if (!buf || bufSize == 0) return 0;
 
 	if (value == 0)
 	{
 		buf[0] = '0';
-		return;
+		return 0;
 	}
 	
 	// NOTE(doyle): Max 32bit integer (+-)2147483647
@@ -1627,6 +1641,8 @@ DQN_FILE_SCOPE void dqn_i32_to_str(i32 value, char *buf, i32 bufSize)
 	{
 		dqn_str_reverse(buf, charIndex);
 	}
+
+	return charIndex;
 }
 
 /*
