@@ -355,22 +355,26 @@ DQN_FILE_SCOPE bool    dqn_rect_contains_p (DqnRect rect, DqnV2 p);
 ////////////////////////////////////////////////////////////////////////////////
 // String Ops
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE char  dqn_char_to_upper   (char c);
 DQN_FILE_SCOPE char  dqn_char_to_lower   (char c);
+DQN_FILE_SCOPE char  dqn_char_to_upper   (char c);
 DQN_FILE_SCOPE bool  dqn_char_is_digit   (char c);
 DQN_FILE_SCOPE bool  dqn_char_is_alpha   (char c);
 DQN_FILE_SCOPE bool  dqn_char_is_alphanum(char c);
 
 DQN_FILE_SCOPE i32   dqn_strcmp (const char *a, const char *b);
 // Returns the length without the null terminator
-DQN_FILE_SCOPE i32   dqn_strlen (const char *a);
-DQN_FILE_SCOPE char *dqn_strncpy(char *dest, const char *src, i32 numChars);
+DQN_FILE_SCOPE i32   dqn_strlen             (const char *a);
+DQN_FILE_SCOPE i32   dqn_strlen_delimit_with(const char *a, const char delimiter);
+DQN_FILE_SCOPE char *dqn_strncpy            (char *dest, const char *src, i32 numChars);
 
 #define DQN_I32_TO_STR_MAX_BUF_SIZE 11
-DQN_FILE_SCOPE bool  dqn_str_reverse(char *buf, const i32 bufSize);
-DQN_FILE_SCOPE i32   dqn_str_to_i32 (const char *const buf, const i32 bufSize);
+DQN_FILE_SCOPE bool  dqn_str_reverse      (char *buf, const i32 bufSize);
+DQN_FILE_SCOPE bool  dqn_str_has_substring(const char *const a, const i32 lenA,
+                                           const char *const b, const i32 lenB);
+
+DQN_FILE_SCOPE i32   dqn_str_to_i32(const char *const buf, const i32 bufSize);
 // Return the len of the derived string
-DQN_FILE_SCOPE i32   dqn_i32_to_str (i32 value, char *buf, i32 bufSize);
+DQN_FILE_SCOPE i32   dqn_i32_to_str(i32 value, char *buf, i32 bufSize);
 
 // Both return the number of bytes read, return 0 if invalid codepoint or UTF8
 DQN_FILE_SCOPE u32 dqn_ucs_to_utf8(u32 *dest, u32 character);
@@ -1600,6 +1604,13 @@ DQN_FILE_SCOPE i32 dqn_strlen(const char *a)
 	return result;
 }
 
+DQN_FILE_SCOPE i32 dqn_strlen_delimit_with(const char *a, const char delimiter)
+{
+	i32 result = 0;
+	while (a && a[result] && a[result] != delimiter) result++;
+	return result;
+}
+
 DQN_FILE_SCOPE char *dqn_strncpy(char *dest, const char *src, i32 numChars)
 {
 	if (!dest) return NULL;
@@ -1624,6 +1635,65 @@ DQN_FILE_SCOPE bool dqn_str_reverse(char *buf, const i32 bufSize)
 	}
 
 	return true;
+}
+
+DQN_FILE_SCOPE bool dqn_str_has_substring(const char *const a, const i32 lenA,
+                                          const char *const b, const i32 lenB)
+{
+	if (!a || !b) return false;
+	if (lenA == 0 || lenB == 0) return false;
+
+	const char *longStr, *shortStr;
+	i32 longLen, shortLen;
+	if (lenA > lenB)
+	{
+		longStr  = a;
+		longLen  = lenA;
+
+		shortStr = b;
+		shortLen = lenB;
+	}
+	else
+	{
+		longStr  = b;
+		longLen  = lenB;
+
+		shortStr = a;
+		shortLen = lenA;
+	}
+
+	bool matchedSubstr = false;
+	for (i32 indexIntoLong = 0; indexIntoLong < longLen && !matchedSubstr;
+	     indexIntoLong++)
+	{
+		// NOTE: As we scan through, if the longer string we index into becomes
+		// shorter than the substring we're checking then the substring is not
+		// contained in the long string.
+		i32 remainingLenInLongStr = longLen - indexIntoLong;
+		if (remainingLenInLongStr < shortLen) break;
+
+		const char *longSubstr = &longStr[indexIntoLong];
+		i32 index = 0;
+		for (;;)
+		{
+			if (dqn_char_to_lower(longSubstr[index]) ==
+			    dqn_char_to_lower(shortStr[index]))
+			{
+				index++;
+				if (index >= shortLen || !shortStr[index])
+				{
+					matchedSubstr = true;
+					break;
+				}
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+
+	return matchedSubstr;
 }
 
 DQN_FILE_SCOPE i32 dqn_str_to_i32(const char *const buf, const i32 bufSize)

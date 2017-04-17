@@ -27,6 +27,14 @@ void dqn_strings_test()
 		DQN_ASSERT(dqn_char_is_alphanum(' ') == false);
 		DQN_ASSERT(dqn_char_is_alphanum('\n') == false);
 
+		DQN_ASSERT(dqn_char_to_lower(L'A') == L'a');
+		DQN_ASSERT(dqn_char_to_lower(L'a') == L'a');
+		DQN_ASSERT(dqn_char_to_lower(L' ') == L' ');
+
+		DQN_ASSERT(dqn_char_to_upper(L'A') == L'A');
+		DQN_ASSERT(dqn_char_to_upper(L'a') == L'A');
+		DQN_ASSERT(dqn_char_to_upper(L' ') == L' ');
+
 		printf("dqn_strings_test(): char_checks: Completed successfully\n");
 	}
 
@@ -207,6 +215,36 @@ void dqn_strings_test()
 			printf("dqn_strings_test(): str_to_i32: Completed successfully\n");
 		}
 	}
+
+	{
+
+		{
+		    char *a  = "Microsoft";
+		    char *b  = "icro";
+		    i32 lenA = dqn_strlen(a);
+		    i32 lenB = dqn_strlen(b);
+		    DQN_ASSERT(dqn_str_has_substring(a, lenA, b, lenB) == true);
+		    DQN_ASSERT(dqn_str_has_substring(a, lenA, "iro",
+		                                     dqn_strlen("iro")) == false);
+		    DQN_ASSERT(dqn_str_has_substring(b, lenB, a, lenA) == true);
+		    DQN_ASSERT(dqn_str_has_substring("iro", dqn_strlen("iro"), a,
+		                                     lenA) == false);
+		    DQN_ASSERT(dqn_str_has_substring("", 0, "iro", 4) == false);
+		    DQN_ASSERT(dqn_str_has_substring("", 0, "", 0) == false);
+		    DQN_ASSERT(dqn_str_has_substring(NULL, 0, NULL, 0) == false);
+	    }
+
+		{
+		    char *a  = "Micro";
+		    char *b  = "irob";
+		    i32 lenA = dqn_strlen(a);
+		    i32 lenB = dqn_strlen(b);
+		    DQN_ASSERT(dqn_str_has_substring(a, lenA, b, lenB) == false);
+		    DQN_ASSERT(dqn_str_has_substring(b, lenB, a, lenA) == false);
+	    }
+
+	    printf("dqn_strings_test(): str_has_substring: Completed successfully\n");
+    }
 
     // UCS <-> UTF8 Checks
     {
