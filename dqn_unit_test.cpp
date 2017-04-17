@@ -550,18 +550,18 @@ void dqn_vec_test()
 	printf("dqn_vec_test(): Completed successfully\n");
 }
 
-void dqn_darray_test()
+void dqn_array_test()
 {
 	{
 		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(dqn_darray_init(&array, 1));
+		DQN_ASSERT(dqn_array_init(&array, 1));
 		DQN_ASSERT(array.capacity == 1);
 		DQN_ASSERT(array.count == 0);
 
 		// Test basic insert
 		{
 			DqnV2 va = dqn_v2(5, 10);
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 
 			DqnV2 vb = array.data[0];
 			DQN_ASSERT(dqn_v2_equals(va, vb));
@@ -573,7 +573,7 @@ void dqn_darray_test()
 		// Test array resizing and freeing
 		{
 			DqnV2 va = dqn_v2(10, 15);
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 
 			DqnV2 vb = array.data[0];
 			DQN_ASSERT(dqn_v2_equals(va, vb) == false);
@@ -584,58 +584,58 @@ void dqn_darray_test()
 			DQN_ASSERT(array.capacity == 2);
 			DQN_ASSERT(array.count == 2);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 3);
 			DQN_ASSERT(array.count == 3);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 4);
 			DQN_ASSERT(array.count == 4);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 5);
 			DQN_ASSERT(array.count == 5);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 6);
 			DQN_ASSERT(array.count == 6);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 7);
 			DQN_ASSERT(array.count == 7);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 8);
 			DQN_ASSERT(array.count == 8);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 9);
 			DQN_ASSERT(array.count == 9);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 10);
 			DQN_ASSERT(array.count == 10);
 
-			DQN_ASSERT(dqn_darray_push(&array, va));
+			DQN_ASSERT(dqn_array_push(&array, va));
 			DQN_ASSERT(array.capacity == 12);
 			DQN_ASSERT(array.count == 11);
 
 			DqnV2 vc = dqn_v2(90, 100);
-			DQN_ASSERT(dqn_darray_push(&array, vc));
+			DQN_ASSERT(dqn_array_push(&array, vc));
 			DQN_ASSERT(array.capacity == 12);
 			DQN_ASSERT(array.count == 12);
 			DQN_ASSERT(dqn_v2_equals(vc, array.data[11]));
 
-			DQN_ASSERT(dqn_darray_free(&array) == true);
+			DQN_ASSERT(dqn_array_free(&array) == true);
 		}
 	}
 
 	{
 		DqnArray<f32> array = {};
-		DQN_ASSERT(dqn_darray_init(&array, 1));
+		DQN_ASSERT(dqn_array_init(&array, 1));
 		DQN_ASSERT(array.capacity == 1);
 		DQN_ASSERT(array.count == 0);
-		dqn_darray_free(&array);
+		dqn_array_free(&array);
 	}
 
 	{
@@ -645,46 +645,46 @@ void dqn_darray_test()
 		DqnV2 d = dqn_v2(7, 8);
 
 		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(dqn_darray_init(&array, 16));
-		DQN_ASSERT(dqn_darray_remove(&array, 0) == false);
+		DQN_ASSERT(dqn_array_init(&array, 16));
+		DQN_ASSERT(dqn_array_remove(&array, 0) == false);
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 0);
 
-		DQN_ASSERT(dqn_darray_clear(&array));
+		DQN_ASSERT(dqn_array_clear(&array));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 0);
 
-		DQN_ASSERT(dqn_darray_push(&array, a));
-		DQN_ASSERT(dqn_darray_push(&array, b));
-		DQN_ASSERT(dqn_darray_push(&array, c));
-		DQN_ASSERT(dqn_darray_push(&array, d));
+		DQN_ASSERT(dqn_array_push(&array, a));
+		DQN_ASSERT(dqn_array_push(&array, b));
+		DQN_ASSERT(dqn_array_push(&array, c));
+		DQN_ASSERT(dqn_array_push(&array, d));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 4);
 
-		DQN_ASSERT(dqn_darray_remove(&array, 0));
+		DQN_ASSERT(dqn_array_remove(&array, 0));
 		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
 		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
 		DQN_ASSERT(dqn_v2_equals(array.data[2], c));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 3);
 
-		DQN_ASSERT(dqn_darray_remove(&array, 2));
+		DQN_ASSERT(dqn_array_remove(&array, 2));
 		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
 		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 2);
 
-		DQN_ASSERT(dqn_darray_remove(&array, 100) == false);
+		DQN_ASSERT(dqn_array_remove(&array, 100) == false);
 		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
 		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 2);
 
-		DQN_ASSERT(dqn_darray_clear(&array));
+		DQN_ASSERT(dqn_array_clear(&array));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 0);
 
-		dqn_darray_free(&array);
+		dqn_array_free(&array);
 	}
 
 	{
@@ -694,36 +694,36 @@ void dqn_darray_test()
 		DqnV2 d = dqn_v2(7, 8);
 
 		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(dqn_darray_init(&array, 16));
+		DQN_ASSERT(dqn_array_init(&array, 16));
 
-		DQN_ASSERT(dqn_darray_push(&array, a));
-		DQN_ASSERT(dqn_darray_push(&array, b));
-		DQN_ASSERT(dqn_darray_push(&array, c));
-		DQN_ASSERT(dqn_darray_push(&array, d));
+		DQN_ASSERT(dqn_array_push(&array, a));
+		DQN_ASSERT(dqn_array_push(&array, b));
+		DQN_ASSERT(dqn_array_push(&array, c));
+		DQN_ASSERT(dqn_array_push(&array, d));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 4);
 
-		dqn_darray_remove_stable(&array, 0);
+		dqn_array_remove_stable(&array, 0);
 		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
 		DQN_ASSERT(dqn_v2_equals(array.data[1], c));
 		DQN_ASSERT(dqn_v2_equals(array.data[2], d));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 3);
 
-		dqn_darray_remove_stable(&array, 1);
+		dqn_array_remove_stable(&array, 1);
 		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
 		DQN_ASSERT(dqn_v2_equals(array.data[1], d));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 2);
 
-		dqn_darray_remove_stable(&array, 1);
+		dqn_array_remove_stable(&array, 1);
 		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 1);
-		dqn_darray_free(&array);
+		dqn_array_free(&array);
 	}
 
-	printf("dqn_darray_test(): Completed successfully\n");
+	printf("dqn_array_test(): Completed successfully\n");
 }
 
 void dqn_file_test()
@@ -775,6 +775,26 @@ void dqn_file_test()
 	printf("dqn_file_test(): Completed successfully\n");
 }
 
+void dqn_push_buffer_test()
+{
+	size_t blockSize = DQN_KILOBYTE(1);
+	void *block = calloc(1, blockSize);
+	PushBuffer buffer = {};
+	push_buffer_init(&buffer, block, blockSize);
+
+	DQN_ASSERT(buffer.memory == block);
+	DQN_ASSERT(buffer.size == blockSize);
+	DQN_ASSERT(buffer.used == 0);
+
+	void *result = push_buffer_allocate(&buffer, (size_t)(blockSize * 0.5f));
+	DQN_ASSERT(buffer.memory == block);
+	DQN_ASSERT(buffer.size == blockSize);
+	DQN_ASSERT(buffer.used == (size_t)(blockSize * 0.5f));
+	DQN_ASSERT(result);
+
+	free(block);
+}
+
 int main(void)
 {
 	dqn_strings_test();
@@ -782,8 +802,9 @@ int main(void)
 	dqn_math_test();
 	dqn_vec_test();
 	dqn_other_test();
-	dqn_darray_test();
+	dqn_array_test();
 	dqn_file_test();
+	dqn_push_buffer_test();
 
 	printf("\nPress 'Enter' Key to Exit\n");
 	getchar();

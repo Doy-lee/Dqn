@@ -18,15 +18,13 @@
 // HEADER
 //
 ////////////////////////////////////////////////////////////////////////////////
-#include "stdint.h" // For standard types
-#include "math.h"   // For trigonometry functions (for now)
-#include "stdlib.h" // For calloc, malloc, free
+#include <stdint.h> // For standard types
 
 #ifdef _WIN32
 	#define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
 	#define DQN_WIN32
 
-	// TODO(doyle): Our own windows.h?
+	// TODO(doyle): Make my own windows.h?
 	#define WIN32_LEAN_AND_MEAN
 	#include <Windows.h>
 #endif
@@ -46,11 +44,17 @@ typedef int64_t i16;
 typedef double f64;
 typedef float  f32;
 
+#define DQN_TERABYTE(val) (DQN_GIGABYTE(val) * 1024LL)
+#define DQN_GIGABYTE(val) (DQN_MEGABYTE(val) * 1024LL)
+#define DQN_MEGABYTE(val) (DQN_KILOBYTE(val) * 1024LL)
+#define DQN_KILOBYTE(val) ((val) * 1024LL)
+
 #define DQN_INVALID_CODE_PATH 0
 #define DQN_ARRAY_COUNT(array) (sizeof(array) / sizeof(array[0]))
 #define DQN_ASSERT(expr) if (!(expr)) { (*((i32 *)0)) = 0; }
 
 #define DQN_PI 3.14159265359f
+
 #define DQN_ABS(x) (((x) < 0) ? (-(x)) : (x))
 #define DQN_DEGREES_TO_RADIANS(x) ((x * (DQN_PI / 180.0f)))
 #define DQN_RADIANS_TO_DEGREES(x) ((x * (180.0f / DQN_PI)))
@@ -61,6 +65,7 @@ typedef float  f32;
 ////////////////////////////////////////////////////////////////////////////////
 // DArray - Dynamic Array
 ////////////////////////////////////////////////////////////////////////////////
+// REMINDER: Dynamic Array can be used as a stack. Don't need to create one.
 template <typename T>
 struct DqnArray
 {
@@ -69,32 +74,30 @@ struct DqnArray
 	T *data;
 };
 
-// REMINDER: This can be used as a stack. So don't need to create a stack data
-// structure.
 #if 0
 template <typename T>
-bool  dqn_darray_init         (DqnArray<T> *array, size_t capacity);
-bool  dqn_darray_grow         (DqnArray<T> *array);
-T    *dqn_darray_push         (DqnArray<T> *array, T item);
-T    *dqn_darray_pop          (DqnArray<T> *array)
-T    *dqn_darray_get          (DqnArray<T> *array, u64 index);
-bool  dqn_darray_clear        (DqnArray<T> *array);
-bool  dqn_darray_free         (DqnArray<T> *array);
-bool  dqn_darray_remove       (DqnArray<T> *array, u64 index);
-bool  dqn_darray_remove_stable(DqnArray<T> *array, u64 index);
+bool  dqn_array_init         (DqnArray<T> *array, size_t capacity);
+bool  dqn_array_grow         (DqnArray<T> *array);
+T    *dqn_array_push         (DqnArray<T> *array, T item);
+T    *dqn_array_pop          (DqnArray<T> *array)
+T    *dqn_array_get          (DqnArray<T> *array, u64 index);
+bool  dqn_array_clear        (DqnArray<T> *array);
+bool  dqn_array_free         (DqnArray<T> *array);
+bool  dqn_array_remove       (DqnArray<T> *array, u64 index);
+bool  dqn_array_remove_stable(DqnArray<T> *array, u64 index);
 #endif
 
 // Implementation taken from Milton, developed by Serge at
 // https://github.com/serge-rgb/milton#license
 template <typename T>
-bool dqn_darray_init(DqnArray<T> *array, size_t capacity)
+bool dqn_array_init(DqnArray<T> *array, size_t capacity)
 {
 	if (!array) return false;
 
 	if (array->data)
 	{
 		// TODO(doyle): Logging? The array already exists
-		if (!dqn_darray_free(array)) return false;
+		if (!dqn_array_free(array)) return false;
 	}
 
 	array->data     = (T *)calloc((size_t)capacity, sizeof(T));
@@ -106,7 +109,7 @@ bool dqn_darray_init(DqnArray<T> *array, size_t capacity)
 }
 
 template <typename T>
-bool dqn_darray_grow(DqnArray<T> *array)
+bool dqn_array_grow(DqnArray<T> *array)
 {
 	if (!array || !array->data) return false;
 
@@ -128,13 +131,13 @@ bool dqn_darray_grow(DqnArray<T> *array)
 }
 
 template <typename T>
-T *dqn_darray_push(DqnArray<T> *array, T item)
+T *dqn_array_push(DqnArray<T> *array, T item)
 {
 	if (!array) return NULL;
 
 	if (array->count >= array->capacity)
 	{
-		if (!dqn_darray_grow(array)) return NULL;
+		if (!dqn_array_grow(array)) return NULL;
 	}
 
 	DQN_ASSERT(array->count < array->capacity);
@@ -144,7 +147,7 @@ T *dqn_darray_push(DqnArray<T> *array, T item)
 }
 
 template <typename T>
-T *dqn_darray_pop(DqnArray<T> *array)
+T *dqn_array_pop(DqnArray<T> *array)
 {
 	if (!array) return NULL;
 	if (array->count == 0) return NULL;
@@ -154,7 +157,7 @@ T *dqn_darray_pop(DqnArray<T> *array)
 }
 
 template <typename T>
-T *dqn_darray_get(DqnArray<T> *array, u64 index)
+T *dqn_array_get(DqnArray<T> *array, u64 index)
 {
 	T *result = NULL;
 	if (index >= 0 && index <= array->count) result = &array->data[index];
@@ -162,7 +165,7 @@ T *dqn_darray_get(DqnArray<T> *array, u64 index)
 }
 
 template <typename T>
-bool dqn_darray_clear(DqnArray<T> *array)
+bool dqn_array_clear(DqnArray<T> *array)
 {
 	if (array)
 	{
@@ -174,7 +177,7 @@ bool dqn_darray_clear(DqnArray<T> *array)
 }
 
 template <typename T>
-bool dqn_darray_free(DqnArray<T> *array)
+bool dqn_array_free(DqnArray<T> *array)
 {
 	if (array && array->data)
 	{
@@ -188,7 +191,7 @@ bool dqn_darray_free(DqnArray<T> *array)
 }
 
 template <typename T>
-bool dqn_darray_remove(DqnArray<T> *array, u64 index)
+bool dqn_array_remove(DqnArray<T> *array, u64 index)
 {
 	if (!array) return false;
 	if (index >= array->count) return false;
@@ -207,7 +210,7 @@ bool dqn_darray_remove(DqnArray<T> *array, u64 index)
 }
 
 template <typename T>
-bool dqn_darray_remove_stable(DqnArray<T> *array, u64 index)
+bool dqn_array_remove_stable(DqnArray<T> *array, u64 index)
 {
 	if (!array) return false;
 	if (index >= array->count) return false;
@@ -237,7 +240,7 @@ bool dqn_darray_remove_stable(DqnArray<T> *array, u64 index)
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE f32 dqn_math_lerp (f32 a, f32 t, f32 b);
+DQN_FILE_SCOPE f32 dqn_math_lerp(f32 a, f32 t, f32 b);
 DQN_FILE_SCOPE f32 dqn_math_sqrtf(f32 a);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -352,6 +355,8 @@ DQN_FILE_SCOPE bool    dqn_rect_contains_p (DqnRect rect, DqnV2 p);
 ////////////////////////////////////////////////////////////////////////////////
 // String Ops
 ////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE char  dqn_char_to_upper   (char c);
+DQN_FILE_SCOPE char  dqn_char_to_lower   (char c);
 DQN_FILE_SCOPE bool  dqn_char_is_digit   (char c);
 DQN_FILE_SCOPE bool  dqn_char_is_alpha   (char c);
 DQN_FILE_SCOPE bool  dqn_char_is_alphanum(char c);
@@ -381,6 +386,7 @@ DQN_FILE_SCOPE bool dqn_win32_utf8_to_wchar (const char *const in, wchar_t *cons
 DQN_FILE_SCOPE bool dqn_win32_wchar_to_utf8 (const wchar_t *const in, char *const out, const i32 outLen);
 
 DQN_FILE_SCOPE void dqn_win32_get_client_dim    (const HWND window, LONG *width, LONG *height);
+DQN_FILE_SCOPE void dqn_win32_get_rect_dim      (RECT rect, LONG *width, LONG *height);
 DQN_FILE_SCOPE void dqn_win32_display_last_error(const char *const errorPrefix);
 #endif /* DQN_WIN32 */
 
@@ -466,6 +472,30 @@ DQN_FILE_SCOPE u32  dqn_rnd_pcg_next (DqnRandPCGState *pcg);
 DQN_FILE_SCOPE f32  dqn_rnd_pcg_nextf(DqnRandPCGState *pcg);
 // Returns a random integer N between [min, max]
 DQN_FILE_SCOPE i32  dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max);
+
+////////////////////////////////////////////////////////////////////////////////
+// PushBuffer Header
+////////////////////////////////////////////////////////////////////////////////
+typedef struct PushBuffer
+{
+	u8     *memory;
+	size_t  used;
+	size_t  size;
+	i32 tempBufferCount;
+} PushBuffer;
+
+typedef struct TempBuffer
+{
+	PushBuffer *buffer;
+	size_t used;
+} TempBuffer;
+
+DQN_FILE_SCOPE bool  push_buffer_init    (PushBuffer *buffer, void *memory, size_t size);
+DQN_FILE_SCOPE void *push_buffer_allocate(PushBuffer *buffer, size_t size);
+
+DQN_FILE_SCOPE TempBuffer push_buffer_begin_temp_region(PushBuffer *buffer);
+DQN_FILE_SCOPE void       push_buffer_end_temp_region  (TempBuffer tempBuffer);
+
 #endif  /* DQN_H */
 
 #ifndef DQN_INI_H
@@ -993,6 +1023,8 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 // DQN_IMPLEMENTATION
 //
 ////////////////////////////////////////////////////////////////////////////////
+#include "math.h"   // TODO(doyle): For trigonometry functions (for now)
+#include "stdlib.h" // For calloc, malloc, free
 
 // NOTE: STB_SPRINTF modified to be included when DQN_IMPLEMENTATION defined
 // #define STB_SPRINTF_IMPLEMENTATION
@@ -1503,19 +1535,42 @@ DQN_FILE_SCOPE inline bool dqn_rect_contains_p(DqnRect rect, DqnV2 p)
 ////////////////////////////////////////////////////////////////////////////////
 // String Operations
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE bool dqn_char_is_digit(char c)
+DQN_FILE_SCOPE inline char dqn_char_to_lower(char c)
+{
+	if (c >= 'A' && c <= 'Z')
+	{
+		i32 shiftOffset = 'a' - 'A';
+		return (c + (char)shiftOffset);
+	}
+
+	return c;
+}
+
+DQN_FILE_SCOPE inline char dqn_char_to_upper(char c)
+{
+	if (c >= 'a' && c <= 'z')
+	{
+		i32 shiftOffset = 'a' - 'A';
+		return (c - (char)shiftOffset);
+	}
+
+	return c;
+}
+
+
+DQN_FILE_SCOPE inline bool dqn_char_is_digit(char c)
 {
 	if (c >= '0' && c <= '9') return true;
 	return false;
 }
 
-DQN_FILE_SCOPE bool dqn_char_is_alpha(char c)
+DQN_FILE_SCOPE inline bool dqn_char_is_alpha(char c)
 {
 	if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return true;
 	return false;
 }
 
-DQN_FILE_SCOPE bool dqn_char_is_alphanum(char c)
+DQN_FILE_SCOPE inline bool dqn_char_is_alphanum(char c)
 {
 	if (dqn_char_is_alpha(c) || dqn_char_is_digit(c)) return true;
 	return false;
@@ -1847,6 +1902,12 @@ DQN_FILE_SCOPE void dqn_win32_get_client_dim(const HWND window, LONG *width,
 {
 	RECT rect;
 	GetClientRect(window, &rect);
+	if (width)  *width  = rect.right - rect.left;
+	if (height) *height = rect.bottom - rect.top;
+}
+
+DQN_FILE_SCOPE void dqn_win32_get_rect_dim(RECT rect, LONG *width, LONG *height)
+{
 	if (width)  *width  = rect.right - rect.left;
 	if (height) *height = rect.bottom - rect.top;
 }
@@ -2191,6 +2252,51 @@ DQN_FILE_SCOPE i32 dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max)
 	i32 const value = (i32)(dqn_rnd_pcg_nextf(pcg) * range);
 	return min + value;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// PushBuffer Header
+////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE bool push_buffer_init(PushBuffer *buffer, void *memory, size_t size)
+{
+	if (!buffer || !memory || size <= 0) return false;
+
+	buffer->memory          = (u8 *)memory;
+	buffer->size            = size;
+	buffer->used            = 0;
+	buffer->tempBufferCount = 0;
+	return true;
+}
+
+DQN_FILE_SCOPE inline void *push_buffer_allocate(PushBuffer *buffer, size_t size)
+{
+	DQN_ASSERT((buffer->used + size) <= buffer->size);
+	void *result  = buffer->memory + buffer->used;
+	buffer->used += size;
+
+	return result;
+}
+
+DQN_FILE_SCOPE TempBuffer push_buffer_begin_temp_region(PushBuffer *buffer)
+{
+	TempBuffer result = {};
+	result.buffer      = buffer;
+	result.used        = buffer->used;
+
+	buffer->tempBufferCount++;
+
+	return result;
+}
+
+DQN_FILE_SCOPE void push_buffer_end_temp_region(TempBuffer tempBuffer)
+{
+	PushBuffer *buffer = tempBuffer.buffer;
+	DQN_ASSERT(buffer->used > tempBuffer.used)
+
+	buffer->used = tempBuffer.used;
+	buffer->tempBufferCount--;
+	DQN_ASSERT(buffer->tempBufferCount >= 0);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // STB_Sprintf
 ////////////////////////////////////////////////////////////////////////////////
