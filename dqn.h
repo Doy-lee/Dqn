@@ -100,7 +100,8 @@ bool dqn_array_init(DqnArray<T> *array, size_t capacity)
 		if (!dqn_array_free(array)) return false;
 	}
 
-	array->data     = (T *)calloc((size_t)capacity, sizeof(T));
+	array->data =
+	    (T *)dqn_mem_alloc_internal((size_t)capacity * sizeof(T), true);
 	if (!array->data) return false;
 
 	array->count    = 0;
@@ -117,7 +118,8 @@ bool dqn_array_grow(DqnArray<T> *array)
 	size_t newCapacity         = (size_t)(array->capacity * GROWTH_FACTOR);
 	if (newCapacity == array->capacity) newCapacity++;
 
-	T *newMem = (T *)realloc(array->data, (size_t)(newCapacity * sizeof(T)));
+	T *newMem = (T *)dqn_mem_realloc_internal(
+	    array->data, (size_t)(newCapacity * sizeof(T)));
 	if (newMem)
 	{
 		array->data     = newMem;
@@ -480,25 +482,37 @@ DQN_FILE_SCOPE i32  dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max);
 ////////////////////////////////////////////////////////////////////////////////
 // PushBuffer Header
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct PushBuffer
+typedef struct DqnPushBufferBlock
 {
 	u8     *memory;
 	size_t  used;
 	size_t  size;
-	i32 tempBufferCount;
-} PushBuffer;
 
-typedef struct TempBuffer
+	DqnPushBufferBlock *prevBlock;
+} DqnPushBufferBlock;
+
+typedef struct DqnPushBuffer
 {
-	PushBuffer *buffer;
+	DqnPushBufferBlock *block;
+
+	i32 tempBufferCount;
+	u32 alignment;
+} DqnPushBuffer;
+
+typedef struct DqnTempBuffer
+{
+	DqnPushBuffer      *buffer;
+	DqnPushBufferBlock *startingBlock;
 	size_t used;
-} TempBuffer;
 
-DQN_FILE_SCOPE bool  push_buffer_init    (PushBuffer *buffer, void *memory, size_t size);
-DQN_FILE_SCOPE void *push_buffer_allocate(PushBuffer *buffer, size_t size);
+} DqnTempBuffer;
 
-DQN_FILE_SCOPE TempBuffer push_buffer_begin_temp_region(PushBuffer *buffer);
-DQN_FILE_SCOPE void       push_buffer_end_temp_region  (TempBuffer tempBuffer);
+DQN_FILE_SCOPE bool  dqn_push_buffer_init    (DqnPushBuffer *buffer, size_t size, u32 alignment);
+DQN_FILE_SCOPE void *dqn_push_buffer_allocate(DqnPushBuffer *buffer, size_t size);
+DQN_FILE_SCOPE void  dqn_push_buffer_free_last_buffer(DqnPushBuffer *buffer);
+
+DQN_FILE_SCOPE DqnTempBuffer dqn_push_buffer_begin_temp_region(DqnPushBuffer *buffer);
+DQN_FILE_SCOPE void          dqn_push_buffer_end_temp_region  (DqnTempBuffer tempBuffer);
 
 #endif  /* DQN_H */
 
@@ -1037,6 +1051,41 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 // #define DQN_INI_IMPLEMENTATION
 #define DQN_INI_STRLEN(s) dqn_strlen(s)
 ////////////////////////////////////////////////////////////////////////////////
+// Memory
+////////////////////////////////////////////////////////////////////////////////
+// NOTE: All memory allocations in dqn.h go through these functions. So they can
+// be rerouted fairly easily especially for platform specific mallocs.
+FILE_SCOPE void *dqn_mem_alloc_internal(size_t size, bool zeroClear)
+{
+	void *result = NULL;
+
+	if (zeroClear)
+	{
+		result = calloc(1, size);
+	}
+	else
+	{
+		result = malloc(size);
+	}
+	return result;
+}
+
+FILE_SCOPE void *dqn_mem_realloc_internal(void *memory, size_t newSize)
+{
+	void *result = realloc(memory, newSize);
+	return result;
+}
+
+FILE_SCOPE void dqn_mem_free_internal(void *memory)
+{
+	if (memory)
+	{
+		free(memory);
+		memory = NULL;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE f32 dqn_math_lerp(f32 a, f32 t, f32 b)
@@ -1159,7 +1208,7 @@ DQN_FILE_SCOPE inline f32 dqn_v2_length(DqnV2 a, DqnV2 b)
 DQN_FILE_SCOPE inline DqnV2 dqn_v2_normalise(DqnV2 a)
 {
 	f32 magnitude = dqn_v2_length(dqn_v2(0, 0), a);
-	DqnV2 result = dqn_v2(a.x, a.y);
+	DqnV2 result  = dqn_v2(a.x, a.y);
 	result        = dqn_v2_scale(a, 1 / magnitude);
 	return result;
 }
@@ -2155,25 +2204,26 @@ DQN_FILE_SCOPE char **dqn_dir_read(char *dir, u32 *numFiles)
 			return NULL;
 		}
 
-
-		char **list = (char **)calloc(1, sizeof(*list) * (currNumFiles));
+		char **list = (char **)dqn_mem_alloc_internal(
+		    sizeof(*list) * (currNumFiles), true);
 		if (!list)
 		{
-			DQN_WIN32_ERROR_BOX("calloc() failed.", NULL);
+			DQN_WIN32_ERROR_BOX("dqn_mem_alloc_internal() failed.", NULL);
 			return NULL;
 		}
 
 		for (u32 i = 0; i < currNumFiles; i++)
 		{
-			list[i] = (char *)calloc(1, sizeof(**list) * MAX_PATH);
+			list[i] =
+			    (char *)dqn_mem_alloc_internal(sizeof(**list) * MAX_PATH, true);
 			if (!list[i])
 			{
 				for (u32 j = 0; j < i; j++)
 				{
-					free(list[j]);
+					dqn_mem_free_internal(list[j]);
 				}
 
-				DQN_WIN32_ERROR_BOX("calloc() failed.", NULL);
+				DQN_WIN32_ERROR_BOX("dqn_mem_alloc_internal() failed.", NULL);
 				return NULL;
 			}
 		}
@@ -2200,11 +2250,11 @@ DQN_FILE_SCOPE inline void dqn_dir_read_free(char **fileList, u32 numFiles)
 	{
 		for (u32 i = 0; i < numFiles; i++)
 		{
-			if (fileList[i]) free(fileList[i]);
+			if (fileList[i]) dqn_mem_free_internal(fileList[i]);
 			fileList[i] = NULL;
 		}
 
-		free(fileList);
+		dqn_mem_free_internal(fileList);
 	}
 }
 
@@ -2324,47 +2374,99 @@ DQN_FILE_SCOPE i32 dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// PushBuffer Header
+// DqnPushBuffer Header
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE bool push_buffer_init(PushBuffer *buffer, void *memory, size_t size)
+FILE_SCOPE size_t inline dqn_size_alignment_internal(u32 alignment, size_t size)
 {
-	if (!buffer || !memory || size <= 0) return false;
+	size_t result = ((size + (alignment-1)) & ~(alignment-1));
+	return result;
+}
 
-	buffer->memory          = (u8 *)memory;
-	buffer->size            = size;
-	buffer->used            = 0;
+FILE_SCOPE DqnPushBufferBlock *
+dqn_push_buffer_alloc_block_internal(u32 alignment, size_t size)
+{
+	size_t alignedSize = dqn_size_alignment_internal(alignment, size);
+	size_t totalSize   = alignedSize + sizeof(DqnPushBufferBlock);
+
+	DqnPushBufferBlock *result = (DqnPushBufferBlock *)dqn_mem_alloc_internal(totalSize, true);
+	if (!result) return NULL;
+
+	result->memory = (u8 *)result + sizeof(*result);
+	result->size   = alignedSize;
+	result->used   = 0;
+	return result;
+}
+
+DQN_FILE_SCOPE bool dqn_push_buffer_init(DqnPushBuffer *buffer, size_t size, u32 alignment)
+{
+	if (!buffer || size <= 0) return false;
+
+	buffer->block = dqn_push_buffer_alloc_block_internal(alignment, size);
+	if (!buffer->block) return false;
+
 	buffer->tempBufferCount = 0;
+	buffer->alignment       = alignment;
 	return true;
 }
 
-DQN_FILE_SCOPE inline void *push_buffer_allocate(PushBuffer *buffer, size_t size)
+DQN_FILE_SCOPE void *dqn_push_buffer_allocate(DqnPushBuffer *buffer, size_t size)
 {
-	DQN_ASSERT((buffer->used + size) <= buffer->size);
-	void *result  = buffer->memory + buffer->used;
-	buffer->used += size;
+	size_t alignedSize = dqn_size_alignment_internal(buffer->alignment, size);
+	if ((buffer->block->used + alignedSize) > buffer->block->size)
+	{
+		size_t newBlockSize = DQN_MAX(alignedSize, buffer->block->size);
+		DqnPushBufferBlock *newBlock = dqn_push_buffer_alloc_block_internal(
+		    buffer->alignment, newBlockSize);
+		if (!newBlock) return NULL;
+
+		newBlock->prevBlock = buffer->block;
+		buffer->block       = newBlock;
+	}
+
+	u8 *currPointer        = buffer->block->memory + buffer->block->used;
+	u8 *alignedResult      = (u8 *)dqn_size_alignment_internal(buffer->alignment, (size_t)currPointer);
+	size_t alignmentOffset = (size_t)(alignedResult - currPointer);
+
+	void *result = alignedResult;
+	buffer->block->used += (alignedSize + alignmentOffset);
 
 	return result;
 }
 
-DQN_FILE_SCOPE TempBuffer push_buffer_begin_temp_region(PushBuffer *buffer)
+DQN_FILE_SCOPE void dqn_push_buffer_free_last_buffer(DqnPushBuffer *buffer)
 {
-	TempBuffer result = {};
-	result.buffer      = buffer;
-	result.used        = buffer->used;
+	DqnPushBufferBlock *prevBlock = buffer->block->prevBlock;
+	dqn_mem_free_internal(buffer->block);
+	buffer->block = prevBlock;
+
+	// No more blocks, then last block has been freed
+	if (!buffer->block) DQN_ASSERT(buffer->tempBufferCount == 0);
+}
+
+DQN_FILE_SCOPE DqnTempBuffer dqn_push_buffer_begin_temp_region(DqnPushBuffer *buffer)
+{
+	DqnTempBuffer result = {};
+	result.buffer        = buffer;
+	result.startingBlock = buffer->block;
+	result.used          = buffer->block->used;
 
 	buffer->tempBufferCount++;
-
 	return result;
 }
 
-DQN_FILE_SCOPE void push_buffer_end_temp_region(TempBuffer tempBuffer)
+DQN_FILE_SCOPE void dqn_push_buffer_end_temp_region(DqnTempBuffer tempBuffer)
 {
-	PushBuffer *buffer = tempBuffer.buffer;
-	DQN_ASSERT(buffer->used > tempBuffer.used)
+	DqnPushBuffer *buffer = tempBuffer.buffer;
+	while (buffer->block != tempBuffer.startingBlock)
+		dqn_push_buffer_free_last_buffer(buffer);
 
-	buffer->used = tempBuffer.used;
+	if (buffer->block)
+	{
+		DQN_ASSERT(buffer->block->used >= tempBuffer.used);
+		buffer->block->used = tempBuffer.used;
+		DQN_ASSERT(buffer->tempBufferCount >= 0);
+	}
 	buffer->tempBufferCount--;
-	DQN_ASSERT(buffer->tempBufferCount >= 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -815,22 +815,115 @@ void dqn_file_test()
 
 void dqn_push_buffer_test()
 {
-	size_t blockSize = DQN_KILOBYTE(1);
-	void *block = calloc(1, blockSize);
-	PushBuffer buffer = {};
-	push_buffer_init(&buffer, block, blockSize);
+	size_t allocSize  = DQN_KILOBYTE(1);
+	DqnPushBuffer buffer = {};
+	const u32 ALIGNMENT  = 4;
+	dqn_push_buffer_init(&buffer, allocSize, ALIGNMENT);
+	DQN_ASSERT(buffer.block && buffer.block->memory);
+	DQN_ASSERT(buffer.block->size == allocSize);
+	DQN_ASSERT(buffer.block->used == 0);
+	DQN_ASSERT(buffer.alignment == ALIGNMENT);
 
-	DQN_ASSERT(buffer.memory == block);
-	DQN_ASSERT(buffer.size == blockSize);
-	DQN_ASSERT(buffer.used == 0);
+	// Alocate A
+	size_t sizeA = (size_t)(allocSize * 0.5f);
+	void *resultA = dqn_push_buffer_allocate(&buffer, sizeA);
+	u64 resultAddrA = *((u64 *)resultA);
+	DQN_ASSERT(resultAddrA % ALIGNMENT == 0);
+	DQN_ASSERT(buffer.block && buffer.block->memory);
+	DQN_ASSERT(buffer.block->size == allocSize);
+	DQN_ASSERT(buffer.block->used >= sizeA + 0 &&
+	           buffer.block->used <= sizeA + 3);
+	DQN_ASSERT(buffer.alignment == ALIGNMENT);
+	DQN_ASSERT(resultA);
+	u8 *ptrA = (u8 *)resultA;
+	for (u32 i  = 0; i < sizeA; i++)
+		ptrA[i] = 1;
 
-	void *result = push_buffer_allocate(&buffer, (size_t)(blockSize * 0.5f));
-	DQN_ASSERT(buffer.memory == block);
-	DQN_ASSERT(buffer.size == blockSize);
-	DQN_ASSERT(buffer.used == (size_t)(blockSize * 0.5f));
-	DQN_ASSERT(result);
+	DqnPushBufferBlock *blockA = buffer.block;
+	// Alocate B
+	size_t sizeB  = (size_t)(allocSize * 2.0f);
+	void *resultB = dqn_push_buffer_allocate(&buffer, sizeB);
+	u64 resultAddrB = *((u64 *)resultB);
+	DQN_ASSERT(resultAddrB % ALIGNMENT == 0);
+	DQN_ASSERT(buffer.block && buffer.block->memory);
+	DQN_ASSERT(buffer.block->size == DQN_KILOBYTE(2));
 
-	free(block);
+	// Since we alignment the pointers we return they can be within 0-3 bytes of
+	// what we expect and since this is in a new block as well used will reflect
+	// just this allocation.
+	DQN_ASSERT(buffer.block->used >= sizeB + 0 &&
+	           buffer.block->used <= sizeB + 3);
+	DQN_ASSERT(resultB);
+	u8 *ptrB = (u8 *)resultB;
+	for (u32 i  = 0; i < sizeB; i++)
+		ptrB[i] = 2;
+
+	// Check that a new block was created since there wasn't enough space
+	DQN_ASSERT(buffer.block->prevBlock == blockA);
+	DQN_ASSERT(buffer.block != blockA);
+	DQN_ASSERT(buffer.alignment == ALIGNMENT);
+	DQN_ASSERT(blockA->used == sizeA);
+	DqnPushBufferBlock *blockB = buffer.block;
+
+	// Check temp regions work
+	DqnTempBuffer tempBuffer = dqn_push_buffer_begin_temp_region(&buffer);
+	size_t sizeC          = 1024 + 1;
+	void *resultC = dqn_push_buffer_allocate(tempBuffer.buffer, sizeC);
+	u64 resultAddrC = *((u64 *)resultC);
+	DQN_ASSERT(resultAddrC % ALIGNMENT == 0);
+	DQN_ASSERT(buffer.block != blockB && buffer.block != blockA);
+	DQN_ASSERT(buffer.block->used >= sizeC + 0 &&
+	           buffer.block->used <= sizeC + 3);
+	DQN_ASSERT(buffer.tempBufferCount == 1);
+	DQN_ASSERT(buffer.alignment == ALIGNMENT);
+
+	// NOTE: Allocation should be aligned to 4 byte boundary
+	DQN_ASSERT(tempBuffer.buffer->block->size == 2048);
+	u8 *ptrC = (u8 *)resultC;
+	for (u32 i  = 0; i < sizeC; i++)
+		ptrC[i] = 3;
+
+	// Check that a new block was created since there wasn't enough space
+	DQN_ASSERT(buffer.block->prevBlock == blockB);
+	DQN_ASSERT(buffer.block != blockB);
+	DQN_ASSERT(buffer.alignment == ALIGNMENT);
+
+	for (u32 i  = 0; i < sizeA; i++)
+		DQN_ASSERT(ptrA[i] == 1);
+	for (u32 i  = 0; i < sizeB; i++)
+		DQN_ASSERT(ptrB[i] == 2);
+	for (u32 i  = 0; i < sizeC; i++)
+		DQN_ASSERT(ptrC[i] == 3);
+
+	// End temp region which should revert back to 2 linked buffers, A and B
+	dqn_push_buffer_end_temp_region(tempBuffer);
+	DQN_ASSERT(buffer.block && buffer.block->memory);
+	DQN_ASSERT(buffer.block->size == sizeB);
+	DQN_ASSERT(buffer.block->used >= sizeB + 0 &&
+	           buffer.block->used <= sizeB + 3);
+	DQN_ASSERT(buffer.tempBufferCount == 0);
+	DQN_ASSERT(resultB);
+
+	DQN_ASSERT(buffer.block->prevBlock == blockA);
+	DQN_ASSERT(buffer.block != blockA);
+	DQN_ASSERT(blockA->used == sizeA);
+	DQN_ASSERT(buffer.alignment == ALIGNMENT);
+
+	// Release the last linked buffer from the push buffer
+	dqn_push_buffer_free_last_buffer(&buffer);
+
+	// Which should return back to the 1st allocation
+	DQN_ASSERT(buffer.block == blockA);
+	DQN_ASSERT(buffer.block->memory);
+	DQN_ASSERT(buffer.block->size == allocSize);
+	DQN_ASSERT(buffer.block->used == sizeA);
+	DQN_ASSERT(buffer.alignment == ALIGNMENT);
+
+	// Free once more to release buffer A memory
+	dqn_push_buffer_free_last_buffer(&buffer);
+	DQN_ASSERT(!buffer.block);
+	DQN_ASSERT(buffer.alignment == ALIGNMENT);
+	DQN_ASSERT(buffer.tempBufferCount == 0);
 }
 
 int main(void)
