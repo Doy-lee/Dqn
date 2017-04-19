@@ -1115,7 +1115,7 @@ DQN_FILE_SCOPE f32 dqn_math_sqrtf(f32 a)
 ////////////////////////////////////////////////////////////////////////////////
 // Vec2
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE inline DqnV2 dqn_v2(f32 x, f32 y)
+DQN_FILE_SCOPE DqnV2 dqn_v2(f32 x, f32 y)
 {
 	DqnV2 result = {};
 	result.x  = x;
@@ -1124,13 +1124,13 @@ DQN_FILE_SCOPE inline DqnV2 dqn_v2(f32 x, f32 y)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV2 dqn_v2i(i32 x, i32 y)
+DQN_FILE_SCOPE DqnV2 dqn_v2i(i32 x, i32 y)
 {
 	DqnV2 result = dqn_v2((f32)x, (f32)y);
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV2 dqn_v2_add(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE DqnV2 dqn_v2_add(DqnV2 a, DqnV2 b)
 {
 	DqnV2 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1139,7 +1139,7 @@ DQN_FILE_SCOPE inline DqnV2 dqn_v2_add(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV2 dqn_v2_sub(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE DqnV2 dqn_v2_sub(DqnV2 a, DqnV2 b)
 {
 	DqnV2 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1148,7 +1148,7 @@ DQN_FILE_SCOPE inline DqnV2 dqn_v2_sub(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV2 dqn_v2_scale(DqnV2 a, f32 b)
+DQN_FILE_SCOPE DqnV2 dqn_v2_scale(DqnV2 a, f32 b)
 {
 	DqnV2 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1157,7 +1157,7 @@ DQN_FILE_SCOPE inline DqnV2 dqn_v2_scale(DqnV2 a, f32 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV2 dqn_v2_hadamard(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE DqnV2 dqn_v2_hadamard(DqnV2 a, DqnV2 b)
 {
 	DqnV2 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1166,7 +1166,7 @@ DQN_FILE_SCOPE inline DqnV2 dqn_v2_hadamard(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline f32 dqn_v2_dot(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE f32 dqn_v2_dot(DqnV2 a, DqnV2 b)
 {
 	/*
 	   DOT PRODUCT
@@ -1182,7 +1182,7 @@ DQN_FILE_SCOPE inline f32 dqn_v2_dot(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline bool dqn_v2_equals(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE bool dqn_v2_equals(DqnV2 a, DqnV2 b)
 {
 	bool result = TRUE;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1190,7 +1190,7 @@ DQN_FILE_SCOPE inline bool dqn_v2_equals(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline f32 dqn_v2_length_squared(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE f32 dqn_v2_length_squared(DqnV2 a, DqnV2 b)
 {
 	f32 x      = b.x - a.x;
 	f32 y      = b.y - a.y;
@@ -1198,14 +1198,14 @@ DQN_FILE_SCOPE inline f32 dqn_v2_length_squared(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline f32 dqn_v2_length(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE f32 dqn_v2_length(DqnV2 a, DqnV2 b)
 {
 	f32 lengthSq = dqn_v2_length_squared(a, b);
 	f32 result   = dqn_math_sqrtf(lengthSq);
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV2 dqn_v2_normalise(DqnV2 a)
+DQN_FILE_SCOPE DqnV2 dqn_v2_normalise(DqnV2 a)
 {
 	f32 magnitude = dqn_v2_length(dqn_v2(0, 0), a);
 	DqnV2 result  = dqn_v2(a.x, a.y);
@@ -1213,7 +1213,7 @@ DQN_FILE_SCOPE inline DqnV2 dqn_v2_normalise(DqnV2 a)
 	return result;
 }
 
-DQN_FILE_SCOPE inline bool dqn_v2_overlaps(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE bool dqn_v2_overlaps(DqnV2 a, DqnV2 b)
 {
 	bool result = false;
 	
@@ -1236,7 +1236,7 @@ DQN_FILE_SCOPE inline bool dqn_v2_overlaps(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV2 dqn_v2_perpendicular(DqnV2 a)
+DQN_FILE_SCOPE DqnV2 dqn_v2_perpendicular(DqnV2 a)
 {
 	DqnV2 result = {a.y, -a.x};
 	return result;
@@ -1260,7 +1260,7 @@ DQN_FILE_SCOPE DqnV2 dqn_v2_constrain_to_ratio(DqnV2 dim, DqnV2 ratio)
 ////////////////////////////////////////////////////////////////////////////////
 // Vec3
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE inline DqnV3 dqn_v3(f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnV3 dqn_v3(f32 x, f32 y, f32 z)
 {
 	DqnV3 result = {};
 	result.x       = x;
@@ -1269,13 +1269,13 @@ DQN_FILE_SCOPE inline DqnV3 dqn_v3(f32 x, f32 y, f32 z)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV3 dqn_v3i(i32 x, i32 y, i32 z)
+DQN_FILE_SCOPE DqnV3 dqn_v3i(i32 x, i32 y, i32 z)
 {
 	DqnV3 result = dqn_v3((f32)x, (f32)y, (f32)z);
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV3 dqn_v3_add(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE DqnV3 dqn_v3_add(DqnV3 a, DqnV3 b)
 {
 	DqnV3 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1284,7 +1284,7 @@ DQN_FILE_SCOPE inline DqnV3 dqn_v3_add(DqnV3 a, DqnV3 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV3 dqn_v3_sub(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE DqnV3 dqn_v3_sub(DqnV3 a, DqnV3 b)
 {
 	DqnV3 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1293,7 +1293,7 @@ DQN_FILE_SCOPE inline DqnV3 dqn_v3_sub(DqnV3 a, DqnV3 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV3 dqn_v3_scale(DqnV3 a, f32 b)
+DQN_FILE_SCOPE DqnV3 dqn_v3_scale(DqnV3 a, f32 b)
 {
 	DqnV3 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1302,7 +1302,7 @@ DQN_FILE_SCOPE inline DqnV3 dqn_v3_scale(DqnV3 a, f32 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV3 dqn_v3_hadamard(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE DqnV3 dqn_v3_hadamard(DqnV3 a, DqnV3 b)
 {
 	DqnV3 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1311,7 +1311,7 @@ DQN_FILE_SCOPE inline DqnV3 dqn_v3_hadamard(DqnV3 a, DqnV3 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline f32 dqn_v3_dot(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE f32 dqn_v3_dot(DqnV3 a, DqnV3 b)
 {
 	/*
 	   DOT PRODUCT
@@ -1327,7 +1327,7 @@ DQN_FILE_SCOPE inline f32 dqn_v3_dot(DqnV3 a, DqnV3 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline bool dqn_v3_equals(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE bool dqn_v3_equals(DqnV3 a, DqnV3 b)
 {
 	bool result = TRUE;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1335,7 +1335,7 @@ DQN_FILE_SCOPE inline bool dqn_v3_equals(DqnV3 a, DqnV3 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV3 dqn_v3_cross(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE DqnV3 dqn_v3_cross(DqnV3 a, DqnV3 b)
 {
 	/*
 	   CROSS PRODUCT
@@ -1354,18 +1354,18 @@ DQN_FILE_SCOPE inline DqnV3 dqn_v3_cross(DqnV3 a, DqnV3 b)
 ////////////////////////////////////////////////////////////////////////////////
 // Vec4
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE inline DqnV4 dqn_v4(f32 x, f32 y, f32 z, f32 w)
+DQN_FILE_SCOPE DqnV4 dqn_v4(f32 x, f32 y, f32 z, f32 w)
 {
 	DqnV4 result = {x, y, z, w};
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV4 dqn_v4i(i32 x, i32 y, i32 z, i32 w) {
+DQN_FILE_SCOPE DqnV4 dqn_v4i(i32 x, i32 y, i32 z, i32 w) {
 	DqnV4 result = dqn_v4((f32)x, (f32)y, (f32)z, (f32)w);
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV4 dqn_v4_add(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE DqnV4 dqn_v4_add(DqnV4 a, DqnV4 b)
 {
 	DqnV4 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1374,7 +1374,7 @@ DQN_FILE_SCOPE inline DqnV4 dqn_v4_add(DqnV4 a, DqnV4 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV4 dqn_v4_sub(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE DqnV4 dqn_v4_sub(DqnV4 a, DqnV4 b)
 {
 	DqnV4 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1383,7 +1383,7 @@ DQN_FILE_SCOPE inline DqnV4 dqn_v4_sub(DqnV4 a, DqnV4 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV4 dqn_v4_scale(DqnV4 a, f32 b)
+DQN_FILE_SCOPE DqnV4 dqn_v4_scale(DqnV4 a, f32 b)
 {
 	DqnV4 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1392,7 +1392,7 @@ DQN_FILE_SCOPE inline DqnV4 dqn_v4_scale(DqnV4 a, f32 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV4 dqn_v4_hadamard(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE DqnV4 dqn_v4_hadamard(DqnV4 a, DqnV4 b)
 {
 	DqnV4 result;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1401,7 +1401,7 @@ DQN_FILE_SCOPE inline DqnV4 dqn_v4_hadamard(DqnV4 a, DqnV4 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline f32 dqn_v4_dot(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE f32 dqn_v4_dot(DqnV4 a, DqnV4 b)
 {
 	/*
 	   DOT PRODUCT
@@ -1417,7 +1417,7 @@ DQN_FILE_SCOPE inline f32 dqn_v4_dot(DqnV4 a, DqnV4 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline bool dqn_v4_equals(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE bool dqn_v4_equals(DqnV4 a, DqnV4 b)
 {
 	bool result = TRUE;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1428,7 +1428,7 @@ DQN_FILE_SCOPE inline bool dqn_v4_equals(DqnV4 a, DqnV4 b)
 ////////////////////////////////////////////////////////////////////////////////
 // 4D Matrix Mat4
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_identity()
+DQN_FILE_SCOPE DqnMat4 dqn_mat4_identity()
 {
 	DqnMat4 result    = {0};
 	result.e[0][0] = 1;
@@ -1438,7 +1438,7 @@ DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_identity()
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnMat4
+DQN_FILE_SCOPE DqnMat4
 dqn_mat4_ortho(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar)
 {
 	DqnMat4 result = dqn_mat4_identity();
@@ -1453,7 +1453,7 @@ dqn_mat4_ortho(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_translate(f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnMat4 dqn_mat4_translate(f32 x, f32 y, f32 z)
 {
 	DqnMat4 result = dqn_mat4_identity();
 	result.e[3][0] = x;
@@ -1462,7 +1462,7 @@ DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_translate(f32 x, f32 y, f32 z)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_rotate(f32 radians, f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnMat4 dqn_mat4_rotate(f32 radians, f32 x, f32 y, f32 z)
 {
 	DqnMat4 result = dqn_mat4_identity();
 	f32 sinVal = sinf(radians);
@@ -1485,7 +1485,7 @@ DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_rotate(f32 radians, f32 x, f32 y, f32 z)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_scale(f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnMat4 dqn_mat4_scale(f32 x, f32 y, f32 z)
 {
 	DqnMat4 result = {0};
 	result.e[0][0] = x;
@@ -1495,7 +1495,7 @@ DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_scale(f32 x, f32 y, f32 z)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_mul(DqnMat4 a, DqnMat4 b)
+DQN_FILE_SCOPE DqnMat4 dqn_mat4_mul(DqnMat4 a, DqnMat4 b)
 {
 	DqnMat4 result = {0};
 	for (i32 j = 0; j < 4; j++) {
@@ -1510,7 +1510,7 @@ DQN_FILE_SCOPE inline DqnMat4 dqn_mat4_mul(DqnMat4 a, DqnMat4 b)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnV4 dqn_mat4_mul_vec4(DqnMat4 a, DqnV4 b)
+DQN_FILE_SCOPE DqnV4 dqn_mat4_mul_vec4(DqnMat4 a, DqnV4 b)
 {
 	DqnV4 result = {0};
 
@@ -1529,7 +1529,7 @@ DQN_FILE_SCOPE inline DqnV4 dqn_mat4_mul_vec4(DqnMat4 a, DqnV4 b)
 ////////////////////////////////////////////////////////////////////////////////
 // Rect
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE inline DqnRect dqn_rect(DqnV2 origin, DqnV2 size)
+DQN_FILE_SCOPE DqnRect dqn_rect(DqnV2 origin, DqnV2 size)
 {
 	DqnRect result = {};
 	result.min      = origin;
@@ -1538,13 +1538,13 @@ DQN_FILE_SCOPE inline DqnRect dqn_rect(DqnV2 origin, DqnV2 size)
 	return result;
 }
 
-DQN_FILE_SCOPE inline void dqn_rect_get_size_2f(DqnRect rect, f32 *width, f32 *height)
+DQN_FILE_SCOPE void dqn_rect_get_size_2f(DqnRect rect, f32 *width, f32 *height)
 {
 	*width  = DQN_ABS(rect.max.x - rect.min.x);
 	*height = DQN_ABS(rect.max.y - rect.min.y);
 }
 
-DQN_FILE_SCOPE inline DqnV2 dqn_rect_get_size_v2(DqnRect rect)
+DQN_FILE_SCOPE DqnV2 dqn_rect_get_size_v2(DqnRect rect)
 {
 	f32 width     = DQN_ABS(rect.max.x - rect.min.x);
 	f32 height    = DQN_ABS(rect.max.y - rect.min.y);
@@ -1553,7 +1553,7 @@ DQN_FILE_SCOPE inline DqnV2 dqn_rect_get_size_v2(DqnRect rect)
 }
 
 
-DQN_FILE_SCOPE inline DqnV2 dqn_rect_get_centre(DqnRect rect)
+DQN_FILE_SCOPE DqnV2 dqn_rect_get_centre(DqnRect rect)
 {
 	f32 sumX  = rect.min.x + rect.max.x;
 	f32 sumY  = rect.min.y + rect.max.y;
@@ -1561,7 +1561,7 @@ DQN_FILE_SCOPE inline DqnV2 dqn_rect_get_centre(DqnRect rect)
 	return result;
 }
 
-DQN_FILE_SCOPE inline DqnRect dqn_rect_move(DqnRect rect, DqnV2 shift)
+DQN_FILE_SCOPE DqnRect dqn_rect_move(DqnRect rect, DqnV2 shift)
 {
 	DqnRect result = {0};
 	result.min       = dqn_v2_add(rect.min, shift);
@@ -1570,7 +1570,7 @@ DQN_FILE_SCOPE inline DqnRect dqn_rect_move(DqnRect rect, DqnV2 shift)
 	return result;
 }
 
-DQN_FILE_SCOPE inline bool dqn_rect_contains_p(DqnRect rect, DqnV2 p)
+DQN_FILE_SCOPE bool dqn_rect_contains_p(DqnRect rect, DqnV2 p)
 {
 	bool outsideOfRectX = false;
 	if (p.x < rect.min.x || p.x > rect.max.w)
@@ -1588,7 +1588,7 @@ DQN_FILE_SCOPE inline bool dqn_rect_contains_p(DqnRect rect, DqnV2 p)
 ////////////////////////////////////////////////////////////////////////////////
 // String Operations
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE inline char dqn_char_to_lower(char c)
+DQN_FILE_SCOPE char dqn_char_to_lower(char c)
 {
 	if (c >= 'A' && c <= 'Z')
 	{
@@ -1599,7 +1599,7 @@ DQN_FILE_SCOPE inline char dqn_char_to_lower(char c)
 	return c;
 }
 
-DQN_FILE_SCOPE inline char dqn_char_to_upper(char c)
+DQN_FILE_SCOPE char dqn_char_to_upper(char c)
 {
 	if (c >= 'a' && c <= 'z')
 	{
@@ -1611,19 +1611,19 @@ DQN_FILE_SCOPE inline char dqn_char_to_upper(char c)
 }
 
 
-DQN_FILE_SCOPE inline bool dqn_char_is_digit(char c)
+DQN_FILE_SCOPE bool dqn_char_is_digit(char c)
 {
 	if (c >= '0' && c <= '9') return true;
 	return false;
 }
 
-DQN_FILE_SCOPE inline bool dqn_char_is_alpha(char c)
+DQN_FILE_SCOPE bool dqn_char_is_alpha(char c)
 {
 	if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return true;
 	return false;
 }
 
-DQN_FILE_SCOPE inline bool dqn_char_is_alphanum(char c)
+DQN_FILE_SCOPE bool dqn_char_is_alphanum(char c)
 {
 	if (dqn_char_is_alpha(c) || dqn_char_is_digit(c)) return true;
 	return false;
@@ -2244,7 +2244,7 @@ DQN_FILE_SCOPE char **dqn_dir_read(char *dir, u32 *numFiles)
 #endif
 }
 
-DQN_FILE_SCOPE inline void dqn_dir_read_free(char **fileList, u32 numFiles)
+DQN_FILE_SCOPE void dqn_dir_read_free(char **fileList, u32 numFiles)
 {
 	if (fileList)
 	{
@@ -2262,7 +2262,7 @@ DQN_FILE_SCOPE inline void dqn_dir_read_free(char **fileList, u32 numFiles)
 // Timer
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_WIN32
-inline FILE_SCOPE f64 dqn_win32_query_perf_counter_time_in_s_internal()
+FILE_SCOPE f64 dqn_win32_query_perf_counter_time_in_s_internal()
 {
 	LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {};
 	if (queryPerformanceFrequency.QuadPart == 0)
@@ -2376,7 +2376,7 @@ DQN_FILE_SCOPE i32 dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max)
 ////////////////////////////////////////////////////////////////////////////////
 // DqnPushBuffer Header
 ////////////////////////////////////////////////////////////////////////////////
-FILE_SCOPE size_t inline dqn_size_alignment_internal(u32 alignment, size_t size)
+FILE_SCOPE size_t dqn_size_alignment_internal(u32 alignment, size_t size)
 {
 	size_t result = ((size + (alignment-1)) & ~(alignment-1));
 	return result;
