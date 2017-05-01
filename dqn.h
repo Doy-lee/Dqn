@@ -66,6 +66,7 @@ typedef float  f32;
 // DArray - Dynamic Array
 ////////////////////////////////////////////////////////////////////////////////
 // REMINDER: Dynamic Array can be used as a stack. Don't need to create one.
+#if 1
 template <typename T>
 struct DqnArray
 {
@@ -76,32 +77,32 @@ struct DqnArray
 
 #if 0
 template <typename T>
-bool  dqn_array_init         (DqnArray<T> *array, size_t capacity);
-bool  dqn_array_grow         (DqnArray<T> *array);
-T    *dqn_array_push         (DqnArray<T> *array, T item);
-T    *dqn_array_pop          (DqnArray<T> *array)
-T    *dqn_array_get          (DqnArray<T> *array, u64 index);
-bool  dqn_array_clear        (DqnArray<T> *array);
-bool  dqn_array_free         (DqnArray<T> *array);
-bool  dqn_array_remove       (DqnArray<T> *array, u64 index);
-bool  dqn_array_remove_stable(DqnArray<T> *array, u64 index);
+bool  DqnArray_init         (DqnArray<T> *array, size_t capacity);
+bool  DqnArray_grow         (DqnArray<T> *array);
+T    *DqnArray_push         (DqnArray<T> *array, T item);
+T    *DqnArray_pop          (DqnArray<T> *array)
+T    *DqnArray_get          (DqnArray<T> *array, u64 index);
+bool  DqnArray_clear        (DqnArray<T> *array);
+bool  DqnArray_free         (DqnArray<T> *array);
+bool  DqnArray_remove       (DqnArray<T> *array, u64 index);
+bool  DqnArray_remove_stable(DqnArray<T> *array, u64 index);
 #endif
 
 // Implementation taken from Milton, developed by Serge at
 // https://github.com/serge-rgb/milton#license
 template <typename T>
-bool dqn_array_init(DqnArray<T> *array, size_t capacity)
+bool DqnArray_Init(DqnArray<T> *array, size_t capacity)
 {
 	if (!array) return false;
 
 	if (array->data)
 	{
 		// TODO(doyle): Logging? The array already exists
-		if (!dqn_array_free(array)) return false;
+		if (!DqnArray_Free(array)) return false;
 	}
 
 	array->data =
-	    (T *)dqn_mem_alloc_internal((size_t)capacity * sizeof(T), true);
+	    (T *)Dqn_MemAllocInternal((size_t)capacity * sizeof(T), true);
 	if (!array->data) return false;
 
 	array->count    = 0;
@@ -110,7 +111,7 @@ bool dqn_array_init(DqnArray<T> *array, size_t capacity)
 }
 
 template <typename T>
-bool dqn_array_grow(DqnArray<T> *array)
+bool DqnArray_Grow(DqnArray<T> *array)
 {
 	if (!array || !array->data) return false;
 
@@ -118,7 +119,7 @@ bool dqn_array_grow(DqnArray<T> *array)
 	size_t newCapacity         = (size_t)(array->capacity * GROWTH_FACTOR);
 	if (newCapacity == array->capacity) newCapacity++;
 
-	T *newMem = (T *)dqn_mem_realloc_internal(
+	T *newMem = (T *)Dqn_MemReallocInternal(
 	    array->data, (size_t)(newCapacity * sizeof(T)));
 	if (newMem)
 	{
@@ -133,13 +134,13 @@ bool dqn_array_grow(DqnArray<T> *array)
 }
 
 template <typename T>
-T *dqn_array_push(DqnArray<T> *array, T item)
+T *DqnArray_Push(DqnArray<T> *array, T item)
 {
 	if (!array) return NULL;
 
 	if (array->count >= array->capacity)
 	{
-		if (!dqn_array_grow(array)) return NULL;
+		if (!DqnArray_Grow(array)) return NULL;
 	}
 
 	DQN_ASSERT(array->count < array->capacity);
@@ -149,7 +150,7 @@ T *dqn_array_push(DqnArray<T> *array, T item)
 }
 
 template <typename T>
-T *dqn_array_pop(DqnArray<T> *array)
+T *DqnArray_Pop(DqnArray<T> *array)
 {
 	if (!array) return NULL;
 	if (array->count == 0) return NULL;
@@ -159,7 +160,7 @@ T *dqn_array_pop(DqnArray<T> *array)
 }
 
 template <typename T>
-T *dqn_array_get(DqnArray<T> *array, u64 index)
+T *DqnArray_Get(DqnArray<T> *array, u64 index)
 {
 	T *result = NULL;
 	if (index >= 0 && index <= array->count) result = &array->data[index];
@@ -167,7 +168,7 @@ T *dqn_array_get(DqnArray<T> *array, u64 index)
 }
 
 template <typename T>
-bool dqn_array_clear(DqnArray<T> *array)
+bool DqnArray_Clear(DqnArray<T> *array)
 {
 	if (array)
 	{
@@ -179,7 +180,7 @@ bool dqn_array_clear(DqnArray<T> *array)
 }
 
 template <typename T>
-bool dqn_array_free(DqnArray<T> *array)
+bool DqnArray_Free(DqnArray<T> *array)
 {
 	if (array && array->data)
 	{
@@ -193,7 +194,7 @@ bool dqn_array_free(DqnArray<T> *array)
 }
 
 template <typename T>
-bool dqn_array_remove(DqnArray<T> *array, u64 index)
+bool DqnArray_Remove(DqnArray<T> *array, u64 index)
 {
 	if (!array) return false;
 	if (index >= array->count) return false;
@@ -212,7 +213,7 @@ bool dqn_array_remove(DqnArray<T> *array, u64 index)
 }
 
 template <typename T>
-bool dqn_array_remove_stable(DqnArray<T> *array, u64 index)
+bool DqnArray_RemoveStable(DqnArray<T> *array, u64 index)
 {
 	if (!array) return false;
 	if (index >= array->count) return false;
@@ -238,12 +239,13 @@ bool dqn_array_remove_stable(DqnArray<T> *array, u64 index)
 	array->count--;
 	return true;
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE f32 dqn_math_lerp(f32 a, f32 t, f32 b);
-DQN_FILE_SCOPE f32 dqn_math_sqrtf(f32 a);
+DQN_FILE_SCOPE f32 DqnMath_Lerp(f32 a, f32 t, f32 b);
+DQN_FILE_SCOPE f32 DqnMath_Sqrtf(f32 a);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec2
@@ -256,24 +258,24 @@ typedef union DqnV2 {
 } DqnV2;
 
 // Create a vector using ints and typecast to floats
-DQN_FILE_SCOPE DqnV2 dqn_v2i(i32 x, i32 y);
-DQN_FILE_SCOPE DqnV2 dqn_v2 (f32 x, f32 y);
+DQN_FILE_SCOPE DqnV2 DqnV2_2i(i32 x, i32 y);
+DQN_FILE_SCOPE DqnV2 DqnV2_2f(f32 x, f32 y);
 
-DQN_FILE_SCOPE DqnV2 dqn_v2_add     (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 dqn_v2_sub     (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 dqn_v2_scale   (DqnV2 a, f32 b);
-DQN_FILE_SCOPE DqnV2 dqn_v2_hadamard(DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE f32   dqn_v2_dot     (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE bool  dqn_v2_equals  (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Add     (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Sub     (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Scale   (DqnV2 a, f32 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Hadamard(DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE f32   DqnV2_Dot     (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE bool  DqnV2_Equals  (DqnV2 a, DqnV2 b);
 
-DQN_FILE_SCOPE f32   dqn_v2_length_squared(DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE f32   dqn_v2_length        (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 dqn_v2_normalise     (DqnV2 a);
-DQN_FILE_SCOPE bool  dqn_v2_overlaps      (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 dqn_v2_perpendicular (DqnV2 a);
+DQN_FILE_SCOPE f32   DqnV2_LengthSquared(DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE f32   DqnV2_Length       (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Normalise    (DqnV2 a);
+DQN_FILE_SCOPE bool  DqnV2_Overlaps     (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(DqnV2 a);
 
 // Resize the dimension to fit the aspect ratio provided. Downscale only.
-DQN_FILE_SCOPE DqnV2 dqn_v2_constrain_to_ratio(DqnV2 dim, DqnV2 ratio);
+DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec3
@@ -286,17 +288,16 @@ typedef union DqnV3
 } DqnV3;
 
 // Create a vector using ints and typecast to floats
-DQN_FILE_SCOPE DqnV3 dqn_v3i(i32 x, i32 y, i32 z);
-DQN_FILE_SCOPE DqnV3 dqn_v3 (f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnV3 DqnV3_3i(i32 x, i32 y, i32 z);
+DQN_FILE_SCOPE DqnV3 DqnV3_3f(f32 x, f32 y, f32 z);
 
-DQN_FILE_SCOPE DqnV3 dqn_v3_add     (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE DqnV3 dqn_v3_sub     (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE DqnV3 dqn_v3_scale   (DqnV3 a, f32 b);
-DQN_FILE_SCOPE DqnV3 dqn_v3_hadamard(DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE f32   dqn_v3_dot     (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE bool  dqn_v3_equals  (DqnV3 a, DqnV3 b);
-
-DQN_FILE_SCOPE DqnV3 dqn_v3_cross(DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Add     (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Sub     (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Scale   (DqnV3 a, f32 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Hadamard(DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE f32   DqnV3_Dot     (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE bool  DqnV3_Equals  (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Cross   (DqnV3 a, DqnV3 b);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec4
@@ -310,15 +311,15 @@ typedef union DqnV4
 } DqnV4;
 
 // Create a vector using ints and typecast to floats
-DQN_FILE_SCOPE DqnV4 dqn_v4i(i32 x, i32 y, i32 z, f32 w);
-DQN_FILE_SCOPE DqnV4 dqn_v4 (f32 x, f32 y, f32 z, f32 w);
+DQN_FILE_SCOPE DqnV4 DqnV4_4i(i32 x, i32 y, i32 z, f32 w);
+DQN_FILE_SCOPE DqnV4 DqnV4_4f(f32 x, f32 y, f32 z, f32 w);
 
-DQN_FILE_SCOPE DqnV4 dqn_v4_add     (DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE DqnV4 dqn_v4_sub     (DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE DqnV4 dqn_v4_scale   (DqnV4 a, f32 b);
-DQN_FILE_SCOPE DqnV4 dqn_v4_hadamard(DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE f32   dqn_v4_dot     (DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE bool  dqn_v4_equals  (DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Sub     (DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Scale   (DqnV4 a, f32 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Hadamard(DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE f32   DqnV4_Dot     (DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE bool  DqnV4_Equals  (DqnV4 a, DqnV4 b);
 
 ////////////////////////////////////////////////////////////////////////////////
 // 4D Matrix Mat4
@@ -330,13 +331,13 @@ typedef union DqnMat4
 	f32 e[4][4];
 } DqnMat4;
 
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_identity ();
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_ortho    (f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar);
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_translate(f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_rotate   (f32 radians, f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_scale    (f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_mul      (DqnMat4 a, DqnMat4 b);
-DQN_FILE_SCOPE DqnV4   dqn_mat4_mul_vec4 (DqnMat4 a, DqnV4 b);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity ();
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Ortho    (f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate(f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate   (f32 radians, f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale    (f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul      (DqnMat4 a, DqnMat4 b);
+DQN_FILE_SCOPE DqnV4   DqnMat4_MulV4    (DqnMat4 a, DqnV4 b);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Other Math
@@ -347,54 +348,53 @@ typedef struct DqnRect
 	DqnV2 max;
 } DqnRect;
 
-DQN_FILE_SCOPE DqnRect dqn_rect            (DqnV2 origin, DqnV2 size);
-DQN_FILE_SCOPE void    dqn_rect_get_size_2f(DqnRect rect, f32 *width, f32 *height);
-DQN_FILE_SCOPE DqnV2   dqn_rect_get_size_v2(DqnRect rect);
-DQN_FILE_SCOPE DqnV2   dqn_rect_get_centre (DqnRect rect);
-DQN_FILE_SCOPE DqnRect dqn_rect_move       (DqnRect rect, DqnV2 shift);
-DQN_FILE_SCOPE bool    dqn_rect_contains_p (DqnRect rect, DqnV2 p);
+DQN_FILE_SCOPE DqnRect DqnRect_Init     (DqnV2 origin, DqnV2 size);
+DQN_FILE_SCOPE void    DqnRect_GetSize2f(DqnRect rect, f32 *width, f32 *height);
+DQN_FILE_SCOPE DqnV2   DqnRect_GetSizev2(DqnRect rect);
+DQN_FILE_SCOPE DqnV2   DqnRect_GetCenter(DqnRect rect);
+DQN_FILE_SCOPE DqnRect DqnRect_Move     (DqnRect rect, DqnV2 shift);
+DQN_FILE_SCOPE bool    DqnRect_ContainsP(DqnRect rect, DqnV2 p);
 
 ////////////////////////////////////////////////////////////////////////////////
 // char String Operations
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE char  dqn_char_to_lower   (char c);
-DQN_FILE_SCOPE char  dqn_char_to_upper   (char c);
-DQN_FILE_SCOPE bool  dqn_char_is_digit   (char c);
-DQN_FILE_SCOPE bool  dqn_char_is_alpha   (char c);
-DQN_FILE_SCOPE bool  dqn_char_is_alphanum(char c);
+DQN_FILE_SCOPE char  DqnChar_ToLower   (char c);
+DQN_FILE_SCOPE char  DqnChar_ToUpper   (char c);
+DQN_FILE_SCOPE bool  DqnChar_IsDigit   (char c);
+DQN_FILE_SCOPE bool  DqnChar_IsAlpha   (char c);
+DQN_FILE_SCOPE bool  DqnChar_IsAlphanum(char c);
 
-DQN_FILE_SCOPE i32   dqn_strcmp (const char *a, const char *b);
+DQN_FILE_SCOPE i32   Dqn_strcmp(const char *a, const char *b);
 // Returns the length without the null terminator
-DQN_FILE_SCOPE i32   dqn_strlen             (const char *a);
-DQN_FILE_SCOPE i32   dqn_strlen_delimit_with(const char *a, const char delimiter);
-DQN_FILE_SCOPE char *dqn_strncpy            (char *dest, const char *src, i32 numChars);
+DQN_FILE_SCOPE i32   Dqn_strlen           (const char *a);
+DQN_FILE_SCOPE i32   Dqn_strlenDelimitWith(const char *a, const char delimiter);
+DQN_FILE_SCOPE char *Dqn_strncpy          (char *dest, const char *src, i32 numChars);
 
 #define DQN_I32_TO_STR_MAX_BUF_SIZE 11
-DQN_FILE_SCOPE bool  dqn_str_reverse      (char *buf, const i32 bufSize);
-DQN_FILE_SCOPE bool  dqn_str_has_substring(const char *const a, const i32 lenA,
+DQN_FILE_SCOPE bool  Dqn_StrReverse      (char *buf, const i32 bufSize);
+DQN_FILE_SCOPE bool  Dqn_StrHasSubstring(const char *const a, const i32 lenA,
                                            const char *const b, const i32 lenB);
 
-DQN_FILE_SCOPE i32   dqn_str_to_i32(const char *const buf, const i32 bufSize);
+DQN_FILE_SCOPE i32   Dqn_StrToI32(const char *const buf, const i32 bufSize);
 // Return the len of the derived string
-DQN_FILE_SCOPE i32   dqn_i32_to_str(i32 value, char *buf, i32 bufSize);
+DQN_FILE_SCOPE i32   Dqn_I32ToStr(i32 value, char *buf, i32 bufSize);
 
 // Both return the number of bytes read, return 0 if invalid codepoint or UTF8
-DQN_FILE_SCOPE u32 dqn_ucs_to_utf8(u32 *dest, u32 character);
-DQN_FILE_SCOPE u32 dqn_utf8_to_ucs(u32 *dest, u32 character);
+DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character);
+DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *dest, u32 character);
 
 ////////////////////////////////////////////////////////////////////////////////
 // wchar String Operations
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE bool    dqn_wchar_is_digit(const wchar_t c);
-DQN_FILE_SCOPE wchar_t dqn_wchar_to_lower(const wchar_t c);
+DQN_FILE_SCOPE bool    DqnWChar_IsDigit(const wchar_t c);
+DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c);
 
-DQN_FILE_SCOPE i32     dqn_wstrlen       (const wchar_t *a);
-DQN_FILE_SCOPE i32     dqn_wstrcmp       (const wchar_t *a, const wchar_t *b);
+DQN_FILE_SCOPE i32     Dqn_wstrlen(const wchar_t *a);
+DQN_FILE_SCOPE i32     Dqn_wstrcmp(const wchar_t *a, const wchar_t *b);
 
-DQN_FILE_SCOPE bool    dqn_wstr_reverse  (wchar_t *buf, const i32 bufSize);
-
-DQN_FILE_SCOPE i32     dqn_wstr_to_i32   (const wchar_t *const buf, const i32 bufSize);
-DQN_FILE_SCOPE i32     dqn_i32_to_wstr   (i32 value, wchar_t *buf, i32 bufSize);
+DQN_FILE_SCOPE bool    Dqn_WStrReverse(wchar_t *buf, const i32 bufSize);
+DQN_FILE_SCOPE i32     Dqn_WStrToI32(const wchar_t *const buf, const i32 bufSize);
+DQN_FILE_SCOPE i32     Dqn_I32ToWStr(i32 value, wchar_t *buf, i32 bufSize);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Win32 Specific
@@ -402,13 +402,13 @@ DQN_FILE_SCOPE i32     dqn_i32_to_wstr   (i32 value, wchar_t *buf, i32 bufSize);
 #ifdef DQN_WIN32
 // Out is a pointer to the buffer to receive the characters.
 // outLen is the length/capacity of the out buffer
-DQN_FILE_SCOPE bool dqn_win32_utf8_to_wchar (const char *const in, wchar_t *const out, const i32 outLen);
-DQN_FILE_SCOPE bool dqn_win32_wchar_to_utf8 (const wchar_t *const in, char *const out, const i32 outLen);
+DQN_FILE_SCOPE bool DqnWin32_UTF8ToWChar (const char *const in, wchar_t *const out, const i32 outLen);
+DQN_FILE_SCOPE bool DqnWin32_WCharToUTF8 (const wchar_t *const in, char *const out, const i32 outLen);
 
-DQN_FILE_SCOPE void dqn_win32_get_client_dim    (const HWND window, LONG *width, LONG *height);
-DQN_FILE_SCOPE void dqn_win32_get_rect_dim      (RECT rect, LONG *width, LONG *height);
-DQN_FILE_SCOPE void dqn_win32_display_last_error(const char *const errorPrefix);
-DQN_FILE_SCOPE void dqn_win32_display_error_code(const DWORD error, const char *const errorPrefix);
+DQN_FILE_SCOPE void DqnWin32_GetClientDim    (const HWND window, LONG *width, LONG *height);
+DQN_FILE_SCOPE void DqnWin32_GetRectDim      (RECT rect, LONG *width, LONG *height);
+DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix);
+DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *const errorPrefix);
 #endif /* DQN_WIN32 */
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -445,36 +445,36 @@ typedef struct DqnFile
 } DqnFile;
 
 // Open a handle to the file
-DQN_FILE_SCOPE bool dqn_file_open(const char *const path, DqnFile *const file,
+DQN_FILE_SCOPE bool DqnFile_Open(const char *const path, DqnFile *const file,
                                   const u32 permissionFlags,
                                   const enum DqnFileAction action);
-DQN_FILE_SCOPE bool dqn_file_openw(const wchar_t *const path, DqnFile *const file,
+DQN_FILE_SCOPE bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file,
                                        const u32 permissionFlags,
                                        const enum DqnFileAction action);
 
 // File offset is the byte offset to starting writing from
-DQN_FILE_SCOPE size_t dqn_file_write(const DqnFile *const file,
+DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
                                   const u8 *const buffer,
                                   const size_t numBytesToWrite,
                                   const size_t fileOffset);
 
 // Return the number of bytes read
-DQN_FILE_SCOPE size_t dqn_file_read(const DqnFile file, const u8 *const buffer,
+DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
                                     const size_t numBytesToRead);
-DQN_FILE_SCOPE void dqn_file_close(DqnFile *const file);
+DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file);
 
 // Return an array of strings of the files in the directory in UTF-8. numFiles
 // returns the number of strings read.
 // This is allocated using malloc and MUST BE FREED! Can be done manually or
 // using the helper function.
-DQN_FILE_SCOPE char **dqn_dir_read     (char *dir, u32 *numFiles);
-DQN_FILE_SCOPE void   dqn_dir_read_free(char **fileList, u32 numFiles);
+DQN_FILE_SCOPE char **DqnDir_Read     (char *dir, u32 *numFiles);
+DQN_FILE_SCOPE void   DqnDir_ReadFree(char **fileList, u32 numFiles);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE f64 dqn_time_now_in_s();
-DQN_FILE_SCOPE f64 dqn_time_now_in_ms();
+DQN_FILE_SCOPE f64 DqnTime_NowInS();
+DQN_FILE_SCOPE f64 DqnTime_NowInMs();
 
 ////////////////////////////////////////////////////////////////////////////////
 // PCG (Permuted Congruential Generator) Random Number Generator
@@ -487,15 +487,15 @@ typedef struct DqnRandPCGState
 // Initialise the random number generator using a seed. If not given it is
 // automatically created by using rdtsc. The generator is not valid until it's
 // been seeded.
-DQN_FILE_SCOPE void dqn_rnd_pcg_init_with_seed(DqnRandPCGState *pcg, u32 seed);
-DQN_FILE_SCOPE void dqn_rnd_pcg_init(DqnRandPCGState *pcg);
+DQN_FILE_SCOPE void DqnRnd_PCGInitWithSeed(DqnRandPCGState *pcg, u32 seed);
+DQN_FILE_SCOPE void DqnRnd_PCGInit(DqnRandPCGState *pcg);
 
 // Returns a random number N between [0, 0xFFFFFFFF]
-DQN_FILE_SCOPE u32  dqn_rnd_pcg_next (DqnRandPCGState *pcg);
+DQN_FILE_SCOPE u32  DqnRnd_PCGNext (DqnRandPCGState *pcg);
 // Returns a random float N between [0.0, 1.0f]
-DQN_FILE_SCOPE f32  dqn_rnd_pcg_nextf(DqnRandPCGState *pcg);
+DQN_FILE_SCOPE f32  DqnRnd_PCGNextf(DqnRandPCGState *pcg);
 // Returns a random integer N between [min, max]
-DQN_FILE_SCOPE i32  dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max);
+DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
 
 ////////////////////////////////////////////////////////////////////////////////
 // PushBuffer Header
@@ -513,8 +513,8 @@ typedef struct DqnPushBuffer
 {
 	DqnPushBufferBlock *block;
 
-	i32 tempBufferCount;
-	u32 alignment;
+	i32    tempBufferCount;
+	size_t alignment;
 } DqnPushBuffer;
 
 typedef struct DqnTempBuffer
@@ -525,13 +525,14 @@ typedef struct DqnTempBuffer
 
 } DqnTempBuffer;
 
-DQN_FILE_SCOPE bool  dqn_push_buffer_init            (DqnPushBuffer *buffer, size_t size, u32 alignment);
-DQN_FILE_SCOPE void *dqn_push_buffer_allocate        (DqnPushBuffer *buffer, size_t size);
-DQN_FILE_SCOPE void  dqn_push_buffer_free_last_buffer(DqnPushBuffer *buffer);
-DQN_FILE_SCOPE void  dqn_push_buffer_free            (DqnPushBuffer *buffer);
+DQN_FILE_SCOPE bool  DqnPushBuffer_Init          (DqnPushBuffer *const buffer, size_t size, const size_t alignment);
+DQN_FILE_SCOPE void *DqnPushBuffer_Allocate      (DqnPushBuffer *const buffer, size_t size);
+DQN_FILE_SCOPE void  DqnPushBuffer_FreeLastBuffer(DqnPushBuffer *const buffer);
+DQN_FILE_SCOPE void  DqnPushBuffer_Free          (DqnPushBuffer *const buffer);
+DQN_FILE_SCOPE void  DqnPushBuffer_ClearCurrBlock(DqnPushBuffer *const buffer, const bool clearToZero);
 
-DQN_FILE_SCOPE DqnTempBuffer dqn_push_buffer_begin_temp_region(DqnPushBuffer *buffer);
-DQN_FILE_SCOPE void          dqn_push_buffer_end_temp_region  (DqnTempBuffer tempBuffer);
+DQN_FILE_SCOPE DqnTempBuffer DqnPushBuffer_BeginTempRegion(DqnPushBuffer *const buffer);
+DQN_FILE_SCOPE void          DqnPushBuffer_EndTempRegion(DqnTempBuffer tempBuffer);
 
 #endif  /* DQN_H */
 
@@ -572,14 +573,14 @@ int main()
 	data[size] = '\0';
 	fclose(fp);
 
-	DqnIni *ini = dqn_ini_load(data);
+	DqnIni *ini = DqnIni_Load(data);
 	free(data);
-	int second_index   = dqn_ini_find_property(ini, DQN_INI_GLOBAL_SECTION, "SecondSetting");
-	char const *second = dqn_ini_property_value(ini, DQN_INI_GLOBAL_SECTION, second_index);
-	int section        = dqn_ini_find_section(ini, "MySection");
-	int third_index    = dqn_ini_find_property(ini, section, "ThirdSetting");
-	char const *third  = dqn_ini_property_value(ini, section, third_index);
-	dqn_ini_destroy(ini);
+	int second_index   = DqnIni_FindProperty(ini, DQN_INI_GLOBAL_SECTION, "SecondSetting");
+	char const *second = DqnIni_PropertyValue(ini, DQN_INI_GLOBAL_SECTION, second_index);
+	int section        = DqnIni_FindSection(ini, "MySection");
+	int third_index    = DqnIni_FindProperty(ini, section, "ThirdSetting");
+	char const *third  = DqnIni_PropertyValue(ini, section, third_index);
+	DqnIni_Destroy(ini);
 
 	return 0;
 }
@@ -593,16 +594,16 @@ Creating a new ini file
 
 int main()
 {
-	DqnIni *ini = dqn_ini_create();
-	dqn_ini_property_add(ini, DQN_INI_GLOBAL_SECTION, "FirstSetting", "Test");
-	dqn_ini_property_add(ini, DQN_INI_GLOBAL_SECTION, "SecondSetting", "2");
-	int section = dqn_ini_section_add(ini, "MySection");
-	dqn_ini_property_add(ini, section, "ThirdSetting", "Three");
+	DqnIni *ini = DqnInit_Create();
+	DqnIni_PropertyAdd(ini, DQN_INI_GLOBAL_SECTION, "FirstSetting", "Test");
+	DqnIni_PropertyAdd(ini, DQN_INI_GLOBAL_SECTION, "SecondSetting", "2");
+	int section = DqnIni_SectionAdd(ini, "MySection");
+	DqnIni_PropertyAdd(ini, section, "ThirdSetting", "Three");
 
-	int size   = dqn_ini_save(ini, NULL, 0); // Find the size needed
+	int size   = DqnIni_Save(ini, NULL, 0); // Find the size needed
 	char *data = (char *)malloc(size);
-	size       = dqn_ini_save(ini, data, size); // Actually save the file
-	dqn_ini_destroy(ini);
+	size       = DqnIni_Save(ini, data, size); // Actually save the file
+	DqnIni_Destroy(ini);
 
 	FILE *fp = fopen("test.ini", "w");
 	fwrite(data, 1, size, fp);
@@ -618,30 +619,30 @@ int main()
 
 typedef struct DqnIni DqnIni;
 
-DqnIni *dqn_ini_create(void *memctx);
-DqnIni *dqn_ini_load  (char const *data, void *memctx);
+DqnIni *DqnInit_Create(void *memctx);
+DqnIni *DqnIni_Load  (char const *data, void *memctx);
 
-int  dqn_ini_save   (DqnIni const *ini, char *data, int size);
-void dqn_ini_destroy(DqnIni *ini);
+int  DqnIni_Save   (DqnIni const *ini, char *data, int size);
+void DqnIni_Destroy(DqnIni *ini);
 
-int         dqn_ini_section_count(DqnIni const *ini);
-char const *dqn_ini_section_name (DqnIni const *ini, int section);
+int         DqnIni_SectionCount(DqnIni const *ini);
+char const *DqnIni_SectionName (DqnIni const *ini, int section);
 
-int         dqn_ini_property_count(DqnIni const *ini, int section);
-char const *dqn_ini_property_name (DqnIni const *ini, int section, int property);
-char const *dqn_ini_property_value(DqnIni const *ini, int section, int property);
+int         DqnIni_PropertyCount(DqnIni const *ini, int section);
+char const *DqnIni_PropertyName (DqnIni const *ini, int section, int property);
+char const *DqnIni_PropertyValue(DqnIni const *ini, int section, int property);
 
-int dqn_ini_find_section (DqnIni const *ini, char const *name, int name_length);
-int dqn_ini_find_property(DqnIni const *ini, int section, char const *name, int name_length);
+int DqnIni_FindSection (DqnIni const *ini, char const *name, int name_length);
+int DqnIni_FindProperty(DqnIni const *ini, int section, char const *name, int name_length);
 
-int  dqn_ini_section_add    (DqnIni *ini, char const *name, int length);
-void dqn_ini_property_add   (DqnIni *ini, int section, char const *name, int name_length, char const *value, int value_length);
-void dqn_ini_section_remove (DqnIni *ini, int section);
-void dqn_ini_property_remove(DqnIni *ini, int section, int property);
+int  DqnIni_SectionAdd    (DqnIni *ini, char const *name, int length);
+void DqnIni_PropertyAdd   (DqnIni *ini, int section, char const *name, int name_length, char const *value, int value_length);
+void DqnIni_SectionRemove (DqnIni *ini, int section);
+void DqnIni_PropertyRemove(DqnIni *ini, int section, int property);
 
-void dqn_ini_section_name_set  (DqnIni *ini, int section, char const *name, int length);
-void dqn_ini_property_name_set (DqnIni *ini, int section, int property, char const *name, int length);
-void dqn_ini_property_value_set(DqnIni *ini, int section, int property, char const *value, int length);
+void DqnIni_SectionNameSet  (DqnIni *ini, int section, char const *name, int length);
+void DqnIni_PropertyNameSet (DqnIni *ini, int section, int property, char const *name, int length);
+void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property, char const *value, int length);
 
 /**
 Customization
@@ -669,7 +670,7 @@ following code:
 
 where `my_custom_malloc` and `my_custom_free` are your own memory
 allocation/deallocation functions. The `ctx` parameter is an optional parameter
-of type `void*`. When `dqn_ini_create` or `dqn_ini_load` is called, you can pass
+of type `void*`. When `DqnInit_Create` or `DqnIni_Load` is called, you can pass
 in a `memctx` parameter, which can be a pointer to anything you like, and which
 will be passed through as the `ctx` parameter to every
 `DQN_INI_MALLOC`/`DQN_INI_FREE` call. For example, if you are doing memory
@@ -694,119 +695,119 @@ an example:
 If no custom function is defined, ini.h will default to the C runtime library equivalent.
 
 
-dqn_ini_create
+DqnInit_Create
 ----------
 
-    DqnIni* dqn_ini_create( void* memctx )
+    DqnIni* DqnInit_Create( void* memctx )
 
 Instantiates a new, empty ini structure, which can be manipulated with other API
 calls, to fill it with data. To save it out to an ini-file string, use
-`dqn_ini_save`. When no longer needed, it can be destroyed by calling
-`dqn_ini_destroy`.  `memctx` is a pointer to user defined data which will be
+`DqnIni_Save`. When no longer needed, it can be destroyed by calling
+`DqnIni_Destroy`.  `memctx` is a pointer to user defined data which will be
 passed through to the custom DQN_INI_MALLOC/DQN_INI_FREE calls. It can be NULL
 if no user defined data is needed.
 
 
-dqn_ini_load
+DqnIni_Load
 --------
 
-    DqnIni* dqn_ini_load( char const* data, void* memctx )
+    DqnIni* DqnIni_Load( char const* data, void* memctx )
 
 Parse the zero-terminated string `data` containing an ini-file, and create a new
 DqnIni instance containing the data.  The instance can be manipulated with
 other API calls to enumerate sections/properties and retrieve values. When no
-longer needed, it can be destroyed by calling `dqn_ini_destroy`. `memctx` is
+longer needed, it can be destroyed by calling `DqnIni_Destroy`. `memctx` is
 a pointer to user defined data which will be passed through to the custom
 DQN_INI_MALLOC/DQN_INI_FREE calls. It can be NULL if no user defined data is
 needed.
 
 
-dqn_ini_save
+DqnIni_Save
 --------
 
-    int dqn_ini_save( DqnIni const* ini, char* data, int size )
+    int DqnIni_Save( DqnIni const* ini, char* data, int size )
 
 Saves an ini structure as a zero-terminated ini-file string, into the specified
 buffer. Returns the number of bytes written, including the zero terminator. If
-`data` is NULL, nothing is written, but `dqn_ini_save` still returns the number
+`data` is NULL, nothing is written, but `DqnIni_Save` still returns the number
 of bytes it would have written. If the size of `data`, as specified in the
 `size` parameter, is smaller than that required, only part of the ini-file
-string will be written. `dqn_ini_save` still returns the number of bytes it
+string will be written. `DqnIni_Save` still returns the number of bytes it
 would have written had the buffer been large enough.
 
-dqn_ini_destroy
+DqnIni_Destroy
 -----------
 
-    void dqn_ini_destroy( DqnIni* ini )
+    void DqnIni_Destroy( DqnIni* ini )
 
-Destroy an `DqnIni` instance created by calling `dqn_ini_load` or
-`dqn_ini_create`, releasing the memory allocated by it. No further API calls are
-valid on an `DqnIni` instance after calling `dqn_ini_destroy` on it.
+Destroy an `DqnIni` instance created by calling `DqnIni_Load` or
+`DqnInit_Create`, releasing the memory allocated by it. No further API calls are
+valid on an `DqnIni` instance after calling `DqnIni_Destroy` on it.
 
 
-dqn_ini_section_count
+DqnIni_SectionCount
 -----------------
 
-    int dqn_ini_section_count( DqnIni const* ini )
+    int DqnIni_SectionCount( DqnIni const* ini )
 
 Returns the number of sections in an ini file. There's at least one section in
 an ini file (the global section), but there can be many more, each specified in
 the file by the section name wrapped in square brackets [ ].
 
 
-dqn_ini_section_name
+DqnIni_SectionName
 ----------------
 
-    char const* dqn_ini_section_name( DqnIni const* ini, int section )
+    char const* DqnIni_SectionName( DqnIni const* ini, int section )
 
 Returns the name of the section with the specified index. `section` must be
-non-negative and less than the value returned by `dqn_ini_section_count`, or
-`dqn_ini_section_name` will return NULL. The defined constant
+non-negative and less than the value returned by `DqnIni_SectionCount`, or
+`DqnIni_SectionName` will return NULL. The defined constant
 `DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.
 
 
-dqn_ini_property_count
+DqnIni_PropertyCount
 ------------------
 
-    int dqn_ini_property_count( DqnIni const* ini, int section )
+    int DqnIni_PropertyCount( DqnIni const* ini, int section )
 
 Returns the number of properties belonging to the section with the specified
 index. `section` must be non-negative and less than the value returned by
-`dqn_ini_section_count`, or `dqn_ini_section_name` will return 0. The defined
+`DqnIni_SectionCount`, or `DqnIni_SectionName` will return 0. The defined
 constant `DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.
 Properties are declared in the ini-file on he format `name=value`.
 
 
-dqn_ini_property_name
+DqnIni_PropertyName
 -----------------
 
-    char const* dqn_ini_property_name( DqnIni const* ini, int section, int property )
+    char const* DqnIni_PropertyName( DqnIni const* ini, int section, int property )
 
 Returns the name of the property with the specified index `property` in the
 section with the specified index `section`.  `section` must be non-negative and
-less than the value returned by `dqn_ini_section_count`, and `property` must be
-non-negative and less than the value returned by `dqn_ini_property_count`, or
-`dqn_ini_property_name` will return NULL. The defined constant
+less than the value returned by `DqnIni_SectionCount`, and `property` must be
+non-negative and less than the value returned by `DqnIni_PropertyCount`, or
+`DqnIni_PropertyName` will return NULL. The defined constant
 `DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.
 
 
-dqn_ini_property_value
+DqnIni_PropertyValue
 ------------------
 
-    char const* dqn_ini_property_value( DqnIni const* ini, int section, int property )
+    char const* DqnIni_PropertyValue( DqnIni const* ini, int section, int property )
 
 Returns the value of the property with the specified index `property` in the
 section with the specified index `section`.  `section` must be non-negative and
-less than the value returned by `dqn_ini_section_count`, and `property` must be
-non-negative and less than the value returned by `dqn_ini_property_count`, or
-`dqn_ini_property_value` will return NULL. The defined constant
+less than the value returned by `DqnIni_SectionCount`, and `property` must be
+non-negative and less than the value returned by `DqnIni_PropertyCount`, or
+`DqnIni_PropertyValue` will return NULL. The defined constant
 `DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.
 
 
-dqn_ini_find_section
+DqnIni_FindSection
 ----------------
 
-    int dqn_ini_find_section( DqnIni const* ini, char const* name, int name_length )
+    int DqnIni_FindSection( DqnIni const* ini, char const* name, int name_length )
 
 Finds the section with the specified name, and returns its index. `name_length`
 specifies the number of characters in `name`, which does not have to be
@@ -816,10 +817,10 @@ with the specified name could be found, the value `DQN_INI_NOT_FOUND` is
 returned.
 
 
-dqn_ini_find_property
+DqnIni_FindProperty
 -----------------
 
-    int dqn_ini_find_property( DqnIni const* ini, int section, char const* name, int name_length )
+    int DqnIni_FindProperty( DqnIni const* ini, int section, char const* name, int name_length )
 
 Finds the property with the specified name, within the section with the
 specified index, and returns the index of the property. `name_length` specifies
@@ -828,15 +829,15 @@ If `name_length` is zero, the length is determined automatically, but in this
 case `name` has to be zero-terminated. If no property with the specified name
 could be found within the specified section, the value `DQN_INI_NOT_FOUND` is
 returned.  `section` must be non-negative and less than the value returned by
-`dqn_ini_section_count`, or `dqn_ini_find_property` will return
+`DqnIni_SectionCount`, or `DqnIni_FindProperty` will return
 `DQN_INI_NOT_FOUND`. The defined constant `DQN_INI_GLOBAL_SECTION` can be used
 to indicate the global section.
 
 
-dqn_ini_section_add
+DqnIni_SectionAdd
 ---------------
 
-    int dqn_ini_section_add( DqnIni* ini, char const* name, int length )
+    int DqnIni_SectionAdd( DqnIni* ini, char const* name, int length )
 
 Adds a section with the specified name, and returns the index it was added at.
 There is no check done to see if a section with the specified name already
@@ -846,10 +847,10 @@ number of characters in `name`, which does not have to be zero-terminated. If
 `name` has to be zero-terminated.
 
 
-dqn_ini_property_add
+DqnIni_PropertyAdd
 ----------------
     
-    void dqn_ini_property_add( DqnIni* ini, int section, char const* name, int name_length, char const* value, int value_length )
+    void DqnIni_PropertyAdd( DqnIni* ini, int section, char const* name, int name_length, char const* value, int value_length )
 
 Adds a property with the specified name and value to the specified section, and returns the index it was added at. There is no check done to see if a property
 with the specified name already exists - multiple properties of the same name
@@ -857,34 +858,34 @@ are allowed. `name_length` and `value_length` specifies the number of characters
 in `name` and `value`, which does not have to be zero-terminated. If
 `name_length` or `value_length` is zero, the length is determined automatically,
 but in this case `name`/`value` has to be zero-terminated. `section` must be
-non-negative and less than the value returned by `dqn_ini_section_count`, or the
+non-negative and less than the value returned by `DqnIni_SectionCount`, or the
 property will not be added. The defined constant `DQN_INI_GLOBAL_SECTION` can be
 used to indicate the global section.
 
 
-dqn_ini_section_remove
+DqnIni_SectionRemove
 ------------------
 
-    void dqn_ini_section_remove( DqnIni* ini, int section )
+    void DqnIni_SectionRemove( DqnIni* ini, int section )
 
 Removes the section with the specified index, and all properties within it.
 `section` must be non-negative and less than the value returned by
-`dqn_ini_section_count`. The defined constant `DQN_INI_GLOBAL_SECTION` can be
+`DqnIni_SectionCount`. The defined constant `DQN_INI_GLOBAL_SECTION` can be
 used to indicate the global section. Note that removing a section will shuffle
 section indices, so that section indices you may have stored will no longer
 indicate the same section as it did before the remove. Use the find functions to
 update your indices.
 
 
-dqn_ini_property_remove
+DqnIni_PropertyRemove
 -------------------
 
-    void dqn_ini_property_remove( DqnIni* ini, int section, int property )
+    void DqnIni_PropertyRemove( DqnIni* ini, int section, int property )
 
 Removes the property with the specified index from the specified section.
 `section` must be non-negative and less than the value returned by
-`dqn_ini_section_count`, and `property` must be non-negative and less than the
-value returned by `dqn_ini_property_count`. The defined constant
+`DqnIni_SectionCount`, and `property` must be non-negative and less than the
+value returned by `DqnIni_PropertyCount`. The defined constant
 `DQN_INI_GLOBAL_SECTION` can be used to indicate the global section. Note that
 removing a property will shuffle property indices within the specified section,
 so that property indices you may have stored will no longer indicate the same
@@ -892,43 +893,43 @@ property as it did before the remove. Use the find functions to update your
 indices.
 
 
-dqn_ini_section_name_set
+DqnIni_SectionNameSet
 --------------------
 
-    void dqn_ini_section_name_set( DqnIni* ini, int section, char const* name, int length )
+    void DqnIni_SectionNameSet( DqnIni* ini, int section, char const* name, int length )
 
 Change the name of the section with the specified index. `section` must be
-non-negative and less than the value returned by `dqn_ini_section_count`. The
+non-negative and less than the value returned by `DqnIni_SectionCount`. The
 defined constant `DQN_INI_GLOBAL_SECTION` can be used to indicate the global
 section. `length` specifies the number of characters in `name`, which does not
 have to be zero-terminated. If `length` is zero, the length is determined
 automatically, but in this case `name` has to be zero-terminated.
 
 
-dqn_ini_property_name_set
+DqnIni_PropertyNameSet
 ---------------------
 
-    void dqn_ini_property_name_set( DqnIni* ini, int section, int property, char const* name, int length )
+    void DqnIni_PropertyNameSet( DqnIni* ini, int section, int property, char const* name, int length )
 
 Change the name of the property with the specified index in the specified
 section. `section` must be non-negative and less than the value returned by
-`dqn_ini_section_count`, and `property` must be non-negative and less than the
-value returned by `dqn_ini_property_count`. The defined constant
+`DqnIni_SectionCount`, and `property` must be non-negative and less than the
+value returned by `DqnIni_PropertyCount`. The defined constant
 `DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.  `length`
 specifies the number of characters in `name`, which does not have to be
 zero-terminated. If `length` is zero, the length is determined automatically,
 	but in this case `name` has to be zero-terminated.
 
 
-dqn_ini_property_value_set
+DqnIni_PropertyValueSet
 ----------------------
 
-    void dqn_ini_property_value_set( DqnIni* ini, int section, int property, char const* value, int length  )
+    void DqnIni_PropertyValueSet( DqnIni* ini, int section, int property, char const* value, int length  )
 
 Change the value of the property with the specified index in the specified
 section. `section` must be non-negative and less than the value returned by
-`dqn_ini_section_count`, and `property` must be non-negative and less than the
-value returned by `dqn_ini_property_count`. The defined constant
+`DqnIni_SectionCount`, and `property` must be non-negative and less than the
+value returned by `DqnIni_PropertyCount`. The defined constant
 `DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.  `length`
 specifies the number of characters in `value`, which does not have to be
 zero-terminated. If `length` is zero, the length is determined automatically,
@@ -943,7 +944,7 @@ zero-terminated. If `length` is zero, the length is determined automatically,
 #define STB_SPRINTF_DECORATE(name) dqn_##name
 
 ////////////////////////////////////////////////////////////////////////////////
-// STB_Sprintf renamed to dqn_sprintf
+// STB_Sprintf renamed to Dqn_Sprintf
 ////////////////////////////////////////////////////////////////////////////////
 /*
 Public Domain library originally written by Jeff Roberts at RAD Game Tools
@@ -951,13 +952,13 @@ Public Domain library originally written by Jeff Roberts at RAD Game Tools
 
 API:
 ====
-int dqn_sprintf (char *buf, char const * fmt, ...)
-int dqn_snprintf(char *buf, int count, char const *fmt, ...)
+int Dqn_sprintf (char *buf, char const * fmt, ...)
+int Dqn_snprintf(char *buf, int count, char const *fmt, ...)
 - Convert an arg list into a buffer.
 - dqn_snprintf always returns a zero-terminated string (unlike regular snprintf).
 
-int dqn_vsprintf (char *buf, char const *fmt, va_list va)
-int dqn_vsnprintf(char *buf, int count, char const *fmt, va_list va)
+int Dqn_vsprintf (char *buf, char const *fmt, va_list va)
+int Dqn_vsnprintf(char *buf, int count, char const *fmt, va_list va)
 - Convert a va_list arg list into a buffer.
 - dqn_vsnprintf always returns a zero-terminated string (unlike regular snprintf).
 
@@ -1067,13 +1068,13 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 
 // NOTE: DQN_INI_IMPLEMENTATION modified to be included when DQN_IMPLEMENTATION defined
 // #define DQN_INI_IMPLEMENTATION
-#define DQN_INI_STRLEN(s) dqn_strlen(s)
+#define DQN_INI_STRLEN(s) Dqn_strlen(s)
 ////////////////////////////////////////////////////////////////////////////////
 // Memory
 ////////////////////////////////////////////////////////////////////////////////
 // NOTE: All memory allocations in dqn.h go through these functions. So they can
 // be rerouted fairly easily especially for platform specific mallocs.
-FILE_SCOPE void *dqn_mem_alloc_internal(size_t size, bool zeroClear)
+FILE_SCOPE void *Dqn_MemAllocInternal(size_t size, bool zeroClear)
 {
 	void *result = NULL;
 
@@ -1088,13 +1089,19 @@ FILE_SCOPE void *dqn_mem_alloc_internal(size_t size, bool zeroClear)
 	return result;
 }
 
-FILE_SCOPE void *dqn_mem_realloc_internal(void *memory, size_t newSize)
+FILE_SCOPE void Dqn_MemClearInternal(void *memory, u8 clearValue,
+                                        size_t size)
+{
+	if (memory) memset(memory, clearValue, size);
+}
+
+FILE_SCOPE void *Dqn_MemReallocInternal(void *memory, size_t newSize)
 {
 	void *result = realloc(memory, newSize);
 	return result;
 }
 
-FILE_SCOPE void dqn_mem_free_internal(void *memory)
+FILE_SCOPE void Dqn_MemFreeInternal(void *memory)
 {
 	if (memory)
 	{
@@ -1106,7 +1113,7 @@ FILE_SCOPE void dqn_mem_free_internal(void *memory)
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE f32 dqn_math_lerp(f32 a, f32 t, f32 b)
+DQN_FILE_SCOPE f32 DqnMath_Lerp(f32 a, f32 t, f32 b)
 {
 	/*
 	    Linear blend between two values. We having a starting point "a", and
@@ -1124,7 +1131,7 @@ DQN_FILE_SCOPE f32 dqn_math_lerp(f32 a, f32 t, f32 b)
 	return result;
 }
 
-DQN_FILE_SCOPE f32 dqn_math_sqrtf(f32 a)
+DQN_FILE_SCOPE f32 DqnMath_Sqrtf(f32 a)
 {
 	f32 result = sqrtf(a);
 	return result;
@@ -1133,7 +1140,7 @@ DQN_FILE_SCOPE f32 dqn_math_sqrtf(f32 a)
 ////////////////////////////////////////////////////////////////////////////////
 // Vec2
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV2 dqn_v2(f32 x, f32 y)
+DQN_FILE_SCOPE DqnV2 DqnV2_2f(f32 x, f32 y)
 {
 	DqnV2 result = {};
 	result.x  = x;
@@ -1142,49 +1149,49 @@ DQN_FILE_SCOPE DqnV2 dqn_v2(f32 x, f32 y)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 dqn_v2i(i32 x, i32 y)
+DQN_FILE_SCOPE DqnV2 DqnV2_2i(i32 x, i32 y)
 {
-	DqnV2 result = dqn_v2((f32)x, (f32)y);
+	DqnV2 result = DqnV2_2f((f32)x, (f32)y);
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 dqn_v2_add(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE DqnV2 DqnV2_Add(DqnV2 a, DqnV2 b)
 {
-	DqnV2 result;
+	DqnV2 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] + b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 dqn_v2_sub(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE DqnV2 DqnV2_Sub(DqnV2 a, DqnV2 b)
 {
-	DqnV2 result;
+	DqnV2 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] - b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 dqn_v2_scale(DqnV2 a, f32 b)
+DQN_FILE_SCOPE DqnV2 DqnV2_Scale(DqnV2 a, f32 b)
 {
-	DqnV2 result;
+	DqnV2 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 dqn_v2_hadamard(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE DqnV2 DqnV2_Hadamard(DqnV2 a, DqnV2 b)
 {
-	DqnV2 result;
+	DqnV2 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE f32 dqn_v2_dot(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE f32 DqnV2_Dot(DqnV2 a, DqnV2 b)
 {
 	/*
 	   DOT PRODUCT
@@ -1200,15 +1207,15 @@ DQN_FILE_SCOPE f32 dqn_v2_dot(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE bool dqn_v2_equals(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE bool DqnV2_Equals(DqnV2 a, DqnV2 b)
 {
-	bool result = TRUE;
+	bool result = true;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
-		if (a.e[i] != b.e[i]) result = FALSE;
+		if (a.e[i] != b.e[i]) result = false;
 	return result;
 }
 
-DQN_FILE_SCOPE f32 dqn_v2_length_squared(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE f32 DqnV2_LengthSquared(DqnV2 a, DqnV2 b)
 {
 	f32 x      = b.x - a.x;
 	f32 y      = b.y - a.y;
@@ -1216,22 +1223,22 @@ DQN_FILE_SCOPE f32 dqn_v2_length_squared(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE f32 dqn_v2_length(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE f32 DqnV2_Length(DqnV2 a, DqnV2 b)
 {
-	f32 lengthSq = dqn_v2_length_squared(a, b);
-	f32 result   = dqn_math_sqrtf(lengthSq);
+	f32 lengthSq = DqnV2_LengthSquared(a, b);
+	f32 result   = DqnMath_Sqrtf(lengthSq);
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 dqn_v2_normalise(DqnV2 a)
+DQN_FILE_SCOPE DqnV2 DqnV2_Normalise(DqnV2 a)
 {
-	f32 magnitude = dqn_v2_length(dqn_v2(0, 0), a);
-	DqnV2 result  = dqn_v2(a.x, a.y);
-	result        = dqn_v2_scale(a, 1 / magnitude);
+	f32 magnitude = DqnV2_Length(DqnV2_2f(0, 0), a);
+	DqnV2 result  = DqnV2_2f(a.x, a.y);
+	result        = DqnV2_Scale(a, 1 / magnitude);
 	return result;
 }
 
-DQN_FILE_SCOPE bool dqn_v2_overlaps(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE bool DqnV2_Overlaps(DqnV2 a, DqnV2 b)
 {
 	bool result = false;
 	
@@ -1254,14 +1261,14 @@ DQN_FILE_SCOPE bool dqn_v2_overlaps(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 dqn_v2_perpendicular(DqnV2 a)
+DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(DqnV2 a)
 {
 	DqnV2 result = {a.y, -a.x};
 	return result;
 }
 
 
-DQN_FILE_SCOPE DqnV2 dqn_v2_constrain_to_ratio(DqnV2 dim, DqnV2 ratio)
+DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio)
 {
 	DqnV2 result                  = {};
 	f32 numRatioIncrementsToWidth  = (f32)(dim.w / ratio.w);
@@ -1278,7 +1285,7 @@ DQN_FILE_SCOPE DqnV2 dqn_v2_constrain_to_ratio(DqnV2 dim, DqnV2 ratio)
 ////////////////////////////////////////////////////////////////////////////////
 // Vec3
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV3 dqn_v3(f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnV3 DqnV3_3f(f32 x, f32 y, f32 z)
 {
 	DqnV3 result = {};
 	result.x       = x;
@@ -1287,49 +1294,49 @@ DQN_FILE_SCOPE DqnV3 dqn_v3(f32 x, f32 y, f32 z)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV3 dqn_v3i(i32 x, i32 y, i32 z)
+DQN_FILE_SCOPE DqnV3 DqnV3_3i(i32 x, i32 y, i32 z)
 {
-	DqnV3 result = dqn_v3((f32)x, (f32)y, (f32)z);
+	DqnV3 result = DqnV3_3f((f32)x, (f32)y, (f32)z);
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV3 dqn_v3_add(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE DqnV3 DqnV3_Add(DqnV3 a, DqnV3 b)
 {
-	DqnV3 result;
+	DqnV3 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] + b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV3 dqn_v3_sub(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE DqnV3 DqnV3_Sub(DqnV3 a, DqnV3 b)
 {
-	DqnV3 result;
+	DqnV3 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] - b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV3 dqn_v3_scale(DqnV3 a, f32 b)
+DQN_FILE_SCOPE DqnV3 DqnV3_Scale(DqnV3 a, f32 b)
 {
-	DqnV3 result;
+	DqnV3 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV3 dqn_v3_hadamard(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE DqnV3 DqnV3_Hadamard(DqnV3 a, DqnV3 b)
 {
-	DqnV3 result;
+	DqnV3 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE f32 dqn_v3_dot(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE f32 DqnV3_Dot(DqnV3 a, DqnV3 b)
 {
 	/*
 	   DOT PRODUCT
@@ -1345,15 +1352,15 @@ DQN_FILE_SCOPE f32 dqn_v3_dot(DqnV3 a, DqnV3 b)
 	return result;
 }
 
-DQN_FILE_SCOPE bool dqn_v3_equals(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE bool DqnV3_Equals(DqnV3 a, DqnV3 b)
 {
-	bool result = TRUE;
+	bool result = true;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
-		if (a.e[i] != b.e[i]) result = FALSE;
+		if (a.e[i] != b.e[i]) result = false;
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV3 dqn_v3_cross(DqnV3 a, DqnV3 b)
+DQN_FILE_SCOPE DqnV3 DqnV3_Cross(DqnV3 a, DqnV3 b)
 {
 	/*
 	   CROSS PRODUCT
@@ -1372,54 +1379,55 @@ DQN_FILE_SCOPE DqnV3 dqn_v3_cross(DqnV3 a, DqnV3 b)
 ////////////////////////////////////////////////////////////////////////////////
 // Vec4
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV4 dqn_v4(f32 x, f32 y, f32 z, f32 w)
+DQN_FILE_SCOPE DqnV4 DqnV4_4f(f32 x, f32 y, f32 z, f32 w)
 {
 	DqnV4 result = {x, y, z, w};
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV4 dqn_v4i(i32 x, i32 y, i32 z, i32 w) {
-	DqnV4 result = dqn_v4((f32)x, (f32)y, (f32)z, (f32)w);
+DQN_FILE_SCOPE DqnV4 DqnV4_4i(i32 x, i32 y, i32 z, i32 w)
+{
+	DqnV4 result = DqnV4_4f((f32)x, (f32)y, (f32)z, (f32)w);
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV4 dqn_v4_add(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE DqnV4 DqnV4_Add(DqnV4 a, DqnV4 b)
 {
-	DqnV4 result;
+	DqnV4 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] + b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV4 dqn_v4_sub(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE DqnV4 DqnV4_Sub(DqnV4 a, DqnV4 b)
 {
-	DqnV4 result;
+	DqnV4 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] - b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV4 dqn_v4_scale(DqnV4 a, f32 b)
+DQN_FILE_SCOPE DqnV4 DqnV4_Scale(DqnV4 a, f32 b)
 {
-	DqnV4 result;
+	DqnV4 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV4 dqn_v4_hadamard(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE DqnV4 DqnV4_Hadamard(DqnV4 a, DqnV4 b)
 {
-	DqnV4 result;
+	DqnV4 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b.e[i];
 
 	return result;
 }
 
-DQN_FILE_SCOPE f32 dqn_v4_dot(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE f32 DqnV4_Dot(DqnV4 a, DqnV4 b)
 {
 	/*
 	   DOT PRODUCT
@@ -1435,18 +1443,18 @@ DQN_FILE_SCOPE f32 dqn_v4_dot(DqnV4 a, DqnV4 b)
 	return result;
 }
 
-DQN_FILE_SCOPE bool dqn_v4_equals(DqnV4 a, DqnV4 b)
+DQN_FILE_SCOPE bool DqnV4_Equals(DqnV4 a, DqnV4 b)
 {
-	bool result = TRUE;
+	bool result = true;
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
-		if (a.e[i] != b.e[i]) result = FALSE;
+		if (a.e[i] != b.e[i]) result = false;
 	return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // 4D Matrix Mat4
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_identity()
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity()
 {
 	DqnMat4 result    = {0};
 	result.e[0][0] = 1;
@@ -1457,9 +1465,9 @@ DQN_FILE_SCOPE DqnMat4 dqn_mat4_identity()
 }
 
 DQN_FILE_SCOPE DqnMat4
-dqn_mat4_ortho(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar)
+DqnMat4_Ortho(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar)
 {
-	DqnMat4 result = dqn_mat4_identity();
+	DqnMat4 result = DqnMat4_Identity();
 	result.e[0][0] = +2.0f   / (right - left);
 	result.e[1][1] = +2.0f   / (top   - bottom);
 	result.e[2][2] = -2.0f   / (zFar  - zNear);
@@ -1471,18 +1479,18 @@ dqn_mat4_ortho(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_translate(f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate(f32 x, f32 y, f32 z)
 {
-	DqnMat4 result = dqn_mat4_identity();
+	DqnMat4 result = DqnMat4_Identity();
 	result.e[3][0] = x;
 	result.e[3][1] = y;
 	result.e[3][2] = z;
 	return result;
 }
 
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_rotate(f32 radians, f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate(f32 radians, f32 x, f32 y, f32 z)
 {
-	DqnMat4 result = dqn_mat4_identity();
+	DqnMat4 result = DqnMat4_Identity();
 	f32 sinVal = sinf(radians);
 	f32 cosVal = cosf(radians);
 
@@ -1503,7 +1511,7 @@ DQN_FILE_SCOPE DqnMat4 dqn_mat4_rotate(f32 radians, f32 x, f32 y, f32 z)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_scale(f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale(f32 x, f32 y, f32 z)
 {
 	DqnMat4 result = {0};
 	result.e[0][0] = x;
@@ -1513,7 +1521,7 @@ DQN_FILE_SCOPE DqnMat4 dqn_mat4_scale(f32 x, f32 y, f32 z)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnMat4 dqn_mat4_mul(DqnMat4 a, DqnMat4 b)
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul(DqnMat4 a, DqnMat4 b)
 {
 	DqnMat4 result = {0};
 	for (i32 j = 0; j < 4; j++) {
@@ -1528,7 +1536,7 @@ DQN_FILE_SCOPE DqnMat4 dqn_mat4_mul(DqnMat4 a, DqnMat4 b)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV4 dqn_mat4_mul_vec4(DqnMat4 a, DqnV4 b)
+DQN_FILE_SCOPE DqnV4 DqnMat4_MulV4(DqnMat4 a, DqnV4 b)
 {
 	DqnV4 result = {0};
 
@@ -1547,48 +1555,48 @@ DQN_FILE_SCOPE DqnV4 dqn_mat4_mul_vec4(DqnMat4 a, DqnV4 b)
 ////////////////////////////////////////////////////////////////////////////////
 // Rect
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnRect dqn_rect(DqnV2 origin, DqnV2 size)
+DQN_FILE_SCOPE DqnRect DqnRect_Init(DqnV2 origin, DqnV2 size)
 {
 	DqnRect result = {};
 	result.min      = origin;
-	result.max      = dqn_v2_add(origin, size);
+	result.max      = DqnV2_Add(origin, size);
 
 	return result;
 }
 
-DQN_FILE_SCOPE void dqn_rect_get_size_2f(DqnRect rect, f32 *width, f32 *height)
+DQN_FILE_SCOPE void DqnRect_GetSize2f(DqnRect rect, f32 *width, f32 *height)
 {
 	*width  = DQN_ABS(rect.max.x - rect.min.x);
 	*height = DQN_ABS(rect.max.y - rect.min.y);
 }
 
-DQN_FILE_SCOPE DqnV2 dqn_rect_get_size_v2(DqnRect rect)
+DQN_FILE_SCOPE DqnV2 DqnRect_GetSizeV2(DqnRect rect)
 {
 	f32 width     = DQN_ABS(rect.max.x - rect.min.x);
 	f32 height    = DQN_ABS(rect.max.y - rect.min.y);
-	DqnV2 result = dqn_v2(width, height);
+	DqnV2 result  = DqnV2_2f(width, height);
 	return result;
 }
 
 
-DQN_FILE_SCOPE DqnV2 dqn_rect_get_centre(DqnRect rect)
+DQN_FILE_SCOPE DqnV2 DqnRect_GetCentre(DqnRect rect)
 {
 	f32 sumX  = rect.min.x + rect.max.x;
 	f32 sumY  = rect.min.y + rect.max.y;
-	DqnV2 result = dqn_v2_scale(dqn_v2(sumX, sumY), 0.5f);
+	DqnV2 result = DqnV2_Scale(DqnV2_2f(sumX, sumY), 0.5f);
 	return result;
 }
 
-DQN_FILE_SCOPE DqnRect dqn_rect_move(DqnRect rect, DqnV2 shift)
+DQN_FILE_SCOPE DqnRect DqnRect_Move(DqnRect rect, DqnV2 shift)
 {
 	DqnRect result = {0};
-	result.min       = dqn_v2_add(rect.min, shift);
-	result.max       = dqn_v2_add(rect.max, shift);
+	result.min       = DqnV2_Add(rect.min, shift);
+	result.max       = DqnV2_Add(rect.max, shift);
 
 	return result;
 }
 
-DQN_FILE_SCOPE bool dqn_rect_contains_p(DqnRect rect, DqnV2 p)
+DQN_FILE_SCOPE bool DqnRect_ContainsP(DqnRect rect, DqnV2 p)
 {
 	bool outsideOfRectX = false;
 	if (p.x < rect.min.x || p.x > rect.max.w)
@@ -1606,7 +1614,7 @@ DQN_FILE_SCOPE bool dqn_rect_contains_p(DqnRect rect, DqnV2 p)
 ////////////////////////////////////////////////////////////////////////////////
 // char String Operations
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE char dqn_char_to_lower(char c)
+DQN_FILE_SCOPE char DqnChar_ToLower(char c)
 {
 	if (c >= 'A' && c <= 'Z')
 	{
@@ -1617,7 +1625,7 @@ DQN_FILE_SCOPE char dqn_char_to_lower(char c)
 	return c;
 }
 
-DQN_FILE_SCOPE char dqn_char_to_upper(char c)
+DQN_FILE_SCOPE char DqnChar_ToUpper(char c)
 {
 	if (c >= 'a' && c <= 'z')
 	{
@@ -1629,25 +1637,25 @@ DQN_FILE_SCOPE char dqn_char_to_upper(char c)
 }
 
 
-DQN_FILE_SCOPE bool dqn_char_is_digit(char c)
+DQN_FILE_SCOPE bool DqnChar_IsDigit(char c)
 {
 	if (c >= '0' && c <= '9') return true;
 	return false;
 }
 
-DQN_FILE_SCOPE bool dqn_char_is_alpha(char c)
+DQN_FILE_SCOPE bool DqnChar_IsAlpha(char c)
 {
 	if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return true;
 	return false;
 }
 
-DQN_FILE_SCOPE bool dqn_char_is_alphanum(char c)
+DQN_FILE_SCOPE bool DqnChar_IsAlphaNum(char c)
 {
-	if (dqn_char_is_alpha(c) || dqn_char_is_digit(c)) return true;
+	if (DqnChar_IsAlpha(c) || DqnChar_IsDigit(c)) return true;
 	return false;
 }
 
-DQN_FILE_SCOPE i32 dqn_strcmp(const char *a, const char *b)
+DQN_FILE_SCOPE i32 Dqn_strcmp(const char *a, const char *b)
 {
 	if (!a && !b) return -1;
 	if (!a) return -1;
@@ -1663,7 +1671,7 @@ DQN_FILE_SCOPE i32 dqn_strcmp(const char *a, const char *b)
 	return (((*a) < (*b)) ? -1 : 1);
 }
 
-DQN_FILE_SCOPE i32 dqn_strlen(const char *a)
+DQN_FILE_SCOPE i32 Dqn_strlen(const char *a)
 {
 	i32 result = 0;
 	while (a && a[result]) result++;
@@ -1671,14 +1679,14 @@ DQN_FILE_SCOPE i32 dqn_strlen(const char *a)
 	return result;
 }
 
-DQN_FILE_SCOPE i32 dqn_strlen_delimit_with(const char *a, const char delimiter)
+DQN_FILE_SCOPE i32 Dqn_strlenDelimitWith(const char *a, const char delimiter)
 {
 	i32 result = 0;
 	while (a && a[result] && a[result] != delimiter) result++;
 	return result;
 }
 
-DQN_FILE_SCOPE char *dqn_strncpy(char *dest, const char *src, i32 numChars)
+DQN_FILE_SCOPE char *Dqn_strncpy(char *dest, const char *src, i32 numChars)
 {
 	if (!dest) return NULL;
 	if (!src)  return dest;
@@ -1689,7 +1697,7 @@ DQN_FILE_SCOPE char *dqn_strncpy(char *dest, const char *src, i32 numChars)
 	return dest;
 }
 
-DQN_FILE_SCOPE bool dqn_str_reverse(char *buf, const i32 bufSize)
+DQN_FILE_SCOPE bool Dqn_StrReverse(char *buf, const i32 bufSize)
 {
 	if (!buf) return false;
 	i32 mid = bufSize / 2;
@@ -1704,7 +1712,7 @@ DQN_FILE_SCOPE bool dqn_str_reverse(char *buf, const i32 bufSize)
 	return true;
 }
 
-DQN_FILE_SCOPE bool dqn_str_has_substring(const char *const a, const i32 lenA,
+DQN_FILE_SCOPE bool Dqn_StrHasSubstring(const char *const a, const i32 lenA,
                                           const char *const b, const i32 lenB)
 {
 	if (!a || !b) return false;
@@ -1743,8 +1751,8 @@ DQN_FILE_SCOPE bool dqn_str_has_substring(const char *const a, const i32 lenA,
 		i32 index = 0;
 		for (;;)
 		{
-			if (dqn_char_to_lower(longSubstr[index]) ==
-			    dqn_char_to_lower(shortStr[index]))
+			if (DqnChar_ToLower(longSubstr[index]) ==
+			    DqnChar_ToLower(shortStr[index]))
 			{
 				index++;
 				if (index >= shortLen || !shortStr[index])
@@ -1763,7 +1771,7 @@ DQN_FILE_SCOPE bool dqn_str_has_substring(const char *const a, const i32 lenA,
 	return matchedSubstr;
 }
 
-DQN_FILE_SCOPE i32 dqn_str_to_i32(const char *const buf, const i32 bufSize)
+DQN_FILE_SCOPE i32 Dqn_StrToI32(const char *const buf, const i32 bufSize)
 {
 	if (!buf || bufSize == 0) return 0;
 
@@ -1774,7 +1782,7 @@ DQN_FILE_SCOPE i32 dqn_str_to_i32(const char *const buf, const i32 bufSize)
 		if (buf[index] == '-') isNegative = true;
 		index++;
 	}
-	else if (!dqn_char_is_digit(buf[index]))
+	else if (!DqnChar_IsDigit(buf[index]))
 	{
 		return 0;
 	}
@@ -1782,7 +1790,7 @@ DQN_FILE_SCOPE i32 dqn_str_to_i32(const char *const buf, const i32 bufSize)
 	i32 result = 0;
 	for (i32 i = index; i < bufSize; i++)
 	{
-		if (dqn_char_is_digit(buf[i]))
+		if (DqnChar_IsDigit(buf[i]))
 		{
 			result *= 10;
 			result += (buf[i] - '0');
@@ -1798,7 +1806,7 @@ DQN_FILE_SCOPE i32 dqn_str_to_i32(const char *const buf, const i32 bufSize)
 	return result;
 }
 
-DQN_FILE_SCOPE i32 dqn_i32_to_str(i32 value, char *buf, i32 bufSize)
+DQN_FILE_SCOPE i32 Dqn_I32ToStr(i32 value, char *buf, i32 bufSize)
 {
 	if (!buf || bufSize == 0) return 0;
 
@@ -1827,11 +1835,11 @@ DQN_FILE_SCOPE i32 dqn_i32_to_str(i32 value, char *buf, i32 bufSize)
 	// from the second character, so we don't put the negative sign at the end
 	if (negative)
 	{
-		dqn_str_reverse(buf + 1, charIndex - 1);
+		Dqn_StrReverse(buf + 1, charIndex - 1);
 	}
 	else
 	{
-		dqn_str_reverse(buf, charIndex);
+		Dqn_StrReverse(buf, charIndex);
 	}
 
 	return charIndex;
@@ -1857,7 +1865,7 @@ DQN_FILE_SCOPE i32 dqn_i32_to_str(i32 value, char *buf, i32 bufSize)
 	The UCS code values 0xd800–0xdfff (UTF-16 surrogates) as well as 0xfffe and
 	0xffff (UCS noncharacters) should not appear in conforming UTF-8 streams.
 */
-DQN_FILE_SCOPE u32 dqn_ucs_to_utf8(u32 *dest, u32 character)
+DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character)
 {
 	if (!dest) return 0;
 
@@ -1926,7 +1934,7 @@ DQN_FILE_SCOPE u32 dqn_ucs_to_utf8(u32 *dest, u32 character)
 	return 0;
 }
 
-DQN_FILE_SCOPE u32 dqn_utf8_to_ucs(u32 *dest, u32 character)
+DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *dest, u32 character)
 {
 	if (!dest) return 0;
 
@@ -2002,13 +2010,13 @@ DQN_FILE_SCOPE u32 dqn_utf8_to_ucs(u32 *dest, u32 character)
 ////////////////////////////////////////////////////////////////////////////////
 // wchar String Operations
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE bool dqn_wchar_is_digit(const wchar_t c)
+DQN_FILE_SCOPE bool DqnWChar_IsDigit(const wchar_t c)
 {
 	if (c >= L'0' && c <= L'9') return true;
 	return false;
 }
 
-DQN_FILE_SCOPE wchar_t dqn_wchar_to_lower(const wchar_t c)
+DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c)
 {
 	if (c >= L'A' && c <= L'Z')
 	{
@@ -2019,14 +2027,14 @@ DQN_FILE_SCOPE wchar_t dqn_wchar_to_lower(const wchar_t c)
 	return c;
 }
 
-DQN_FILE_SCOPE i32 dqn_wstrlen(const wchar_t *a)
+DQN_FILE_SCOPE i32 Dqn_wstrlen(const wchar_t *a)
 {
 	i32 result = 0;
 	while (a && a[result]) result++;
 	return result;
 }
 
-DQN_FILE_SCOPE i32 dqn_wstrcmp(const wchar_t *a, const wchar_t *b)
+DQN_FILE_SCOPE i32 Dqn_wstrcmp(const wchar_t *a, const wchar_t *b)
 {
 	if (!a && !b) return -1;
 	if (!a) return -1;
@@ -2042,7 +2050,7 @@ DQN_FILE_SCOPE i32 dqn_wstrcmp(const wchar_t *a, const wchar_t *b)
 	return (((*a) < (*b)) ? -1 : 1);
 }
 
-DQN_FILE_SCOPE bool dqn_wstr_reverse(wchar_t *buf, const i32 bufSize)
+DQN_FILE_SCOPE bool Dqn_WStrReverse(wchar_t *buf, const i32 bufSize)
 {
 	if (!buf) return false;
 	i32 mid = bufSize / 2;
@@ -2057,7 +2065,7 @@ DQN_FILE_SCOPE bool dqn_wstr_reverse(wchar_t *buf, const i32 bufSize)
 	return true;
 }
 
-DQN_FILE_SCOPE i32 dqn_wstr_to_i32(const wchar_t *const buf, const i32 bufSize)
+DQN_FILE_SCOPE i32 Dqn_WStrToI32(const wchar_t *const buf, const i32 bufSize)
 {
 	if (!buf || bufSize == 0) return 0;
 
@@ -2068,7 +2076,7 @@ DQN_FILE_SCOPE i32 dqn_wstr_to_i32(const wchar_t *const buf, const i32 bufSize)
 		if (buf[index] == L'-') isNegative = true;
 		index++;
 	}
-	else if (!dqn_wchar_is_digit(buf[index]))
+	else if (!DqnWChar_IsDigit(buf[index]))
 	{
 		return 0;
 	}
@@ -2076,7 +2084,7 @@ DQN_FILE_SCOPE i32 dqn_wstr_to_i32(const wchar_t *const buf, const i32 bufSize)
 	i32 result = 0;
 	for (i32 i = index; i < bufSize; i++)
 	{
-		if (dqn_wchar_is_digit(buf[i]))
+		if (DqnWChar_IsDigit(buf[i]))
 		{
 			result *= 10;
 			result += (buf[i] - L'0');
@@ -2092,7 +2100,7 @@ DQN_FILE_SCOPE i32 dqn_wstr_to_i32(const wchar_t *const buf, const i32 bufSize)
 	return result;
 }
 
-DQN_FILE_SCOPE i32 dqn_i32_to_wstr(i32 value, wchar_t *buf, i32 bufSize)
+DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 {
 	if (!buf || bufSize == 0) return 0;
 
@@ -2121,11 +2129,11 @@ DQN_FILE_SCOPE i32 dqn_i32_to_wstr(i32 value, wchar_t *buf, i32 bufSize)
 	// from the second character, so we don't put the negative sign at the end
 	if (negative)
 	{
-		dqn_wstr_reverse(buf + 1, charIndex - 1);
+		Dqn_WStrReverse(buf + 1, charIndex - 1);
 	}
 	else
 	{
-		dqn_wstr_reverse(buf, charIndex);
+		Dqn_WStrReverse(buf, charIndex);
 	}
 
 	return charIndex;
@@ -2135,9 +2143,8 @@ DQN_FILE_SCOPE i32 dqn_i32_to_wstr(i32 value, wchar_t *buf, i32 bufSize)
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_WIN32
 
-DQN_FILE_SCOPE bool dqn_win32_utf8_to_wchar(const char *const in,
-                                            wchar_t *const out,
-                                            const i32 outLen)
+DQN_FILE_SCOPE bool DqnWin32_UTF8ToWChar(const char *const in,
+                                         wchar_t *const out, const i32 outLen)
 {
 	u32 result = MultiByteToWideChar(CP_UTF8, 0, in, -1, out, outLen-1);
 
@@ -2150,8 +2157,8 @@ DQN_FILE_SCOPE bool dqn_win32_utf8_to_wchar(const char *const in,
 	return true;
 }
 
-DQN_FILE_SCOPE bool dqn_win32_wchar_to_utf8(const wchar_t *const in,
-                                            char *const out, const i32 outLen)
+DQN_FILE_SCOPE bool DqnWin32_WCharToUTF8(const wchar_t *const in,
+                                         char *const out, const i32 outLen)
 {
 	u32 result =
 	    WideCharToMultiByte(CP_UTF8, 0, in, -1, out, outLen, NULL, NULL);
@@ -2165,8 +2172,8 @@ DQN_FILE_SCOPE bool dqn_win32_wchar_to_utf8(const wchar_t *const in,
 	return true;
 }
 
-DQN_FILE_SCOPE void dqn_win32_get_client_dim(const HWND window, LONG *width,
-                                             LONG *height)
+DQN_FILE_SCOPE void DqnWin32_GetClientDim(const HWND window, LONG *width,
+                                          LONG *height)
 {
 	RECT rect;
 	GetClientRect(window, &rect);
@@ -2174,13 +2181,13 @@ DQN_FILE_SCOPE void dqn_win32_get_client_dim(const HWND window, LONG *width,
 	if (height) *height = rect.bottom - rect.top;
 }
 
-DQN_FILE_SCOPE void dqn_win32_get_rect_dim(RECT rect, LONG *width, LONG *height)
+DQN_FILE_SCOPE void DqnWin32_GetRectDim(RECT rect, LONG *width, LONG *height)
 {
 	if (width)  *width  = rect.right - rect.left;
 	if (height) *height = rect.bottom - rect.top;
 }
 
-DQN_FILE_SCOPE void dqn_win32_display_last_error(const char *const errorPrefix)
+DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix)
 {
 	DWORD error         = GetLastError();
 	char errorMsg[1024] = {};
@@ -2192,7 +2199,7 @@ DQN_FILE_SCOPE void dqn_win32_display_last_error(const char *const errorPrefix)
 	DQN_WIN32_ERROR_BOX(formattedError, NULL);
 }
 
-DQN_FILE_SCOPE void dqn_win32_display_error_code(const DWORD error, const char *const errorPrefix)
+DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *const errorPrefix)
 {
 	char errorMsg[1024] = {};
 	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -2204,10 +2211,10 @@ DQN_FILE_SCOPE void dqn_win32_display_error_code(const DWORD error, const char *
 }
 #endif
 
-FILE_SCOPE bool dqn_file_open_internal(const wchar_t *const path,
-                                       DqnFile *const file,
-                                       const u32 permissionFlags,
-                                       const enum DqnFileAction action)
+FILE_SCOPE bool DqnFile_OpenInternal(const wchar_t *const path,
+                                     DqnFile *const file,
+                                     const u32 permissionFlags,
+                                     const enum DqnFileAction action)
 {
 	if (!file || !path) return false;
 
@@ -2245,7 +2252,7 @@ FILE_SCOPE bool dqn_file_open_internal(const wchar_t *const path,
 	LARGE_INTEGER size;
 	if (GetFileSizeEx(handle, &size) == 0)
 	{
-		dqn_win32_display_last_error("GetFileSizeEx() failed");
+		DqnWin32_DisplayLastError("GetFileSizeEx() failed");
 		return false;
 	}
 
@@ -2261,45 +2268,44 @@ FILE_SCOPE bool dqn_file_open_internal(const wchar_t *const path,
 }
 
 DQN_FILE_SCOPE
-bool dqn_file_openw(const wchar_t *const path, DqnFile *const file,
-                    const u32 permissionFlags, const enum DqnFileAction action)
+bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file,
+                   const u32 permissionFlags, const enum DqnFileAction action)
 {
 	if (!file || !path) return false;
 #ifdef DQN_WIN32
-	return dqn_file_open_internal(path, file, permissionFlags, action);
+	return DqnFile_OpenInternal(path, file, permissionFlags, action);
 #else
 	return false;
 #endif
 }
 
 DQN_FILE_SCOPE
-bool dqn_file_open(const char *const path, DqnFile *const file,
-                   const u32 permissionFlags, const enum DqnFileAction action)
+bool DqnFile_Open(const char *const path, DqnFile *const file,
+                  const u32 permissionFlags, const enum DqnFileAction action)
 {
 	if (!file || !path) return false;
 
 #ifdef DQN_WIN32
 	wchar_t widePath[MAX_PATH] = {};
-	dqn_win32_utf8_to_wchar(path, widePath, DQN_ARRAY_COUNT(widePath));
-	dqn_file_open_internal(widePath, file, permissionFlags, action);
+	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
+	return DqnFile_OpenInternal(widePath, file, permissionFlags, action);
 #else
 	return false;
 #endif
-
-	return true;
 }
 
-DQN_FILE_SCOPE size_t dqn_file_read(const DqnFile file, const u8 *const buffer,
-                                    const size_t numBytesToRead)
+DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
+                                   const size_t numBytesToRead)
 {
 	size_t numBytesRead = 0;
 #ifdef DQN_WIN32
 	if (file.handle && buffer)
 	{
+		DWORD bytesToRead = (DWORD)numBytesToRead;
 		DWORD bytesRead    = 0;
 		HANDLE win32Handle = file.handle;
 
-		BOOL result = ReadFile(win32Handle, (void *)buffer, numBytesToRead,
+		BOOL result = ReadFile(win32Handle, (void *)buffer, bytesToRead,
 		                       &bytesRead, NULL);
 
 		numBytesRead = (size_t)bytesRead;
@@ -2314,10 +2320,10 @@ DQN_FILE_SCOPE size_t dqn_file_read(const DqnFile file, const u8 *const buffer,
 	return numBytesRead;
 }
 
-DQN_FILE_SCOPE size_t dqn_file_write(const DqnFile *const file,
-                                     const u8 *const buffer,
-                                     const size_t numBytesToWrite,
-                                     const size_t fileOffset)
+DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
+                                    const u8 *const buffer,
+                                    const size_t numBytesToWrite,
+                                    const size_t fileOffset)
 {
 	size_t numBytesWritten = 0;
 
@@ -2328,9 +2334,10 @@ DQN_FILE_SCOPE size_t dqn_file_write(const DqnFile *const file,
 
 
 #ifdef DQN_WIN32
+	DWORD bytesToWrite = (DWORD)numBytesToWrite;
 	DWORD bytesWritten;
 	BOOL result =
-	    WriteFile(file->handle, buffer, numBytesToWrite, &bytesWritten, NULL);
+	    WriteFile(file->handle, buffer, bytesToWrite, &bytesWritten, NULL);
 
 	numBytesWritten = (size_t)bytesWritten;
 	// TODO(doyle): Better logging system
@@ -2345,7 +2352,7 @@ DQN_FILE_SCOPE size_t dqn_file_write(const DqnFile *const file,
 }
 
 
-DQN_FILE_SCOPE void dqn_file_close(DqnFile *const file)
+DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
 {
 #ifdef DQN_WIN32
 	if (file && file->handle)
@@ -2358,14 +2365,14 @@ DQN_FILE_SCOPE void dqn_file_close(DqnFile *const file)
 #endif
 }
 
-DQN_FILE_SCOPE char **dqn_dir_read(char *dir, u32 *numFiles)
+DQN_FILE_SCOPE char **DqnDir_Read(char *dir, u32 *numFiles)
 {
 	if (!dir) return NULL;
 #ifdef DQN_WIN32
 
 	u32 currNumFiles = 0;
 	wchar_t wideDir[MAX_PATH] = {};
-	dqn_win32_utf8_to_wchar(dir, wideDir, DQN_ARRAY_COUNT(wideDir));
+	DqnWin32_UTF8ToWChar(dir, wideDir, DQN_ARRAY_COUNT(wideDir));
 
 	// Enumerate number of files first
 	{
@@ -2386,7 +2393,7 @@ DQN_FILE_SCOPE char **dqn_dir_read(char *dir, u32 *numFiles)
 				DWORD error = GetLastError();
 				if (error != ERROR_NO_MORE_FILES)
 				{
-					dqn_win32_display_error_code(error,
+					DqnWin32_DisplayErrorCode(error,
 					                             "FindNextFileW() failed");
 				}
 
@@ -2415,26 +2422,26 @@ DQN_FILE_SCOPE char **dqn_dir_read(char *dir, u32 *numFiles)
 			return NULL;
 		}
 
-		char **list = (char **)dqn_mem_alloc_internal(
+		char **list = (char **)Dqn_MemAllocInternal(
 		    sizeof(*list) * (currNumFiles), true);
 		if (!list)
 		{
-			DQN_WIN32_ERROR_BOX("dqn_mem_alloc_internal() failed.", NULL);
+			DQN_WIN32_ERROR_BOX("Dqn_MemAllocInternal() failed.", NULL);
 			return NULL;
 		}
 
 		for (u32 i = 0; i < currNumFiles; i++)
 		{
 			list[i] =
-			    (char *)dqn_mem_alloc_internal(sizeof(**list) * MAX_PATH, true);
+			    (char *)Dqn_MemAllocInternal(sizeof(**list) * MAX_PATH, true);
 			if (!list[i])
 			{
 				for (u32 j = 0; j < i; j++)
 				{
-					dqn_mem_free_internal(list[j]);
+					Dqn_MemFreeInternal(list[j]);
 				}
 
-				DQN_WIN32_ERROR_BOX("dqn_mem_alloc_internal() failed.", NULL);
+				DQN_WIN32_ERROR_BOX("Dqn_MemAllocInternal() failed.", NULL);
 				return NULL;
 			}
 		}
@@ -2443,7 +2450,7 @@ DQN_FILE_SCOPE char **dqn_dir_read(char *dir, u32 *numFiles)
 		WIN32_FIND_DATAW findData = {};
 		while (FindNextFileW(findHandle, &findData) != 0)
 		{
-			dqn_win32_wchar_to_utf8(findData.cFileName, list[listIndex++],
+			DqnWin32_WCharToUTF8(findData.cFileName, list[listIndex++],
 			                        MAX_PATH);
 		}
 
@@ -2452,20 +2459,22 @@ DQN_FILE_SCOPE char **dqn_dir_read(char *dir, u32 *numFiles)
 
 		return list;
 	}
+#else
+	return NULL;
 #endif
 }
 
-DQN_FILE_SCOPE void dqn_dir_read_free(char **fileList, u32 numFiles)
+DQN_FILE_SCOPE void DqnDir_ReadFree(char **fileList, u32 numFiles)
 {
 	if (fileList)
 	{
 		for (u32 i = 0; i < numFiles; i++)
 		{
-			if (fileList[i]) dqn_mem_free_internal(fileList[i]);
+			if (fileList[i]) Dqn_MemFreeInternal(fileList[i]);
 			fileList[i] = NULL;
 		}
 
-		dqn_mem_free_internal(fileList);
+		Dqn_MemFreeInternal(fileList);
 	}
 }
 
@@ -2473,7 +2482,7 @@ DQN_FILE_SCOPE void dqn_dir_read_free(char **fileList, u32 numFiles)
 // Timer
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_WIN32
-FILE_SCOPE f64 dqn_win32_query_perf_counter_time_in_s_internal()
+FILE_SCOPE f64 DqnWin32_QueryPerfCounterTimeInSInternal()
 {
 	LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {};
 	if (queryPerformanceFrequency.QuadPart == 0)
@@ -2492,20 +2501,17 @@ FILE_SCOPE f64 dqn_win32_query_perf_counter_time_in_s_internal()
 }
 #endif
 
-f64 dqn_time_now_in_s()
+f64 DqnTime_NowInS()
 {
-#ifdef _WIN32
-	return dqn_win32_query_perf_counter_time_in_s_internal();
+#ifdef DQN_WIN32
+	return DqnWin32_QueryPerfCounterTimeInSInternal();
 #else
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return 0;
 #endif
 };
 
-f64 dqn_time_now_in_ms()
-{
-	return dqn_time_now_in_s() * 1000.0f;
-}
+f64 DqnTime_NowInMs() { return DqnTime_NowInS() * 1000.0f; }
 
 ////////////////////////////////////////////////////////////////////////////////
 // PCG (Permuted Congruential Generator) Random Number Generator
@@ -2515,7 +2521,7 @@ f64 dqn_time_now_in_ms()
 
 // Convert a randomized u32 value to a float value x in the range 0.0f <= x
 // < 1.0f. Contributed by Jonatan Hedborg
-FILE_SCOPE f32 dqn_rnd_f32_normalized_from_u32_internal(u32 value)
+FILE_SCOPE f32 DqnRnd_F32NormalizedFromU32Internal(u32 value)
 {
 	u32 exponent = 127;
 	u32 mantissa = value >> 9;
@@ -2524,7 +2530,7 @@ FILE_SCOPE f32 dqn_rnd_f32_normalized_from_u32_internal(u32 value)
 	return fresult - 1.0f;
 }
 
-FILE_SCOPE u64 dqn_rnd_murmur3_avalanche64_internal(u64 h)
+FILE_SCOPE u64 DqnRnd_Murmur3Avalanche64Internal(u64 h)
 {
 	h ^= h >> 33;
 	h *= 0xff51afd7ed558ccd;
@@ -2534,35 +2540,37 @@ FILE_SCOPE u64 dqn_rnd_murmur3_avalanche64_internal(u64 h)
 	return h;
 }
 
-FILE_SCOPE u32 dqn_rnd_make_seed_internal()
+FILE_SCOPE u32 DqnRnd_MakeSeedInternal()
 {
 #ifdef _WIN32
 	__int64 numClockCycles = __rdtsc();
 	return (u32)numClockCycles;
-#else
+#elif __ANDROID__
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+#elif __linux__
 	unsigned long long numClockCycles = rdtsc();
 	return (u32)numClockCycles;
 #endif
 }
 
-DQN_FILE_SCOPE void dqn_rnd_pcg_init_with_seed(DqnRandPCGState *pcg, u32 seed)
+DQN_FILE_SCOPE void DqnRnd_PCGInitWithSeed(DqnRandPCGState *pcg, u32 seed)
 {
 	u64 value     = (((u64)seed) << 1ULL) | 1ULL;
-	value         = dqn_rnd_murmur3_avalanche64_internal(value);
+	value         = DqnRnd_Murmur3Avalanche64Internal(value);
 	pcg->state[0] = 0U;
 	pcg->state[1] = (value << 1ULL) | 1ULL;
-	dqn_rnd_pcg_next(pcg);
-	pcg->state[0] += dqn_rnd_murmur3_avalanche64_internal(value);
-	dqn_rnd_pcg_next(pcg);
+	DqnRnd_PCGNext(pcg);
+	pcg->state[0] += DqnRnd_Murmur3Avalanche64Internal(value);
+	DqnRnd_PCGNext(pcg);
 }
 
-DQN_FILE_SCOPE void dqn_rnd_pcg_init(DqnRandPCGState *pcg)
+DQN_FILE_SCOPE void DqnRnd_PCGInit(DqnRandPCGState *pcg)
 {
-	u32 seed = dqn_rnd_make_seed_internal();
-	dqn_rnd_pcg_init_with_seed(pcg, seed);
+	u32 seed = DqnRnd_MakeSeedInternal();
+	DqnRnd_PCGInitWithSeed(pcg, seed);
 }
 
-DQN_FILE_SCOPE u32 dqn_rnd_pcg_next(DqnRandPCGState *pcg)
+DQN_FILE_SCOPE u32 DqnRnd_PCGNext(DqnRandPCGState *pcg)
 {
 	u64 oldstate   = pcg->state[0];
 	pcg->state[0]  = oldstate * 0x5851f42d4c957f2dULL + pcg->state[1];
@@ -2571,35 +2579,35 @@ DQN_FILE_SCOPE u32 dqn_rnd_pcg_next(DqnRandPCGState *pcg)
 	return (xorshifted >> rot) | (xorshifted << ((-(i32)rot) & 31));
 }
 
-DQN_FILE_SCOPE f32 dqn_rnd_pcg_nextf(DqnRandPCGState *pcg)
+DQN_FILE_SCOPE f32 DqnRnd_PCGNextf(DqnRandPCGState *pcg)
 {
-	return dqn_rnd_f32_normalized_from_u32_internal(dqn_rnd_pcg_next(pcg));
+	return DqnRnd_F32NormalizedFromU32Internal(DqnRnd_PCGNext(pcg));
 }
 
-DQN_FILE_SCOPE i32 dqn_rnd_pcg_range(DqnRandPCGState *pcg, i32 min, i32 max)
+DQN_FILE_SCOPE i32 DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max)
 {
 	i32 const range = (max - min) + 1;
 	if (range <= 0) return min;
-	i32 const value = (i32)(dqn_rnd_pcg_nextf(pcg) * range);
+	i32 const value = (i32)(DqnRnd_PCGNextf(pcg) * range);
 	return min + value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // DqnPushBuffer Header
 ////////////////////////////////////////////////////////////////////////////////
-FILE_SCOPE size_t dqn_size_alignment_internal(u32 alignment, size_t size)
+FILE_SCOPE size_t Dqn_SizeAlignmentInternal(size_t alignment, size_t size)
 {
-	size_t result = ((size + (alignment-1)) & ~(alignment-1));
+	size_t result = ((size + (alignment-1)) & (size_t)(~(alignment-1)));
 	return result;
 }
 
 FILE_SCOPE DqnPushBufferBlock *
-dqn_push_buffer_alloc_block_internal(u32 alignment, size_t size)
+DqnPushBuffer_AllocBlockInternal(size_t alignment, size_t size)
 {
-	size_t alignedSize = dqn_size_alignment_internal(alignment, size);
+	size_t alignedSize = Dqn_SizeAlignmentInternal(alignment, size);
 	size_t totalSize   = alignedSize + sizeof(DqnPushBufferBlock);
 
-	DqnPushBufferBlock *result = (DqnPushBufferBlock *)dqn_mem_alloc_internal(totalSize, true);
+	DqnPushBufferBlock *result = (DqnPushBufferBlock *)Dqn_MemAllocInternal(totalSize, true);
 	if (!result) return NULL;
 
 	result->memory = (u8 *)result + sizeof(*result);
@@ -2608,12 +2616,13 @@ dqn_push_buffer_alloc_block_internal(u32 alignment, size_t size)
 	return result;
 }
 
-DQN_FILE_SCOPE bool dqn_push_buffer_init(DqnPushBuffer *buffer, size_t size, u32 alignment)
+DQN_FILE_SCOPE bool DqnPushBuffer_Init(DqnPushBuffer *const buffer,
+                                         size_t size, const size_t alignment)
 {
 	if (!buffer || size <= 0) return false;
 	DQN_ASSERT(!buffer->block);
 
-	buffer->block = dqn_push_buffer_alloc_block_internal(alignment, size);
+	buffer->block = DqnPushBuffer_AllocBlockInternal(alignment, size);
 	if (!buffer->block) return false;
 
 	buffer->tempBufferCount = 0;
@@ -2621,16 +2630,16 @@ DQN_FILE_SCOPE bool dqn_push_buffer_init(DqnPushBuffer *buffer, size_t size, u32
 	return true;
 }
 
-DQN_FILE_SCOPE void *dqn_push_buffer_allocate(DqnPushBuffer *buffer, size_t size)
+DQN_FILE_SCOPE void *DqnPushBuffer_Allocate(DqnPushBuffer *const buffer, size_t size)
 {
 	if (!buffer || size == 0) return NULL;
 
-	size_t alignedSize = dqn_size_alignment_internal(buffer->alignment, size);
+	size_t alignedSize = Dqn_SizeAlignmentInternal(buffer->alignment, size);
 	if (!buffer->block ||
 	    (buffer->block->used + alignedSize) > buffer->block->size)
 	{
 		size_t newBlockSize = DQN_MAX(alignedSize, buffer->block->size);
-		DqnPushBufferBlock *newBlock = dqn_push_buffer_alloc_block_internal(
+		DqnPushBufferBlock *newBlock = DqnPushBuffer_AllocBlockInternal(
 		    buffer->alignment, newBlockSize);
 		if (!newBlock) return NULL;
 
@@ -2639,7 +2648,7 @@ DQN_FILE_SCOPE void *dqn_push_buffer_allocate(DqnPushBuffer *buffer, size_t size
 	}
 
 	u8 *currPointer        = buffer->block->memory + buffer->block->used;
-	u8 *alignedResult      = (u8 *)dqn_size_alignment_internal(buffer->alignment, (size_t)currPointer);
+	u8 *alignedResult      = (u8 *)Dqn_SizeAlignmentInternal(buffer->alignment, (size_t)currPointer);
 	size_t alignmentOffset = (size_t)(alignedResult - currPointer);
 
 	void *result = alignedResult;
@@ -2648,26 +2657,44 @@ DQN_FILE_SCOPE void *dqn_push_buffer_allocate(DqnPushBuffer *buffer, size_t size
 	return result;
 }
 
-DQN_FILE_SCOPE void dqn_push_buffer_free_last_buffer(DqnPushBuffer *buffer)
+DQN_FILE_SCOPE void
+DqnPushBuffer_FreeLastBuffer(DqnPushBuffer *const buffer)
 {
 	DqnPushBufferBlock *prevBlock = buffer->block->prevBlock;
-	dqn_mem_free_internal(buffer->block);
+	Dqn_MemFreeInternal(buffer->block);
 	buffer->block = prevBlock;
 
 	// No more blocks, then last block has been freed
 	if (!buffer->block) DQN_ASSERT(buffer->tempBufferCount == 0);
 }
 
-DQN_FILE_SCOPE void dqn_push_buffer_free(DqnPushBuffer *buffer)
+DQN_FILE_SCOPE void DqnPushBuffer_Free(DqnPushBuffer *buffer)
 {
 	if (!buffer) return;
 	while (buffer->block)
 	{
-		dqn_push_buffer_free_last_buffer(buffer);
+		DqnPushBuffer_FreeLastBuffer(buffer);
 	}
 }
 
-DQN_FILE_SCOPE DqnTempBuffer dqn_push_buffer_begin_temp_region(DqnPushBuffer *buffer)
+DQN_FILE_SCOPE void
+DqnPushBuffer_ClearCurrBlock(DqnPushBuffer *const buffer,
+                                 const bool clearToZero)
+{
+	if (!buffer) return;
+	if (buffer->block)
+	{
+		buffer->block->used = 0;
+		if (clearToZero)
+		{
+			Dqn_MemClearInternal(buffer->block->memory, 0,
+			                       buffer->block->size);
+		}
+	}
+}
+
+DQN_FILE_SCOPE DqnTempBuffer
+DqnPushBuffer_BeginTempRegion(DqnPushBuffer *const buffer)
 {
 	DqnTempBuffer result = {};
 	result.buffer        = buffer;
@@ -2678,11 +2705,11 @@ DQN_FILE_SCOPE DqnTempBuffer dqn_push_buffer_begin_temp_region(DqnPushBuffer *bu
 	return result;
 }
 
-DQN_FILE_SCOPE void dqn_push_buffer_end_temp_region(DqnTempBuffer tempBuffer)
+DQN_FILE_SCOPE void DqnPushBuffer_EndTempRegion(DqnTempBuffer tempBuffer)
 {
 	DqnPushBuffer *buffer = tempBuffer.buffer;
 	while (buffer->block != tempBuffer.startingBlock)
-		dqn_push_buffer_free_last_buffer(buffer);
+		DqnPushBuffer_FreeLastBuffer(buffer);
 
 	if (buffer->block)
 	{
@@ -3799,7 +3826,7 @@ struct DqnIni
 	void *memctx;
 };
 
-static int dqn_ini_internal_property_index(DqnIni const *ini, int section,
+static int DqnIni_InternalPropertyIndex(DqnIni const *ini, int section,
                                            int property)
 {
 	int i;
@@ -3821,7 +3848,7 @@ static int dqn_ini_internal_property_index(DqnIni const *ini, int section,
 	return DQN_INI_NOT_FOUND;
 }
 
-DqnIni *dqn_ini_create(void *memctx)
+DqnIni *DqnInit_Create(void *memctx)
 {
 	DqnIni *ini;
 
@@ -3840,7 +3867,7 @@ DqnIni *dqn_ini_create(void *memctx)
 	return ini;
 }
 
-DqnIni *dqn_ini_load(char const *data, void *memctx)
+DqnIni *DqnIni_Load(char const *data, void *memctx)
 {
 	DqnIni *ini;
 	char const *ptr;
@@ -3849,7 +3876,7 @@ DqnIni *dqn_ini_load(char const *data, void *memctx)
 	char const *start2;
 	int l;
 
-	ini = dqn_ini_create(memctx);
+	ini = DqnInit_Create(memctx);
 
 	ptr = data;
 	if (ptr)
@@ -3880,7 +3907,7 @@ DqnIni *dqn_ini_load(char const *data, void *memctx)
 
 				if (*ptr == ']')
 				{
-					s = dqn_ini_section_add(ini, start, (int)(ptr - start));
+					s = DqnIni_SectionAdd(ini, start, (int)(ptr - start));
 					++ptr;
 				}
 			}
@@ -3903,7 +3930,7 @@ DqnIni *dqn_ini_load(char const *data, void *memctx)
 					while (*(--ptr) <= ' ')
 						(void)ptr;
 					ptr++;
-					dqn_ini_property_add(ini, s, start, l, start2,
+					DqnIni_PropertyAdd(ini, s, start, l, start2,
 					                     (int)(ptr - start2));
 				}
 			}
@@ -3913,7 +3940,7 @@ DqnIni *dqn_ini_load(char const *data, void *memctx)
 	return ini;
 }
 
-int dqn_ini_save(DqnIni const *ini, char *data, int size)
+int DqnIni_Save(DqnIni const *ini, char *data, int size)
 {
 	int s;
 	int p;
@@ -3990,7 +4017,7 @@ int dqn_ini_save(DqnIni const *ini, char *data, int size)
 	return 0;
 }
 
-void dqn_ini_destroy(DqnIni *ini)
+void DqnIni_Destroy(DqnIni *ini)
 {
 	int i;
 
@@ -4012,13 +4039,13 @@ void dqn_ini_destroy(DqnIni *ini)
 	}
 }
 
-int dqn_ini_section_count(DqnIni const *ini)
+int DqnIni_SectionCount(DqnIni const *ini)
 {
 	if (ini) return ini->section_count;
 	return 0;
 }
 
-char const *dqn_ini_section_name(DqnIni const *ini, int section)
+char const *DqnIni_SectionName(DqnIni const *ini, int section)
 {
 	if (ini && section >= 0 && section < ini->section_count)
 		return ini->sections[section].name_large
@@ -4028,7 +4055,7 @@ char const *dqn_ini_section_name(DqnIni const *ini, int section)
 	return NULL;
 }
 
-int dqn_ini_property_count(DqnIni const *ini, int section)
+int DqnIni_PropertyCount(DqnIni const *ini, int section)
 {
 	int i;
 	int count;
@@ -4046,13 +4073,13 @@ int dqn_ini_property_count(DqnIni const *ini, int section)
 	return 0;
 }
 
-char const *dqn_ini_property_name(DqnIni const *ini, int section, int property)
+char const *DqnIni_PropertyName(DqnIni const *ini, int section, int property)
 {
 	int p;
 
 	if (ini && section >= 0 && section < ini->section_count)
 	{
-		p = dqn_ini_internal_property_index(ini, section, property);
+		p = DqnIni_InternalPropertyIndex(ini, section, property);
 		if (p != DQN_INI_NOT_FOUND)
 			return ini->properties[p].name_large ? ini->properties[p].name_large
 			                                     : ini->properties[p].name;
@@ -4061,13 +4088,13 @@ char const *dqn_ini_property_name(DqnIni const *ini, int section, int property)
 	return NULL;
 }
 
-char const *dqn_ini_property_value(DqnIni const *ini, int section, int property)
+char const *DqnIni_PropertyValue(DqnIni const *ini, int section, int property)
 {
 	int p;
 
 	if (ini && section >= 0 && section < ini->section_count)
 	{
-		p = dqn_ini_internal_property_index(ini, section, property);
+		p = DqnIni_InternalPropertyIndex(ini, section, property);
 		if (p != DQN_INI_NOT_FOUND)
 			return ini->properties[p].value_large
 			           ? ini->properties[p].value_large
@@ -4077,7 +4104,7 @@ char const *dqn_ini_property_value(DqnIni const *ini, int section, int property)
 	return NULL;
 }
 
-int dqn_ini_find_section(DqnIni const *ini, char const *name, int name_length)
+int DqnIni_FindSection(DqnIni const *ini, char const *name, int name_length)
 {
 	int i;
 
@@ -4098,7 +4125,7 @@ int dqn_ini_find_section(DqnIni const *ini, char const *name, int name_length)
 	return DQN_INI_NOT_FOUND;
 }
 
-int dqn_ini_find_property(DqnIni const *ini, int section, char const *name,
+int DqnIni_FindProperty(DqnIni const *ini, int section, char const *name,
                           int name_length)
 {
 	int i;
@@ -4126,7 +4153,7 @@ int dqn_ini_find_property(DqnIni const *ini, int section, char const *name,
 	return DQN_INI_NOT_FOUND;
 }
 
-int dqn_ini_section_add(DqnIni *ini, char const *name, int length)
+int DqnIni_SectionAdd(DqnIni *ini, char const *name, int length)
 {
 	struct dqn_ini_internal_section_t *new_sections;
 
@@ -4165,7 +4192,7 @@ int dqn_ini_section_add(DqnIni *ini, char const *name, int length)
 	return DQN_INI_NOT_FOUND;
 }
 
-void dqn_ini_property_add(DqnIni *ini, int section, char const *name,
+void DqnIni_PropertyAdd(DqnIni *ini, int section, char const *name,
                           int name_length, char const *value, int value_length)
 {
 	struct dqn_ini_internal_property_t *new_properties;
@@ -4228,7 +4255,7 @@ void dqn_ini_property_add(DqnIni *ini, int section, char const *name,
 	}
 }
 
-void dqn_ini_section_remove(DqnIni *ini, int section)
+void DqnIni_SectionRemove(DqnIni *ini, int section)
 {
 	int p;
 
@@ -4258,13 +4285,13 @@ void dqn_ini_section_remove(DqnIni *ini, int section)
 	}
 }
 
-void dqn_ini_property_remove(DqnIni *ini, int section, int property)
+void DqnIni_PropertyRemove(DqnIni *ini, int section, int property)
 {
 	int p;
 
 	if (ini && section >= 0 && section < ini->section_count)
 	{
-		p = dqn_ini_internal_property_index(ini, section, property);
+		p = DqnIni_InternalPropertyIndex(ini, section, property);
 		if (p != DQN_INI_NOT_FOUND)
 		{
 			if (ini->properties[p].value_large)
@@ -4277,7 +4304,7 @@ void dqn_ini_property_remove(DqnIni *ini, int section, int property)
 	}
 }
 
-void dqn_ini_section_name_set(DqnIni *ini, int section, char const *name,
+void DqnIni_SectionNameSet(DqnIni *ini, int section, char const *name,
                               int length)
 {
 	if (ini && name && section >= 0 && section < ini->section_count)
@@ -4303,7 +4330,7 @@ void dqn_ini_section_name_set(DqnIni *ini, int section, char const *name,
 	}
 }
 
-void dqn_ini_property_name_set(DqnIni *ini, int section, int property,
+void DqnIni_PropertyNameSet(DqnIni *ini, int section, int property,
                                char const *name, int length)
 {
 	int p;
@@ -4311,7 +4338,7 @@ void dqn_ini_property_name_set(DqnIni *ini, int section, int property,
 	if (ini && name && section >= 0 && section < ini->section_count)
 	{
 		if (length <= 0) length = (int)DQN_INI_STRLEN(name);
-		p = dqn_ini_internal_property_index(ini, section, property);
+		p = DqnIni_InternalPropertyIndex(ini, section, property);
 		if (p != DQN_INI_NOT_FOUND)
 		{
 			if (ini->properties[p].name_large)
@@ -4335,7 +4362,7 @@ void dqn_ini_property_name_set(DqnIni *ini, int section, int property,
 	}
 }
 
-void dqn_ini_property_value_set(DqnIni *ini, int section, int property,
+void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
                                 char const *value, int length)
 {
 	int p;
@@ -4343,7 +4370,7 @@ void dqn_ini_property_value_set(DqnIni *ini, int section, int property,
 	if (ini && value && section >= 0 && section < ini->section_count)
 	{
 		if (length <= 0) length = (int)DQN_INI_STRLEN(value);
-		p = dqn_ini_internal_property_index(ini, section, property);
+		p = DqnIni_InternalPropertyIndex(ini, section, property);
 		if (p != DQN_INI_NOT_FOUND)
 		{
 			if (ini->properties[p].value_large)

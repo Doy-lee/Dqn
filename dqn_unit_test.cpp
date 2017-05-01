@@ -3,39 +3,39 @@
 
 #include "stdio.h"
 
-void dqn_strings_test()
+void StringsTest()
 {
 	{ // Char Checks
-		DQN_ASSERT(dqn_char_is_alpha('a') == true);
-		DQN_ASSERT(dqn_char_is_alpha('A') == true);
-		DQN_ASSERT(dqn_char_is_alpha('0') == false);
-		DQN_ASSERT(dqn_char_is_alpha('@') == false);
-		DQN_ASSERT(dqn_char_is_alpha(' ') == false);
-		DQN_ASSERT(dqn_char_is_alpha('\n') == false);
+		DQN_ASSERT(DqnChar_IsAlpha('a') == true);
+		DQN_ASSERT(DqnChar_IsAlpha('A') == true);
+		DQN_ASSERT(DqnChar_IsAlpha('0') == false);
+		DQN_ASSERT(DqnChar_IsAlpha('@') == false);
+		DQN_ASSERT(DqnChar_IsAlpha(' ') == false);
+		DQN_ASSERT(DqnChar_IsAlpha('\n') == false);
 
-		DQN_ASSERT(dqn_char_is_digit('1') == true);
-		DQN_ASSERT(dqn_char_is_digit('n') == false);
-		DQN_ASSERT(dqn_char_is_digit('N') == false);
-		DQN_ASSERT(dqn_char_is_digit('*') == false);
-		DQN_ASSERT(dqn_char_is_digit(' ') == false);
-		DQN_ASSERT(dqn_char_is_digit('\n') == false);
+		DQN_ASSERT(DqnChar_IsDigit('1') == true);
+		DQN_ASSERT(DqnChar_IsDigit('n') == false);
+		DQN_ASSERT(DqnChar_IsDigit('N') == false);
+		DQN_ASSERT(DqnChar_IsDigit('*') == false);
+		DQN_ASSERT(DqnChar_IsDigit(' ') == false);
+		DQN_ASSERT(DqnChar_IsDigit('\n') == false);
 
-		DQN_ASSERT(dqn_char_is_alphanum('1') == true);
-		DQN_ASSERT(dqn_char_is_alphanum('a') == true);
-		DQN_ASSERT(dqn_char_is_alphanum('A') == true);
-		DQN_ASSERT(dqn_char_is_alphanum('*') == false);
-		DQN_ASSERT(dqn_char_is_alphanum(' ') == false);
-		DQN_ASSERT(dqn_char_is_alphanum('\n') == false);
+		DQN_ASSERT(DqnChar_IsAlphaNum('1') == true);
+		DQN_ASSERT(DqnChar_IsAlphaNum('a') == true);
+		DQN_ASSERT(DqnChar_IsAlphaNum('A') == true);
+		DQN_ASSERT(DqnChar_IsAlphaNum('*') == false);
+		DQN_ASSERT(DqnChar_IsAlphaNum(' ') == false);
+		DQN_ASSERT(DqnChar_IsAlphaNum('\n') == false);
 
-		DQN_ASSERT(dqn_char_to_lower(L'A') == L'a');
-		DQN_ASSERT(dqn_char_to_lower(L'a') == L'a');
-		DQN_ASSERT(dqn_char_to_lower(L' ') == L' ');
+		DQN_ASSERT(DqnChar_ToLower(L'A') == L'a');
+		DQN_ASSERT(DqnChar_ToLower(L'a') == L'a');
+		DQN_ASSERT(DqnChar_ToLower(L' ') == L' ');
 
-		DQN_ASSERT(dqn_char_to_upper(L'A') == L'A');
-		DQN_ASSERT(dqn_char_to_upper(L'a') == L'A');
-		DQN_ASSERT(dqn_char_to_upper(L' ') == L' ');
+		DQN_ASSERT(DqnChar_ToUpper(L'A') == L'A');
+		DQN_ASSERT(DqnChar_ToUpper(L'a') == L'A');
+		DQN_ASSERT(DqnChar_ToUpper(L' ') == L' ');
 
-		printf("dqn_strings_test(): char_checks: Completed successfully\n");
+		printf("StringsTest(): CharChecks: Completed successfully\n");
 	}
 
 	// String Checks
@@ -46,40 +46,40 @@ void dqn_strings_test()
 
 			// Check simple compares
 			{
-				DQN_ASSERT(dqn_strcmp(a, "str_a") == +0);
-				DQN_ASSERT(dqn_strcmp(a, "str_b") == -1);
-				DQN_ASSERT(dqn_strcmp("str_b", a) == +1);
-				DQN_ASSERT(dqn_strcmp(a, "") == +1);
-				DQN_ASSERT(dqn_strcmp("", "") == 0);
+				DQN_ASSERT(Dqn_strcmp(a, "str_a") == +0);
+				DQN_ASSERT(Dqn_strcmp(a, "str_b") == -1);
+				DQN_ASSERT(Dqn_strcmp("str_b", a) == +1);
+				DQN_ASSERT(Dqn_strcmp(a, "") == +1);
+				DQN_ASSERT(Dqn_strcmp("", "") == 0);
 
 				// NOTE: Check that the string has not been trashed.
-				DQN_ASSERT(dqn_strcmp(a, "str_a") == +0);
+				DQN_ASSERT(Dqn_strcmp(a, "str_a") == +0);
 			}
 
 			// Check ops against null
 			{
-				DQN_ASSERT(dqn_strcmp(NULL, NULL) != +0);
-				DQN_ASSERT(dqn_strcmp(a, NULL) != +0);
-				DQN_ASSERT(dqn_strcmp(NULL, a) != +0);
+				DQN_ASSERT(Dqn_strcmp(NULL, NULL) != +0);
+				DQN_ASSERT(Dqn_strcmp(a, NULL) != +0);
+				DQN_ASSERT(Dqn_strcmp(NULL, a) != +0);
 			}
 
-			printf("dqn_strings_test(): strcmp: Completed successfully\n");
+			printf("StringsTest(): strcmp: Completed successfully\n");
 		}
 
 		// strlen
 		{
 			char *a = "str_a";
-			DQN_ASSERT(dqn_strlen(a) == 5);
-			DQN_ASSERT(dqn_strlen("") == 0);
-			DQN_ASSERT(dqn_strlen("   a  ") == 6);
-			DQN_ASSERT(dqn_strlen("a\n") == 2);
+			DQN_ASSERT(Dqn_strlen(a) == 5);
+			DQN_ASSERT(Dqn_strlen("") == 0);
+			DQN_ASSERT(Dqn_strlen("   a  ") == 6);
+			DQN_ASSERT(Dqn_strlen("a\n") == 2);
 
 			// NOTE: Check that the string has not been trashed.
-			DQN_ASSERT(dqn_strcmp(a, "str_a") == 0);
+			DQN_ASSERT(Dqn_strcmp(a, "str_a") == 0);
 
-			DQN_ASSERT(dqn_strlen(NULL) == 0);
+			DQN_ASSERT(Dqn_strlen(NULL) == 0);
 
-			printf("dqn_strings_test(): strlen: Completed successfully\n");
+			printf("StringsTest(): strlen: Completed successfully\n");
 		}
 
 		// strncpy
@@ -89,37 +89,37 @@ void dqn_strings_test()
 				char b[10] = {};
 				// Check copy into empty array
 				{
-					char *result = dqn_strncpy(b, a, dqn_strlen(a));
-					DQN_ASSERT(dqn_strcmp(b, "str_a") == 0);
-					DQN_ASSERT(dqn_strcmp(a, "str_a") == 0);
-					DQN_ASSERT(dqn_strcmp(result, "str_a") == 0);
-					DQN_ASSERT(dqn_strlen(result) == 5);
+					char *result = Dqn_strncpy(b, a, Dqn_strlen(a));
+					DQN_ASSERT(Dqn_strcmp(b, "str_a") == 0);
+					DQN_ASSERT(Dqn_strcmp(a, "str_a") == 0);
+					DQN_ASSERT(Dqn_strcmp(result, "str_a") == 0);
+					DQN_ASSERT(Dqn_strlen(result) == 5);
 				}
 
 				// Check copy into array offset, overlap with old results
 				{
-					char *newResult = dqn_strncpy(&b[1], a, dqn_strlen(a));
-					DQN_ASSERT(dqn_strcmp(newResult, "str_a") == 0);
-					DQN_ASSERT(dqn_strlen(newResult) == 5);
+					char *newResult = Dqn_strncpy(&b[1], a, Dqn_strlen(a));
+					DQN_ASSERT(Dqn_strcmp(newResult, "str_a") == 0);
+					DQN_ASSERT(Dqn_strlen(newResult) == 5);
 
-					DQN_ASSERT(dqn_strcmp(a, "str_a") == 0);
-					DQN_ASSERT(dqn_strlen(a) == 5);
+					DQN_ASSERT(Dqn_strcmp(a, "str_a") == 0);
+					DQN_ASSERT(Dqn_strlen(a) == 5);
 
-					DQN_ASSERT(dqn_strcmp(b, "sstr_a") == 0);
-					DQN_ASSERT(dqn_strlen(b) == 6);
+					DQN_ASSERT(Dqn_strcmp(b, "sstr_a") == 0);
+					DQN_ASSERT(Dqn_strlen(b) == 6);
 				}
 			}
 
 			// Check strncpy with NULL pointers
 			{
-				DQN_ASSERT(dqn_strncpy(NULL, NULL, 5) == NULL);
+				DQN_ASSERT(Dqn_strncpy(NULL, NULL, 5) == NULL);
 
 				char *a      = "str";
-				char *result = dqn_strncpy(a, NULL, 5);
+				char *result = Dqn_strncpy(a, NULL, 5);
 
-				DQN_ASSERT(dqn_strcmp(a, "str") == 0);
-				DQN_ASSERT(dqn_strcmp(result, "str") == 0);
-				DQN_ASSERT(dqn_strcmp(result, a) == 0);
+				DQN_ASSERT(Dqn_strcmp(a, "str") == 0);
+				DQN_ASSERT(Dqn_strcmp(result, "str") == 0);
+				DQN_ASSERT(Dqn_strcmp(result, a) == 0);
 			}
 
 			// Check strncpy with 0 chars to copy
@@ -127,92 +127,92 @@ void dqn_strings_test()
 				char *a = "str";
 				char *b = "ing";
 
-				char *result = dqn_strncpy(a, b, 0);
-				DQN_ASSERT(dqn_strcmp(a, "str") == 0);
-				DQN_ASSERT(dqn_strcmp(b, "ing") == 0);
-				DQN_ASSERT(dqn_strcmp(result, "str") == 0);
+				char *result = Dqn_strncpy(a, b, 0);
+				DQN_ASSERT(Dqn_strcmp(a, "str") == 0);
+				DQN_ASSERT(Dqn_strcmp(b, "ing") == 0);
+				DQN_ASSERT(Dqn_strcmp(result, "str") == 0);
 			}
 
-			printf("dqn_strings_test(): strncpy: Completed successfully\n");
+			printf("StringsTest(): strncpy: Completed successfully\n");
 		}
 
-		// str_reverse
+		// StrReverse
 		{
 			// Basic reverse operations
 			{
 				char a[] = "aba";
-				DQN_ASSERT(dqn_str_reverse(a, dqn_strlen(a)) == true);
-				DQN_ASSERT(dqn_strcmp(a, "aba") == 0);
+				DQN_ASSERT(Dqn_StrReverse(a, Dqn_strlen(a)) == true);
+				DQN_ASSERT(Dqn_strcmp(a, "aba") == 0);
 
-				DQN_ASSERT(dqn_str_reverse(a, 2) == true);
-				DQN_ASSERT(dqn_strcmp(a, "baa") == 0);
+				DQN_ASSERT(Dqn_StrReverse(a, 2) == true);
+				DQN_ASSERT(Dqn_strcmp(a, "baa") == 0);
 
-				DQN_ASSERT(dqn_str_reverse(a, dqn_strlen(a)) == true);
-				DQN_ASSERT(dqn_strcmp(a, "aab") == 0);
+				DQN_ASSERT(Dqn_StrReverse(a, Dqn_strlen(a)) == true);
+				DQN_ASSERT(Dqn_strcmp(a, "aab") == 0);
 
-				DQN_ASSERT(dqn_str_reverse(&a[1], 2) == true);
-				DQN_ASSERT(dqn_strcmp(a, "aba") == 0);
+				DQN_ASSERT(Dqn_StrReverse(&a[1], 2) == true);
+				DQN_ASSERT(Dqn_strcmp(a, "aba") == 0);
 
-				DQN_ASSERT(dqn_str_reverse(a, 0) == true);
-				DQN_ASSERT(dqn_strcmp(a, "aba") == 0);
+				DQN_ASSERT(Dqn_StrReverse(a, 0) == true);
+				DQN_ASSERT(Dqn_strcmp(a, "aba") == 0);
 			}
 
 			// Try reverse empty string
 			{
 				char a[] = "";
-				DQN_ASSERT(dqn_str_reverse(a, dqn_strlen(a)) == true);
-				DQN_ASSERT(dqn_strcmp(a, "") == 0);
+				DQN_ASSERT(Dqn_StrReverse(a, Dqn_strlen(a)) == true);
+				DQN_ASSERT(Dqn_strcmp(a, "") == 0);
 			}
 
 			// Try reverse single char string
 			{
 				char a[] = "a";
-				DQN_ASSERT(dqn_str_reverse(a, dqn_strlen(a)) == true);
-				DQN_ASSERT(dqn_strcmp(a, "a") == 0);
+				DQN_ASSERT(Dqn_StrReverse(a, Dqn_strlen(a)) == true);
+				DQN_ASSERT(Dqn_strcmp(a, "a") == 0);
 
-				DQN_ASSERT(dqn_str_reverse(a, 0) == true);
-				DQN_ASSERT(dqn_strcmp(a, "a") == 0);
+				DQN_ASSERT(Dqn_StrReverse(a, 0) == true);
+				DQN_ASSERT(Dqn_strcmp(a, "a") == 0);
 			}
 
 			printf(
-			    "dqn_strings_test(): str_reverse: Completed successfully\n");
+			    "StringsTest(): StrReverse: Completed successfully\n");
 		}
 
-		// str_to_i32
+		// StrToI32
 		{
 			char *a = "123";
-			DQN_ASSERT(dqn_str_to_i32(a, dqn_strlen(a)) == 123);
+			DQN_ASSERT(Dqn_StrToI32(a, Dqn_strlen(a)) == 123);
 
 			char *b = "-123";
-			DQN_ASSERT(dqn_str_to_i32(b, dqn_strlen(b)) == -123);
-			DQN_ASSERT(dqn_str_to_i32(b, 1) == 0);
-			DQN_ASSERT(dqn_str_to_i32(&b[1], dqn_strlen(&b[1])) == 123);
+			DQN_ASSERT(Dqn_StrToI32(b, Dqn_strlen(b)) == -123);
+			DQN_ASSERT(Dqn_StrToI32(b, 1) == 0);
+			DQN_ASSERT(Dqn_StrToI32(&b[1], Dqn_strlen(&b[1])) == 123);
 
 			char *c = "-0";
-			DQN_ASSERT(dqn_str_to_i32(c, dqn_strlen(c)) == 0);
+			DQN_ASSERT(Dqn_StrToI32(c, Dqn_strlen(c)) == 0);
 
 			char *d = "+123";
-			DQN_ASSERT(dqn_str_to_i32(d, dqn_strlen(d)) == 123);
-			DQN_ASSERT(dqn_str_to_i32(&d[1], dqn_strlen(&d[1])) == 123);
+			DQN_ASSERT(Dqn_StrToI32(d, Dqn_strlen(d)) == 123);
+			DQN_ASSERT(Dqn_StrToI32(&d[1], Dqn_strlen(&d[1])) == 123);
 
-			printf("dqn_strings_test(): str_to_i32: Completed successfully\n");
+			printf("StringsTest(): StrToI32: Completed successfully\n");
 		}
 
 		// i32_to_str
 		{
 			char a[DQN_I32_TO_STR_MAX_BUF_SIZE] = {};
-			dqn_i32_to_str(+100, a, DQN_ARRAY_COUNT(a));
-			DQN_ASSERT(dqn_strcmp(a, "100") == 0);
+			Dqn_I32ToStr(+100, a, DQN_ARRAY_COUNT(a));
+			DQN_ASSERT(Dqn_strcmp(a, "100") == 0);
 
 			char b[DQN_I32_TO_STR_MAX_BUF_SIZE] = {};
-			dqn_i32_to_str(-100, b, DQN_ARRAY_COUNT(b));
-			DQN_ASSERT(dqn_strcmp(b, "-100") == 0);
+			Dqn_I32ToStr(-100, b, DQN_ARRAY_COUNT(b));
+			DQN_ASSERT(Dqn_strcmp(b, "-100") == 0);
 
 			char c[DQN_I32_TO_STR_MAX_BUF_SIZE] = {};
-			dqn_i32_to_str(0, c, DQN_ARRAY_COUNT(c));
-			DQN_ASSERT(dqn_strcmp(c, "0") == 0);
+			Dqn_I32ToStr(0, c, DQN_ARRAY_COUNT(c));
+			DQN_ASSERT(Dqn_strcmp(c, "0") == 0);
 
-			printf("dqn_strings_test(): str_to_i32: Completed successfully\n");
+			printf("StringsTest(): StrToI32: Completed successfully\n");
 		}
 	}
 
@@ -221,29 +221,29 @@ void dqn_strings_test()
 		{
 		    char *a  = "Microsoft";
 		    char *b  = "icro";
-		    i32 lenA = dqn_strlen(a);
-		    i32 lenB = dqn_strlen(b);
-		    DQN_ASSERT(dqn_str_has_substring(a, lenA, b, lenB) == true);
-		    DQN_ASSERT(dqn_str_has_substring(a, lenA, "iro",
-		                                     dqn_strlen("iro")) == false);
-		    DQN_ASSERT(dqn_str_has_substring(b, lenB, a, lenA) == true);
-		    DQN_ASSERT(dqn_str_has_substring("iro", dqn_strlen("iro"), a,
+		    i32 lenA = Dqn_strlen(a);
+		    i32 lenB = Dqn_strlen(b);
+		    DQN_ASSERT(Dqn_StrHasSubstring(a, lenA, b, lenB) == true);
+		    DQN_ASSERT(Dqn_StrHasSubstring(a, lenA, "iro",
+		                                     Dqn_strlen("iro")) == false);
+		    DQN_ASSERT(Dqn_StrHasSubstring(b, lenB, a, lenA) == true);
+		    DQN_ASSERT(Dqn_StrHasSubstring("iro", Dqn_strlen("iro"), a,
 		                                     lenA) == false);
-		    DQN_ASSERT(dqn_str_has_substring("", 0, "iro", 4) == false);
-		    DQN_ASSERT(dqn_str_has_substring("", 0, "", 0) == false);
-		    DQN_ASSERT(dqn_str_has_substring(NULL, 0, NULL, 0) == false);
+		    DQN_ASSERT(Dqn_StrHasSubstring("", 0, "iro", 4) == false);
+		    DQN_ASSERT(Dqn_StrHasSubstring("", 0, "", 0) == false);
+		    DQN_ASSERT(Dqn_StrHasSubstring(NULL, 0, NULL, 0) == false);
 	    }
 
 		{
 		    char *a  = "Micro";
 		    char *b  = "irob";
-		    i32 lenA = dqn_strlen(a);
-		    i32 lenB = dqn_strlen(b);
-		    DQN_ASSERT(dqn_str_has_substring(a, lenA, b, lenB) == false);
-		    DQN_ASSERT(dqn_str_has_substring(b, lenB, a, lenA) == false);
+		    i32 lenA = Dqn_strlen(a);
+		    i32 lenB = Dqn_strlen(b);
+		    DQN_ASSERT(Dqn_StrHasSubstring(a, lenA, b, lenB) == false);
+		    DQN_ASSERT(Dqn_StrHasSubstring(b, lenB, a, lenA) == false);
 	    }
 
-	    printf("dqn_strings_test(): str_has_substring: Completed successfully\n");
+	    printf("StringsTest(): StrHasSubstring: Completed successfully\n");
     }
 
     // UCS <-> UTF8 Checks
@@ -253,11 +253,11 @@ void dqn_strings_test()
 		    u32 codepoint = '@';
 		    u32 string[1] = {};
 
-		    u32 bytesUsed = dqn_ucs_to_utf8(&string[0], codepoint);
+		    u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
 		    DQN_ASSERT(bytesUsed == 1);
 		    DQN_ASSERT(string[0] == '@');
 
-		    bytesUsed = dqn_utf8_to_ucs(&string[0], codepoint);
+		    bytesUsed = Dqn_UTF8ToUCS(&string[0], codepoint);
 		    DQN_ASSERT(string[0] >= 0 && string[0] < 0x80);
 		    DQN_ASSERT(bytesUsed == 1);
 	    }
@@ -267,11 +267,11 @@ void dqn_strings_test()
 		    u32 codepoint = 0x278;
 		    u32 string[1] = {};
 
-		    u32 bytesUsed = dqn_ucs_to_utf8(&string[0], codepoint);
+		    u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
 		    DQN_ASSERT(bytesUsed == 2);
 		    DQN_ASSERT(string[0] == 0xC9B8);
 
-		    bytesUsed = dqn_utf8_to_ucs(&string[0], string[0]);
+		    bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
 		    DQN_ASSERT(string[0] == codepoint);
 		    DQN_ASSERT(bytesUsed == 2);
 	    }
@@ -281,11 +281,11 @@ void dqn_strings_test()
 		    u32 codepoint = 0x0A0A;
 		    u32 string[1] = {};
 
-			u32 bytesUsed = dqn_ucs_to_utf8(&string[0], codepoint);
+			u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
 		    DQN_ASSERT(bytesUsed == 3);
 			DQN_ASSERT(string[0] == 0xE0A88A);
 
-		    bytesUsed = dqn_utf8_to_ucs(&string[0], string[0]);
+		    bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
 		    DQN_ASSERT(string[0] == codepoint);
 		    DQN_ASSERT(bytesUsed == 3);
 	    }
@@ -294,315 +294,315 @@ void dqn_strings_test()
 		{
 		    u32 codepoint = 0x10912;
 		    u32 string[1] = {};
-			u32 bytesUsed = dqn_ucs_to_utf8(&string[0], codepoint);
+			u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
 
 		    DQN_ASSERT(bytesUsed == 4);
 		    DQN_ASSERT(string[0] == 0xF090A492);
 
-		    bytesUsed = dqn_utf8_to_ucs(&string[0], string[0]);
+		    bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
 		    DQN_ASSERT(string[0] == codepoint);
 		    DQN_ASSERT(bytesUsed == 4);
 	    }
 
 		{
 		    u32 codepoint = 0x10912;
-			u32 bytesUsed = dqn_ucs_to_utf8(NULL, codepoint);
+			u32 bytesUsed = Dqn_UCSToUTF8(NULL, codepoint);
 		    DQN_ASSERT(bytesUsed == 0);
 
-		    bytesUsed = dqn_utf8_to_ucs(NULL, codepoint);
+		    bytesUsed = Dqn_UTF8ToUCS(NULL, codepoint);
 		    DQN_ASSERT(bytesUsed == 0);
 	    }
 
-	    printf("dqn_strings_test(): ucs <-> utf8: Completed successfully\n");
+	    printf("StringsTest(): ucs <-> utf8: Completed successfully\n");
     }
 
-    printf("dqn_strings_test(): Completed successfully\n");
+    printf("StringsTest(): Completed successfully\n");
 }
 
 #include "Windows.h"
 #define WIN32_LEAN_AND_MEAN
-void dqn_other_test()
+void OtherTest()
 {
 	{ // Test Win32 Sleep
 		// NOTE: Win32 Sleep is not granular to a certain point so sleep excessively
 		u32 sleepInMs = 1000;
-		f64 startInMs = dqn_time_now_in_ms();
+		f64 startInMs = DqnTime_NowInMs();
 		Sleep(sleepInMs);
-		f64 endInMs = dqn_time_now_in_ms();
+		f64 endInMs = DqnTime_NowInMs();
 
 		DQN_ASSERT(startInMs < endInMs);
-		printf("dqn_other_test(): time_now: Completed successfully\n");
+		printf("OtherTest(): TimeNow: Completed successfully\n");
 	}
-	printf("dqn_other_test(): Completed successfully\n");
+	printf("OtherTest(): Completed successfully\n");
 }
 
-void dqn_random_test() {
+void RandomTest() {
 
 	DqnRandPCGState pcg;
-	dqn_rnd_pcg_init(&pcg);
+	DqnRnd_PCGInit(&pcg);
 	for (i32 i = 0; i < 10; i++)
 	{
 		i32 min    = -100;
 		i32 max    = 100000;
-		i32 result = dqn_rnd_pcg_range(&pcg, min, max);
+		i32 result = DqnRnd_PCGRange(&pcg, min, max);
 		DQN_ASSERT(result >= min && result <= max)
 
-		f32 randF32 = dqn_rnd_pcg_nextf(&pcg);
+		f32 randF32 = DqnRnd_PCGNextf(&pcg);
 		DQN_ASSERT(randF32 >= 0.0f && randF32 <= 1.0f);
-		printf("dqn_random_test(): rnd_pcg: Completed successfully\n");
+		printf("RandomTest(): RndPCG: Completed successfully\n");
 	}
 
-	printf("dqn_random_test(): Completed successfully\n");
+	printf("RandomTest(): Completed successfully\n");
 }
 
-void dqn_math_test()
+void MathTest()
 {
 	{ // Lerp
 		{
 			f32 start = 10;
 			f32 t     = 0.5f;
 			f32 end   = 20;
-			DQN_ASSERT(dqn_math_lerp(start, t, end) == 15);
+			DQN_ASSERT(DqnMath_Lerp(start, t, end) == 15);
 		}
 
 		{
 			f32 start = 10;
 			f32 t     = 2.0f;
 			f32 end   = 20;
-			DQN_ASSERT(dqn_math_lerp(start, t, end) == 30);
+			DQN_ASSERT(DqnMath_Lerp(start, t, end) == 30);
 		}
 
-		printf("dqn_math_test(): lerp: Completed successfully\n");
+		printf("MathTest(): Lerp: Completed successfully\n");
 	}
 
 	{ // sqrtf
-		DQN_ASSERT(dqn_math_sqrtf(4.0f) == 2.0f);
-		printf("dqn_math_test(): sqrtf: Completed successfully\n");
+		DQN_ASSERT(DqnMath_Sqrtf(4.0f) == 2.0f);
+		printf("MathTest(): Sqrtf: Completed successfully\n");
 	}
 
-	printf("dqn_math_test(): Completed successfully\n");
+	printf("MathTest(): Completed successfully\n");
 }
 
-void dqn_vec_test()
+void VecTest()
 {
 	{ // V2
 
 		// V2 Creating
 		{
-			DqnV2 vec = dqn_v2(5.5f, 5.0f);
+			DqnV2 vec = DqnV2_2f(5.5f, 5.0f);
 			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f);
 			DQN_ASSERT(vec.w == 5.5f && vec.h == 5.0f);
 		}
 
 		// V2i Creating
 		{
-			DqnV2 vec = dqn_v2i(3, 5);
+			DqnV2 vec = DqnV2_2i(3, 5);
 			DQN_ASSERT(vec.x == 3 && vec.y == 5.0f);
 			DQN_ASSERT(vec.w == 3 && vec.h == 5.0f);
 		}
 
 		// V2 Arithmetic
 		{
-			DqnV2 vecA = dqn_v2(5, 10);
-			DqnV2 vecB = dqn_v2i(2, 3);
-			DQN_ASSERT(dqn_v2_equals(vecA, vecB) == false);
-			DQN_ASSERT(dqn_v2_equals(vecA, dqn_v2(5, 10)) == true);
-			DQN_ASSERT(dqn_v2_equals(vecB, dqn_v2(2, 3)) == true);
+			DqnV2 vecA = DqnV2_2f(5, 10);
+			DqnV2 vecB = DqnV2_2i(2, 3);
+			DQN_ASSERT(DqnV2_Equals(vecA, vecB) == false);
+			DQN_ASSERT(DqnV2_Equals(vecA, DqnV2_2f(5, 10)) == true);
+			DQN_ASSERT(DqnV2_Equals(vecB, DqnV2_2f(2, 3)) == true);
 
-			DqnV2 result = dqn_v2_add(vecA, dqn_v2(5, 10));
-			DQN_ASSERT(dqn_v2_equals(result, dqn_v2(10, 20)) == true);
+			DqnV2 result = DqnV2_Add(vecA, DqnV2_2f(5, 10));
+			DQN_ASSERT(DqnV2_Equals(result, DqnV2_2f(10, 20)) == true);
 
-			result = dqn_v2_sub(result, dqn_v2(5, 10));
-			DQN_ASSERT(dqn_v2_equals(result, dqn_v2(5, 10)) == true);
+			result = DqnV2_Sub(result, DqnV2_2f(5, 10));
+			DQN_ASSERT(DqnV2_Equals(result, DqnV2_2f(5, 10)) == true);
 
-			result = dqn_v2_scale(result, 5);
-			DQN_ASSERT(dqn_v2_equals(result, dqn_v2(25, 50)) == true);
+			result = DqnV2_Scale(result, 5);
+			DQN_ASSERT(DqnV2_Equals(result, DqnV2_2f(25, 50)) == true);
 
-			result = dqn_v2_hadamard(result, dqn_v2(10, 0.5f));
-			DQN_ASSERT(dqn_v2_equals(result, dqn_v2(250, 25)) == true);
+			result = DqnV2_Hadamard(result, DqnV2_2f(10, 0.5f));
+			DQN_ASSERT(DqnV2_Equals(result, DqnV2_2f(250, 25)) == true);
 
-			f32 dotResult = dqn_v2_dot(dqn_v2(5, 10), dqn_v2(3, 4));
+			f32 dotResult = DqnV2_Dot(DqnV2_2f(5, 10), DqnV2_2f(3, 4));
 			DQN_ASSERT(dotResult == 55);
 		}
 
 		// V2 Properties
 		{
-			DqnV2 a = dqn_v2(0, 0);
-			DqnV2 b = dqn_v2(3, 4);
+			DqnV2 a = DqnV2_2f(0, 0);
+			DqnV2 b = DqnV2_2f(3, 4);
 
-			f32 lengthSq = dqn_v2_length_squared(a, b);
+			f32 lengthSq = DqnV2_LengthSquared(a, b);
 			DQN_ASSERT(lengthSq == 25);
 
-			f32 length = dqn_v2_length(a, b);
+			f32 length = DqnV2_Length(a, b);
 			DQN_ASSERT(length == 5);
 
-			DqnV2 normalised = dqn_v2_normalise(b);
+			DqnV2 normalised = DqnV2_Normalise(b);
 			DQN_ASSERT(normalised.x == (b.x / 5.0f));
 			DQN_ASSERT(normalised.y == (b.y / 5.0f));
 
-			DqnV2 c = dqn_v2(3.5f, 8.0f);
-			DQN_ASSERT(dqn_v2_overlaps(b, c) == true);
-			DQN_ASSERT(dqn_v2_overlaps(b, a) == false);
+			DqnV2 c = DqnV2_2f(3.5f, 8.0f);
+			DQN_ASSERT(DqnV2_Overlaps(b, c) == true);
+			DQN_ASSERT(DqnV2_Overlaps(b, a) == false);
 
-			DqnV2 d = dqn_v2_perpendicular(c);
-			DQN_ASSERT(dqn_v2_dot(c, d) == 0);
+			DqnV2 d = DqnV2_Perpendicular(c);
+			DQN_ASSERT(DqnV2_Dot(c, d) == 0);
 		}
 
 		{ // constrain_to_ratio
-			DqnV2 ratio  = dqn_v2(16, 9);
-			DqnV2 dim    = dqn_v2(2000, 1080);
-			DqnV2 result = dqn_v2_constrain_to_ratio(dim, ratio);
+			DqnV2 ratio  = DqnV2_2f(16, 9);
+			DqnV2 dim    = DqnV2_2f(2000, 1080);
+			DqnV2 result = DqnV2_ConstrainToRatio(dim, ratio);
 			DQN_ASSERT(result.w == 1920 && result.h == 1080);
 		}
 
-		printf("dqn_vec_test(): vec2: Completed successfully\n");
+		printf("VecTest(): Vec2: Completed successfully\n");
 	}
 
 	{ // V3
 
 		// V3i Creating
 		{
-			DqnV3 vec = dqn_v3(5.5f, 5.0f, 5.875f);
+			DqnV3 vec = DqnV3_3f(5.5f, 5.0f, 5.875f);
 			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f);
 			DQN_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f);
 		}
 
 		// V3i Creating
 		{
-			DqnV3 vec = dqn_v3i(3, 4, 5);
+			DqnV3 vec = DqnV3_3i(3, 4, 5);
 			DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5);
 			DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5);
 		}
 
 		// V3 Arithmetic
 		{
-			DqnV3 vecA = dqn_v3(5, 10, 15);
-			DqnV3 vecB = dqn_v3(2, 3, 6);
-			DQN_ASSERT(dqn_v3_equals(vecA, vecB) == false);
-			DQN_ASSERT(dqn_v3_equals(vecA, dqn_v3(5, 10, 15)) == true);
-			DQN_ASSERT(dqn_v3_equals(vecB, dqn_v3(2, 3, 6)) == true);
+			DqnV3 vecA = DqnV3_3f(5, 10, 15);
+			DqnV3 vecB = DqnV3_3f(2, 3, 6);
+			DQN_ASSERT(DqnV3_Equals(vecA, vecB) == false);
+			DQN_ASSERT(DqnV3_Equals(vecA, DqnV3_3f(5, 10, 15)) == true);
+			DQN_ASSERT(DqnV3_Equals(vecB, DqnV3_3f(2, 3, 6)) == true);
 
-			DqnV3 result = dqn_v3_add(vecA, dqn_v3(5, 10, 15));
-			DQN_ASSERT(dqn_v3_equals(result, dqn_v3(10, 20, 30)) == true);
+			DqnV3 result = DqnV3_Add(vecA, DqnV3_3f(5, 10, 15));
+			DQN_ASSERT(DqnV3_Equals(result, DqnV3_3f(10, 20, 30)) == true);
 
-			result = dqn_v3_sub(result, dqn_v3(5, 10, 15));
-			DQN_ASSERT(dqn_v3_equals(result, dqn_v3(5, 10, 15)) == true);
+			result = DqnV3_Sub(result, DqnV3_3f(5, 10, 15));
+			DQN_ASSERT(DqnV3_Equals(result, DqnV3_3f(5, 10, 15)) == true);
 
-			result = dqn_v3_scale(result, 5);
-			DQN_ASSERT(dqn_v3_equals(result, dqn_v3(25, 50, 75)) == true);
+			result = DqnV3_Scale(result, 5);
+			DQN_ASSERT(DqnV3_Equals(result, DqnV3_3f(25, 50, 75)) == true);
 
-			result = dqn_v3_hadamard(result, dqn_v3(10.0f, 0.5f, 10.0f));
-			DQN_ASSERT(dqn_v3_equals(result, dqn_v3(250, 25, 750)) == true);
+			result = DqnV3_Hadamard(result, DqnV3_3f(10.0f, 0.5f, 10.0f));
+			DQN_ASSERT(DqnV3_Equals(result, DqnV3_3f(250, 25, 750)) == true);
 
-			f32 dotResult = dqn_v3_dot(dqn_v3(5, 10, 2), dqn_v3(3, 4, 6));
+			f32 dotResult = DqnV3_Dot(DqnV3_3f(5, 10, 2), DqnV3_3f(3, 4, 6));
 			DQN_ASSERT(dotResult == 67);
 
-			DqnV3 cross = dqn_v3_cross(vecA, vecB);
-			DQN_ASSERT(dqn_v3_equals(cross, dqn_v3(15, 0, -5)) == true);
+			DqnV3 cross = DqnV3_Cross(vecA, vecB);
+			DQN_ASSERT(DqnV3_Equals(cross, DqnV3_3f(15, 0, -5)) == true);
 		}
 
-		printf("dqn_vec_test(): vec3: Completed successfully\n");
+		printf("VecTest(): Vec3: Completed successfully\n");
 	}
 
 	{ // V4
 
 		// V4 Creating
 		{
-			DqnV4 vec = dqn_v4(5.5f, 5.0f, 5.875f, 5.928f);
+			DqnV4 vec = DqnV4_4f(5.5f, 5.0f, 5.875f, 5.928f);
 			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f && vec.w == 5.928f);
 			DQN_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f && vec.a == 5.928f);
 		}
 
 		// V4i Creating
 		{
-			DqnV4 vec = dqn_v4i(3, 4, 5, 6);
+			DqnV4 vec = DqnV4_4i(3, 4, 5, 6);
 		    DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5 && vec.w == 6);
 		    DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5 && vec.a == 6);
 	    }
 
 		// V4 Arithmetic
 		{
-			DqnV4 vecA = dqn_v4(5, 10, 15, 20);
-			DqnV4 vecB = dqn_v4i(2, 3, 6, 8);
-			DQN_ASSERT(dqn_v4_equals(vecA, vecB) == false);
-			DQN_ASSERT(dqn_v4_equals(vecA, dqn_v4(5, 10, 15, 20)) == true);
-			DQN_ASSERT(dqn_v4_equals(vecB, dqn_v4(2, 3, 6, 8)) == true);
+			DqnV4 vecA = DqnV4_4f(5, 10, 15, 20);
+			DqnV4 vecB = DqnV4_4i(2, 3, 6, 8);
+			DQN_ASSERT(DqnV4_Equals(vecA, vecB) == false);
+			DQN_ASSERT(DqnV4_Equals(vecA, DqnV4_4f(5, 10, 15, 20)) == true);
+			DQN_ASSERT(DqnV4_Equals(vecB, DqnV4_4f(2, 3, 6, 8)) == true);
 
-			DqnV4 result = dqn_v4_add(vecA, dqn_v4(5, 10, 15, 20));
-			DQN_ASSERT(dqn_v4_equals(result, dqn_v4(10, 20, 30, 40)) == true);
+			DqnV4 result = DqnV4_Add(vecA, DqnV4_4f(5, 10, 15, 20));
+			DQN_ASSERT(DqnV4_Equals(result, DqnV4_4f(10, 20, 30, 40)) == true);
 
-			result = dqn_v4_sub(result, dqn_v4(5, 10, 15, 20));
-			DQN_ASSERT(dqn_v4_equals(result, dqn_v4(5, 10, 15, 20)) == true);
+			result = DqnV4_Sub(result, DqnV4_4f(5, 10, 15, 20));
+			DQN_ASSERT(DqnV4_Equals(result, DqnV4_4f(5, 10, 15, 20)) == true);
 
-			result = dqn_v4_scale(result, 5);
-			DQN_ASSERT(dqn_v4_equals(result, dqn_v4(25, 50, 75, 100)) == true);
+			result = DqnV4_Scale(result, 5);
+			DQN_ASSERT(DqnV4_Equals(result, DqnV4_4f(25, 50, 75, 100)) == true);
 
-			result = dqn_v4_hadamard(result, dqn_v4(10, 0.5f, 10, 0.25f));
-			DQN_ASSERT(dqn_v4_equals(result, dqn_v4(250, 25, 750, 25)) == true);
+			result = DqnV4_Hadamard(result, DqnV4_4f(10, 0.5f, 10, 0.25f));
+			DQN_ASSERT(DqnV4_Equals(result, DqnV4_4f(250, 25, 750, 25)) == true);
 
-			f32 dotResult = dqn_v4_dot(dqn_v4(5, 10, 2, 8), dqn_v4(3, 4, 6, 5));
+			f32 dotResult = DqnV4_Dot(DqnV4_4f(5, 10, 2, 8), DqnV4_4f(3, 4, 6, 5));
 			DQN_ASSERT(dotResult == 107);
 		}
 
-		printf("dqn_vec_test(): vec4: Completed successfully\n");
+		printf("VecTest(): Vec4: Completed successfully\n");
 	}
 
 	// Rect
 	{
-		DqnRect rect = dqn_rect(dqn_v2(-10, -10), dqn_v2(20, 20));
-		DQN_ASSERT(dqn_v2_equals(rect.min, dqn_v2(-10, -10)));
-		DQN_ASSERT(dqn_v2_equals(rect.max, dqn_v2(10, 10)));
+		DqnRect rect = DqnRect_Init(DqnV2_2f(-10, -10), DqnV2_2f(20, 20));
+		DQN_ASSERT(DqnV2_Equals(rect.min, DqnV2_2f(-10, -10)));
+		DQN_ASSERT(DqnV2_Equals(rect.max, DqnV2_2f(10, 10)));
 
 		f32 width, height;
-		dqn_rect_get_size_2f(rect, &width, &height);
+		DqnRect_GetSize2f(rect, &width, &height);
 		DQN_ASSERT(width == 20);
 		DQN_ASSERT(height == 20);
 
-		DqnV2 dim = dqn_rect_get_size_v2(rect);
-		DQN_ASSERT(dqn_v2_equals(dim, dqn_v2(20, 20)));
+		DqnV2 dim = DqnRect_GetSizeV2(rect);
+		DQN_ASSERT(DqnV2_Equals(dim, DqnV2_2f(20, 20)));
 
-		DqnV2 rectCenter = dqn_rect_get_centre(rect);
-		DQN_ASSERT(dqn_v2_equals(rectCenter, dqn_v2(0, 0)));
+		DqnV2 rectCenter = DqnRect_GetCentre(rect);
+		DQN_ASSERT(DqnV2_Equals(rectCenter, DqnV2_2f(0, 0)));
 
 		// Test shifting rect
-		DqnRect shiftedRect = dqn_rect_move(rect, dqn_v2(10, 0));
-		DQN_ASSERT(dqn_v2_equals(shiftedRect.min, dqn_v2(0, -10)));
-		DQN_ASSERT(dqn_v2_equals(shiftedRect.max, dqn_v2(20, 10)));
+		DqnRect shiftedRect = DqnRect_Move(rect, DqnV2_2f(10, 0));
+		DQN_ASSERT(DqnV2_Equals(shiftedRect.min, DqnV2_2f(0, -10)));
+		DQN_ASSERT(DqnV2_Equals(shiftedRect.max, DqnV2_2f(20, 10)));
 
-		dqn_rect_get_size_2f(shiftedRect, &width, &height);
+		DqnRect_GetSize2f(shiftedRect, &width, &height);
 		DQN_ASSERT(width == 20);
 		DQN_ASSERT(height == 20);
 
-		dim = dqn_rect_get_size_v2(shiftedRect);
-		DQN_ASSERT(dqn_v2_equals(dim, dqn_v2(20, 20)));
+		dim = DqnRect_GetSizeV2(shiftedRect);
+		DQN_ASSERT(DqnV2_Equals(dim, DqnV2_2f(20, 20)));
 
 		// Test rect contains p
-		DqnV2 inP  = dqn_v2(5, 5);
-		DqnV2 outP = dqn_v2(100, 100);
-		DQN_ASSERT(dqn_rect_contains_p(shiftedRect, inP));
-		DQN_ASSERT(!dqn_rect_contains_p(shiftedRect, outP));
+		DqnV2 inP  = DqnV2_2f(5, 5);
+		DqnV2 outP = DqnV2_2f(100, 100);
+		DQN_ASSERT(DqnRect_ContainsP(shiftedRect, inP));
+		DQN_ASSERT(!DqnRect_ContainsP(shiftedRect, outP));
 
-		printf("dqn_vec_test(): rect: Completed successfully\n");
+		printf("VecTest(): Rect: Completed successfully\n");
 	}
 
-	printf("dqn_vec_test(): Completed successfully\n");
+	printf("VecTest(): Completed successfully\n");
 }
 
-void dqn_array_test()
+void ArrayTest()
 {
 	{
 		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(dqn_array_init(&array, 1));
+		DQN_ASSERT(DqnArray_Init(&array, 1));
 		DQN_ASSERT(array.capacity == 1);
 		DQN_ASSERT(array.count == 0);
 
 		// Test basic insert
 		{
-			DqnV2 va = dqn_v2(5, 10);
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DqnV2 va = DqnV2_2f(5, 10);
+			DQN_ASSERT(DqnArray_Push(&array, va));
 
 			DqnV2 vb = array.data[0];
-			DQN_ASSERT(dqn_v2_equals(va, vb));
+			DQN_ASSERT(DqnV2_Equals(va, vb));
 
 			DQN_ASSERT(array.capacity == 1);
 			DQN_ASSERT(array.count == 1);
@@ -610,215 +610,215 @@ void dqn_array_test()
 
 		// Test array resizing and freeing
 		{
-			DqnV2 va = dqn_v2(10, 15);
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DqnV2 va = DqnV2_2f(10, 15);
+			DQN_ASSERT(DqnArray_Push(&array, va));
 
 			DqnV2 vb = array.data[0];
-			DQN_ASSERT(dqn_v2_equals(va, vb) == false);
+			DQN_ASSERT(DqnV2_Equals(va, vb) == false);
 
 			vb = array.data[1];
-			DQN_ASSERT(dqn_v2_equals(va, vb) == true);
+			DQN_ASSERT(DqnV2_Equals(va, vb) == true);
 
 			DQN_ASSERT(array.capacity == 2);
 			DQN_ASSERT(array.count == 2);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 3);
 			DQN_ASSERT(array.count == 3);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 4);
 			DQN_ASSERT(array.count == 4);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 5);
 			DQN_ASSERT(array.count == 5);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 6);
 			DQN_ASSERT(array.count == 6);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 7);
 			DQN_ASSERT(array.count == 7);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 8);
 			DQN_ASSERT(array.count == 8);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 9);
 			DQN_ASSERT(array.count == 9);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 10);
 			DQN_ASSERT(array.count == 10);
 
-			DQN_ASSERT(dqn_array_push(&array, va));
+			DQN_ASSERT(DqnArray_Push(&array, va));
 			DQN_ASSERT(array.capacity == 12);
 			DQN_ASSERT(array.count == 11);
 
-			DqnV2 vc = dqn_v2(90, 100);
-			DQN_ASSERT(dqn_array_push(&array, vc));
+			DqnV2 vc = DqnV2_2f(90, 100);
+			DQN_ASSERT(DqnArray_Push(&array, vc));
 			DQN_ASSERT(array.capacity == 12);
 			DQN_ASSERT(array.count == 12);
-			DQN_ASSERT(dqn_v2_equals(vc, array.data[11]));
+			DQN_ASSERT(DqnV2_Equals(vc, array.data[11]));
 
-			DQN_ASSERT(dqn_array_free(&array) == true);
+			DQN_ASSERT(DqnArray_Free(&array) == true);
 		}
 	}
 
 	{
 		DqnArray<f32> array = {};
-		DQN_ASSERT(dqn_array_init(&array, 1));
+		DQN_ASSERT(DqnArray_Init(&array, 1));
 		DQN_ASSERT(array.capacity == 1);
 		DQN_ASSERT(array.count == 0);
-		dqn_array_free(&array);
+		DqnArray_Free(&array);
 	}
 
 	{
-		DqnV2 a = dqn_v2(1, 2);
-		DqnV2 b = dqn_v2(3, 4);
-		DqnV2 c = dqn_v2(5, 6);
-		DqnV2 d = dqn_v2(7, 8);
+		DqnV2 a = DqnV2_2f(1, 2);
+		DqnV2 b = DqnV2_2f(3, 4);
+		DqnV2 c = DqnV2_2f(5, 6);
+		DqnV2 d = DqnV2_2f(7, 8);
 
 		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(dqn_array_init(&array, 16));
-		DQN_ASSERT(dqn_array_remove(&array, 0) == false);
+		DQN_ASSERT(DqnArray_Init(&array, 16));
+		DQN_ASSERT(DqnArray_Remove(&array, 0) == false);
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 0);
 
-		DQN_ASSERT(dqn_array_clear(&array));
+		DQN_ASSERT(DqnArray_Clear(&array));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 0);
 
-		DQN_ASSERT(dqn_array_push(&array, a));
-		DQN_ASSERT(dqn_array_push(&array, b));
-		DQN_ASSERT(dqn_array_push(&array, c));
-		DQN_ASSERT(dqn_array_push(&array, d));
+		DQN_ASSERT(DqnArray_Push(&array, a));
+		DQN_ASSERT(DqnArray_Push(&array, b));
+		DQN_ASSERT(DqnArray_Push(&array, c));
+		DQN_ASSERT(DqnArray_Push(&array, d));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 4);
 
-		DQN_ASSERT(dqn_array_remove(&array, 0));
-		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
-		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
-		DQN_ASSERT(dqn_v2_equals(array.data[2], c));
+		DQN_ASSERT(DqnArray_Remove(&array, 0));
+		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
+		DQN_ASSERT(DqnV2_Equals(array.data[2], c));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 3);
 
-		DQN_ASSERT(dqn_array_remove(&array, 2));
-		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
-		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
+		DQN_ASSERT(DqnArray_Remove(&array, 2));
+		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 2);
 
-		DQN_ASSERT(dqn_array_remove(&array, 100) == false);
-		DQN_ASSERT(dqn_v2_equals(array.data[0], d));
-		DQN_ASSERT(dqn_v2_equals(array.data[1], b));
+		DQN_ASSERT(DqnArray_Remove(&array, 100) == false);
+		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 2);
 
-		DQN_ASSERT(dqn_array_clear(&array));
+		DQN_ASSERT(DqnArray_Clear(&array));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 0);
 
-		dqn_array_free(&array);
+		DqnArray_Free(&array);
 	}
 
 	{
-		DqnV2 a = dqn_v2(1, 2);
-		DqnV2 b = dqn_v2(3, 4);
-		DqnV2 c = dqn_v2(5, 6);
-		DqnV2 d = dqn_v2(7, 8);
+		DqnV2 a = DqnV2_2f(1, 2);
+		DqnV2 b = DqnV2_2f(3, 4);
+		DqnV2 c = DqnV2_2f(5, 6);
+		DqnV2 d = DqnV2_2f(7, 8);
 
 		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(dqn_array_init(&array, 16));
+		DQN_ASSERT(DqnArray_Init(&array, 16));
 
-		DQN_ASSERT(dqn_array_push(&array, a));
-		DQN_ASSERT(dqn_array_push(&array, b));
-		DQN_ASSERT(dqn_array_push(&array, c));
-		DQN_ASSERT(dqn_array_push(&array, d));
+		DQN_ASSERT(DqnArray_Push(&array, a));
+		DQN_ASSERT(DqnArray_Push(&array, b));
+		DQN_ASSERT(DqnArray_Push(&array, c));
+		DQN_ASSERT(DqnArray_Push(&array, d));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 4);
 
-		dqn_array_remove_stable(&array, 0);
-		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
-		DQN_ASSERT(dqn_v2_equals(array.data[1], c));
-		DQN_ASSERT(dqn_v2_equals(array.data[2], d));
+		DqnArray_RemoveStable(&array, 0);
+		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], c));
+		DQN_ASSERT(DqnV2_Equals(array.data[2], d));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 3);
 
-		dqn_array_remove_stable(&array, 1);
-		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
-		DQN_ASSERT(dqn_v2_equals(array.data[1], d));
+		DqnArray_RemoveStable(&array, 1);
+		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], d));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 2);
 
-		dqn_array_remove_stable(&array, 1);
-		DQN_ASSERT(dqn_v2_equals(array.data[0], b));
+		DqnArray_RemoveStable(&array, 1);
+		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
 		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 1);
-		dqn_array_free(&array);
+		DqnArray_Free(&array);
 	}
 
-	printf("dqn_array_test(): Completed successfully\n");
+	printf("ArrayTest(): Completed successfully\n");
 }
 
-void dqn_file_test()
+void FileTest()
 {
 	// File i/o
 	{
 		{
 			DqnFile file = {};
-			DQN_ASSERT(dqn_file_open(
+			DQN_ASSERT(DqnFile_Open(
 				".clang-format", &file,
 				(dqnfilepermissionflag_write | dqnfilepermissionflag_read),
 				dqnfileaction_open_only));
 			DQN_ASSERT(file.size == 1320);
 
 			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
-			DQN_ASSERT(dqn_file_read(file, buffer, (u32)file.size) == file.size);
+			DQN_ASSERT(DqnFile_Read(file, buffer, (u32)file.size) == file.size);
 			free(buffer);
 
-			dqn_file_close(&file);
+			DqnFile_Close(&file);
 	        DQN_ASSERT(!file.handle && file.size == 0 &&
 	                   file.permissionFlags == 0);
         }
 
 		{
 			DqnFile file = {};
-			DQN_ASSERT(!dqn_file_open(
+			DQN_ASSERT(!DqnFile_Open(
 				"asdljasdnel;kajdf", &file,
 				(dqnfilepermissionflag_write | dqnfilepermissionflag_read),
 				dqnfileaction_open_only));
 			DQN_ASSERT(file.size == 0);
 			DQN_ASSERT(file.permissionFlags == 0);
 			DQN_ASSERT(!file.handle);
-			printf("dqn_file_test(): file_io: Completed successfully\n");
+			printf("FileTest(): FileIO: Completed successfully\n");
 		}
 	}
 
 	{
 		u32 numFiles;
-		char **filelist = dqn_dir_read("*", &numFiles);
-		printf("dqn_file_test(): dir_read: Display read files\n");
+		char **filelist = DqnDir_Read("*", &numFiles);
+		printf("FileTest(): DirRead: Display read files\n");
 
 		for (u32 i = 0; i < numFiles; i++)
-			printf("dqn_file_test(): dir_read: %s\n", filelist[i]);
+			printf("FileTest(): DirRead: %s\n", filelist[i]);
 
-		dqn_dir_read_free(filelist, numFiles);
-		printf("dqn_file_test(): dir_read: Completed successfully\n");
+		DqnDir_ReadFree(filelist, numFiles);
+		printf("FileTest(): DirRead: Completed successfully\n");
 	}
 
-	printf("dqn_file_test(): Completed successfully\n");
+	printf("FileTest(): Completed successfully\n");
 }
 
-void dqn_push_buffer_test()
+void PushBufferTest()
 {
 	size_t allocSize  = DQN_KILOBYTE(1);
 	DqnPushBuffer buffer = {};
 	const u32 ALIGNMENT  = 4;
-	dqn_push_buffer_init(&buffer, allocSize, ALIGNMENT);
+	DqnPushBuffer_Init(&buffer, allocSize, ALIGNMENT);
 	DQN_ASSERT(buffer.block && buffer.block->memory);
 	DQN_ASSERT(buffer.block->size == allocSize);
 	DQN_ASSERT(buffer.block->used == 0);
@@ -826,7 +826,7 @@ void dqn_push_buffer_test()
 
 	// Alocate A
 	size_t sizeA = (size_t)(allocSize * 0.5f);
-	void *resultA = dqn_push_buffer_allocate(&buffer, sizeA);
+	void *resultA = DqnPushBuffer_Allocate(&buffer, sizeA);
 	u64 resultAddrA = *((u64 *)resultA);
 	DQN_ASSERT(resultAddrA % ALIGNMENT == 0);
 	DQN_ASSERT(buffer.block && buffer.block->memory);
@@ -842,7 +842,7 @@ void dqn_push_buffer_test()
 	DqnPushBufferBlock *blockA = buffer.block;
 	// Alocate B
 	size_t sizeB  = (size_t)(allocSize * 2.0f);
-	void *resultB = dqn_push_buffer_allocate(&buffer, sizeB);
+	void *resultB = DqnPushBuffer_Allocate(&buffer, sizeB);
 	u64 resultAddrB = *((u64 *)resultB);
 	DQN_ASSERT(resultAddrB % ALIGNMENT == 0);
 	DQN_ASSERT(buffer.block && buffer.block->memory);
@@ -866,9 +866,9 @@ void dqn_push_buffer_test()
 	DqnPushBufferBlock *blockB = buffer.block;
 
 	// Check temp regions work
-	DqnTempBuffer tempBuffer = dqn_push_buffer_begin_temp_region(&buffer);
+	DqnTempBuffer tempBuffer = DqnPushBuffer_BeginTempRegion(&buffer);
 	size_t sizeC          = 1024 + 1;
-	void *resultC = dqn_push_buffer_allocate(tempBuffer.buffer, sizeC);
+	void *resultC = DqnPushBuffer_Allocate(tempBuffer.buffer, sizeC);
 	u64 resultAddrC = *((u64 *)resultC);
 	DQN_ASSERT(resultAddrC % ALIGNMENT == 0);
 	DQN_ASSERT(buffer.block != blockB && buffer.block != blockA);
@@ -896,7 +896,7 @@ void dqn_push_buffer_test()
 		DQN_ASSERT(ptrC[i] == 3);
 
 	// End temp region which should revert back to 2 linked buffers, A and B
-	dqn_push_buffer_end_temp_region(tempBuffer);
+	DqnPushBuffer_EndTempRegion(tempBuffer);
 	DQN_ASSERT(buffer.block && buffer.block->memory);
 	DQN_ASSERT(buffer.block->size == sizeB);
 	DQN_ASSERT(buffer.block->used >= sizeB + 0 &&
@@ -910,7 +910,7 @@ void dqn_push_buffer_test()
 	DQN_ASSERT(buffer.alignment == ALIGNMENT);
 
 	// Release the last linked buffer from the push buffer
-	dqn_push_buffer_free_last_buffer(&buffer);
+	DqnPushBuffer_FreeLastBuffer(&buffer);
 
 	// Which should return back to the 1st allocation
 	DQN_ASSERT(buffer.block == blockA);
@@ -920,7 +920,7 @@ void dqn_push_buffer_test()
 	DQN_ASSERT(buffer.alignment == ALIGNMENT);
 
 	// Free once more to release buffer A memory
-	dqn_push_buffer_free_last_buffer(&buffer);
+	DqnPushBuffer_FreeLastBuffer(&buffer);
 	DQN_ASSERT(!buffer.block);
 	DQN_ASSERT(buffer.alignment == ALIGNMENT);
 	DQN_ASSERT(buffer.tempBufferCount == 0);
@@ -928,14 +928,14 @@ void dqn_push_buffer_test()
 
 int main(void)
 {
-	dqn_strings_test();
-	dqn_random_test();
-	dqn_math_test();
-	dqn_vec_test();
-	dqn_other_test();
-	dqn_array_test();
-	dqn_file_test();
-	dqn_push_buffer_test();
+	StringsTest();
+	RandomTest();
+	MathTest();
+	VecTest();
+	OtherTest();
+	ArrayTest();
+	FileTest();
+	PushBufferTest();
 
 	printf("\nPress 'Enter' Key to Exit\n");
 	getchar();
