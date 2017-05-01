@@ -117,7 +117,7 @@ bool DqnArray_Grow(DqnArray<T> *array)
 	if (!array || !array->data) return false;
 
 	const f32 GROWTH_FACTOR = 1.2f;
-	size_t newCapacity         = (size_t)(array->capacity * GROWTH_FACTOR);
+	size_t newCapacity      = (size_t)(array->capacity * GROWTH_FACTOR);
 	if (newCapacity == array->capacity) newCapacity++;
 
 	T *newMem = (T *)Dqn_MemReallocInternal(
@@ -567,39 +567,52 @@ DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
 ////////////////////////////////////////////////////////////////////////////////
 // PushBuffer Header
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct DqnPushBufferBlock
+typedef struct DqnMemBufferBlock
 {
 	u8     *memory;
 	size_t  used;
 	size_t  size;
 
-	DqnPushBufferBlock *prevBlock;
-} DqnPushBufferBlock;
+	DqnMemBufferBlock *prevBlock;
+} DqnMemBufferBlock;
 
-typedef struct DqnPushBuffer
+enum DqnMemBufferFlag
 {
-	DqnPushBufferBlock *block;
+	DqnMemBufferFlag_IsExpandable          = (1 << 0),
+	DqnMemBufferFlag_IsFixedMemoryFromUser = (1 << 1),
+};
 
+typedef struct DqnMemBuffer
+{
+	DqnMemBufferBlock *block;
+
+	u32    flags;
 	i32    tempBufferCount;
 	size_t alignment;
-} DqnPushBuffer;
+} DqnMemBuffer;
 
 typedef struct DqnTempBuffer
 {
-	DqnPushBuffer      *buffer;
-	DqnPushBufferBlock *startingBlock;
+	DqnMemBuffer      *buffer;
+	DqnMemBufferBlock *startingBlock;
 	size_t used;
 
 } DqnTempBuffer;
 
-DQN_FILE_SCOPE bool  DqnPushBuffer_Init          (DqnPushBuffer *const buffer, size_t size, const size_t alignment);
-DQN_FILE_SCOPE void *DqnPushBuffer_Allocate      (DqnPushBuffer *const buffer, size_t size);
-DQN_FILE_SCOPE void  DqnPushBuffer_FreeLastBuffer(DqnPushBuffer *const buffer);
-DQN_FILE_SCOPE void  DqnPushBuffer_Free          (DqnPushBuffer *const buffer);
-DQN_FILE_SCOPE void  DqnPushBuffer_ClearCurrBlock(DqnPushBuffer *const buffer, const bool clearToZero);
+// NOTE: InitWithFixedMem() is for giving the MemBuffer a pre-allocated block AND the buffer WILL NOT allocate new blocks.
+//                          Memory from user given memory is required for MemBufferBlock metadata which is equal to sizeof(DqnMemBufferBlock)
+//       InitWithFixedSize() will incur one allocation from the platform and WILL NOT allocate any more blocks after that
+DQN_FILE_SCOPE bool  DqnMemBuffer_InitWithFixedMem (DqnMemBuffer *const buffer, u8* mem, size_t memSize, const size_t alignment = 4);
+DQN_FILE_SCOPE bool  DqnMemBuffer_InitWithFixedSize(DqnMemBuffer *const buffer, size_t size, const size_t alignment = 4);
+DQN_FILE_SCOPE bool  DqnMemBuffer_Init             (DqnMemBuffer *const buffer, size_t size, const size_t alignment = 4);
 
-DQN_FILE_SCOPE DqnTempBuffer DqnPushBuffer_BeginTempRegion(DqnPushBuffer *const buffer);
-DQN_FILE_SCOPE void          DqnPushBuffer_EndTempRegion(DqnTempBuffer tempBuffer);
+DQN_FILE_SCOPE void *DqnMemBuffer_Allocate      (DqnMemBuffer *const buffer, size_t size);
+DQN_FILE_SCOPE void  DqnMemBuffer_FreeLastBuffer(DqnMemBuffer *const buffer);
+DQN_FILE_SCOPE void  DqnMemBuffer_Free          (DqnMemBuffer *const buffer);
+DQN_FILE_SCOPE void  DqnMemBuffer_ClearCurrBlock(DqnMemBuffer *const buffer, const bool clearToZero);
+
+DQN_FILE_SCOPE DqnTempBuffer DqnMemBuffer_BeginTempRegion(DqnMemBuffer *const buffer);
+DQN_FILE_SCOPE void          DqnMemBuffer_EndTempRegion  (DqnTempBuffer tempBuffer);
 
 #endif  /* DQN_H */
 
@@ -2770,7 +2783,7 @@ DQN_FILE_SCOPE i32 DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DqnPushBuffer Header
+// DqnMemBuffer Header
 ////////////////////////////////////////////////////////////////////////////////
 FILE_SCOPE size_t Dqn_SizeAlignmentInternal(size_t alignment, size_t size)
 {
@@ -2778,13 +2791,13 @@ FILE_SCOPE size_t Dqn_SizeAlignmentInternal(size_t alignment, size_t size)
 	return result;
 }
 
-FILE_SCOPE DqnPushBufferBlock *
-DqnPushBuffer_AllocBlockInternal(size_t alignment, size_t size)
+FILE_SCOPE DqnMemBufferBlock *
+DqnMemBuffer_AllocBlockInternal(size_t alignment, size_t size)
 {
 	size_t alignedSize = Dqn_SizeAlignmentInternal(alignment, size);
-	size_t totalSize   = alignedSize + sizeof(DqnPushBufferBlock);
+	size_t totalSize   = alignedSize + sizeof(DqnMemBufferBlock);
 
-	DqnPushBufferBlock *result = (DqnPushBufferBlock *)Dqn_MemAllocInternal(totalSize, true);
+	DqnMemBufferBlock *result = (DqnMemBufferBlock *)Dqn_MemAllocInternal(totalSize, true);
 	if (!result) return NULL;
 
 	result->memory = (u8 *)result + sizeof(*result);
@@ -2793,21 +2806,59 @@ DqnPushBuffer_AllocBlockInternal(size_t alignment, size_t size)
 	return result;
 }
 
-DQN_FILE_SCOPE bool DqnPushBuffer_Init(DqnPushBuffer *const buffer,
-                                         size_t size, const size_t alignment)
+DQN_FILE_SCOPE bool DqnMemBuffer_Init(DqnMemBuffer *const buffer, size_t size,
+                                      const size_t alignment)
 {
 	if (!buffer || size <= 0) return false;
 	DQN_ASSERT(!buffer->block);
 
-	buffer->block = DqnPushBuffer_AllocBlockInternal(alignment, size);
+	buffer->block = DqnMemBuffer_AllocBlockInternal(alignment, size);
 	if (!buffer->block) return false;
 
 	buffer->tempBufferCount = 0;
 	buffer->alignment       = alignment;
+	buffer->flags           = DqnMemBufferFlag_IsExpandable;
 	return true;
 }
 
-DQN_FILE_SCOPE void *DqnPushBuffer_Allocate(DqnPushBuffer *const buffer, size_t size)
+DQN_FILE_SCOPE bool DqnMemBuffer_InitWithFixedSize(DqnMemBuffer *const buffer,
+                                                   size_t size,
+                                                   const size_t alignment)
+{
+	bool result = DqnMemBuffer_Init(buffer, size, alignment);
+	if (result)
+	{
+		buffer->flags = 0;
+		return true;
+	}
+
+	return false;
+}
+
+DQN_FILE_SCOPE bool DqnMemBuffer_InitWithFixedMem(DqnMemBuffer *const buffer,
+                                                  u8 *mem, size_t memSize,
+                                                  const size_t alignment)
+{
+	if (!buffer || !mem) return false;
+	DQN_ASSERT(!buffer->block);
+
+	// TODO(doyle): Better logging
+	if (memSize < sizeof(DqnMemBufferBlock))
+		DQN_ASSERT(DQN_INVALID_CODE_PATH);
+
+	buffer->block         = (DqnMemBufferBlock *)mem;
+	buffer->block->memory = mem + sizeof(DqnMemBufferBlock);
+	buffer->block->used   = 0;
+	buffer->block->size   = memSize - sizeof(DqnMemBufferBlock);
+	buffer->flags         = DqnMemBufferFlag_IsFixedMemoryFromUser;
+
+	const u32 DEFAULT_ALIGNMENT = 4;
+	buffer->tempBufferCount     = 0;
+	buffer->alignment = (alignment == 0) ? DEFAULT_ALIGNMENT : alignment;
+	return true;
+}
+
+DQN_FILE_SCOPE void *DqnMemBuffer_Allocate(DqnMemBuffer *const buffer, size_t size)
 {
 	if (!buffer || size == 0) return NULL;
 
@@ -2815,13 +2866,23 @@ DQN_FILE_SCOPE void *DqnPushBuffer_Allocate(DqnPushBuffer *const buffer, size_t 
 	if (!buffer->block ||
 	    (buffer->block->used + alignedSize) > buffer->block->size)
 	{
-		size_t newBlockSize = DQN_MAX(alignedSize, buffer->block->size);
-		DqnPushBufferBlock *newBlock = DqnPushBuffer_AllocBlockInternal(
-		    buffer->alignment, newBlockSize);
-		if (!newBlock) return NULL;
+		if (buffer->flags & DqnMemBufferFlag_IsFixedMemoryFromUser) return NULL;
 
-		newBlock->prevBlock = buffer->block;
-		buffer->block       = newBlock;
+		// TODO: Better notifying to user, out of space in buffer
+		if (buffer->flags & DqnMemBufferFlag_IsExpandable)
+		{
+			size_t newBlockSize = DQN_MAX(alignedSize, buffer->block->size);
+			DqnMemBufferBlock *newBlock = DqnMemBuffer_AllocBlockInternal(
+			    buffer->alignment, newBlockSize);
+			if (!newBlock) return NULL;
+
+			newBlock->prevBlock = buffer->block;
+			buffer->block       = newBlock;
+		}
+		else
+		{
+			return NULL;
+		}
 	}
 
 	u8 *currPointer        = buffer->block->memory + buffer->block->used;
@@ -2835,9 +2896,11 @@ DQN_FILE_SCOPE void *DqnPushBuffer_Allocate(DqnPushBuffer *const buffer, size_t 
 }
 
 DQN_FILE_SCOPE void
-DqnPushBuffer_FreeLastBuffer(DqnPushBuffer *const buffer)
+DqnMemBuffer_FreeLastBuffer(DqnMemBuffer *const buffer)
 {
-	DqnPushBufferBlock *prevBlock = buffer->block->prevBlock;
+	if (buffer->flags & DqnMemBufferFlag_IsFixedMemoryFromUser) return;
+
+	DqnMemBufferBlock *prevBlock = buffer->block->prevBlock;
 	Dqn_MemFreeInternal(buffer->block);
 	buffer->block = prevBlock;
 
@@ -2845,18 +2908,19 @@ DqnPushBuffer_FreeLastBuffer(DqnPushBuffer *const buffer)
 	if (!buffer->block) DQN_ASSERT(buffer->tempBufferCount == 0);
 }
 
-DQN_FILE_SCOPE void DqnPushBuffer_Free(DqnPushBuffer *buffer)
+DQN_FILE_SCOPE void DqnMemBuffer_Free(DqnMemBuffer *buffer)
 {
 	if (!buffer) return;
+	if (buffer->flags & DqnMemBufferFlag_IsFixedMemoryFromUser) return;
+
 	while (buffer->block)
 	{
-		DqnPushBuffer_FreeLastBuffer(buffer);
+		DqnMemBuffer_FreeLastBuffer(buffer);
 	}
 }
 
-DQN_FILE_SCOPE void
-DqnPushBuffer_ClearCurrBlock(DqnPushBuffer *const buffer,
-                                 const bool clearToZero)
+DQN_FILE_SCOPE void DqnMemBuffer_ClearCurrBlock(DqnMemBuffer *const buffer,
+                                                const bool clearToZero)
 {
 	if (!buffer) return;
 	if (buffer->block)
@@ -2871,7 +2935,7 @@ DqnPushBuffer_ClearCurrBlock(DqnPushBuffer *const buffer,
 }
 
 DQN_FILE_SCOPE DqnTempBuffer
-DqnPushBuffer_BeginTempRegion(DqnPushBuffer *const buffer)
+DqnMemBuffer_BeginTempRegion(DqnMemBuffer *const buffer)
 {
 	DqnTempBuffer result = {};
 	result.buffer        = buffer;
@@ -2882,11 +2946,11 @@ DqnPushBuffer_BeginTempRegion(DqnPushBuffer *const buffer)
 	return result;
 }
 
-DQN_FILE_SCOPE void DqnPushBuffer_EndTempRegion(DqnTempBuffer tempBuffer)
+DQN_FILE_SCOPE void DqnMemBuffer_EndTempRegion(DqnTempBuffer tempBuffer)
 {
-	DqnPushBuffer *buffer = tempBuffer.buffer;
+	DqnMemBuffer *buffer = tempBuffer.buffer;
 	while (buffer->block != tempBuffer.startingBlock)
-		DqnPushBuffer_FreeLastBuffer(buffer);
+		DqnMemBuffer_FreeLastBuffer(buffer);
 
 	if (buffer->block)
 	{
