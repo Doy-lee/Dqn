@@ -904,7 +904,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block && buffer.block->memory);
 		DQN_ASSERT(buffer.block->size == allocSize);
 		DQN_ASSERT(buffer.block->used == 0);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		// Alocate A
 		size_t sizeA    = (size_t)(allocSize * 0.5f);
@@ -915,7 +915,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block->size == allocSize);
 		DQN_ASSERT(buffer.block->used >= sizeA + 0 &&
 		           buffer.block->used <= sizeA + 3);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 		DQN_ASSERT(resultA);
 		u8 *ptrA = (u8 *)resultA;
 		for (u32 i  = 0; i < sizeA; i++)
@@ -945,7 +945,7 @@ void MemBufferTest()
 		// Check that a new block was created since there wasn't enough space
 		DQN_ASSERT(buffer.block->prevBlock == blockA);
 		DQN_ASSERT(buffer.block != blockA);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 		DQN_ASSERT(blockA->used == sizeA);
 		DqnMemBufferBlock *blockB = buffer.block;
 
@@ -959,7 +959,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block->used >= sizeC + 0 &&
 		           buffer.block->used <= sizeC + 3);
 		DQN_ASSERT(buffer.tempBufferCount == 1);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		// NOTE: Allocation should be aligned to 4 byte boundary
 		DQN_ASSERT(tempBuffer.buffer->block->size == 2048);
@@ -970,7 +970,7 @@ void MemBufferTest()
 		// Check that a new block was created since there wasn't enough space
 		DQN_ASSERT(buffer.block->prevBlock == blockB);
 		DQN_ASSERT(buffer.block != blockB);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		for (u32 i = 0; i < sizeA; i++)
 			DQN_ASSERT(ptrA[i] == 1);
@@ -991,7 +991,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block->prevBlock == blockA);
 		DQN_ASSERT(buffer.block != blockA);
 		DQN_ASSERT(blockA->used == sizeA);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		// Release the last linked buffer from the push buffer
 		DqnMemBuffer_FreeLastBuffer(&buffer);
@@ -1001,12 +1001,12 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block->memory);
 		DQN_ASSERT(buffer.block->size == allocSize);
 		DQN_ASSERT(buffer.block->used == sizeA);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		// Free once more to release buffer A memory
 		DqnMemBuffer_FreeLastBuffer(&buffer);
 		DQN_ASSERT(!buffer.block);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 		DQN_ASSERT(buffer.tempBufferCount == 0);
 	}
 
@@ -1021,7 +1021,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block->size ==
 		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemBufferBlock));
 		DQN_ASSERT(buffer.block->used == 0);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		// Allocation larger than stack mem size should fail
 		DQN_ASSERT(!DqnMemBuffer_Allocate(&buffer, DQN_ARRAY_COUNT(memory) * 2));
@@ -1033,7 +1033,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block->size ==
 		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemBufferBlock));
 		DQN_ASSERT(buffer.block->used == 0);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 	}
 
 	// Test buffer with fixed size, allocates once from platform but does not
@@ -1046,7 +1046,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block && buffer.block->memory);
 		DQN_ASSERT(buffer.block->size == allocSize);
 		DQN_ASSERT(buffer.block->used == 0);
-		DQN_ASSERT(buffer.alignment == ALIGNMENT);
+		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		void *result = DqnMemBuffer_Allocate(&buffer, (size_t)(0.5f * allocSize));
 		DQN_ASSERT(result);
