@@ -1,8 +1,8 @@
+#define DQN_WIN32_IMPLEMENTATION
 #define DQN_IMPLEMENTATION
 #include "dqn.h"
 
-#include "stdio.h"
-
+#include <stdio.h>
 void StringsTest()
 {
 	{ // Char Checks
@@ -319,8 +319,8 @@ void StringsTest()
     printf("StringsTest(): Completed successfully\n");
 }
 
-#include "Windows.h"
 #define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 void OtherTest()
 {
 	{ // Test Win32 Sleep
@@ -415,7 +415,7 @@ void VecTest()
 			result = DqnV2_Sub(result, DqnV2_2f(5, 10));
 			DQN_ASSERT(DqnV2_Equals(result, DqnV2_2f(5, 10)) == true);
 
-			result = DqnV2_Scale(result, 5);
+			result = DqnV2_Scalef(result, 5);
 			DQN_ASSERT(DqnV2_Equals(result, DqnV2_2f(25, 50)) == true);
 
 			result = DqnV2_Hadamard(result, DqnV2_2f(10, 0.5f));
@@ -424,6 +424,34 @@ void VecTest()
 			f32 dotResult = DqnV2_Dot(DqnV2_2f(5, 10), DqnV2_2f(3, 4));
 			DQN_ASSERT(dotResult == 55);
 		}
+
+		// Test operator overloadign
+		{
+			DqnV2 vecA = DqnV2_2f(5, 10);
+			DqnV2 vecB = DqnV2_2i(2, 3);
+			DQN_ASSERT((vecA == vecB) == false);
+			DQN_ASSERT((vecA == DqnV2_2f(5, 10)) == true);
+			DQN_ASSERT((vecB == DqnV2_2f(2, 3)) == true);
+
+			DqnV2 result = vecA + DqnV2_2f(5, 10);
+			DQN_ASSERT((result == DqnV2_2f(10, 20)) == true);
+
+			result -= DqnV2_2f(5, 10);
+			DQN_ASSERT((result == DqnV2_2f(5, 10)) == true);
+
+			result *= 5;
+			DQN_ASSERT((result == DqnV2_2f(25, 50)) == true);
+
+			result = result * DqnV2_2f(10, 0.5f);
+			DQN_ASSERT((result == DqnV2_2f(250, 25)) == true);
+
+			result += DqnV2_2f(1, 1);
+			DQN_ASSERT((result == DqnV2_2f(251, 26)) == true);
+
+			result = result - DqnV2_2f(1, 1);
+			DQN_ASSERT((result == DqnV2_2f(250, 25)) == true);
+		}
+
 
 		// V2 Properties
 		{
@@ -488,7 +516,7 @@ void VecTest()
 			result = DqnV3_Sub(result, DqnV3_3f(5, 10, 15));
 			DQN_ASSERT(DqnV3_Equals(result, DqnV3_3f(5, 10, 15)) == true);
 
-			result = DqnV3_Scale(result, 5);
+			result = DqnV3_Scalef(result, 5);
 			DQN_ASSERT(DqnV3_Equals(result, DqnV3_3f(25, 50, 75)) == true);
 
 			result = DqnV3_Hadamard(result, DqnV3_3f(10.0f, 0.5f, 10.0f));
@@ -499,6 +527,32 @@ void VecTest()
 
 			DqnV3 cross = DqnV3_Cross(vecA, vecB);
 			DQN_ASSERT(DqnV3_Equals(cross, DqnV3_3f(15, 0, -5)) == true);
+		}
+
+		{
+			DqnV3 vecA = DqnV3_3f(5, 10, 15);
+			DqnV3 vecB = DqnV3_3f(2, 3, 6);
+			DQN_ASSERT((vecA ==  vecB) == false);
+			DQN_ASSERT((vecA ==  DqnV3_3f(5, 10, 15)) == true);
+			DQN_ASSERT((vecB ==  DqnV3_3f(2, 3, 6)) == true);
+
+			DqnV3 result = vecA + DqnV3_3f(5, 10, 15);
+			DQN_ASSERT((result == DqnV3_3f(10, 20, 30)) == true);
+
+			result -= DqnV3_3f(5, 10, 15);
+			DQN_ASSERT((result == DqnV3_3f(5, 10, 15)) == true);
+
+			result = result * 5;
+			DQN_ASSERT((result == DqnV3_3f(25, 50, 75)) == true);
+
+			result *= DqnV3_3f(10.0f, 0.5f, 10.0f);
+			DQN_ASSERT((result == DqnV3_3f(250, 25, 750)) == true);
+
+			result = result - DqnV3_3f(1, 1, 1);
+			DQN_ASSERT((result == DqnV3_3f(249, 24, 749)) == true);
+
+			result += DqnV3_3f(1, 1, 1);
+			DQN_ASSERT((result == DqnV3_3f(250, 25, 750)) == true);
 		}
 
 		printf("VecTest(): Vec3: Completed successfully\n");
@@ -534,7 +588,7 @@ void VecTest()
 			result = DqnV4_Sub(result, DqnV4_4f(5, 10, 15, 20));
 			DQN_ASSERT(DqnV4_Equals(result, DqnV4_4f(5, 10, 15, 20)) == true);
 
-			result = DqnV4_Scale(result, 5);
+			result = DqnV4_Scalef(result, 5);
 			DQN_ASSERT(DqnV4_Equals(result, DqnV4_4f(25, 50, 75, 100)) == true);
 
 			result = DqnV4_Hadamard(result, DqnV4_4f(10, 0.5f, 10, 0.25f));
@@ -542,6 +596,32 @@ void VecTest()
 
 			f32 dotResult = DqnV4_Dot(DqnV4_4f(5, 10, 2, 8), DqnV4_4f(3, 4, 6, 5));
 			DQN_ASSERT(dotResult == 107);
+		}
+
+		{
+			DqnV4 vecA = DqnV4_4f(5, 10, 15, 20);
+			DqnV4 vecB = DqnV4_4i(2, 3, 6, 8);
+			DQN_ASSERT((vecA == vecB) == false);
+			DQN_ASSERT((vecA == DqnV4_4f(5, 10, 15, 20)) == true);
+			DQN_ASSERT((vecB == DqnV4_4f(2, 3, 6, 8)) == true);
+
+			DqnV4 result = vecA + DqnV4_4f(5, 10, 15, 20);
+			DQN_ASSERT((result == DqnV4_4f(10, 20, 30, 40)) == true);
+
+			result = result - DqnV4_4f(5, 10, 15, 20);
+			DQN_ASSERT((result == DqnV4_4f(5, 10, 15, 20)) == true);
+
+			result = result * 5;
+			DQN_ASSERT((result == DqnV4_4f(25, 50, 75, 100)) == true);
+
+			result *= DqnV4_4f(10, 0.5f, 10, 0.25f);
+			DQN_ASSERT((result == DqnV4_4f(250, 25, 750, 25)) == true);
+
+			result += DqnV4_4f(1, 1, 1, 1);
+			DQN_ASSERT((result == DqnV4_4f(251, 26, 751, 26)) == true);
+
+			result -= DqnV4_4f(1, 1, 1, 1);
+			DQN_ASSERT((result == DqnV4_4f(250, 25, 750, 25)) == true);
 		}
 
 		printf("VecTest(): Vec4: Completed successfully\n");

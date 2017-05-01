@@ -2,33 +2,34 @@
 #define DQN_H
 
 /*
-	#define DQN_IMPLEMENTATION // Enable the implementation
-	#define DQN_MAKE_STATIC    // Make all functions be static
+	#define DQN_IMPLEMENTATION       // Enable the implementation
+	#define DQN_WIN32_IMPLEMENTATION // Enable Win32 Code, but only if _WIN32 is already defined. Also requires DQN_IMPLEMENTATION.
+	#define DQN_MAKE_STATIC          // Make all functions be static
 	#include "dqn.h"
  */
-
-#ifdef DQN_MAKE_STATIC
-	#define DQN_FILE_SCOPE static
-#else
-	#define DQN_FILE_SCOPE
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //
 // HEADER
 //
 ////////////////////////////////////////////////////////////////////////////////
-#include <stdint.h> // For standard types
-
-#ifdef _WIN32
-	#define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
-	#define DQN_WIN32
-
-	// TODO(doyle): Make my own windows.h?
-	#define WIN32_LEAN_AND_MEAN
-	#include <Windows.h>
+#ifdef DQN_MAKE_STATIC
+	#define DQN_FILE_SCOPE static
+#else
+	#define DQN_FILE_SCOPE
 #endif
 
+#ifdef _WIN32
+	#ifdef DQN_WIN32_IMPLEMENTATION
+		// TODO(doyle): Make my own windows.h?
+		#define WIN32_LEAN_AND_MEAN
+		#include <Windows.h>
+
+		#define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
+	#endif
+#endif
+
+#include <stdint.h> // For standard types
 #define LOCAL_PERSIST static
 #define FILE_SCOPE    static
 
@@ -257,13 +258,14 @@ typedef union DqnV2 {
 	f32 e[2];
 } DqnV2;
 
-// Create a vector using ints and typecast to floats
-DQN_FILE_SCOPE DqnV2 DqnV2_2i(i32 x, i32 y);
+
+DQN_FILE_SCOPE DqnV2 DqnV2_2i(i32 x, i32 y); // Typecasts 2 integers to 2 floats
 DQN_FILE_SCOPE DqnV2 DqnV2_2f(f32 x, f32 y);
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Add     (DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE DqnV2 DqnV2_Sub     (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Scale   (DqnV2 a, f32 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Scalei  (DqnV2 a, i32 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Scalef  (DqnV2 a, f32 b);
 DQN_FILE_SCOPE DqnV2 DqnV2_Hadamard(DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE f32   DqnV2_Dot     (DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE bool  DqnV2_Equals  (DqnV2 a, DqnV2 b);
@@ -274,8 +276,47 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Normalise    (DqnV2 a);
 DQN_FILE_SCOPE bool  DqnV2_Overlaps     (DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(DqnV2 a);
 
-// Resize the dimension to fit the aspect ratio provided. Downscale only.
-DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio);
+DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio); // Resize the dimension to fit the aspect ratio provided. Downscale only.
+
+DQN_FILE_SCOPE inline DqnV2  operator- (DqnV2  a, DqnV2 b) { return      DqnV2_Sub     (a, b);  }
+DQN_FILE_SCOPE inline DqnV2  operator+ (DqnV2  a, DqnV2 b) { return      DqnV2_Add     (a, b);  }
+DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, DqnV2 b) { return      DqnV2_Hadamard(a, b);  }
+DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, f32   b) { return      DqnV2_Scalef  (a, b);  }
+DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, i32   b) { return      DqnV2_Scalei  (a, b);  }
+DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Hadamard(a, b)); }
+DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, f32   b) { return (a = DqnV2_Scalef  (a, b)); }
+DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, i32   b) { return (a = DqnV2_Scalei  (a, b)); }
+DQN_FILE_SCOPE inline DqnV2 &operator-=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Sub     (a, b)); }
+DQN_FILE_SCOPE inline DqnV2 &operator+=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Add     (a, b)); }
+DQN_FILE_SCOPE inline bool   operator==(DqnV2  a, DqnV2 b) { return      DqnV2_Equals  (a, b);  }
+
+typedef union DqnV2i {
+	struct { i32 x, y; };
+	struct { i32 w, h; };
+	struct { i32 min, max; };
+	i32 e[2];
+} DqnV2i;
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_2i(i32 x, i32 y);
+DQN_FILE_SCOPE DqnV2i DqnV2i_2f(f32 x, f32 y); // Typecasts 2 floats to 2 integers
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_Add     (DqnV2i a, DqnV2i b);
+DQN_FILE_SCOPE DqnV2i DqnV2i_Sub     (DqnV2i a, DqnV2i b);
+DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei  (DqnV2i a, i32 b);
+DQN_FILE_SCOPE DqnV2i DqnV2i_Scalef  (DqnV2i a, f32 b);
+DQN_FILE_SCOPE DqnV2i DqnV2i_Hadamard(DqnV2i a, DqnV2i b);
+DQN_FILE_SCOPE f32    DqnV2i_Dot     (DqnV2i a, DqnV2i b);
+DQN_FILE_SCOPE bool   DqnV2i_Equals  (DqnV2i a, DqnV2i b);
+
+DQN_FILE_SCOPE inline DqnV2i  operator- (DqnV2i  a, DqnV2i b) { return      DqnV2i_Sub     (a, b);  }
+DQN_FILE_SCOPE inline DqnV2i  operator+ (DqnV2i  a, DqnV2i b) { return      DqnV2i_Add     (a, b);  }
+DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, DqnV2i b) { return      DqnV2i_Hadamard(a, b);  }
+DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, f32    b) { return      DqnV2i_Scalef  (a, b);  }
+DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, i32    b) { return      DqnV2i_Scalei  (a, b);  }
+DQN_FILE_SCOPE inline DqnV2i &operator*=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Hadamard(a, b)); }
+DQN_FILE_SCOPE inline DqnV2i &operator-=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Sub     (a, b)); }
+DQN_FILE_SCOPE inline DqnV2i &operator+=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Add     (a, b)); }
+DQN_FILE_SCOPE inline bool    operator==(DqnV2i  a, DqnV2i b) { return      DqnV2i_Equals  (a, b);  }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec3
@@ -293,11 +334,24 @@ DQN_FILE_SCOPE DqnV3 DqnV3_3f(f32 x, f32 y, f32 z);
 
 DQN_FILE_SCOPE DqnV3 DqnV3_Add     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Sub     (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE DqnV3 DqnV3_Scale   (DqnV3 a, f32 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Scalei  (DqnV3 a, i32 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Scalef  (DqnV3 a, f32 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Hadamard(DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE f32   DqnV3_Dot     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE bool  DqnV3_Equals  (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Cross   (DqnV3 a, DqnV3 b);
+
+DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);  }
+DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);  }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);  }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, b);  }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, i32   b) { return      DqnV3_Scalei  (a, b);  }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Hadamard(a, b)); }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, f32   b) { return (a = DqnV3_Scalef  (a, b)); }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, i32   b) { return (a = DqnV3_Scalei  (a, b)); }
+DQN_FILE_SCOPE inline DqnV3 &operator-=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Sub     (a, b)); }
+DQN_FILE_SCOPE inline DqnV3 &operator+=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Add     (a, b)); }
+DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_Equals  (a, b);  }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec4
@@ -316,10 +370,23 @@ DQN_FILE_SCOPE DqnV4 DqnV4_4f(f32 x, f32 y, f32 z, f32 w);
 
 DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE DqnV4 DqnV4_Sub     (DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE DqnV4 DqnV4_Scale   (DqnV4 a, f32 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Scalef  (DqnV4 a, f32 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Scalei  (DqnV4 a, i32 b);
 DQN_FILE_SCOPE DqnV4 DqnV4_Hadamard(DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE f32   DqnV4_Dot     (DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE bool  DqnV4_Equals  (DqnV4 a, DqnV4 b);
+
+DQN_FILE_SCOPE inline DqnV4  operator- (DqnV4  a, DqnV4 b) { return      DqnV4_Sub     (a, b);  }
+DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, DqnV4 b) { return      DqnV4_Add     (a, b);  }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, DqnV4 b) { return      DqnV4_Hadamard(a, b);  }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, f32   b) { return      DqnV4_Scalef  (a, b);  }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, i32   b) { return      DqnV4_Scalei  (a, b);  }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Hadamard(a, b)); }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, f32   b) { return (a = DqnV4_Scalef  (a, b)); }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, i32   b) { return (a = DqnV4_Scalei  (a, b)); }
+DQN_FILE_SCOPE inline DqnV4 &operator-=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Sub     (a, b)); }
+DQN_FILE_SCOPE inline DqnV4 &operator+=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Add     (a, b)); }
+DQN_FILE_SCOPE inline bool   operator==(DqnV4  a, DqnV4 b) { return      DqnV4_Equals  (a, b);  }
 
 ////////////////////////////////////////////////////////////////////////////////
 // 4D Matrix Mat4
@@ -399,7 +466,7 @@ DQN_FILE_SCOPE i32     Dqn_I32ToWStr(i32 value, wchar_t *buf, i32 bufSize);
 ////////////////////////////////////////////////////////////////////////////////
 // Win32 Specific
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 // Out is a pointer to the buffer to receive the characters.
 // outLen is the length/capacity of the out buffer
 DQN_FILE_SCOPE bool DqnWin32_UTF8ToWChar (const char *const in, wchar_t *const out, const i32 outLen);
@@ -409,7 +476,7 @@ DQN_FILE_SCOPE void DqnWin32_GetClientDim    (const HWND window, LONG *width, LO
 DQN_FILE_SCOPE void DqnWin32_GetRectDim      (RECT rect, LONG *width, LONG *height);
 DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix);
 DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *const errorPrefix);
-#endif /* DQN_WIN32 */
+#endif /* DQN_WIN32_IMPLEMENTATION */
 
 ////////////////////////////////////////////////////////////////////////////////
 // File Operations
@@ -1060,8 +1127,9 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 // DQN_IMPLEMENTATION
 //
 ////////////////////////////////////////////////////////////////////////////////
-#include "math.h"   // TODO(doyle): For trigonometry functions (for now)
-#include "stdlib.h" // For calloc, malloc, free
+#include <math.h>   // TODO(doyle): For trigonometry functions (for now)
+#include <stdlib.h> // For calloc, malloc, free
+#include <string.h> // For memset
 
 // NOTE: STB_SPRINTF modified to be included when DQN_IMPLEMENTATION defined
 // #define STB_SPRINTF_IMPLEMENTATION
@@ -1089,8 +1157,7 @@ FILE_SCOPE void *Dqn_MemAllocInternal(size_t size, bool zeroClear)
 	return result;
 }
 
-FILE_SCOPE void Dqn_MemClearInternal(void *memory, u8 clearValue,
-                                        size_t size)
+FILE_SCOPE void Dqn_MemClearInternal(void *memory, u8 clearValue, size_t size)
 {
 	if (memory) memset(memory, clearValue, size);
 }
@@ -1173,7 +1240,16 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Sub(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 DqnV2_Scale(DqnV2 a, f32 b)
+DQN_FILE_SCOPE DqnV2 DqnV2_Scalei(DqnV2 a, i32 b)
+{
+	DqnV2 result = {};
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b;
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2 DqnV2_Scalef(DqnV2 a, f32 b)
 {
 	DqnV2 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1234,7 +1310,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Normalise(DqnV2 a)
 {
 	f32 magnitude = DqnV2_Length(DqnV2_2f(0, 0), a);
 	DqnV2 result  = DqnV2_2f(a.x, a.y);
-	result        = DqnV2_Scale(a, 1 / magnitude);
+	result        = DqnV2_Scalef(a, 1 / magnitude);
 	return result;
 }
 
@@ -1282,6 +1358,89 @@ DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio)
 	return result;
 }
 
+DQN_FILE_SCOPE DqnV2i DqnV2i_2i(i32 x, i32 y)
+{
+	DqnV2i result = {};
+	result.x      = x;
+	result.y      = y;
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_2f(f32 x, f32 y)
+{
+	DqnV2i result = DqnV2i_2i((i32)x, (i32)y);
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_Add(DqnV2i a, DqnV2i b)
+{
+	DqnV2i result = {};
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] + b.e[i];
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_Sub(DqnV2i a, DqnV2i b)
+{
+	DqnV2i result = {};
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] - b.e[i];
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_Scalef(DqnV2i a, f32 b)
+{
+	DqnV2i result = {};
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result.e[i] = (i32)(a.e[i] * b);
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei(DqnV2i a, i32 b)
+{
+	DqnV2i result = {};
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b;
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_Hadamard(DqnV2i a, DqnV2i b)
+{
+	DqnV2i result = {};
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b.e[i];
+
+	return result;
+}
+
+DQN_FILE_SCOPE f32 DqnV2i_Dot(DqnV2i a, DqnV2i b)
+{
+	/*
+	   DOT PRODUCT
+	   Two vectors with dot product equals |a||b|cos(theta)
+	   |a|   |d|
+	   |b| . |e| = (ad + be + cf)
+	   |c|   |f|
+	 */
+	f32 result = 0;
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result += (a.e[i] * b.e[i]);
+
+	return result;
+}
+
+DQN_FILE_SCOPE bool DqnV2i_Equals(DqnV2i a, DqnV2i b)
+{
+	bool result = true;
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		if (a.e[i] != b.e[i]) result = false;
+	return result;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Vec3
 ////////////////////////////////////////////////////////////////////////////////
@@ -1318,7 +1477,16 @@ DQN_FILE_SCOPE DqnV3 DqnV3_Sub(DqnV3 a, DqnV3 b)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV3 DqnV3_Scale(DqnV3 a, f32 b)
+DQN_FILE_SCOPE DqnV3 DqnV3_Scalei(DqnV3 a, i32 b)
+{
+	DqnV3 result = {};
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b;
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV3 DqnV3_Scalef(DqnV3 a, f32 b)
 {
 	DqnV3 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1409,7 +1577,16 @@ DQN_FILE_SCOPE DqnV4 DqnV4_Sub(DqnV4 a, DqnV4 b)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV4 DqnV4_Scale(DqnV4 a, f32 b)
+DQN_FILE_SCOPE DqnV4 DqnV4_Scalei(DqnV4 a, i32 b)
+{
+	DqnV4 result = {};
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+		result.e[i] = a.e[i] * b;
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV4 DqnV4_Scalef(DqnV4 a, f32 b)
 {
 	DqnV4 result = {};
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
@@ -1583,7 +1760,7 @@ DQN_FILE_SCOPE DqnV2 DqnRect_GetCentre(DqnRect rect)
 {
 	f32 sumX  = rect.min.x + rect.max.x;
 	f32 sumY  = rect.min.y + rect.max.y;
-	DqnV2 result = DqnV2_Scale(DqnV2_2f(sumX, sumY), 0.5f);
+	DqnV2 result = DqnV2_Scalef(DqnV2_2f(sumX, sumY), 0.5f);
 	return result;
 }
 
@@ -2141,8 +2318,7 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 ////////////////////////////////////////////////////////////////////////////////
 // File Operations
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef DQN_WIN32
-
+#ifdef DQN_WIN32_IMPLEMENTATION
 DQN_FILE_SCOPE bool DqnWin32_UTF8ToWChar(const char *const in,
                                          wchar_t *const out, const i32 outLen)
 {
@@ -2209,7 +2385,7 @@ DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *con
 	dqn_sprintf(formattedError, "%s: %s", errorPrefix, errorMsg);
 	DQN_WIN32_ERROR_BOX(formattedError, NULL);
 }
-#endif
+#endif // DQN_WIN32_PLATFROM
 
 FILE_SCOPE bool DqnFile_OpenInternal(const wchar_t *const path,
                                      DqnFile *const file,
@@ -2218,7 +2394,7 @@ FILE_SCOPE bool DqnFile_OpenInternal(const wchar_t *const path,
 {
 	if (!file || !path) return false;
 
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 	DWORD win32Permission = 0;
 	if (permissionFlags & dqnfilepermissionflag_all)
 	{
@@ -2259,12 +2435,11 @@ FILE_SCOPE bool DqnFile_OpenInternal(const wchar_t *const path,
 	file->handle          = handle;
 	file->size            = (size_t)size.QuadPart;
 	file->permissionFlags = permissionFlags;
-
+	return true;
 #else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return false;
 #endif
-
-	return true;
 }
 
 DQN_FILE_SCOPE
@@ -2272,11 +2447,7 @@ bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file,
                    const u32 permissionFlags, const enum DqnFileAction action)
 {
 	if (!file || !path) return false;
-#ifdef DQN_WIN32
 	return DqnFile_OpenInternal(path, file, permissionFlags, action);
-#else
-	return false;
-#endif
 }
 
 DQN_FILE_SCOPE
@@ -2285,11 +2456,12 @@ bool DqnFile_Open(const char *const path, DqnFile *const file,
 {
 	if (!file || !path) return false;
 
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 	wchar_t widePath[MAX_PATH] = {};
 	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
 	return DqnFile_OpenInternal(widePath, file, permissionFlags, action);
 #else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return false;
 #endif
 }
@@ -2298,7 +2470,7 @@ DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
                                    const size_t numBytesToRead)
 {
 	size_t numBytesRead = 0;
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 	if (file.handle && buffer)
 	{
 		DWORD bytesToRead = (DWORD)numBytesToRead;
@@ -2316,7 +2488,7 @@ DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
 		}
 
 	}
-#endif
+#endif // DQN_WIN32_IMPLEMENTATION
 	return numBytesRead;
 }
 
@@ -2326,14 +2498,11 @@ DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
                                     const size_t fileOffset)
 {
 	size_t numBytesWritten = 0;
-
 	// TODO(doyle): Implement when it's needed
 	DQN_ASSERT(fileOffset == 0);
-
 	if (!file || !buffer) return numBytesToWrite;
 
-
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 	DWORD bytesToWrite = (DWORD)numBytesToWrite;
 	DWORD bytesWritten;
 	BOOL result =
@@ -2346,6 +2515,8 @@ DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
 		DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
 	}
 
+#else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 #endif
 
 	return numBytesWritten;
@@ -2354,7 +2525,7 @@ DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
 
 DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
 {
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 	if (file && file->handle)
 	{
 		CloseHandle(file->handle);
@@ -2362,13 +2533,15 @@ DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
 		file->size            = 0;
 		file->permissionFlags = 0;
 	}
+#else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 #endif
 }
 
 DQN_FILE_SCOPE char **DqnDir_Read(char *dir, u32 *numFiles)
 {
 	if (!dir) return NULL;
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 
 	u32 currNumFiles = 0;
 	wchar_t wideDir[MAX_PATH] = {};
@@ -2481,7 +2654,7 @@ DQN_FILE_SCOPE void DqnDir_ReadFree(char **fileList, u32 numFiles)
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 FILE_SCOPE f64 DqnWin32_QueryPerfCounterTimeInSInternal()
 {
 	LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {};
@@ -2503,7 +2676,7 @@ FILE_SCOPE f64 DqnWin32_QueryPerfCounterTimeInSInternal()
 
 f64 DqnTime_NowInS()
 {
-#ifdef DQN_WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 	return DqnWin32_QueryPerfCounterTimeInSInternal();
 #else
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
@@ -2542,14 +2715,18 @@ FILE_SCOPE u64 DqnRnd_Murmur3Avalanche64Internal(u64 h)
 
 FILE_SCOPE u32 DqnRnd_MakeSeedInternal()
 {
-#ifdef _WIN32
+#ifdef DQN_WIN32_IMPLEMENTATION
 	__int64 numClockCycles = __rdtsc();
 	return (u32)numClockCycles;
 #elif __ANDROID__
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	return 0;
 #elif __linux__
 	unsigned long long numClockCycles = rdtsc();
 	return (u32)numClockCycles;
+#else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	return 0;
 #endif
 }
 
@@ -4395,4 +4572,3 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 }
 
 #endif /* DQN_IMPLEMENTATION */
-

@@ -47,6 +47,7 @@ REM opt:ref, try to remove functions from libs that are referenced at all
 set LinkFlags=-incremental:no -opt:ref
 
 cl %CompileFlags% %CompileEntryPoint% %IncludeFlags% /link %LinkLibraries% %LinkFlags% /nologo /OUT:"%ProjectName%.exe"
+REM cl /P /c %CompileFlags% %CompileEntryPoint%
 
 popd
 
