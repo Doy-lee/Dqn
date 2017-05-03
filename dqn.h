@@ -70,6 +70,7 @@ typedef float  f32;
 // DArray - Dynamic Array
 ////////////////////////////////////////////////////////////////////////////////
 // REMINDER: Dynamic Array can be used as a stack. Don't need to create one.
+// TODO(doyle): Custom allocator
 #if 1
 template <typename T>
 struct DqnArray
@@ -105,8 +106,7 @@ bool DqnArray_Init(DqnArray<T> *array, size_t capacity)
 		if (!DqnArray_Free(array)) return false;
 	}
 
-	array->data =
-	    (T *)Dqn_MemAllocInternal((size_t)capacity * sizeof(T), true);
+	array->data = (T *)Dqn_MemAllocInternal((size_t)capacity * sizeof(T), true);
 	if (!array->data) return false;
 
 	array->count    = 0;
@@ -123,8 +123,8 @@ bool DqnArray_Grow(DqnArray<T> *array)
 	size_t newCapacity      = (size_t)(array->capacity * GROWTH_FACTOR);
 	if (newCapacity == array->capacity) newCapacity++;
 
-	T *newMem = (T *)Dqn_MemReallocInternal(
-	    array->data, (size_t)(newCapacity * sizeof(T)));
+	T *newMem = (T *)Dqn_MemReallocInternal(array->data,
+	                                        (size_t)(newCapacity * sizeof(T)));
 	if (newMem)
 	{
 		array->data     = newMem;
@@ -154,13 +154,13 @@ T *DqnArray_Push(DqnArray<T> *array, T item)
 }
 
 template <typename T>
-T *DqnArray_Pop(DqnArray<T> *array)
+void DqnArray_Pop(DqnArray<T> *array)
 {
-	if (!array) return NULL;
-	if (array->count == 0) return NULL;
+	if (!array) return;
+	if (array->count == 0) return;
+	array->count--;
 
-	T *result = &array->data[--array->count];
-	return result;
+	return;
 }
 
 template <typename T>
@@ -441,9 +441,9 @@ DQN_FILE_SCOPE i32   Dqn_strlenDelimitWith(const char *a, const char delimiter);
 DQN_FILE_SCOPE char *Dqn_strncpy          (char *dest, const char *src, i32 numChars);
 
 #define DQN_I32_TO_STR_MAX_BUF_SIZE 11
-DQN_FILE_SCOPE bool  Dqn_StrReverse      (char *buf, const i32 bufSize);
-DQN_FILE_SCOPE bool  Dqn_StrHasSubstring(const char *const a, const i32 lenA,
-                                           const char *const b, const i32 lenB);
+DQN_FILE_SCOPE bool Dqn_StrReverse           (char *buf, const i32 bufSize);
+DQN_FILE_SCOPE i32  Dqn_StrFindFirstOccurence(const char *const src, const i32 srcLen, const char *const find, const i32 findLen);
+DQN_FILE_SCOPE bool Dqn_StrHasSubstring      (const char *const src, const i32 srcLen, const char *const find, const i32 findLen);
 
 DQN_FILE_SCOPE i32   Dqn_StrToI32(const char *const buf, const i32 bufSize);
 // Return the len of the derived string
@@ -515,29 +515,20 @@ typedef struct DqnFile
 } DqnFile;
 
 // Open a handle to the file
-DQN_FILE_SCOPE bool DqnFile_Open(const char *const path, DqnFile *const file,
-                                  const u32 permissionFlags,
-                                  const enum DqnFileAction action);
-DQN_FILE_SCOPE bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file,
-                                       const u32 permissionFlags,
-                                       const enum DqnFileAction action);
-
+DQN_FILE_SCOPE bool   DqnFile_Open (const char *const path, DqnFile *const file, const u32 permissionFlags, const enum DqnFileAction action);
+DQN_FILE_SCOPE bool   DqnFile_OpenW(const wchar_t *const path, DqnFile *const file, const u32 permissionFlags, const enum DqnFileAction action);
 // File offset is the byte offset to starting writing from
-DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
-                                  const u8 *const buffer,
-                                  const size_t numBytesToWrite,
-                                  const size_t fileOffset);
+DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file, const u8 *const buffer, const size_t numBytesToWrite, const size_t fileOffset);
 
 // Return the number of bytes read
-DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
-                                    const size_t numBytesToRead);
-DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file);
+DQN_FILE_SCOPE size_t DqnFile_Read (const DqnFile file, const u8 *const buffer, const size_t numBytesToRead);
+DQN_FILE_SCOPE void   DqnFile_Close(DqnFile *const file);
 
 // Return an array of strings of the files in the directory in UTF-8. numFiles
 // returns the number of strings read.
 // This is allocated using malloc and MUST BE FREED! Can be done manually or
 // using the helper function.
-DQN_FILE_SCOPE char **DqnDir_Read     (char *dir, u32 *numFiles);
+DQN_FILE_SCOPE char **DqnDir_Read    (char *dir, u32 *numFiles);
 DQN_FILE_SCOPE void   DqnDir_ReadFree(char **fileList, u32 numFiles);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1027,7 +1018,7 @@ zero-terminated. If `length` is zero, the length is determined automatically,
 #ifndef STB_SPRINTF_H_INCLUDE
 #define STB_SPRINTF_H_INCLUDE
 
-#define STB_SPRINTF_DECORATE(name) dqn_##name
+#define STB_SPRINTF_DECORATE(name) Dqn_##name
 
 ////////////////////////////////////////////////////////////////////////////////
 // STB_Sprintf renamed to Dqn_Sprintf
@@ -1358,7 +1349,7 @@ DQN_FILE_SCOPE bool DqnV2_Overlaps(DqnV2 a, DqnV2 b)
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(DqnV2 a)
 {
-	DqnV2 result = {a.y, -a.x};
+	DqnV2 result = DqnV2_2f(a.y, -a.x);
 	return result;
 }
 
@@ -1908,53 +1899,32 @@ DQN_FILE_SCOPE bool Dqn_StrReverse(char *buf, const i32 bufSize)
 	return true;
 }
 
-DQN_FILE_SCOPE bool Dqn_StrHasSubstring(const char *const a, const i32 lenA,
-                                          const char *const b, const i32 lenB)
+DQN_FILE_SCOPE i32 Dqn_StrFindFirstOccurence(const char *const src, const i32 srcLen,
+                                             const char *const find, const i32 findLen)
 {
-	if (!a || !b) return false;
-	if (lenA == 0 || lenB == 0) return false;
+	if (!src || !find)               return -1;
+	if (srcLen == 0 || findLen == 0) return -1;
+	if (srcLen < findLen)            return -1;
 
-	const char *longStr, *shortStr;
-	i32 longLen, shortLen;
-	if (lenA > lenB)
+	for (i32 indexIntoSrc = 0; indexIntoSrc < srcLen; indexIntoSrc++)
 	{
-		longStr  = a;
-		longLen  = lenA;
-
-		shortStr = b;
-		shortLen = lenB;
-	}
-	else
-	{
-		longStr  = b;
-		longLen  = lenB;
-
-		shortStr = a;
-		shortLen = lenA;
-	}
-
-	bool matchedSubstr = false;
-	for (i32 indexIntoLong = 0; indexIntoLong < longLen && !matchedSubstr;
-	     indexIntoLong++)
-	{
-		// NOTE: As we scan through, if the longer string we index into becomes
+		// NOTE: As we scan through, if the src string we index into becomes
 		// shorter than the substring we're checking then the substring is not
-		// contained in the long string.
-		i32 remainingLenInLongStr = longLen - indexIntoLong;
-		if (remainingLenInLongStr < shortLen) break;
+		// contained in the src string.
+		i32 remainingLenInSrcStr = srcLen - indexIntoSrc;
+		if (remainingLenInSrcStr < findLen) break;
 
-		const char *longSubstr = &longStr[indexIntoLong];
+		const char *srcSubStr = &src[indexIntoSrc];
 		i32 index = 0;
 		for (;;)
 		{
-			if (DqnChar_ToLower(longSubstr[index]) ==
-			    DqnChar_ToLower(shortStr[index]))
+			if (DqnChar_ToLower(srcSubStr[index]) ==
+			    DqnChar_ToLower(find[index]))
 			{
 				index++;
-				if (index >= shortLen || !shortStr[index])
+				if (index >= findLen || !find[index])
 				{
-					matchedSubstr = true;
-					break;
+					return indexIntoSrc;
 				}
 			}
 			else
@@ -1964,7 +1934,18 @@ DQN_FILE_SCOPE bool Dqn_StrHasSubstring(const char *const a, const i32 lenA,
 		}
 	}
 
-	return matchedSubstr;
+	// NOTE(doyle): We have early exit, if we reach here, then the substring was
+	// not found.
+	return -1;
+}
+
+DQN_FILE_SCOPE bool Dqn_StrHasSubstring(const char *const src, const i32 srcLen,
+                                        const char *const find, const i32 findLen)
+{
+	if (Dqn_StrFindFirstOccurence(src, srcLen, find, findLen) == -1)
+		return false;
+
+	return true;
 }
 
 DQN_FILE_SCOPE i32 Dqn_StrToI32(const char *const buf, const i32 bufSize)
