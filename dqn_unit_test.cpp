@@ -226,7 +226,7 @@ void StringsTest()
 		    DQN_ASSERT(Dqn_StrHasSubstring(a, lenA, b, lenB) == true);
 		    DQN_ASSERT(Dqn_StrHasSubstring(a, lenA, "iro",
 		                                     Dqn_strlen("iro")) == false);
-		    DQN_ASSERT(Dqn_StrHasSubstring(b, lenB, a, lenA) == true);
+		    DQN_ASSERT(Dqn_StrHasSubstring(b, lenB, a, lenA) == false);
 		    DQN_ASSERT(Dqn_StrHasSubstring("iro", Dqn_strlen("iro"), a,
 		                                     lenA) == false);
 		    DQN_ASSERT(Dqn_StrHasSubstring("", 0, "iro", 4) == false);
