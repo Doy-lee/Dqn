@@ -668,177 +668,262 @@ void VecTest()
 	printf("VecTest(): Completed successfully\n");
 }
 
-void ArrayTest()
+void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 {
 	{
-		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(DqnArray_Init(&array, 1));
-		DQN_ASSERT(array.capacity == 1);
-		DQN_ASSERT(array.count == 0);
+		DQN_ASSERT(DqnArray_Init(array, 1, memAPI));
+		DQN_ASSERT(array->capacity == 1);
+		DQN_ASSERT(array->count == 0);
 
 		// Test basic insert
 		{
 			DqnV2 va = DqnV2_2f(5, 10);
-			DQN_ASSERT(DqnArray_Push(&array, va));
+			DQN_ASSERT(DqnArray_Push(array, va));
 
-			DqnV2 vb = array.data[0];
+			DqnV2 vb = array->data[0];
 			DQN_ASSERT(DqnV2_Equals(va, vb));
 
-			DQN_ASSERT(array.capacity == 1);
-			DQN_ASSERT(array.count == 1);
+			DQN_ASSERT(array->capacity == 1);
+			DQN_ASSERT(array->count == 1);
 		}
 
 		// Test array resizing and freeing
 		{
 			DqnV2 va = DqnV2_2f(10, 15);
-			DQN_ASSERT(DqnArray_Push(&array, va));
+			DQN_ASSERT(DqnArray_Push(array, va));
 
-			DqnV2 vb = array.data[0];
+			DqnV2 vb = array->data[0];
 			DQN_ASSERT(DqnV2_Equals(va, vb) == false);
 
-			vb = array.data[1];
+			vb = array->data[1];
 			DQN_ASSERT(DqnV2_Equals(va, vb) == true);
 
-			DQN_ASSERT(array.capacity == 2);
-			DQN_ASSERT(array.count == 2);
+			DQN_ASSERT(array->capacity == 2);
+			DQN_ASSERT(array->count == 2);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 3);
-			DQN_ASSERT(array.count == 3);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 3);
+			DQN_ASSERT(array->count == 3);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 4);
-			DQN_ASSERT(array.count == 4);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 4);
+			DQN_ASSERT(array->count == 4);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 5);
-			DQN_ASSERT(array.count == 5);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 5);
+			DQN_ASSERT(array->count == 5);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 6);
-			DQN_ASSERT(array.count == 6);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 6);
+			DQN_ASSERT(array->count == 6);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 7);
-			DQN_ASSERT(array.count == 7);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 7);
+			DQN_ASSERT(array->count == 7);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 8);
-			DQN_ASSERT(array.count == 8);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 8);
+			DQN_ASSERT(array->count == 8);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 9);
-			DQN_ASSERT(array.count == 9);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 9);
+			DQN_ASSERT(array->count == 9);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 10);
-			DQN_ASSERT(array.count == 10);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 10);
+			DQN_ASSERT(array->count == 10);
 
-			DQN_ASSERT(DqnArray_Push(&array, va));
-			DQN_ASSERT(array.capacity == 12);
-			DQN_ASSERT(array.count == 11);
+			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array->capacity == 12);
+			DQN_ASSERT(array->count == 11);
 
 			DqnV2 vc = DqnV2_2f(90, 100);
-			DQN_ASSERT(DqnArray_Push(&array, vc));
-			DQN_ASSERT(array.capacity == 12);
-			DQN_ASSERT(array.count == 12);
-			DQN_ASSERT(DqnV2_Equals(vc, array.data[11]));
-
-			DQN_ASSERT(DqnArray_Free(&array) == true);
+			DQN_ASSERT(DqnArray_Push(array, vc));
+			DQN_ASSERT(array->capacity == 12);
+			DQN_ASSERT(array->count == 12);
+			DQN_ASSERT(DqnV2_Equals(vc, array->data[11]));
 		}
 	}
+	DQN_ASSERT(DqnArray_Free(array));
 
 	{
-		DqnArray<f32> array = {};
-		DQN_ASSERT(DqnArray_Init(&array, 1));
+		DQN_ASSERT(DqnArray_Init(array, 1, memAPI));
+		DQN_ASSERT(array->capacity == 1);
+		DQN_ASSERT(array->count == 0);
+	}
+	DQN_ASSERT(DqnArray_Free(array));
+
+	{
+		DqnV2 a = DqnV2_2f(1, 2);
+		DqnV2 b = DqnV2_2f(3, 4);
+		DqnV2 c = DqnV2_2f(5, 6);
+		DqnV2 d = DqnV2_2f(7, 8);
+
+		DQN_ASSERT(DqnArray_Init(array, 16, memAPI));
+		DQN_ASSERT(DqnArray_Remove(array, 0) == false);
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 0);
+
+		DQN_ASSERT(DqnArray_Clear(array));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 0);
+
+		DQN_ASSERT(DqnArray_Push(array, a));
+		DQN_ASSERT(DqnArray_Push(array, b));
+		DQN_ASSERT(DqnArray_Push(array, c));
+		DQN_ASSERT(DqnArray_Push(array, d));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 4);
+
+		DQN_ASSERT(DqnArray_Remove(array, 0));
+		DQN_ASSERT(DqnV2_Equals(array->data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array->data[1], b));
+		DQN_ASSERT(DqnV2_Equals(array->data[2], c));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 3);
+
+		DQN_ASSERT(DqnArray_Remove(array, 2));
+		DQN_ASSERT(DqnV2_Equals(array->data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array->data[1], b));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 2);
+
+		DQN_ASSERT(DqnArray_Remove(array, 100) == false);
+		DQN_ASSERT(DqnV2_Equals(array->data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array->data[1], b));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 2);
+
+		DQN_ASSERT(DqnArray_Clear(array));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 0);
+
+	}
+	DQN_ASSERT(DqnArray_Free(array));
+
+	{
+		DqnV2 a = DqnV2_2f(1, 2);
+		DqnV2 b = DqnV2_2f(3, 4);
+		DqnV2 c = DqnV2_2f(5, 6);
+		DqnV2 d = DqnV2_2f(7, 8);
+
+		DQN_ASSERT(DqnArray_Init(array, 16, memAPI));
+
+		DQN_ASSERT(DqnArray_Push(array, a));
+		DQN_ASSERT(DqnArray_Push(array, b));
+		DQN_ASSERT(DqnArray_Push(array, c));
+		DQN_ASSERT(DqnArray_Push(array, d));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 4);
+
+		DqnArray_RemoveStable(array, 0);
+		DQN_ASSERT(DqnV2_Equals(array->data[0], b));
+		DQN_ASSERT(DqnV2_Equals(array->data[1], c));
+		DQN_ASSERT(DqnV2_Equals(array->data[2], d));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 3);
+
+		DqnArray_RemoveStable(array, 1);
+		DQN_ASSERT(DqnV2_Equals(array->data[0], b));
+		DQN_ASSERT(DqnV2_Equals(array->data[1], d));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 2);
+
+		DqnArray_RemoveStable(array, 1);
+		DQN_ASSERT(DqnV2_Equals(array->data[0], b));
+		DQN_ASSERT(array->capacity == 16);
+		DQN_ASSERT(array->count == 1);
+	}
+	DQN_ASSERT(DqnArray_Free(array));
+	printf("ArrayTestMemAPIInternal(): Completed successfully\n");
+
+}
+
+void ArrayTest()
+{
+	DqnArray<DqnV2> array = {};
+	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseCalloc());
+
+	DqnMemBuffer largeEnoughBuffer = {};
+	DqnMemBuffer_Init(&largeEnoughBuffer, DQN_MEGABYTE(1), false);
+	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseMemBuffer(&largeEnoughBuffer));
+	DqnMemBuffer_Free(&largeEnoughBuffer);
+
+	DqnMemBuffer smallBuffer = {};
+	DqnMemBuffer_Init(&smallBuffer, 8, false);
+	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseMemBuffer(&smallBuffer));
+	DqnMemBuffer_Free(&smallBuffer);
+
+	// TODO(doyle): Doesn't work for now since after freeing a fixed size
+	// buffer, it becomes useless as the not set Is_Expandable flag blocks any
+	// further allocations.
+#if 0
+	DqnMemBuffer largeFixedSizeBuffer = {};
+	DqnMemBuffer_InitWithFixedSize(&largeFixedSizeBuffer, DQN_MEGABYTE(1), false);
+	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseMemBuffer(&largeFixedSizeBuffer));
+	DqnMemBuffer_Free(&largeFixedSizeBuffer);
+#endif
+
+	{
+		DqnMemBuffer smallFixedSizeBuffer = {};
+		DqnMemBuffer_InitWithFixedSize(&smallFixedSizeBuffer, 8, false);
+
+		DQN_ASSERT(DqnArray_Init(&array, 1, DqnMemAPI_DefaultUseMemBuffer(&smallFixedSizeBuffer)));
 		DQN_ASSERT(array.capacity == 1);
 		DQN_ASSERT(array.count == 0);
-		DqnArray_Free(&array);
-	}
 
-	{
+		// Fill the only slot in the array
 		DqnV2 a = DqnV2_2f(1, 2);
-		DqnV2 b = DqnV2_2f(3, 4);
-		DqnV2 c = DqnV2_2f(5, 6);
-		DqnV2 d = DqnV2_2f(7, 8);
-
-		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(DqnArray_Init(&array, 16));
-		DQN_ASSERT(DqnArray_Remove(&array, 0) == false);
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 0);
-
-		DQN_ASSERT(DqnArray_Clear(&array));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 0);
-
 		DQN_ASSERT(DqnArray_Push(&array, a));
-		DQN_ASSERT(DqnArray_Push(&array, b));
-		DQN_ASSERT(DqnArray_Push(&array, c));
-		DQN_ASSERT(DqnArray_Push(&array, d));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 4);
-
-		DQN_ASSERT(DqnArray_Remove(&array, 0));
-		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
-		DQN_ASSERT(DqnV2_Equals(array.data[2], c));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 3);
-
-		DQN_ASSERT(DqnArray_Remove(&array, 2));
-		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 2);
-
-		DQN_ASSERT(DqnArray_Remove(&array, 100) == false);
-		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 2);
-
-		DQN_ASSERT(DqnArray_Clear(&array));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 0);
-
-		DqnArray_Free(&array);
-	}
-
-	{
-		DqnV2 a = DqnV2_2f(1, 2);
-		DqnV2 b = DqnV2_2f(3, 4);
-		DqnV2 c = DqnV2_2f(5, 6);
-		DqnV2 d = DqnV2_2f(7, 8);
-
-		DqnArray<DqnV2> array = {};
-		DQN_ASSERT(DqnArray_Init(&array, 16));
-
-		DQN_ASSERT(DqnArray_Push(&array, a));
-		DQN_ASSERT(DqnArray_Push(&array, b));
-		DQN_ASSERT(DqnArray_Push(&array, c));
-		DQN_ASSERT(DqnArray_Push(&array, d));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 4);
-
-		DqnArray_RemoveStable(&array, 0);
-		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], c));
-		DQN_ASSERT(DqnV2_Equals(array.data[2], d));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 3);
-
-		DqnArray_RemoveStable(&array, 1);
-		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], d));
-		DQN_ASSERT(array.capacity == 16);
-		DQN_ASSERT(array.count == 2);
-
-		DqnArray_RemoveStable(&array, 1);
-		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
-		DQN_ASSERT(array.capacity == 16);
 		DQN_ASSERT(array.count == 1);
-		DqnArray_Free(&array);
+
+		// Try push another, but it should fail since it's a fixed size buffer.
+		// The realloc that occurs in push should also fail.
+		DQN_ASSERT(!DqnArray_Push(&array, a));
+		DQN_ASSERT(array.count == 1);
+		DQN_ASSERT(smallFixedSizeBuffer.block->prevBlock == NULL);
+		DQN_ASSERT(smallFixedSizeBuffer.block->used == 8);
+		DQN_ASSERT(smallFixedSizeBuffer.block->size == 8);
+
+		DQN_ASSERT(DqnArray_Free(&array));
+		DqnMemBuffer_Free(&smallFixedSizeBuffer);
+	}
+
+#if 0
+	{
+		u8 largeFixedMem[DQN_KILOBYTE(1)] = {};
+		DqnMemBuffer largeFixedMemBuffer  = {};
+		DqnMemBuffer_InitWithFixedMem(&largeFixedMemBuffer, largeFixedMem,
+		                              DQN_ARRAY_COUNT(largeFixedMem));
+		ArrayTestMemAPIInternal(
+		    &array, DqnMemAPI_DefaultUseMemBuffer(&largeFixedMemBuffer));
+	}
+#endif
+
+	{
+		u8 smallFixedMem[sizeof(DqnMemBufferBlock) + 8] = {};
+		DqnMemBuffer smallFixedMemBuffer = {};
+		DqnMemBuffer_InitWithFixedMem(&smallFixedMemBuffer, smallFixedMem,
+		                              DQN_ARRAY_COUNT(smallFixedMem));
+
+		DQN_ASSERT(DqnArray_Init(&array, 1, DqnMemAPI_DefaultUseMemBuffer(&smallFixedMemBuffer)));
+		DQN_ASSERT(array.capacity == 1);
+		DQN_ASSERT(array.count == 0);
+
+		// Fill the only slot in the array
+		DqnV2 a = DqnV2_2f(1, 2);
+		DQN_ASSERT(DqnArray_Push(&array, a));
+		DQN_ASSERT(array.count == 1);
+
+		// Try push another, but it should fail since it's a fixed mem buffer.
+		// The realloc that occurs in push should also fail.
+		DQN_ASSERT(!DqnArray_Push(&array, a));
+		DQN_ASSERT(array.count == 1);
+		DQN_ASSERT(smallFixedMemBuffer.block->prevBlock == NULL);
+		DQN_ASSERT(smallFixedMemBuffer.block->used == 8);
+		DQN_ASSERT(smallFixedMemBuffer.block->size == 8);
+
+		DQN_ASSERT(DqnArray_Free(&array));
 	}
 
 	printf("ArrayTest(): Completed successfully\n");
@@ -895,12 +980,12 @@ void FileTest()
 
 void MemBufferTest()
 {
-	// Expandable memory buffer
+	// Test over allocation, alignments, temp regions
 	{
 		size_t allocSize    = DQN_KILOBYTE(1);
 		DqnMemBuffer buffer = {};
 		const u32 ALIGNMENT = 4;
-		DqnMemBuffer_Init(&buffer, allocSize, ALIGNMENT);
+		DqnMemBuffer_Init(&buffer, allocSize, false, ALIGNMENT);
 		DQN_ASSERT(buffer.block && buffer.block->memory);
 		DQN_ASSERT(buffer.block->size == allocSize);
 		DQN_ASSERT(buffer.block->used == 0);
@@ -931,10 +1016,8 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.block->size == DQN_KILOBYTE(2));
 
 		// Since we alignment the pointers we return they can be within 0-3
-		// bytes of
-		// what we expect and since this is in a new block as well used will
-		// reflect
-		// just this allocation.
+		// bytes of what we expect and since this is in a new block as well used
+		// will reflect just this allocation.
 		DQN_ASSERT(buffer.block->used >= sizeB + 0 &&
 		           buffer.block->used <= sizeB + 3);
 		DQN_ASSERT(resultB);
@@ -994,7 +1077,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		// Release the last linked buffer from the push buffer
-		DqnMemBuffer_FreeLastBuffer(&buffer);
+		DqnMemBuffer_FreeLastBlock(&buffer);
 
 		// Which should return back to the 1st allocation
 		DQN_ASSERT(buffer.block == blockA);
@@ -1004,7 +1087,7 @@ void MemBufferTest()
 		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 
 		// Free once more to release buffer A memory
-		DqnMemBuffer_FreeLastBuffer(&buffer);
+		DqnMemBuffer_FreeLastBlock(&buffer);
 		DQN_ASSERT(!buffer.block);
 		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 		DQN_ASSERT(buffer.tempBufferCount == 0);
@@ -1028,7 +1111,7 @@ void MemBufferTest()
 
 		// Check free does nothing
 		DqnMemBuffer_Free(&buffer);
-		DqnMemBuffer_FreeLastBuffer(&buffer);
+		DqnMemBuffer_FreeLastBlock(&buffer);
 		DQN_ASSERT(buffer.block && buffer.block->memory);
 		DQN_ASSERT(buffer.block->size ==
 		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemBufferBlock));
@@ -1042,7 +1125,7 @@ void MemBufferTest()
 		size_t allocSize    = DQN_KILOBYTE(1);
 		DqnMemBuffer buffer = {};
 		const u32 ALIGNMENT = 4;
-		DqnMemBuffer_InitWithFixedSize(&buffer, allocSize, ALIGNMENT);
+		DqnMemBuffer_InitWithFixedSize(&buffer, allocSize, false, ALIGNMENT);
 		DQN_ASSERT(buffer.block && buffer.block->memory);
 		DQN_ASSERT(buffer.block->size == allocSize);
 		DQN_ASSERT(buffer.block->used == 0);
@@ -1055,6 +1138,190 @@ void MemBufferTest()
 		DQN_ASSERT(!DqnMemBuffer_Allocate(&buffer, allocSize));
 
 		// Freeing should work
+		DqnMemBuffer_Free(&buffer);
+		DQN_ASSERT(!buffer.block);
+	}
+
+	// Test freeing/clear block and alignment
+	{
+		size_t firstBlockSize = DQN_KILOBYTE(1);
+		DqnMemBuffer buffer = {};
+		const u32 ALIGNMENT = 16;
+		DqnMemBuffer_Init(&buffer, firstBlockSize, false, ALIGNMENT);
+
+		DqnMemBufferBlock *firstBlock = buffer.block;
+		u8 *first                     = NULL;
+		{
+			u32 allocate40Bytes = 40;
+			u8 *data = (u8 *)DqnMemBuffer_Allocate(&buffer, allocate40Bytes);
+
+			// Test that the allocation got aligned to 16 byte boundary
+			DQN_ASSERT(data);
+			DQN_ASSERT(buffer.block->size == firstBlockSize);
+			DQN_ASSERT((size_t)data % ALIGNMENT == 0);
+
+			for (u32 i  = 0; i < allocate40Bytes; i++)
+				data[i] = 'a';
+
+			// Clear the block, but don't zero it out
+			DqnMemBuffer_ClearCurrBlock(&buffer, false);
+			for (u32 i = 0; i < allocate40Bytes; i++)
+				DQN_ASSERT(data[i] == 'a');
+
+			// Test clear reverted the use pointer
+			DQN_ASSERT(buffer.block->used == 0);
+			DQN_ASSERT(buffer.block->size == firstBlockSize);
+
+			// Reallocate the data
+			data = (u8 *)DqnMemBuffer_Allocate(&buffer, firstBlockSize);
+			DQN_ASSERT(buffer.block->size == firstBlockSize);
+			DQN_ASSERT((size_t)data % ALIGNMENT == 0);
+
+			// Fill with 'b's
+			for (u32 i  = 0; i < firstBlockSize; i++)
+				data[i] = 'b';
+
+			// Clear block and zero it out
+			DqnMemBuffer_ClearCurrBlock(&buffer, true);
+			for (u32 i = 0; i < firstBlockSize; i++)
+				DQN_ASSERT(data[i] == 0);
+
+			// General Check buffer struct contains the values we expect from
+			// initialisation
+			DQN_ASSERT(buffer.flags & DqnMemBufferFlag_IsExpandable);
+			DQN_ASSERT(buffer.tempBufferCount == 0);
+			DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+			DQN_ASSERT(buffer.block->size == firstBlockSize);
+
+			// Write out data to current block
+			data = (u8 *)DqnMemBuffer_Allocate(&buffer, firstBlockSize);
+			for (u32 i  = 0; i < firstBlockSize; i++)
+				data[i] = 'c';
+
+			first = data;
+		}
+
+		// Force it to allocate three new blocks and write out data to each
+		size_t secondBlockSize = DQN_KILOBYTE(2);
+		u8 *second = (u8 *)DqnMemBuffer_Allocate(&buffer, secondBlockSize);
+		DqnMemBufferBlock *secondBlock = buffer.block;
+		for (u32 i  = 0; i < secondBlockSize; i++)
+			second[i] = 'd';
+
+		size_t thirdBlockSize = DQN_KILOBYTE(3);
+		u8 *third = (u8 *)DqnMemBuffer_Allocate(&buffer, thirdBlockSize);
+		DqnMemBufferBlock *thirdBlock = buffer.block;
+		for (u32 i  = 0; i < thirdBlockSize; i++)
+			third[i] = 'e';
+
+		size_t fourthBlockSize = DQN_KILOBYTE(4);
+		u8 *fourth = (u8 *)DqnMemBuffer_Allocate(&buffer, fourthBlockSize);
+		DqnMemBufferBlock *fourthBlock = buffer.block;
+		for (u32 i  = 0; i < fourthBlockSize; i++)
+			fourth[i] = 'f';
+
+		DQN_ASSERT((firstBlock != secondBlock) && (secondBlock != thirdBlock) && (thirdBlock != fourthBlock));
+		DQN_ASSERT(firstBlock->prevBlock  == NULL);
+		DQN_ASSERT(secondBlock->prevBlock == firstBlock);
+		DQN_ASSERT(thirdBlock->prevBlock  == secondBlock);
+		DQN_ASSERT(fourthBlock->prevBlock == thirdBlock);
+
+		// NOTE: Making blocks manually is not really recommended ..
+		// Try and free an invalid block by mocking a fake block
+		u8 fakeBlockMem[DQN_KILOBYTE(3)] = {};
+		DqnMemBufferBlock fakeBlock   = {};
+		fakeBlock.memory              = fakeBlockMem;
+		fakeBlock.size                = DQN_ARRAY_COUNT(fakeBlockMem);
+		fakeBlock.used                = 0;
+		DQN_ASSERT(!DqnMemBuffer_FreeBlock(&buffer, &fakeBlock));
+
+		//Ensure that the actual blocks are still valid and freeing did nothing
+		DQN_ASSERT(firstBlock->size  == firstBlockSize);
+		DQN_ASSERT(secondBlock->size == secondBlockSize);
+		DQN_ASSERT(thirdBlock->size  == thirdBlockSize);
+		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
+
+		DQN_ASSERT(firstBlock->used  == firstBlockSize);
+		DQN_ASSERT(secondBlock->used == secondBlockSize);
+		DQN_ASSERT(thirdBlock->used  == thirdBlockSize);
+		DQN_ASSERT(fourthBlock->used == fourthBlockSize);
+
+		DQN_ASSERT((firstBlock != secondBlock) && (secondBlock != thirdBlock) && (thirdBlock != fourthBlock));
+		DQN_ASSERT(firstBlock->prevBlock  == NULL);
+		DQN_ASSERT(secondBlock->prevBlock == firstBlock);
+		DQN_ASSERT(thirdBlock->prevBlock  == secondBlock);
+		DQN_ASSERT(fourthBlock->prevBlock == thirdBlock);
+
+		for (u32 i  = 0; i < firstBlockSize; i++)
+			DQN_ASSERT(first[i] == 'c');
+
+		for (u32 i  = 0; i < secondBlockSize; i++)
+			DQN_ASSERT(second[i] == 'd');
+		
+		for (u32 i  = 0; i < thirdBlockSize; i++)
+			DQN_ASSERT(third[i] == 'e');
+
+		for (u32 i  = 0; i < fourthBlockSize; i++)
+			DQN_ASSERT(fourth[i] == 'f');
+
+		// Free the first block
+		DqnMemBuffer_FreeBlock(&buffer, firstBlock);
+
+		// Revalidate state
+		DQN_ASSERT(secondBlock->size == secondBlockSize);
+		DQN_ASSERT(thirdBlock->size  == thirdBlockSize);
+		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
+
+		DQN_ASSERT(secondBlock->used == secondBlockSize);
+		DQN_ASSERT(thirdBlock->used  == thirdBlockSize);
+		DQN_ASSERT(fourthBlock->used == fourthBlockSize);
+
+		DQN_ASSERT((secondBlock != thirdBlock) && (thirdBlock != fourthBlock));
+		DQN_ASSERT(secondBlock->prevBlock == NULL);
+		DQN_ASSERT(thirdBlock->prevBlock == secondBlock);
+		DQN_ASSERT(fourthBlock->prevBlock == thirdBlock);
+
+		for (u32 i  = 0; i < secondBlockSize; i++)
+			DQN_ASSERT(second[i] == 'd');
+		
+		for (u32 i  = 0; i < thirdBlockSize; i++)
+			DQN_ASSERT(third[i] == 'e');
+
+		for (u32 i  = 0; i < fourthBlockSize; i++)
+			DQN_ASSERT(fourth[i] == 'f');
+
+		// Free the third block
+		DqnMemBuffer_FreeBlock(&buffer, thirdBlock);
+
+		// Revalidate state
+		DQN_ASSERT(secondBlock->size == secondBlockSize);
+		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
+
+		DQN_ASSERT(secondBlock->used == secondBlockSize);
+		DQN_ASSERT(fourthBlock->used == fourthBlockSize);
+
+		DQN_ASSERT(secondBlock != fourthBlock);
+		DQN_ASSERT(secondBlock->prevBlock == NULL);
+		DQN_ASSERT(fourthBlock->prevBlock == secondBlock);
+
+		for (u32 i  = 0; i < secondBlockSize; i++)
+			DQN_ASSERT(second[i] == 'd');
+		
+		for (u32 i  = 0; i < fourthBlockSize; i++)
+			DQN_ASSERT(fourth[i] == 'f');
+
+		// Free the second block
+		DqnMemBuffer_FreeBlock(&buffer, secondBlock);
+
+		// Revalidate state
+		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
+		DQN_ASSERT(fourthBlock->used == fourthBlockSize);
+		DQN_ASSERT(fourthBlock->prevBlock == NULL);
+
+		for (u32 i  = 0; i < fourthBlockSize; i++)
+			DQN_ASSERT(fourth[i] == 'f');
+
+		// Free the buffer
 		DqnMemBuffer_Free(&buffer);
 		DQN_ASSERT(!buffer.block);
 	}
