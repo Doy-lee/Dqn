@@ -845,16 +845,59 @@ void ArrayTest()
 	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseCalloc());
 
 	DqnMemBuffer largeEnoughBuffer = {};
-	DqnMemBuffer_Init(&largeEnoughBuffer, DQN_MEGABYTE(1), false);
-	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseMemBuffer(&largeEnoughBuffer));
-	DqnMemBuffer_Free(&largeEnoughBuffer);
+	{
+		size_t size = DQN_MEGABYTE(1);
+		// Empty buffer
+		{
+			DqnMemBuffer_Init(&largeEnoughBuffer, size, false);
+			ArrayTestMemAPIInternal(
+			    &array, DqnMemAPI_DefaultUseMemBuffer(&largeEnoughBuffer));
+			DqnMemBuffer_Free(&largeEnoughBuffer);
+		}
+
+		// Allocate data to buffer, and cause realloc to have to create a new
+		// block
+		{
+			DqnMemBuffer_Init(&largeEnoughBuffer, size, false);
+
+			size_t usedSize = (size_t)(size * 0.5f);
+			u8 *usedData =
+			    (u8 *)DqnMemBuffer_Allocate(&largeEnoughBuffer, usedSize);
+			for (u32 i      = 0; i < usedSize; i++)
+				usedData[i] = 'a';
+
+			ArrayTestMemAPIInternal(
+			    &array, DqnMemAPI_DefaultUseMemBuffer(&largeEnoughBuffer));
+			DqnMemBuffer_Free(&largeEnoughBuffer);
+		}
+	}
 
 	DqnMemBuffer smallBuffer = {};
-	DqnMemBuffer_Init(&smallBuffer, 8, false);
-	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseMemBuffer(&smallBuffer));
-	DqnMemBuffer_Free(&smallBuffer);
+	{
+		size_t size = 8;
+		// Empty small buffer
+		{
+			DqnMemBuffer_Init(&smallBuffer, size, false);
+			ArrayTestMemAPIInternal(
+			    &array, DqnMemAPI_DefaultUseMemBuffer(&smallBuffer));
+			DqnMemBuffer_Free(&smallBuffer);
+		}
 
-	// TODO(doyle): Doesn't work for now since after freeing a fixed size
+		// Allocate data to buffer, force realloc to have to create a new block
+		{
+			DqnMemBuffer_Init(&smallBuffer, size, false);
+
+			size_t usedSize = (size_t)(size * 0.5f);
+			u8 *usedData = (u8 *)DqnMemBuffer_Allocate(&smallBuffer, usedSize);
+			for (u32 i      = 0; i < usedSize; i++)
+				usedData[i] = 'a';
+			ArrayTestMemAPIInternal(
+			    &array, DqnMemAPI_DefaultUseMemBuffer(&smallBuffer));
+			DqnMemBuffer_Free(&smallBuffer);
+		}
+	}
+
+    // TODO(doyle): Doesn't work for now since after freeing a fixed size
 	// buffer, it becomes useless as the not set Is_Expandable flag blocks any
 	// further allocations.
 #if 0
