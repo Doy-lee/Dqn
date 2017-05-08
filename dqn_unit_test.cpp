@@ -1150,7 +1150,7 @@ void MemBufferTest()
 		fakeBlock.memory              = fakeBlockMem;
 		fakeBlock.size                = DQN_ARRAY_COUNT(fakeBlockMem);
 		fakeBlock.used                = 0;
-		DQN_ASSERT(!DqnMemBuffer_FreeBlock(&buffer, &fakeBlock));
+		DQN_ASSERT(!DqnMemBuffer_FreeBufferBlock(&buffer, &fakeBlock));
 
 		//Ensure that the actual blocks are still valid and freeing did nothing
 		DQN_ASSERT(firstBlock->size  == firstBlockSize);
@@ -1182,7 +1182,7 @@ void MemBufferTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the first block
-		DqnMemBuffer_FreeBlock(&buffer, firstBlock);
+		DqnMemBuffer_FreeBufferBlock(&buffer, firstBlock);
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
@@ -1208,7 +1208,7 @@ void MemBufferTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the third block
-		DqnMemBuffer_FreeBlock(&buffer, thirdBlock);
+		DqnMemBuffer_FreeBufferBlock(&buffer, thirdBlock);
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
@@ -1228,7 +1228,7 @@ void MemBufferTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the second block
-		DqnMemBuffer_FreeBlock(&buffer, secondBlock);
+		DqnMemBuffer_FreeBufferBlock(&buffer, secondBlock);
 
 		// Revalidate state
 		DQN_ASSERT(fourthBlock->size == fourthBlockSize);

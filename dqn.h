@@ -129,11 +129,11 @@ DQN_FILE_SCOPE bool DqnMemBuffer_InitWithFixedMem (DqnMemBuffer *const buffer, u
 DQN_FILE_SCOPE bool DqnMemBuffer_InitWithFixedSize(DqnMemBuffer *const buffer, size_t size, const bool zeroClear, const u32 byteAlign = 4); // Single allocation from platform, no further allocations, returns NULL of allocate if out of space
 DQN_FILE_SCOPE bool DqnMemBuffer_Init             (DqnMemBuffer *const buffer, size_t size, const bool zeroClear, const u32 byteAlign = 4); // Allocates from platform dynamically as space runs out
 
-DQN_FILE_SCOPE void *DqnMemBuffer_Allocate      (DqnMemBuffer *const buffer, size_t size);              // Returns NULL if out of space and buffer is using fixed memory/size, or platform allocation fails
-DQN_FILE_SCOPE void  DqnMemBuffer_Free          (DqnMemBuffer *const buffer);                           // Frees all blocks belonging to this buffer
-DQN_FILE_SCOPE bool  DqnMemBuffer_FreeBlock     (DqnMemBuffer *const buffer, DqnMemBufferBlock *block); // Frees the specified block, returns false if block doesn't belong
-DQN_FILE_SCOPE bool  DqnMemBuffer_FreeLastBlock (DqnMemBuffer *const buffer);                           // Frees the last-most memory block. If last block, free that block, next allocate will attach a block.
-DQN_FILE_SCOPE void  DqnMemBuffer_ClearCurrBlock(DqnMemBuffer *const buffer, const bool zeroClear);     // Reset the current memory block usage to 0
+DQN_FILE_SCOPE void *DqnMemBuffer_Allocate       (DqnMemBuffer *const buffer, size_t size);              // Returns NULL if out of space and buffer is using fixed memory/size, or platform allocation fails
+DQN_FILE_SCOPE void  DqnMemBuffer_Free           (DqnMemBuffer *const buffer);                           // Frees all blocks belonging to this buffer
+DQN_FILE_SCOPE bool  DqnMemBuffer_FreeBufferBlock(DqnMemBuffer *const buffer, DqnMemBufferBlock *block); // Frees the specified block, returns false if block doesn't belong
+DQN_FILE_SCOPE bool  DqnMemBuffer_FreeLastBlock  (DqnMemBuffer *const buffer);                           // Frees the last-most memory block. If last block, free that block, next allocate will attach a block.
+DQN_FILE_SCOPE void  DqnMemBuffer_ClearCurrBlock (DqnMemBuffer *const buffer, const bool zeroClear);     // Reset the current memory block usage to 0
 
 // TempBuffer is only required for the function. Once BeginTempRegion() is called, subsequent allocation calls can be made using the original buffer.
 // Upon EndTempRegion() the original buffer will free any additional blocks it allocated during the temp region and revert to the original
@@ -149,6 +149,10 @@ DQN_FILE_SCOPE void          DqnMemBuffer_EndTempRegion  (DqnTempBuffer tempBuff
 // allowed to have new blocks.
 DQN_FILE_SCOPE DqnMemBufferBlock *DqnMemBuffer_AllocateCompatibleBlock(const DqnMemBuffer *const buffer, size_t size);
 DQN_FILE_SCOPE bool               DqnMemBuffer_AttachBlock            (DqnMemBuffer *const buffer, DqnMemBufferBlock *const newBlock);
+
+// (IMPORTANT) Should only be used to free blocks that haven't been attached!
+// Attached blocks should be freed using FreeBufferBlock().
+DQN_FILE_SCOPE void DqnMemBuffer_FreeBlock(DqnMemBufferBlock *block);
 
 ////////////////////////////////////////////////////////////////////////////////
 // DqnMemAPI - Memory API, For using custom allocators
@@ -1348,6 +1352,12 @@ DQN_FILE_SCOPE bool DqnMemBuffer_AttachBlock(DqnMemBuffer *const buffer,
 	return true;
 }
 
+DQN_FILE_SCOPE void DqnMemBuffer_FreeBlock(DqnMemBufferBlock *block)
+{
+	if (!block) return;
+	DqnMem_Free(block);
+}
+
 DQN_FILE_SCOPE bool DqnMemBuffer_InitWithFixedMem(DqnMemBuffer *const buffer,
                                                   u8 *const mem,
                                                   const size_t memSize,
@@ -1458,8 +1468,8 @@ DQN_FILE_SCOPE void *DqnMemBuffer_Allocate(DqnMemBuffer *const buffer, size_t si
 	return result;
 }
 
-DQN_FILE_SCOPE bool DqnMemBuffer_FreeBlock(DqnMemBuffer *const buffer,
-                                           DqnMemBufferBlock *block)
+DQN_FILE_SCOPE bool DqnMemBuffer_FreeBufferBlock(DqnMemBuffer *const buffer,
+                                                 DqnMemBufferBlock *block)
 {
 	if (!buffer || !block || !buffer->block) return false;
 	if (buffer->flags & DqnMemBufferFlag_IsFixedMemoryFromUser) return false;
@@ -1486,7 +1496,7 @@ DQN_FILE_SCOPE bool DqnMemBuffer_FreeBlock(DqnMemBuffer *const buffer,
 DQN_FILE_SCOPE bool
 DqnMemBuffer_FreeLastBlock(DqnMemBuffer *const buffer)
 {
-	bool result = DqnMemBuffer_FreeBlock(buffer, buffer->block);
+	bool result = DqnMemBuffer_FreeBufferBlock(buffer, buffer->block);
 	return result;
 }
 
