@@ -104,7 +104,7 @@ typedef struct DqnMemBufferBlock
 
 enum DqnMemBufferFlag
 {
-	DqnMemBufferFlag_IsExpandable          = (1 << 0),
+	DqnMemBufferFlag_IsNotExpandable       = (1 << 0),
 	DqnMemBufferFlag_IsFixedMemoryFromUser = (1 << 1), // NOTE(doyle): Required to indicate we CAN'T free this memory when free is called.
 };
 
@@ -180,14 +180,22 @@ typedef struct DqnMemAPICallbackInfo
 	enum DqnMemAPICallbackType type;
 	void *userContext;
 	union {
-		struct { size_t requestSize; };                     // DqnMemAPICallbackType_Alloc
-		struct { void  *ptrToFree; };                       // DqnMemAPICallbackType_Free
+		struct { size_t requestSize; }; // DqnMemAPICallbackType_Alloc
+
+		// DqnMemAPICallbackType_Free
+		struct
+		{
+			void  *ptrToFree;
+			size_t sizeToFree;
+		};
+
+		// DqnMemAPICallbackType_Realloc
 		struct
 		{
 			size_t newRequestSize;
 			void *oldMemPtr;
 			size_t oldSize;
-		}; // DqnMemAPICallbackType_Realloc
+		};
 	};
 } DqnMemAPICallbackInfo;
 
@@ -205,15 +213,11 @@ typedef struct DqnMemAPI
 	void               *userContext;
 } DqnMemAPI;
 
-// TODO(doyle): DefaultUseMemBuffer is experimental!!!!
-DQN_FILE_SCOPE DqnMemAPI DqnMemAPI_DefaultUseMemBuffer(DqnMemBuffer *const buffer);
 DQN_FILE_SCOPE DqnMemAPI DqnMemAPI_DefaultUseCalloc();
-
 ////////////////////////////////////////////////////////////////////////////////
 // DArray - Dynamic Array
 ////////////////////////////////////////////////////////////////////////////////
 // REMINDER: Dynamic Array can be used as a stack. Don't need to create one.
-// TODO(doyle): Custom allocator
 #if 1
 template <typename T>
 struct DqnArray
@@ -227,33 +231,46 @@ struct DqnArray
 
 #if 0
 template <typename T>
-bool  DqnArray_init         (DqnArray<T> *array, size_t capacity);
-bool  DqnArray_grow         (DqnArray<T> *array);
-T    *DqnArray_push         (DqnArray<T> *array, T item);
-T    *DqnArray_pop          (DqnArray<T> *array)
-T    *DqnArray_get          (DqnArray<T> *array, u64 index);
-bool  DqnArray_clear        (DqnArray<T> *array);
-bool  DqnArray_free         (DqnArray<T> *array);
-bool  DqnArray_remove       (DqnArray<T> *array, u64 index);
-bool  DqnArray_remove_stable(DqnArray<T> *array, u64 index);
+bool  DqnArray_Init        (DqnArray<T> *array, size_t capacity);
+bool  DqnArray_Grow        (DqnArray<T> *array);
+T    *DqnArray_Push        (DqnArray<T> *array, T item);
+T    *DqnArray_Pop         (DqnArray<T> *array)
+T    *DqnArray_Get         (DqnArray<T> *array, u64 index);
+bool  DqnArray_Clear       (DqnArray<T> *array);
+bool  DqnArray_Free        (DqnArray<T> *array);
+bool  DqnArray_Remove      (DqnArray<T> *array, u64 index);
+bool  DqnArray_RemoveStable(DqnArray<T> *array, u64 index);
 #endif
 
 // Implementation taken from Milton, developed by Serge at
 // https://github.com/serge-rgb/milton#license
 template <typename T>
+bool DqnArray_Free(DqnArray<T> *array)
+{
+	if (array && array->data)
+	{
+		// TODO(doyle): Right now we assume free always works, and it probably should?
+		size_t sizeToFree = (size_t)array->capacity * sizeof(T);
+		DqnMemAPICallbackInfo info = DqnMemAPICallback_InfoAskFreeInternal(
+		    array->memAPI, array->data, sizeToFree);
+		array->memAPI.callback(info, NULL);
+		array->data = NULL;
+
+		array->count    = 0;
+		array->capacity = 0;
+		return true;
+	}
+
+	return false;
+}
+
+template <typename T>
 bool DqnArray_Init(DqnArray<T> *array, size_t capacity,
                    DqnMemAPI memAPI = DqnMemAPI_DefaultUseCalloc())
 {
 	if (!array) return false;
+	if (array->data) DqnArray_Free(array);
 
-	if (array->data)
-	{
-		// TODO(doyle): Logging? The array already exists
-		DqnMemAPICallbackInfo info =
-		    DqnMemAPICallback_InfoAskFreeInternal(array->memAPI, array->data);
-		array->memAPI.callback(info, NULL);
-		array->data = NULL;
-	}
 	array->memAPI       = memAPI;
 	size_t allocateSize = (size_t)capacity * sizeof(T);
 
@@ -341,25 +358,6 @@ bool DqnArray_Clear(DqnArray<T> *array)
 	if (array)
 	{
 		array->count = 0;
-		return true;
-	}
-
-	return false;
-}
-
-template <typename T>
-bool DqnArray_Free(DqnArray<T> *array)
-{
-	if (array && array->data)
-	{
-		// TODO(doyle): Right now we assume free always works, and it probably should?
-		DqnMemAPICallbackInfo info =
-		    DqnMemAPICallback_InfoAskFreeInternal(array->memAPI, array->data);
-		array->memAPI.callback(info, NULL);
-		array->data = NULL;
-
-		array->count    = 0;
-		array->capacity = 0;
 		return true;
 	}
 
@@ -1331,7 +1329,7 @@ DqnMemBuffer_AllocateCompatibleBlock(const DqnMemBuffer *const buffer, size_t si
 {
 	if (!buffer) return NULL;
 	if (buffer->flags & DqnMemBufferFlag_IsFixedMemoryFromUser) return NULL;
-	if (!(buffer->flags & DqnMemBufferFlag_IsExpandable))       return NULL;
+	if (buffer->flags & DqnMemBufferFlag_IsNotExpandable)       return NULL;
 
 	DqnMemBufferBlock *block =
 	    DqnMemBuffer_AllocateBlockInternal(buffer->byteAlign, size);
@@ -1343,19 +1341,11 @@ DQN_FILE_SCOPE bool DqnMemBuffer_AttachBlock(DqnMemBuffer *const buffer,
 {
 	if (!buffer || !newBlock) return false;
 	if (buffer->flags & DqnMemBufferFlag_IsFixedMemoryFromUser) return false;
+	if (buffer->flags & DqnMemBufferFlag_IsNotExpandable)       return false;
 
-	// TODO(doyle): If we make InitWithFixedSize buffer the Is_Expandable
-	// flag is not set. But if you free the buffery and try to allocate to
-	// it again since the flag is not set, the buffer becomes useless as we
-	// can't allocate to it anymore. How should we solve this?
-	if (buffer->flags & DqnMemBufferFlag_IsExpandable)
-	{
-		newBlock->prevBlock = buffer->block;
-		buffer->block       = newBlock;
-		return true;
-	}
-
-	return false;
+	newBlock->prevBlock = buffer->block;
+	buffer->block       = newBlock;
+	return true;
 }
 
 DQN_FILE_SCOPE bool DqnMemBuffer_InitWithFixedMem(DqnMemBuffer *const buffer,
@@ -1374,7 +1364,7 @@ DQN_FILE_SCOPE bool DqnMemBuffer_InitWithFixedMem(DqnMemBuffer *const buffer,
 	buffer->block->memory = mem + sizeof(DqnMemBufferBlock);
 	buffer->block->used   = 0;
 	buffer->block->size   = memSize - sizeof(DqnMemBufferBlock);
-	buffer->flags         = DqnMemBufferFlag_IsFixedMemoryFromUser;
+	buffer->flags         = (DqnMemBufferFlag_IsFixedMemoryFromUser | DqnMemBufferFlag_IsNotExpandable);
 
 	const u32 DEFAULT_ALIGNMENT = 4;
 	buffer->tempBufferCount     = 0;
@@ -1394,7 +1384,7 @@ DQN_FILE_SCOPE bool DqnMemBuffer_Init(DqnMemBuffer *const buffer, size_t size,
 
 	buffer->tempBufferCount = 0;
 	buffer->byteAlign       = byteAlign;
-	buffer->flags           = DqnMemBufferFlag_IsExpandable;
+	buffer->flags           = 0;
 	return true;
 }
 
@@ -1406,7 +1396,7 @@ DQN_FILE_SCOPE bool DqnMemBuffer_InitWithFixedSize(DqnMemBuffer *const buffer,
 	bool result = DqnMemBuffer_Init(buffer, size, byteAlign);
 	if (result)
 	{
-		buffer->flags = 0;
+		buffer->flags |= DqnMemBufferFlag_IsNotExpandable;
 		return true;
 	}
 
@@ -1503,10 +1493,22 @@ DqnMemBuffer_FreeLastBlock(DqnMemBuffer *const buffer)
 DQN_FILE_SCOPE void DqnMemBuffer_Free(DqnMemBuffer *buffer)
 {
 	if (!buffer) return;
-	if (buffer->flags & DqnMemBufferFlag_IsFixedMemoryFromUser) return;
+
+	// NOTE(doyle): User is in charge of freeing this memory, so all we need to
+	// do is clear the block.
+	if (buffer->flags & DqnMemBufferFlag_IsFixedMemoryFromUser)
+	{
+		DQN_ASSERT(!buffer->block->prevBlock);
+		DqnMemBuffer_ClearCurrBlock(buffer, false);
+		return;
+	}
 
 	while (buffer->block)
 		DqnMemBuffer_FreeLastBlock(buffer);
+
+	// After a buffer is free, we reset the not expandable flag so that if we
+	// allocate on an empty buffer it still works.
+	buffer->flags &= ~DqnMemBufferFlag_IsNotExpandable;
 }
 
 DQN_FILE_SCOPE void DqnMemBuffer_ClearCurrBlock(DqnMemBuffer *const buffer,
@@ -1581,12 +1583,13 @@ DqnMemAPICallback_InfoAskAllocInternal(const DqnMemAPI memAPI,
 }
 
 FILE_SCOPE DqnMemAPICallbackInfo DqnMemAPICallback_InfoAskFreeInternal(
-    const DqnMemAPI memAPI, void *const ptrToFree)
+    const DqnMemAPI memAPI, void *const ptrToFree, const size_t sizeToFree)
 {
 	DqnMemAPICallbackInfo info = {};
 	info.type        = DqnMemAPICallbackType_Free;
 	info.userContext = memAPI.userContext;
 	info.ptrToFree   = ptrToFree;
+	info.sizeToFree  = sizeToFree;
 	return info;
 }
 
@@ -1653,172 +1656,11 @@ DqnMemAPI_DefaultUseCallocCallbackInternal(DqnMemAPICallbackInfo info,
 	}
 }
 
-FILE_SCOPE void
-DqnMemAPI_DefaultUseMemBufferCallbackInternal(DqnMemAPICallbackInfo info,
-                                              DqnMemAPICallbackResult *result)
-{
-	DQN_ASSERT(info.userContext);
-	DqnMemAPI_ValidateCallbackInfo(info);
-	DqnMemBuffer *const buffer = static_cast<DqnMemBuffer *>(info.userContext);
-
-	switch(info.type)
-	{
-		case DqnMemAPICallbackType_Alloc:
-		{
-			DQN_ASSERT(result);
-			result->type      = info.type;
-			result->newMemPtr = DqnMemBuffer_Allocate(buffer, info.requestSize);
-		}
-		break;
-
-		// TODO(doyle): This is so badly handled. Currently MemBuffers are not
-		// designed to handle realloc in anyway elegantly due to it's memory
-		// block nature.
-		case DqnMemAPICallbackType_Realloc:
-		{
-			// NOTE(doyle): Realloc implies that we want our data to be
-			// contiguous. We also enforce (assert) in init that the supplied
-			// memory buffer is brand new, i.e. the memory buffer is used
-			// exclusively for the MemAPI operations. So if we don't have enough
-			// space, we can free the entire memory buffer and reallocate
-			// without having to worry about part of blocks holding data
-			// belonging to other objects.
-			DQN_ASSERT(result);
-			result->type = info.type;
-
-			u8 *oldPtr                   = (u8 *)info.oldMemPtr;
-			DqnMemBufferBlock *currBlock = buffer->block;
-
-			for (;;)
-			{
-				// NOTE(doyle): Block containing our data must exist otherwise
-				// it has been invalidly deleted without us knowing, or it
-				// doesn't belong to the buffer the memAPI is using
-				if (!currBlock) DQN_ASSERT(DQN_INVALID_CODE_PATH);
-
-				if (oldPtr >= currBlock->memory &&
-				    oldPtr < (currBlock->memory + currBlock->size))
-				{
-					break;
-				}
-
-				currBlock = currBlock->prevBlock;
-			}
-
-			size_t alignedSize =
-			    DQN_ALIGN_POW_N(info.newRequestSize, buffer->byteAlign);
-			// If true, then this block ONLY has data that this MemAPI has
-			// allocated which means it's valid for us to completely free it
-			// or allocate further within it.
-			DqnMemBufferBlock *const oldBlock = currBlock;
-			if (info.oldSize == oldBlock->used)
-			{
-				// NOTE(doyle): If size is the same as used, then I'm pretty
-				// sure this guarantees that the old memory is a ptr to the
-				// base of the memory block.
-				DQN_ASSERT(oldPtr == oldBlock->memory);
-
-				if (alignedSize > oldBlock->size)
-				{
-					result->newMemPtr =
-					    DqnMemBuffer_Allocate(buffer, alignedSize);
-					if (result->newMemPtr)
-					{
-						DqnMemBufferBlock *newBlock = buffer->block;
-						DQN_ASSERT(oldBlock != newBlock);
-
-						for (u32 i = 0; i < oldBlock->used; i++)
-							newBlock->memory[i] = oldBlock->memory[i];
-
-						newBlock->used = alignedSize;
-						DqnMemBuffer_FreeBlock(buffer, oldBlock);
-					}
-				}
-				else
-				{
-					// Otherwise, the current block still has enough space
-					// so we can realloc in place.
-
-					// TODO(doyle): Somewhat hacky, we clear the curr block
-					// pointer, and don't zero it out, and just reallocate
-					// the aligned size.
-					DqnMemBuffer_ClearCurrBlock(buffer, false);
-					result->newMemPtr =
-					    DqnMemBuffer_Allocate(buffer, alignedSize);
-				}
-
-				return;
-			}
-
-			// TODO(doyle): How to free the left over data from the old block?
-			// TODO(doyle): Think about putting the old realloc block, not at
-			// the front of the list, since when we realloc, we search our block
-			// list for the mem block that contains our data anyway so the
-			// realloc block does NOT have to be at the front of the list to use
-			// it.
-			// If we place the block behind the front of the list, then we also
-			// need to fix the logic above using Allocate() which will
-			// automatically place the block in front of the list. This way we
-			// can take advantage of whatever free space is left in the block we
-			// just left, instead of leaving it dead.
-
-			// TODO(doyle): If this code branch occurs, then when we get around
-			// to implementing memory profiling, we're going to want to mark
-			// this as dead memory.
-
-			// Otherwise, the more difficult case. This block contains other
-			// data that has been allocated to it. The easy option is to
-			// just allocate a new block and leave the old data lying around.
-			// We force a new block to be attached which will hold our realloced
-			// data.
-			DqnMemBufferBlock *newBlock =
-			    DqnMemBuffer_AllocateCompatibleBlock(buffer, alignedSize);
-			if (newBlock)
-			{
-				if (DqnMemBuffer_AttachBlock(buffer, newBlock))
-				{
-					DQN_ASSERT(buffer->block != oldBlock &&
-					           buffer->block == newBlock);
-
-					result->newMemPtr = buffer->block->memory;
-					for (u32 i = 0; i < info.oldSize; i++)
-						newBlock->memory[i] = oldPtr[i];
-
-					newBlock->used = alignedSize;
-				}
-			}
-		}
-		break;
-
-		case DqnMemAPICallbackType_Free:
-		{
-			// TODO(doyle): Freeing technically works, if we enforce that the
-			// MemBuffer exclusively belongs to the MemAPI it's linked to.
-			if (result) result->type = info.type;
-			DQN_ASSERT(info.ptrToFree == buffer->block->memory);
-			DqnMemBuffer_Free(buffer);
-		}
-		break;
-	}
-}
-
 DQN_FILE_SCOPE DqnMemAPI DqnMemAPI_DefaultUseCalloc()
 {
 	DqnMemAPI result   = {};
 	result.callback    = DqnMemAPI_DefaultUseCallocCallbackInternal;
 	result.userContext = NULL;
-	return result;
-}
-
-DQN_FILE_SCOPE DqnMemAPI DqnMemAPI_DefaultUseMemBuffer(DqnMemBuffer *const buffer)
-{
-	// TODO(doyle): We assert that the buffer has to be a brand new mem buffer.
-	// Is this the correct design choice?
-	DQN_ASSERT(buffer && buffer->block);
-
-	DqnMemAPI result   = {};
-	result.callback    = DqnMemAPI_DefaultUseMemBufferCallbackInternal;
-	result.userContext = buffer;
 	return result;
 }
 

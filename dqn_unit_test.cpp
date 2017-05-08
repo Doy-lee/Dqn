@@ -843,132 +843,6 @@ void ArrayTest()
 {
 	DqnArray<DqnV2> array = {};
 	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseCalloc());
-
-	DqnMemBuffer largeEnoughBuffer = {};
-	{
-		size_t size = DQN_MEGABYTE(1);
-		// Empty buffer
-		{
-			DqnMemBuffer_Init(&largeEnoughBuffer, size, false);
-			ArrayTestMemAPIInternal(
-			    &array, DqnMemAPI_DefaultUseMemBuffer(&largeEnoughBuffer));
-			DqnMemBuffer_Free(&largeEnoughBuffer);
-		}
-
-		// Allocate data to buffer, and cause realloc to have to create a new
-		// block
-		{
-			DqnMemBuffer_Init(&largeEnoughBuffer, size, false);
-
-			size_t usedSize = (size_t)(size * 0.5f);
-			u8 *usedData =
-			    (u8 *)DqnMemBuffer_Allocate(&largeEnoughBuffer, usedSize);
-			for (u32 i      = 0; i < usedSize; i++)
-				usedData[i] = 'a';
-
-			ArrayTestMemAPIInternal(
-			    &array, DqnMemAPI_DefaultUseMemBuffer(&largeEnoughBuffer));
-			DqnMemBuffer_Free(&largeEnoughBuffer);
-		}
-	}
-
-	DqnMemBuffer smallBuffer = {};
-	{
-		size_t size = 8;
-		// Empty small buffer
-		{
-			DqnMemBuffer_Init(&smallBuffer, size, false);
-			ArrayTestMemAPIInternal(
-			    &array, DqnMemAPI_DefaultUseMemBuffer(&smallBuffer));
-			DqnMemBuffer_Free(&smallBuffer);
-		}
-
-		// Allocate data to buffer, force realloc to have to create a new block
-		{
-			DqnMemBuffer_Init(&smallBuffer, size, false);
-
-			size_t usedSize = (size_t)(size * 0.5f);
-			u8 *usedData = (u8 *)DqnMemBuffer_Allocate(&smallBuffer, usedSize);
-			for (u32 i      = 0; i < usedSize; i++)
-				usedData[i] = 'a';
-			ArrayTestMemAPIInternal(
-			    &array, DqnMemAPI_DefaultUseMemBuffer(&smallBuffer));
-			DqnMemBuffer_Free(&smallBuffer);
-		}
-	}
-
-    // TODO(doyle): Doesn't work for now since after freeing a fixed size
-	// buffer, it becomes useless as the not set Is_Expandable flag blocks any
-	// further allocations.
-#if 0
-	DqnMemBuffer largeFixedSizeBuffer = {};
-	DqnMemBuffer_InitWithFixedSize(&largeFixedSizeBuffer, DQN_MEGABYTE(1), false);
-	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseMemBuffer(&largeFixedSizeBuffer));
-	DqnMemBuffer_Free(&largeFixedSizeBuffer);
-#endif
-
-	{
-		DqnMemBuffer smallFixedSizeBuffer = {};
-		DqnMemBuffer_InitWithFixedSize(&smallFixedSizeBuffer, 8, false);
-
-		DQN_ASSERT(DqnArray_Init(&array, 1, DqnMemAPI_DefaultUseMemBuffer(&smallFixedSizeBuffer)));
-		DQN_ASSERT(array.capacity == 1);
-		DQN_ASSERT(array.count == 0);
-
-		// Fill the only slot in the array
-		DqnV2 a = DqnV2_2f(1, 2);
-		DQN_ASSERT(DqnArray_Push(&array, a));
-		DQN_ASSERT(array.count == 1);
-
-		// Try push another, but it should fail since it's a fixed size buffer.
-		// The realloc that occurs in push should also fail.
-		DQN_ASSERT(!DqnArray_Push(&array, a));
-		DQN_ASSERT(array.count == 1);
-		DQN_ASSERT(smallFixedSizeBuffer.block->prevBlock == NULL);
-		DQN_ASSERT(smallFixedSizeBuffer.block->used == 8);
-		DQN_ASSERT(smallFixedSizeBuffer.block->size == 8);
-
-		DQN_ASSERT(DqnArray_Free(&array));
-		DqnMemBuffer_Free(&smallFixedSizeBuffer);
-	}
-
-#if 0
-	{
-		u8 largeFixedMem[DQN_KILOBYTE(1)] = {};
-		DqnMemBuffer largeFixedMemBuffer  = {};
-		DqnMemBuffer_InitWithFixedMem(&largeFixedMemBuffer, largeFixedMem,
-		                              DQN_ARRAY_COUNT(largeFixedMem));
-		ArrayTestMemAPIInternal(
-		    &array, DqnMemAPI_DefaultUseMemBuffer(&largeFixedMemBuffer));
-	}
-#endif
-
-	{
-		u8 smallFixedMem[sizeof(DqnMemBufferBlock) + 8] = {};
-		DqnMemBuffer smallFixedMemBuffer = {};
-		DqnMemBuffer_InitWithFixedMem(&smallFixedMemBuffer, smallFixedMem,
-		                              DQN_ARRAY_COUNT(smallFixedMem));
-
-		DQN_ASSERT(DqnArray_Init(&array, 1, DqnMemAPI_DefaultUseMemBuffer(&smallFixedMemBuffer)));
-		DQN_ASSERT(array.capacity == 1);
-		DQN_ASSERT(array.count == 0);
-
-		// Fill the only slot in the array
-		DqnV2 a = DqnV2_2f(1, 2);
-		DQN_ASSERT(DqnArray_Push(&array, a));
-		DQN_ASSERT(array.count == 1);
-
-		// Try push another, but it should fail since it's a fixed mem buffer.
-		// The realloc that occurs in push should also fail.
-		DQN_ASSERT(!DqnArray_Push(&array, a));
-		DQN_ASSERT(array.count == 1);
-		DQN_ASSERT(smallFixedMemBuffer.block->prevBlock == NULL);
-		DQN_ASSERT(smallFixedMemBuffer.block->used == 8);
-		DQN_ASSERT(smallFixedMemBuffer.block->size == 8);
-
-		DQN_ASSERT(DqnArray_Free(&array));
-	}
-
 	printf("ArrayTest(): Completed successfully\n");
 }
 
@@ -1231,7 +1105,7 @@ void MemBufferTest()
 
 			// General Check buffer struct contains the values we expect from
 			// initialisation
-			DQN_ASSERT(buffer.flags & DqnMemBufferFlag_IsExpandable);
+			DQN_ASSERT(buffer.flags == 0);
 			DQN_ASSERT(buffer.tempBufferCount == 0);
 			DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
 			DQN_ASSERT(buffer.block->size == firstBlockSize);
