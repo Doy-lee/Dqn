@@ -980,8 +980,8 @@ void FileTest()
 			DqnFile file = {};
 			DQN_ASSERT(DqnFile_Open(
 				".clang-format", &file,
-				(dqnfilepermissionflag_write | dqnfilepermissionflag_read),
-				dqnfileaction_open_only));
+				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
+				DqnFileAction_OpenOnly));
 			DQN_ASSERT(file.size == 1320);
 
 			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
@@ -997,8 +997,8 @@ void FileTest()
 			DqnFile file = {};
 			DQN_ASSERT(!DqnFile_Open(
 				"asdljasdnel;kajdf", &file,
-				(dqnfilepermissionflag_write | dqnfilepermissionflag_read),
-				dqnfileaction_open_only));
+				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
+				DqnFileAction_OpenOnly));
 			DQN_ASSERT(file.size == 0);
 			DQN_ASSERT(file.permissionFlags == 0);
 			DQN_ASSERT(!file.handle);

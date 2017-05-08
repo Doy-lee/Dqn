@@ -640,25 +640,25 @@ DQN_FILE_SCOPE i32     Dqn_I32ToWStr(i32 value, wchar_t *buf, i32 bufSize);
 ////////////////////////////////////////////////////////////////////////////////
 enum DqnFilePermissionFlag
 {
-	dqnfilepermissionflag_read    = (1 << 0),
-	dqnfilepermissionflag_write   = (1 << 1),
-	dqnfilepermissionflag_execute = (1 << 2),
-	dqnfilepermissionflag_all     = (1 << 3)
+	DqnFilePermissionFlag_Read    = (1 << 0),
+	DqnFilePermissionFlag_Write   = (1 << 1),
+	DqnFilePermissionFlag_Execute = (1 << 2),
+	DqnFilePermissionFlag_All     = (1 << 3)
 };
 
 enum DqnFileAction
 {
 	// Only open file if it exists. Fails and returns false if file did not
 	// exist or could not open.
-	dqnfileaction_open_only,
+	DqnFileAction_OpenOnly,
 
 	// Try and create file. Return true if it was able to create. If it already
 	// exists, this will fail.
-	dqnfileaction_create_if_not_exist,
+	DqnFileAction_CreateIfNotExist,
 
 	// Clear the file contents to zero if it exists. Fails and returns false if
 	// file does not exist.
-	dqnfileaction_clear_if_exist,
+	DqnFileAction_ClearIfExist,
 };
 
 typedef struct DqnFile
@@ -3031,15 +3031,15 @@ FILE_SCOPE bool DqnFile_OpenInternal(const wchar_t *const path,
 
 #ifdef DQN_WIN32_IMPLEMENTATION
 	DWORD win32Permission = 0;
-	if (permissionFlags & dqnfilepermissionflag_all)
+	if (permissionFlags & DqnFilePermissionFlag_All)
 	{
 		win32Permission = GENERIC_ALL;
 	}
 	else
 	{
-		if (permissionFlags & dqnfilepermissionflag_read)    win32Permission |= GENERIC_READ;
-		if (permissionFlags & dqnfilepermissionflag_write)   win32Permission |= GENERIC_WRITE;
-		if (permissionFlags & dqnfilepermissionflag_execute) win32Permission |= GENERIC_EXECUTE;
+		if (permissionFlags & DqnFilePermissionFlag_Read)    win32Permission |= GENERIC_READ;
+		if (permissionFlags & DqnFilePermissionFlag_Write)   win32Permission |= GENERIC_WRITE;
+		if (permissionFlags & DqnFilePermissionFlag_Execute) win32Permission |= GENERIC_EXECUTE;
 	}
 
 	DWORD win32Action = 0;
@@ -3047,9 +3047,9 @@ FILE_SCOPE bool DqnFile_OpenInternal(const wchar_t *const path,
 	{
 		// Allow fall through
 		default: DQN_ASSERT(DQN_INVALID_CODE_PATH);
-		case dqnfileaction_open_only:           win32Action = OPEN_EXISTING; break;
-		case dqnfileaction_clear_if_exist:      win32Action = TRUNCATE_EXISTING; break;
-		case dqnfileaction_create_if_not_exist: win32Action = CREATE_NEW; break;
+		case DqnFileAction_OpenOnly:         win32Action = OPEN_EXISTING; break;
+		case DqnFileAction_ClearIfExist:     win32Action = TRUNCATE_EXISTING; break;
+		case DqnFileAction_CreateIfNotExist: win32Action = CREATE_NEW; break;
 	}
 
 	HANDLE handle = CreateFileW(path, win32Permission, 0, NULL, win32Action,
