@@ -178,41 +178,58 @@ void StringsTest()
 			    "StringsTest(): StrReverse: Completed successfully\n");
 		}
 
-		// StrToI32
+		const u64 LARGEST_NUM     = (u64)-1;
+		const i64 SMALLEST_NUM = -9223372036854775808LL;
+		// StrToI64
 		{
 			char *a = "123";
-			DQN_ASSERT(Dqn_StrToI32(a, Dqn_strlen(a)) == 123);
+			DQN_ASSERT(Dqn_StrToI64(a, Dqn_strlen(a)) == 123);
 
 			char *b = "-123";
-			DQN_ASSERT(Dqn_StrToI32(b, Dqn_strlen(b)) == -123);
-			DQN_ASSERT(Dqn_StrToI32(b, 1) == 0);
-			DQN_ASSERT(Dqn_StrToI32(&b[1], Dqn_strlen(&b[1])) == 123);
+			DQN_ASSERT(Dqn_StrToI64(b, Dqn_strlen(b)) == -123);
+			DQN_ASSERT(Dqn_StrToI64(b, 1) == 0);
 
 			char *c = "-0";
-			DQN_ASSERT(Dqn_StrToI32(c, Dqn_strlen(c)) == 0);
+			DQN_ASSERT(Dqn_StrToI64(c, Dqn_strlen(c)) == 0);
 
 			char *d = "+123";
-			DQN_ASSERT(Dqn_StrToI32(d, Dqn_strlen(d)) == 123);
-			DQN_ASSERT(Dqn_StrToI32(&d[1], Dqn_strlen(&d[1])) == 123);
+			DQN_ASSERT(Dqn_StrToI64(d, Dqn_strlen(d)) == 123);
 
-			printf("StringsTest(): StrToI32: Completed successfully\n");
+			// TODO(doyle): Unsigned conversion
+#if 0
+			char *e = "18446744073709551615";
+	        DQN_ASSERT((u64)(Dqn_StrToI64(e, Dqn_strlen(e))) == LARGEST_NUM);
+#endif
+
+			char *f = "-9223372036854775808";
+			DQN_ASSERT(Dqn_StrToI64(f, Dqn_strlen(f)) == SMALLEST_NUM);
+
+	        printf("StringsTest(): StrToI64: Completed successfully\n");
 		}
 
-		// i32_to_str
+		// i64 to str
 		{
-			char a[DQN_I32_TO_STR_MAX_BUF_SIZE] = {};
-			Dqn_I32ToStr(+100, a, DQN_ARRAY_COUNT(a));
+			char a[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+			Dqn_I64ToStr(+100, a, DQN_ARRAY_COUNT(a));
 			DQN_ASSERT(Dqn_strcmp(a, "100") == 0);
 
-			char b[DQN_I32_TO_STR_MAX_BUF_SIZE] = {};
-			Dqn_I32ToStr(-100, b, DQN_ARRAY_COUNT(b));
+			char b[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+			Dqn_I64ToStr(-100, b, DQN_ARRAY_COUNT(b));
 			DQN_ASSERT(Dqn_strcmp(b, "-100") == 0);
 
-			char c[DQN_I32_TO_STR_MAX_BUF_SIZE] = {};
-			Dqn_I32ToStr(0, c, DQN_ARRAY_COUNT(c));
+			char c[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+			Dqn_I64ToStr(0, c, DQN_ARRAY_COUNT(c));
 			DQN_ASSERT(Dqn_strcmp(c, "0") == 0);
 
-			printf("StringsTest(): StrToI32: Completed successfully\n");
+			char d[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+			Dqn_I64ToStr(LARGEST_NUM, d, DQN_ARRAY_COUNT(d));
+			DQN_ASSERT(Dqn_strcmp(d, "18446744073709551615") == 0);
+
+			char e[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+			Dqn_I64ToStr(SMALLEST_NUM, e, DQN_ARRAY_COUNT(e));
+			DQN_ASSERT(Dqn_strcmp(e, "-9223372036854775808") == 0);
+
+			printf("StringsTest(): I64ToStr: Completed successfully\n");
 		}
 	}
 
@@ -394,13 +411,13 @@ void VecTest()
 			DQN_ASSERT(vec.w == 5.5f && vec.h == 5.0f);
 		}
 
-		// V2i Creating
+		// V2 with 2 integers
 		{
 			DqnV2 vec = DqnV2_2i(3, 5);
 			DQN_ASSERT(vec.x == 3 && vec.y == 5.0f);
 			DQN_ASSERT(vec.w == 3 && vec.h == 5.0f);
 		}
-
+		
 		// V2 Arithmetic
 		{
 			DqnV2 vecA = DqnV2_2f(5, 10);
@@ -425,7 +442,7 @@ void VecTest()
 			DQN_ASSERT(dotResult == 55);
 		}
 
-		// Test operator overloadign
+		// Test operator overloading
 		{
 			DqnV2 vecA = DqnV2_2f(5, 10);
 			DqnV2 vecB = DqnV2_2i(2, 3);
@@ -451,7 +468,6 @@ void VecTest()
 			result = result - DqnV2_2f(1, 1);
 			DQN_ASSERT((result == DqnV2_2f(250, 25)) == true);
 		}
-
 
 		// V2 Properties
 		{
@@ -629,38 +645,84 @@ void VecTest()
 
 	// Rect
 	{
-		DqnRect rect = DqnRect_Init(DqnV2_2f(-10, -10), DqnV2_2f(20, 20));
-		DQN_ASSERT(DqnV2_Equals(rect.min, DqnV2_2f(-10, -10)));
-		DQN_ASSERT(DqnV2_Equals(rect.max, DqnV2_2f(10, 10)));
+		// Test rect init functions
+		{
+			DqnRect rect4f = DqnRect_4f(1.1f, 2.2f, 3.3f, 4.4f);
+			DqnRect rect4i = DqnRect_4i(1, 2, 3, 4);
 
-		f32 width, height;
-		DqnRect_GetSize2f(rect, &width, &height);
-		DQN_ASSERT(width == 20);
-		DQN_ASSERT(height == 20);
+			DQN_ASSERT(rect4i.min.x == 1 && rect4i.min.y == 2);
+			DQN_ASSERT(rect4i.max.x == 3 && rect4i.max.y == 4);
+			DQN_ASSERT(rect4f.min.x == 1.1f && rect4f.min.y == 2.2f);
+			DQN_ASSERT(rect4f.max.x == 3.3f && rect4f.max.y == 4.4f);
 
-		DqnV2 dim = DqnRect_GetSizeV2(rect);
-		DQN_ASSERT(DqnV2_Equals(dim, DqnV2_2f(20, 20)));
+			DqnRect rect = DqnRect_Init(DqnV2_2f(-10, -10), DqnV2_2f(20, 20));
+			DQN_ASSERT(DqnV2_Equals(rect.min, DqnV2_2f(-10, -10)));
+			DQN_ASSERT(DqnV2_Equals(rect.max, DqnV2_2f(10, 10)));
+		}
 
+		// Test rect get size function
+		{
+			// Test float rect
+			{
+				DqnRect rect =
+				    DqnRect_Init(DqnV2_2f(-10, -10), DqnV2_2f(20, 20));
+
+				f32 width, height;
+				DqnRect_GetSize2f(rect, &width, &height);
+				DQN_ASSERT(width == 20);
+				DQN_ASSERT(height == 20);
+
+				DqnV2 dim = DqnRect_GetSizeV2(rect);
+				DQN_ASSERT(DqnV2_Equals(dim, DqnV2_2f(20, 20)));
+			}
+
+			// Test rect with float values and GetSize as 2 integers
+			{
+				DqnRect rect = DqnRect_Init(DqnV2_2f(-10.5f, -10.5f),
+				                            DqnV2_2f(20.5f, 20.5f));
+				i32 width, height;
+				DqnRect_GetSize2i(rect, &width, &height);
+				DQN_ASSERT(width == 20);
+				DQN_ASSERT(height == 20);
+			}
+		}
+
+		// Test rect get centre
+		DqnRect rect     = DqnRect_Init(DqnV2_2f(-10, -10), DqnV2_2f(20, 20));
 		DqnV2 rectCenter = DqnRect_GetCentre(rect);
 		DQN_ASSERT(DqnV2_Equals(rectCenter, DqnV2_2f(0, 0)));
 
+		// Test clipping rect get centre
+		DqnRect clipRect   = DqnRect_4i(-15, -15, 10, 10);
+		DqnRect clipResult = DqnRect_ClipRect(rect, clipRect);
+		DQN_ASSERT(clipResult.min.x == -10 && clipResult.min.y == -10);
+		DQN_ASSERT(clipResult.max.x == 10 && clipResult.max.y == 10);
+
 		// Test shifting rect
-		DqnRect shiftedRect = DqnRect_Move(rect, DqnV2_2f(10, 0));
-		DQN_ASSERT(DqnV2_Equals(shiftedRect.min, DqnV2_2f(0, -10)));
-		DQN_ASSERT(DqnV2_Equals(shiftedRect.max, DqnV2_2f(20, 10)));
+		{
+			DqnRect shiftedRect = DqnRect_Move(rect, DqnV2_2f(10, 0));
+			DQN_ASSERT(DqnV2_Equals(shiftedRect.min, DqnV2_2f(0, -10)));
+			DQN_ASSERT(DqnV2_Equals(shiftedRect.max, DqnV2_2f(20, 10)));
 
-		DqnRect_GetSize2f(shiftedRect, &width, &height);
-		DQN_ASSERT(width == 20);
-		DQN_ASSERT(height == 20);
+			// Ensure dimensions have remained the same
+			{
+				f32 width, height;
+				DqnRect_GetSize2f(shiftedRect, &width, &height);
+				DQN_ASSERT(width == 20);
+				DQN_ASSERT(height == 20);
 
-		dim = DqnRect_GetSizeV2(shiftedRect);
-		DQN_ASSERT(DqnV2_Equals(dim, DqnV2_2f(20, 20)));
+				DqnV2 dim = DqnRect_GetSizeV2(shiftedRect);
+				DQN_ASSERT(DqnV2_Equals(dim, DqnV2_2f(20, 20)));
+			}
 
-		// Test rect contains p
-		DqnV2 inP  = DqnV2_2f(5, 5);
-		DqnV2 outP = DqnV2_2f(100, 100);
-		DQN_ASSERT(DqnRect_ContainsP(shiftedRect, inP));
-		DQN_ASSERT(!DqnRect_ContainsP(shiftedRect, outP));
+			// Test rect contains p
+			{
+				DqnV2 inP  = DqnV2_2f(5, 5);
+				DqnV2 outP = DqnV2_2f(100, 100);
+				DQN_ASSERT(DqnRect_ContainsP(shiftedRect, inP));
+				DQN_ASSERT(!DqnRect_ContainsP(shiftedRect, outP));
+			}
+		}
 
 		printf("VecTest(): Rect: Completed successfully\n");
 	}
