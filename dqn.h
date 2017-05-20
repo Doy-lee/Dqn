@@ -419,8 +419,9 @@ bool DqnArray_RemoveStable(DqnArray<T> *array, u64 index)
 ////////////////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE f32 DqnMath_Lerp (f32 a, f32 t, f32 b);
-DQN_FILE_SCOPE f32 DqnMath_Sqrtf(f32 a);
+DQN_FILE_SCOPE f32 DqnMath_Lerp  (f32 a, f32 t, f32 b);
+DQN_FILE_SCOPE f32 DqnMath_Sqrtf (f32 a);
+DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vec2
@@ -441,6 +442,7 @@ typedef union DqnV2i {
 
 // DqnV2
 DQN_FILE_SCOPE DqnV2 DqnV2_2i (i32 x, i32 y); // Typecasts 2 integers to 2 floats
+DQN_FILE_SCOPE DqnV2 DqnV2_1f (f32 xy);
 DQN_FILE_SCOPE DqnV2 DqnV2_2f (f32 x, f32 y);
 DQN_FILE_SCOPE DqnV2 DqnV2_V2i(DqnV2i a);
 
@@ -475,7 +477,7 @@ DQN_FILE_SCOPE inline bool   operator==(DqnV2  a, DqnV2 b) { return      DqnV2_E
 // DqnV2i
 DQN_FILE_SCOPE DqnV2i DqnV2i_2i(i32 x, i32 y);
 DQN_FILE_SCOPE DqnV2i DqnV2i_2f(f32 x, f32 y); // Typecasts 2 floats to 2 integers
-DQN_FILE_SCOPE DqnV2i DqnV2i_V2(DqnV2 a);      // Typecasts the floats to integers
+DQN_FILE_SCOPE DqnV2i DqnV2i_V2(DqnV2 a);
 
 DQN_FILE_SCOPE DqnV2i DqnV2i_Add     (DqnV2i a, DqnV2i b);
 DQN_FILE_SCOPE DqnV2i DqnV2i_Sub     (DqnV2i a, DqnV2i b);
@@ -544,6 +546,7 @@ typedef union DqnV4
 // Create a vector using ints and typecast to floats
 DQN_FILE_SCOPE DqnV4 DqnV4_4i(i32 x, i32 y, i32 z, f32 w);
 DQN_FILE_SCOPE DqnV4 DqnV4_4f(f32 x, f32 y, f32 z, f32 w);
+DQN_FILE_SCOPE DqnV4 DqnV4_1f(f32 xyzw);
 
 DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE DqnV4 DqnV4_Sub     (DqnV4 a, DqnV4 b);
@@ -596,7 +599,7 @@ DQN_FILE_SCOPE DqnRect DqnRect_4f       (f32 minX, f32 minY, f32 maxX, f32 maxY)
 DQN_FILE_SCOPE DqnRect DqnRect_4i       (i32 minX, i32 minY, i32 maxX, i32 maxY);
 DQN_FILE_SCOPE DqnRect DqnRect_Init     (DqnV2 origin, DqnV2 size);
 DQN_FILE_SCOPE void    DqnRect_GetSize2f(DqnRect rect, f32 *width, f32 *height);
-DQN_FILE_SCOPE void    DqnRect_GetSize2i(DqnRect rect, i32 *width, i32 *height); // TODO(doyle): Is this even worth it. Purposely losing precision, i.e. using rect as integers not floats
+DQN_FILE_SCOPE void    DqnRect_GetSize2i(DqnRect rect, i32 *width, i32 *height);
 DQN_FILE_SCOPE DqnV2   DqnRect_GetSizeV2(DqnRect rect);
 DQN_FILE_SCOPE DqnV2   DqnRect_GetCenter(DqnRect rect);
 DQN_FILE_SCOPE DqnRect DqnRect_ClipRect (DqnRect rect, DqnRect clip);
@@ -623,11 +626,15 @@ DQN_FILE_SCOPE i32  Dqn_StrFindFirstOccurence(const char *const src, const i32 s
 DQN_FILE_SCOPE bool Dqn_StrHasSubstring      (const char *const src, const i32 srcLen, const char *const find, const i32 findLen);
 
 #define DQN_32BIT_NUM_MAX_STR_SIZE 11
-#define DQN_64BIT_NUM_MAX_STR_SIZE 20
+#define DQN_64BIT_NUM_MAX_STR_SIZE 21
 // Return the len of the derived string. If buf is NULL and or bufSize is 0 the
 // function returns the required string length for the integer.
 DQN_FILE_SCOPE i32   Dqn_I64ToStr(i64 value, char *const buf, const i32 bufSize);
+
 DQN_FILE_SCOPE i64   Dqn_StrToI64(const char *const buf, const i32 bufSize);
+
+// WARNING: Not robust, precision errors and whatnot but good enough!
+DQN_FILE_SCOPE f32   Dqn_StrToF32(const char *const buf, const i32 bufSize);
 
 // Both return the number of bytes read, return 0 if invalid codepoint or UTF8
 DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character);
@@ -732,6 +739,7 @@ DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+
 #define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
 // Out is a pointer to the buffer to receive the characters.
 // outLen is the length/capacity of the out buffer
@@ -743,6 +751,7 @@ DQN_FILE_SCOPE void DqnWin32_GetRectDim      (RECT rect, LONG *width, LONG *heig
 DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix);
 DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *const errorPrefix);
 #endif /* DQN_WIN32_IMPLEMENTATION */
+
 
 #ifndef DQN_INI_H
 #define DQN_INI_H
@@ -1708,15 +1717,16 @@ DQN_FILE_SCOPE f32 DqnMath_Sqrtf(f32 a)
 	return result;
 }
 
+DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max)
+{
+	if (val < min) return min;
+	if (val > max) return max;
+	return val;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Vec2
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV2 DqnV2_2i(i32 x, i32 y)
-{
-	DqnV2 result = DqnV2_2f((f32)x, (f32)y);
-	return result;
-}
-
 DQN_FILE_SCOPE DqnV2 DqnV2_2f(f32 x, f32 y)
 {
 	DqnV2 result = {};
@@ -1726,12 +1736,26 @@ DQN_FILE_SCOPE DqnV2 DqnV2_2f(f32 x, f32 y)
 	return result;
 }
 
+DQN_FILE_SCOPE DqnV2 DqnV2_1f(f32 xy)
+{
+	DqnV2 result = {};
+	result.x  = xy;
+	result.y  = xy;
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2 DqnV2_2i(i32 x, i32 y)
+{
+	DqnV2 result = DqnV2_2f((f32)x, (f32)y);
+	return result;
+}
+
 DQN_FILE_SCOPE DqnV2 DqnV2_V2i(DqnV2i a)
 {
 	DqnV2 result = {};
-	result.x     = (f32)a.x;
-	result.y     = (f32)a.y;
-
+	result.x = (f32)a.x;
+	result.y = (f32)a.y;
 	return result;
 }
 
@@ -1815,13 +1839,17 @@ DQN_FILE_SCOPE f32 DqnV2_LengthSquared(DqnV2 a, DqnV2 b)
 DQN_FILE_SCOPE f32 DqnV2_Length(DqnV2 a, DqnV2 b)
 {
 	f32 lengthSq = DqnV2_LengthSquared(a, b);
-	f32 result   = DqnMath_Sqrtf(lengthSq);
+	if (lengthSq == 0) return 0;
+
+	f32 result = DqnMath_Sqrtf(lengthSq);
 	return result;
 }
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Normalise(DqnV2 a)
 {
 	f32 magnitude = DqnV2_Length(DqnV2_2f(0, 0), a);
+	if (magnitude == 0) return DqnV2_1f(0.0f);
+
 	DqnV2 result  = DqnV2_2f(a.x, a.y);
 	result        = DqnV2_Scalef(a, 1 / magnitude);
 	return result;
@@ -2080,6 +2108,12 @@ DQN_FILE_SCOPE DqnV4 DqnV4_4i(i32 x, i32 y, i32 z, i32 w)
 	return result;
 }
 
+DQN_FILE_SCOPE DqnV4 DqnV4_1f(f32 xyzw)
+{
+	DqnV4 result = {xyzw, xyzw, xyzw, xyzw};
+	return result;
+}
+
 DQN_FILE_SCOPE DqnV4 DqnV4_Add(DqnV4 a, DqnV4 b)
 {
 	DqnV4 result = {};
@@ -2282,24 +2316,23 @@ DQN_FILE_SCOPE DqnRect DqnRect_Init(DqnV2 origin, DqnV2 size)
 
 DQN_FILE_SCOPE void DqnRect_GetSize2f(DqnRect rect, f32 *width, f32 *height)
 {
-	*width  = DQN_ABS(rect.max.x - rect.min.x);
-	*height = DQN_ABS(rect.max.y - rect.min.y);
+	*width  = rect.max.x - rect.min.x;
+	*height = rect.max.y - rect.min.y;
 }
 
 DQN_FILE_SCOPE void DqnRect_GetSize2i(DqnRect rect, i32 *width, i32 *height)
 {
-	*width  = (i32)DQN_ABS(rect.max.x - rect.min.x);
-	*height = (i32)DQN_ABS(rect.max.y - rect.min.y);
+	*width  = (i32)(rect.max.x - rect.min.x);
+	*height = (i32)(rect.max.y - rect.min.y);
 }
 
 DQN_FILE_SCOPE DqnV2 DqnRect_GetSizeV2(DqnRect rect)
 {
-	f32 width     = DQN_ABS(rect.max.x - rect.min.x);
-	f32 height    = DQN_ABS(rect.max.y - rect.min.y);
+	f32 width     = rect.max.x - rect.min.x;
+	f32 height    = rect.max.y - rect.min.y;
 	DqnV2 result  = DqnV2_2f(width, height);
 	return result;
 }
-
 
 DQN_FILE_SCOPE DqnV2 DqnRect_GetCentre(DqnRect rect)
 {
@@ -2506,7 +2539,6 @@ DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 value, char *const buf, const i32 bufSize)
 		return 1;
 	}
 	
-	// NOTE(doyle): Max 32bit integer (+-)2147483647
 	i32 charIndex = 0;
 	bool negative           = false;
 	if (value < 0) negative = true;
@@ -2515,16 +2547,34 @@ DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 value, char *const buf, const i32 bufSize)
 	{
 		if (validBuffer) buf[charIndex] = '-';
 		charIndex++;
-		value *= -1;
+	}
+
+	bool lastDigitDecremented = false;
+	i64 val = DQN_ABS(value);
+	if (val < 0)
+	{
+		// TODO(doyle): This will occur if we are checking the smallest number
+		// possible in i64 since the range of negative numbers is one more than
+		// it is for positives, so ABS will fail.
+		lastDigitDecremented = true;
+		val                  = DQN_ABS(val - 1);
+		DQN_ASSERT(val >= 0);
 	}
 
 	if (validBuffer)
 	{
-		while (value != 0 && charIndex < bufSize)
+		if (lastDigitDecremented)
 		{
-			i32 rem        = value % 10;
+			i64 rem = (val % 10) + 1;
 			buf[charIndex++] = (u8)rem + '0';
-			value /= 10;
+			val /= 10;
+		}
+
+		while (val != 0 && charIndex < bufSize)
+		{
+			i64 rem          = val % 10;
+			buf[charIndex++] = (u8)rem + '0';
+			val /= 10;
 		}
 
 		// NOTE(doyle): If string is negative, we only want to reverse starting
@@ -2541,10 +2591,10 @@ DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 value, char *const buf, const i32 bufSize)
 	}
 	else
 	{
-		while (value != 0)
+		while (val != 0)
 		{
-			i32 rem = value % 10;
-			value /= 10;
+			i32 rem = val % 10;
+			val /= 10;
 			charIndex++;
 		}
 	}
@@ -2580,6 +2630,50 @@ DQN_FILE_SCOPE i64 Dqn_StrToI64(const char *const buf, const i32 bufSize)
 		{
 			break;
 		}
+	}
+
+	if (isNegative) result *= -1;
+
+	return result;
+}
+
+DQN_FILE_SCOPE f32 Dqn_StrToF32(const char *const buf, const i32 bufSize)
+{
+	if (!buf || bufSize == 0) return 0;
+
+	i32 index       = 0;
+	bool isNegative = false;
+	if (buf[index++] == '-') isNegative = true;
+
+	bool isPastDecimal        = false;
+	i32 numDigitsAfterDecimal = 0;
+	i32 rawNumber             = 0;
+	for (i32 i = index; i < bufSize; i++)
+	{
+		char ch = buf[i];
+		if (ch == '.')
+		{
+			isPastDecimal = true;
+			continue;
+		}
+		else if (!DqnChar_IsDigit(ch))
+		{
+			break;
+		}
+
+		numDigitsAfterDecimal += (i32)isPastDecimal;
+		rawNumber *= 10;
+		rawNumber += (ch - '0');
+	}
+
+	f32 digitShifter = 0.1f;
+	const f32 INV_10 = 1.0f / 10.0f;
+	for (i32 i = 0; i < numDigitsAfterDecimal-1; i++) digitShifter *= INV_10;
+
+	f32 result = (f32)rawNumber;
+	if (numDigitsAfterDecimal > 0)
+	{
+		result *= digitShifter;
 	}
 
 	if (isNegative) result *= -1;

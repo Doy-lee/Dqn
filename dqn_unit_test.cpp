@@ -178,7 +178,7 @@ void StringsTest()
 			    "StringsTest(): StrReverse: Completed successfully\n");
 		}
 
-		const u64 LARGEST_NUM     = (u64)-1;
+		const u64 LARGEST_NUM  = (u64)-1;
 		const i64 SMALLEST_NUM = -9223372036854775808LL;
 		// StrToI64
 		{
@@ -221,9 +221,11 @@ void StringsTest()
 			Dqn_I64ToStr(0, c, DQN_ARRAY_COUNT(c));
 			DQN_ASSERT(Dqn_strcmp(c, "0") == 0);
 
+#if 0
 			char d[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(LARGEST_NUM, d, DQN_ARRAY_COUNT(d));
 			DQN_ASSERT(Dqn_strcmp(d, "18446744073709551615") == 0);
+#endif
 
 			char e[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(SMALLEST_NUM, e, DQN_ARRAY_COUNT(e));
@@ -231,6 +233,76 @@ void StringsTest()
 
 			printf("StringsTest(): I64ToStr: Completed successfully\n");
 		}
+	}
+
+	// StrToF32
+	{
+		const f32 EPSILON = 0.001f;
+		const char a[]    = "-0.66248";
+		f32 vA            = Dqn_StrToF32(a, DQN_ARRAY_COUNT(a));
+		DQN_ASSERT(DQN_ABS(vA) - DQN_ABS(-0.66248f) < EPSILON);
+
+		const char b[] = "-0.632053";
+		f32 vB         = Dqn_StrToF32(b, DQN_ARRAY_COUNT(b));
+		DQN_ASSERT(DQN_ABS(vB) - DQN_ABS(-0.632053f) < EPSILON);
+
+		const char c[] = "-0.244271";
+		f32 vC         = Dqn_StrToF32(c, DQN_ARRAY_COUNT(c));
+		DQN_ASSERT(DQN_ABS(vC) - DQN_ABS(-0.244271f) < EPSILON);
+
+		const char d[] = "-0.511812";
+		f32 vD         = Dqn_StrToF32(d, DQN_ARRAY_COUNT(d));
+		DQN_ASSERT(DQN_ABS(vD) - DQN_ABS(-0.511812f) < EPSILON);
+
+		const char e[] = "-0.845392";
+		f32 vE         = Dqn_StrToF32(e, DQN_ARRAY_COUNT(e));
+		DQN_ASSERT(DQN_ABS(vE) - DQN_ABS(-0.845392f) < EPSILON);
+
+		const char f[] = "0.127809";
+		f32 vF         = Dqn_StrToF32(f, DQN_ARRAY_COUNT(f));
+		DQN_ASSERT(DQN_ABS(vF) - DQN_ABS(-0.127809f) < EPSILON);
+
+		const char g[] = "0.532";
+		f32 vG         = Dqn_StrToF32(g, DQN_ARRAY_COUNT(g));
+		DQN_ASSERT(DQN_ABS(vG) - DQN_ABS(-0.532f) < EPSILON);
+
+		const char h[] = "0.923";
+		f32 vH         = Dqn_StrToF32(h, DQN_ARRAY_COUNT(h));
+		DQN_ASSERT(DQN_ABS(vH) - DQN_ABS(-0.923f) < EPSILON);
+
+		const char i[] = "0.000";
+		f32 vI         = Dqn_StrToF32(i, DQN_ARRAY_COUNT(i));
+		DQN_ASSERT(DQN_ABS(vI) - DQN_ABS(-0.000f) < EPSILON);
+
+		const char j[] = "0.000283538";
+		f32 vJ         = Dqn_StrToF32(j, DQN_ARRAY_COUNT(j));
+		DQN_ASSERT(DQN_ABS(vJ) - DQN_ABS(-0.000283538f) < EPSILON);
+
+		const char k[] = "-1.25";
+		f32 vK         = Dqn_StrToF32(k, DQN_ARRAY_COUNT(k));
+		DQN_ASSERT(DQN_ABS(vK) - DQN_ABS(-1.25f) < EPSILON);
+
+		const char l[] = "0.286843";
+		f32 vL         = Dqn_StrToF32(l, DQN_ARRAY_COUNT(l));
+		DQN_ASSERT(DQN_ABS(vL) - DQN_ABS(-0.286843f) < EPSILON);
+
+		const char m[] = "-0.406";
+		f32 vM         = Dqn_StrToF32(m, DQN_ARRAY_COUNT(m));
+		DQN_ASSERT(DQN_ABS(vM) - DQN_ABS(-0.406f) < EPSILON);
+
+		const char n[] = "-0.892";
+		f32 vN         = Dqn_StrToF32(n, DQN_ARRAY_COUNT(n));
+		DQN_ASSERT(DQN_ABS(vN) - DQN_ABS(-0.892f) < EPSILON);
+
+		const char o[] = "0.201";
+		f32 vO         = Dqn_StrToF32(o, DQN_ARRAY_COUNT(o));
+		DQN_ASSERT(DQN_ABS(vO) - DQN_ABS(-0.201f) < EPSILON);
+
+		const char p[] = "1.25";
+		f32 vP         = Dqn_StrToF32(p, DQN_ARRAY_COUNT(p));
+		DQN_ASSERT(DQN_ABS(vP) - DQN_ABS(1.25f) < EPSILON);
+
+	    printf("StringsTest(): StrToF32: Completed successfully\n");
 	}
 
 	{
