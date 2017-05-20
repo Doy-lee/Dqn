@@ -302,7 +302,15 @@ void StringsTest()
 		f32 vP         = Dqn_StrToF32(p, DQN_ARRAY_COUNT(p));
 		DQN_ASSERT(DQN_ABS(vP) - DQN_ABS(1.25f) < EPSILON);
 
-	    printf("StringsTest(): StrToF32: Completed successfully\n");
+		const char q[] = "9.64635e-05";
+		f32 vQ         = Dqn_StrToF32(q, DQN_ARRAY_COUNT(q));
+		DQN_ASSERT(DQN_ABS(vQ) - DQN_ABS(9.64635e-05) < EPSILON);
+
+		const char r[] = "9.64635e+05";
+		f32 vR         = Dqn_StrToF32(q, DQN_ARRAY_COUNT(q));
+		DQN_ASSERT(DQN_ABS(vR) - DQN_ABS(9.64635e+05) < EPSILON);
+
+		printf("StringsTest(): StrToF32: Completed successfully\n");
 	}
 
 	{

@@ -535,11 +535,14 @@ DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_E
 ////////////////////////////////////////////////////////////////////////////////
 // Vec4
 ////////////////////////////////////////////////////////////////////////////////
-typedef union DqnV4
-{
+typedef union DqnV4 {
 	struct { f32 x, y, z, w; };
+	DqnV3 xyz;
+
 	struct { f32 r, g, b, a; };
-	f32 e[4];
+	DqnV3 rgb;
+
+	f32    e[4];
 	DqnV2 v2[2];
 } DqnV4;
 
@@ -2643,11 +2646,18 @@ DQN_FILE_SCOPE f32 Dqn_StrToF32(const char *const buf, const i32 bufSize)
 
 	i32 index       = 0;
 	bool isNegative = false;
-	if (buf[index++] == '-') isNegative = true;
+	if (buf[index] == '-')
+	{
+		index++;
+		isNegative = true;
+	}
 
 	bool isPastDecimal        = false;
 	i32 numDigitsAfterDecimal = 0;
 	i32 rawNumber             = 0;
+
+	f32 digitShiftValue      = 1.0f;
+	f32 digitShiftMultiplier = 0.1f;
 	for (i32 i = index; i < bufSize; i++)
 	{
 		char ch = buf[i];
@@ -2656,26 +2666,61 @@ DQN_FILE_SCOPE f32 Dqn_StrToF32(const char *const buf, const i32 bufSize)
 			isPastDecimal = true;
 			continue;
 		}
-		else if (!DqnChar_IsDigit(ch))
+		// Handle scientific notation
+		else if (ch == 'e')
+		{
+			bool digitShiftIsPositive = true;
+			if (i < bufSize)
+			{
+				if (buf[i + 1] == '-') digitShiftIsPositive = false;
+				DQN_ASSERT(buf[i + 1] == '-' || buf[i + 1] == '+');
+				i += 2;
+			}
+
+			i32 exponentPow         = 0;
+			bool scientificNotation = false;
+			while (i < bufSize)
+			{
+				scientificNotation = true;
+				char exponentCh    = buf[i];
+				if (DqnChar_IsDigit(exponentCh))
+				{
+					exponentPow *= 10;
+					exponentPow += (buf[i] - '0');
+				}
+				else
+				{
+					i = bufSize;
+				}
+
+				i++;
+			}
+
+			// NOTE(doyle): If exponent not specified but this branch occurred,
+			// the float string has a malformed scientific notation in the
+			// string, i.e. "e" followed by no number.
+			DQN_ASSERT(scientificNotation);
+
+			numDigitsAfterDecimal += exponentPow;
+			if (digitShiftIsPositive) digitShiftMultiplier = 10.0f;
+		}
+		else if (DqnChar_IsDigit(ch))
+		{
+			numDigitsAfterDecimal += (i32)isPastDecimal;
+			rawNumber *= 10;
+			rawNumber += (ch - '0');
+		}
+		else
 		{
 			break;
 		}
-
-		numDigitsAfterDecimal += (i32)isPastDecimal;
-		rawNumber *= 10;
-		rawNumber += (ch - '0');
 	}
 
-	f32 digitShifter = 0.1f;
-	const f32 INV_10 = 1.0f / 10.0f;
-	for (i32 i = 0; i < numDigitsAfterDecimal-1; i++) digitShifter *= INV_10;
+	for (i32 i = 0; i < numDigitsAfterDecimal; i++)
+		digitShiftValue *= digitShiftMultiplier;
 
 	f32 result = (f32)rawNumber;
-	if (numDigitsAfterDecimal > 0)
-	{
-		result *= digitShifter;
-	}
-
+	if (numDigitsAfterDecimal > 0) result *= digitShiftValue;
 	if (isNegative) result *= -1;
 
 	return result;
