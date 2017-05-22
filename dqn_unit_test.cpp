@@ -1037,82 +1037,82 @@ void FileTest()
 	printf("FileTest(): Completed successfully\n");
 }
 
-void MemBufferTest()
+void MemStackTest()
 {
 	// Test over allocation, alignments, temp regions
 	{
 		size_t allocSize    = DQN_KILOBYTE(1);
-		DqnMemBuffer buffer = {};
+		DqnMemStack stack = {};
 		const u32 ALIGNMENT = 4;
-		DqnMemBuffer_Init(&buffer, allocSize, false, ALIGNMENT);
-		DQN_ASSERT(buffer.block && buffer.block->memory);
-		DQN_ASSERT(buffer.block->size == allocSize);
-		DQN_ASSERT(buffer.block->used == 0);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DqnMemStack_Init(&stack, allocSize, false, ALIGNMENT);
+		DQN_ASSERT(stack.block && stack.block->memory);
+		DQN_ASSERT(stack.block->size == allocSize);
+		DQN_ASSERT(stack.block->used == 0);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// Alocate A
 		size_t sizeA    = (size_t)(allocSize * 0.5f);
-		void *resultA   = DqnMemBuffer_Allocate(&buffer, sizeA);
+		void *resultA   = DqnMemStack_Allocate(&stack, sizeA);
 		u64 resultAddrA = *((u64 *)resultA);
 		DQN_ASSERT(resultAddrA % ALIGNMENT == 0);
-		DQN_ASSERT(buffer.block && buffer.block->memory);
-		DQN_ASSERT(buffer.block->size == allocSize);
-		DQN_ASSERT(buffer.block->used >= sizeA + 0 &&
-		           buffer.block->used <= sizeA + 3);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DQN_ASSERT(stack.block && stack.block->memory);
+		DQN_ASSERT(stack.block->size == allocSize);
+		DQN_ASSERT(stack.block->used >= sizeA + 0 &&
+		           stack.block->used <= sizeA + 3);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 		DQN_ASSERT(resultA);
 		u8 *ptrA = (u8 *)resultA;
 		for (u32 i  = 0; i < sizeA; i++)
 			ptrA[i] = 1;
 
-		DqnMemBufferBlock *blockA = buffer.block;
+		DqnMemStackBlock *blockA = stack.block;
 		// Alocate B
 		size_t sizeB    = (size_t)(allocSize * 2.0f);
-		void *resultB   = DqnMemBuffer_Allocate(&buffer, sizeB);
+		void *resultB   = DqnMemStack_Allocate(&stack, sizeB);
 		u64 resultAddrB = *((u64 *)resultB);
 		DQN_ASSERT(resultAddrB % ALIGNMENT == 0);
-		DQN_ASSERT(buffer.block && buffer.block->memory);
-		DQN_ASSERT(buffer.block->size == DQN_KILOBYTE(2));
+		DQN_ASSERT(stack.block && stack.block->memory);
+		DQN_ASSERT(stack.block->size == DQN_KILOBYTE(2));
 
 		// Since we alignment the pointers we return they can be within 0-3
 		// bytes of what we expect and since this is in a new block as well used
 		// will reflect just this allocation.
-		DQN_ASSERT(buffer.block->used >= sizeB + 0 &&
-		           buffer.block->used <= sizeB + 3);
+		DQN_ASSERT(stack.block->used >= sizeB + 0 &&
+		           stack.block->used <= sizeB + 3);
 		DQN_ASSERT(resultB);
 		u8 *ptrB = (u8 *)resultB;
 		for (u32 i  = 0; i < sizeB; i++)
 			ptrB[i] = 2;
 
 		// Check that a new block was created since there wasn't enough space
-		DQN_ASSERT(buffer.block->prevBlock == blockA);
-		DQN_ASSERT(buffer.block != blockA);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DQN_ASSERT(stack.block->prevBlock == blockA);
+		DQN_ASSERT(stack.block != blockA);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 		DQN_ASSERT(blockA->used == sizeA);
-		DqnMemBufferBlock *blockB = buffer.block;
+		DqnMemStackBlock *blockB = stack.block;
 
 		// Check temp regions work
-		DqnTempBuffer tempBuffer = DqnMemBuffer_BeginTempRegion(&buffer);
+		DqnTempMemStack tempBuffer = DqnMemStack_BeginTempRegion(&stack);
 		size_t sizeC             = 1024 + 1;
-		void *resultC   = DqnMemBuffer_Allocate(tempBuffer.buffer, sizeC);
+		void *resultC   = DqnMemStack_Allocate(tempBuffer.stack, sizeC);
 		u64 resultAddrC = *((u64 *)resultC);
 		DQN_ASSERT(resultAddrC % ALIGNMENT == 0);
-		DQN_ASSERT(buffer.block != blockB && buffer.block != blockA);
-		DQN_ASSERT(buffer.block->used >= sizeC + 0 &&
-		           buffer.block->used <= sizeC + 3);
-		DQN_ASSERT(buffer.tempBufferCount == 1);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DQN_ASSERT(stack.block != blockB && stack.block != blockA);
+		DQN_ASSERT(stack.block->used >= sizeC + 0 &&
+		           stack.block->used <= sizeC + 3);
+		DQN_ASSERT(stack.tempStackCount == 1);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// NOTE: Allocation should be aligned to 4 byte boundary
-		DQN_ASSERT(tempBuffer.buffer->block->size == 2048);
+		DQN_ASSERT(tempBuffer.stack->block->size == 2048);
 		u8 *ptrC = (u8 *)resultC;
 		for (u32 i  = 0; i < sizeC; i++)
 			ptrC[i] = 3;
 
 		// Check that a new block was created since there wasn't enough space
-		DQN_ASSERT(buffer.block->prevBlock == blockB);
-		DQN_ASSERT(buffer.block != blockB);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DQN_ASSERT(stack.block->prevBlock == blockB);
+		DQN_ASSERT(stack.block != blockB);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		for (u32 i = 0; i < sizeA; i++)
 			DQN_ASSERT(ptrA[i] == 1);
@@ -1121,119 +1121,119 @@ void MemBufferTest()
 		for (u32 i = 0; i < sizeC; i++)
 			DQN_ASSERT(ptrC[i] == 3);
 
-		// End temp region which should revert back to 2 linked buffers, A and B
-		DqnMemBuffer_EndTempRegion(tempBuffer);
-		DQN_ASSERT(buffer.block && buffer.block->memory);
-		DQN_ASSERT(buffer.block->size == sizeB);
-		DQN_ASSERT(buffer.block->used >= sizeB + 0 &&
-		           buffer.block->used <= sizeB + 3);
-		DQN_ASSERT(buffer.tempBufferCount == 0);
+		// End temp region which should revert back to 2 linked stacks, A and B
+		DqnMemStack_EndTempRegion(tempBuffer);
+		DQN_ASSERT(stack.block && stack.block->memory);
+		DQN_ASSERT(stack.block->size == sizeB);
+		DQN_ASSERT(stack.block->used >= sizeB + 0 &&
+		           stack.block->used <= sizeB + 3);
+		DQN_ASSERT(stack.tempStackCount == 0);
 		DQN_ASSERT(resultB);
 
-		DQN_ASSERT(buffer.block->prevBlock == blockA);
-		DQN_ASSERT(buffer.block != blockA);
+		DQN_ASSERT(stack.block->prevBlock == blockA);
+		DQN_ASSERT(stack.block != blockA);
 		DQN_ASSERT(blockA->used == sizeA);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
-		// Release the last linked buffer from the push buffer
-		DqnMemBuffer_FreeLastBlock(&buffer);
+		// Release the last linked stack from the push stack
+		DqnMemStack_FreeLastBlock(&stack);
 
 		// Which should return back to the 1st allocation
-		DQN_ASSERT(buffer.block == blockA);
-		DQN_ASSERT(buffer.block->memory);
-		DQN_ASSERT(buffer.block->size == allocSize);
-		DQN_ASSERT(buffer.block->used == sizeA);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DQN_ASSERT(stack.block == blockA);
+		DQN_ASSERT(stack.block->memory);
+		DQN_ASSERT(stack.block->size == allocSize);
+		DQN_ASSERT(stack.block->used == sizeA);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
-		// Free once more to release buffer A memory
-		DqnMemBuffer_FreeLastBlock(&buffer);
-		DQN_ASSERT(!buffer.block);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
-		DQN_ASSERT(buffer.tempBufferCount == 0);
+		// Free once more to release stack A memory
+		DqnMemStack_FreeLastBlock(&stack);
+		DQN_ASSERT(!stack.block);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
+		DQN_ASSERT(stack.tempStackCount == 0);
 	}
 
-	// Test buffer with fixed memory does not allocate more
+	// Test stack with fixed memory does not allocate more
 	{
 		u8 memory[DQN_KILOBYTE(1)] = {};
-		DqnMemBuffer buffer        = {};
+		DqnMemStack stack        = {};
 		const u32 ALIGNMENT        = 4;
-		DqnMemBuffer_InitWithFixedMem(&buffer, memory, DQN_ARRAY_COUNT(memory),
+		DqnMemStack_InitWithFixedMem(&stack, memory, DQN_ARRAY_COUNT(memory),
 		                              ALIGNMENT);
-		DQN_ASSERT(buffer.block && buffer.block->memory);
-		DQN_ASSERT(buffer.block->size ==
-		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemBufferBlock));
-		DQN_ASSERT(buffer.block->used == 0);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DQN_ASSERT(stack.block && stack.block->memory);
+		DQN_ASSERT(stack.block->size ==
+		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
+		DQN_ASSERT(stack.block->used == 0);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// Allocation larger than stack mem size should fail
-		DQN_ASSERT(!DqnMemBuffer_Allocate(&buffer, DQN_ARRAY_COUNT(memory) * 2));
+		DQN_ASSERT(!DqnMemStack_Allocate(&stack, DQN_ARRAY_COUNT(memory) * 2));
 
 		// Check free does nothing
-		DqnMemBuffer_Free(&buffer);
-		DqnMemBuffer_FreeLastBlock(&buffer);
-		DQN_ASSERT(buffer.block && buffer.block->memory);
-		DQN_ASSERT(buffer.block->size ==
-		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemBufferBlock));
-		DQN_ASSERT(buffer.block->used == 0);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DqnMemStack_Free(&stack);
+		DqnMemStack_FreeLastBlock(&stack);
+		DQN_ASSERT(stack.block && stack.block->memory);
+		DQN_ASSERT(stack.block->size ==
+		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
+		DQN_ASSERT(stack.block->used == 0);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 	}
 
-	// Test buffer with fixed size, allocates once from platform but does not
+	// Test stack with fixed size, allocates once from platform but does not
 	// grow further
 	{
 		size_t allocSize    = DQN_KILOBYTE(1);
-		DqnMemBuffer buffer = {};
+		DqnMemStack stack = {};
 		const u32 ALIGNMENT = 4;
-		DqnMemBuffer_InitWithFixedSize(&buffer, allocSize, false, ALIGNMENT);
-		DQN_ASSERT(buffer.block && buffer.block->memory);
-		DQN_ASSERT(buffer.block->size == allocSize);
-		DQN_ASSERT(buffer.block->used == 0);
-		DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
+		DqnMemStack_InitWithFixedSize(&stack, allocSize, false, ALIGNMENT);
+		DQN_ASSERT(stack.block && stack.block->memory);
+		DQN_ASSERT(stack.block->size == allocSize);
+		DQN_ASSERT(stack.block->used == 0);
+		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
-		void *result = DqnMemBuffer_Allocate(&buffer, (size_t)(0.5f * allocSize));
+		void *result = DqnMemStack_Allocate(&stack, (size_t)(0.5f * allocSize));
 		DQN_ASSERT(result);
 
 		// Allocating more should fail
-		DQN_ASSERT(!DqnMemBuffer_Allocate(&buffer, allocSize));
+		DQN_ASSERT(!DqnMemStack_Allocate(&stack, allocSize));
 
 		// Freeing should work
-		DqnMemBuffer_Free(&buffer);
-		DQN_ASSERT(!buffer.block);
+		DqnMemStack_Free(&stack);
+		DQN_ASSERT(!stack.block);
 	}
 
 	// Test freeing/clear block and alignment
 	{
 		size_t firstBlockSize = DQN_KILOBYTE(1);
-		DqnMemBuffer buffer = {};
+		DqnMemStack stack = {};
 		const u32 ALIGNMENT = 16;
-		DqnMemBuffer_Init(&buffer, firstBlockSize, false, ALIGNMENT);
+		DqnMemStack_Init(&stack, firstBlockSize, false, ALIGNMENT);
 
-		DqnMemBufferBlock *firstBlock = buffer.block;
+		DqnMemStackBlock *firstBlock = stack.block;
 		u8 *first                     = NULL;
 		{
 			u32 allocate40Bytes = 40;
-			u8 *data = (u8 *)DqnMemBuffer_Allocate(&buffer, allocate40Bytes);
+			u8 *data = (u8 *)DqnMemStack_Allocate(&stack, allocate40Bytes);
 
 			// Test that the allocation got aligned to 16 byte boundary
 			DQN_ASSERT(data);
-			DQN_ASSERT(buffer.block->size == firstBlockSize);
+			DQN_ASSERT(stack.block->size == firstBlockSize);
 			DQN_ASSERT((size_t)data % ALIGNMENT == 0);
 
 			for (u32 i  = 0; i < allocate40Bytes; i++)
 				data[i] = 'a';
 
 			// Clear the block, but don't zero it out
-			DqnMemBuffer_ClearCurrBlock(&buffer, false);
+			DqnMemStack_ClearCurrBlock(&stack, false);
 			for (u32 i = 0; i < allocate40Bytes; i++)
 				DQN_ASSERT(data[i] == 'a');
 
 			// Test clear reverted the use pointer
-			DQN_ASSERT(buffer.block->used == 0);
-			DQN_ASSERT(buffer.block->size == firstBlockSize);
+			DQN_ASSERT(stack.block->used == 0);
+			DQN_ASSERT(stack.block->size == firstBlockSize);
 
 			// Reallocate the data
-			data = (u8 *)DqnMemBuffer_Allocate(&buffer, firstBlockSize);
-			DQN_ASSERT(buffer.block->size == firstBlockSize);
+			data = (u8 *)DqnMemStack_Allocate(&stack, firstBlockSize);
+			DQN_ASSERT(stack.block->size == firstBlockSize);
 			DQN_ASSERT((size_t)data % ALIGNMENT == 0);
 
 			// Fill with 'b's
@@ -1241,19 +1241,19 @@ void MemBufferTest()
 				data[i] = 'b';
 
 			// Clear block and zero it out
-			DqnMemBuffer_ClearCurrBlock(&buffer, true);
+			DqnMemStack_ClearCurrBlock(&stack, true);
 			for (u32 i = 0; i < firstBlockSize; i++)
 				DQN_ASSERT(data[i] == 0);
 
-			// General Check buffer struct contains the values we expect from
+			// General Check stack struct contains the values we expect from
 			// initialisation
-			DQN_ASSERT(buffer.flags == 0);
-			DQN_ASSERT(buffer.tempBufferCount == 0);
-			DQN_ASSERT(buffer.byteAlign == ALIGNMENT);
-			DQN_ASSERT(buffer.block->size == firstBlockSize);
+			DQN_ASSERT(stack.flags == 0);
+			DQN_ASSERT(stack.tempStackCount == 0);
+			DQN_ASSERT(stack.byteAlign == ALIGNMENT);
+			DQN_ASSERT(stack.block->size == firstBlockSize);
 
 			// Write out data to current block
-			data = (u8 *)DqnMemBuffer_Allocate(&buffer, firstBlockSize);
+			data = (u8 *)DqnMemStack_Allocate(&stack, firstBlockSize);
 			for (u32 i  = 0; i < firstBlockSize; i++)
 				data[i] = 'c';
 
@@ -1262,20 +1262,20 @@ void MemBufferTest()
 
 		// Force it to allocate three new blocks and write out data to each
 		size_t secondBlockSize = DQN_KILOBYTE(2);
-		u8 *second = (u8 *)DqnMemBuffer_Allocate(&buffer, secondBlockSize);
-		DqnMemBufferBlock *secondBlock = buffer.block;
+		u8 *second = (u8 *)DqnMemStack_Allocate(&stack, secondBlockSize);
+		DqnMemStackBlock *secondBlock = stack.block;
 		for (u32 i  = 0; i < secondBlockSize; i++)
 			second[i] = 'd';
 
 		size_t thirdBlockSize = DQN_KILOBYTE(3);
-		u8 *third = (u8 *)DqnMemBuffer_Allocate(&buffer, thirdBlockSize);
-		DqnMemBufferBlock *thirdBlock = buffer.block;
+		u8 *third = (u8 *)DqnMemStack_Allocate(&stack, thirdBlockSize);
+		DqnMemStackBlock *thirdBlock = stack.block;
 		for (u32 i  = 0; i < thirdBlockSize; i++)
 			third[i] = 'e';
 
 		size_t fourthBlockSize = DQN_KILOBYTE(4);
-		u8 *fourth = (u8 *)DqnMemBuffer_Allocate(&buffer, fourthBlockSize);
-		DqnMemBufferBlock *fourthBlock = buffer.block;
+		u8 *fourth = (u8 *)DqnMemStack_Allocate(&stack, fourthBlockSize);
+		DqnMemStackBlock *fourthBlock = stack.block;
 		for (u32 i  = 0; i < fourthBlockSize; i++)
 			fourth[i] = 'f';
 
@@ -1288,11 +1288,11 @@ void MemBufferTest()
 		// NOTE: Making blocks manually is not really recommended ..
 		// Try and free an invalid block by mocking a fake block
 		u8 fakeBlockMem[DQN_KILOBYTE(3)] = {};
-		DqnMemBufferBlock fakeBlock   = {};
+		DqnMemStackBlock fakeBlock   = {};
 		fakeBlock.memory              = fakeBlockMem;
 		fakeBlock.size                = DQN_ARRAY_COUNT(fakeBlockMem);
 		fakeBlock.used                = 0;
-		DQN_ASSERT(!DqnMemBuffer_FreeBufferBlock(&buffer, &fakeBlock));
+		DQN_ASSERT(!DqnMemStack_FreeStackBlock(&stack, &fakeBlock));
 
 		//Ensure that the actual blocks are still valid and freeing did nothing
 		DQN_ASSERT(firstBlock->size  == firstBlockSize);
@@ -1324,7 +1324,7 @@ void MemBufferTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the first block
-		DqnMemBuffer_FreeBufferBlock(&buffer, firstBlock);
+		DqnMemStack_FreeStackBlock(&stack, firstBlock);
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
@@ -1350,7 +1350,7 @@ void MemBufferTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the third block
-		DqnMemBuffer_FreeBufferBlock(&buffer, thirdBlock);
+		DqnMemStack_FreeStackBlock(&stack, thirdBlock);
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
@@ -1370,7 +1370,7 @@ void MemBufferTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the second block
-		DqnMemBuffer_FreeBufferBlock(&buffer, secondBlock);
+		DqnMemStack_FreeStackBlock(&stack, secondBlock);
 
 		// Revalidate state
 		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
@@ -1380,9 +1380,22 @@ void MemBufferTest()
 		for (u32 i  = 0; i < fourthBlockSize; i++)
 			DQN_ASSERT(fourth[i] == 'f');
 
-		// Free the buffer
-		DqnMemBuffer_Free(&buffer);
-		DQN_ASSERT(!buffer.block);
+		// Free the stack
+		DqnMemStack_Free(&stack);
+		DQN_ASSERT(!stack.block);
+	}
+
+	// Test pop
+	{
+		DqnMemStack stack = {};
+		DqnMemStack_Init(&stack, DQN_KILOBYTE(1), true);
+
+		size_t allocSize = 512;
+		void *alloc = DqnMemStack_Allocate(&stack, allocSize);
+		DQN_ASSERT(stack.block->used == allocSize);
+
+		DQN_ASSERT(DqnMemStack_Pop(&stack, alloc, allocSize));
+		DQN_ASSERT(stack.block->used == 0);
 	}
 }
 
@@ -1395,7 +1408,7 @@ int main(void)
 	OtherTest();
 	ArrayTest();
 	FileTest();
-	MemBufferTest();
+	MemStackTest();
 
 	printf("\nPress 'Enter' Key to Exit\n");
 	getchar();
