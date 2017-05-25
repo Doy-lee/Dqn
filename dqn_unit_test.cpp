@@ -1052,7 +1052,7 @@ void MemStackTest()
 
 		// Alocate A
 		size_t sizeA    = (size_t)(allocSize * 0.5f);
-		void *resultA   = DqnMemStack_Allocate(&stack, sizeA);
+		void *resultA   = DqnMemStack_Push(&stack, sizeA);
 		u64 resultAddrA = *((u64 *)resultA);
 		DQN_ASSERT(resultAddrA % ALIGNMENT == 0);
 		DQN_ASSERT(stack.block && stack.block->memory);
@@ -1068,7 +1068,7 @@ void MemStackTest()
 		DqnMemStackBlock *blockA = stack.block;
 		// Alocate B
 		size_t sizeB    = (size_t)(allocSize * 2.0f);
-		void *resultB   = DqnMemStack_Allocate(&stack, sizeB);
+		void *resultB   = DqnMemStack_Push(&stack, sizeB);
 		u64 resultAddrB = *((u64 *)resultB);
 		DQN_ASSERT(resultAddrB % ALIGNMENT == 0);
 		DQN_ASSERT(stack.block && stack.block->memory);
@@ -1094,7 +1094,7 @@ void MemStackTest()
 		// Check temp regions work
 		DqnTempMemStack tempBuffer = DqnMemStack_BeginTempRegion(&stack);
 		size_t sizeC             = 1024 + 1;
-		void *resultC   = DqnMemStack_Allocate(tempBuffer.stack, sizeC);
+		void *resultC   = DqnMemStack_Push(tempBuffer.stack, sizeC);
 		u64 resultAddrC = *((u64 *)resultC);
 		DQN_ASSERT(resultAddrC % ALIGNMENT == 0);
 		DQN_ASSERT(stack.block != blockB && stack.block != blockA);
@@ -1166,7 +1166,7 @@ void MemStackTest()
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// Allocation larger than stack mem size should fail
-		DQN_ASSERT(!DqnMemStack_Allocate(&stack, DQN_ARRAY_COUNT(memory) * 2));
+		DQN_ASSERT(!DqnMemStack_Push(&stack, DQN_ARRAY_COUNT(memory) * 2));
 
 		// Check free does nothing
 		DqnMemStack_Free(&stack);
@@ -1190,11 +1190,11 @@ void MemStackTest()
 		DQN_ASSERT(stack.block->used == 0);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
-		void *result = DqnMemStack_Allocate(&stack, (size_t)(0.5f * allocSize));
+		void *result = DqnMemStack_Push(&stack, (size_t)(0.5f * allocSize));
 		DQN_ASSERT(result);
 
 		// Allocating more should fail
-		DQN_ASSERT(!DqnMemStack_Allocate(&stack, allocSize));
+		DQN_ASSERT(!DqnMemStack_Push(&stack, allocSize));
 
 		// Freeing should work
 		DqnMemStack_Free(&stack);
@@ -1212,7 +1212,7 @@ void MemStackTest()
 		u8 *first                     = NULL;
 		{
 			u32 allocate40Bytes = 40;
-			u8 *data = (u8 *)DqnMemStack_Allocate(&stack, allocate40Bytes);
+			u8 *data = (u8 *)DqnMemStack_Push(&stack, allocate40Bytes);
 
 			// Test that the allocation got aligned to 16 byte boundary
 			DQN_ASSERT(data);
@@ -1232,7 +1232,7 @@ void MemStackTest()
 			DQN_ASSERT(stack.block->size == firstBlockSize);
 
 			// Reallocate the data
-			data = (u8 *)DqnMemStack_Allocate(&stack, firstBlockSize);
+			data = (u8 *)DqnMemStack_Push(&stack, firstBlockSize);
 			DQN_ASSERT(stack.block->size == firstBlockSize);
 			DQN_ASSERT((size_t)data % ALIGNMENT == 0);
 
@@ -1253,7 +1253,7 @@ void MemStackTest()
 			DQN_ASSERT(stack.block->size == firstBlockSize);
 
 			// Write out data to current block
-			data = (u8 *)DqnMemStack_Allocate(&stack, firstBlockSize);
+			data = (u8 *)DqnMemStack_Push(&stack, firstBlockSize);
 			for (u32 i  = 0; i < firstBlockSize; i++)
 				data[i] = 'c';
 
@@ -1262,19 +1262,19 @@ void MemStackTest()
 
 		// Force it to allocate three new blocks and write out data to each
 		size_t secondBlockSize = DQN_KILOBYTE(2);
-		u8 *second = (u8 *)DqnMemStack_Allocate(&stack, secondBlockSize);
+		u8 *second = (u8 *)DqnMemStack_Push(&stack, secondBlockSize);
 		DqnMemStackBlock *secondBlock = stack.block;
 		for (u32 i  = 0; i < secondBlockSize; i++)
 			second[i] = 'd';
 
 		size_t thirdBlockSize = DQN_KILOBYTE(3);
-		u8 *third = (u8 *)DqnMemStack_Allocate(&stack, thirdBlockSize);
+		u8 *third = (u8 *)DqnMemStack_Push(&stack, thirdBlockSize);
 		DqnMemStackBlock *thirdBlock = stack.block;
 		for (u32 i  = 0; i < thirdBlockSize; i++)
 			third[i] = 'e';
 
 		size_t fourthBlockSize = DQN_KILOBYTE(4);
-		u8 *fourth = (u8 *)DqnMemStack_Allocate(&stack, fourthBlockSize);
+		u8 *fourth = (u8 *)DqnMemStack_Push(&stack, fourthBlockSize);
 		DqnMemStackBlock *fourthBlock = stack.block;
 		for (u32 i  = 0; i < fourthBlockSize; i++)
 			fourth[i] = 'f';
@@ -1391,7 +1391,7 @@ void MemStackTest()
 		DqnMemStack_Init(&stack, DQN_KILOBYTE(1), true);
 
 		size_t allocSize = 512;
-		void *alloc = DqnMemStack_Allocate(&stack, allocSize);
+		void *alloc = DqnMemStack_Push(&stack, allocSize);
 		DQN_ASSERT(stack.block->used == allocSize);
 
 		DQN_ASSERT(DqnMemStack_Pop(&stack, alloc, allocSize));

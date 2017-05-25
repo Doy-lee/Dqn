@@ -20,6 +20,7 @@
 #endif
 
 #include <stdint.h> // For standard types
+#include <float.h>
 #define LOCAL_PERSIST static
 #define FILE_SCOPE    static
 
@@ -34,6 +35,8 @@ typedef int16_t i16;
 
 typedef double f64;
 typedef float  f32;
+
+#define DQN_F32_MIN -FLT_MAX
 
 #define DQN_TERABYTE(val) (DQN_GIGABYTE(val) * 1024LL)
 #define DQN_GIGABYTE(val) (DQN_MEGABYTE(val) * 1024LL)
@@ -75,7 +78,7 @@ DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
 
 // When an allocation requires a larger amount of memory than available in the
 // block then the MemStack will allocate a new block of sufficient size for
-// you in DqnMemStack_Allocate(..). This _DOES_ mean that there will be wasted
+// you in DqnMemStack_Push(..). This _DOES_ mean that there will be wasted
 // space at the end of each block and is a tradeoff for memory locality against
 // optimal space usage.
 
@@ -88,7 +91,7 @@ DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
 //    - InitWithFixedSize() allows you to to disable dynamic allocations and
 //      sub-allocate from the initial MemStack allocation size only.
 
-// 2. Use DqnMemStack_Allocate(..) to allocate memory for use.
+// 2. Use DqnMemStack_Push(..) to allocate memory for use.
 //    - "Freeing" memory is dealt by creating temporary MemStacks or using the
 //      BeginTempRegion and EndTempRegion functions. Specifically freeing
 //      individual items is typically not generalisable in this scheme.
@@ -129,12 +132,12 @@ DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedMem (DqnMemStack *const stack, u8 *
 DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedSize(DqnMemStack *const stack, size_t size, const bool zeroClear, const u32 byteAlign = 4); // Single allocation from platform, no further allocations, returns NULL of allocate if out of space
 DQN_FILE_SCOPE bool DqnMemStack_Init             (DqnMemStack *const stack, size_t size, const bool zeroClear, const u32 byteAlign = 4); // Allocates from platform dynamically as space runs out
 
-DQN_FILE_SCOPE void *DqnMemStack_Allocate       (DqnMemStack *const stack, size_t size);             // Returns NULL if out of space and stack is using fixed memory/size, or platform allocation fails
-DQN_FILE_SCOPE bool  DqnMemStack_Pop            (DqnMemStack *const stack, void *ptr, size_t size);  // Frees the given ptr. It MUST be the last allocated item in the stack
-DQN_FILE_SCOPE void  DqnMemStack_Free           (DqnMemStack *const stack);                          // Frees all blocks belonging to this stack
-DQN_FILE_SCOPE bool  DqnMemStack_FreeStackBlock (DqnMemStack *const stack, DqnMemStackBlock *block); // Frees the specified block, returns false if block doesn't belong
-DQN_FILE_SCOPE bool  DqnMemStack_FreeLastBlock  (DqnMemStack *const stack);                          // Frees the last-most memory block. If last block, free that block, next allocate will attach a block.
-DQN_FILE_SCOPE void  DqnMemStack_ClearCurrBlock (DqnMemStack *const stack, const bool zeroClear);    // Reset the current memory block usage to 0
+DQN_FILE_SCOPE void *DqnMemStack_Push          (DqnMemStack *const stack, size_t size);             // Returns NULL if out of space and stack is using fixed memory/size, or platform allocation fails
+DQN_FILE_SCOPE bool  DqnMemStack_Pop           (DqnMemStack *const stack, void *ptr, size_t size);  // Frees the given ptr. It MUST be the last allocated item in the stack
+DQN_FILE_SCOPE void  DqnMemStack_Free          (DqnMemStack *const stack);                          // Frees all blocks belonging to this stack
+DQN_FILE_SCOPE bool  DqnMemStack_FreeStackBlock(DqnMemStack *const stack, DqnMemStackBlock *block); // Frees the specified block, returns false if block doesn't belong
+DQN_FILE_SCOPE bool  DqnMemStack_FreeLastBlock (DqnMemStack *const stack);                          // Frees the last-most memory block. If last block, free that block, next allocate will attach a block.
+DQN_FILE_SCOPE void  DqnMemStack_ClearCurrBlock(DqnMemStack *const stack, const bool zeroClear);    // Reset the current memory block usage to 0
 
 // TempMemStack is only required for the function. Once BeginTempRegion() is called, subsequent allocation calls can be made using the original stack.
 // Upon EndTempRegion() the original stack will free any additional blocks it allocated during the temp region and revert to the original
@@ -504,6 +507,8 @@ DQN_FILE_SCOPE inline bool    operator==(DqnV2i  a, DqnV2i b) { return      DqnV
 typedef union DqnV3
 {
 	struct { f32 x, y, z; };
+    DqnV2 xy;
+
     struct { f32 r, g, b; };
 	f32 e[3];
 } DqnV3;
@@ -528,6 +533,8 @@ DQN_FILE_SCOPE f32   DqnV3_Dot     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE bool  DqnV3_Equals  (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Cross   (DqnV3 a, DqnV3 b);
 
+DQN_FILE_SCOPE DqnV3 DqnV3_Normalise(DqnV3 a);
+
 DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);  }
 DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);  }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);  }
@@ -548,8 +555,12 @@ DQN_FILE_SCOPE DqnV3i DqnV3i_3f(f32 x, f32 y, f32 z);
 // Vec4
 ////////////////////////////////////////////////////////////////////////////////
 typedef union DqnV4 {
-	struct { f32 x, y, z, w; };
+	struct
+	{
+		f32 x, y, z, w;
+	};
 	DqnV3 xyz;
+	DqnV2 xy;
 
 	struct { f32 r, g, b, a; };
 	DqnV3 rgb;
@@ -571,17 +582,18 @@ DQN_FILE_SCOPE DqnV4 DqnV4_Hadamard(DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE f32   DqnV4_Dot     (DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE bool  DqnV4_Equals  (DqnV4 a, DqnV4 b);
 
-DQN_FILE_SCOPE inline DqnV4  operator- (DqnV4  a, DqnV4 b) { return      DqnV4_Sub     (a, b);  }
-DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, DqnV4 b) { return      DqnV4_Add     (a, b);  }
-DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, DqnV4 b) { return      DqnV4_Hadamard(a, b);  }
-DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, f32   b) { return      DqnV4_Scalef  (a, b);  }
-DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, i32   b) { return      DqnV4_Scalei  (a, b);  }
-DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Hadamard(a, b)); }
-DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, f32   b) { return (a = DqnV4_Scalef  (a, b)); }
-DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, i32   b) { return (a = DqnV4_Scalei  (a, b)); }
-DQN_FILE_SCOPE inline DqnV4 &operator-=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Sub     (a, b)); }
-DQN_FILE_SCOPE inline DqnV4 &operator+=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Add     (a, b)); }
-DQN_FILE_SCOPE inline bool   operator==(DqnV4  a, DqnV4 b) { return      DqnV4_Equals  (a, b);  }
+DQN_FILE_SCOPE inline DqnV4  operator- (DqnV4  a, DqnV4 b) { return      DqnV4_Sub     (a, b);            }
+DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, DqnV4 b) { return      DqnV4_Add     (a, b);            }
+DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4_1f(b));  }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, DqnV4 b) { return      DqnV4_Hadamard(a, b);            }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, f32   b) { return      DqnV4_Scalef  (a, b);            }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, i32   b) { return      DqnV4_Scalei  (a, b);            }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Hadamard(a, b));           }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, f32   b) { return (a = DqnV4_Scalef  (a, b));           }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, i32   b) { return (a = DqnV4_Scalei  (a, b));           }
+DQN_FILE_SCOPE inline DqnV4 &operator-=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Sub     (a, b));           }
+DQN_FILE_SCOPE inline DqnV4 &operator+=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Add     (a, b));           }
+DQN_FILE_SCOPE inline bool   operator==(DqnV4  a, DqnV4 b) { return      DqnV4_Equals  (a, b);            }
 
 ////////////////////////////////////////////////////////////////////////////////
 // 4D Matrix Mat4
@@ -753,7 +765,6 @@ DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
 ////////////////////////////////////////////////////////////////////////////////
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-
 
 #define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
 // Out is a pointer to the buffer to receive the characters.
@@ -1444,7 +1455,7 @@ DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedSize(DqnMemStack *const stack,
 	return false;
 }
 
-DQN_FILE_SCOPE void *DqnMemStack_Allocate(DqnMemStack *const stack, size_t size)
+DQN_FILE_SCOPE void *DqnMemStack_Push(DqnMemStack *const stack, size_t size)
 {
 	if (!stack || size == 0) return NULL;
 
@@ -2118,6 +2129,15 @@ DQN_FILE_SCOPE DqnV3 DqnV3_Cross(DqnV3 a, DqnV3 b)
 	result.e[0] = (a.e[1] * b.e[2]) - (a.e[2] * b.e[1]);
 	result.e[1] = (a.e[2] * b.e[0]) - (a.e[0] * b.e[2]);
 	result.e[2] = (a.e[0] * b.e[1]) - (a.e[1] * b.e[0]);
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV3 DqnV3_Normalise(DqnV3 a)
+{
+	f32 length    = DqnMath_Sqrtf(DQN_SQUARED(a.x) + DQN_SQUARED(a.y) + DQN_SQUARED(a.z));
+	f32 invLength = 1 / length;
+	DqnV3 result  = a * invLength;
+
 	return result;
 }
 
