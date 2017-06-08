@@ -2,7 +2,97 @@
 #define DQN_IMPLEMENTATION
 #include "dqn.h"
 
+#define HANDMADE_MATH_IMPLEMENTATION
+#define HANDMADE_MATH_CPP_MODE
+#include "tests/HandmadeMath.h"
+
 #include <stdio.h>
+
+void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
+{
+	f32 *hmmMatf = (f32 *)&hmmMat;
+	f32 *dqnMatf = (f32 *)&dqnMat;
+
+	const u32 EXPECTED_SIZE = 16;
+	u32 totalSize = DQN_ARRAY_COUNT(dqnMat.e) * DQN_ARRAY_COUNT(dqnMat.e[0]);
+	DQN_ASSERT(totalSize == EXPECTED_SIZE);
+	DQN_ASSERT(totalSize == (DQN_ARRAY_COUNT(hmmMat.Elements) * DQN_ARRAY_COUNT(hmmMat.Elements[0])));
+
+	for (i32 i = 0; i < EXPECTED_SIZE; i++)
+		DQN_ASSERT(hmmMatf[i] == dqnMatf[i]);
+}
+
+void HandmadeMathTest()
+{
+	// Test Perspective/Projection matrix values
+	{
+		f32 aspectRatio = 1;
+		DqnMat4 dqnPerspective = DqnMat4_Perspective(90, aspectRatio, 100, 1000);
+		hmm_mat4 hmmPerspective = HMM_Perspective(90, aspectRatio, 100, 1000);
+		HandmadeMathVerifyMat4(dqnPerspective, hmmPerspective);
+
+		printf("HandmadeMathTest(): Perspective: Completed successfully\n");
+	}
+
+	// Test Mat4 translate * scale
+	{
+		hmm_vec3 hmmVec       = HMM_Vec3i(1, 2, 3);
+		DqnV3 dqnVec          = DqnV3_3i(1, 2, 3);
+		DqnMat4 dqnTranslate  = DqnMat4_Translate(dqnVec.x, dqnVec.y, dqnVec.z);
+		hmm_mat4 hmmTranslate = HMM_Translate(hmmVec);
+		HandmadeMathVerifyMat4(dqnTranslate, hmmTranslate);
+
+		hmm_vec3 hmmAxis      = HMM_Vec3(0.5f, 0.2f, 0.7f);
+		DqnV3 dqnAxis         = DqnV3_3f(0.5f, 0.2f, 0.7f);
+		f32 rotationInDegrees = 80.0f;
+
+		// TODO(doyle): ?? Handmade Math does it a rotations in a different way
+		// way, they normalise the given axis producing different results.
+		// HandmadeMathVerifyMat4(dqnRotate, hmmRotate);
+
+		dqnVec *= 2;
+		hmmVec *= 2;
+		DqnMat4 dqnScale  = DqnMat4_Scale(dqnVec.x, dqnVec.y, dqnVec.z);
+		hmm_mat4 hmmScale = HMM_Scale(hmmVec);
+		HandmadeMathVerifyMat4(dqnScale, hmmScale);
+
+		DqnMat4 dqnTSMatrix  = DqnMat4_Mul(dqnTranslate, dqnScale);
+		hmm_mat4 hmmTSMatrix = HMM_MultiplyMat4(hmmTranslate, hmmScale);
+		HandmadeMathVerifyMat4(dqnTSMatrix, hmmTSMatrix);
+
+
+		// Test Mat4 * MulV4
+		{
+			DqnV4 dqnV4    = DqnV4_4f(1, 2, 3, 4);
+			hmm_vec4 hmmV4 = HMM_Vec4(1, 2, 3, 4);
+
+			DqnV4 dqnResult    = DqnMat4_MulV4(dqnTSMatrix, dqnV4);
+			hmm_vec4 hmmResult = HMM_MultiplyMat4ByVec4(hmmTSMatrix, hmmV4);
+
+			DQN_ASSERT(dqnResult.x == hmmResult.X);
+			DQN_ASSERT(dqnResult.y == hmmResult.Y);
+			DQN_ASSERT(dqnResult.z == hmmResult.Z);
+			DQN_ASSERT(dqnResult.w == hmmResult.W);
+
+			printf(
+			    "HandmadeMathTest(): Mat4 * MulV4: Completed successfully\n");
+		}
+
+		printf("HandmadeMathTest(): Translate/Scale/Rotate Mat4_Mul: Completed successfully\n");
+	}
+
+	// Test LookAt/Camera/View matrix returns same results
+	{
+		DqnMat4 dqnViewMatrix = DqnMat4_LookAt(DqnV3_3f(4, 3, 3), DqnV3_1f(0), DqnV3_3f(0, 1, 0));
+		hmm_mat4 hmmViewMatrix =
+		    HMM_LookAt(HMM_Vec3(4, 3, 3), HMM_Vec3(0, 0, 0), HMM_Vec3(0, 1, 0));
+
+		HandmadeMathVerifyMat4(dqnViewMatrix, hmmViewMatrix);
+		printf("HandmadeMathTest(): LookAt: Completed successfully\n");
+	}
+
+}
+
 void StringsTest()
 {
 	{ // Char Checks
@@ -1404,6 +1494,7 @@ int main(void)
 	StringsTest();
 	RandomTest();
 	MathTest();
+	HandmadeMathTest();
 	VecTest();
 	OtherTest();
 	ArrayTest();

@@ -96,24 +96,18 @@ DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
 //      BeginTempRegion and EndTempRegion functions. Specifically freeing
 //      individual items is typically not generalisable in this scheme.
 
-typedef struct DqnMemStackBlock
-{
-	u8     *memory;
-	size_t  used;
-	size_t  size;
-
-	DqnMemStackBlock *prevBlock;
-} DqnMemStackBlock;
-
 enum DqnMemStackFlag
 {
 	DqnMemStackFlag_IsNotExpandable       = (1 << 0),
 	DqnMemStackFlag_IsFixedMemoryFromUser = (1 << 1), // NOTE(doyle): Required to indicate we CAN'T free this memory when free is called.
 };
 
+////////////////////////////////////////////////////////////////////////////////
+// Advanced API Structs
+////////////////////////////////////////////////////////////////////////////////
 typedef struct DqnMemStack
 {
-	DqnMemStackBlock *block;
+	struct DqnMemStackBlock *block;
 
 	u32 flags;
 	i32 tempStackCount;
@@ -122,8 +116,8 @@ typedef struct DqnMemStack
 
 typedef struct DqnTempMemStack
 {
-	DqnMemStack      *stack;
-	DqnMemStackBlock *startingBlock;
+	DqnMemStack             *stack;
+	struct DqnMemStackBlock *startingBlock;
 	size_t used;
 
 } DqnTempMemStack;
@@ -132,12 +126,12 @@ DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedMem (DqnMemStack *const stack, u8 *
 DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedSize(DqnMemStack *const stack, size_t size, const bool zeroClear, const u32 byteAlign = 4); // Single allocation from platform, no further allocations, returns NULL of allocate if out of space
 DQN_FILE_SCOPE bool DqnMemStack_Init             (DqnMemStack *const stack, size_t size, const bool zeroClear, const u32 byteAlign = 4); // Allocates from platform dynamically as space runs out
 
-DQN_FILE_SCOPE void *DqnMemStack_Push          (DqnMemStack *const stack, size_t size);             // Returns NULL if out of space and stack is using fixed memory/size, or platform allocation fails
-DQN_FILE_SCOPE bool  DqnMemStack_Pop           (DqnMemStack *const stack, void *ptr, size_t size);  // Frees the given ptr. It MUST be the last allocated item in the stack
-DQN_FILE_SCOPE void  DqnMemStack_Free          (DqnMemStack *const stack);                          // Frees all blocks belonging to this stack
-DQN_FILE_SCOPE bool  DqnMemStack_FreeStackBlock(DqnMemStack *const stack, DqnMemStackBlock *block); // Frees the specified block, returns false if block doesn't belong
+DQN_FILE_SCOPE void *DqnMemStack_Push          (DqnMemStack *const stack, size_t size);             // Returns NULL if out of space and stack is using fixed memory/size, or platform allocation fails.
+DQN_FILE_SCOPE bool  DqnMemStack_Pop           (DqnMemStack *const stack, void *ptr, size_t size);  // Frees the given ptr. It MUST be the last allocated item in the stack.
+DQN_FILE_SCOPE void  DqnMemStack_Free          (DqnMemStack *const stack);                          // Frees all blocks belonging to this stack.
+DQN_FILE_SCOPE bool  DqnMemStack_FreeStackBlock(DqnMemStack *const stack, DqnMemStackBlock *block); // Frees the specified block, returns false if block doesn't belong, calls DqnMem_Free().
 DQN_FILE_SCOPE bool  DqnMemStack_FreeLastBlock (DqnMemStack *const stack);                          // Frees the last-most memory block. If last block, free that block, next allocate will attach a block.
-DQN_FILE_SCOPE void  DqnMemStack_ClearCurrBlock(DqnMemStack *const stack, const bool zeroClear);    // Reset the current memory block usage to 0
+DQN_FILE_SCOPE void  DqnMemStack_ClearCurrBlock(DqnMemStack *const stack, const bool zeroClear);    // Reset the current memory block usage to 0.
 
 // TempMemStack is only required for the function. Once BeginTempRegion() is called, subsequent allocation calls can be made using the original stack.
 // Upon EndTempRegion() the original stack will free any additional blocks it allocated during the temp region and revert to the original
@@ -147,12 +141,26 @@ DQN_FILE_SCOPE void  DqnMemStack_ClearCurrBlock(DqnMemStack *const stack, const 
 DQN_FILE_SCOPE DqnTempMemStack DqnMemStack_BeginTempRegion(DqnMemStack *const stack);
 DQN_FILE_SCOPE void            DqnMemStack_EndTempRegion  (DqnTempMemStack tempstack);
 
+////////////////////////////////////////////////////////////////////////////////
 // (OPTIONAL) DqnMemStack Advanced API
+// Blocks are freely modifiable if you want fine grained control. Size value and
+// memory ptr should _NOT_ be modified directly, only indirectly through the
+// regular API.
+typedef struct DqnMemStackBlock
+{
+	u8     *memory;
+	size_t  size;
+	size_t  used;
+
+	DqnMemStackBlock *prevBlock;
+} DqnMemStackBlock;
+
 // This is useful for forcing a new block to be used. AllocateCompatibleBlock
 // will fail if the supplied stack has flags set such that the stack is not
 // allowed to have new blocks.
 DQN_FILE_SCOPE DqnMemStackBlock *DqnMemStack_AllocateCompatibleBlock(const DqnMemStack *const stack, size_t size);
 DQN_FILE_SCOPE bool              DqnMemStack_AttachBlock            (DqnMemStack *const stack, DqnMemStackBlock *const newBlock);
+DQN_FILE_SCOPE bool              DqnMemStack_DetachBlock            (DqnMemStack *const stack, DqnMemStackBlock *const detachBlock);
 
 // (IMPORTANT) Should only be used to free blocks that haven't been attached!
 // Attached blocks should be freed using FreeStackBlock().
@@ -521,8 +529,9 @@ typedef union DqnV3i
 } DqnV3i;
 
 // DqnV3
-DQN_FILE_SCOPE DqnV3 DqnV3_3i(i32 x, i32 y, i32 z); // Create a vector using ints and typecast to floats
+DQN_FILE_SCOPE DqnV3 DqnV3_1f(f32 xyz);
 DQN_FILE_SCOPE DqnV3 DqnV3_3f(f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnV3 DqnV3_3i(i32 x, i32 y, i32 z); // Create a vector using ints and typecast to floats
 
 DQN_FILE_SCOPE DqnV3 DqnV3_Add     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Sub     (DqnV3 a, DqnV3 b);
@@ -533,19 +542,23 @@ DQN_FILE_SCOPE f32   DqnV3_Dot     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE bool  DqnV3_Equals  (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Cross   (DqnV3 a, DqnV3 b);
 
-DQN_FILE_SCOPE DqnV3 DqnV3_Normalise(DqnV3 a);
+DQN_FILE_SCOPE DqnV3 DqnV3_Normalise    (DqnV3 a);
+DQN_FILE_SCOPE f32   DqnV3_Length       (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE f32   DqnV3_LengthSquared(DqnV3 a, DqnV3 b);
 
-DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);  }
-DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);  }
-DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);  }
-DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, b);  }
-DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, i32   b) { return      DqnV3_Scalei  (a, b);  }
-DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Hadamard(a, b)); }
-DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, f32   b) { return (a = DqnV3_Scalef  (a, b)); }
-DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, i32   b) { return (a = DqnV3_Scalei  (a, b)); }
-DQN_FILE_SCOPE inline DqnV3 &operator-=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Sub     (a, b)); }
-DQN_FILE_SCOPE inline DqnV3 &operator+=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Add     (a, b)); }
-DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_Equals  (a, b);  }
+DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3_1f(b)); }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, i32   b) { return      DqnV3_Scalei  (a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator/ (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, (1.0f/b));    }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Hadamard(a, b));          }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, f32   b) { return (a = DqnV3_Scalef  (a, b));          }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, i32   b) { return (a = DqnV3_Scalei  (a, b));          }
+DQN_FILE_SCOPE inline DqnV3 &operator-=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Sub     (a, b));          }
+DQN_FILE_SCOPE inline DqnV3 &operator+=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Add     (a, b));          }
+DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_Equals  (a, b);           }
 
 // DqnV3i
 DQN_FILE_SCOPE DqnV3i DqnV3i_3i(i32 x, i32 y, i32 z);
@@ -572,6 +585,7 @@ typedef union DqnV4 {
 // Create a vector using ints and typecast to floats
 DQN_FILE_SCOPE DqnV4 DqnV4_4i(i32 x, i32 y, i32 z, f32 w);
 DQN_FILE_SCOPE DqnV4 DqnV4_4f(f32 x, f32 y, f32 z, f32 w);
+DQN_FILE_SCOPE DqnV4 DqnV4_V3(DqnV3 a, f32 w);
 DQN_FILE_SCOPE DqnV4 DqnV4_1f(f32 xyzw);
 
 DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
@@ -600,18 +614,23 @@ DQN_FILE_SCOPE inline bool   operator==(DqnV4  a, DqnV4 b) { return      DqnV4_E
 ////////////////////////////////////////////////////////////////////////////////
 typedef union DqnMat4
 {
+	// TODO(doyle): Row/column instead? More cache friendly since multiplication
+	// prefers rows.
 	DqnV4 col[4];
-	// Column/row
-	f32 e[4][4];
+	f32   e[4][4]; // Column/row
 } DqnMat4;
 
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity ();
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Ortho    (f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate(f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate   (f32 radians, f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale    (f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul      (DqnMat4 a, DqnMat4 b);
-DQN_FILE_SCOPE DqnV4   DqnMat4_MulV4    (DqnMat4 a, DqnV4 b);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity    ();
+
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Perspective (f32 fovYDegrees, f32 aspectRatio, f32 zNear, f32 zFar);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_LookAt      (DqnV3 eye, DqnV3 center, DqnV3 up);
+
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate   (f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate      (f32 radians, f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale       (f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul         (DqnMat4 a, DqnMat4 b);
+DQN_FILE_SCOPE DqnV4   DqnMat4_MulV4       (DqnMat4 a, DqnV4 b);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Other Math
@@ -1383,7 +1402,7 @@ DqnMemStack_AllocateCompatibleBlock(const DqnMemStack *const stack, size_t size)
 }
 
 DQN_FILE_SCOPE bool DqnMemStack_AttachBlock(DqnMemStack *const stack,
-                                             DqnMemStackBlock *const newBlock)
+                                            DqnMemStackBlock *const newBlock)
 {
 	if (!stack || !newBlock) return false;
 	if (stack->flags & DqnMemStackFlag_IsFixedMemoryFromUser) return false;
@@ -1393,6 +1412,31 @@ DQN_FILE_SCOPE bool DqnMemStack_AttachBlock(DqnMemStack *const stack,
 	stack->block       = newBlock;
 	return true;
 }
+
+DQN_FILE_SCOPE bool DqnMemStack_DetachBlock(DqnMemStack *const stack,
+                                            DqnMemStackBlock *const detachBlock)
+{
+	if (!stack || !detachBlock) return false;
+	if (stack->flags & DqnMemStackFlag_IsFixedMemoryFromUser) return false;
+	if (stack->flags & DqnMemStackFlag_IsNotExpandable)       return false;
+
+	DqnMemStackBlock **blockPtr = &stack->block;
+	while (*blockPtr && *blockPtr != detachBlock)
+		blockPtr = &((*blockPtr)->prevBlock);
+
+	if (*blockPtr)
+	{
+		*blockPtr = detachBlock->prevBlock;
+		detachBlock->prevBlock = NULL;
+	}
+	else
+	{
+		return false;
+	}
+
+	return true;
+}
+
 
 DQN_FILE_SCOPE void DqnMemStack_FreeBlock(DqnMemStackBlock *block)
 {
@@ -1406,17 +1450,17 @@ DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedMem(DqnMemStack *const stack,
                                                   const u32 byteAlign)
 {
 	if (!stack || !mem) return false;
-	DQN_ASSERT(!stack->block);
 
 	// TODO(doyle): Better logging
 	if (memSize < sizeof(DqnMemStackBlock))
 		DQN_ASSERT(DQN_INVALID_CODE_PATH);
 
-	stack->block         = (DqnMemStackBlock *)mem;
-	stack->block->memory = mem + sizeof(DqnMemStackBlock);
-	stack->block->used   = 0;
-	stack->block->size   = memSize - sizeof(DqnMemStackBlock);
-	stack->flags         = (DqnMemStackFlag_IsFixedMemoryFromUser | DqnMemStackFlag_IsNotExpandable);
+	stack->block            = (DqnMemStackBlock *)mem;
+	stack->block->memory    = mem + sizeof(DqnMemStackBlock);
+	stack->block->used      = 0;
+	stack->block->size      = memSize - sizeof(DqnMemStackBlock);
+	stack->block->prevBlock = NULL;
+	stack->flags = (DqnMemStackFlag_IsFixedMemoryFromUser | DqnMemStackFlag_IsNotExpandable);
 
 	const u32 DEFAULT_ALIGNMENT = 4;
 	stack->tempStackCount     = 0;
@@ -2032,18 +2076,21 @@ DQN_FILE_SCOPE bool DqnV2i_Equals(DqnV2i a, DqnV2i b)
 ////////////////////////////////////////////////////////////////////////////////
 // Vec3
 ////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE DqnV3 DqnV3_1f(f32 xyz)
+{
+	DqnV3 result = {xyz, xyz, xyz};
+	return result;
+}
+
 DQN_FILE_SCOPE DqnV3 DqnV3_3f(f32 x, f32 y, f32 z)
 {
-	DqnV3 result = {};
-	result.x       = x;
-	result.y       = y;
-	result.z       = z;
+	DqnV3 result = {x, y, z};
 	return result;
 }
 
 DQN_FILE_SCOPE DqnV3 DqnV3_3i(i32 x, i32 y, i32 z)
 {
-	DqnV3 result = DqnV3_3f((f32)x, (f32)y, (f32)z);
+	DqnV3 result = {(f32)x, (f32)y, (f32)z};
 	return result;
 }
 
@@ -2141,6 +2188,24 @@ DQN_FILE_SCOPE DqnV3 DqnV3_Normalise(DqnV3 a)
 	return result;
 }
 
+DQN_FILE_SCOPE f32 DqnV3_LengthSquared(DqnV3 a, DqnV3 b)
+{
+	f32 x      = b.x - a.x;
+	f32 y      = b.y - a.y;
+	f32 z      = b.z - a.z;
+	f32 result = (DQN_SQUARED(x) + DQN_SQUARED(y) + DQN_SQUARED(z));
+	return result;
+}
+
+DQN_FILE_SCOPE f32 DqnV3_Length(DqnV3 a, DqnV3 b)
+{
+	f32 lengthSq = DqnV3_LengthSquared(a, b);
+	if (lengthSq == 0) return 0;
+
+	f32 result = DqnMath_Sqrtf(lengthSq);
+	return result;
+}
+
 DQN_FILE_SCOPE DqnV3i DqnV3i_3i(i32 x, i32 y, i32 z)
 {
 	DqnV3i result = {x, y, z};
@@ -2165,6 +2230,14 @@ DQN_FILE_SCOPE DqnV4 DqnV4_4f(f32 x, f32 y, f32 z, f32 w)
 DQN_FILE_SCOPE DqnV4 DqnV4_4i(i32 x, i32 y, i32 z, i32 w)
 {
 	DqnV4 result = DqnV4_4f((f32)x, (f32)y, (f32)z, (f32)w);
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV4 DqnV4_V3(DqnV3 a, f32 w)
+{
+	DqnV4 result;
+	result.xyz = a;
+	result.w   = w;
 	return result;
 }
 
@@ -2248,7 +2321,7 @@ DQN_FILE_SCOPE bool DqnV4_Equals(DqnV4 a, DqnV4 b)
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity()
 {
-	DqnMat4 result    = {0};
+	DqnMat4 result = {0};
 	result.e[0][0] = 1;
 	result.e[1][1] = 1;
 	result.e[2][2] = 1;
@@ -2256,18 +2329,63 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity()
 	return result;
 }
 
-DQN_FILE_SCOPE DqnMat4
-DqnMat4_Ortho(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar)
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 zNear,
+                                            f32 zFar)
 {
 	DqnMat4 result = DqnMat4_Identity();
-	result.e[0][0] = +2.0f   / (right - left);
-	result.e[1][1] = +2.0f   / (top   - bottom);
-	result.e[2][2] = -2.0f   / (zFar  - zNear);
+	result.e[0][0] = +2.0f / (right - left);
+	result.e[1][1] = +2.0f / (top   - bottom);
+	result.e[2][2] = -2.0f / (zFar  - zNear);
 
 	result.e[3][0] = -(right + left)   / (right - left);
 	result.e[3][1] = -(top   + bottom) / (top   - bottom);
 	result.e[3][2] = -(zFar  + zNear)  / (zFar  - zNear);
 
+	return result;
+}
+
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Perspective(f32 fovYDegrees, f32 aspectRatio, f32 zNear, f32 zFar)
+{
+	f32 fovYRadians         = DQN_DEGREES_TO_RADIANS(fovYDegrees);
+	f32 fovYRadiansOver2    = fovYRadians * 0.5f;
+	f32 tanFovYRadiansOver2 = tanf(fovYRadiansOver2);
+	f32 zNearSubZFar        = zNear - zFar;
+
+	DqnMat4 result = DqnMat4_Identity();
+	result.e[0][0] = 1.0f / (tanFovYRadiansOver2 * aspectRatio);
+	result.e[1][1] = 1.0f / tanFovYRadiansOver2;
+	result.e[2][2] = (zNear + zFar) / zNearSubZFar;
+	result.e[2][3] = -1.0f;
+	result.e[3][2] = (2.0f * zNear * zFar) / zNearSubZFar;
+	result.e[3][3] = 0.0f;
+
+	return result;
+}
+
+DQN_FILE_SCOPE DqnMat4 DqnMat4_LookAt(DqnV3 eye, DqnV3 center, DqnV3 up)
+{
+	DqnMat4 result = {0};
+
+	DqnV3 f = DqnV3_Normalise(DqnV3_Sub(eye, center));
+	DqnV3 s = DqnV3_Normalise(DqnV3_Cross(up, f));
+	DqnV3 u = DqnV3_Cross(f, s);
+
+	result.e[0][0] = s.x;
+	result.e[0][1] = u.x;
+	result.e[0][2] = f.x;
+
+	result.e[1][0] = s.y;
+	result.e[1][1] = u.y;
+	result.e[1][2] = f.y;
+
+	result.e[2][0] = s.z;
+	result.e[2][1] = u.z;
+	result.e[2][2] = f.z;
+
+	result.e[3][0] = DqnV3_Dot(s, eye);
+	result.e[3][1] = DqnV3_Dot(u, eye);
+	result.e[3][2] = -DqnV3_Dot(f, eye);
+	result.e[3][3] = 1.0f;
 	return result;
 }
 
@@ -2282,23 +2400,22 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate(f32 x, f32 y, f32 z)
 
 DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate(f32 radians, f32 x, f32 y, f32 z)
 {
-	DqnMat4 result = DqnMat4_Identity();
-	f32 sinVal = sinf(radians);
-	f32 cosVal = cosf(radians);
+	DqnMat4 result     = DqnMat4_Identity();
+	f32 sinVal         = sinf(radians);
+	f32 cosVal         = cosf(radians);
+	f32 oneMinusCosVal = 1 - cosVal;
 
-	result.e[0][0] = (cosVal + (DQN_SQUARED(x) * (1.0f - cosVal)));
-	result.e[0][1] = ((y * z * (1.0f - cosVal)) + (z * sinVal));
-	result.e[0][2] = ((z * x * (1.0f - cosVal)) - (y * sinVal));
+	result.e[0][0] = (DQN_SQUARED(x) * oneMinusCosVal) + cosVal;
+	result.e[0][1] = (x * y          * oneMinusCosVal) + (z * sinVal);
+	result.e[0][2] = (x * z          * oneMinusCosVal) - (y * sinVal);
 
-	result.e[1][0] = ((x * y * (1.0f - cosVal)) - (z * sinVal));
-	result.e[1][1] = (cosVal + (DQN_SQUARED(y) * (1.0f - cosVal)));
-	result.e[1][2] = ((z * y * (1.0f - cosVal)) + (x * sinVal));
+	result.e[1][0] = (y * x          * oneMinusCosVal) - (z * sinVal);
+	result.e[1][1] = (DQN_SQUARED(y) * oneMinusCosVal) + cosVal;
+	result.e[1][2] = (y * z          * oneMinusCosVal) + (x * sinVal);
 
-	result.e[2][0] = ((x * z * (1.0f - cosVal)) + (y * sinVal));
-	result.e[2][1] = ((y * z * (1.0f - cosVal)) - (x * sinVal));
-	result.e[2][2] = (cosVal + (DQN_SQUARED(z) * (1.0f - cosVal)));
-
-	result.e[3][3] = 1;
+	result.e[2][0] = (z * x          * oneMinusCosVal) + (y * sinVal);
+	result.e[2][1] = (z * y          * oneMinusCosVal) - (x * sinVal);
+	result.e[2][2] = (DQN_SQUARED(z) * oneMinusCosVal) + cosVal;
 
 	return result;
 }
@@ -2317,7 +2434,8 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul(DqnMat4 a, DqnMat4 b)
 {
 	DqnMat4 result = {0};
 	for (i32 j = 0; j < 4; j++) {
-		for (i32 i = 0; i < 4; i++) {
+		for (i32 i = 0; i < 4; i++)
+		{
 			result.e[j][i] = a.e[0][i] * b.e[j][0]
 			               + a.e[1][i] * b.e[j][1]
 			               + a.e[2][i] * b.e[j][2]
@@ -2331,15 +2449,10 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul(DqnMat4 a, DqnMat4 b)
 DQN_FILE_SCOPE DqnV4 DqnMat4_MulV4(DqnMat4 a, DqnV4 b)
 {
 	DqnV4 result = {0};
-
-	result.x = (a.e[0][0] * b.x) + (a.e[1][0] * b.y) + (a.e[2][0] * b.z) +
-	           (a.e[3][0] * b.w);
-	result.y = (a.e[0][1] * b.x) + (a.e[1][1] * b.y) + (a.e[2][1] * b.z) +
-	           (a.e[3][1] * b.w);
-	result.z = (a.e[0][2] * b.x) + (a.e[1][2] * b.y) + (a.e[2][2] * b.z) +
-	           (a.e[3][2] * b.w);
-	result.w = (a.e[0][3] * b.x) + (a.e[1][3] * b.y) + (a.e[2][3] * b.z) +
-	           (a.e[3][3] * b.w);
+	result.x = (a.e[0][0] * b.x) + (a.e[1][0] * b.y) + (a.e[2][0] * b.z) + (a.e[3][0] * b.w);
+	result.y = (a.e[0][1] * b.x) + (a.e[1][1] * b.y) + (a.e[2][1] * b.z) + (a.e[3][1] * b.w);
+	result.z = (a.e[0][2] * b.x) + (a.e[1][2] * b.y) + (a.e[2][2] * b.z) + (a.e[3][2] * b.w);
+	result.w = (a.e[0][3] * b.x) + (a.e[1][3] * b.y) + (a.e[2][3] * b.z) + (a.e[3][3] * b.w);
 
 	return result;
 }
