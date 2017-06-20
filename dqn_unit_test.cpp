@@ -136,21 +136,21 @@ void StringsTest()
 
 			// Check simple compares
 			{
-				DQN_ASSERT(Dqn_strcmp(a, "str_a") == +0);
-				DQN_ASSERT(Dqn_strcmp(a, "str_b") == -1);
-				DQN_ASSERT(Dqn_strcmp("str_b", a) == +1);
-				DQN_ASSERT(Dqn_strcmp(a, "") == +1);
-				DQN_ASSERT(Dqn_strcmp("", "") == 0);
+				DQN_ASSERT(DqnStr_Cmp(a, "str_a") == +0);
+				DQN_ASSERT(DqnStr_Cmp(a, "str_b") == -1);
+				DQN_ASSERT(DqnStr_Cmp("str_b", a) == +1);
+				DQN_ASSERT(DqnStr_Cmp(a, "") == +1);
+				DQN_ASSERT(DqnStr_Cmp("", "") == 0);
 
 				// NOTE: Check that the string has not been trashed.
-				DQN_ASSERT(Dqn_strcmp(a, "str_a") == +0);
+				DQN_ASSERT(DqnStr_Cmp(a, "str_a") == +0);
 			}
 
 			// Check ops against null
 			{
-				DQN_ASSERT(Dqn_strcmp(NULL, NULL) != +0);
-				DQN_ASSERT(Dqn_strcmp(a, NULL) != +0);
-				DQN_ASSERT(Dqn_strcmp(NULL, a) != +0);
+				DQN_ASSERT(DqnStr_Cmp(NULL, NULL) != +0);
+				DQN_ASSERT(DqnStr_Cmp(a, NULL) != +0);
+				DQN_ASSERT(DqnStr_Cmp(NULL, a) != +0);
 			}
 
 			printf("StringsTest(): strcmp: Completed successfully\n");
@@ -159,15 +159,15 @@ void StringsTest()
 		// strlen
 		{
 			char *a = "str_a";
-			DQN_ASSERT(Dqn_strlen(a) == 5);
-			DQN_ASSERT(Dqn_strlen("") == 0);
-			DQN_ASSERT(Dqn_strlen("   a  ") == 6);
-			DQN_ASSERT(Dqn_strlen("a\n") == 2);
+			DQN_ASSERT(DqnStr_Len(a) == 5);
+			DQN_ASSERT(DqnStr_Len("") == 0);
+			DQN_ASSERT(DqnStr_Len("   a  ") == 6);
+			DQN_ASSERT(DqnStr_Len("a\n") == 2);
 
 			// NOTE: Check that the string has not been trashed.
-			DQN_ASSERT(Dqn_strcmp(a, "str_a") == 0);
+			DQN_ASSERT(DqnStr_Cmp(a, "str_a") == 0);
 
-			DQN_ASSERT(Dqn_strlen(NULL) == 0);
+			DQN_ASSERT(DqnStr_Len(NULL) == 0);
 
 			printf("StringsTest(): strlen: Completed successfully\n");
 		}
@@ -179,37 +179,37 @@ void StringsTest()
 				char b[10] = {};
 				// Check copy into empty array
 				{
-					char *result = Dqn_strncpy(b, a, Dqn_strlen(a));
-					DQN_ASSERT(Dqn_strcmp(b, "str_a") == 0);
-					DQN_ASSERT(Dqn_strcmp(a, "str_a") == 0);
-					DQN_ASSERT(Dqn_strcmp(result, "str_a") == 0);
-					DQN_ASSERT(Dqn_strlen(result) == 5);
+					char *result = DqnStr_Copy(b, a, DqnStr_Len(a));
+					DQN_ASSERT(DqnStr_Cmp(b, "str_a") == 0);
+					DQN_ASSERT(DqnStr_Cmp(a, "str_a") == 0);
+					DQN_ASSERT(DqnStr_Cmp(result, "str_a") == 0);
+					DQN_ASSERT(DqnStr_Len(result) == 5);
 				}
 
 				// Check copy into array offset, overlap with old results
 				{
-					char *newResult = Dqn_strncpy(&b[1], a, Dqn_strlen(a));
-					DQN_ASSERT(Dqn_strcmp(newResult, "str_a") == 0);
-					DQN_ASSERT(Dqn_strlen(newResult) == 5);
+					char *newResult = DqnStr_Copy(&b[1], a, DqnStr_Len(a));
+					DQN_ASSERT(DqnStr_Cmp(newResult, "str_a") == 0);
+					DQN_ASSERT(DqnStr_Len(newResult) == 5);
 
-					DQN_ASSERT(Dqn_strcmp(a, "str_a") == 0);
-					DQN_ASSERT(Dqn_strlen(a) == 5);
+					DQN_ASSERT(DqnStr_Cmp(a, "str_a") == 0);
+					DQN_ASSERT(DqnStr_Len(a) == 5);
 
-					DQN_ASSERT(Dqn_strcmp(b, "sstr_a") == 0);
-					DQN_ASSERT(Dqn_strlen(b) == 6);
+					DQN_ASSERT(DqnStr_Cmp(b, "sstr_a") == 0);
+					DQN_ASSERT(DqnStr_Len(b) == 6);
 				}
 			}
 
 			// Check strncpy with NULL pointers
 			{
-				DQN_ASSERT(Dqn_strncpy(NULL, NULL, 5) == NULL);
+				DQN_ASSERT(DqnStr_Copy(NULL, NULL, 5) == NULL);
 
 				char *a      = "str";
-				char *result = Dqn_strncpy(a, NULL, 5);
+				char *result = DqnStr_Copy(a, NULL, 5);
 
-				DQN_ASSERT(Dqn_strcmp(a, "str") == 0);
-				DQN_ASSERT(Dqn_strcmp(result, "str") == 0);
-				DQN_ASSERT(Dqn_strcmp(result, a) == 0);
+				DQN_ASSERT(DqnStr_Cmp(a, "str") == 0);
+				DQN_ASSERT(DqnStr_Cmp(result, "str") == 0);
+				DQN_ASSERT(DqnStr_Cmp(result, a) == 0);
 			}
 
 			// Check strncpy with 0 chars to copy
@@ -217,10 +217,10 @@ void StringsTest()
 				char *a = "str";
 				char *b = "ing";
 
-				char *result = Dqn_strncpy(a, b, 0);
-				DQN_ASSERT(Dqn_strcmp(a, "str") == 0);
-				DQN_ASSERT(Dqn_strcmp(b, "ing") == 0);
-				DQN_ASSERT(Dqn_strcmp(result, "str") == 0);
+				char *result = DqnStr_Copy(a, b, 0);
+				DQN_ASSERT(DqnStr_Cmp(a, "str") == 0);
+				DQN_ASSERT(DqnStr_Cmp(b, "ing") == 0);
+				DQN_ASSERT(DqnStr_Cmp(result, "str") == 0);
 			}
 
 			printf("StringsTest(): strncpy: Completed successfully\n");
@@ -231,37 +231,37 @@ void StringsTest()
 			// Basic reverse operations
 			{
 				char a[] = "aba";
-				DQN_ASSERT(Dqn_StrReverse(a, Dqn_strlen(a)) == true);
-				DQN_ASSERT(Dqn_strcmp(a, "aba") == 0);
+				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
+				DQN_ASSERT(DqnStr_Cmp(a, "aba") == 0);
 
-				DQN_ASSERT(Dqn_StrReverse(a, 2) == true);
-				DQN_ASSERT(Dqn_strcmp(a, "baa") == 0);
+				DQN_ASSERT(DqnStr_Reverse(a, 2) == true);
+				DQN_ASSERT(DqnStr_Cmp(a, "baa") == 0);
 
-				DQN_ASSERT(Dqn_StrReverse(a, Dqn_strlen(a)) == true);
-				DQN_ASSERT(Dqn_strcmp(a, "aab") == 0);
+				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
+				DQN_ASSERT(DqnStr_Cmp(a, "aab") == 0);
 
-				DQN_ASSERT(Dqn_StrReverse(&a[1], 2) == true);
-				DQN_ASSERT(Dqn_strcmp(a, "aba") == 0);
+				DQN_ASSERT(DqnStr_Reverse(&a[1], 2) == true);
+				DQN_ASSERT(DqnStr_Cmp(a, "aba") == 0);
 
-				DQN_ASSERT(Dqn_StrReverse(a, 0) == true);
-				DQN_ASSERT(Dqn_strcmp(a, "aba") == 0);
+				DQN_ASSERT(DqnStr_Reverse(a, 0) == true);
+				DQN_ASSERT(DqnStr_Cmp(a, "aba") == 0);
 			}
 
 			// Try reverse empty string
 			{
 				char a[] = "";
-				DQN_ASSERT(Dqn_StrReverse(a, Dqn_strlen(a)) == true);
-				DQN_ASSERT(Dqn_strcmp(a, "") == 0);
+				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
+				DQN_ASSERT(DqnStr_Cmp(a, "") == 0);
 			}
 
 			// Try reverse single char string
 			{
 				char a[] = "a";
-				DQN_ASSERT(Dqn_StrReverse(a, Dqn_strlen(a)) == true);
-				DQN_ASSERT(Dqn_strcmp(a, "a") == 0);
+				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
+				DQN_ASSERT(DqnStr_Cmp(a, "a") == 0);
 
-				DQN_ASSERT(Dqn_StrReverse(a, 0) == true);
-				DQN_ASSERT(Dqn_strcmp(a, "a") == 0);
+				DQN_ASSERT(DqnStr_Reverse(a, 0) == true);
+				DQN_ASSERT(DqnStr_Cmp(a, "a") == 0);
 			}
 
 			printf(
@@ -273,26 +273,26 @@ void StringsTest()
 		// StrToI64
 		{
 			char *a = "123";
-			DQN_ASSERT(Dqn_StrToI64(a, Dqn_strlen(a)) == 123);
+			DQN_ASSERT(Dqn_StrToI64(a, DqnStr_Len(a)) == 123);
 
 			char *b = "-123";
-			DQN_ASSERT(Dqn_StrToI64(b, Dqn_strlen(b)) == -123);
+			DQN_ASSERT(Dqn_StrToI64(b, DqnStr_Len(b)) == -123);
 			DQN_ASSERT(Dqn_StrToI64(b, 1) == 0);
 
 			char *c = "-0";
-			DQN_ASSERT(Dqn_StrToI64(c, Dqn_strlen(c)) == 0);
+			DQN_ASSERT(Dqn_StrToI64(c, DqnStr_Len(c)) == 0);
 
 			char *d = "+123";
-			DQN_ASSERT(Dqn_StrToI64(d, Dqn_strlen(d)) == 123);
+			DQN_ASSERT(Dqn_StrToI64(d, DqnStr_Len(d)) == 123);
 
 			// TODO(doyle): Unsigned conversion
 #if 0
 			char *e = "18446744073709551615";
-	        DQN_ASSERT((u64)(Dqn_StrToI64(e, Dqn_strlen(e))) == LARGEST_NUM);
+	        DQN_ASSERT((u64)(Dqn_StrToI64(e, DqnStr_Len(e))) == LARGEST_NUM);
 #endif
 
 			char *f = "-9223372036854775808";
-			DQN_ASSERT(Dqn_StrToI64(f, Dqn_strlen(f)) == SMALLEST_NUM);
+			DQN_ASSERT(Dqn_StrToI64(f, DqnStr_Len(f)) == SMALLEST_NUM);
 
 	        printf("StringsTest(): StrToI64: Completed successfully\n");
 		}
@@ -301,25 +301,25 @@ void StringsTest()
 		{
 			char a[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(+100, a, DQN_ARRAY_COUNT(a));
-			DQN_ASSERT(Dqn_strcmp(a, "100") == 0);
+			DQN_ASSERT(DqnStr_Cmp(a, "100") == 0);
 
 			char b[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(-100, b, DQN_ARRAY_COUNT(b));
-			DQN_ASSERT(Dqn_strcmp(b, "-100") == 0);
+			DQN_ASSERT(DqnStr_Cmp(b, "-100") == 0);
 
 			char c[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(0, c, DQN_ARRAY_COUNT(c));
-			DQN_ASSERT(Dqn_strcmp(c, "0") == 0);
+			DQN_ASSERT(DqnStr_Cmp(c, "0") == 0);
 
 #if 0
 			char d[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(LARGEST_NUM, d, DQN_ARRAY_COUNT(d));
-			DQN_ASSERT(Dqn_strcmp(d, "18446744073709551615") == 0);
+			DQN_ASSERT(DqnStr_Cmp(d, "18446744073709551615") == 0);
 #endif
 
 			char e[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(SMALLEST_NUM, e, DQN_ARRAY_COUNT(e));
-			DQN_ASSERT(Dqn_strcmp(e, "-9223372036854775808") == 0);
+			DQN_ASSERT(DqnStr_Cmp(e, "-9223372036854775808") == 0);
 
 			printf("StringsTest(): I64ToStr: Completed successfully\n");
 		}
@@ -408,26 +408,26 @@ void StringsTest()
 		{
 		    char *a  = "Microsoft";
 		    char *b  = "icro";
-		    i32 lenA = Dqn_strlen(a);
-		    i32 lenB = Dqn_strlen(b);
-		    DQN_ASSERT(Dqn_StrHasSubstring(a, lenA, b, lenB) == true);
-		    DQN_ASSERT(Dqn_StrHasSubstring(a, lenA, "iro",
-		                                     Dqn_strlen("iro")) == false);
-		    DQN_ASSERT(Dqn_StrHasSubstring(b, lenB, a, lenA) == false);
-		    DQN_ASSERT(Dqn_StrHasSubstring("iro", Dqn_strlen("iro"), a,
+		    i32 lenA = DqnStr_Len(a);
+		    i32 lenB = DqnStr_Len(b);
+		    DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == true);
+		    DQN_ASSERT(DqnStr_HasSubstring(a, lenA, "iro",
+		                                     DqnStr_Len("iro")) == false);
+		    DQN_ASSERT(DqnStr_HasSubstring(b, lenB, a, lenA) == false);
+		    DQN_ASSERT(DqnStr_HasSubstring("iro", DqnStr_Len("iro"), a,
 		                                     lenA) == false);
-		    DQN_ASSERT(Dqn_StrHasSubstring("", 0, "iro", 4) == false);
-		    DQN_ASSERT(Dqn_StrHasSubstring("", 0, "", 0) == false);
-		    DQN_ASSERT(Dqn_StrHasSubstring(NULL, 0, NULL, 0) == false);
+		    DQN_ASSERT(DqnStr_HasSubstring("", 0, "iro", 4) == false);
+		    DQN_ASSERT(DqnStr_HasSubstring("", 0, "", 0) == false);
+		    DQN_ASSERT(DqnStr_HasSubstring(NULL, 0, NULL, 0) == false);
 	    }
 
 		{
 		    char *a  = "Micro";
 		    char *b  = "irob";
-		    i32 lenA = Dqn_strlen(a);
-		    i32 lenB = Dqn_strlen(b);
-		    DQN_ASSERT(Dqn_StrHasSubstring(a, lenA, b, lenB) == false);
-		    DQN_ASSERT(Dqn_StrHasSubstring(b, lenB, a, lenA) == false);
+		    i32 lenA = DqnStr_Len(a);
+		    i32 lenB = DqnStr_Len(b);
+		    DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == false);
+		    DQN_ASSERT(DqnStr_HasSubstring(b, lenB, a, lenA) == false);
 	    }
 
 	    printf("StringsTest(): StrHasSubstring: Completed successfully\n");
@@ -532,7 +532,7 @@ void RandomTest() {
 		i32 min    = -100;
 		i32 max    = 100000;
 		i32 result = DqnRnd_PCGRange(&pcg, min, max);
-		DQN_ASSERT(result >= min && result <= max)
+		DQN_ASSERT(result >= min && result <= max);
 
 		f32 randF32 = DqnRnd_PCGNextf(&pcg);
 		DQN_ASSERT(randF32 >= 0.0f && randF32 <= 1.0f);
@@ -1182,7 +1182,9 @@ void MemStackTest()
 		DqnMemStackBlock *blockB = stack.block;
 
 		// Check temp regions work
-		DqnTempMemStack tempBuffer = DqnMemStack_BeginTempRegion(&stack);
+		DqnMemStackTempRegion tempBuffer;
+		DQN_ASSERT(DqnMemStackTempRegion_Begin(&tempBuffer, &stack));
+
 		size_t sizeC             = 1024 + 1;
 		void *resultC   = DqnMemStack_Push(tempBuffer.stack, sizeC);
 		u64 resultAddrC = *((u64 *)resultC);
@@ -1190,7 +1192,7 @@ void MemStackTest()
 		DQN_ASSERT(stack.block != blockB && stack.block != blockA);
 		DQN_ASSERT(stack.block->used >= sizeC + 0 &&
 		           stack.block->used <= sizeC + 3);
-		DQN_ASSERT(stack.tempStackCount == 1);
+		DQN_ASSERT(stack.tempRegionCount == 1);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// NOTE: Allocation should be aligned to 4 byte boundary
@@ -1212,12 +1214,12 @@ void MemStackTest()
 			DQN_ASSERT(ptrC[i] == 3);
 
 		// End temp region which should revert back to 2 linked stacks, A and B
-		DqnMemStack_EndTempRegion(tempBuffer);
+		DqnMemStackTempRegion_End(tempBuffer);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == sizeB);
 		DQN_ASSERT(stack.block->used >= sizeB + 0 &&
 		           stack.block->used <= sizeB + 3);
-		DQN_ASSERT(stack.tempStackCount == 0);
+		DQN_ASSERT(stack.tempRegionCount == 0);
 		DQN_ASSERT(resultB);
 
 		DQN_ASSERT(stack.block->prevBlock == blockA);
@@ -1239,7 +1241,7 @@ void MemStackTest()
 		DqnMemStack_FreeLastBlock(&stack);
 		DQN_ASSERT(!stack.block);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
-		DQN_ASSERT(stack.tempStackCount == 0);
+		DQN_ASSERT(stack.tempRegionCount == 0);
 	}
 
 	// Test stack with fixed memory does not allocate more
@@ -1338,7 +1340,7 @@ void MemStackTest()
 			// General Check stack struct contains the values we expect from
 			// initialisation
 			DQN_ASSERT(stack.flags == 0);
-			DQN_ASSERT(stack.tempStackCount == 0);
+			DQN_ASSERT(stack.tempRegionCount == 0);
 			DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 			DQN_ASSERT(stack.block->size == firstBlockSize);
 
@@ -1489,6 +1491,64 @@ void MemStackTest()
 	}
 }
 
+FILE_SCOPE u32 volatile globalDebugCounter;
+FILE_SCOPE bool volatile globalDebugCounterMemoize[2048];
+FILE_SCOPE DqnLock globalJobQueueLock;
+FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
+                                                      void *const userData)
+{
+	DqnLock_Acquire(&globalJobQueueLock);
+	DQN_ASSERT(!globalDebugCounterMemoize[globalDebugCounter]);
+	globalDebugCounterMemoize[globalDebugCounter] = true;
+	globalDebugCounter++;
+	u32 number = globalDebugCounter;
+	DqnLock_Release(&globalJobQueueLock);
+
+	printf("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n", GetCurrentThreadId(),
+	       number);
+}
+
+FILE_SCOPE void JobQueueTest()
+{
+	size_t requiredSize;
+	const i32 QUEUE_SIZE = 256;
+	DqnJobQueue_InitWithMem(NULL, &requiredSize, QUEUE_SIZE, 0);
+
+	DqnMemStack memStack;
+	DQN_ASSERT_HARD(DqnMemStack_Init(&memStack, requiredSize, true));
+
+	i32 numThreads, numCores;
+	DqnWin32_GetNumThreadsAndCores(&numCores, &numThreads);
+	DQN_ASSERT(numThreads > 0 && numCores > 0);
+	i32 totalThreads = (numCores - 1) * numThreads;
+
+	void *jobQueueMem = DqnMemStack_Push(&memStack, requiredSize);
+	DQN_ASSERT_HARD(jobQueueMem);
+	DqnJobQueue *jobQueue = DqnJobQueue_InitWithMem(jobQueueMem, &requiredSize,
+	                                                QUEUE_SIZE, totalThreads);
+	DQN_ASSERT_HARD(jobQueue);
+
+	DQN_ASSERT(DqnLock_Init(&globalJobQueueLock));
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(globalDebugCounterMemoize); i++)
+	{
+		DqnJob job   = {};
+		job.callback = JobQueueDebugCallbackIncrementCounter;
+		while (!DqnJobQueue_AddJob(jobQueue, job))
+		{
+			DqnJobQueue_TryExecuteNextJob(jobQueue);
+		}
+	}
+
+	while (DqnJobQueue_TryExecuteNextJob(jobQueue))
+		;
+
+	for (i32 i = 0; i < DQN_ARRAY_COUNT(globalDebugCounterMemoize); i++)
+		DQN_ASSERT(globalDebugCounterMemoize[i]);
+
+	printf("\nJobQueueTest(): Final incremented value: %d\n", globalDebugCounter);
+	DQN_ASSERT(globalDebugCounter == DQN_ARRAY_COUNT(globalDebugCounterMemoize));
+}
+
 int main(void)
 {
 	StringsTest();
@@ -1500,6 +1560,7 @@ int main(void)
 	ArrayTest();
 	FileTest();
 	MemStackTest();
+	JobQueueTest();
 
 	printf("\nPress 'Enter' Key to Exit\n");
 	getchar();
