@@ -1,6 +1,6 @@
-#ifndef DQN_H
-#define DQN_H
-
+////////////////////////////////////////////////////////////////////////////////
+// Dqn.h Usage
+////////////////////////////////////////////////////////////////////////////////
 /*
 	#define DQN_IMPLEMENTATION       // Enable the implementation
 	#define DQN_WIN32_IMPLEMENTATION // Enable Win32 Code, but only if _WIN32 is already defined. Also requires DQN_IMPLEMENTATION.
@@ -9,10 +9,21 @@
  */
 
 ////////////////////////////////////////////////////////////////////////////////
-//
-// HEADER
-//
+// Platform Checks
 ////////////////////////////////////////////////////////////////////////////////
+// This needs to be above the portable layer so  that, if the user requests
+// a platform implementation, platform specific implementations in the portable
+// layer will get activated.
+#if (defined(_WIN32) || defined(_WIN64)) && defined(DQN_WIN32_IMPLEMENTATION)
+	#define DQN_PLATFORM_LAYER
+	#define DQN_WIN32_PLATFORM
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
+// Cross-Platform/Portable Layer
+////////////////////////////////////////////////////////////////////////////////
+#ifndef DQN_H
+#define DQN_H
 #ifdef DQN_MAKE_STATIC
 	#define DQN_FILE_SCOPE static
 #else
@@ -21,12 +32,6 @@
 
 #ifdef __cplusplus
 	#define DQN_CPP_MODE
-#endif
-
-#if (defined(_WIN32) || defined(_WIN64)) && defined(DQN_WIN32_IMPLEMENTATION)
-	#define DQN_WIN32_PLATFORM
-	#define WIN32_LEAN_AND_MEAN
-	#include <Windows.h>
 #endif
 
 #include <stdint.h> // For standard types
@@ -765,14 +770,46 @@ DQN_FILE_SCOPE bool    DqnWChar_IsDigit(const wchar_t c);
 DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c);
 
 DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *a);
-DQN_FILE_SCOPE i32 DqnWstr_Cmp(const wchar_t *a, const wchar_t *b);
+DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *a, const wchar_t *b);
 
 DQN_FILE_SCOPE bool Dqn_WStrReverse(wchar_t *buf, const i32 bufSize);
 DQN_FILE_SCOPE i32  Dqn_WStrToI32(const wchar_t *const buf, const i32 bufSize);
 DQN_FILE_SCOPE i32  Dqn_I32ToWStr(i32 value, wchar_t *buf, i32 bufSize);
 
 ////////////////////////////////////////////////////////////////////////////////
-// File Operations
+// PCG (Permuted Congruential Generator) Random Number Generator
+////////////////////////////////////////////////////////////////////////////////
+typedef struct DqnRandPCGState
+{
+	u64 state[2];
+} DqnRandPCGState;
+
+// Initialise the random number generator using a seed. If not given it is
+// automatically created by using rdtsc. The generator is not valid until it's
+// been seeded.
+DQN_FILE_SCOPE void DqnRnd_PCGInitWithSeed(DqnRandPCGState *pcg, u32 seed);
+DQN_FILE_SCOPE void DqnRnd_PCGInit        (DqnRandPCGState *pcg);
+
+// Returns a random number N between [0, 0xFFFFFFFF]
+DQN_FILE_SCOPE u32  DqnRnd_PCGNext (DqnRandPCGState *pcg);
+// Returns a random float N between [0.0, 1.0f]
+DQN_FILE_SCOPE f32  DqnRnd_PCGNextf(DqnRandPCGState *pcg);
+// Returns a random integer N between [min, max]
+DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
+#endif  /* DQN_H */
+
+////////////////////////////////////////////////////////////////////////////////
+// Platform Layer
+////////////////////////////////////////////////////////////////////////////////
+// TODO(doyle): The following functions require a platform to work, at this
+// point in time, they all only support Win32.
+#ifdef DQN_PLATFORM_LAYER
+#ifdef DQN_WIN32_PLATFORM
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+////////////////////////////////////////////////////////////////////////////////
+// DqnFile
 ////////////////////////////////////////////////////////////////////////////////
 enum DqnFilePermissionFlag
 {
@@ -828,36 +865,11 @@ DQN_FILE_SCOPE f64 DqnTime_NowInS();
 DQN_FILE_SCOPE f64 DqnTime_NowInMs();
 
 ////////////////////////////////////////////////////////////////////////////////
-// PCG (Permuted Congruential Generator) Random Number Generator
-////////////////////////////////////////////////////////////////////////////////
-typedef struct DqnRandPCGState
-{
-	u64 state[2];
-} DqnRandPCGState;
-
-// Initialise the random number generator using a seed. If not given it is
-// automatically created by using rdtsc. The generator is not valid until it's
-// been seeded.
-DQN_FILE_SCOPE void DqnRnd_PCGInitWithSeed(DqnRandPCGState *pcg, u32 seed);
-DQN_FILE_SCOPE void DqnRnd_PCGInit        (DqnRandPCGState *pcg);
-
-// Returns a random number N between [0, 0xFFFFFFFF]
-DQN_FILE_SCOPE u32  DqnRnd_PCGNext (DqnRandPCGState *pcg);
-// Returns a random float N between [0.0, 1.0f]
-DQN_FILE_SCOPE f32  DqnRnd_PCGNextf(DqnRandPCGState *pcg);
-// Returns a random integer N between [min, max]
-DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
-
-////////////////////////////////////////////////////////////////////////////////
 // DqnLock
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct DqnLock
 {
-#ifdef DQN_WIN32_PLATFORM
 	CRITICAL_SECTION win32Handle;
-#else
-	void *handle;
-#endif
 } DqnLock;
 
 DQN_FILE_SCOPE bool DqnLock_Init   (DqnLock *const lock, const u32 spinCount = 16000);
@@ -875,8 +887,6 @@ DQN_FILE_SCOPE u32 DqnAtomic_Sub32        (u32 volatile *src);
 ////////////////////////////////////////////////////////////////////////////////
 // DqnJobQueue - Multithreaded Job Queue
 ////////////////////////////////////////////////////////////////////////////////
-// TODO(doyle): Only WIN32!!
-
 // DqnJobQueue is a platform abstracted "lockless" multithreaded work queue. It
 // will create threads and assign threads to complete the job via the job
 // 'callback' using the 'userData' supplied.
@@ -912,9 +922,7 @@ DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob jo
 // are no jobs left. That can only be known using DqnJobQueue_AllJobsComplete().
 DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue);
 DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete  (DqnJobQueue *const queue);
-#endif  /* DQN_H */
 
-#ifdef DQN_WIN32_PLATFORM
 ////////////////////////////////////////////////////////////////////////////////
 // Win32 Specific
 ////////////////////////////////////////////////////////////////////////////////
@@ -937,7 +945,8 @@ DQN_FILE_SCOPE i32  DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen);
 // numCores: numThreadsPerCore: Can be NULL, the function will just skip it.
 // Uses calloc and free for querying numCores.
 DQN_FILE_SCOPE void DqnWin32_GetNumThreadsAndCores(i32 *const numCores, i32 *const numThreadsPerCore);
-#endif /* DQN_WIN32_PLATFORM */
+#endif // DQN_WIN32_PLATFORM
+#endif // DQN_PLATFORM_LAYER
 
 #ifndef DQN_INI_H
 #define DQN_INI_H
@@ -1050,14 +1059,6 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property, char const 
 /**
 Customization
 -------------
-There are a few different things in ini.h which are configurable by #defines.
-The customizations only affect the implementation, so will only need to be
-defined in the file where you have the #define DQN_INI_IMPLEMENTATION.
-
-Note that if all customizations are utilized, ini.h will include no external
-files whatsoever, which might be useful if you need full control over what code
-is being built.
-
 ### Custom memory allocators
 
 To store the internal data structures, ini.h needs to do dynamic allocation by
@@ -1339,11 +1340,10 @@ zero-terminated. If `length` is zero, the length is determined automatically,
 	but in this case `value` has to be zero-terminated.
 
 **/
-#endif /* dqn_ini_h */
+#endif // DQN_INI_H
 
 #ifndef STB_SPRINTF_H_INCLUDE
 #define STB_SPRINTF_H_INCLUDE
-
 #define STB_SPRINTF_DECORATE(name) Dqn_##name
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1466,8 +1466,9 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #include <math.h>   // TODO(doyle): For trigonometry functions (for now)
 #include <stdlib.h> // For calloc, malloc, free
 #include <string.h> // For memset
+#include <stdio.h>  // For printf
 
-// NOTE: STB_SPRINTF modified to be included when DQN_IMPLEMENTATION defined
+// NOTE: STB_SPRINTF is included when DQN_IMPLEMENTATION defined
 // #define STB_SPRINTF_IMPLEMENTATION
 
 // NOTE: DQN_INI_IMPLEMENTATION modified to be included when DQN_IMPLEMENTATION defined
@@ -1477,10 +1478,6 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 ////////////////////////////////////////////////////////////////////////////////
 // Dqn Error
 ////////////////////////////////////////////////////////////////////////////////
-#ifndef DQN_WIN32_PLATFORM
-#include <stdio.h>
-#endif
-
 DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file, const i32 lineNum,
                                       const char *const expr, const char *const msg, ...)
 {
@@ -3328,7 +3325,7 @@ DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *a)
 	return result;
 }
 
-DQN_FILE_SCOPE i32 DqnWstr_Cmp(const wchar_t *a, const wchar_t *b)
+DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *a, const wchar_t *b)
 {
 	if (!a && !b) return -1;
 	if (!a) return -1;
@@ -3434,312 +3431,6 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DqnFileInternal Implementation
-////////////////////////////////////////////////////////////////////////////////
-FILE_SCOPE bool DqnFileInternal_Open(const wchar_t *const path,
-                                     DqnFile *const file,
-                                     const u32 permissionFlags,
-                                     const enum DqnFileAction action)
-{
-	if (!file || !path) return false;
-
-#ifdef DQN_WIN32_PLATFORM
-	DWORD win32Permission = 0;
-	if (permissionFlags & DqnFilePermissionFlag_All)
-	{
-		win32Permission = GENERIC_ALL;
-	}
-	else
-	{
-		if (permissionFlags & DqnFilePermissionFlag_Read)    win32Permission |= GENERIC_READ;
-		if (permissionFlags & DqnFilePermissionFlag_Write)   win32Permission |= GENERIC_WRITE;
-		if (permissionFlags & DqnFilePermissionFlag_Execute) win32Permission |= GENERIC_EXECUTE;
-	}
-
-	DWORD win32Action = 0;
-	switch (action)
-	{
-		// Allow fall through
-		default: DQN_ASSERT(DQN_INVALID_CODE_PATH);
-		case DqnFileAction_OpenOnly:         win32Action = OPEN_EXISTING; break;
-		case DqnFileAction_ClearIfExist:     win32Action = TRUNCATE_EXISTING; break;
-		case DqnFileAction_CreateIfNotExist: win32Action = CREATE_NEW; break;
-	}
-
-	HANDLE handle = CreateFileW(path, win32Permission, 0, NULL, win32Action,
-	                            FILE_ATTRIBUTE_NORMAL, NULL);
-
-	if (handle == INVALID_HANDLE_VALUE)
-	{
-		return false;
-	}
-
-	LARGE_INTEGER size;
-	if (GetFileSizeEx(handle, &size) == 0)
-	{
-		DqnWin32_DisplayLastError("GetFileSizeEx() failed");
-		return false;
-	}
-
-	file->handle          = handle;
-	file->size            = (size_t)size.QuadPart;
-	file->permissionFlags = permissionFlags;
-	return true;
-#else
-	DQN_ASSERT(DQN_INVALID_CODE_PATH);
-	return false;
-#endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DqnFile Implementation
-////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE
-bool DqnFile_Open(const char *const path, DqnFile *const file,
-                  const u32 permissionFlags, const enum DqnFileAction action)
-{
-	if (!file || !path) return false;
-
-#ifdef DQN_WIN32_PLATFORM
-	wchar_t widePath[MAX_PATH] = {0};
-	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
-	return DqnFileInternal_Open(widePath, file, permissionFlags, action);
-#else
-	DQN_ASSERT(DQN_INVALID_CODE_PATH);
-	return false;
-#endif
-}
-
-DQN_FILE_SCOPE
-bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file, const u32 permissionFlags,
-                   const enum DqnFileAction action)
-{
-	if (!file || !path) return false;
-	return DqnFileInternal_Open(path, file, permissionFlags, action);
-}
-
-DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
-                                    const u8 *const buffer,
-                                    const size_t numBytesToWrite,
-                                    const size_t fileOffset)
-{
-	size_t numBytesWritten = 0;
-	// TODO(doyle): Implement when it's needed
-	if (DQN_ASSERT_MSG(fileOffset != 0, "'fileOffset' not implemented yet")) return 0;
-	if (!file || !buffer) return numBytesToWrite;
-
-#ifdef DQN_WIN32_PLATFORM
-	DWORD bytesToWrite = (DWORD)numBytesToWrite;
-	DWORD bytesWritten;
-	BOOL result =
-	    WriteFile(file->handle, buffer, bytesToWrite, &bytesWritten, NULL);
-
-	numBytesWritten = (size_t)bytesWritten;
-	// TODO(doyle): Better logging system
-	if (result == 0)
-	{
-		DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
-	}
-
-#else
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
-#endif
-
-	return numBytesWritten;
-}
-
-DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
-                                   const size_t numBytesToRead)
-{
-	size_t numBytesRead = 0;
-#ifdef DQN_WIN32_PLATFORM
-	if (file.handle && buffer)
-	{
-		DWORD bytesToRead = (DWORD)numBytesToRead;
-		DWORD bytesRead    = 0;
-		HANDLE win32Handle = file.handle;
-
-		BOOL result = ReadFile(win32Handle, (void *)buffer, bytesToRead,
-		                       &bytesRead, NULL);
-
-		numBytesRead = (size_t)bytesRead;
-		// TODO(doyle): 0 also means it is completing async, but still valid
-		if (result == 0)
-		{
-			DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
-		}
-
-	}
-#endif
-	return numBytesRead;
-}
-
-DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
-{
-#ifdef DQN_WIN32_PLATFORM
-	if (file && file->handle)
-	{
-		CloseHandle(file->handle);
-		file->handle          = NULL;
-		file->size            = 0;
-		file->permissionFlags = 0;
-	}
-#else
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
-#endif
-}
-
-DQN_FILE_SCOPE char **DqnDir_Read(char *dir, u32 *numFiles)
-{
-	if (!dir) return NULL;
-#ifdef DQN_WIN32_PLATFORM
-
-	u32 currNumFiles = 0;
-	wchar_t wideDir[MAX_PATH] = {0};
-	DqnWin32_UTF8ToWChar(dir, wideDir, DQN_ARRAY_COUNT(wideDir));
-
-	// Enumerate number of files first
-	{
-		WIN32_FIND_DATAW findData = {0};
-		HANDLE findHandle = FindFirstFileW(wideDir, &findData);
-		if (findHandle == INVALID_HANDLE_VALUE)
-		{
-			DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
-			return NULL;
-		}
-
-		bool stayInLoop = true;
-		while (stayInLoop)
-		{
-			BOOL result = FindNextFileW(findHandle, &findData);
-			if (result == 0)
-			{
-				DWORD error = GetLastError();
-				if (error != ERROR_NO_MORE_FILES)
-				{
-					DqnWin32_DisplayErrorCode(error,
-					                             "FindNextFileW() failed");
-				}
-
-				stayInLoop = false;
-			}
-			else
-			{
-				currNumFiles++;
-			}
-		}
-		FindClose(findHandle);
-	}
-
-	if (currNumFiles == 0)
-	{
-		*numFiles = 0;
-		return NULL;
-	}
-
-	{
-		WIN32_FIND_DATAW initFind = {0};
-		HANDLE findHandle = FindFirstFileW(wideDir, &initFind);
-		if (findHandle == INVALID_HANDLE_VALUE)
-		{
-			DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
-			return NULL;
-		}
-
-		char **list = (char **)DqnMem_Calloc(
-		    sizeof(*list) * (currNumFiles));
-		if (!list)
-		{
-			DQN_WIN32_ERROR_BOX("DqnMem_Alloc() failed.", NULL);
-			return NULL;
-		}
-
-		for (u32 i = 0; i < currNumFiles; i++)
-		{
-			list[i] =
-			    (char *)DqnMem_Calloc(sizeof(**list) * MAX_PATH);
-			if (!list[i])
-			{
-				for (u32 j = 0; j < i; j++)
-				{
-					DqnMem_Free(list[j]);
-				}
-
-				DQN_WIN32_ERROR_BOX("DqnMem_Alloc() failed.", NULL);
-				return NULL;
-			}
-		}
-
-		i32 listIndex = 0;
-		WIN32_FIND_DATAW findData = {0};
-		while (FindNextFileW(findHandle, &findData) != 0)
-		{
-			DqnWin32_WCharToUTF8(findData.cFileName, list[listIndex++],
-			                        MAX_PATH);
-		}
-
-		*numFiles = currNumFiles;
-		FindClose(findHandle);
-
-		return list;
-	}
-#else
-	return NULL;
-#endif
-}
-
-DQN_FILE_SCOPE void DqnDir_ReadFree(char **fileList, u32 numFiles)
-{
-	if (fileList)
-	{
-		for (u32 i = 0; i < numFiles; i++)
-		{
-			if (fileList[i]) DqnMem_Free(fileList[i]);
-			fileList[i] = NULL;
-		}
-
-		DqnMem_Free(fileList);
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Timer
-////////////////////////////////////////////////////////////////////////////////
-#ifdef DQN_WIN32_PLATFORM
-FILE_SCOPE f64 DqnTimeInternal_Win32QueryPerfCounterTimeInS()
-{
-	LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {0};
-	if (queryPerformanceFrequency.QuadPart == 0)
-	{
-		QueryPerformanceFrequency(&queryPerformanceFrequency);
-		DQN_ASSERT_HARD(queryPerformanceFrequency.QuadPart != 0);
-	}
-
-	LARGE_INTEGER qpcResult;
-	QueryPerformanceCounter(&qpcResult);
-
-	// Convert to ms
-	f64 timestamp =
-	    qpcResult.QuadPart / (f64)queryPerformanceFrequency.QuadPart;
-	return timestamp;
-}
-#endif
-
-f64 DqnTime_NowInS()
-{
-	f64 result;
-#ifdef DQN_WIN32_PLATFORM
-	result = DQN_MAX(DqnTimeInternal_Win32QueryPerfCounterTimeInS(), 0);
-#else
-	result = 0;
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
-#endif
-	return result;
-};
-
-f64 DqnTime_NowInMs() { return DqnTime_NowInS() * 1000.0f; }
-
-////////////////////////////////////////////////////////////////////////////////
 // PCG (Permuted Congruential Generator) Random Number Generator
 ////////////////////////////////////////////////////////////////////////////////
 // Public Domain library with thanks to Mattias Gustavsson
@@ -3821,416 +3512,6 @@ DQN_FILE_SCOPE i32 DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max)
 	i32 const value = (i32)(DqnRnd_PCGNextf(pcg) * range);
 	return min + value;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// DqnLock
-////////////////////////////////////////////////////////////////////////////////
-bool DqnLock_Init(DqnLock *const lock, const u32 spinCount)
-{
-	if (!lock) return false;
-
-#ifdef DQN_WIN32_PLATFORM
-	if (InitializeCriticalSectionEx(&lock->win32Handle, spinCount, 0))
-		return true;
-#endif
-
-	return false;
-}
-
-void DqnLock_Acquire(DqnLock *const lock)
-{
-	if (!lock) return;
-#ifdef DQN_WIN32_PLATFORM
-	EnterCriticalSection(&lock->win32Handle);
-#else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-#endif
-}
-
-void DqnLock_Release(DqnLock *const lock)
-{
-	if (!lock) return;
-#ifdef DQN_WIN32_PLATFORM
-	LeaveCriticalSection(&lock->win32Handle);
-#else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-#endif
-}
-
-void DqnLock_Delete(DqnLock *const lock)
-{
-	if (!lock) return;
-#ifdef DQN_WIN32_PLATFORM
-	DeleteCriticalSection(&lock->win32Handle);
-#else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-#endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DqnAtomics
-////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE u32 DqnAtomic_CompareSwap32(u32 volatile *dest, u32 swapVal, u32 compareVal)
-{
-#ifdef DQN_WIN32_PLATFORM
-	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
-	u32 result =
-	    (u32)InterlockedCompareExchange((LONG volatile *)dest, (LONG)swapVal, (LONG)compareVal);
-	return result;
-#else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-	return 0;
-#endif
-}
-
-DQN_FILE_SCOPE u32 DqnAtomic_Add32(u32 volatile *src)
-{
-#ifdef DQN_WIN32_PLATFORM
-	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
-	u32 result = (u32)InterlockedIncrement((LONG volatile *)src);
-	return result;
-#else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-	return 0;
-#endif
-}
-
-DQN_FILE_SCOPE u32 DqnAtomic_Sub32(u32 volatile *src)
-{
-#ifdef DQN_WIN32_PLATFORM
-	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
-	u32 result = (u32)InterlockedDecrement((LONG volatile *)src);
-	return result;
-#else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-	return 0;
-#endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DqnJobQueue - Multithreaded Job Queue
-////////////////////////////////////////////////////////////////////////////////
-typedef struct DqnJobQueue
-{
-	DqnJob *jobList;
-	u32     size;
-
-	// NOTE: Modified by main+worker threads
-	u32   volatile jobToExecuteIndex;
-	u32   volatile numJobsToComplete;
-	void *semaphore;
-
-	// NOTE: Modified by main thread ONLY
-	u32 volatile jobInsertIndex;
-} DqnJobQueue;
-
-////////////////////////////////////////////////////////////////////////////////
-// DqnJobQueueInternal
-////////////////////////////////////////////////////////////////////////////////
-size_t DQN_JOB_QUEUE_INTERNAL_THREAD_DEFAULT_STACK_SIZE = 0;
-FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(const size_t stackSize, void *threadCallback,
-                                                void *threadParam, const u32 numThreads)
-{
-	u32 numThreadsCreated = 0;
-
-#ifdef DQN_WIN32_PLATFORM
-	DQN_ASSERT_HARD(stackSize == 0 || !threadCallback);
-	for (u32 i = 0; i < numThreads; i++)
-	{
-		HANDLE handle = CreateThread(NULL, stackSize, (LPTHREAD_START_ROUTINE)threadCallback,
-		                             threadParam, 0, NULL);
-		CloseHandle(handle);
-		numThreadsCreated++;
-	}
-
-#else
-	DQN_ASSERT(DQN_INVALID_CODE_PATH);
-#endif
-
-	DQN_ASSERT(numThreadsCreated == numThreads);
-	return numThreadsCreated;
-}
-
-
-FILE_SCOPE u32 DqnJobQueueInternal_ThreadCallback(void *threadParam)
-{
-	DqnJobQueue *queue = (DqnJobQueue *)threadParam;
-#ifdef DQN_WIN32_PLATFORM
-	for (;;)
-	{
-		if (!DqnJobQueue_TryExecuteNextJob(queue))
-		{
-			WaitForSingleObjectEx(queue->semaphore, INFINITE, false);
-		}
-	}
-#else
-	DQN_ASSERT(DQN_INVALID_CODE_PATH);
-	return 0;
-#endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DqnJobQueue Implementation
-////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnJobQueue *DqnJobQueue_InitWithMem(const void *const mem, size_t *const memSize,
-                                                    const u32 queueSize, const u32 numThreads)
-{
-	DqnJobQueue emptyQueue = {};
-	size_t reqStructSize   = sizeof(emptyQueue);
-	size_t reqQueueSize    = sizeof(*emptyQueue.jobList) * queueSize;
-
-	if (!mem || !memSize || *memSize == 0 || queueSize == 0)
-	{
-		*memSize = reqStructSize + reqQueueSize;
-		return NULL;
-	}
-
-	u8 *memPtr = (u8 *)mem;
-
-	// Sub-allocate Queue
-	DqnJobQueue *queue = (DqnJobQueue *)memPtr;
-	*queue             = emptyQueue;
-	queue->size        = queueSize;
-
-	// Sub-allocate jobList
-	memPtr += reqStructSize;
-	queue->jobList = (DqnJob *)memPtr;
-
-	// Validate memPtr used size
-	memPtr += reqQueueSize;
-	DQN_ASSERT_HARD((size_t)(memPtr - (u8 *)mem) <= *memSize);
-
-	// Create semaphore
-#ifdef DQN_WIN32_PLATFORM
-	queue->semaphore = (void *)CreateSemaphore(NULL, 0, numThreads, NULL);
-	DQN_ASSERT_HARD(queue->semaphore);
-#else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-#endif
-
-	// Create threads
-	u32 numThreadsCreated = DqnJobQueueInternal_ThreadCreate(
-	    DQN_JOB_QUEUE_INTERNAL_THREAD_DEFAULT_STACK_SIZE, DqnJobQueueInternal_ThreadCallback,
-	    (void *)queue, numThreads);
-	DQN_ASSERT_HARD(numThreads == numThreadsCreated);
-	return queue;
-}
-
-DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob job)
-{
-	u32 newJobInsertIndex = (queue->jobInsertIndex + 1) % queue->size;
-	if (newJobInsertIndex == queue->jobToExecuteIndex) return false;
-
-	queue->jobList[queue->jobInsertIndex] = job;
-
-	DqnAtomic_Add32(&queue->numJobsToComplete);
-
-#ifdef DQN_WIN32_PLATFORM
-	ReleaseSemaphore(queue->semaphore, 1, NULL);
-#else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-#endif
-	queue->jobInsertIndex = newJobInsertIndex;
-	return true;
-}
-
-DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue)
-{
-	u32 originalJobToExecute = queue->jobToExecuteIndex;
-	if (originalJobToExecute != queue->jobInsertIndex)
-	{
-		u32 newJobIndexForNextThread = (originalJobToExecute + 1) % queue->size;
-		u32 index = DqnAtomic_CompareSwap32(&queue->jobToExecuteIndex, newJobIndexForNextThread,
-		                                    originalJobToExecute);
-
-		// NOTE: If we weren't successful at the interlock, another thread has
-		// taken the work and we can't know if there's more work or not. So
-		// irrespective of that result, return true to let the thread check
-		// again for more work.
-		if (index == originalJobToExecute)
-		{
-			DqnJob job = queue->jobList[index];
-			job.callback(queue, job.userData);
-			DqnAtomic_Sub32(&queue->numJobsToComplete);
-		}
-
-		return true;
-	}
-
-	return false;
-}
-
-DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete(DqnJobQueue *const queue)
-{
-	bool result = (queue->numJobsToComplete == 0);
-	return result;
-}
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-// DqnWin32 Operations
-////////////////////////////////////////////////////////////////////////////////
-#ifdef DQN_WIN32_PLATFORM
-DQN_FILE_SCOPE bool DqnWin32_UTF8ToWChar(const char *const in,
-                                         wchar_t *const out, const i32 outLen)
-{
-	u32 result = MultiByteToWideChar(CP_UTF8, 0, in, -1, out, outLen-1);
-
-	if (result == 0xFFFD || 0)
-	{
-		DQN_WIN32_ERROR_BOX("WideCharToMultiByte() failed.", NULL);
-		return false;
-	}
-
-	return true;
-}
-
-DQN_FILE_SCOPE bool DqnWin32_WCharToUTF8(const wchar_t *const in,
-                                         char *const out, const i32 outLen)
-{
-	u32 result =
-	    WideCharToMultiByte(CP_UTF8, 0, in, -1, out, outLen, NULL, NULL);
-
-	if (result == 0xFFFD || 0)
-	{
-		DQN_WIN32_ERROR_BOX("WideCharToMultiByte() failed.", NULL);
-		return false;
-	}
-
-	return true;
-}
-
-DQN_FILE_SCOPE void DqnWin32_GetClientDim(const HWND window, LONG *width,
-                                          LONG *height)
-{
-	RECT rect;
-	GetClientRect(window, &rect);
-	if (width)  *width  = rect.right - rect.left;
-	if (height) *height = rect.bottom - rect.top;
-}
-
-DQN_FILE_SCOPE void DqnWin32_GetRectDim(RECT rect, LONG *width, LONG *height)
-{
-	if (width)  *width  = rect.right - rect.left;
-	if (height) *height = rect.bottom - rect.top;
-}
-
-DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix)
-{
-	DWORD error         = GetLastError();
-	char errorMsg[1024] = {0};
-	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-	               NULL, error, 0, errorMsg, DQN_ARRAY_COUNT(errorMsg), NULL);
-
-	char formattedError[2048] = {0};
-	Dqn_sprintf(formattedError, "%s: %s", errorPrefix, errorMsg);
-	DQN_WIN32_ERROR_BOX(formattedError, NULL);
-}
-
-DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *const errorPrefix)
-{
-	char errorMsg[1024] = {0};
-	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-	               NULL, error, 0, errorMsg, DQN_ARRAY_COUNT(errorMsg), NULL);
-
-	char formattedError[2048] = {0};
-	Dqn_sprintf(formattedError, "%s: %s", errorPrefix, errorMsg);
-	DQN_WIN32_ERROR_BOX(formattedError, NULL);
-}
-
-DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
-{
-	char str[1024] = {0};
-
-	va_list argList;
-	va_start(argList, formatStr);
-	{
-		i32 numCopied = Dqn_vsprintf(str, formatStr, argList);
-		DQN_ASSERT_HARD(numCopied < DQN_ARRAY_COUNT(str));
-	}
-	va_end(argList);
-
-	OutputDebugString(str);
-}
-
-DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen)
-{
-	if (!buf || bufLen == 0) return 0;
-	u32 copiedLen = GetModuleFileName(NULL, buf, bufLen);
-	if (copiedLen == bufLen) return -1;
-
-	// NOTE: Should always work if GetModuleFileName works and we're running an
-	// executable.
-	i32 lastSlashIndex = 0;
-	for (i32 i = copiedLen; i > 0; i--)
-	{
-		if (buf[i] == '\\')
-		{
-			lastSlashIndex = i;
-			break;
-		}
-	}
-
-	return lastSlashIndex;
-}
-
-DQN_FILE_SCOPE void DqnWin32_GetNumThreadsAndCores(i32 *const numCores, i32 *const numThreadsPerCore)
-{
-	if (numThreadsPerCore)
-	{
-		SYSTEM_INFO systemInfo;
-		GetNativeSystemInfo(&systemInfo);
-		*numThreadsPerCore = systemInfo.dwNumberOfProcessors;
-	}
-
-	if (numCores)
-	{
-		*numCores = 0;
-		DWORD requiredSize    = 0;
-		u8 insufficientBuffer = {0};
-		GetLogicalProcessorInformationEx(
-		    RelationProcessorCore, (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)insufficientBuffer,
-		    &requiredSize);
-
-		u8 *rawProcInfoArray = (u8 *)DqnMem_Calloc(requiredSize);
-		if (!DQN_ASSERT_MSG(rawProcInfoArray, "Calloc failed, could not allocate memory"))
-		{
-			return;
-		}
-
-		if (GetLogicalProcessorInformationEx(
-		        RelationProcessorCore, (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)rawProcInfoArray,
-		        &requiredSize))
-		{
-			SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *logicalProcInfo =
-			    (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)rawProcInfoArray;
-			DWORD bytesRead = 0;
-
-			do
-			{
-				// NOTE: High efficiency value has greater performance and less efficiency.
-				PROCESSOR_RELATIONSHIP *procInfo = &logicalProcInfo->Processor;
-				u32 efficiency                   = procInfo->EfficiencyClass;
-				(*numCores)++;
-				DQN_ASSERT_HARD(logicalProcInfo->Relationship == RelationProcessorCore);
-				DQN_ASSERT_HARD(procInfo->GroupCount == 1);
-
-				bytesRead += logicalProcInfo->Size;
-				logicalProcInfo =
-				    (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((u8 *)logicalProcInfo +
-				                                                logicalProcInfo->Size);
-			} while (bytesRead < requiredSize);
-		}
-		else
-		{
-			DqnWin32_DisplayLastError("GetLogicalProcessorInformationEx() failed");
-		}
-
-		DqnMem_Free(rawProcInfoArray);
-	}
-}
-#endif // DQN_WIN32_PLATFORM
 
 ////////////////////////////////////////////////////////////////////////////////
 // STB_Sprintf
@@ -5905,5 +5186,723 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 		}
 	}
 }
+#endif // DQN_IMPLEMENTATION
 
-#endif /* DQN_IMPLEMENTATION */
+////////////////////////////////////////////////////////////////////////////////
+// Platform Layer
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DQN_WIN32_PLATFORM
+////////////////////////////////////////////////////////////////////////////////
+// DqnFileInternal Implementation
+////////////////////////////////////////////////////////////////////////////////
+FILE_SCOPE bool DqnFileInternal_Open(const wchar_t *const path,
+                                     DqnFile *const file,
+                                     const u32 permissionFlags,
+                                     const enum DqnFileAction action)
+{
+	if (!file || !path) return false;
+
+#ifdef DQN_WIN32_PLATFORM
+	DWORD win32Permission = 0;
+	if (permissionFlags & DqnFilePermissionFlag_All)
+	{
+		win32Permission = GENERIC_ALL;
+	}
+	else
+	{
+		if (permissionFlags & DqnFilePermissionFlag_Read)    win32Permission |= GENERIC_READ;
+		if (permissionFlags & DqnFilePermissionFlag_Write)   win32Permission |= GENERIC_WRITE;
+		if (permissionFlags & DqnFilePermissionFlag_Execute) win32Permission |= GENERIC_EXECUTE;
+	}
+
+	DWORD win32Action = 0;
+	switch (action)
+	{
+		// Allow fall through
+		default: DQN_ASSERT(DQN_INVALID_CODE_PATH);
+		case DqnFileAction_OpenOnly:         win32Action = OPEN_EXISTING; break;
+		case DqnFileAction_ClearIfExist:     win32Action = TRUNCATE_EXISTING; break;
+		case DqnFileAction_CreateIfNotExist: win32Action = CREATE_NEW; break;
+	}
+
+	HANDLE handle = CreateFileW(path, win32Permission, 0, NULL, win32Action,
+	                            FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (handle == INVALID_HANDLE_VALUE)
+	{
+		return false;
+	}
+
+	LARGE_INTEGER size;
+	if (GetFileSizeEx(handle, &size) == 0)
+	{
+		DqnWin32_DisplayLastError("GetFileSizeEx() failed");
+		return false;
+	}
+
+	file->handle          = handle;
+	file->size            = (size_t)size.QuadPart;
+	file->permissionFlags = permissionFlags;
+	return true;
+#else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	return false;
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DqnFile Implementation
+////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE
+bool DqnFile_Open(const char *const path, DqnFile *const file,
+                  const u32 permissionFlags, const enum DqnFileAction action)
+{
+	if (!file || !path) return false;
+
+#ifdef DQN_WIN32_PLATFORM
+	wchar_t widePath[MAX_PATH] = {0};
+	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
+	return DqnFileInternal_Open(widePath, file, permissionFlags, action);
+#else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	return false;
+#endif
+}
+
+DQN_FILE_SCOPE
+bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file, const u32 permissionFlags,
+                   const enum DqnFileAction action)
+{
+	if (!file || !path) return false;
+	return DqnFileInternal_Open(path, file, permissionFlags, action);
+}
+
+DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
+                                    const u8 *const buffer,
+                                    const size_t numBytesToWrite,
+                                    const size_t fileOffset)
+{
+	size_t numBytesWritten = 0;
+	// TODO(doyle): Implement when it's needed
+	if (DQN_ASSERT_MSG(fileOffset != 0, "'fileOffset' not implemented yet")) return 0;
+	if (!file || !buffer) return numBytesToWrite;
+
+#ifdef DQN_WIN32_PLATFORM
+	DWORD bytesToWrite = (DWORD)numBytesToWrite;
+	DWORD bytesWritten;
+	BOOL result =
+	    WriteFile(file->handle, buffer, bytesToWrite, &bytesWritten, NULL);
+
+	numBytesWritten = (size_t)bytesWritten;
+	// TODO(doyle): Better logging system
+	if (result == 0)
+	{
+		DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
+	}
+
+#else
+	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
+#endif
+
+	return numBytesWritten;
+}
+
+DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
+                                   const size_t numBytesToRead)
+{
+	size_t numBytesRead = 0;
+#ifdef DQN_WIN32_PLATFORM
+	if (file.handle && buffer)
+	{
+		DWORD bytesToRead = (DWORD)numBytesToRead;
+		DWORD bytesRead    = 0;
+		HANDLE win32Handle = file.handle;
+
+		BOOL result = ReadFile(win32Handle, (void *)buffer, bytesToRead,
+		                       &bytesRead, NULL);
+
+		numBytesRead = (size_t)bytesRead;
+		// TODO(doyle): 0 also means it is completing async, but still valid
+		if (result == 0)
+		{
+			DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
+		}
+
+	}
+#endif
+	return numBytesRead;
+}
+
+DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
+{
+#ifdef DQN_WIN32_PLATFORM
+	if (file && file->handle)
+	{
+		CloseHandle(file->handle);
+		file->handle          = NULL;
+		file->size            = 0;
+		file->permissionFlags = 0;
+	}
+#else
+	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
+#endif
+}
+
+DQN_FILE_SCOPE char **DqnDir_Read(char *dir, u32 *numFiles)
+{
+	if (!dir) return NULL;
+#ifdef DQN_WIN32_PLATFORM
+
+	u32 currNumFiles = 0;
+	wchar_t wideDir[MAX_PATH] = {0};
+	DqnWin32_UTF8ToWChar(dir, wideDir, DQN_ARRAY_COUNT(wideDir));
+
+	// Enumerate number of files first
+	{
+		WIN32_FIND_DATAW findData = {0};
+		HANDLE findHandle = FindFirstFileW(wideDir, &findData);
+		if (findHandle == INVALID_HANDLE_VALUE)
+		{
+			DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
+			return NULL;
+		}
+
+		bool stayInLoop = true;
+		while (stayInLoop)
+		{
+			BOOL result = FindNextFileW(findHandle, &findData);
+			if (result == 0)
+			{
+				DWORD error = GetLastError();
+				if (error != ERROR_NO_MORE_FILES)
+				{
+					DqnWin32_DisplayErrorCode(error,
+					                             "FindNextFileW() failed");
+				}
+
+				stayInLoop = false;
+			}
+			else
+			{
+				currNumFiles++;
+			}
+		}
+		FindClose(findHandle);
+	}
+
+	if (currNumFiles == 0)
+	{
+		*numFiles = 0;
+		return NULL;
+	}
+
+	{
+		WIN32_FIND_DATAW initFind = {0};
+		HANDLE findHandle = FindFirstFileW(wideDir, &initFind);
+		if (findHandle == INVALID_HANDLE_VALUE)
+		{
+			DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
+			return NULL;
+		}
+
+		char **list = (char **)DqnMem_Calloc(
+		    sizeof(*list) * (currNumFiles));
+		if (!list)
+		{
+			DQN_WIN32_ERROR_BOX("DqnMem_Alloc() failed.", NULL);
+			return NULL;
+		}
+
+		for (u32 i = 0; i < currNumFiles; i++)
+		{
+			list[i] =
+			    (char *)DqnMem_Calloc(sizeof(**list) * MAX_PATH);
+			if (!list[i])
+			{
+				for (u32 j = 0; j < i; j++)
+				{
+					DqnMem_Free(list[j]);
+				}
+
+				DQN_WIN32_ERROR_BOX("DqnMem_Alloc() failed.", NULL);
+				return NULL;
+			}
+		}
+
+		i32 listIndex = 0;
+		WIN32_FIND_DATAW findData = {0};
+		while (FindNextFileW(findHandle, &findData) != 0)
+		{
+			DqnWin32_WCharToUTF8(findData.cFileName, list[listIndex++],
+			                        MAX_PATH);
+		}
+
+		*numFiles = currNumFiles;
+		FindClose(findHandle);
+
+		return list;
+	}
+#else
+	return NULL;
+#endif
+}
+
+DQN_FILE_SCOPE void DqnDir_ReadFree(char **fileList, u32 numFiles)
+{
+	if (fileList)
+	{
+		for (u32 i = 0; i < numFiles; i++)
+		{
+			if (fileList[i]) DqnMem_Free(fileList[i]);
+			fileList[i] = NULL;
+		}
+
+		DqnMem_Free(fileList);
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Timer
+////////////////////////////////////////////////////////////////////////////////
+#ifdef DQN_WIN32_PLATFORM
+FILE_SCOPE f64 DqnTimeInternal_Win32QueryPerfCounterTimeInS()
+{
+	LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {0};
+	if (queryPerformanceFrequency.QuadPart == 0)
+	{
+		QueryPerformanceFrequency(&queryPerformanceFrequency);
+		DQN_ASSERT_HARD(queryPerformanceFrequency.QuadPart != 0);
+	}
+
+	LARGE_INTEGER qpcResult;
+	QueryPerformanceCounter(&qpcResult);
+
+	// Convert to ms
+	f64 timestamp =
+	    qpcResult.QuadPart / (f64)queryPerformanceFrequency.QuadPart;
+	return timestamp;
+}
+#endif
+
+f64 DqnTime_NowInS()
+{
+	f64 result;
+#ifdef DQN_WIN32_PLATFORM
+	result = DQN_MAX(DqnTimeInternal_Win32QueryPerfCounterTimeInS(), 0);
+#else
+	result = 0;
+	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
+#endif
+	return result;
+};
+
+f64 DqnTime_NowInMs() { return DqnTime_NowInS() * 1000.0f; }
+
+////////////////////////////////////////////////////////////////////////////////
+// DqnLock
+////////////////////////////////////////////////////////////////////////////////
+bool DqnLock_Init(DqnLock *const lock, const u32 spinCount)
+{
+	if (!lock) return false;
+
+#ifdef DQN_WIN32_PLATFORM
+	if (InitializeCriticalSectionEx(&lock->win32Handle, spinCount, 0))
+		return true;
+#endif
+
+	return false;
+}
+
+void DqnLock_Acquire(DqnLock *const lock)
+{
+	if (!lock) return;
+#ifdef DQN_WIN32_PLATFORM
+	EnterCriticalSection(&lock->win32Handle);
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+#endif
+}
+
+void DqnLock_Release(DqnLock *const lock)
+{
+	if (!lock) return;
+#ifdef DQN_WIN32_PLATFORM
+	LeaveCriticalSection(&lock->win32Handle);
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+#endif
+}
+
+void DqnLock_Delete(DqnLock *const lock)
+{
+	if (!lock) return;
+#ifdef DQN_WIN32_PLATFORM
+	DeleteCriticalSection(&lock->win32Handle);
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DqnAtomics
+////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE u32 DqnAtomic_CompareSwap32(u32 volatile *dest, u32 swapVal, u32 compareVal)
+{
+#ifdef DQN_WIN32_PLATFORM
+	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
+	u32 result =
+	    (u32)InterlockedCompareExchange((LONG volatile *)dest, (LONG)swapVal, (LONG)compareVal);
+	return result;
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	return 0;
+#endif
+}
+
+DQN_FILE_SCOPE u32 DqnAtomic_Add32(u32 volatile *src)
+{
+#ifdef DQN_WIN32_PLATFORM
+	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
+	u32 result = (u32)InterlockedIncrement((LONG volatile *)src);
+	return result;
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	return 0;
+#endif
+}
+
+DQN_FILE_SCOPE u32 DqnAtomic_Sub32(u32 volatile *src)
+{
+#ifdef DQN_WIN32_PLATFORM
+	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
+	u32 result = (u32)InterlockedDecrement((LONG volatile *)src);
+	return result;
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	return 0;
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DqnJobQueue - Multithreaded Job Queue
+////////////////////////////////////////////////////////////////////////////////
+typedef struct DqnJobQueue
+{
+	DqnJob *jobList;
+	u32     size;
+
+	// NOTE: Modified by main+worker threads
+	u32   volatile jobToExecuteIndex;
+	u32   volatile numJobsToComplete;
+	void *semaphore;
+
+	// NOTE: Modified by main thread ONLY
+	u32 volatile jobInsertIndex;
+} DqnJobQueue;
+
+////////////////////////////////////////////////////////////////////////////////
+// DqnJobQueueInternal
+////////////////////////////////////////////////////////////////////////////////
+size_t DQN_JOB_QUEUE_INTERNAL_THREAD_DEFAULT_STACK_SIZE = 0;
+FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(const size_t stackSize, void *threadCallback,
+                                                void *threadParam, const u32 numThreads)
+{
+	u32 numThreadsCreated = 0;
+
+#ifdef DQN_WIN32_PLATFORM
+	DQN_ASSERT_HARD(stackSize == 0 || !threadCallback);
+	for (u32 i = 0; i < numThreads; i++)
+	{
+		HANDLE handle = CreateThread(NULL, stackSize, (LPTHREAD_START_ROUTINE)threadCallback,
+		                             threadParam, 0, NULL);
+		CloseHandle(handle);
+		numThreadsCreated++;
+	}
+
+#else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+#endif
+
+	DQN_ASSERT(numThreadsCreated == numThreads);
+	return numThreadsCreated;
+}
+
+
+FILE_SCOPE u32 DqnJobQueueInternal_ThreadCallback(void *threadParam)
+{
+	DqnJobQueue *queue = (DqnJobQueue *)threadParam;
+#ifdef DQN_WIN32_PLATFORM
+	for (;;)
+	{
+		if (!DqnJobQueue_TryExecuteNextJob(queue))
+		{
+			WaitForSingleObjectEx(queue->semaphore, INFINITE, false);
+		}
+	}
+#else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	return 0;
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DqnJobQueue Implementation
+////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE DqnJobQueue *DqnJobQueue_InitWithMem(const void *const mem, size_t *const memSize,
+                                                    const u32 queueSize, const u32 numThreads)
+{
+	DqnJobQueue emptyQueue = {};
+	size_t reqStructSize   = sizeof(emptyQueue);
+	size_t reqQueueSize    = sizeof(*emptyQueue.jobList) * queueSize;
+
+	if (!mem || !memSize || *memSize == 0 || queueSize == 0)
+	{
+		*memSize = reqStructSize + reqQueueSize;
+		return NULL;
+	}
+
+	u8 *memPtr = (u8 *)mem;
+
+	// Sub-allocate Queue
+	DqnJobQueue *queue = (DqnJobQueue *)memPtr;
+	*queue             = emptyQueue;
+	queue->size        = queueSize;
+
+	// Sub-allocate jobList
+	memPtr += reqStructSize;
+	queue->jobList = (DqnJob *)memPtr;
+
+	// Validate memPtr used size
+	memPtr += reqQueueSize;
+	DQN_ASSERT_HARD((size_t)(memPtr - (u8 *)mem) <= *memSize);
+
+	// Create semaphore
+#ifdef DQN_WIN32_PLATFORM
+	queue->semaphore = (void *)CreateSemaphore(NULL, 0, numThreads, NULL);
+	DQN_ASSERT_HARD(queue->semaphore);
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+#endif
+
+	// Create threads
+	u32 numThreadsCreated = DqnJobQueueInternal_ThreadCreate(
+	    DQN_JOB_QUEUE_INTERNAL_THREAD_DEFAULT_STACK_SIZE, DqnJobQueueInternal_ThreadCallback,
+	    (void *)queue, numThreads);
+	DQN_ASSERT_HARD(numThreads == numThreadsCreated);
+	return queue;
+}
+
+DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob job)
+{
+	u32 newJobInsertIndex = (queue->jobInsertIndex + 1) % queue->size;
+	if (newJobInsertIndex == queue->jobToExecuteIndex) return false;
+
+	queue->jobList[queue->jobInsertIndex] = job;
+
+	DqnAtomic_Add32(&queue->numJobsToComplete);
+
+#ifdef DQN_WIN32_PLATFORM
+	ReleaseSemaphore(queue->semaphore, 1, NULL);
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+#endif
+	queue->jobInsertIndex = newJobInsertIndex;
+	return true;
+}
+
+DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue)
+{
+	u32 originalJobToExecute = queue->jobToExecuteIndex;
+	if (originalJobToExecute != queue->jobInsertIndex)
+	{
+		u32 newJobIndexForNextThread = (originalJobToExecute + 1) % queue->size;
+		u32 index = DqnAtomic_CompareSwap32(&queue->jobToExecuteIndex, newJobIndexForNextThread,
+		                                    originalJobToExecute);
+
+		// NOTE: If we weren't successful at the interlock, another thread has
+		// taken the work and we can't know if there's more work or not. So
+		// irrespective of that result, return true to let the thread check
+		// again for more work.
+		if (index == originalJobToExecute)
+		{
+			DqnJob job = queue->jobList[index];
+			job.callback(queue, job.userData);
+			DqnAtomic_Sub32(&queue->numJobsToComplete);
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete(DqnJobQueue *const queue)
+{
+	bool result = (queue->numJobsToComplete == 0);
+	return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DqnWin32 Operations
+////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE bool DqnWin32_UTF8ToWChar(const char *const in,
+                                         wchar_t *const out, const i32 outLen)
+{
+	u32 result = MultiByteToWideChar(CP_UTF8, 0, in, -1, out, outLen-1);
+
+	if (result == 0xFFFD || 0)
+	{
+		DQN_WIN32_ERROR_BOX("WideCharToMultiByte() failed.", NULL);
+		return false;
+	}
+
+	return true;
+}
+
+DQN_FILE_SCOPE bool DqnWin32_WCharToUTF8(const wchar_t *const in,
+                                         char *const out, const i32 outLen)
+{
+	u32 result =
+	    WideCharToMultiByte(CP_UTF8, 0, in, -1, out, outLen, NULL, NULL);
+
+	if (result == 0xFFFD || 0)
+	{
+		DQN_WIN32_ERROR_BOX("WideCharToMultiByte() failed.", NULL);
+		return false;
+	}
+
+	return true;
+}
+
+DQN_FILE_SCOPE void DqnWin32_GetClientDim(const HWND window, LONG *width,
+                                          LONG *height)
+{
+	RECT rect;
+	GetClientRect(window, &rect);
+	if (width)  *width  = rect.right - rect.left;
+	if (height) *height = rect.bottom - rect.top;
+}
+
+DQN_FILE_SCOPE void DqnWin32_GetRectDim(RECT rect, LONG *width, LONG *height)
+{
+	if (width)  *width  = rect.right - rect.left;
+	if (height) *height = rect.bottom - rect.top;
+}
+
+DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix)
+{
+	DWORD error         = GetLastError();
+	char errorMsg[1024] = {0};
+	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+	               NULL, error, 0, errorMsg, DQN_ARRAY_COUNT(errorMsg), NULL);
+
+	char formattedError[2048] = {0};
+	Dqn_sprintf(formattedError, "%s: %s", errorPrefix, errorMsg);
+	DQN_WIN32_ERROR_BOX(formattedError, NULL);
+}
+
+DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *const errorPrefix)
+{
+	char errorMsg[1024] = {0};
+	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+	               NULL, error, 0, errorMsg, DQN_ARRAY_COUNT(errorMsg), NULL);
+
+	char formattedError[2048] = {0};
+	Dqn_sprintf(formattedError, "%s: %s", errorPrefix, errorMsg);
+	DQN_WIN32_ERROR_BOX(formattedError, NULL);
+}
+
+DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
+{
+	char str[1024] = {0};
+
+	va_list argList;
+	va_start(argList, formatStr);
+	{
+		i32 numCopied = Dqn_vsprintf(str, formatStr, argList);
+		DQN_ASSERT_HARD(numCopied < DQN_ARRAY_COUNT(str));
+	}
+	va_end(argList);
+
+	OutputDebugString(str);
+}
+
+DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen)
+{
+	if (!buf || bufLen == 0) return 0;
+	u32 copiedLen = GetModuleFileName(NULL, buf, bufLen);
+	if (copiedLen == bufLen) return -1;
+
+	// NOTE: Should always work if GetModuleFileName works and we're running an
+	// executable.
+	i32 lastSlashIndex = 0;
+	for (i32 i = copiedLen; i > 0; i--)
+	{
+		if (buf[i] == '\\')
+		{
+			lastSlashIndex = i;
+			break;
+		}
+	}
+
+	return lastSlashIndex;
+}
+
+DQN_FILE_SCOPE void DqnWin32_GetNumThreadsAndCores(i32 *const numCores, i32 *const numThreadsPerCore)
+{
+	if (numThreadsPerCore)
+	{
+		SYSTEM_INFO systemInfo;
+		GetNativeSystemInfo(&systemInfo);
+		*numThreadsPerCore = systemInfo.dwNumberOfProcessors;
+	}
+
+	if (numCores)
+	{
+		*numCores = 0;
+		DWORD requiredSize    = 0;
+		u8 insufficientBuffer = {0};
+		GetLogicalProcessorInformationEx(
+		    RelationProcessorCore, (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)insufficientBuffer,
+		    &requiredSize);
+
+		u8 *rawProcInfoArray = (u8 *)DqnMem_Calloc(requiredSize);
+		if (!DQN_ASSERT_MSG(rawProcInfoArray, "Calloc failed, could not allocate memory"))
+		{
+			return;
+		}
+
+		if (GetLogicalProcessorInformationEx(
+		        RelationProcessorCore, (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)rawProcInfoArray,
+		        &requiredSize))
+		{
+			SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *logicalProcInfo =
+			    (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)rawProcInfoArray;
+			DWORD bytesRead = 0;
+
+			do
+			{
+				// NOTE: High efficiency value has greater performance and less efficiency.
+				PROCESSOR_RELATIONSHIP *procInfo = &logicalProcInfo->Processor;
+				u32 efficiency                   = procInfo->EfficiencyClass;
+				(*numCores)++;
+				DQN_ASSERT_HARD(logicalProcInfo->Relationship == RelationProcessorCore);
+				DQN_ASSERT_HARD(procInfo->GroupCount == 1);
+
+				bytesRead += logicalProcInfo->Size;
+				logicalProcInfo =
+				    (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((u8 *)logicalProcInfo +
+				                                                logicalProcInfo->Size);
+			} while (bytesRead < requiredSize);
+		}
+		else
+		{
+			DqnWin32_DisplayLastError("GetLogicalProcessorInformationEx() failed");
+		}
+
+		DqnMem_Free(rawProcInfoArray);
+	}
+}
+#endif // DQN_WIN32_PLATFORM
+
