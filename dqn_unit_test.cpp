@@ -1481,13 +1481,18 @@ void FileTest()
 			DQN_ASSERT(!file.handle);
 			printf("FileTest(): FileIO: Completed successfully\n");
 		}
+
+		// TODO(doyle): Write tests for writing out to file
 	}
 
 	{
 		u32 numFiles;
-		char **filelist = DqnDir_Read("*", &numFiles);
+#if defined(DQN_UNIX_IMPLEMENTATION)
+	    char **filelist = DqnDir_Read(".", &numFiles);
+#elif defined(DQN_WIN32_IMPLEMENTATION)
+	    char **filelist = DqnDir_Read("*", &numFiles);
+#endif
 		printf("FileTest(): DirRead: Display read files\n");
-
 		for (u32 i = 0; i < numFiles; i++)
 			printf("FileTest(): DirRead: %s\n", filelist[i]);
 
