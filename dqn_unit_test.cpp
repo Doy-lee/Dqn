@@ -1439,8 +1439,8 @@ void MemStackTest()
 	}
 }
 
-#ifdef DQN_WIN32_IMPLEMENTATION
 
+#ifdef DQN_PLATFORM_LAYER
 void FileTest()
 {
 	// File i/o
@@ -1451,9 +1451,17 @@ void FileTest()
 				".clang-format", &file,
 				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
 				DqnFileAction_OpenOnly));
-			DQN_ASSERT(file.size == 1320);
 
-			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
+#if defined(DQN_UNIX_IMPLEMENTATION)
+			const u32 EXPECTED_SIZE = 1274;
+#elif defined(DQN_WIN32_IMPLEMENTATION)
+			const u32 EXPECTED_SIZE = 1320;
+#endif
+	        DQN_ASSERT_MSG(file.size == EXPECTED_SIZE,
+	                       "DqnFileOpen() failed: file.size: %d, expected:%d\n",
+	                       file.size, EXPECTED_SIZE);
+
+	        u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
 			DQN_ASSERT(DqnFile_Read(file, buffer, (u32)file.size) == file.size);
 			free(buffer);
 
@@ -1489,7 +1497,9 @@ void FileTest()
 
 	printf("FileTest(): Completed successfully\n");
 }
+#endif
 
+#ifdef DQN_WIN32_IMPLEMENTATION
 FILE_SCOPE u32 volatile globalDebugCounter;
 FILE_SCOPE bool volatile globalDebugCounterMemoize[2048];
 FILE_SCOPE DqnLock globalJobQueueLock;
@@ -1559,9 +1569,12 @@ int main(void)
 	ArrayTest();
 	MemStackTest();
 
+#ifdef DQN_PLATFORM_LAYER
+	FileTest();
+#endif
+
 #ifdef DQN_WIN32_IMPLEMENTATION
 	OtherTest();
-	FileTest();
 	JobQueueTest();
 #endif
 

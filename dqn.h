@@ -801,18 +801,24 @@ DQN_FILE_SCOPE u32  DqnRnd_PCGNext (DqnRandPCGState *pcg);
 DQN_FILE_SCOPE f32  DqnRnd_PCGNextf(DqnRandPCGState *pcg);
 // Returns a random integer N between [min, max]
 DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
+
 #endif  /* DQN_H */
 
 ////////////////////////////////////////////////////////////////////////////////
 // Platform Layer
 ////////////////////////////////////////////////////////////////////////////////
-// TODO(doyle): The following functions require a platform to work, at this
-// point in time, they all only support Win32.
+// TODO(doyle): The following functions require a platform to work.
 #ifdef DQN_PLATFORM_LAYER
-#ifdef DQN_WIN32_PLATFORM
 
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#ifdef DQN_WIN32_PLATFORM
+	#define WIN32_LEAN_AND_MEAN
+	#include <Windows.h>
+#endif
+
+#ifdef DQN_UNIX_PLATFORM
+	#include <sys/stat.h>
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 // DqnFile
 ////////////////////////////////////////////////////////////////////////////////
@@ -860,9 +866,10 @@ DQN_FILE_SCOPE void   DqnFile_Close(DqnFile *const file);
 // returns the number of strings read.
 // This is allocated using malloc and MUST BE FREED! Can be done manually or
 // using the helper function.
-DQN_FILE_SCOPE char **DqnDir_Read    (char *dir, u32 *numFiles);
+DQN_FILE_SCOPE char **DqnDir_Read    (const char *const dir, u32 *const numFiles);
 DQN_FILE_SCOPE void   DqnDir_ReadFree(char **fileList, u32 numFiles);
 
+#ifdef DQN_WIN32_PLATFORM
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
 ////////////////////////////////////////////////////////////////////////////////
@@ -1470,7 +1477,7 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 ////////////////////////////////////////////////////////////////////////////////
 #include <math.h>    // TODO(doyle): For trigonometry functions (for now)
 #include <stdlib.h>    // For calloc, malloc, free
-#include <stdio.h>     // For printf
+#include <stdio.h>     // For printf, portable file io
 #include <x86intrin.h> // __rdtsc
 
 // NOTE: STB_SPRINTF is included when DQN_IMPLEMENTATION defined
@@ -3533,6 +3540,354 @@ DQN_FILE_SCOPE i32 DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// DqnFileInternal Implementation
+////////////////////////////////////////////////////////////////////////////////
+#ifdef DQN_WIN32_PLATFORM
+FILE_SCOPE bool DqnFileInternal_Win32OpenW(const wchar_t *const path,
+                                           DqnFile *const file,
+                                           const u32 permissionFlags,
+                                           const enum DqnFileAction action)
+{
+	if (!file || !path) return false;
+
+	DWORD win32Permission = 0;
+	if (permissionFlags & DqnFilePermissionFlag_All)
+	{
+		win32Permission = GENERIC_ALL;
+	}
+	else
+	{
+		if (permissionFlags & DqnFilePermissionFlag_Read)    win32Permission |= GENERIC_READ;
+		if (permissionFlags & DqnFilePermissionFlag_Write)   win32Permission |= GENERIC_WRITE;
+		if (permissionFlags & DqnFilePermissionFlag_Execute) win32Permission |= GENERIC_EXECUTE;
+	}
+
+	DWORD win32Action = 0;
+	switch (action)
+	{
+		// Allow fall through
+		default: DQN_ASSERT(DQN_INVALID_CODE_PATH);
+		case DqnFileAction_OpenOnly:         win32Action = OPEN_EXISTING; break;
+		case DqnFileAction_ClearIfExist:     win32Action = TRUNCATE_EXISTING; break;
+		case DqnFileAction_CreateIfNotExist: win32Action = CREATE_NEW; break;
+	}
+
+	HANDLE handle = CreateFileW(path, win32Permission, 0, NULL, win32Action,
+	                            FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (handle == INVALID_HANDLE_VALUE)
+	{
+		return false;
+	}
+
+	LARGE_INTEGER size;
+	if (GetFileSizeEx(handle, &size) == 0)
+	{
+		DqnFile_Close(file);
+		DqnWin32_DisplayLastError("GetFileSizeEx() failed");
+		return false;
+	}
+
+	file->handle          = handle;
+	file->size            = (size_t)size.QuadPart;
+	file->permissionFlags = permissionFlags;
+	return true;
+}
+#endif // DQN_WIN32_PLATFORM
+
+#ifdef DQN_UNIX_PLATFORM
+FILE_SCOPE bool DqnFileInternal_UnixOpen(const char *const path,
+                                         DqnFile *const file,
+                                         const u32 permissionFlags,
+                                         const enum DqnFileAction action)
+{
+	char operation  = 0;
+	bool updateFlag = false;
+
+	if (permissionFlags & DqnFilePermissionFlag_Write)
+	{
+		updateFlag = true;
+		switch (action)
+		{
+			default: DQN_ASSERT(DQN_INVALID_CODE_PATH);
+			case DqnFileAction_OpenOnly:
+			{
+				operation   = 'r';
+			}
+			break;
+
+			case DqnFileAction_CreateIfNotExist:
+			case DqnFileAction_ClearIfExist:
+			{
+				operation   = 'w';
+			}
+			break;
+		}
+	}
+	else if ((permissionFlags & DqnFilePermissionFlag_Read) ||
+	         (permissionFlags & DqnFilePermissionFlag_Execute))
+	{
+		if (permissionFlags & DqnFilePermissionFlag_Execute)
+		{
+			// TODO(doyle): Logging, UNIX doesn't have execute param for file
+			// handles. Execution goes through system()
+		}
+		operation = 'r';
+	}
+	DQN_ASSERT_HARD(operation != 0);
+
+	// TODO(doyle): What about not reading as a binary file and appending to end
+	// of file.
+	char mode[4] = {};
+	mode[0]      = operation;
+	mode[1]      = (updateFlag) ? '+' : 0;
+	mode[2]      = 'b';
+
+	// TODO(doyle): Use open syscall
+	// TODO(doyle): Query errno
+	FILE *handle = fopen(path, mode);
+	if (!handle) return false;
+
+	struct stat fileStat = {0};
+	if (stat(path, &fileStat))
+	{
+		// TODO(doyle): Logging
+		fclose(handle);
+		return false;
+	}
+
+	file->handle          = (void *)handle;
+	file->size            = fileStat.st_size;
+	file->permissionFlags = permissionFlags;
+
+	return true;
+}
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
+// DqnFile Implementation
+////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE
+bool DqnFile_Open(const char *const path, DqnFile *const file,
+                  const u32 permissionFlags, const enum DqnFileAction action)
+{
+	if (!file || !path) return false;
+
+#if defined(DQN_WIN32_PLATFORM)
+	wchar_t widePath[MAX_PATH] = {0};
+	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
+	return DqnFileInternal_Win32OpenW(widePath, file, permissionFlags, action);
+
+#elif defined(DQN_UNIX_PLATFORM)
+	return DqnFileInternal_UnixOpen(path, file, permissionFlags, action);
+
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	return false;
+
+#endif
+}
+
+DQN_FILE_SCOPE
+bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file, const u32 permissionFlags,
+                   const enum DqnFileAction action)
+{
+	if (!file || !path) return false;
+
+#ifdef DQN_WIN32_PLATFORM
+	return DqnFileInternal_Win32OpenW(path, file, permissionFlags, action);
+#else
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	return false;
+#endif
+}
+
+DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
+                                    const u8 *const buffer,
+                                    const size_t numBytesToWrite,
+                                    const size_t fileOffset)
+{
+	size_t numBytesWritten = 0;
+	// TODO(doyle): Implement when it's needed
+	if (DQN_ASSERT_MSG(fileOffset != 0, "'fileOffset' not implemented yet")) return 0;
+	if (!file || !buffer) return numBytesToWrite;
+
+#ifdef DQN_WIN32_PLATFORM
+	DWORD bytesToWrite = (DWORD)numBytesToWrite;
+	DWORD bytesWritten;
+	BOOL result =
+	    WriteFile(file->handle, buffer, bytesToWrite, &bytesWritten, NULL);
+
+	numBytesWritten = (size_t)bytesWritten;
+	// TODO(doyle): Better logging system
+	if (result == 0)
+	{
+		DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
+	}
+
+#else
+	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
+#endif
+
+	return numBytesWritten;
+}
+
+DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
+                                   const size_t numBytesToRead)
+{
+	size_t numBytesRead = 0;
+#ifdef DQN_WIN32_PLATFORM
+	if (file.handle && buffer)
+	{
+		DWORD bytesToRead = (DWORD)numBytesToRead;
+		DWORD bytesRead    = 0;
+		HANDLE win32Handle = file.handle;
+
+		BOOL result = ReadFile(win32Handle, (void *)buffer, bytesToRead,
+		                       &bytesRead, NULL);
+
+		numBytesRead = (size_t)bytesRead;
+		// TODO(doyle): 0 also means it is completing async, but still valid
+		if (result == 0)
+		{
+			DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
+		}
+
+	}
+#endif
+	return numBytesRead;
+}
+
+DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
+{
+#ifdef DQN_WIN32_PLATFORM
+	if (file && file->handle)
+	{
+		CloseHandle(file->handle);
+		file->handle          = NULL;
+		file->size            = 0;
+		file->permissionFlags = 0;
+	}
+#else
+	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
+#endif
+}
+
+DQN_FILE_SCOPE char **DqnDir_Read(const char *const dir, u32 *const numFiles)
+{
+	if (!dir) return NULL;
+#ifdef DQN_WIN32_PLATFORM
+
+	u32 currNumFiles = 0;
+	wchar_t wideDir[MAX_PATH] = {0};
+	DqnWin32_UTF8ToWChar(dir, wideDir, DQN_ARRAY_COUNT(wideDir));
+
+	// Enumerate number of files first
+	{
+		WIN32_FIND_DATAW findData = {0};
+		HANDLE findHandle = FindFirstFileW(wideDir, &findData);
+		if (findHandle == INVALID_HANDLE_VALUE)
+		{
+			DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
+			return NULL;
+		}
+
+		bool stayInLoop = true;
+		while (stayInLoop)
+		{
+			BOOL result = FindNextFileW(findHandle, &findData);
+			if (result == 0)
+			{
+				DWORD error = GetLastError();
+				if (error != ERROR_NO_MORE_FILES)
+				{
+					DqnWin32_DisplayErrorCode(error,
+					                             "FindNextFileW() failed");
+				}
+
+				stayInLoop = false;
+			}
+			else
+			{
+				currNumFiles++;
+			}
+		}
+		FindClose(findHandle);
+	}
+
+	if (currNumFiles == 0)
+	{
+		*numFiles = 0;
+		return NULL;
+	}
+
+	{
+		WIN32_FIND_DATAW initFind = {0};
+		HANDLE findHandle = FindFirstFileW(wideDir, &initFind);
+		if (findHandle == INVALID_HANDLE_VALUE)
+		{
+			DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
+			return NULL;
+		}
+
+		char **list = (char **)DqnMem_Calloc(
+		    sizeof(*list) * (currNumFiles));
+		if (!list)
+		{
+			DQN_WIN32_ERROR_BOX("DqnMem_Alloc() failed.", NULL);
+			return NULL;
+		}
+
+		for (u32 i = 0; i < currNumFiles; i++)
+		{
+			list[i] =
+			    (char *)DqnMem_Calloc(sizeof(**list) * MAX_PATH);
+			if (!list[i])
+			{
+				for (u32 j = 0; j < i; j++)
+				{
+					DqnMem_Free(list[j]);
+				}
+
+				DQN_WIN32_ERROR_BOX("DqnMem_Alloc() failed.", NULL);
+				return NULL;
+			}
+		}
+
+		i32 listIndex = 0;
+		WIN32_FIND_DATAW findData = {0};
+		while (FindNextFileW(findHandle, &findData) != 0)
+		{
+			DqnWin32_WCharToUTF8(findData.cFileName, list[listIndex++],
+			                        MAX_PATH);
+		}
+
+		*numFiles = currNumFiles;
+		FindClose(findHandle);
+
+		return list;
+	}
+#else
+	return NULL;
+#endif
+}
+
+DQN_FILE_SCOPE void DqnDir_ReadFree(char **fileList, u32 numFiles)
+{
+	if (fileList)
+	{
+		for (u32 i = 0; i < numFiles; i++)
+		{
+			if (fileList[i]) DqnMem_Free(fileList[i]);
+			fileList[i] = NULL;
+		}
+
+		DqnMem_Free(fileList);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // STB_Sprintf
 ////////////////////////////////////////////////////////////////////////////////
 /*
@@ -5218,275 +5573,6 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifdef DQN_WIN32_PLATFORM
-////////////////////////////////////////////////////////////////////////////////
-// DqnFileInternal Implementation
-////////////////////////////////////////////////////////////////////////////////
-FILE_SCOPE bool DqnFileInternal_Open(const wchar_t *const path,
-                                     DqnFile *const file,
-                                     const u32 permissionFlags,
-                                     const enum DqnFileAction action)
-{
-	if (!file || !path) return false;
-
-#ifdef DQN_WIN32_PLATFORM
-	DWORD win32Permission = 0;
-	if (permissionFlags & DqnFilePermissionFlag_All)
-	{
-		win32Permission = GENERIC_ALL;
-	}
-	else
-	{
-		if (permissionFlags & DqnFilePermissionFlag_Read)    win32Permission |= GENERIC_READ;
-		if (permissionFlags & DqnFilePermissionFlag_Write)   win32Permission |= GENERIC_WRITE;
-		if (permissionFlags & DqnFilePermissionFlag_Execute) win32Permission |= GENERIC_EXECUTE;
-	}
-
-	DWORD win32Action = 0;
-	switch (action)
-	{
-		// Allow fall through
-		default: DQN_ASSERT(DQN_INVALID_CODE_PATH);
-		case DqnFileAction_OpenOnly:         win32Action = OPEN_EXISTING; break;
-		case DqnFileAction_ClearIfExist:     win32Action = TRUNCATE_EXISTING; break;
-		case DqnFileAction_CreateIfNotExist: win32Action = CREATE_NEW; break;
-	}
-
-	HANDLE handle = CreateFileW(path, win32Permission, 0, NULL, win32Action,
-	                            FILE_ATTRIBUTE_NORMAL, NULL);
-
-	if (handle == INVALID_HANDLE_VALUE)
-	{
-		return false;
-	}
-
-	LARGE_INTEGER size;
-	if (GetFileSizeEx(handle, &size) == 0)
-	{
-		DqnWin32_DisplayLastError("GetFileSizeEx() failed");
-		return false;
-	}
-
-	file->handle          = handle;
-	file->size            = (size_t)size.QuadPart;
-	file->permissionFlags = permissionFlags;
-	return true;
-#else
-	DQN_ASSERT(DQN_INVALID_CODE_PATH);
-	return false;
-#endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DqnFile Implementation
-////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE
-bool DqnFile_Open(const char *const path, DqnFile *const file,
-                  const u32 permissionFlags, const enum DqnFileAction action)
-{
-	if (!file || !path) return false;
-
-#ifdef DQN_WIN32_PLATFORM
-	wchar_t widePath[MAX_PATH] = {0};
-	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
-	return DqnFileInternal_Open(widePath, file, permissionFlags, action);
-#else
-	DQN_ASSERT(DQN_INVALID_CODE_PATH);
-	return false;
-#endif
-}
-
-DQN_FILE_SCOPE
-bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file, const u32 permissionFlags,
-                   const enum DqnFileAction action)
-{
-	if (!file || !path) return false;
-	return DqnFileInternal_Open(path, file, permissionFlags, action);
-}
-
-DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
-                                    const u8 *const buffer,
-                                    const size_t numBytesToWrite,
-                                    const size_t fileOffset)
-{
-	size_t numBytesWritten = 0;
-	// TODO(doyle): Implement when it's needed
-	if (DQN_ASSERT_MSG(fileOffset != 0, "'fileOffset' not implemented yet")) return 0;
-	if (!file || !buffer) return numBytesToWrite;
-
-#ifdef DQN_WIN32_PLATFORM
-	DWORD bytesToWrite = (DWORD)numBytesToWrite;
-	DWORD bytesWritten;
-	BOOL result =
-	    WriteFile(file->handle, buffer, bytesToWrite, &bytesWritten, NULL);
-
-	numBytesWritten = (size_t)bytesWritten;
-	// TODO(doyle): Better logging system
-	if (result == 0)
-	{
-		DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
-	}
-
-#else
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
-#endif
-
-	return numBytesWritten;
-}
-
-DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
-                                   const size_t numBytesToRead)
-{
-	size_t numBytesRead = 0;
-#ifdef DQN_WIN32_PLATFORM
-	if (file.handle && buffer)
-	{
-		DWORD bytesToRead = (DWORD)numBytesToRead;
-		DWORD bytesRead    = 0;
-		HANDLE win32Handle = file.handle;
-
-		BOOL result = ReadFile(win32Handle, (void *)buffer, bytesToRead,
-		                       &bytesRead, NULL);
-
-		numBytesRead = (size_t)bytesRead;
-		// TODO(doyle): 0 also means it is completing async, but still valid
-		if (result == 0)
-		{
-			DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
-		}
-
-	}
-#endif
-	return numBytesRead;
-}
-
-DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
-{
-#ifdef DQN_WIN32_PLATFORM
-	if (file && file->handle)
-	{
-		CloseHandle(file->handle);
-		file->handle          = NULL;
-		file->size            = 0;
-		file->permissionFlags = 0;
-	}
-#else
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
-#endif
-}
-
-DQN_FILE_SCOPE char **DqnDir_Read(char *dir, u32 *numFiles)
-{
-	if (!dir) return NULL;
-#ifdef DQN_WIN32_PLATFORM
-
-	u32 currNumFiles = 0;
-	wchar_t wideDir[MAX_PATH] = {0};
-	DqnWin32_UTF8ToWChar(dir, wideDir, DQN_ARRAY_COUNT(wideDir));
-
-	// Enumerate number of files first
-	{
-		WIN32_FIND_DATAW findData = {0};
-		HANDLE findHandle = FindFirstFileW(wideDir, &findData);
-		if (findHandle == INVALID_HANDLE_VALUE)
-		{
-			DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
-			return NULL;
-		}
-
-		bool stayInLoop = true;
-		while (stayInLoop)
-		{
-			BOOL result = FindNextFileW(findHandle, &findData);
-			if (result == 0)
-			{
-				DWORD error = GetLastError();
-				if (error != ERROR_NO_MORE_FILES)
-				{
-					DqnWin32_DisplayErrorCode(error,
-					                             "FindNextFileW() failed");
-				}
-
-				stayInLoop = false;
-			}
-			else
-			{
-				currNumFiles++;
-			}
-		}
-		FindClose(findHandle);
-	}
-
-	if (currNumFiles == 0)
-	{
-		*numFiles = 0;
-		return NULL;
-	}
-
-	{
-		WIN32_FIND_DATAW initFind = {0};
-		HANDLE findHandle = FindFirstFileW(wideDir, &initFind);
-		if (findHandle == INVALID_HANDLE_VALUE)
-		{
-			DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", NULL);
-			return NULL;
-		}
-
-		char **list = (char **)DqnMem_Calloc(
-		    sizeof(*list) * (currNumFiles));
-		if (!list)
-		{
-			DQN_WIN32_ERROR_BOX("DqnMem_Alloc() failed.", NULL);
-			return NULL;
-		}
-
-		for (u32 i = 0; i < currNumFiles; i++)
-		{
-			list[i] =
-			    (char *)DqnMem_Calloc(sizeof(**list) * MAX_PATH);
-			if (!list[i])
-			{
-				for (u32 j = 0; j < i; j++)
-				{
-					DqnMem_Free(list[j]);
-				}
-
-				DQN_WIN32_ERROR_BOX("DqnMem_Alloc() failed.", NULL);
-				return NULL;
-			}
-		}
-
-		i32 listIndex = 0;
-		WIN32_FIND_DATAW findData = {0};
-		while (FindNextFileW(findHandle, &findData) != 0)
-		{
-			DqnWin32_WCharToUTF8(findData.cFileName, list[listIndex++],
-			                        MAX_PATH);
-		}
-
-		*numFiles = currNumFiles;
-		FindClose(findHandle);
-
-		return list;
-	}
-#else
-	return NULL;
-#endif
-}
-
-DQN_FILE_SCOPE void DqnDir_ReadFree(char **fileList, u32 numFiles)
-{
-	if (fileList)
-	{
-		for (u32 i = 0; i < numFiles; i++)
-		{
-			if (fileList[i]) DqnMem_Free(fileList[i]);
-			fileList[i] = NULL;
-		}
-
-		DqnMem_Free(fileList);
-	}
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Timer
 ////////////////////////////////////////////////////////////////////////////////
