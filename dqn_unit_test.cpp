@@ -26,7 +26,7 @@ void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 	DQN_ASSERT(totalSize == EXPECTED_SIZE);
 	DQN_ASSERT(totalSize == (DQN_ARRAY_COUNT(hmmMat.Elements) * DQN_ARRAY_COUNT(hmmMat.Elements[0])));
 
-	for (i32 i = 0; i < EXPECTED_SIZE; i++)
+	for (u32 i = 0; i < EXPECTED_SIZE; i++)
 	{
 		const f32 EPSILON = 0.001f;
 		f32 diff = hmmMatf[i] - dqnMatf[i];
@@ -56,6 +56,7 @@ void HandmadeMathTest()
 		hmm_mat4 hmmTranslate = HMM_Translate(hmmVec);
 		HandmadeMathVerifyMat4(dqnTranslate, hmmTranslate);
 
+#if 0
 		hmm_vec3 hmmAxis      = HMM_Vec3(0.5f, 0.2f, 0.7f);
 		DqnV3 dqnAxis         = DqnV3_3f(0.5f, 0.2f, 0.7f);
 		f32 rotationInDegrees = 80.0f;
@@ -63,6 +64,7 @@ void HandmadeMathTest()
 		// TODO(doyle): ?? Handmade Math does it a rotations in a different way
 		// way, they normalise the given axis producing different results.
 		// HandmadeMathVerifyMat4(dqnRotate, hmmRotate);
+#endif
 
 		dqnVec *= 2;
 		hmmVec *= 2;
@@ -257,7 +259,7 @@ void StringsTest()
 			    "StringsTest(): StrReverse: Completed successfully\n");
 		}
 
-		const u64 LARGEST_NUM  = (u64)-1;
+		// const u64 LARGEST_NUM  = (u64)-1;
 		const i64 SMALLEST_NUM = LLONG_MIN;
 		// StrToI64
 		{
@@ -385,10 +387,9 @@ void StringsTest()
 		f32 vQ         = Dqn_StrToF32(q, DQN_ARRAY_COUNT(q));
 		DQN_ASSERT(DQN_ABS(vQ) - DQN_ABS(9.64635e-05) < EPSILON);
 
-		const char r[] = "9.64635e+05";
-		f32 vR         = Dqn_StrToF32(q, DQN_ARRAY_COUNT(q));
+	    const char r[] = "9.64635e+05";
+	    f32 vR         = Dqn_StrToF32(r, DQN_ARRAY_COUNT(r));
 		DQN_ASSERT(DQN_ABS(vR) - DQN_ABS(9.64635e+05) < EPSILON);
-
 		printf("StringsTest(): StrToF32: Completed successfully\n");
 	}
 

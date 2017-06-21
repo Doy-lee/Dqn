@@ -1498,7 +1498,7 @@ DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file,
 			va_list argList;
 			va_start(argList, msg);
 			{
-				i32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
+				u32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
 				DQN_ASSERT_HARD(numCopied < DQN_ARRAY_COUNT(userMsg));
 			}
 			va_end(argList);
@@ -1937,6 +1937,12 @@ FILE_SCOPE void DqnMemAPIInternal_ValidateCallbackInfo(DqnMemAPICallbackInfo inf
 			// nothing to validate
 		}
 		break;
+
+		default:
+		{
+			DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+		}
+		break;
 	}
 }
 
@@ -1970,6 +1976,12 @@ FILE_SCOPE void DqnMemAPIInternal_DefaultUseCallocCallback(DqnMemAPICallbackInfo
 			// passed in, we can fill the type data out.
 			if (result) result->type = info.type;
 			DqnMem_Free(info.ptrToFree);
+		}
+		break;
+
+		default:
+		{
+			DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
 		}
 		break;
 	}
@@ -2061,7 +2073,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_V2i(DqnV2i a)
 DQN_FILE_SCOPE DqnV2 DqnV2_Add(DqnV2 a, DqnV2 b)
 {
 	DqnV2 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] + b.e[i];
 
 	return result;
@@ -2070,7 +2082,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Add(DqnV2 a, DqnV2 b)
 DQN_FILE_SCOPE DqnV2 DqnV2_Sub(DqnV2 a, DqnV2 b)
 {
 	DqnV2 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] - b.e[i];
 
 	return result;
@@ -2079,7 +2091,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Sub(DqnV2 a, DqnV2 b)
 DQN_FILE_SCOPE DqnV2 DqnV2_Scalei(DqnV2 a, i32 b)
 {
 	DqnV2 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
@@ -2088,7 +2100,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Scalei(DqnV2 a, i32 b)
 DQN_FILE_SCOPE DqnV2 DqnV2_Scalef(DqnV2 a, f32 b)
 {
 	DqnV2 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
@@ -2097,7 +2109,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Scalef(DqnV2 a, f32 b)
 DQN_FILE_SCOPE DqnV2 DqnV2_Hadamard(DqnV2 a, DqnV2 b)
 {
 	DqnV2 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b.e[i];
 
 	return result;
@@ -2113,7 +2125,7 @@ DQN_FILE_SCOPE f32 DqnV2_Dot(DqnV2 a, DqnV2 b)
 	   |c|   |f|
 	 */
 	f32 result = 0;
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result += (a.e[i] * b.e[i]);
 
 	return result;
@@ -2122,7 +2134,7 @@ DQN_FILE_SCOPE f32 DqnV2_Dot(DqnV2 a, DqnV2 b)
 DQN_FILE_SCOPE bool DqnV2_Equals(DqnV2 a, DqnV2 b)
 {
 	bool result = true;
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		if (a.e[i] != b.e[i]) result = false;
 	return result;
 }
@@ -2229,7 +2241,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_V2(DqnV2 a)
 DQN_FILE_SCOPE DqnV2i DqnV2i_Add(DqnV2i a, DqnV2i b)
 {
 	DqnV2i result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] + b.e[i];
 
 	return result;
@@ -2238,7 +2250,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_Add(DqnV2i a, DqnV2i b)
 DQN_FILE_SCOPE DqnV2i DqnV2i_Sub(DqnV2i a, DqnV2i b)
 {
 	DqnV2i result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] - b.e[i];
 
 	return result;
@@ -2247,7 +2259,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_Sub(DqnV2i a, DqnV2i b)
 DQN_FILE_SCOPE DqnV2i DqnV2i_Scalef(DqnV2i a, f32 b)
 {
 	DqnV2i result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = (i32)(a.e[i] * b);
 
 	return result;
@@ -2256,7 +2268,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_Scalef(DqnV2i a, f32 b)
 DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei(DqnV2i a, i32 b)
 {
 	DqnV2i result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
@@ -2265,7 +2277,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei(DqnV2i a, i32 b)
 DQN_FILE_SCOPE DqnV2i DqnV2i_Hadamard(DqnV2i a, DqnV2i b)
 {
 	DqnV2i result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b.e[i];
 
 	return result;
@@ -2281,7 +2293,7 @@ DQN_FILE_SCOPE f32 DqnV2i_Dot(DqnV2i a, DqnV2i b)
 	   |c|   |f|
 	 */
 	f32 result = 0;
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result += (a.e[i] * b.e[i]);
 
 	return result;
@@ -2290,7 +2302,7 @@ DQN_FILE_SCOPE f32 DqnV2i_Dot(DqnV2i a, DqnV2i b)
 DQN_FILE_SCOPE bool DqnV2i_Equals(DqnV2i a, DqnV2i b)
 {
 	bool result = true;
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		if (a.e[i] != b.e[i]) result = false;
 	return result;
 }
@@ -2322,7 +2334,7 @@ DQN_FILE_SCOPE DqnV3 DqnV3_3i(i32 x, i32 y, i32 z)
 DQN_FILE_SCOPE DqnV3 DqnV3_Add(DqnV3 a, DqnV3 b)
 {
 	DqnV3 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] + b.e[i];
 
 	return result;
@@ -2331,7 +2343,7 @@ DQN_FILE_SCOPE DqnV3 DqnV3_Add(DqnV3 a, DqnV3 b)
 DQN_FILE_SCOPE DqnV3 DqnV3_Sub(DqnV3 a, DqnV3 b)
 {
 	DqnV3 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] - b.e[i];
 
 	return result;
@@ -2340,7 +2352,7 @@ DQN_FILE_SCOPE DqnV3 DqnV3_Sub(DqnV3 a, DqnV3 b)
 DQN_FILE_SCOPE DqnV3 DqnV3_Scalei(DqnV3 a, i32 b)
 {
 	DqnV3 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
@@ -2349,7 +2361,7 @@ DQN_FILE_SCOPE DqnV3 DqnV3_Scalei(DqnV3 a, i32 b)
 DQN_FILE_SCOPE DqnV3 DqnV3_Scalef(DqnV3 a, f32 b)
 {
 	DqnV3 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
@@ -2358,7 +2370,7 @@ DQN_FILE_SCOPE DqnV3 DqnV3_Scalef(DqnV3 a, f32 b)
 DQN_FILE_SCOPE DqnV3 DqnV3_Hadamard(DqnV3 a, DqnV3 b)
 {
 	DqnV3 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b.e[i];
 
 	return result;
@@ -2374,7 +2386,7 @@ DQN_FILE_SCOPE f32 DqnV3_Dot(DqnV3 a, DqnV3 b)
 	   |c|   |f|
 	 */
 	f32 result = 0;
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result += (a.e[i] * b.e[i]);
 
 	return result;
@@ -2383,7 +2395,7 @@ DQN_FILE_SCOPE f32 DqnV3_Dot(DqnV3 a, DqnV3 b)
 DQN_FILE_SCOPE bool DqnV3_Equals(DqnV3 a, DqnV3 b)
 {
 	bool result = true;
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		if (a.e[i] != b.e[i]) result = false;
 	return result;
 }
@@ -2481,7 +2493,7 @@ DQN_FILE_SCOPE DqnV4 DqnV4_V3(DqnV3 a, f32 w)
 DQN_FILE_SCOPE DqnV4 DqnV4_Add(DqnV4 a, DqnV4 b)
 {
 	DqnV4 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] + b.e[i];
 
 	return result;
@@ -2490,7 +2502,7 @@ DQN_FILE_SCOPE DqnV4 DqnV4_Add(DqnV4 a, DqnV4 b)
 DQN_FILE_SCOPE DqnV4 DqnV4_Sub(DqnV4 a, DqnV4 b)
 {
 	DqnV4 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] - b.e[i];
 
 	return result;
@@ -2499,7 +2511,7 @@ DQN_FILE_SCOPE DqnV4 DqnV4_Sub(DqnV4 a, DqnV4 b)
 DQN_FILE_SCOPE DqnV4 DqnV4_Scalei(DqnV4 a, i32 b)
 {
 	DqnV4 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
@@ -2508,7 +2520,7 @@ DQN_FILE_SCOPE DqnV4 DqnV4_Scalei(DqnV4 a, i32 b)
 DQN_FILE_SCOPE DqnV4 DqnV4_Scalef(DqnV4 a, f32 b)
 {
 	DqnV4 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
 	return result;
@@ -2517,7 +2529,7 @@ DQN_FILE_SCOPE DqnV4 DqnV4_Scalef(DqnV4 a, f32 b)
 DQN_FILE_SCOPE DqnV4 DqnV4_Hadamard(DqnV4 a, DqnV4 b)
 {
 	DqnV4 result = {0};
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b.e[i];
 
 	return result;
@@ -2533,7 +2545,7 @@ DQN_FILE_SCOPE f32 DqnV4_Dot(DqnV4 a, DqnV4 b)
 	   |c|   |f|
 	 */
 	f32 result = 0;
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result += (a.e[i] * b.e[i]);
 
 	return result;
@@ -2542,7 +2554,7 @@ DQN_FILE_SCOPE f32 DqnV4_Dot(DqnV4 a, DqnV4 b)
 DQN_FILE_SCOPE bool DqnV4_Equals(DqnV4 a, DqnV4 b)
 {
 	bool result = true;
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
+	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		if (a.e[i] != b.e[i]) result = false;
 	return result;
 }
@@ -2674,8 +2686,8 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_ScaleV3(DqnV3 scale)
 DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul(DqnMat4 a, DqnMat4 b)
 {
 	DqnMat4 result = {0};
-	for (i32 j = 0; j < 4; j++) {
-		for (i32 i = 0; i < 4; i++)
+	for (u32 j = 0; j < 4; j++) {
+		for (u32 i = 0; i < 4; i++)
 		{
 			result.e[j][i] = a.e[0][i] * b.e[j][0]
 			               + a.e[1][i] * b.e[j][1]
@@ -3011,7 +3023,6 @@ DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 value, char *const buf, const i32 bufSize)
 	{
 		while (val != 0)
 		{
-			i32 rem = val % 10;
 			val /= 10;
 			charIndex++;
 		}
@@ -3116,8 +3127,14 @@ DQN_FILE_SCOPE f32 Dqn_StrToF32(const char *const buf, const i32 bufSize)
 			// string, i.e. "e" followed by no number.
 			DQN_ASSERT_HARD(scientificNotation);
 
-			numDigitsAfterDecimal += exponentPow;
-			if (digitShiftIsPositive) digitShiftMultiplier = 10.0f;
+			if (digitShiftIsPositive)
+			{
+				numDigitsAfterDecimal -= exponentPow;
+			}
+			else
+			{
+				numDigitsAfterDecimal += exponentPow;
+			}
 		}
 		else if (DqnChar_IsDigit(ch))
 		{
@@ -3568,6 +3585,8 @@ PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
 "...512 char string..." ( 35.0x/32.5x faster!)
 */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmisleading-indentation"
 #include <stdlib.h>  // for va_arg()
 
 #define stbsp__uint32 unsigned int
@@ -4548,11 +4567,14 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 #undef stbsp__uint64
 #undef stbsp__int64
 #undef STBSP__UNALIGNED
+#pragma GCC diagnostic pop
 
 ////////////////////////////////////////////////////////////////////////////////
 // ini.h v1.1 | IMPLEMENTATION
 // Simple ini-file reader for C/C++.
 ////////////////////////////////////////////////////////////////////////////////
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #define INITIAL_CAPACITY (256)
 
 #define _CRT_NONSTDC_NO_DEPRECATE
@@ -5188,6 +5210,7 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 		}
 	}
 }
+#pragma GCC diagnostic pop // -Wsign-compare for DQN_INI
 #endif // DQN_IMPLEMENTATION
 
 ////////////////////////////////////////////////////////////////////////////////
