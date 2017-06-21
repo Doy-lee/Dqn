@@ -859,7 +859,7 @@ DQN_FILE_SCOPE bool   DqnFile_OpenW(const wchar_t *const path, DqnFile *const fi
 DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file, const u8 *const buffer, const size_t numBytesToWrite, const size_t fileOffset);
 
 // Return the number of bytes read
-DQN_FILE_SCOPE size_t DqnFile_Read (const DqnFile file, const u8 *const buffer, const size_t numBytesToRead);
+DQN_FILE_SCOPE size_t DqnFile_Read (const DqnFile file, u8 *const buffer, const size_t numBytesToRead);
 DQN_FILE_SCOPE void   DqnFile_Close(DqnFile *const file);
 
 // Return an array of strings of the files in the directory in UTF-8. numFiles
@@ -3732,13 +3732,13 @@ DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
 	return numBytesWritten;
 }
 
-DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
+DQN_FILE_SCOPE size_t DqnFile_Read(DqnFile file, u8 *const buffer,
                                    const size_t numBytesToRead)
 {
 	size_t numBytesRead = 0;
-#ifdef DQN_WIN32_PLATFORM
 	if (file.handle && buffer)
 	{
+#if defined(DQN_WIN32_PLATFORM)
 		DWORD bytesToRead = (DWORD)numBytesToRead;
 		DWORD bytesRead    = 0;
 		HANDLE win32Handle = file.handle;
@@ -3753,24 +3753,39 @@ DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile file, const u8 *const buffer,
 			DQN_WIN32_ERROR_BOX("ReadFile() failed.", NULL);
 		}
 
-	}
+#elif defined(DQN_UNIX_PLATFORM)
+		// TODO(doyle): Syscall version
+		const size_t ITEMS_TO_READ = 1;
+		if (fread(buffer, numBytesToRead, ITEMS_TO_READ, (FILE *)file.handle) ==
+		    ITEMS_TO_READ)
+		{
+			rewind((FILE *)file.handle);
+			numBytesRead = ITEMS_TO_READ * numBytesToRead;
+		}
+		else
+		{
+			// TODO(doyle): Logging, failed read
+		}
+#else
+	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32/Unix path not implemented");
 #endif
+	}
 	return numBytesRead;
 }
 
 DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
 {
-#ifdef DQN_WIN32_PLATFORM
 	if (file && file->handle)
 	{
+#if defined(DQN_WIN32_PLATFORM)
 		CloseHandle(file->handle);
+#elif defined(DQN_UNIX_PLATFORM)
+		fclose((FILE *)file->handle);
+#endif
 		file->handle          = NULL;
 		file->size            = 0;
 		file->permissionFlags = 0;
 	}
-#else
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented");
-#endif
 }
 
 DQN_FILE_SCOPE char **DqnDir_Read(const char *const dir, u32 *const numFiles)
