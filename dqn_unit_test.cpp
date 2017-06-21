@@ -1,5 +1,6 @@
 #if (defined(_WIN32) || defined(_WIN64))
 	#define DQN_WIN32_IMPLEMENTATION
+	#include <Windows.h>
 #endif
 
 #if defined(__linux__)
@@ -1445,21 +1446,46 @@ void FileTest()
 {
 	// File i/o
 	{
-		{
-			DqnFile file = {};
-			DQN_ASSERT(DqnFile_Open(
-				".clang-format", &file,
-				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
-				DqnFileAction_OpenOnly));
 
+		// Test file open
+		{
+			const char *const FILE_TO_OPEN = ".clang-format";
+	        u32 expectedSize = 0;
 #if defined(DQN_UNIX_IMPLEMENTATION)
-			const u32 EXPECTED_SIZE = 1274;
+	        {
+		        struct stat fileStat = {0};
+		        DQN_ASSERT(stat(FILE_TO_OPEN, &fileStat) == 0);
+		        expectedSize = fileStat.st_size;
+	        }
+
 #elif defined(DQN_WIN32_IMPLEMENTATION)
-			const u32 EXPECTED_SIZE = 1320;
+	        {
+		        HANDLE handle =
+		            CreateFile(FILE_TO_OPEN, GENERIC_READ, 0, NULL,
+		                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		        if (handle == INVALID_HANDLE_VALUE)
+		        {
+					DqnWin32_DisplayLastError("CreateFile() failed");
+		        }
+		        DQN_ASSERT(handle != INVALID_HANDLE_VALUE);
+
+		        LARGE_INTEGER size;
+		        DQN_ASSERT(GetFileSizeEx(handle, &size));
+
+		        CloseHandle(handle);
+		        expectedSize = size.LowPart;
+	        }
 #endif
-	        DQN_ASSERT_MSG(file.size == EXPECTED_SIZE,
+
+			DqnFile file = {};
+	        DQN_ASSERT(DqnFile_Open(
+	            ".clang-format", &file,
+	            (DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
+	            DqnFileAction_OpenOnly));
+
+	        DQN_ASSERT_MSG(file.size == expectedSize,
 	                       "DqnFileOpen() failed: file.size: %d, expected:%d\n",
-	                       file.size, EXPECTED_SIZE);
+	                       file.size, expectedSize);
 
 	        u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
 			DQN_ASSERT(DqnFile_Read(file, buffer, (u32)file.size) == file.size);
@@ -1470,6 +1496,7 @@ void FileTest()
 	                   file.permissionFlags == 0);
         }
 
+		// Test invalid file
 		{
 			DqnFile file = {};
 			DQN_ASSERT(!DqnFile_Open(
@@ -1482,10 +1509,77 @@ void FileTest()
 			printf("FileTest(): FileIO: Completed successfully\n");
 		}
 
-		// TODO(doyle): Write tests for writing out to file
 	}
 
+	////////////////////////////////////////////////////////////////////////////
+	// Write Test
+	////////////////////////////////////////////////////////////////////////////
 	{
+	    const char *fileNames[] = {"dqn_1", "dqn_2", "dqn_3", "dqn_4", "dqn_5"};
+	    const char *writeData[] = {"1234", "2468", "36912", "481216",
+	                               "5101520"};
+	    DqnFile files[DQN_ARRAY_COUNT(fileNames)] = {};
+
+	    // Write data out to some files
+	    for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+	    {
+		    u32 permissions =
+		        DqnFilePermissionFlag_Read | DqnFilePermissionFlag_Write;
+		    if (!DqnFile_Open(fileNames[i], files + i, permissions,
+		                      DqnFileAction_ClearIfExist))
+		    {
+			    bool result = DqnFile_Open(fileNames[i], files + i, permissions,
+			                               DqnFileAction_CreateIfNotExist);
+			    DQN_ASSERT(result);
+		    }
+
+		    size_t bytesToWrite = DqnStr_Len(writeData[i]);
+		    u8 *dataToWrite     = (u8 *)(writeData[i]);
+		    size_t bytesWritten = DqnFile_Write(files + i, dataToWrite, bytesToWrite, 0);
+		    DQN_ASSERT(bytesWritten == bytesToWrite);
+		    DqnFile_Close(&files[i]);
+	    }
+
+	    DqnMemStack memStack = {};
+	    DQN_ASSERT(DqnMemStack_Init(&memStack, DQN_MEGABYTE(1), true));
+	    // Read data back in
+	    for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+	    {
+		    u32 permissions = DqnFilePermissionFlag_Read;
+		    DqnFile *file   = files + i;
+		    bool result     = DqnFile_Open(fileNames[i], file, permissions,
+		                               DqnFileAction_OpenOnly);
+		    DQN_ASSERT(result);
+
+		    u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, file->size);
+		    DQN_ASSERT(buffer);
+
+		    size_t bytesRead = DqnFile_Read(files[i], buffer, file->size);
+		    DQN_ASSERT(bytesRead == file->size);
+
+		    // Verify the data is the same as we wrote out
+		    DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i])) == 0);
+
+		    // Delete when we're done with it
+		    DQN_ASSERT(DqnMemStack_Pop(&memStack, buffer, file->size));
+		    DqnFile_Close(file);
+
+		    DQN_ASSERT(DqnFile_Delete(fileNames[i]));
+	    }
+
+	    // Then check delete actually worked, files should not exist.
+	    for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+	    {
+		    DqnFile dummy   = {};
+		    u32 permissions = DqnFilePermissionFlag_Read;
+		    bool fileExists = DqnFile_Open(fileNames[i], &dummy, permissions,
+		                                   DqnFileAction_OpenOnly);
+		    DQN_ASSERT(!fileExists);
+	    }
+	    DqnMemStack_Free(&memStack);
+    }
+
+    {
 		u32 numFiles;
 #if defined(DQN_UNIX_IMPLEMENTATION)
 	    char **filelist = DqnDir_Read(".", &numFiles);
@@ -1558,6 +1652,10 @@ FILE_SCOPE void JobQueueTest()
 
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(globalDebugCounterMemoize); i++)
 		DQN_ASSERT(globalDebugCounterMemoize[i]);
+
+	while (DqnJobQueue_TryExecuteNextJob(jobQueue) &&
+	       !DqnJobQueue_AllJobsComplete(jobQueue))
+		;
 
 	printf("\nJobQueueTest(): Final incremented value: %d\n", globalDebugCounter);
 	DQN_ASSERT(globalDebugCounter == DQN_ARRAY_COUNT(globalDebugCounterMemoize));

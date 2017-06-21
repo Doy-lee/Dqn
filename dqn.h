@@ -801,7 +801,6 @@ DQN_FILE_SCOPE u32  DqnRnd_PCGNext (DqnRandPCGState *pcg);
 DQN_FILE_SCOPE f32  DqnRnd_PCGNextf(DqnRandPCGState *pcg);
 // Returns a random integer N between [min, max]
 DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
-
 #endif  /* DQN_H */
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -817,6 +816,7 @@ DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
 
 #ifdef DQN_UNIX_PLATFORM
 	#include <sys/stat.h>
+	#include <unistd.h>   // unlink()
 	#include <stdio.h>    // Basic File I/O
 	#include <dirent.h>   // readdir()/opendir()/closedir()
 #endif
@@ -854,6 +854,7 @@ typedef struct DqnFile
 	u32     permissionFlags;
 } DqnFile;
 
+// NOTE: W(ide) versions of functions only work on Win32, since Unix is UTF-8 compatible.
 // Open a handle to the file
 DQN_FILE_SCOPE bool   DqnFile_Open (const char *const path, DqnFile *const file, const u32 permissionFlags, const enum DqnFileAction action);
 DQN_FILE_SCOPE bool   DqnFile_OpenW(const wchar_t *const path, DqnFile *const file, const u32 permissionFlags, const enum DqnFileAction action);
@@ -863,6 +864,10 @@ DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file, u8 *const buffer,
 // Return the number of bytes read
 DQN_FILE_SCOPE size_t DqnFile_Read (const DqnFile file, u8 *const buffer, const size_t numBytesToRead);
 DQN_FILE_SCOPE void   DqnFile_Close(DqnFile *const file);
+
+// NOTE: You can't delete a file unless the handle has been closed to it on Win32.
+DQN_FILE_SCOPE bool DqnFile_Delete (const char *const path);
+DQN_FILE_SCOPE bool DqnFile_DeleteW(const wchar_t *const path);
 
 // Return an array of strings of the files in the directory in UTF-8. numFiles
 // returns the number of strings read.
@@ -1704,9 +1709,10 @@ DQN_FILE_SCOPE bool DqnMemStack_Pop(DqnMemStack *const stack, void *ptr, size_t 
 	                   "'ptr' to pop does not belong to current memStack attached block"))
 	{
 		size_t calcSize = (size_t)currPtr - (size_t)ptr;
-		if (DQN_ASSERT_MSG(calcSize == size, "'ptr' was not the last item allocated to memStack"))
+		size_t sizeAligned = DQN_ALIGN_POW_N(size, stack->byteAlign);
+		if (DQN_ASSERT_MSG(calcSize == sizeAligned, "'ptr' was not the last item allocated to memStack"))
 		{
-			stack->block->used -= size;
+			stack->block->used -= sizeAligned;
 			return true;
 		}
 	}
@@ -3878,7 +3884,7 @@ DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
 {
 	size_t numBytesWritten = 0;
 	// TODO(doyle): Implement when it's needed
-	if (DQN_ASSERT_MSG(fileOffset != 0, "'fileOffset' not implemented yet")) return 0;
+	if (!DQN_ASSERT_MSG(fileOffset == 0, "'fileOffset' not implemented yet")) return 0;
 	if (!file || !buffer) return numBytesToWrite;
 
 #if defined(DQN_WIN32_PLATFORM)
@@ -3961,6 +3967,23 @@ DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
 		file->size            = 0;
 		file->permissionFlags = 0;
 	}
+}
+
+DQN_FILE_SCOPE bool DqnFile_Delete(const char *const path)
+{
+	if (!path) return false;
+
+	// TODO(doyle): Logging
+#if defined(DQN_WIN32_PLATFORM)
+	return DeleteFile(path);
+
+#elif defined(DQN_UNIX_PLATFORM)
+	i32 result = unlink(path);
+
+	if (result == 0) return true;
+	return false;
+
+#endif
 }
 
 DQN_FILE_SCOPE char **DqnDir_Read(const char *const dir, u32 *const numFiles)
