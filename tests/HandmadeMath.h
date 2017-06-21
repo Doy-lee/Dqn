@@ -1,5 +1,7 @@
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpsabi"
+#ifdef __GNUC__
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wpsabi"
+#endif
 /*
   HandmadeMath.h v1.1.2
 
@@ -2659,4 +2661,7 @@ operator*=(hmm_quaternion &Left, float Right)
 #endif /* HANDMADE_MATH_CPP_MODE */
 
 #endif /* HANDMADE_MATH_IMPLEMENTATION */
-#pragma GCC diagnostic pop
+
+#ifdef __GNUC__
+	#pragma GCC diagnostic pop
+#endif

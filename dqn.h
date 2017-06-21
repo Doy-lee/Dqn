@@ -1480,7 +1480,6 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #include <math.h>    // TODO(doyle): For trigonometry functions (for now)
 #include <stdlib.h>    // For calloc, malloc, free
 #include <stdio.h>     // For printf
-#include <x86intrin.h> // __rdtsc
 
 // NOTE: STB_SPRINTF is included when DQN_IMPLEMENTATION defined
 // #define STB_SPRINTF_IMPLEMENTATION
@@ -3488,6 +3487,10 @@ FILE_SCOPE u64 DqnRnd_Murmur3Avalanche64Internal(u64 h)
 	return h;
 }
 
+#if defined(DQN_UNIX_PLATFORM)
+	#include <x86intrin.h> // __rdtsc
+#endif
+
 FILE_SCOPE u32 DqnRnd_MakeSeedInternal()
 {
 #if defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM)
@@ -4034,8 +4037,11 @@ PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
 "...512 char string..." ( 35.0x/32.5x faster!)
 */
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#ifdef __GNUC__
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#endif
+
 #include <stdlib.h>  // for va_arg()
 
 #define stbsp__uint32 unsigned int
@@ -5016,14 +5022,20 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 #undef stbsp__uint64
 #undef stbsp__int64
 #undef STBSP__UNALIGNED
-#pragma GCC diagnostic pop
+
+#ifdef __GNUC__
+	#pragma GCC diagnostic pop
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // ini.h v1.1 | IMPLEMENTATION
 // Simple ini-file reader for C/C++.
 ////////////////////////////////////////////////////////////////////////////////
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-compare"
+#ifdef __GNUC__
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
+
 #define INITIAL_CAPACITY (256)
 
 #define _CRT_NONSTDC_NO_DEPRECATE
@@ -5659,7 +5671,10 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 		}
 	}
 }
-#pragma GCC diagnostic pop // -Wsign-compare for DQN_INI
+
+#ifdef __GNUC__
+		#pragma GCC diagnostic pop // -Wsign-compare for DQN_INI
+#endif
 #endif // DQN_IMPLEMENTATION
 
 ////////////////////////////////////////////////////////////////////////////////

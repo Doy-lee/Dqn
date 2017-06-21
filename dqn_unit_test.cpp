@@ -1528,7 +1528,7 @@ FILE_SCOPE void JobQueueTest()
 	const i32 QUEUE_SIZE = 256;
 	DqnJobQueue_InitWithMem(NULL, &requiredSize, QUEUE_SIZE, 0);
 
-	DqnMemStack memStack;
+	DqnMemStack memStack = {};
 	DQN_ASSERT_HARD(DqnMemStack_Init(&memStack, requiredSize, true));
 
 	i32 numThreads, numCores;
