@@ -1,3 +1,5 @@
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpsabi"
 /*
   HandmadeMath.h v1.1.2
 
@@ -777,7 +779,7 @@ HMM_RSquareRootF(float Value)
     float Result = 0.0f;
 
 #ifdef HANDMADE_MATH_NO_SSE
-    Result = 1.0f/HMM_SqrtF(Value);    
+    Result = 1.0f/HMM_SquareRootF(Value);    
 #else        
     __m128 In = _mm_set_ss(Value);
     __m128 Out = _mm_rsqrt_ss(In);
@@ -2657,3 +2659,4 @@ operator*=(hmm_quaternion &Left, float Right)
 #endif /* HANDMADE_MATH_CPP_MODE */
 
 #endif /* HANDMADE_MATH_IMPLEMENTATION */
+#pragma GCC diagnostic pop

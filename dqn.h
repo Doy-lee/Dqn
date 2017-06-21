@@ -17,6 +17,9 @@
 #if (defined(_WIN32) || defined(_WIN64)) && defined(DQN_WIN32_IMPLEMENTATION)
 	#define DQN_PLATFORM_LAYER
 	#define DQN_WIN32_PLATFORM
+#elif defined(__linux__) && defined(DQN_UNIX_IMPLEMENTATION)
+	#define DQN_PLATFORM_LAYER
+	#define DQN_UNIX_PLATFORM
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +38,8 @@
 #endif
 
 #include <stdint.h> // For standard types
+#include <stddef.h> // For standard types
+#include <string.h> // memmove
 #include <float.h>
 #define LOCAL_PERSIST static
 #define FILE_SCOPE    static
@@ -1463,10 +1468,10 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 // DQN_IMPLEMENTATION
 //
 ////////////////////////////////////////////////////////////////////////////////
-#include <math.h>   // TODO(doyle): For trigonometry functions (for now)
-#include <stdlib.h> // For calloc, malloc, free
-#include <string.h> // For memset
-#include <stdio.h>  // For printf
+#include <math.h>    // TODO(doyle): For trigonometry functions (for now)
+#include <stdlib.h>    // For calloc, malloc, free
+#include <stdio.h>     // For printf
+#include <x86intrin.h> // __rdtsc
 
 // NOTE: STB_SPRINTF is included when DQN_IMPLEMENTATION defined
 // #define STB_SPRINTF_IMPLEMENTATION
@@ -3459,15 +3464,12 @@ FILE_SCOPE u64 DqnRnd_Murmur3Avalanche64Internal(u64 h)
 
 FILE_SCOPE u32 DqnRnd_MakeSeedInternal()
 {
-#ifdef DQN_WIN32_PLATFORM
-	__int64 numClockCycles = __rdtsc();
+#if defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM)
+	i64 numClockCycles = __rdtsc();
 	return (u32)numClockCycles;
 #elif __ANDROID__
 	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Android path not implemented yet");
 	return 0;
-#elif __linux__
-	unsigned long long numClockCycles = rdtsc();
-	return (u32)numClockCycles;
 #else
 	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
 	return 0;

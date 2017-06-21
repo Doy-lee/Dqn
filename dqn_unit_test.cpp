@@ -1,4 +1,12 @@
-#define DQN_WIN32_IMPLEMENTATION
+#if (defined(_WIN32) || defined(_WIN64))
+	#define DQN_WIN32_IMPLEMENTATION
+#endif
+
+#if defined(__linux__)
+	#define DQN_UNIX_IMPLEMENTATION
+	#define HANDMADE_MATH_NO_SSE
+#endif
+
 #define DQN_IMPLEMENTATION
 #include "dqn.h"
 
@@ -7,7 +15,7 @@
 #include "tests/HandmadeMath.h"
 
 #include <stdio.h>
-
+#include <limits.h>
 void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 {
 	f32 *hmmMatf = (f32 *)&hmmMat;
@@ -19,7 +27,13 @@ void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 	DQN_ASSERT(totalSize == (DQN_ARRAY_COUNT(hmmMat.Elements) * DQN_ARRAY_COUNT(hmmMat.Elements[0])));
 
 	for (i32 i = 0; i < EXPECTED_SIZE; i++)
-		DQN_ASSERT(hmmMatf[i] == dqnMatf[i]);
+	{
+		const f32 EPSILON = 0.001f;
+		f32 diff = hmmMatf[i] - dqnMatf[i];
+		diff = DQN_ABS(diff);
+		DQN_ASSERT_MSG(diff < EPSILON, "hmmMatf[%d]: %f, dqnMatf[%d]: %f\n", i,
+		               hmmMatf[i], i, dqnMatf[i]);
+	}
 }
 
 void HandmadeMathTest()
@@ -132,7 +146,7 @@ void StringsTest()
 	{
 		// strcmp
 		{
-			char *a = "str_a";
+			const char *const a = "str_a";
 
 			// Check simple compares
 			{
@@ -158,7 +172,7 @@ void StringsTest()
 
 		// strlen
 		{
-			char *a = "str_a";
+			const char *const a = "str_a";
 			DQN_ASSERT(DqnStr_Len(a) == 5);
 			DQN_ASSERT(DqnStr_Len("") == 0);
 			DQN_ASSERT(DqnStr_Len("   a  ") == 6);
@@ -175,7 +189,7 @@ void StringsTest()
 		// strncpy
 		{
 			{
-				char *a    = "str_a";
+				const char *const a    = "str_a";
 				char b[10] = {};
 				// Check copy into empty array
 				{
@@ -199,31 +213,6 @@ void StringsTest()
 					DQN_ASSERT(DqnStr_Len(b) == 6);
 				}
 			}
-
-			// Check strncpy with NULL pointers
-			{
-				DQN_ASSERT(DqnStr_Copy(NULL, NULL, 5) == NULL);
-
-				char *a      = "str";
-				char *result = DqnStr_Copy(a, NULL, 5);
-
-				DQN_ASSERT(DqnStr_Cmp(a, "str") == 0);
-				DQN_ASSERT(DqnStr_Cmp(result, "str") == 0);
-				DQN_ASSERT(DqnStr_Cmp(result, a) == 0);
-			}
-
-			// Check strncpy with 0 chars to copy
-			{
-				char *a = "str";
-				char *b = "ing";
-
-				char *result = DqnStr_Copy(a, b, 0);
-				DQN_ASSERT(DqnStr_Cmp(a, "str") == 0);
-				DQN_ASSERT(DqnStr_Cmp(b, "ing") == 0);
-				DQN_ASSERT(DqnStr_Cmp(result, "str") == 0);
-			}
-
-			printf("StringsTest(): strncpy: Completed successfully\n");
 		}
 
 		// StrReverse
@@ -269,20 +258,20 @@ void StringsTest()
 		}
 
 		const u64 LARGEST_NUM  = (u64)-1;
-		const i64 SMALLEST_NUM = -9223372036854775808LL;
+		const i64 SMALLEST_NUM = LLONG_MIN;
 		// StrToI64
 		{
-			char *a = "123";
+			const char *const a = "123";
 			DQN_ASSERT(Dqn_StrToI64(a, DqnStr_Len(a)) == 123);
 
-			char *b = "-123";
+			const char *const b = "-123";
 			DQN_ASSERT(Dqn_StrToI64(b, DqnStr_Len(b)) == -123);
 			DQN_ASSERT(Dqn_StrToI64(b, 1) == 0);
 
-			char *c = "-0";
+			const char *const c = "-0";
 			DQN_ASSERT(Dqn_StrToI64(c, DqnStr_Len(c)) == 0);
 
-			char *d = "+123";
+			const char *const d = "+123";
 			DQN_ASSERT(Dqn_StrToI64(d, DqnStr_Len(d)) == 123);
 
 			// TODO(doyle): Unsigned conversion
@@ -291,7 +280,7 @@ void StringsTest()
 	        DQN_ASSERT((u64)(Dqn_StrToI64(e, DqnStr_Len(e))) == LARGEST_NUM);
 #endif
 
-			char *f = "-9223372036854775808";
+			const char *const f = "-9223372036854775808";
 			DQN_ASSERT(Dqn_StrToI64(f, DqnStr_Len(f)) == SMALLEST_NUM);
 
 	        printf("StringsTest(): StrToI64: Completed successfully\n");
@@ -406,8 +395,8 @@ void StringsTest()
 	{
 
 		{
-		    char *a  = "Microsoft";
-		    char *b  = "icro";
+		    const char *const a  = "Microsoft";
+		    const char *const b  = "icro";
 		    i32 lenA = DqnStr_Len(a);
 		    i32 lenB = DqnStr_Len(b);
 		    DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == true);
@@ -422,8 +411,8 @@ void StringsTest()
 	    }
 
 		{
-		    char *a  = "Micro";
-		    char *b  = "irob";
+		    const char *const a  = "Micro";
+		    const char *const b  = "irob";
 		    i32 lenA = DqnStr_Len(a);
 		    i32 lenB = DqnStr_Len(b);
 		    DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == false);
@@ -506,6 +495,7 @@ void StringsTest()
     printf("StringsTest(): Completed successfully\n");
 }
 
+#ifdef DQN_WIN32_IMPLEMENTATION
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 void OtherTest()
@@ -522,6 +512,7 @@ void OtherTest()
 	}
 	printf("OtherTest(): Completed successfully\n");
 }
+#endif
 
 void RandomTest() {
 
@@ -641,6 +632,7 @@ void VecTest()
 
 		// V2 Properties
 		{
+			const f32 EPSILON = 0.001f;
 			DqnV2 a = DqnV2_2f(0, 0);
 			DqnV2 b = DqnV2_2f(3, 4);
 
@@ -651,8 +643,12 @@ void VecTest()
 			DQN_ASSERT(length == 5);
 
 			DqnV2 normalised = DqnV2_Normalise(b);
-			DQN_ASSERT(normalised.x == (b.x / 5.0f));
-			DQN_ASSERT(normalised.y == (b.y / 5.0f));
+			f32 normX        = b.x / 5.0f;
+			f32 normY        = b.y / 5.0f;
+			f32 diffNormX = normalised.x - normX;
+			f32 diffNormY = normalised.y - normY;
+			DQN_ASSERT_MSG(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x, normX);
+			DQN_ASSERT_MSG(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y, normY);
 
 			DqnV2 c = DqnV2_2f(3.5f, 8.0f);
 			DQN_ASSERT(DqnV2_Overlaps(b, c) == true);
@@ -1078,55 +1074,6 @@ void ArrayTest()
 	printf("ArrayTest(): Completed successfully\n");
 }
 
-void FileTest()
-{
-	// File i/o
-	{
-		{
-			DqnFile file = {};
-			DQN_ASSERT(DqnFile_Open(
-				".clang-format", &file,
-				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
-				DqnFileAction_OpenOnly));
-			DQN_ASSERT(file.size == 1320);
-
-			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
-			DQN_ASSERT(DqnFile_Read(file, buffer, (u32)file.size) == file.size);
-			free(buffer);
-
-			DqnFile_Close(&file);
-	        DQN_ASSERT(!file.handle && file.size == 0 &&
-	                   file.permissionFlags == 0);
-        }
-
-		{
-			DqnFile file = {};
-			DQN_ASSERT(!DqnFile_Open(
-				"asdljasdnel;kajdf", &file,
-				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
-				DqnFileAction_OpenOnly));
-			DQN_ASSERT(file.size == 0);
-			DQN_ASSERT(file.permissionFlags == 0);
-			DQN_ASSERT(!file.handle);
-			printf("FileTest(): FileIO: Completed successfully\n");
-		}
-	}
-
-	{
-		u32 numFiles;
-		char **filelist = DqnDir_Read("*", &numFiles);
-		printf("FileTest(): DirRead: Display read files\n");
-
-		for (u32 i = 0; i < numFiles; i++)
-			printf("FileTest(): DirRead: %s\n", filelist[i]);
-
-		DqnDir_ReadFree(filelist, numFiles);
-		printf("FileTest(): DirRead: Completed successfully\n");
-	}
-
-	printf("FileTest(): Completed successfully\n");
-}
-
 void MemStackTest()
 {
 	// Test over allocation, alignments, temp regions
@@ -1491,6 +1438,57 @@ void MemStackTest()
 	}
 }
 
+#ifdef DQN_WIN32_IMPLEMENTATION
+
+void FileTest()
+{
+	// File i/o
+	{
+		{
+			DqnFile file = {};
+			DQN_ASSERT(DqnFile_Open(
+				".clang-format", &file,
+				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
+				DqnFileAction_OpenOnly));
+			DQN_ASSERT(file.size == 1320);
+
+			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
+			DQN_ASSERT(DqnFile_Read(file, buffer, (u32)file.size) == file.size);
+			free(buffer);
+
+			DqnFile_Close(&file);
+	        DQN_ASSERT(!file.handle && file.size == 0 &&
+	                   file.permissionFlags == 0);
+        }
+
+		{
+			DqnFile file = {};
+			DQN_ASSERT(!DqnFile_Open(
+				"asdljasdnel;kajdf", &file,
+				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
+				DqnFileAction_OpenOnly));
+			DQN_ASSERT(file.size == 0);
+			DQN_ASSERT(file.permissionFlags == 0);
+			DQN_ASSERT(!file.handle);
+			printf("FileTest(): FileIO: Completed successfully\n");
+		}
+	}
+
+	{
+		u32 numFiles;
+		char **filelist = DqnDir_Read("*", &numFiles);
+		printf("FileTest(): DirRead: Display read files\n");
+
+		for (u32 i = 0; i < numFiles; i++)
+			printf("FileTest(): DirRead: %s\n", filelist[i]);
+
+		DqnDir_ReadFree(filelist, numFiles);
+		printf("FileTest(): DirRead: Completed successfully\n");
+	}
+
+	printf("FileTest(): Completed successfully\n");
+}
+
 FILE_SCOPE u32 volatile globalDebugCounter;
 FILE_SCOPE bool volatile globalDebugCounterMemoize[2048];
 FILE_SCOPE DqnLock globalJobQueueLock;
@@ -1548,6 +1546,7 @@ FILE_SCOPE void JobQueueTest()
 	printf("\nJobQueueTest(): Final incremented value: %d\n", globalDebugCounter);
 	DQN_ASSERT(globalDebugCounter == DQN_ARRAY_COUNT(globalDebugCounterMemoize));
 }
+#endif
 
 int main(void)
 {
@@ -1556,11 +1555,14 @@ int main(void)
 	MathTest();
 	HandmadeMathTest();
 	VecTest();
-	OtherTest();
 	ArrayTest();
-	FileTest();
 	MemStackTest();
+
+#ifdef DQN_WIN32_IMPLEMENTATION
+	OtherTest();
+	FileTest();
 	JobQueueTest();
+#endif
 
 	printf("\nPress 'Enter' Key to Exit\n");
 	getchar();
