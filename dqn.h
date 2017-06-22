@@ -3,10 +3,51 @@
 ////////////////////////////////////////////////////////////////////////////////
 /*
 	#define DQN_IMPLEMENTATION       // Enable the implementation
-	#define DQN_WIN32_IMPLEMENTATION // Enable Win32 Code, but only if _WIN32 is already defined. Also requires DQN_IMPLEMENTATION.
+
+	// NOTE: For platform code, it's one or the other or you will get compilation problems.
+	#define DQN_WIN32_IMPLEMENTATION // Enable Win32 Code, but only if _WIN32 or _WIN64 is already defined. Also requires DQN_IMPLEMENTATION.
+	#define DQN_UNIX_IMPLEMENTATION  // Enable Unix Code, but only if __linux__ is already defined. Also requires DQN_IMPLEMENTATION.
+
 	#define DQN_MAKE_STATIC          // Make all functions be static
 	#include "dqn.h"
  */
+////////////////////////////////////////////////////////////////////////////////
+// Table Of Contents #TOC #TableOfContents
+////////////////////////////////////////////////////////////////////////////////
+// You can search by #<entry> to jump straight to the section.
+
+// Public Header API | Portable Code
+// #DqnAssert    Assertions
+// #DqnMem       Memory Allocation
+// #DqnMemStack  Memory Allocator
+// #DqnMemAPI    Custom memory API for Dqn Data Structures
+// #DqnArray     CPP Dynamic Array with Templates
+// #DqnMath      Simple Math Helpers (Lerp etc.)
+// #DqnV2        2D  Math Vectors
+// #DqnV3        3D  Math Vectors
+// #DqnV4        4D  Math Vectors
+// #DqnMat4      4x4 Math Matrix
+// #DqnRect      Rectangles
+// #DqnChar      Char  Operations (IsDigit(), IsAlpha() etc)
+// #DqnStr       Str   Operations (Str_Len(), Str_Copy() etc)
+// #DqnWChar     WChar Operations (IsDigit(), IsAlpha() etc)
+// #DqnWStr      WStr  Operations (WStr_Len() etc)
+// #DqnRnd       Random Number Generator (ints and floats)
+
+// Public Header API | Cross Platform Code
+// #DqnFile      File I/O (Read, Write, Delete)
+// #DqnDir       Directory Querying
+
+// Public Header API | Win32 Only
+// #DqnTime      Platform High Resolution Timer
+// #DqnLock      Multithreading Mutex Synchronisation
+// #DqnAtomic    Interlocks/Atomic Operations
+// #DqnJobQueue  Multithreaded Job Queue
+// #DqnWin32     Common Win32 API Helpers
+
+// Public Header API | External Code
+// #DqnIni       Simple INI Config File API
+// #DqnSprintf   Cross-platform sprintf implementation
 
 ////////////////////////////////////////////////////////////////////////////////
 // Platform Checks
@@ -80,7 +121,7 @@ typedef float  f32;
 #define DQN_SWAP(type, a, b) do { type tmp = a; a = b; b = tmp; } while(0)
 
 ////////////////////////////////////////////////////////////////////////////////
-// DqnAssert
+// #DqnAssert
 ////////////////////////////////////////////////////////////////////////////////
 // DQN_ASSERT() & DQN_ASSERT_MSG() will hard break the program but it can be
 // disabled in DqnAssertInternal() for release whilst still allowing the assert
@@ -112,11 +153,16 @@ typedef float  f32;
 DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file, const i32 lineNum,
                                       const char *const expr, const char *const msg, ...);
 
+DQN_FILE_SCOPE bool DqnDiagnosticInternal_Error(const char *const file, const i32 lineNum, const char *const msg, ...)
+{
+}
+
 // Hard assert causes an immediate program break at point of assertion by trying
 // to modify the 0th mem-address.
 #define DQN_ASSERT_HARD(expr) if (!(expr)) { *((int *)0) = 0; }
+
 ////////////////////////////////////////////////////////////////////////////////
-// DqnMem - Memory
+// #DqnMem - Memory
 ////////////////////////////////////////////////////////////////////////////////
 // TODO(doyle): Use platform allocation, fallback to malloc if platform not defined
 DQN_FILE_SCOPE void *DqnMem_Alloc  (const size_t size);
@@ -126,7 +172,7 @@ DQN_FILE_SCOPE void *DqnMem_Realloc(void *const memory, const size_t newSize);
 DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
 
 ////////////////////////////////////////////////////////////////////////////////
-// DqnMemStack - Memory Stack, For push stack/ptr memory style management
+// #DqnMemStack - Memory Stack, For push stack/ptr memory style management
 ////////////////////////////////////////////////////////////////////////////////
 // DqnMemStack is an memory allocator in a stack like, push-pop style. It pre-allocates a block of
 // memory at init and sub-allocates from this block to take advantage of memory locality.
@@ -272,7 +318,7 @@ DQN_FILE_SCOPE bool              DqnMemStack_DetachBlock            (DqnMemStack
 DQN_FILE_SCOPE void DqnMemStack_FreeBlock(DqnMemStackBlock *block);
 
 ////////////////////////////////////////////////////////////////////////////////
-// DqnMemAPI - Memory API, For using custom allocators
+// #DqnMemAPI - Memory API, For using custom allocators
 ////////////////////////////////////////////////////////////////////////////////
 // You only need to care about this API if you want to use custom mem-alloc routines in the data
 // structures! Otherwise it already has a default one to use.
@@ -340,7 +386,7 @@ typedef struct DqnMemAPI
 
 DQN_FILE_SCOPE DqnMemAPI DqnMemAPI_DefaultUseCalloc();
 ////////////////////////////////////////////////////////////////////////////////
-// DArray - Dynamic Array
+// #DqnArray - Dynamic Array
 ////////////////////////////////////////////////////////////////////////////////
 // Cplusplus mode only since it uses templates
 
@@ -536,14 +582,14 @@ bool DqnArray_RemoveStable(DqnArray<T> *array, u64 index)
 #endif // DQN_CPP_MODE
 
 ////////////////////////////////////////////////////////////////////////////////
-// Math
+// #DqnMath
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE f32 DqnMath_Lerp  (f32 a, f32 t, f32 b);
 DQN_FILE_SCOPE f32 DqnMath_Sqrtf (f32 a);
 DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max);
 
 ////////////////////////////////////////////////////////////////////////////////
-// DqnV2 Vec2
+// #DqnV2 - Vec2
 ////////////////////////////////////////////////////////////////////////////////
 typedef union DqnV2 {
 	struct { f32 x, y; };
@@ -621,7 +667,7 @@ DQN_FILE_SCOPE inline bool    operator==(DqnV2i  a, DqnV2i b) { return      DqnV
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
-// Vec3
+// #DqnV3 - Vec3
 ////////////////////////////////////////////////////////////////////////////////
 typedef union DqnV3
 {
@@ -678,7 +724,7 @@ DQN_FILE_SCOPE DqnV3i DqnV3i_3i(i32 x, i32 y, i32 z);
 DQN_FILE_SCOPE DqnV3i DqnV3i_3f(f32 x, f32 y, f32 z);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Vec4
+// #DqnV4 - Vec4
 ////////////////////////////////////////////////////////////////////////////////
 typedef union DqnV4 {
 	struct
@@ -724,7 +770,7 @@ DQN_FILE_SCOPE inline bool   operator==(DqnV4  a, DqnV4 b) { return      DqnV4_E
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
-// 4D Matrix Mat4
+// #DqnMat4 - 4D Matrix
 ////////////////////////////////////////////////////////////////////////////////
 typedef union DqnMat4
 {
@@ -748,7 +794,7 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul         (DqnMat4 a, DqnMat4 b);
 DQN_FILE_SCOPE DqnV4   DqnMat4_MulV4       (DqnMat4 a, DqnV4 b);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Other Math
+// #DqnRect
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct DqnRect
 {
@@ -769,7 +815,7 @@ DQN_FILE_SCOPE DqnRect DqnRect_Move     (DqnRect rect, DqnV2 shift);
 DQN_FILE_SCOPE bool    DqnRect_ContainsP(DqnRect rect, DqnV2 p);
 
 ////////////////////////////////////////////////////////////////////////////////
-// char String Operations
+// #DqnChar
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE char DqnChar_ToLower   (char c);
 DQN_FILE_SCOPE char DqnChar_ToUpper   (char c);
@@ -777,6 +823,9 @@ DQN_FILE_SCOPE bool DqnChar_IsDigit   (char c);
 DQN_FILE_SCOPE bool DqnChar_IsAlpha   (char c);
 DQN_FILE_SCOPE bool DqnChar_IsAlphanum(char c);
 
+////////////////////////////////////////////////////////////////////////////////
+// #DqnStr
+////////////////////////////////////////////////////////////////////////////////
 // return: 0 if equal. 0 < if a is before b, > 0 if a is after b
 DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *a, const char *b);
 
@@ -807,7 +856,7 @@ DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character);
 DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *dest, u32 character);
 
 ////////////////////////////////////////////////////////////////////////////////
-// wchar String Operations
+// #DqnWChar - wchar String Operations
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE bool    DqnWChar_IsDigit(const wchar_t c);
 DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c);
@@ -820,7 +869,7 @@ DQN_FILE_SCOPE i32  Dqn_WStrToI32(const wchar_t *const buf, const i32 bufSize);
 DQN_FILE_SCOPE i32  Dqn_I32ToWStr(i32 value, wchar_t *buf, i32 bufSize);
 
 ////////////////////////////////////////////////////////////////////////////////
-// PCG (Permuted Congruential Generator) Random Number Generator
+// #DqnRnd PCG (Permuted Congruential Generator) Random Number Generator
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct DqnRandPCGState
 {
@@ -854,13 +903,13 @@ DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
 
 #ifdef DQN_UNIX_PLATFORM
 	#include <sys/stat.h>
+	#include <stdio.h>    // Basic File I/O // TODO(doyle): Syscall versions
 	#include <unistd.h>   // unlink()
-	#include <stdio.h>    // Basic File I/O
 	#include <dirent.h>   // readdir()/opendir()/closedir()
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
-// Cross-Platform > DqnFile
+// Cross-Platform > #DqnFile
 ////////////////////////////////////////////////////////////////////////////////
 enum DqnFilePermissionFlag
 {
@@ -926,13 +975,13 @@ DQN_FILE_SCOPE void   DqnDir_ReadFree(char **fileList, u32 numFiles);
 
 #ifdef DQN_WIN32_PLATFORM
 ////////////////////////////////////////////////////////////////////////////////
-// Platform Specific > Win32  > Timer
+// Platform Specific > Win32  > #DqnTimer
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE f64 DqnTime_NowInS();
 DQN_FILE_SCOPE f64 DqnTime_NowInMs();
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform Specific > Win32 > DqnLock
+// Platform Specific > Win32 > #DqnLock
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct DqnLock
 {
@@ -945,14 +994,14 @@ DQN_FILE_SCOPE void DqnLock_Release(DqnLock *const lock);
 DQN_FILE_SCOPE void DqnLock_Delete (DqnLock *const lock);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform Specific > Win32 > DqnAtomics
+// Platform Specific > Win32 > #DqnAtomic - Interlocks/Atomic Operation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE u32 DqnAtomic_CompareSwap32(u32 volatile *dest, u32 swapVal, u32 compareVal);
 DQN_FILE_SCOPE u32 DqnAtomic_Add32        (u32 volatile *src);
 DQN_FILE_SCOPE u32 DqnAtomic_Sub32        (u32 volatile *src);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform Specific > Win32 > DqnJobQueue - Multithreaded Job Queue
+// Platform Specific > Win32 > #DqnJobQueue - Multithreaded Job Queue
 ////////////////////////////////////////////////////////////////////////////////
 // DqnJobQueue is a platform abstracted "lockless" multithreaded work queue. It will create threads
 // and assign threads to complete the job via the job "callback" using the "userData" supplied.
@@ -992,8 +1041,9 @@ DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob jo
 //         while (DqnJobQueue_TryExecuteNextJob(queue) && !DqnJobQueue_AllJobsComplete(queue));
 DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue);
 DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete  (DqnJobQueue *const queue);
+
 ////////////////////////////////////////////////////////////////////////////////
-// Platform Specific > Win32
+// Platform Specific > #DqnWin32 - Common Win32 API Helpers
 ////////////////////////////////////////////////////////////////////////////////
 #define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(NULL, text, title, MB_OK);
 
@@ -1030,6 +1080,9 @@ DQN_FILE_SCOPE void DqnWin32_GetNumThreadsAndCores(i32 *const numCores, i32 *con
 #endif // DQN_WIN32_PLATFORM
 
 #ifdef DQN_UNIX_PLATFORM
+////////////////////////////////////////////////////////////////////////////////
+// Platform Specific > Unix
+////////////////////////////////////////////////////////////////////////////////
 #endif
 
 #endif // DQN_PLATFORM_LAYER
@@ -1037,8 +1090,7 @@ DQN_FILE_SCOPE void DqnWin32_GetNumThreadsAndCores(i32 *const numCores, i32 *con
 #ifndef DQN_INI_H
 #define DQN_INI_H
 ////////////////////////////////////////////////////////////////////////////////
-// ini.h v1.1
-// Simple ini-file reader for C/C++.
+// #DqnIni - Simple INI Config File API v1.1
 ////////////////////////////////////////////////////////////////////////////////
 /*
 TODO(doyle): Make my own for fun?
@@ -1433,34 +1485,11 @@ zero-terminated. If `length` is zero, the length is determined automatically,
 #define STB_SPRINTF_DECORATE(name) Dqn_##name
 
 ////////////////////////////////////////////////////////////////////////////////
-// STB_Sprintf renamed to Dqn_Sprintf
+// #DqnSprintf - STB_Sprintf renamed to Dqn_Sprintf
 ////////////////////////////////////////////////////////////////////////////////
 /*
 Public Domain library originally written by Jeff Roberts at RAD Game Tools
 - 2015/10/20.  Hereby placed in public domain.
-
-API:
-====
-int Dqn_sprintf (char *buf, char const * fmt, ...)
-int Dqn_snprintf(char *buf, int count, char const *fmt, ...)
-- Convert an arg list into a buffer.
-- dqn_snprintf always returns a zero-terminated string (unlike regular snprintf).
-
-int Dqn_vsprintf (char *buf, char const *fmt, va_list va)
-int Dqn_vsnprintf(char *buf, int count, char const *fmt, va_list va)
-- Convert a va_list arg list into a buffer.
-- dqn_vsnprintf always returns a zero-terminated string (unlike regular snprintf).
-
-int dqn_vsprintfcb(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va)
-typedef char *STBSP_SPRINTFCB(char const *buf, void *user, int len);
-- Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
-- Your callback can then copy the chars out, print them or whatever.
-- This function is actually the workhorse for everything else.
-- The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
-- You return the next buffer to use or 0 to stop converting
-
-void dqn_set_separators(char comma, char period)
-- Set the comma and period characters to use.
 
 FLOATS/DOUBLES:
 ===============
@@ -1527,18 +1556,30 @@ binary: "%b" for 256 would print 100.
 #ifndef STB_SPRINTF_MIN
 	#define STB_SPRINTF_MIN 512 // how many characters per callback
 #endif
-typedef char *STBSP_SPRINTFCB(char *buf, void *user, int len);
 
 #ifndef STB_SPRINTF_DECORATE
 	#define STB_SPRINTF_DECORATE(name) stbsp_##name  // define this before including if you want to change the names
 #endif
 
+// Convert a va_list arg list into a buffer. vsnprintf always returns a zero-terminated string (unlike regular snprintf).
+// return: The number of characters copied into the buffer
 STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf) (char *buf, char const *fmt, va_list va);
 STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsnprintf)(char *buf, int count, char const *fmt, va_list va);
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf)  (char *buf, char const *fmt, ...);
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(snprintf) (char *buf, int count, char const *fmt, ...);
 
+// Convert an arg list into a buffer. snprintf() always returns a zero-terminated string (unlike regular snprintf).
+// return: The number of characters copied into the buffer
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf) (char *buf, char const *fmt, ...);
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char const *fmt, ...);
+
+// Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
+// Your callback can then copy the chars out, print them or whatever.
+// This function is actually the workhorse for everything else.
+// The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
+// You return the next buffer to use or 0 to stop converting
+typedef char *STBSP_SPRINTFCB(char *buf, void *user, int len);
 STBSP__PUBLICDEF int  STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB* callback, void *user, char *buf, char const *fmt, va_list va);
+
+// Set the comma and period characters to use.
 STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
 
 #endif // STB_SPRINTF_H_INCLUDE
@@ -1550,8 +1591,8 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 //
 ////////////////////////////////////////////////////////////////////////////////
 #include <math.h>    // TODO(doyle): For trigonometry functions (for now)
-#include <stdlib.h>    // For calloc, malloc, free
-#include <stdio.h>     // For printf
+#include <stdlib.h>  // For calloc, malloc, free
+#include <stdio.h>   // For printf
 
 // NOTE: STB_SPRINTF is included when DQN_IMPLEMENTATION defined
 // #define STB_SPRINTF_IMPLEMENTATION
@@ -6223,4 +6264,3 @@ DQN_FILE_SCOPE void DqnWin32_GetNumThreadsAndCores(i32 *const numCores, i32 *con
 	}
 }
 #endif // DQN_WIN32_PLATFORM
-
