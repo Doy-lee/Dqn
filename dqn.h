@@ -18,7 +18,7 @@
 // You can search by #<entry> to jump straight to the section.
 // The first match is the public API, the next matche(s) are the implementation
 
-// API > Portable Code
+// #Portable Code
 // #DqnAssert    Assertions
 // #DqnMem       Memory Allocation
 // #DqnMemStack  Memory Allocator, Push, Pop Style
@@ -36,18 +36,19 @@
 // #DqnWStr      WStr  Operations (WStr_Len() etc)
 // #DqnRnd       Random Number Generator (ints and floats)
 
-// API > Cross Platform Code
-// #DqnFile      File I/O (Read, Write, Delete)
-// #DqnDir       Directory Querying
+// #XPlatform (Win32 & Unix)
+// #DqnFile   File I/O (Read, Write, Delete)
+// #DqnDir    Directory Querying
+// #DqnTimer  High Resolution Timer
 
-// API > Win32 Only
-// #DqnTime      Platform High Resolution Timer
-// #DqnLock      Mutex Synchronisation
-// #DqnAtomic    Interlocks/Atomic Operations
-// #DqnJobQueue  Multithreaded Job Queue
-// #DqnWin32     Common Win32 API Helpers
+// #Platform
+// - #Win32Platform
+//   - #DqnLock      Mutex Synchronisation
+//   - #DqnAtomic    Interlocks/Atomic Operations
+//   - #DqnJobQueue  Multithreaded Job Queue
+//   - #DqnWin32     Common Win32 API Helpers
 
-// API > External Code
+// #External Code
 // #DqnIni       Simple INI Config File API (Public Domain lib by Mattias Gustavsson)
 // #DqnSprintf   Cross-platform Sprintf Implementation (Public Domain lib stb_sprintf)
 
@@ -58,15 +59,15 @@
 // a platform implementation, platform specific implementations in the portable
 // layer will get activated.
 #if (defined(_WIN32) || defined(_WIN64)) && defined(DQN_WIN32_IMPLEMENTATION)
-	#define DQN_PLATFORM_LAYER
+	#define DQN_XPLATFORM_LAYER
 	#define DQN_WIN32_PLATFORM
 #elif defined(__linux__) && defined(DQN_UNIX_IMPLEMENTATION)
-	#define DQN_PLATFORM_LAYER
+	#define DQN_XPLATFORM_LAYER
 	#define DQN_UNIX_PLATFORM
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
-// Portable Layer
+// #Portable Code
 ////////////////////////////////////////////////////////////////////////////////
 #ifndef DQN_H
 #define DQN_H
@@ -893,26 +894,13 @@ DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
 #endif  /* DQN_H */
 
 ////////////////////////////////////////////////////////////////////////////////
-// Cross-Platform Layer
+// #XPlatform (Win32 & Unix) Public API
 ////////////////////////////////////////////////////////////////////////////////
 // Functions in the Cross Platform are guaranteed to be supported in both Unix
 // and Win32
-#ifdef DQN_PLATFORM_LAYER
-
-#ifdef DQN_WIN32_PLATFORM
-	#define WIN32_LEAN_AND_MEAN
-	#include <Windows.h>
-#endif
-
-#ifdef DQN_UNIX_PLATFORM
-	#include <sys/stat.h>
-	#include <stdio.h>    // Basic File I/O // TODO(doyle): Syscall versions
-	#include <unistd.h>   // unlink()
-	#include <dirent.h>   // readdir()/opendir()/closedir()
-#endif
-
+#ifdef DQN_XPLATFORM_LAYER
 ////////////////////////////////////////////////////////////////////////////////
-// Cross-Platform > #DqnFile Public API - File I/O
+// XPlatform > #DqnFile Public API - File I/O
 ////////////////////////////////////////////////////////////////////////////////
 enum DqnFilePermissionFlag
 {
@@ -964,6 +952,9 @@ DQN_FILE_SCOPE void   DqnFile_Close(DqnFile *const file);
 DQN_FILE_SCOPE bool DqnFile_Delete (const char *const path);
 DQN_FILE_SCOPE bool DqnFile_DeleteW(const wchar_t *const path);
 
+////////////////////////////////////////////////////////////////////////////////
+// XPlatform > #DqnDir Public API - Directory Querying
+////////////////////////////////////////////////////////////////////////////////
 // numFiles: Pass in a pointer to a u32. The function fills it out with the number of entries.
 // return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
 //           allocated with malloc and must be freed using free() or the helper function DqnDir_ReadFree()
@@ -971,20 +962,27 @@ DQN_FILE_SCOPE char **DqnDir_Read    (const char *const dir, u32 *const numFiles
 DQN_FILE_SCOPE void   DqnDir_ReadFree(char **fileList, u32 numFiles);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform Layer
+// XPlatform > #DqnTimer Public API - High Resolution Timer
+////////////////////////////////////////////////////////////////////////////////
+DQN_FILE_SCOPE f64  DqnTimer_NowInMs();
+DQN_FILE_SCOPE f64  DqnTimer_NowInS ();
+#endif // DQN_XPLATFORM_LAYER
+
+////////////////////////////////////////////////////////////////////////////////
+// #Platform Public API
 ////////////////////////////////////////////////////////////////////////////////
 // Functions here are only available for the #defined sections (i.e. all functions in
 // DQN_WIN32_PLATFORM only have a valid implementation in Win32.
 
+////////////////////////////////////////////////////////////////////////////////
+// #Win32Platform Public API
+////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_WIN32_PLATFORM
-////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32  > #DqnTimer Public API - High Resolution Timer
-////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE f64 DqnTime_NowInS();
-DQN_FILE_SCOPE f64 DqnTime_NowInMs();
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnLock Public API - Mutex Synchronisation
+// Win32Platform > #DqnLock Public API - Mutex Synchronisation
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct DqnLock
 {
@@ -997,14 +995,14 @@ DQN_FILE_SCOPE void DqnLock_Release(DqnLock *const lock);
 DQN_FILE_SCOPE void DqnLock_Delete (DqnLock *const lock);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnAtomic Public API - Interlocks/Atomic Operations
+// Win32Platform > #DqnAtomic Public API - Interlocks/Atomic Operations
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE u32 DqnAtomic_CompareSwap32(u32 volatile *dest, u32 swapVal, u32 compareVal);
 DQN_FILE_SCOPE u32 DqnAtomic_Add32        (u32 volatile *src);
 DQN_FILE_SCOPE u32 DqnAtomic_Sub32        (u32 volatile *src);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnJobQueue Public API - Multithreaded Job Queue
+// Win32Platform > #DqnJobQueue Public API - Multithreaded Job Queue
 ////////////////////////////////////////////////////////////////////////////////
 // DqnJobQueue is a platform abstracted "lockless" multithreaded work queue. It will create threads
 // and assign threads to complete the job via the job "callback" using the "userData" supplied.
@@ -1082,14 +1080,9 @@ DQN_FILE_SCOPE i32  DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen);
 DQN_FILE_SCOPE void DqnWin32_GetNumThreadsAndCores(i32 *const numCores, i32 *const numThreadsPerCore);
 #endif // DQN_WIN32_PLATFORM
 
-#ifdef DQN_UNIX_PLATFORM
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Unix
+// #External Code
 ////////////////////////////////////////////////////////////////////////////////
-#endif
-
-#endif // DQN_PLATFORM_LAYER
-
 #ifndef DQN_INI_H
 #define DQN_INI_H
 ////////////////////////////////////////////////////////////////////////////////
@@ -3658,6 +3651,9 @@ DQN_FILE_SCOPE i32 DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// #External Code
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // #DqnSprintf Implementation - STB_Sprintf
 ////////////////////////////////////////////////////////////////////////////////
 /*
@@ -5349,14 +5345,24 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 #endif
 #endif // DQN_IMPLEMENTATION
 
+#if defined(DQN_XPLATFORM_LAYER)
 ////////////////////////////////////////////////////////////////////////////////
-// Cross-Platform Layer
+// #XPlatform (Win32 & Unix) Implementation
 ////////////////////////////////////////////////////////////////////////////////
 // Functions in the Cross Platform are guaranteed to be supported in both Unix
 // and Win32
 
+#ifdef DQN_UNIX_PLATFORM
+	#include <sys/stat.h>
+	#include <sys/time.h>
+	#include <time.h>
+	#include <stdio.h>    // Basic File I/O // TODO(doyle): Syscall versions
+	#include <unistd.h>   // unlink()
+	#include <dirent.h>   // readdir()/opendir()/closedir()
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
-// Cross-Platform > #DqnFileInternal Implementation
+// XPlatform > #DqnFileInternal Implementation
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_WIN32_PLATFORM
 FILE_SCOPE bool DqnFileInternal_Win32OpenW(const wchar_t *const path,
@@ -5645,7 +5651,7 @@ DQN_FILE_SCOPE char **DqnDirInternal_PlatformRead(const char *const dir,
 #endif // DQN_UNIX_PLATFORM
 
 ////////////////////////////////////////////////////////////////////////////////
-// Cross-Platform > #DqnFile Implementation
+// XPlatform > #DqnFile Implementation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE
 bool DqnFile_Open(const char *const path, DqnFile *const file,
@@ -5674,7 +5680,7 @@ bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file, const u32 per
 {
 	if (!file || !path) return false;
 
-#ifdef DQN_WIN32_PLATFORM
+#if defined(DQN_WIN32_PLATFORM)
 	return DqnFileInternal_Win32OpenW(path, file, permissionFlags, action);
 #else
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
@@ -5780,7 +5786,7 @@ DQN_FILE_SCOPE bool DqnFile_Delete(const char *const path)
 
 	// TODO(doyle): Logging
 #if defined(DQN_WIN32_PLATFORM)
-	return DeleteFile(path);
+	return DeleteFileA(path);
 
 #elif defined(DQN_UNIX_PLATFORM)
 	i32 result = unlink(path);
@@ -5791,6 +5797,9 @@ DQN_FILE_SCOPE bool DqnFile_Delete(const char *const path)
 #endif
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// XPlatform > #DqnDir Implementation
+////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE char **DqnDir_Read(const char *const dir, u32 *const numFiles)
 {
 	char **result = DqnDirInternal_PlatformRead(dir, numFiles);
@@ -5812,13 +5821,10 @@ DQN_FILE_SCOPE void DqnDir_ReadFree(char **fileList, u32 numFiles)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform Layer
+// XPlatform > #DqnTimer Implementation
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef DQN_WIN32_PLATFORM
-////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnTimer Implementation
-////////////////////////////////////////////////////////////////////////////////
-FILE_SCOPE f64 DqnTimeInternal_Win32QueryPerfCounterTimeInS()
+#if defined (DQN_WIN32_PLATFORM)
+FILE_SCOPE f64 DqnTimerInternal_Win32QueryPerfCounterTimeInMs()
 {
 	LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {0};
 	if (queryPerformanceFrequency.QuadPart == 0)
@@ -5830,28 +5836,53 @@ FILE_SCOPE f64 DqnTimeInternal_Win32QueryPerfCounterTimeInS()
 	LARGE_INTEGER qpcResult;
 	QueryPerformanceCounter(&qpcResult);
 
-	// Convert to ms
-	f64 timestamp =
-	    qpcResult.QuadPart / (f64)queryPerformanceFrequency.QuadPart;
+	// Convert to microseconds first then divide by ticks per second then to milliseconds
+	qpcResult.QuadPart *= 1000000;
+	f64 timestamp = qpcResult.QuadPart / (f64)queryPerformanceFrequency.QuadPart;
+	timestamp /= 1000.0f;
 	return timestamp;
 }
+#endif
 
-f64 DqnTime_NowInS()
+DQN_FILE_SCOPE f64 DqnTimer_NowInMs()
 {
-	f64 result;
-#ifdef DQN_WIN32_PLATFORM
-	result = DQN_MAX(DqnTimeInternal_Win32QueryPerfCounterTimeInS(), 0);
+	f64 result = 0;
+#if defined(DQN_WIN32_PLATFORM)
+	result = DQN_MAX(DqnTimerInternal_Win32QueryPerfCounterTimeInMs(), 0);
+
+#elif defined(DQN_UNIX_PLATFORM)
+	struct timespec timeSpec = {0};
+	if (clock_gettime(CLOCK_MONOTONIC, &timeSpec))
+	{
+		// TODO(doyle): Failed logging
+		DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	}
+	else
+	{
+		printf("tv_nsec: %ld\n", timeSpec.tv_nsec);
+		result = ((f64)timeSpec.tv_sec * 1000.0f) + ((f64)timeSpec.tv_nsec / 100000.0f);
+	}
+
 #else
-	result = 0;
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
+	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Unix/Win32 path not implemented yet");
+
 #endif
 	return result;
 };
 
-f64 DqnTime_NowInMs() { return DqnTime_NowInS() * 1000.0f; }
+DQN_FILE_SCOPE f64 DqnTimer_NowInS() { return DqnTimer_NowInMs() / 1000.0f; }
+#endif // DQN_XPLATFORM_LAYER
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnLock Implementation
+// #Platform Implementation
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DQN_WIN32_PLATFORM
+////////////////////////////////////////////////////////////////////////////////
+// #Win32Platform Implementation
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Win32Platform > #DqnLock Implementation
 ////////////////////////////////////////////////////////////////////////////////
 bool DqnLock_Init(DqnLock *const lock, const u32 spinCount)
 {
@@ -5896,7 +5927,7 @@ void DqnLock_Delete(DqnLock *const lock)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnAtomic Implementation
+// Win32Platform > #DqnAtomic Implementation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE u32 DqnAtomic_CompareSwap32(u32 volatile *dest, u32 swapVal, u32 compareVal)
 {
@@ -5936,7 +5967,7 @@ DQN_FILE_SCOPE u32 DqnAtomic_Sub32(u32 volatile *src)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnJobQueue Implementation
+// Win32Platform > #DqnJobQueue Implementation
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct DqnJobQueue
 {
@@ -5953,7 +5984,7 @@ typedef struct DqnJobQueue
 } DqnJobQueue;
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnJobQueueInternal Implementation
+// Win32Platform > #DqnJobQueueInternal Implementation
 ////////////////////////////////////////////////////////////////////////////////
 size_t DQN_JOB_QUEUE_INTERNAL_THREAD_DEFAULT_STACK_SIZE = 0;
 FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(const size_t stackSize, void *threadCallback,
@@ -5998,7 +6029,7 @@ FILE_SCOPE u32 DqnJobQueueInternal_ThreadCallback(void *threadParam)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnJobQueue Implementation
+// Win32Platform > #DqnJobQueue Implementation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE DqnJobQueue *DqnJobQueue_InitWithMem(const void *const mem, size_t *const memSize,
                                                     const u32 queueSize, const u32 numThreads)
@@ -6095,7 +6126,7 @@ DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete(DqnJobQueue *const queue)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform > Win32 > #DqnWin32 Implementation
+// Win32Platform > #DqnWin32 Implementation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE bool DqnWin32_UTF8ToWChar(const char *const in,
                                          wchar_t *const out, const i32 outLen)
@@ -6182,13 +6213,13 @@ DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
 	}
 	va_end(argList);
 
-	OutputDebugString(str);
+	OutputDebugStringA(str);
 }
 
 DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen)
 {
 	if (!buf || bufLen == 0) return 0;
-	u32 copiedLen = GetModuleFileName(NULL, buf, bufLen);
+	u32 copiedLen = GetModuleFileNameA(NULL, buf, bufLen);
 	if (copiedLen == bufLen) return -1;
 
 	// NOTE: Should always work if GetModuleFileName works and we're running an

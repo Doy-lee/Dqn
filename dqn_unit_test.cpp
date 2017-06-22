@@ -15,34 +15,36 @@
 #define HANDMADE_MATH_CPP_MODE
 #include "tests/HandmadeMath.h"
 
-#include <stdio.h>
 #include <limits.h>
+#include <stdio.h>
 void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 {
 	f32 *hmmMatf = (f32 *)&hmmMat;
 	f32 *dqnMatf = (f32 *)&dqnMat;
 
 	const u32 EXPECTED_SIZE = 16;
-	u32 totalSize = DQN_ARRAY_COUNT(dqnMat.e) * DQN_ARRAY_COUNT(dqnMat.e[0]);
+	u32 totalSize           = DQN_ARRAY_COUNT(dqnMat.e) * DQN_ARRAY_COUNT(dqnMat.e[0]);
 	DQN_ASSERT(totalSize == EXPECTED_SIZE);
-	DQN_ASSERT(totalSize == (DQN_ARRAY_COUNT(hmmMat.Elements) * DQN_ARRAY_COUNT(hmmMat.Elements[0])));
+	DQN_ASSERT(totalSize ==
+	           (DQN_ARRAY_COUNT(hmmMat.Elements) * DQN_ARRAY_COUNT(hmmMat.Elements[0])));
 
 	for (u32 i = 0; i < EXPECTED_SIZE; i++)
 	{
 		const f32 EPSILON = 0.001f;
-		f32 diff = hmmMatf[i] - dqnMatf[i];
-		diff = DQN_ABS(diff);
-		DQN_ASSERT_MSG(diff < EPSILON, "hmmMatf[%d]: %f, dqnMatf[%d]: %f\n", i,
-		               hmmMatf[i], i, dqnMatf[i]);
+		f32 diff          = hmmMatf[i] - dqnMatf[i];
+		diff              = DQN_ABS(diff);
+		DQN_ASSERT_MSG(diff < EPSILON, "hmmMatf[%d]: %f, dqnMatf[%d]: %f\n", i, hmmMatf[i], i,
+		               dqnMatf[i]);
 	}
 }
 
 void HandmadeMathTest()
 {
 	// Test Perspective/Projection matrix values
+	if (1)
 	{
-		f32 aspectRatio = 1;
-		DqnMat4 dqnPerspective = DqnMat4_Perspective(90, aspectRatio, 100, 1000);
+		f32 aspectRatio         = 1;
+		DqnMat4 dqnPerspective  = DqnMat4_Perspective(90, aspectRatio, 100, 1000);
 		hmm_mat4 hmmPerspective = HMM_Perspective(90, aspectRatio, 100, 1000);
 		HandmadeMathVerifyMat4(dqnPerspective, hmmPerspective);
 
@@ -50,6 +52,7 @@ void HandmadeMathTest()
 	}
 
 	// Test Mat4 translate * scale
+	if (1)
 	{
 		hmm_vec3 hmmVec       = HMM_Vec3i(1, 2, 3);
 		DqnV3 dqnVec          = DqnV3_3i(1, 2, 3);
@@ -77,8 +80,8 @@ void HandmadeMathTest()
 		hmm_mat4 hmmTSMatrix = HMM_MultiplyMat4(hmmTranslate, hmmScale);
 		HandmadeMathVerifyMat4(dqnTSMatrix, hmmTSMatrix);
 
-
 		// Test Mat4 * MulV4
+		if (1)
 		{
 			DqnV4 dqnV4    = DqnV4_4f(1, 2, 3, 4);
 			hmm_vec4 hmmV4 = HMM_Vec4(1, 2, 3, 4);
@@ -91,14 +94,14 @@ void HandmadeMathTest()
 			DQN_ASSERT(dqnResult.z == hmmResult.Z);
 			DQN_ASSERT(dqnResult.w == hmmResult.W);
 
-			printf(
-			    "HandmadeMathTest(): Mat4 * MulV4: Completed successfully\n");
+			printf("HandmadeMathTest(): Mat4 * MulV4: Completed successfully\n");
 		}
 
 		printf("HandmadeMathTest(): Translate/Scale/Rotate Mat4_Mul: Completed successfully\n");
 	}
 
 	// Test LookAt/Camera/View matrix returns same results
+	if (1)
 	{
 		DqnMat4 dqnViewMatrix = DqnMat4_LookAt(DqnV3_3f(4, 3, 3), DqnV3_1f(0), DqnV3_3f(0, 1, 0));
 		hmm_mat4 hmmViewMatrix =
@@ -107,12 +110,13 @@ void HandmadeMathTest()
 		HandmadeMathVerifyMat4(dqnViewMatrix, hmmViewMatrix);
 		printf("HandmadeMathTest(): LookAt: Completed successfully\n");
 	}
-
 }
 
 void StringsTest()
 {
-	{ // Char Checks
+	// Char Checks
+	if (1)
+	{
 		DQN_ASSERT(DqnChar_IsAlpha('a') == true);
 		DQN_ASSERT(DqnChar_IsAlpha('A') == true);
 		DQN_ASSERT(DqnChar_IsAlpha('0') == false);
@@ -146,12 +150,15 @@ void StringsTest()
 	}
 
 	// String Checks
+	if (1)
 	{
 		// strcmp
+		if (1)
 		{
 			const char *const a = "str_a";
 
 			// Check simple compares
+			if (1)
 			{
 				DQN_ASSERT(DqnStr_Cmp(a, "str_a") == +0);
 				DQN_ASSERT(DqnStr_Cmp(a, "str_b") == -1);
@@ -164,6 +171,7 @@ void StringsTest()
 			}
 
 			// Check ops against null
+			if (1)
 			{
 				DQN_ASSERT(DqnStr_Cmp(NULL, NULL) != +0);
 				DQN_ASSERT(DqnStr_Cmp(a, NULL) != +0);
@@ -174,6 +182,7 @@ void StringsTest()
 		}
 
 		// strlen
+		if (1)
 		{
 			const char *const a = "str_a";
 			DQN_ASSERT(DqnStr_Len(a) == 5);
@@ -190,11 +199,14 @@ void StringsTest()
 		}
 
 		// strncpy
+		if (1)
 		{
+			if (1)
 			{
-				const char *const a    = "str_a";
-				char b[10] = {};
+				const char *const a = "str_a";
+				char b[10]          = {};
 				// Check copy into empty array
+				if (1)
 				{
 					char *result = DqnStr_Copy(b, a, DqnStr_Len(a));
 					DQN_ASSERT(DqnStr_Cmp(b, "str_a") == 0);
@@ -204,6 +216,7 @@ void StringsTest()
 				}
 
 				// Check copy into array offset, overlap with old results
+				if (1)
 				{
 					char *newResult = DqnStr_Copy(&b[1], a, DqnStr_Len(a));
 					DQN_ASSERT(DqnStr_Cmp(newResult, "str_a") == 0);
@@ -219,8 +232,10 @@ void StringsTest()
 		}
 
 		// StrReverse
+		if (1)
 		{
 			// Basic reverse operations
+			if (1)
 			{
 				char a[] = "aba";
 				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
@@ -240,6 +255,7 @@ void StringsTest()
 			}
 
 			// Try reverse empty string
+			if (1)
 			{
 				char a[] = "";
 				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
@@ -247,6 +263,7 @@ void StringsTest()
 			}
 
 			// Try reverse single char string
+			if (1)
 			{
 				char a[] = "a";
 				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
@@ -256,13 +273,13 @@ void StringsTest()
 				DQN_ASSERT(DqnStr_Cmp(a, "a") == 0);
 			}
 
-			printf(
-			    "StringsTest(): StrReverse: Completed successfully\n");
+			printf("StringsTest(): StrReverse: Completed successfully\n");
 		}
 
 		// const u64 LARGEST_NUM  = (u64)-1;
 		const i64 SMALLEST_NUM = LLONG_MIN;
 		// StrToI64
+		if (1)
 		{
 			const char *const a = "123";
 			DQN_ASSERT(Dqn_StrToI64(a, DqnStr_Len(a)) == 123);
@@ -277,7 +294,7 @@ void StringsTest()
 			const char *const d = "+123";
 			DQN_ASSERT(Dqn_StrToI64(d, DqnStr_Len(d)) == 123);
 
-			// TODO(doyle): Unsigned conversion
+// TODO(doyle): Unsigned conversion
 #if 0
 			char *e = "18446744073709551615";
 	        DQN_ASSERT((u64)(Dqn_StrToI64(e, DqnStr_Len(e))) == LARGEST_NUM);
@@ -286,10 +303,11 @@ void StringsTest()
 			const char *const f = "-9223372036854775808";
 			DQN_ASSERT(Dqn_StrToI64(f, DqnStr_Len(f)) == SMALLEST_NUM);
 
-	        printf("StringsTest(): StrToI64: Completed successfully\n");
+			printf("StringsTest(): StrToI64: Completed successfully\n");
 		}
 
 		// i64 to str
+		if (1)
 		{
 			char a[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(+100, a, DQN_ARRAY_COUNT(a));
@@ -318,6 +336,7 @@ void StringsTest()
 	}
 
 	// StrToF32
+	if (1)
 	{
 		const f32 EPSILON = 0.001f;
 		const char a[]    = "-0.66248";
@@ -388,135 +407,151 @@ void StringsTest()
 		f32 vQ         = Dqn_StrToF32(q, DQN_ARRAY_COUNT(q));
 		DQN_ASSERT(DQN_ABS(vQ) - DQN_ABS(9.64635e-05) < EPSILON);
 
-	    const char r[] = "9.64635e+05";
-	    f32 vR         = Dqn_StrToF32(r, DQN_ARRAY_COUNT(r));
+		const char r[] = "9.64635e+05";
+		f32 vR         = Dqn_StrToF32(r, DQN_ARRAY_COUNT(r));
 		DQN_ASSERT(DQN_ABS(vR) - DQN_ABS(9.64635e+05) < EPSILON);
 		printf("StringsTest(): StrToF32: Completed successfully\n");
 	}
 
+	if (1)
 	{
 
+		if (1)
 		{
-		    const char *const a  = "Microsoft";
-		    const char *const b  = "icro";
-		    i32 lenA = DqnStr_Len(a);
-		    i32 lenB = DqnStr_Len(b);
-		    DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == true);
-		    DQN_ASSERT(DqnStr_HasSubstring(a, lenA, "iro",
-		                                     DqnStr_Len("iro")) == false);
-		    DQN_ASSERT(DqnStr_HasSubstring(b, lenB, a, lenA) == false);
-		    DQN_ASSERT(DqnStr_HasSubstring("iro", DqnStr_Len("iro"), a,
-		                                     lenA) == false);
-		    DQN_ASSERT(DqnStr_HasSubstring("", 0, "iro", 4) == false);
-		    DQN_ASSERT(DqnStr_HasSubstring("", 0, "", 0) == false);
-		    DQN_ASSERT(DqnStr_HasSubstring(NULL, 0, NULL, 0) == false);
-	    }
+			const char *const a = "Microsoft";
+			const char *const b = "icro";
+			i32 lenA            = DqnStr_Len(a);
+			i32 lenB            = DqnStr_Len(b);
+			DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == true);
+			DQN_ASSERT(DqnStr_HasSubstring(a, lenA, "iro", DqnStr_Len("iro")) == false);
+			DQN_ASSERT(DqnStr_HasSubstring(b, lenB, a, lenA) == false);
+			DQN_ASSERT(DqnStr_HasSubstring("iro", DqnStr_Len("iro"), a, lenA) == false);
+			DQN_ASSERT(DqnStr_HasSubstring("", 0, "iro", 4) == false);
+			DQN_ASSERT(DqnStr_HasSubstring("", 0, "", 0) == false);
+			DQN_ASSERT(DqnStr_HasSubstring(NULL, 0, NULL, 0) == false);
+		}
 
+		if (1)
 		{
-		    const char *const a  = "Micro";
-		    const char *const b  = "irob";
-		    i32 lenA = DqnStr_Len(a);
-		    i32 lenB = DqnStr_Len(b);
-		    DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == false);
-		    DQN_ASSERT(DqnStr_HasSubstring(b, lenB, a, lenA) == false);
-	    }
+			const char *const a = "Micro";
+			const char *const b = "irob";
+			i32 lenA            = DqnStr_Len(a);
+			i32 lenB            = DqnStr_Len(b);
+			DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == false);
+			DQN_ASSERT(DqnStr_HasSubstring(b, lenB, a, lenA) == false);
+		}
 
-	    printf("StringsTest(): StrHasSubstring: Completed successfully\n");
-    }
+		printf("StringsTest(): StrHasSubstring: Completed successfully\n");
+	}
 
-    // UCS <-> UTF8 Checks
-    {
-	    // Test ascii characters
-	    {
-		    u32 codepoint = '@';
-		    u32 string[1] = {};
-
-		    u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
-		    DQN_ASSERT(bytesUsed == 1);
-		    DQN_ASSERT(string[0] == '@');
-
-		    bytesUsed = Dqn_UTF8ToUCS(&string[0], codepoint);
-		    DQN_ASSERT(string[0] >= 0 && string[0] < 0x80);
-		    DQN_ASSERT(bytesUsed == 1);
-	    }
-
-	    // Test 2 byte characters
+	// UCS <-> UTF8 Checks
+	if (1)
+	{
+		// Test ascii characters
+		if (1)
 		{
-		    u32 codepoint = 0x278;
-		    u32 string[1] = {};
-
-		    u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
-		    DQN_ASSERT(bytesUsed == 2);
-		    DQN_ASSERT(string[0] == 0xC9B8);
-
-		    bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
-		    DQN_ASSERT(string[0] == codepoint);
-		    DQN_ASSERT(bytesUsed == 2);
-	    }
-
-	    // Test 3 byte characters
-		{
-		    u32 codepoint = 0x0A0A;
-		    u32 string[1] = {};
+			u32 codepoint = '@';
+			u32 string[1] = {};
 
 			u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
-		    DQN_ASSERT(bytesUsed == 3);
+			DQN_ASSERT(bytesUsed == 1);
+			DQN_ASSERT(string[0] == '@');
+
+			bytesUsed = Dqn_UTF8ToUCS(&string[0], codepoint);
+			DQN_ASSERT(string[0] >= 0 && string[0] < 0x80);
+			DQN_ASSERT(bytesUsed == 1);
+		}
+
+		// Test 2 byte characters
+		if (1)
+		{
+			u32 codepoint = 0x278;
+			u32 string[1] = {};
+
+			u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
+			DQN_ASSERT(bytesUsed == 2);
+			DQN_ASSERT(string[0] == 0xC9B8);
+
+			bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
+			DQN_ASSERT(string[0] == codepoint);
+			DQN_ASSERT(bytesUsed == 2);
+		}
+
+		// Test 3 byte characters
+		if (1)
+		{
+			u32 codepoint = 0x0A0A;
+			u32 string[1] = {};
+
+			u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
+			DQN_ASSERT(bytesUsed == 3);
 			DQN_ASSERT(string[0] == 0xE0A88A);
 
-		    bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
-		    DQN_ASSERT(string[0] == codepoint);
-		    DQN_ASSERT(bytesUsed == 3);
-	    }
+			bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
+			DQN_ASSERT(string[0] == codepoint);
+			DQN_ASSERT(bytesUsed == 3);
+		}
 
-	    // Test 4 byte characters
+		// Test 4 byte characters
+		if (1)
 		{
-		    u32 codepoint = 0x10912;
-		    u32 string[1] = {};
+			u32 codepoint = 0x10912;
+			u32 string[1] = {};
 			u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
 
-		    DQN_ASSERT(bytesUsed == 4);
-		    DQN_ASSERT(string[0] == 0xF090A492);
+			DQN_ASSERT(bytesUsed == 4);
+			DQN_ASSERT(string[0] == 0xF090A492);
 
-		    bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
-		    DQN_ASSERT(string[0] == codepoint);
-		    DQN_ASSERT(bytesUsed == 4);
-	    }
+			bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
+			DQN_ASSERT(string[0] == codepoint);
+			DQN_ASSERT(bytesUsed == 4);
+		}
 
+		if (1)
 		{
-		    u32 codepoint = 0x10912;
+			u32 codepoint = 0x10912;
 			u32 bytesUsed = Dqn_UCSToUTF8(NULL, codepoint);
-		    DQN_ASSERT(bytesUsed == 0);
+			DQN_ASSERT(bytesUsed == 0);
 
-		    bytesUsed = Dqn_UTF8ToUCS(NULL, codepoint);
-		    DQN_ASSERT(bytesUsed == 0);
-	    }
+			bytesUsed = Dqn_UTF8ToUCS(NULL, codepoint);
+			DQN_ASSERT(bytesUsed == 0);
+		}
 
-	    printf("StringsTest(): ucs <-> utf8: Completed successfully\n");
-    }
+		printf("StringsTest(): ucs <-> utf8: Completed successfully\n");
+	}
 
-    printf("StringsTest(): Completed successfully\n");
+	printf("StringsTest(): Completed successfully\n");
 }
 
-#ifdef DQN_WIN32_IMPLEMENTATION
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 void OtherTest()
 {
-	{ // Test Win32 Sleep
-		// NOTE: Win32 Sleep is not granular to a certain point so sleep excessively
-		u32 sleepInMs = 1000;
-		f64 startInMs = DqnTime_NowInMs();
-		Sleep(sleepInMs);
-		f64 endInMs = DqnTime_NowInMs();
 
-		DQN_ASSERT(startInMs < endInMs);
+	if (1)
+	{
+#if defined(DQN_UNIX_PLATFORM)
+		f64 startInS     = DqnTimer_NowInS();
+		u32 sleepTimeInS = 1;
+		sleep(sleepTimeInS);
+		f64 endInS = DqnTimer_NowInS();
+		printf("start: %f, end: %f\n", startInS, endInS);
+		DQN_ASSERT((startInS + sleepTimeInS) <= endInS);
+
+#elif defined(DQN_WIN32_PLATFORM)
+		f64 startInMs     = DqnTimer_NowInMs();
+		u32 sleepTimeInMs = 1000;
+		Sleep(sleepTimeInMs);
+		f64 endInMs = DqnTimer_NowInMs();
+
+		printf("start: %f, end: %f\n", startInMs, endInMs);
+		DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
+#endif
 		printf("OtherTest(): TimeNow: Completed successfully\n");
 	}
 	printf("OtherTest(): Completed successfully\n");
 }
-#endif
 
-void RandomTest() {
+void RandomTest()
+{
 
 	DqnRandPCGState pcg;
 	DqnRnd_PCGInit(&pcg);
@@ -537,7 +572,9 @@ void RandomTest() {
 
 void MathTest()
 {
+	if (1)
 	{ // Lerp
+		if (1)
 		{
 			f32 start = 10;
 			f32 t     = 0.5f;
@@ -545,6 +582,7 @@ void MathTest()
 			DQN_ASSERT(DqnMath_Lerp(start, t, end) == 15);
 		}
 
+		if (1)
 		{
 			f32 start = 10;
 			f32 t     = 2.0f;
@@ -555,6 +593,7 @@ void MathTest()
 		printf("MathTest(): Lerp: Completed successfully\n");
 	}
 
+	if (1)
 	{ // sqrtf
 		DQN_ASSERT(DqnMath_Sqrtf(4.0f) == 2.0f);
 		printf("MathTest(): Sqrtf: Completed successfully\n");
@@ -565,9 +604,11 @@ void MathTest()
 
 void VecTest()
 {
+	if (1)
 	{ // V2
 
 		// V2 Creating
+		if (1)
 		{
 			DqnV2 vec = DqnV2_2f(5.5f, 5.0f);
 			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f);
@@ -575,13 +616,15 @@ void VecTest()
 		}
 
 		// V2 with 2 integers
+		if (1)
 		{
 			DqnV2 vec = DqnV2_2i(3, 5);
 			DQN_ASSERT(vec.x == 3 && vec.y == 5.0f);
 			DQN_ASSERT(vec.w == 3 && vec.h == 5.0f);
 		}
-		
+
 		// V2 Arithmetic
+		if (1)
 		{
 			DqnV2 vecA = DqnV2_2f(5, 10);
 			DqnV2 vecB = DqnV2_2i(2, 3);
@@ -606,6 +649,7 @@ void VecTest()
 		}
 
 		// Test operator overloading
+		if (1)
 		{
 			DqnV2 vecA = DqnV2_2f(5, 10);
 			DqnV2 vecB = DqnV2_2i(2, 3);
@@ -633,10 +677,11 @@ void VecTest()
 		}
 
 		// V2 Properties
+		if (1)
 		{
 			const f32 EPSILON = 0.001f;
-			DqnV2 a = DqnV2_2f(0, 0);
-			DqnV2 b = DqnV2_2f(3, 4);
+			DqnV2 a           = DqnV2_2f(0, 0);
+			DqnV2 b           = DqnV2_2f(3, 4);
 
 			f32 lengthSq = DqnV2_LengthSquared(a, b);
 			DQN_ASSERT(lengthSq == 25);
@@ -647,10 +692,12 @@ void VecTest()
 			DqnV2 normalised = DqnV2_Normalise(b);
 			f32 normX        = b.x / 5.0f;
 			f32 normY        = b.y / 5.0f;
-			f32 diffNormX = normalised.x - normX;
-			f32 diffNormY = normalised.y - normY;
-			DQN_ASSERT_MSG(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x, normX);
-			DQN_ASSERT_MSG(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y, normY);
+			f32 diffNormX    = normalised.x - normX;
+			f32 diffNormY    = normalised.y - normY;
+			DQN_ASSERT_MSG(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x,
+			               normX);
+			DQN_ASSERT_MSG(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y,
+			               normY);
 
 			DqnV2 c = DqnV2_2f(3.5f, 8.0f);
 			DQN_ASSERT(DqnV2_Overlaps(b, c) == true);
@@ -660,6 +707,7 @@ void VecTest()
 			DQN_ASSERT(DqnV2_Dot(c, d) == 0);
 		}
 
+		if (1)
 		{ // constrain_to_ratio
 			DqnV2 ratio  = DqnV2_2f(16, 9);
 			DqnV2 dim    = DqnV2_2f(2000, 1080);
@@ -670,9 +718,11 @@ void VecTest()
 		printf("VecTest(): Vec2: Completed successfully\n");
 	}
 
+	if (1)
 	{ // V3
 
 		// V3i Creating
+		if (1)
 		{
 			DqnV3 vec = DqnV3_3f(5.5f, 5.0f, 5.875f);
 			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f);
@@ -680,6 +730,7 @@ void VecTest()
 		}
 
 		// V3i Creating
+		if (1)
 		{
 			DqnV3 vec = DqnV3_3i(3, 4, 5);
 			DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5);
@@ -687,6 +738,7 @@ void VecTest()
 		}
 
 		// V3 Arithmetic
+		if (1)
 		{
 			DqnV3 vecA = DqnV3_3f(5, 10, 15);
 			DqnV3 vecB = DqnV3_3f(2, 3, 6);
@@ -713,12 +765,13 @@ void VecTest()
 			DQN_ASSERT(DqnV3_Equals(cross, DqnV3_3f(15, 0, -5)) == true);
 		}
 
+		if (1)
 		{
 			DqnV3 vecA = DqnV3_3f(5, 10, 15);
 			DqnV3 vecB = DqnV3_3f(2, 3, 6);
-			DQN_ASSERT((vecA ==  vecB) == false);
-			DQN_ASSERT((vecA ==  DqnV3_3f(5, 10, 15)) == true);
-			DQN_ASSERT((vecB ==  DqnV3_3f(2, 3, 6)) == true);
+			DQN_ASSERT((vecA == vecB) == false);
+			DQN_ASSERT((vecA == DqnV3_3f(5, 10, 15)) == true);
+			DQN_ASSERT((vecB == DqnV3_3f(2, 3, 6)) == true);
 
 			DqnV3 result = vecA + DqnV3_3f(5, 10, 15);
 			DQN_ASSERT((result == DqnV3_3f(10, 20, 30)) == true);
@@ -742,9 +795,11 @@ void VecTest()
 		printf("VecTest(): Vec3: Completed successfully\n");
 	}
 
+	if (1)
 	{ // V4
 
 		// V4 Creating
+		if (1)
 		{
 			DqnV4 vec = DqnV4_4f(5.5f, 5.0f, 5.875f, 5.928f);
 			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f && vec.w == 5.928f);
@@ -752,13 +807,15 @@ void VecTest()
 		}
 
 		// V4i Creating
+		if (1)
 		{
 			DqnV4 vec = DqnV4_4i(3, 4, 5, 6);
-		    DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5 && vec.w == 6);
-		    DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5 && vec.a == 6);
-	    }
+			DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5 && vec.w == 6);
+			DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5 && vec.a == 6);
+		}
 
 		// V4 Arithmetic
+		if (1)
 		{
 			DqnV4 vecA = DqnV4_4f(5, 10, 15, 20);
 			DqnV4 vecB = DqnV4_4i(2, 3, 6, 8);
@@ -782,6 +839,7 @@ void VecTest()
 			DQN_ASSERT(dotResult == 107);
 		}
 
+		if (1)
 		{
 			DqnV4 vecA = DqnV4_4f(5, 10, 15, 20);
 			DqnV4 vecB = DqnV4_4i(2, 3, 6, 8);
@@ -812,8 +870,10 @@ void VecTest()
 	}
 
 	// Rect
+	if (1)
 	{
 		// Test rect init functions
+		if (1)
 		{
 			DqnRect rect4f = DqnRect_4f(1.1f, 2.2f, 3.3f, 4.4f);
 			DqnRect rect4i = DqnRect_4i(1, 2, 3, 4);
@@ -829,11 +889,12 @@ void VecTest()
 		}
 
 		// Test rect get size function
+		if (1)
 		{
 			// Test float rect
+			if (1)
 			{
-				DqnRect rect =
-				    DqnRect_Init(DqnV2_2f(-10, -10), DqnV2_2f(20, 20));
+				DqnRect rect = DqnRect_Init(DqnV2_2f(-10, -10), DqnV2_2f(20, 20));
 
 				f32 width, height;
 				DqnRect_GetSize2f(rect, &width, &height);
@@ -845,9 +906,9 @@ void VecTest()
 			}
 
 			// Test rect with float values and GetSize as 2 integers
+			if (1)
 			{
-				DqnRect rect = DqnRect_Init(DqnV2_2f(-10.5f, -10.5f),
-				                            DqnV2_2f(20.5f, 20.5f));
+				DqnRect rect = DqnRect_Init(DqnV2_2f(-10.5f, -10.5f), DqnV2_2f(20.5f, 20.5f));
 				i32 width, height;
 				DqnRect_GetSize2i(rect, &width, &height);
 				DQN_ASSERT(width == 20);
@@ -867,12 +928,14 @@ void VecTest()
 		DQN_ASSERT(clipResult.max.x == 10 && clipResult.max.y == 10);
 
 		// Test shifting rect
+		if (1)
 		{
 			DqnRect shiftedRect = DqnRect_Move(rect, DqnV2_2f(10, 0));
 			DQN_ASSERT(DqnV2_Equals(shiftedRect.min, DqnV2_2f(0, -10)));
 			DQN_ASSERT(DqnV2_Equals(shiftedRect.max, DqnV2_2f(20, 10)));
 
 			// Ensure dimensions have remained the same
+			if (1)
 			{
 				f32 width, height;
 				DqnRect_GetSize2f(shiftedRect, &width, &height);
@@ -884,6 +947,7 @@ void VecTest()
 			}
 
 			// Test rect contains p
+			if (1)
 			{
 				DqnV2 inP  = DqnV2_2f(5, 5);
 				DqnV2 outP = DqnV2_2f(100, 100);
@@ -900,12 +964,14 @@ void VecTest()
 
 void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 {
+	if (1)
 	{
 		DQN_ASSERT(DqnArray_Init(array, 1, memAPI));
 		DQN_ASSERT(array->capacity == 1);
 		DQN_ASSERT(array->count == 0);
 
 		// Test basic insert
+		if (1)
 		{
 			DqnV2 va = DqnV2_2f(5, 10);
 			DQN_ASSERT(DqnArray_Push(array, va));
@@ -918,6 +984,7 @@ void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 		}
 
 		// Test array resizing and freeing
+		if (1)
 		{
 			DqnV2 va = DqnV2_2f(10, 15);
 			DQN_ASSERT(DqnArray_Push(array, va));
@@ -976,6 +1043,7 @@ void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 	}
 	DQN_ASSERT(DqnArray_Free(array));
 
+	if (1)
 	{
 		DQN_ASSERT(DqnArray_Init(array, 1, memAPI));
 		DQN_ASSERT(array->capacity == 1);
@@ -983,6 +1051,7 @@ void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 	}
 	DQN_ASSERT(DqnArray_Free(array));
 
+	if (1)
 	{
 		DqnV2 a = DqnV2_2f(1, 2);
 		DqnV2 b = DqnV2_2f(3, 4);
@@ -1027,10 +1096,10 @@ void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 		DQN_ASSERT(DqnArray_Clear(array));
 		DQN_ASSERT(array->capacity == 16);
 		DQN_ASSERT(array->count == 0);
-
 	}
 	DQN_ASSERT(DqnArray_Free(array));
 
+	if (1)
 	{
 		DqnV2 a = DqnV2_2f(1, 2);
 		DqnV2 b = DqnV2_2f(3, 4);
@@ -1066,7 +1135,6 @@ void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 	}
 	DQN_ASSERT(DqnArray_Free(array));
 	printf("ArrayTestMemAPIInternal(): Completed successfully\n");
-
 }
 
 void ArrayTest()
@@ -1079,9 +1147,10 @@ void ArrayTest()
 void MemStackTest()
 {
 	// Test over allocation, alignments, temp regions
+	if (1)
 	{
 		size_t allocSize    = DQN_KILOBYTE(1);
-		DqnMemStack stack = {};
+		DqnMemStack stack   = {};
 		const u32 ALIGNMENT = 4;
 		DqnMemStack_Init(&stack, allocSize, false, ALIGNMENT);
 		DQN_ASSERT(stack.block && stack.block->memory);
@@ -1096,8 +1165,7 @@ void MemStackTest()
 		DQN_ASSERT(resultAddrA % ALIGNMENT == 0);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == allocSize);
-		DQN_ASSERT(stack.block->used >= sizeA + 0 &&
-		           stack.block->used <= sizeA + 3);
+		DQN_ASSERT(stack.block->used >= sizeA + 0 && stack.block->used <= sizeA + 3);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 		DQN_ASSERT(resultA);
 		u8 *ptrA = (u8 *)resultA;
@@ -1116,8 +1184,7 @@ void MemStackTest()
 		// Since we alignment the pointers we return they can be within 0-3
 		// bytes of what we expect and since this is in a new block as well used
 		// will reflect just this allocation.
-		DQN_ASSERT(stack.block->used >= sizeB + 0 &&
-		           stack.block->used <= sizeB + 3);
+		DQN_ASSERT(stack.block->used >= sizeB + 0 && stack.block->used <= sizeB + 3);
 		DQN_ASSERT(resultB);
 		u8 *ptrB = (u8 *)resultB;
 		for (u32 i  = 0; i < sizeB; i++)
@@ -1134,13 +1201,12 @@ void MemStackTest()
 		DqnMemStackTempRegion tempBuffer;
 		DQN_ASSERT(DqnMemStackTempRegion_Begin(&tempBuffer, &stack));
 
-		size_t sizeC             = 1024 + 1;
+		size_t sizeC    = 1024 + 1;
 		void *resultC   = DqnMemStack_Push(tempBuffer.stack, sizeC);
 		u64 resultAddrC = *((u64 *)resultC);
 		DQN_ASSERT(resultAddrC % ALIGNMENT == 0);
 		DQN_ASSERT(stack.block != blockB && stack.block != blockA);
-		DQN_ASSERT(stack.block->used >= sizeC + 0 &&
-		           stack.block->used <= sizeC + 3);
+		DQN_ASSERT(stack.block->used >= sizeC + 0 && stack.block->used <= sizeC + 3);
 		DQN_ASSERT(stack.tempRegionCount == 1);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
@@ -1166,8 +1232,7 @@ void MemStackTest()
 		DqnMemStackTempRegion_End(tempBuffer);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == sizeB);
-		DQN_ASSERT(stack.block->used >= sizeB + 0 &&
-		           stack.block->used <= sizeB + 3);
+		DQN_ASSERT(stack.block->used >= sizeB + 0 && stack.block->used <= sizeB + 3);
 		DQN_ASSERT(stack.tempRegionCount == 0);
 		DQN_ASSERT(resultB);
 
@@ -1194,15 +1259,14 @@ void MemStackTest()
 	}
 
 	// Test stack with fixed memory does not allocate more
+	if (1)
 	{
 		u8 memory[DQN_KILOBYTE(1)] = {};
-		DqnMemStack stack        = {};
+		DqnMemStack stack          = {};
 		const u32 ALIGNMENT        = 4;
-		DqnMemStack_InitWithFixedMem(&stack, memory, DQN_ARRAY_COUNT(memory),
-		                              ALIGNMENT);
+		DqnMemStack_InitWithFixedMem(&stack, memory, DQN_ARRAY_COUNT(memory), ALIGNMENT);
 		DQN_ASSERT(stack.block && stack.block->memory);
-		DQN_ASSERT(stack.block->size ==
-		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
+		DQN_ASSERT(stack.block->size == DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
 		DQN_ASSERT(stack.block->used == 0);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
@@ -1213,17 +1277,17 @@ void MemStackTest()
 		DqnMemStack_Free(&stack);
 		DqnMemStack_FreeLastBlock(&stack);
 		DQN_ASSERT(stack.block && stack.block->memory);
-		DQN_ASSERT(stack.block->size ==
-		           DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
+		DQN_ASSERT(stack.block->size == DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
 		DQN_ASSERT(stack.block->used == 0);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 	}
 
 	// Test stack with fixed size, allocates once from platform but does not
 	// grow further
+	if (1)
 	{
 		size_t allocSize    = DQN_KILOBYTE(1);
-		DqnMemStack stack = {};
+		DqnMemStack stack   = {};
 		const u32 ALIGNMENT = 4;
 		DqnMemStack_InitWithFixedSize(&stack, allocSize, false, ALIGNMENT);
 		DQN_ASSERT(stack.block && stack.block->memory);
@@ -1243,17 +1307,18 @@ void MemStackTest()
 	}
 
 	// Test freeing/clear block and alignment
+	if (1)
 	{
 		size_t firstBlockSize = DQN_KILOBYTE(1);
-		DqnMemStack stack = {};
-		const u32 ALIGNMENT = 16;
+		DqnMemStack stack     = {};
+		const u32 ALIGNMENT   = 16;
 		DqnMemStack_Init(&stack, firstBlockSize, false, ALIGNMENT);
 
 		DqnMemStackBlock *firstBlock = stack.block;
-		u8 *first                     = NULL;
+		u8 *first                    = NULL;
 		{
 			u32 allocate40Bytes = 40;
-			u8 *data = (u8 *)DqnMemStack_Push(&stack, allocate40Bytes);
+			u8 *data            = (u8 *)DqnMemStack_Push(&stack, allocate40Bytes);
 
 			// Test that the allocation got aligned to 16 byte boundary
 			DQN_ASSERT(data);
@@ -1302,66 +1367,68 @@ void MemStackTest()
 		}
 
 		// Force it to allocate three new blocks and write out data to each
-		size_t secondBlockSize = DQN_KILOBYTE(2);
-		u8 *second = (u8 *)DqnMemStack_Push(&stack, secondBlockSize);
+		size_t secondBlockSize        = DQN_KILOBYTE(2);
+		u8 *second                    = (u8 *)DqnMemStack_Push(&stack, secondBlockSize);
 		DqnMemStackBlock *secondBlock = stack.block;
-		for (u32 i  = 0; i < secondBlockSize; i++)
+		for (u32 i    = 0; i < secondBlockSize; i++)
 			second[i] = 'd';
 
-		size_t thirdBlockSize = DQN_KILOBYTE(3);
-		u8 *third = (u8 *)DqnMemStack_Push(&stack, thirdBlockSize);
+		size_t thirdBlockSize        = DQN_KILOBYTE(3);
+		u8 *third                    = (u8 *)DqnMemStack_Push(&stack, thirdBlockSize);
 		DqnMemStackBlock *thirdBlock = stack.block;
-		for (u32 i  = 0; i < thirdBlockSize; i++)
+		for (u32 i   = 0; i < thirdBlockSize; i++)
 			third[i] = 'e';
 
-		size_t fourthBlockSize = DQN_KILOBYTE(4);
-		u8 *fourth = (u8 *)DqnMemStack_Push(&stack, fourthBlockSize);
+		size_t fourthBlockSize        = DQN_KILOBYTE(4);
+		u8 *fourth                    = (u8 *)DqnMemStack_Push(&stack, fourthBlockSize);
 		DqnMemStackBlock *fourthBlock = stack.block;
-		for (u32 i  = 0; i < fourthBlockSize; i++)
+		for (u32 i    = 0; i < fourthBlockSize; i++)
 			fourth[i] = 'f';
 
-		DQN_ASSERT((firstBlock != secondBlock) && (secondBlock != thirdBlock) && (thirdBlock != fourthBlock));
-		DQN_ASSERT(firstBlock->prevBlock  == NULL);
+		DQN_ASSERT((firstBlock != secondBlock) && (secondBlock != thirdBlock) &&
+		           (thirdBlock != fourthBlock));
+		DQN_ASSERT(firstBlock->prevBlock == NULL);
 		DQN_ASSERT(secondBlock->prevBlock == firstBlock);
-		DQN_ASSERT(thirdBlock->prevBlock  == secondBlock);
+		DQN_ASSERT(thirdBlock->prevBlock == secondBlock);
 		DQN_ASSERT(fourthBlock->prevBlock == thirdBlock);
 
 		// NOTE: Making blocks manually is not really recommended ..
 		// Try and free an invalid block by mocking a fake block
 		u8 fakeBlockMem[DQN_KILOBYTE(3)] = {};
-		DqnMemStackBlock fakeBlock   = {};
-		fakeBlock.memory              = fakeBlockMem;
-		fakeBlock.size                = DQN_ARRAY_COUNT(fakeBlockMem);
-		fakeBlock.used                = 0;
+		DqnMemStackBlock fakeBlock       = {};
+		fakeBlock.memory                 = fakeBlockMem;
+		fakeBlock.size                   = DQN_ARRAY_COUNT(fakeBlockMem);
+		fakeBlock.used                   = 0;
 		DQN_ASSERT(!DqnMemStack_FreeStackBlock(&stack, &fakeBlock));
 
-		//Ensure that the actual blocks are still valid and freeing did nothing
-		DQN_ASSERT(firstBlock->size  == firstBlockSize);
+		// Ensure that the actual blocks are still valid and freeing did nothing
+		DQN_ASSERT(firstBlock->size == firstBlockSize);
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
-		DQN_ASSERT(thirdBlock->size  == thirdBlockSize);
+		DQN_ASSERT(thirdBlock->size == thirdBlockSize);
 		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
 
-		DQN_ASSERT(firstBlock->used  == firstBlockSize);
+		DQN_ASSERT(firstBlock->used == firstBlockSize);
 		DQN_ASSERT(secondBlock->used == secondBlockSize);
-		DQN_ASSERT(thirdBlock->used  == thirdBlockSize);
+		DQN_ASSERT(thirdBlock->used == thirdBlockSize);
 		DQN_ASSERT(fourthBlock->used == fourthBlockSize);
 
-		DQN_ASSERT((firstBlock != secondBlock) && (secondBlock != thirdBlock) && (thirdBlock != fourthBlock));
-		DQN_ASSERT(firstBlock->prevBlock  == NULL);
+		DQN_ASSERT((firstBlock != secondBlock) && (secondBlock != thirdBlock) &&
+		           (thirdBlock != fourthBlock));
+		DQN_ASSERT(firstBlock->prevBlock == NULL);
 		DQN_ASSERT(secondBlock->prevBlock == firstBlock);
-		DQN_ASSERT(thirdBlock->prevBlock  == secondBlock);
+		DQN_ASSERT(thirdBlock->prevBlock == secondBlock);
 		DQN_ASSERT(fourthBlock->prevBlock == thirdBlock);
 
-		for (u32 i  = 0; i < firstBlockSize; i++)
+		for (u32 i = 0; i < firstBlockSize; i++)
 			DQN_ASSERT(first[i] == 'c');
 
-		for (u32 i  = 0; i < secondBlockSize; i++)
+		for (u32 i = 0; i < secondBlockSize; i++)
 			DQN_ASSERT(second[i] == 'd');
-		
-		for (u32 i  = 0; i < thirdBlockSize; i++)
+
+		for (u32 i = 0; i < thirdBlockSize; i++)
 			DQN_ASSERT(third[i] == 'e');
 
-		for (u32 i  = 0; i < fourthBlockSize; i++)
+		for (u32 i = 0; i < fourthBlockSize; i++)
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the first block
@@ -1369,11 +1436,11 @@ void MemStackTest()
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
-		DQN_ASSERT(thirdBlock->size  == thirdBlockSize);
+		DQN_ASSERT(thirdBlock->size == thirdBlockSize);
 		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
 
 		DQN_ASSERT(secondBlock->used == secondBlockSize);
-		DQN_ASSERT(thirdBlock->used  == thirdBlockSize);
+		DQN_ASSERT(thirdBlock->used == thirdBlockSize);
 		DQN_ASSERT(fourthBlock->used == fourthBlockSize);
 
 		DQN_ASSERT((secondBlock != thirdBlock) && (thirdBlock != fourthBlock));
@@ -1381,13 +1448,13 @@ void MemStackTest()
 		DQN_ASSERT(thirdBlock->prevBlock == secondBlock);
 		DQN_ASSERT(fourthBlock->prevBlock == thirdBlock);
 
-		for (u32 i  = 0; i < secondBlockSize; i++)
+		for (u32 i = 0; i < secondBlockSize; i++)
 			DQN_ASSERT(second[i] == 'd');
-		
-		for (u32 i  = 0; i < thirdBlockSize; i++)
+
+		for (u32 i = 0; i < thirdBlockSize; i++)
 			DQN_ASSERT(third[i] == 'e');
 
-		for (u32 i  = 0; i < fourthBlockSize; i++)
+		for (u32 i = 0; i < fourthBlockSize; i++)
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the third block
@@ -1404,10 +1471,10 @@ void MemStackTest()
 		DQN_ASSERT(secondBlock->prevBlock == NULL);
 		DQN_ASSERT(fourthBlock->prevBlock == secondBlock);
 
-		for (u32 i  = 0; i < secondBlockSize; i++)
+		for (u32 i = 0; i < secondBlockSize; i++)
 			DQN_ASSERT(second[i] == 'd');
-		
-		for (u32 i  = 0; i < fourthBlockSize; i++)
+
+		for (u32 i = 0; i < fourthBlockSize; i++)
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the second block
@@ -1418,7 +1485,7 @@ void MemStackTest()
 		DQN_ASSERT(fourthBlock->used == fourthBlockSize);
 		DQN_ASSERT(fourthBlock->prevBlock == NULL);
 
-		for (u32 i  = 0; i < fourthBlockSize; i++)
+		for (u32 i = 0; i < fourthBlockSize; i++)
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the stack
@@ -1427,12 +1494,13 @@ void MemStackTest()
 	}
 
 	// Test pop
+	if (1)
 	{
 		DqnMemStack stack = {};
 		DqnMemStack_Init(&stack, DQN_KILOBYTE(1), true);
 
 		size_t allocSize = 512;
-		void *alloc = DqnMemStack_Push(&stack, allocSize);
+		void *alloc      = DqnMemStack_Push(&stack, allocSize);
 		DQN_ASSERT(stack.block->used == allocSize);
 
 		DQN_ASSERT(DqnMemStack_Pop(&stack, alloc, allocSize));
@@ -1440,151 +1508,146 @@ void MemStackTest()
 	}
 }
 
-
-#ifdef DQN_PLATFORM_LAYER
+#ifdef DQN_XPLATFORM_LAYER
 void FileTest()
 {
 	// File i/o
+	if (1)
 	{
 
 		// Test file open
+		if (1)
 		{
 			const char *const FILE_TO_OPEN = ".clang-format";
-	        u32 expectedSize = 0;
+			u32 expectedSize               = 0;
 #if defined(DQN_UNIX_IMPLEMENTATION)
-	        {
-		        struct stat fileStat = {0};
-		        DQN_ASSERT(stat(FILE_TO_OPEN, &fileStat) == 0);
-		        expectedSize = fileStat.st_size;
-	        }
+			{
+				struct stat fileStat = {0};
+				DQN_ASSERT(stat(FILE_TO_OPEN, &fileStat) == 0);
+				expectedSize = fileStat.st_size;
+			}
 
 #elif defined(DQN_WIN32_IMPLEMENTATION)
-	        {
-		        HANDLE handle =
-		            CreateFile(FILE_TO_OPEN, GENERIC_READ, 0, NULL,
-		                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		        if (handle == INVALID_HANDLE_VALUE)
-		        {
+			{
+				HANDLE handle = CreateFile(FILE_TO_OPEN, GENERIC_READ, 0, NULL, OPEN_EXISTING,
+				                           FILE_ATTRIBUTE_NORMAL, NULL);
+				if (handle == INVALID_HANDLE_VALUE)
+				{
 					DqnWin32_DisplayLastError("CreateFile() failed");
-		        }
-		        DQN_ASSERT(handle != INVALID_HANDLE_VALUE);
+				}
+				DQN_ASSERT(handle != INVALID_HANDLE_VALUE);
 
-		        LARGE_INTEGER size;
-		        DQN_ASSERT(GetFileSizeEx(handle, &size));
+				LARGE_INTEGER size;
+				DQN_ASSERT(GetFileSizeEx(handle, &size));
 
-		        CloseHandle(handle);
-		        expectedSize = size.LowPart;
-	        }
+				CloseHandle(handle);
+				expectedSize = size.LowPart;
+			}
 #endif
 
 			DqnFile file = {};
-	        DQN_ASSERT(DqnFile_Open(
-	            ".clang-format", &file,
-	            (DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
-	            DqnFileAction_OpenOnly));
+			DQN_ASSERT(DqnFile_Open(".clang-format", &file,
+			                        (DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
+			                        DqnFileAction_OpenOnly));
 
-	        DQN_ASSERT_MSG(file.size == expectedSize,
-	                       "DqnFileOpen() failed: file.size: %d, expected:%d\n",
-	                       file.size, expectedSize);
+			DQN_ASSERT_MSG(file.size == expectedSize,
+			               "DqnFileOpen() failed: file.size: %d, expected:%d\n", file.size,
+			               expectedSize);
 
-	        u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
+			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
 			DQN_ASSERT(DqnFile_Read(file, buffer, (u32)file.size) == file.size);
 			free(buffer);
 
 			DqnFile_Close(&file);
-	        DQN_ASSERT(!file.handle && file.size == 0 &&
-	                   file.permissionFlags == 0);
-        }
+			DQN_ASSERT(!file.handle && file.size == 0 && file.permissionFlags == 0);
+		}
 
 		// Test invalid file
+		if (1)
 		{
 			DqnFile file = {};
-			DQN_ASSERT(!DqnFile_Open(
-				"asdljasdnel;kajdf", &file,
-				(DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
-				DqnFileAction_OpenOnly));
+			DQN_ASSERT(!DqnFile_Open("asdljasdnel;kajdf", &file,
+			                         (DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
+			                         DqnFileAction_OpenOnly));
 			DQN_ASSERT(file.size == 0);
 			DQN_ASSERT(file.permissionFlags == 0);
 			DQN_ASSERT(!file.handle);
 			printf("FileTest(): FileIO: Completed successfully\n");
 		}
-
 	}
 
 	////////////////////////////////////////////////////////////////////////////
 	// Write Test
 	////////////////////////////////////////////////////////////////////////////
+	if (1)
 	{
-	    const char *fileNames[] = {"dqn_1", "dqn_2", "dqn_3", "dqn_4", "dqn_5"};
-	    const char *writeData[] = {"1234", "2468", "36912", "481216",
-	                               "5101520"};
-	    DqnFile files[DQN_ARRAY_COUNT(fileNames)] = {};
+		const char *fileNames[]                   = {"dqn_1", "dqn_2", "dqn_3", "dqn_4", "dqn_5"};
+		const char *writeData[]                   = {"1234", "2468", "36912", "481216", "5101520"};
+		DqnFile files[DQN_ARRAY_COUNT(fileNames)] = {};
 
-	    // Write data out to some files
-	    for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
-	    {
-		    u32 permissions =
-		        DqnFilePermissionFlag_Read | DqnFilePermissionFlag_Write;
-		    if (!DqnFile_Open(fileNames[i], files + i, permissions,
-		                      DqnFileAction_ClearIfExist))
-		    {
-			    bool result = DqnFile_Open(fileNames[i], files + i, permissions,
-			                               DqnFileAction_CreateIfNotExist);
-			    DQN_ASSERT(result);
-		    }
+		// Write data out to some files
+		for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+		{
+			u32 permissions = DqnFilePermissionFlag_Read | DqnFilePermissionFlag_Write;
+			if (!DqnFile_Open(fileNames[i], files + i, permissions, DqnFileAction_ClearIfExist))
+			{
+				bool result = DqnFile_Open(fileNames[i], files + i, permissions,
+				                           DqnFileAction_CreateIfNotExist);
+				DQN_ASSERT(result);
+			}
 
-		    size_t bytesToWrite = DqnStr_Len(writeData[i]);
-		    u8 *dataToWrite     = (u8 *)(writeData[i]);
-		    size_t bytesWritten = DqnFile_Write(files + i, dataToWrite, bytesToWrite, 0);
-		    DQN_ASSERT(bytesWritten == bytesToWrite);
-		    DqnFile_Close(&files[i]);
-	    }
+			size_t bytesToWrite = DqnStr_Len(writeData[i]);
+			u8 *dataToWrite     = (u8 *)(writeData[i]);
+			size_t bytesWritten = DqnFile_Write(files + i, dataToWrite, bytesToWrite, 0);
+			DQN_ASSERT(bytesWritten == bytesToWrite);
+			DqnFile_Close(&files[i]);
+		}
 
-	    DqnMemStack memStack = {};
-	    DQN_ASSERT(DqnMemStack_Init(&memStack, DQN_MEGABYTE(1), true));
-	    // Read data back in
-	    for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
-	    {
-		    u32 permissions = DqnFilePermissionFlag_Read;
-		    DqnFile *file   = files + i;
-		    bool result     = DqnFile_Open(fileNames[i], file, permissions,
-		                               DqnFileAction_OpenOnly);
-		    DQN_ASSERT(result);
+		DqnMemStack memStack = {};
+		DQN_ASSERT(DqnMemStack_Init(&memStack, DQN_MEGABYTE(1), true));
+		// Read data back in
+		for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+		{
+			u32 permissions = DqnFilePermissionFlag_Read;
+			DqnFile *file   = files + i;
+			bool result     = DqnFile_Open(fileNames[i], file, permissions, DqnFileAction_OpenOnly);
+			DQN_ASSERT(result);
 
-		    u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, file->size);
-		    DQN_ASSERT(buffer);
+			u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, file->size);
+			DQN_ASSERT(buffer);
 
-		    size_t bytesRead = DqnFile_Read(files[i], buffer, file->size);
-		    DQN_ASSERT(bytesRead == file->size);
+			size_t bytesRead = DqnFile_Read(files[i], buffer, file->size);
+			DQN_ASSERT(bytesRead == file->size);
 
-		    // Verify the data is the same as we wrote out
-		    DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i])) == 0);
+			// Verify the data is the same as we wrote out
+			DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i])) == 0);
 
-		    // Delete when we're done with it
-		    DQN_ASSERT(DqnMemStack_Pop(&memStack, buffer, file->size));
-		    DqnFile_Close(file);
+			// Delete when we're done with it
+			DQN_ASSERT(DqnMemStack_Pop(&memStack, buffer, file->size));
+			DqnFile_Close(file);
 
-		    DQN_ASSERT(DqnFile_Delete(fileNames[i]));
-	    }
+			DQN_ASSERT(DqnFile_Delete(fileNames[i]));
+		}
 
-	    // Then check delete actually worked, files should not exist.
-	    for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
-	    {
-		    DqnFile dummy   = {};
-		    u32 permissions = DqnFilePermissionFlag_Read;
-		    bool fileExists = DqnFile_Open(fileNames[i], &dummy, permissions,
-		                                   DqnFileAction_OpenOnly);
-		    DQN_ASSERT(!fileExists);
-	    }
-	    DqnMemStack_Free(&memStack);
-    }
+		// Then check delete actually worked, files should not exist.
+		for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+		{
+			DqnFile dummy   = {};
+			u32 permissions = DqnFilePermissionFlag_Read;
+			bool fileExists =
+			    DqnFile_Open(fileNames[i], &dummy, permissions, DqnFileAction_OpenOnly);
+			DQN_ASSERT(!fileExists);
+		}
+		DqnMemStack_Free(&memStack);
+	}
 
-    {
+	if (1)
+	{
 		u32 numFiles;
 #if defined(DQN_UNIX_IMPLEMENTATION)
-	    char **filelist = DqnDir_Read(".", &numFiles);
+		char **filelist = DqnDir_Read(".", &numFiles);
 #elif defined(DQN_WIN32_IMPLEMENTATION)
-	    char **filelist = DqnDir_Read("*", &numFiles);
+		char **filelist = DqnDir_Read("*", &numFiles);
 #endif
 		printf("FileTest(): DirRead: Display read files\n");
 		for (u32 i = 0; i < numFiles; i++)
@@ -1612,8 +1675,8 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
 	u32 number = globalDebugCounter;
 	DqnLock_Release(&globalJobQueueLock);
 
-	printf("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n", GetCurrentThreadId(),
-	       number);
+	printf("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n",
+	       GetCurrentThreadId(), number);
 }
 
 FILE_SCOPE void JobQueueTest()
@@ -1632,8 +1695,8 @@ FILE_SCOPE void JobQueueTest()
 
 	void *jobQueueMem = DqnMemStack_Push(&memStack, requiredSize);
 	DQN_ASSERT_HARD(jobQueueMem);
-	DqnJobQueue *jobQueue = DqnJobQueue_InitWithMem(jobQueueMem, &requiredSize,
-	                                                QUEUE_SIZE, totalThreads);
+	DqnJobQueue *jobQueue =
+	    DqnJobQueue_InitWithMem(jobQueueMem, &requiredSize, QUEUE_SIZE, totalThreads);
 	DQN_ASSERT_HARD(jobQueue);
 
 	DQN_ASSERT(DqnLock_Init(&globalJobQueueLock));
@@ -1653,8 +1716,7 @@ FILE_SCOPE void JobQueueTest()
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(globalDebugCounterMemoize); i++)
 		DQN_ASSERT(globalDebugCounterMemoize[i]);
 
-	while (DqnJobQueue_TryExecuteNextJob(jobQueue) &&
-	       !DqnJobQueue_AllJobsComplete(jobQueue))
+	while (DqnJobQueue_TryExecuteNextJob(jobQueue) && !DqnJobQueue_AllJobsComplete(jobQueue))
 		;
 
 	printf("\nJobQueueTest(): Final incremented value: %d\n", globalDebugCounter);
@@ -1672,12 +1734,12 @@ int main(void)
 	ArrayTest();
 	MemStackTest();
 
-#ifdef DQN_PLATFORM_LAYER
+#ifdef DQN_XPLATFORM_LAYER
 	FileTest();
+	OtherTest();
 #endif
 
 #ifdef DQN_WIN32_IMPLEMENTATION
-	OtherTest();
 	JobQueueTest();
 #endif
 
