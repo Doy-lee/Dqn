@@ -1705,42 +1705,37 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
 
 FILE_SCOPE void JobQueueTest()
 {
-	size_t requiredSize;
-	const i32 QUEUE_SIZE = 256;
-	DqnJobQueue_InitWithMem(NULL, &requiredSize, QUEUE_SIZE, 0);
-
 	DqnMemStack memStack = {};
-	DQN_ASSERT_HARD(DqnMemStack_Init(&memStack, requiredSize, true));
+	DQN_ASSERT_HARD(memStack.Init(DQN_MEGABYTE(1), true));
 
 	i32 numThreads, numCores;
 	DqnWin32_GetNumThreadsAndCores(&numCores, &numThreads);
 	DQN_ASSERT(numThreads > 0 && numCores > 0);
 	i32 totalThreads = (numCores - 1) * numThreads;
 
-	void *jobQueueMem = DqnMemStack_Push(&memStack, requiredSize);
-	DQN_ASSERT_HARD(jobQueueMem);
-	DqnJobQueue *jobQueue =
-	    DqnJobQueue_InitWithMem(jobQueueMem, &requiredSize, QUEUE_SIZE, totalThreads);
-	DQN_ASSERT_HARD(jobQueue);
+	const i32 QUEUE_SIZE = 256;
+	DqnJobQueue jobQueue = {};
+	DqnJob *jobList      = (DqnJob *)memStack.Push(sizeof(*jobQueue.jobList) * QUEUE_SIZE);
+	DQN_ASSERT(DqnJobQueue_Init(&jobQueue, jobList, QUEUE_SIZE, totalThreads));
 
 	DQN_ASSERT(DqnLock_Init(&globalJobQueueLock));
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(globalDebugCounterMemoize); i++)
 	{
 		DqnJob job   = {};
 		job.callback = JobQueueDebugCallbackIncrementCounter;
-		while (!DqnJobQueue_AddJob(jobQueue, job))
+		while (!DqnJobQueue_AddJob(&jobQueue, job))
 		{
-			DqnJobQueue_TryExecuteNextJob(jobQueue);
+			DqnJobQueue_TryExecuteNextJob(&jobQueue);
 		}
 	}
 
-	while (DqnJobQueue_TryExecuteNextJob(jobQueue))
+	while (DqnJobQueue_TryExecuteNextJob(&jobQueue))
 		;
 
 	for (i32 i = 0; i < DQN_ARRAY_COUNT(globalDebugCounterMemoize); i++)
 		DQN_ASSERT(globalDebugCounterMemoize[i]);
 
-	while (DqnJobQueue_TryExecuteNextJob(jobQueue) && !DqnJobQueue_AllJobsComplete(jobQueue))
+	while (DqnJobQueue_TryExecuteNextJob(&jobQueue) && !DqnJobQueue_AllJobsComplete(&jobQueue))
 		;
 
 	printf("\nJobQueueTest(): Final incremented value: %d\n", globalDebugCounter);
