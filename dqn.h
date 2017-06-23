@@ -53,7 +53,7 @@
 // #DqnSprintf   Cross-platform Sprintf Implementation (Public Domain lib stb_sprintf)
 
 ////////////////////////////////////////////////////////////////////////////////
-// Platform Checks
+// Global Preprocessor Checks
 ////////////////////////////////////////////////////////////////////////////////
 // This needs to be above the portable layer so  that, if the user requests
 // a platform implementation, platform specific implementations in the portable
@@ -66,6 +66,10 @@
 	#define DQN_UNIX_PLATFORM
 #endif
 
+#ifdef __cplusplus
+	#define DQN_CPP_MODE
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 // #Portable Code
 ////////////////////////////////////////////////////////////////////////////////
@@ -75,10 +79,6 @@
 	#define DQN_FILE_SCOPE static
 #else
 	#define DQN_FILE_SCOPE
-#endif
-
-#ifdef __cplusplus
-	#define DQN_CPP_MODE
 #endif
 
 #include <stdint.h> // For standard types
@@ -210,10 +210,37 @@ enum DqnMemStackFlag
 typedef struct DqnMemStack
 {
 	struct DqnMemStackBlock *block;
-
 	u32 flags;
 	i32 tempRegionCount;
 	u32 byteAlign;
+
+#if defined(DQN_CPP_MODE)
+	// Initialisation API
+	bool  InitWithFixedMem (u8 *const mem,     const size_t memSize, const u32 byteAlignment = 4);
+	bool  InitWithFixedSize(const size_t size, const bool zeroClear, const u32 byteAlignment = 4);
+	bool  Init             (const size_t size, const bool zeroClear, const u32 byteAlignment = 4);
+
+	// Memory API
+	void *Push(size_t size);
+	void  Pop (void *const ptr, size_t size);
+	void  Free();
+	bool  FreeMemBlock  (DqnMemStackBlock *memBlock);
+	bool  FreeLastBlock ();
+	void  ClearCurrBlock(const bool zeroClear);
+
+	// Temporary Regions API
+	struct DqnMemStackTempRegion TempRegionBegin();
+	void                         TempRegionEnd  (DqnMemStackTempRegion region);
+
+	// Scoped Temporary Regions API
+	struct DqnMemStackTempRegionScoped TempRegionScoped(bool *const succeeded);
+
+	// Advanced API
+	DqnMemStackBlock *AllocateCompatibleBlock(size_t size);
+	bool              AttachBlock            (DqnMemStackBlock *const newBlock);
+	bool              DetachBlock            (DqnMemStackBlock *const detachBlock);
+    void              FreeDetachedBlock      (DqnMemStackBlock *memBlock);
+#endif
 } DqnMemStack;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -241,6 +268,7 @@ DQN_FILE_SCOPE bool DqnMemStack_Init (DqnMemStack *const stack, size_t size, con
 //  DqnMemStack Memory Operations
 ////////////////////////////////////////////////////////////////////////////////
 // Allocate memory from the MemStack.
+// size:   "size" gets aligned to the byte alignment of the stack. 
 // return: NULL if out of space OR stack is using fixed memory/size OR stack full and platform malloc fails.
 DQN_FILE_SCOPE void *DqnMemStack_Push          (DqnMemStack *const stack, size_t size);
 
@@ -252,7 +280,7 @@ DQN_FILE_SCOPE void  DqnMemStack_Free          (DqnMemStack *const stack);
 
 // Frees the specified block belonging to the stack.
 // return: FALSE if block doesn't belong this into calls DqnMem_Free() or invalid args.
-DQN_FILE_SCOPE bool  DqnMemStack_FreeStackBlock(DqnMemStack *const stack, DqnMemStackBlock *block);
+DQN_FILE_SCOPE bool  DqnMemStack_FreeMemBlock(DqnMemStack *const stack, DqnMemStackBlock *memBlock);
 
 // Frees the last-most memory block. If last block, free that block making the MemStack blockless.
 // Next allocate will attach a block.
@@ -287,8 +315,7 @@ DQN_FILE_SCOPE void DqnMemStackTempRegion_End  (DqnMemStackTempRegion region);
 #ifdef DQN_CPP_MODE
 struct DqnMemStackTempRegionScoped
 {
-	bool isInit;
-	DqnMemStackTempRegionScoped(DqnMemStack *const stack);
+	DqnMemStackTempRegionScoped(DqnMemStack *const stack, bool *const succeeded);
 	~DqnMemStackTempRegionScoped();
 
 private:
@@ -317,8 +344,8 @@ DQN_FILE_SCOPE bool              DqnMemStack_AttachBlock            (DqnMemStack
 DQN_FILE_SCOPE bool              DqnMemStack_DetachBlock            (DqnMemStack *const stack, DqnMemStackBlock *const detachBlock);
 
 // (IMPORTANT) Should only be used to free blocks that haven't been attached! Attached blocks should
-// be freed using DqnMemStack_FreeStackBlock().
-DQN_FILE_SCOPE void DqnMemStack_FreeBlock(DqnMemStackBlock *block);
+// be freed using DqnMemStack_FreeMemBlock().
+DQN_FILE_SCOPE void DqnMemStack_FreeDetachedBlock(DqnMemStackBlock *memBlock);
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnMemAPI Public API - Custom memory API for Dqn Data Structures
@@ -927,9 +954,10 @@ enum DqnFileAction
 
 typedef struct DqnFile
 {
+	u32 permissionFlags;
 	void   *handle;
 	size_t  size;
-	u32     permissionFlags;
+
 } DqnFile;
 
 // NOTE: W(ide) versions of functions only work on Win32, since Unix is UTF-8 compatible.
@@ -1683,11 +1711,44 @@ DqnMemStackInternal_AllocateBlock(u32 byteAlign, size_t size)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// #DqnMemStack CPP Implementation
+////////////////////////////////////////////////////////////////////////////////
+#if defined(DQN_CPP_MODE)
+bool DqnMemStack::InitWithFixedMem (u8 *const mem,     const size_t memSize, const u32 byteAlignment) { return DqnMemStack_InitWithFixedMem (this, mem, memSize, byteAlign);    }
+bool DqnMemStack::InitWithFixedSize(const size_t size, const bool zeroClear, const u32 byteAlignment) { return DqnMemStack_InitWithFixedSize(this, size, zeroClear, byteAlign); }
+bool DqnMemStack::Init             (const size_t size, const bool zeroClear, const u32 byteAlignment) { return DqnMemStack_Init             (this, size, zeroClear, byteAlign); }
+
+void *DqnMemStack::Push(size_t size)                        { return DqnMemStack_Push(this, size);                }
+void  DqnMemStack::Pop (void *const ptr, size_t size)       {        DqnMemStack_Pop (this, ptr, size);           }
+void  DqnMemStack::Free()                                   {        DqnMemStack_Free(this);                      }
+bool  DqnMemStack::FreeMemBlock(DqnMemStackBlock *memBlock) { return DqnMemStack_FreeMemBlock(this, block);       }
+bool  DqnMemStack::FreeLastBlock()                          { return DqnMemStack_FreeLastBlock(this);             }
+void  DqnMemStack::ClearCurrBlock(const bool zeroClear)     {        DqnMemStack_ClearCurrBlock(this, zeroClear); }
+
+DqnMemStackTempRegion DqnMemStack::TempRegionBegin()
+{
+	// NOTE: Should always succeed since the stack is guaranteed to exist.
+	DqnMemStackTempRegion result = {};
+	bool succeeded               = DqnMemStackTempRegion_Begin(&result, this);
+	DQN_ASSERT_HARD(succeeded);
+	return result;
+}
+void                        DqnMemStack::TempRegionEnd(DqnMemStackTempRegion region) { DqnMemStackTempRegion_End(region); }
+DqnMemStackTempRegionScoped DqnMemStack::TempRegionScoped(bool *const succeeded)     { return DqnMemStackTempRegionScoped(this, succeeded); }
+
+DqnMemStackBlock *DqnMemStack::AllocateCompatibleBlock(size_t size)                          { return DqnMemStack_AllocateCompatibleBlock(this, size);        }
+bool              DqnMemStack::AttachBlock            (DqnMemStackBlock *const newBlock)     { return DqnMemStack_AttachBlock            (this, newBlock);    }
+bool              DqnMemStack::DetachBlock            (DqnMemStackBlock *const detachBlock)  { return DqnMemStack_DetachBlock            (this, detachBlock); }
+void              DqnMemStack::FreeDetachedBlock      (DqnMemStackBlock *memBlock)           {        DqnMemStack_FreeDetachedBlock      (memBlock);             }
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 // #DqnMemStack Initialisation Implementation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedMem(DqnMemStack *const stack, u8 *const mem,
                                                  const size_t memSize, const u32 byteAlign)
 {
+	// TODO(doyle): Logging
 	if (!stack || !mem) return false;
 
 	if (!DQN_ASSERT_MSG(
@@ -1706,7 +1767,7 @@ DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedMem(DqnMemStack *const stack, u8 *c
 	stack->flags = (DqnMemStackFlag_IsFixedMemoryFromUser | DqnMemStackFlag_IsNotExpandable);
 
 	const u32 DEFAULT_ALIGNMENT = 4;
-	stack->tempRegionCount     = 0;
+	stack->tempRegionCount      = 0;
 	stack->byteAlign = (byteAlign == 0) ? DEFAULT_ALIGNMENT : byteAlign;
 	return true;
 }
@@ -1837,14 +1898,14 @@ DQN_FILE_SCOPE void DqnMemStack_Free(DqnMemStack *stack)
 	stack->flags &= ~DqnMemStackFlag_IsNotExpandable;
 }
 
-DQN_FILE_SCOPE bool DqnMemStack_FreeStackBlock(DqnMemStack *const stack, DqnMemStackBlock *block)
+DQN_FILE_SCOPE bool DqnMemStack_FreeMemBlock(DqnMemStack *const stack, DqnMemStackBlock *memBlock)
 {
-	if (!stack || !block || !stack->block) return false;
+	if (!stack || !memBlock || !stack->block) return false;
 	if (stack->flags & DqnMemStackFlag_IsFixedMemoryFromUser) return false;
 
 	DqnMemStackBlock **blockPtr = &stack->block;
 
-	while (*blockPtr && (*blockPtr) != block)
+	while (*blockPtr && (*blockPtr) != memBlock)
 		blockPtr = &((*blockPtr)->prevBlock);
 
 	if (*blockPtr)
@@ -1863,7 +1924,7 @@ DQN_FILE_SCOPE bool DqnMemStack_FreeStackBlock(DqnMemStack *const stack, DqnMemS
 
 DQN_FILE_SCOPE bool DqnMemStack_FreeLastBlock(DqnMemStack *const stack)
 {
-	bool result = DqnMemStack_FreeStackBlock(stack, stack->block);
+	bool result = DqnMemStack_FreeMemBlock(stack, stack->block);
 	return result;
 }
 
@@ -1913,10 +1974,10 @@ DQN_FILE_SCOPE void DqnMemStackTempRegion_End(DqnMemStackTempRegion region)
 }
 
 #ifdef DQN_CPP_MODE
-DqnMemStackTempRegionScoped::DqnMemStackTempRegionScoped(DqnMemStack *const stack)
+DqnMemStackTempRegionScoped::DqnMemStackTempRegionScoped(DqnMemStack *const stack, bool *const succeeded)
 {
-	this->isInit = DqnMemStackTempRegion_Begin(&this->tempMemStack, stack);
-	DQN_ASSERT(this->isInit);
+	bool result = DqnMemStackTempRegion_Begin(&this->tempMemStack, stack);
+	if (succeeded) *succeeded = result;
 }
 
 DqnMemStackTempRegionScoped::~DqnMemStackTempRegionScoped()
@@ -1976,10 +2037,10 @@ DQN_FILE_SCOPE bool DqnMemStack_DetachBlock(DqnMemStack *const stack,
 	return true;
 }
 
-DQN_FILE_SCOPE void DqnMemStack_FreeBlock(DqnMemStackBlock *block)
+DQN_FILE_SCOPE void DqnMemStack_FreeDetachedBlock(DqnMemStackBlock *memBlock)
 {
-	if (!block) return;
-	DqnMem_Free(block);
+	if (!memBlock) return;
+	DqnMem_Free(memBlock);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

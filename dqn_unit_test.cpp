@@ -1399,7 +1399,7 @@ void MemStackTest()
 		fakeBlock.memory                 = fakeBlockMem;
 		fakeBlock.size                   = DQN_ARRAY_COUNT(fakeBlockMem);
 		fakeBlock.used                   = 0;
-		DQN_ASSERT(!DqnMemStack_FreeStackBlock(&stack, &fakeBlock));
+		DQN_ASSERT(!DqnMemStack_FreeMemBlock(&stack, &fakeBlock));
 
 		// Ensure that the actual blocks are still valid and freeing did nothing
 		DQN_ASSERT(firstBlock->size == firstBlockSize);
@@ -1432,7 +1432,7 @@ void MemStackTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the first block
-		DqnMemStack_FreeStackBlock(&stack, firstBlock);
+		DqnMemStack_FreeMemBlock(&stack, firstBlock);
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
@@ -1458,7 +1458,7 @@ void MemStackTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the third block
-		DqnMemStack_FreeStackBlock(&stack, thirdBlock);
+		DqnMemStack_FreeMemBlock(&stack, thirdBlock);
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
@@ -1478,7 +1478,7 @@ void MemStackTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the second block
-		DqnMemStack_FreeStackBlock(&stack, secondBlock);
+		DqnMemStack_FreeMemBlock(&stack, secondBlock);
 
 		// Revalidate state
 		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
@@ -1496,15 +1496,36 @@ void MemStackTest()
 	// Test pop
 	if (1)
 	{
-		DqnMemStack stack = {};
-		DqnMemStack_Init(&stack, DQN_KILOBYTE(1), true);
+		// Test aligned pop
+		if (1)
+		{
+			DqnMemStack stack = {};
+			DqnMemStack_Init(&stack, DQN_KILOBYTE(1), true);
 
-		size_t allocSize = 512;
-		void *alloc      = DqnMemStack_Push(&stack, allocSize);
-		DQN_ASSERT(stack.block->used == allocSize);
+			size_t allocSize = 512;
+			void *alloc      = DqnMemStack_Push(&stack, allocSize);
+			DQN_ASSERT(stack.block->used == allocSize);
 
-		DQN_ASSERT(DqnMemStack_Pop(&stack, alloc, allocSize));
-		DQN_ASSERT(stack.block->used == 0);
+			DQN_ASSERT(DqnMemStack_Pop(&stack, alloc, allocSize));
+			DQN_ASSERT(stack.block->used == 0);
+			DqnMemStack_Free(&stack);
+		}
+
+		// Test pop on a non-byte aligned allocation. This checks to see if
+		// Pop() doesn't naiively forget to re-byte align the passed in size.
+		if (1)
+		{
+			DqnMemStack stack = {};
+			DqnMemStack_Init(&stack, DQN_KILOBYTE(1), true);
+
+			size_t allocSize = 1;
+			void *alloc      = DqnMemStack_Push(&stack, allocSize);
+			DQN_ASSERT(stack.block->used == DQN_ALIGN_POW_N(allocSize, stack.byteAlign));
+
+			DQN_ASSERT(DqnMemStack_Pop(&stack, alloc, allocSize));
+			DQN_ASSERT(stack.block->used == 0);
+			DqnMemStack_Free(&stack);
+		}
 	}
 }
 
@@ -1641,6 +1662,9 @@ void FileTest()
 		DqnMemStack_Free(&memStack);
 	}
 
+	////////////////////////////////////////////////////////////////////////////
+	// Test directory listing
+	////////////////////////////////////////////////////////////////////////////
 	if (1)
 	{
 		u32 numFiles;
