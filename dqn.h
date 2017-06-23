@@ -66,7 +66,7 @@
 	#define DQN_UNIX_PLATFORM
 #endif
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 	#define DQN_CPP_MODE
 #endif
 
@@ -233,7 +233,7 @@ typedef struct DqnMemStack
 	void                         TempRegionEnd  (DqnMemStackTempRegion region);
 
 	// Scoped Temporary Regions API
-	struct DqnMemStackTempRegionScoped TempRegionScoped(bool *const succeeded);
+	struct DqnMemStackTempRegionScoped TempRegionScoped();
 
 	// Advanced API
 	DqnMemStackBlock *AllocateCompatibleBlock(size_t size);
@@ -1733,8 +1733,10 @@ DqnMemStackTempRegion DqnMemStack::TempRegionBegin()
 	DQN_ASSERT_HARD(succeeded);
 	return result;
 }
-void                        DqnMemStack::TempRegionEnd(DqnMemStackTempRegion region) { DqnMemStackTempRegion_End(region); }
-DqnMemStackTempRegionScoped DqnMemStack::TempRegionScoped(bool *const succeeded)     { return DqnMemStackTempRegionScoped(this, succeeded); }
+void DqnMemStack::TempRegionEnd(DqnMemStackTempRegion region) { DqnMemStackTempRegion_End(region); }
+
+// NOTE: Guaranteed to always succeed. Fails when arguments are invalid, like a NULL ptr which is impossible here.
+DqnMemStackTempRegionScoped DqnMemStack::TempRegionScoped() { return DqnMemStackTempRegionScoped(this, NULL); }
 
 DqnMemStackBlock *DqnMemStack::AllocateCompatibleBlock(size_t size)                          { return DqnMemStack_AllocateCompatibleBlock(this, size);        }
 bool              DqnMemStack::AttachBlock            (DqnMemStackBlock *const newBlock)     { return DqnMemStack_AttachBlock            (this, newBlock);    }
