@@ -429,36 +429,24 @@ struct DqnArray
 	u64 count;
 	u64 capacity;
 	T *data;
+
+	void  Init        (const size_t capacity, DqnMemAPI memAPI = DqnMemAPI_DefaultUseCalloc());
+	bool  Free        ();
+	bool  Grow        ();
+	T    *Push        (const T item);
+	void  Pop         ();
+	T    *Get         (u64 index);
+	bool  Clear       ();
+	bool  Remove      (u64 index);
+	bool  RemoveStable(u64 index);
 };
 
 FILE_SCOPE const char *const DQN_MEM_API_CALLBACK_RESULT_TYPE_INCORRECT =
     "DqnMemAPICallbackResult type is incorrect";
 
-// Implementation taken from Milton, developed by Serge at
-// https://github.com/serge-rgb/milton#license
 template <typename T>
-bool DqnArray_Free(DqnArray<T> *array)
-{
-	if (array && array->data)
-	{
-		// TODO(doyle): Right now we assume free always works, and it probably should?
-		size_t sizeToFree = (size_t)array->capacity * sizeof(T);
-		DqnMemAPICallbackInfo info = DqnMemAPIInternal_CallbackInfoAskFree(
-		    array->memAPI, array->data, sizeToFree);
-		array->memAPI.callback(info, NULL);
-		array->data = NULL;
-
-		array->count    = 0;
-		array->capacity = 0;
-		return true;
-	}
-
-	return false;
-}
-
-template <typename T>
-bool DqnArray_Init(DqnArray<T> *array, size_t capacity,
-                   DqnMemAPI memAPI = DqnMemAPI_DefaultUseCalloc())
+bool DqnArray_Init(DqnArray<T> *const array, const size_t capacity,
+                   const DqnMemAPI memAPI = DqnMemAPI_DefaultUseCalloc())
 {
 	if (!array) return false;
 	if (array->data) DqnArray_Free(array);
@@ -482,8 +470,30 @@ bool DqnArray_Init(DqnArray<T> *array, size_t capacity,
 	return true;
 }
 
+// Implementation taken from Milton, developed by Serge at
+// https://github.com/serge-rgb/milton#license
 template <typename T>
-bool DqnArray_Grow(DqnArray<T> *array)
+bool DqnArray_Free(DqnArray<T> *const array)
+{
+	if (array && array->data)
+	{
+		// TODO(doyle): Right now we assume free always works, and it probably should?
+		size_t sizeToFree = (size_t)array->capacity * sizeof(T);
+		DqnMemAPICallbackInfo info = DqnMemAPIInternal_CallbackInfoAskFree(
+		    array->memAPI, array->data, sizeToFree);
+		array->memAPI.callback(info, NULL);
+		array->data = NULL;
+
+		array->count    = 0;
+		array->capacity = 0;
+		return true;
+	}
+
+	return false;
+}
+
+template <typename T>
+bool DqnArray_Grow(DqnArray<T> *const array)
 {
 	if (!array || !array->data) return false;
 
@@ -518,7 +528,7 @@ bool DqnArray_Grow(DqnArray<T> *array)
 }
 
 template <typename T>
-T *DqnArray_Push(DqnArray<T> *array, T item)
+T *DqnArray_Push(DqnArray<T> *const array, const T item)
 {
 	if (!array) return NULL;
 
@@ -544,7 +554,7 @@ void DqnArray_Pop(DqnArray<T> *array)
 }
 
 template <typename T>
-T *DqnArray_Get(DqnArray<T> *array, u64 index)
+T *DqnArray_Get(DqnArray<T> *const array, const u64 index)
 {
 	T *result = NULL;
 	if (index >= 0 && index <= array->count) result = &array->data[index];
@@ -552,7 +562,7 @@ T *DqnArray_Get(DqnArray<T> *array, u64 index)
 }
 
 template <typename T>
-bool DqnArray_Clear(DqnArray<T> *array)
+bool DqnArray_Clear(DqnArray<T> *const array)
 {
 	if (array)
 	{
@@ -564,7 +574,7 @@ bool DqnArray_Clear(DqnArray<T> *array)
 }
 
 template <typename T>
-bool DqnArray_Remove(DqnArray<T> *array, u64 index)
+bool DqnArray_Remove(DqnArray<T> *const array, const u64 index)
 {
 	if (!array) return false;
 	if (index >= array->count) return false;
@@ -583,7 +593,7 @@ bool DqnArray_Remove(DqnArray<T> *array, u64 index)
 }
 
 template <typename T>
-bool DqnArray_RemoveStable(DqnArray<T> *array, u64 index)
+bool DqnArray_RemoveStable(DqnArray<T> *const array, const u64 index)
 {
 	if (!array) return false;
 	if (index >= array->count) return false;
@@ -609,6 +619,17 @@ bool DqnArray_RemoveStable(DqnArray<T> *array, u64 index)
 	array->count--;
 	return true;
 }
+
+template <typename T> void DqnArray<T>::Init (const size_t capacity, DqnMemAPI memAPI) { DqnArray_Init(this, capacity, memAPI); }
+template <typename T> bool DqnArray<T>::Free ()                                        { return DqnArray_Free(this); }
+template <typename T> bool DqnArray<T>::Grow ()                                        { return DqnArray_Grow(this);}
+template <typename T> T*   DqnArray<T>::Push (const T item)                            { return DqnArray_Push(this, item); }
+template <typename T> void DqnArray<T>::Pop  ()                                        { DqnArray_Pop(this); }
+template <typename T> T*   DqnArray<T>::Get  (const u64 index)                         { return DqnArray_Get(this, index); }
+template <typename T> bool DqnArray<T>::Clear()                                        { return DqnArray_Clear (this); }
+template <typename T> bool DqnArray<T>::Remove      (const u64 index)                  { return DqnArray_Remove(this, index); }
+template <typename T> bool DqnArray<T>::RemoveStable(const u64 index)                  { return DqnArray_RemoveStable(this, u64 index); }
+
 #endif // DQN_CPP_MODE
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -954,10 +975,9 @@ enum DqnFileAction
 
 typedef struct DqnFile
 {
-	u32 permissionFlags;
+	u32     permissionFlags;
 	void   *handle;
 	size_t  size;
-
 } DqnFile;
 
 // NOTE: W(ide) versions of functions only work on Win32, since Unix is UTF-8 compatible.
