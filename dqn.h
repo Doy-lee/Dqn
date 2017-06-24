@@ -178,7 +178,7 @@ DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file,
 DQN_FILE_SCOPE void *DqnMem_Alloc  (const size_t size);
 DQN_FILE_SCOPE void *DqnMem_Calloc (const size_t size);
 DQN_FILE_SCOPE void  DqnMem_Clear  (void *const memory, const u8 clearValue, const size_t size);
-DQN_FILE_SCOPE void *DqnMem_Realloc(void *const memory, const size_t newSize);
+DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, const size_t newSize);
 DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -245,7 +245,7 @@ typedef struct DqnMemStack
 	void                         TempRegionEnd  (DqnMemStackTempRegion region);
 
 	// Scoped Temporary Regions API
-	struct DqnMemStackTempRegionScoped TempRegionScoped();
+	struct DqnMemStackTempRegionGuard TempRegionGuard();
 
 	// Advanced API
 	DqnMemStackBlock *AllocateCompatibleBlock(size_t size);
@@ -313,7 +313,7 @@ DQN_FILE_SCOPE void  DqnMemStack_ClearCurrBlock(DqnMemStack *const stack, const 
 typedef struct DqnMemStackTempRegion
 {
 	// The stack associated with this TempRegion
-	DqnMemStack             *stack;
+	DqnMemStack *stack;
 
 	// Store memBlock state to revert back to on DqnMemStackTempRegion_End()
 	struct DqnMemStackBlock *startingBlock;
@@ -322,16 +322,19 @@ typedef struct DqnMemStackTempRegion
 
 // region: Takes pointer to a zero-cleared DqnMemStackTempRegion struct.
 // return: FALSE if arguments are invalid.
-DQN_FILE_SCOPE bool DqnMemStackTempRegion_Begin(DqnMemStackTempRegion *region, DqnMemStack *const stack);
+DQN_FILE_SCOPE bool DqnMemStackTempRegion_Begin(DqnMemStackTempRegion *const region, DqnMemStack *const stack);
 DQN_FILE_SCOPE void DqnMemStackTempRegion_End  (DqnMemStackTempRegion region);
 
-// In cplusplus this allows automatic Begin/End pairs upon constructor of DqnMemStackTempRegionScoped.
-// isInit: Constructor was successful
 #ifdef DQN_CPP_MODE
-struct DqnMemStackTempRegionScoped
+// Region guard automatically starts a region on construction and ends a region
+// on destruction.
+struct DqnMemStackTempRegionGuard
 {
-	DqnMemStackTempRegionScoped(DqnMemStack *const stack, bool *const succeeded);
-	~DqnMemStackTempRegionScoped();
+	// lock: Takes a pointer to a pre-existing and already initialised stack
+	// bool: Pass in (optionally) a pointer to a bool which returns whether construction was successful.
+	//       It can be FALSE if stack is NULL.
+	DqnMemStackTempRegionGuard(DqnMemStack *const stack, bool *const succeeded);
+	~DqnMemStackTempRegionGuard();
 
 private:
 	DqnMemStackTempRegion tempMemStack;
@@ -648,7 +651,7 @@ template <typename T> void DqnArray<T>::Pop  ()                                 
 template <typename T> T*   DqnArray<T>::Get  (const u64 index)                         { return DqnArray_Get(this, index); }
 template <typename T> bool DqnArray<T>::Clear()                                        { return DqnArray_Clear (this); }
 template <typename T> bool DqnArray<T>::Remove      (const u64 index)                  { return DqnArray_Remove(this, index); }
-template <typename T> bool DqnArray<T>::RemoveStable(const u64 index)                  { return DqnArray_RemoveStable(this, u64 index); }
+template <typename T> bool DqnArray<T>::RemoveStable(const u64 index)                  { return DqnArray_RemoveStable(this, index); }
 
 #endif // DQN_CPP_MODE
 
@@ -898,18 +901,18 @@ DQN_FILE_SCOPE bool DqnChar_IsAlphanum(char c);
 // #DqnStr Public API - Str Operations
 ////////////////////////////////////////////////////////////////////////////////
 // return: 0 if equal. 0 < if a is before b, > 0 if a is after b
-DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *a, const char *b);
+DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *const a, const char *const b);
 
 // return: String length not including the NULL terminator. 0 if invalid args.
-DQN_FILE_SCOPE i32   DqnStr_Len           (const char *a);
+DQN_FILE_SCOPE i32   DqnStr_Len           (const char *const a);
 
 // Get the String length starting from a, up to and not including the first delimiter character.
-DQN_FILE_SCOPE i32   DqnStr_LenDelimitWith(const char *a, const char delimiter);
+DQN_FILE_SCOPE i32   DqnStr_LenDelimitWith(char *const a, const char delimiter);
 
 // return: The dest argument, NULL if args invalid (i.e. NULL pointers or numChars < 0)
-DQN_FILE_SCOPE char *DqnStr_Copy(char *dest, const char *src, i32 numChars);
+DQN_FILE_SCOPE char *DqnStr_Copy(char *const dest, const char *const src, const i32 numChars);
 
-DQN_FILE_SCOPE bool DqnStr_Reverse           (char *buf, const i32 bufSize);
+DQN_FILE_SCOPE bool DqnStr_Reverse           (char *const buf, const i32 bufSize);
 DQN_FILE_SCOPE i32  DqnStr_FindFirstOccurence(const char *const src, const i32 srcLen, const char *const find, const i32 findLen);
 DQN_FILE_SCOPE bool DqnStr_HasSubstring      (const char *const src, const i32 srcLen, const char *const find, const i32 findLen);
 
@@ -917,14 +920,14 @@ DQN_FILE_SCOPE bool DqnStr_HasSubstring      (const char *const src, const i32 s
 #define DQN_64BIT_NUM_MAX_STR_SIZE 21
 // Return the len of the derived string. If buf is NULL and or bufSize is 0 the
 // function returns the required string length for the integer.
-DQN_FILE_SCOPE i32   Dqn_I64ToStr(i64 value, char *const buf, const i32 bufSize);
+DQN_FILE_SCOPE i32   Dqn_I64ToStr(const i64 value, char *const buf, const i32 bufSize);
 DQN_FILE_SCOPE i64   Dqn_StrToI64(const char *const buf, const i32 bufSize);
 // WARNING: Not robust, precision errors and whatnot but good enough!
 DQN_FILE_SCOPE f32   Dqn_StrToF32(const char *const buf, const i32 bufSize);
 
 // Both return the number of bytes read, return 0 if invalid codepoint or UTF8
-DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character);
-DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *dest, u32 character);
+DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, const u32 character);
+DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, const u32 character);
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnWChar Public API - WChar Operations
@@ -932,8 +935,8 @@ DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *dest, u32 character);
 DQN_FILE_SCOPE bool    DqnWChar_IsDigit(const wchar_t c);
 DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c);
 
-DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *a);
-DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *a, const wchar_t *b);
+DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *const a);
+DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *const a, const wchar_t *const b);
 
 DQN_FILE_SCOPE bool Dqn_WStrReverse(wchar_t *buf, const i32 bufSize);
 DQN_FILE_SCOPE i32  Dqn_WStrToI32(const wchar_t *const buf, const i32 bufSize);
@@ -1000,11 +1003,17 @@ typedef struct DqnFile
 	size_t  size;
 
 #if defined(DQN_CPP_MODE)
-	bool   Open (char    const *const path, const u32 permissionFlags_, const enum DqnFileAction action);
-	bool   OpenW(wchar_t const *const path, const u32 permissionFlags_, const enum DqnFileAction action);
+	// If true, RAII cleanup in the destructor on scope exit. Can be changed at any point by user.
+	bool    raiiCleanup;
+	DqnFile (const bool raiiCleanup = false);
+	~DqnFile();
+
+	bool   Open (const char    *const path, const u32 permissionFlags_, const enum DqnFileAction action);
+	bool   OpenW(const wchar_t *const path, const u32 permissionFlags_, const enum DqnFileAction action);
 	size_t Write(u8 *const buffer, const size_t numBytesToWrite, const size_t fileOffset);
 	size_t Read (u8 *const buffer, const size_t numBytesToRead);
 	void   Close();
+
 #endif
 } DqnFile;
 
@@ -1021,7 +1030,7 @@ DQN_FILE_SCOPE bool DqnFile_OpenW(const wchar_t *const path, DqnFile *const file
 DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file, u8 *const buffer, const size_t numBytesToWrite, const size_t fileOffset);
 
 // return: The number of bytes read. 0 if invalid args or it failed to read.
-DQN_FILE_SCOPE size_t DqnFile_Read (const DqnFile file, u8 *const buffer, const size_t numBytesToRead);
+DQN_FILE_SCOPE size_t DqnFile_Read (const DqnFile *const file, u8 *const buffer, const size_t numBytesToRead);
 DQN_FILE_SCOPE void   DqnFile_Close(DqnFile *const file);
 
 // NOTE: You can't delete a file unless the handle has been closed to it on Win32.
@@ -1071,6 +1080,22 @@ typedef struct DqnLock
 	void Delete();
 #endif
 } DqnLock;
+
+#if defined(DQN_CPP_MODE)
+// Lock guard automatically acquires a lock on construction and releases a lock
+// on destruction.
+struct DqnLockGuard
+{
+	// lock: Takes a pointer to a pre-existing and already initialised lock
+	// bool: Pass in (optionally) a pointer to a bool which returns whether a lock was successful.
+	// FALSE if lock is NULL.
+	 DqnLockGuard(DqnLock *const lock_, bool *const succeeded);
+	~DqnLockGuard();
+
+private:
+	DqnLock *lock;
+};
+#endif
 
 DQN_FILE_SCOPE bool DqnLock_Init   (DqnLock *const lock, const u32 spinCount = 16000);
 DQN_FILE_SCOPE void DqnLock_Acquire(DqnLock *const lock);
@@ -1125,30 +1150,39 @@ typedef struct DqnJobQueue
 	u32 volatile jobInsertIndex;
 
 #if defined(DQN_CPP_MODE)
-	bool Init             (DqnJob const *const jobList_, const u32 jobListSize, const u32 numThreads);
+	bool Init             (const DqnJob *const jobList_, const u32 jobListSize, const u32 numThreads);
 	bool AddJob           (const DqnJob job);
+
+    void BlockAndCompleteAllJobs();
 	bool TryExecuteNextJob();
 	bool AllJobsComplete  ();
 #endif
 } DqnJobQueue;
 
+// TODO(doyle): Queue delete, thread delete
+
 // queue:       Pass a pointer to a zero cleared DqnJobQueue struct
 // jobList:     Pass in a pointer to an array of DqnJob's
 // jobListSize: The number of elements in the jobList array
 // numThreads:  The number of threads the queue should request from the OS for working on the queue
-// return:      FALSE if invalid args.
-DQN_FILE_SCOPE bool DqnJobQueue_Init(DqnJobQueue *const queue, DqnJob const *const jobList,
+// return:      FALSE if invalid args i.e. NULL ptrs or jobListSize & numThreads == 0
+DQN_FILE_SCOPE bool DqnJobQueue_Init(DqnJobQueue *const queue, const DqnJob *const jobList,
                                      const u32 jobListSize, const u32 numThreads);
 
 // return: FALSE if the job is not able to be added, this occurs if the queue is full.
 DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob job);
+
+// Helper function that combines TryExecuteNextJob() and AllJobsComplete(), i.e.
+// complete all work before moving on. Does nothing if queue is NULL.
+DQN_FILE_SCOPE void DqnJobQueue_BlockAndCompleteAllJobs(DqnJobQueue *const queue);
 
 // return: TRUE if there was a job to execute (the calling thread executes it). FALSE if it could
 //         not get a job. It may return FALSE whilst there are still jobs, this means that another thread
 //         has taken the job before the calling thread could and should NOT be used to determine if there
 //         are any remaining jobs left. That can only be definitively known using
 //         DqnJobQueue_AllJobsComplete(). This is typically combined like so ..
-//         while (DqnJobQueue_TryExecuteNextJob(queue) && !DqnJobQueue_AllJobsComplete(queue));
+//         while (DqnJobQueue_TryExecuteNextJob(queue) || !DqnJobQueue_AllJobsComplete(queue));
+//         Return FALSE also if queue is a NULL pointer.
 DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue);
 DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete  (DqnJobQueue *const queue);
 
@@ -1757,7 +1791,7 @@ DQN_FILE_SCOPE void DqnMem_Clear(void *const memory, const u8 clearValue, const 
 	if (memory) memset(memory, clearValue, size);
 }
 
-DQN_FILE_SCOPE void *DqnMem_Realloc(void *const memory, const size_t newSize)
+DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, const size_t newSize)
 {
 	void *result = realloc(memory, newSize);
 	return result;
@@ -1817,7 +1851,7 @@ DqnMemStackTempRegion DqnMemStack::TempRegionBegin()
 void DqnMemStack::TempRegionEnd(DqnMemStackTempRegion region) { DqnMemStackTempRegion_End(region); }
 
 // NOTE: Guaranteed to always succeed. Fails when arguments are invalid, like a NULL ptr which is impossible here.
-DqnMemStackTempRegionScoped DqnMemStack::TempRegionScoped() { return DqnMemStackTempRegionScoped(this, NULL); }
+DqnMemStackTempRegionGuard DqnMemStack::TempRegionGuard() { return DqnMemStackTempRegionGuard(this, NULL); }
 
 DqnMemStackBlock *DqnMemStack::AllocateCompatibleBlock(size_t size)                          { return DqnMemStack_AllocateCompatibleBlock(this, size);        }
 bool              DqnMemStack::AttachBlock            (DqnMemStackBlock *const newBlock)     { return DqnMemStack_AttachBlock            (this, newBlock);    }
@@ -2027,7 +2061,7 @@ DQN_FILE_SCOPE void DqnMemStack_ClearCurrBlock(DqnMemStack *const stack, const b
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnMemStackTempRegion Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE bool DqnMemStackTempRegion_Begin(DqnMemStackTempRegion *region,
+DQN_FILE_SCOPE bool DqnMemStackTempRegion_Begin(DqnMemStackTempRegion *const region,
                                                 DqnMemStack *const stack)
 {
 	if (!region || !stack) return false;
@@ -2057,13 +2091,20 @@ DQN_FILE_SCOPE void DqnMemStackTempRegion_End(DqnMemStackTempRegion region)
 }
 
 #ifdef DQN_CPP_MODE
-DqnMemStackTempRegionScoped::DqnMemStackTempRegionScoped(DqnMemStack *const stack, bool *const succeeded)
+DqnMemStackTempRegionGuard::DqnMemStackTempRegionGuard(DqnMemStack *const stack, bool *const succeeded)
 {
-	bool result = DqnMemStackTempRegion_Begin(&this->tempMemStack, stack);
-	if (succeeded) *succeeded = result;
+	if (stack)
+	{
+		DQN_ASSERT_HARD(DqnMemStackTempRegion_Begin(&this->tempMemStack, stack));
+		if (succeeded) *succeeded = true;
+	}
+	else
+	{
+		if (succeeded) *succeeded = false;
+	}
 }
 
-DqnMemStackTempRegionScoped::~DqnMemStackTempRegionScoped()
+DqnMemStackTempRegionGuard::~DqnMemStackTempRegionGuard()
 {
 	DqnMemStackTempRegion_End(this->tempMemStack);
 }
@@ -3106,23 +3147,26 @@ DQN_FILE_SCOPE bool DqnChar_IsAlphaNum(char c)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnStr Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *a, const char *b)
+DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *const a, const char *const b)
 {
 	if (!a && !b) return -1;
 	if (!a) return -1;
 	if (!b) return -1;
 
-	while ((*a) == (*b))
+	char const *aPtr = a;
+	char const *bPtr = b;
+
+	while ((*aPtr) == (*bPtr))
 	{
-		if (!(*a)) return 0;
-		a++;
-		b++;
+		if (!(*aPtr)) return 0;
+		aPtr++;
+		bPtr++;
 	}
 
-	return (((*a) < (*b)) ? -1 : 1);
+	return (((*aPtr) < (*bPtr)) ? -1 : 1);
 }
 
-DQN_FILE_SCOPE i32 DqnStr_Len(const char *a)
+DQN_FILE_SCOPE i32 DqnStr_Len(const char *const a)
 {
 	i32 result = 0;
 	while (a && a[result]) result++;
@@ -3137,7 +3181,7 @@ DQN_FILE_SCOPE i32 DqnStr_LenDelimitWith(const char *a, const char delimiter)
 	return result;
 }
 
-DQN_FILE_SCOPE char *DqnStr_Copy(char *dest, const char *src, i32 numChars)
+DQN_FILE_SCOPE char *DqnStr_Copy(char *const dest, const char *const src, const i32 numChars)
 {
 	if (!dest) return NULL;
 	if (!src)  return NULL;
@@ -3149,7 +3193,7 @@ DQN_FILE_SCOPE char *DqnStr_Copy(char *dest, const char *src, i32 numChars)
 	return dest;
 }
 
-DQN_FILE_SCOPE bool DqnStr_Reverse(char *buf, const i32 bufSize)
+DQN_FILE_SCOPE bool DqnStr_Reverse(char *const buf, const i32 bufSize)
 {
 	if (!buf) return false;
 	i32 mid = bufSize / 2;
@@ -3213,7 +3257,7 @@ DQN_FILE_SCOPE bool DqnStr_HasSubstring(const char *const src, const i32 srcLen,
 	return true;
 }
 
-DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 value, char *const buf, const i32 bufSize)
+DQN_FILE_SCOPE i32 Dqn_I64ToStr(const i64 value, char *const buf, const i32 bufSize)
 {
 	bool validBuffer = true;
 	if (!buf || bufSize == 0) validBuffer = false;
@@ -3433,7 +3477,7 @@ DQN_FILE_SCOPE f32 Dqn_StrToF32(const char *const buf, const i32 bufSize)
 	The UCS code values 0xd800–0xdfff (UTF-16 surrogates) as well as 0xfffe and
 	0xffff (UCS noncharacters) should not appear in conforming UTF-8 streams.
 */
-DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character)
+DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, const u32 character)
 {
 	if (!dest) return 0;
 
@@ -3502,7 +3546,7 @@ DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character)
 	return 0;
 }
 
-DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *dest, u32 character)
+DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, const u32 character)
 {
 	if (!dest) return 0;
 
@@ -3598,27 +3642,30 @@ DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnWStr Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *a)
+DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *const a)
 {
 	i32 result = 0;
 	while (a && a[result]) result++;
 	return result;
 }
 
-DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *a, const wchar_t *b)
+DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *const a, const wchar_t *const b)
 {
 	if (!a && !b) return -1;
 	if (!a) return -1;
 	if (!b) return -1;
 
-	while ((*a) == (*b))
+	const wchar_t *aPtr = a;
+	const wchar_t *bPtr = b;
+
+	while ((*aPtr) == (*bPtr))
 	{
-		if (!(*a)) return 0;
-		a++;
-		b++;
+		if (!(*aPtr)) return 0;
+		aPtr++;
+		bPtr++;
 	}
 
-	return (((*a) < (*b)) ? -1 : 1);
+	return (((*aPtr) < (*bPtr)) ? -1 : 1);
 }
 
 DQN_FILE_SCOPE bool Dqn_WStrReverse(wchar_t *buf, const i32 bufSize)
@@ -5506,15 +5553,18 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
-// XPlatform > #DqnFileInternal CPP Implementation
+// XPlatform > #DqnFile CPP Implementation
 ////////////////////////////////////////////////////////////////////////////////
-bool DqnFile::Open(char const *const path, const u32 permissionFlags_,
+DqnFile::DqnFile (const bool raiiCleanup) { this->raiiCleanup = raiiCleanup;      }
+DqnFile::~DqnFile()                       { if (this->raiiCleanup) this->Close(); }
+
+bool DqnFile::Open(const char *const path, const u32 permissionFlags_,
                    const enum DqnFileAction action)
 {
 	return DqnFile_Open(path, this, permissionFlags, action);
 }
 
-bool DqnFile::OpenW(wchar_t const *const path, const u32 permissionFlags_,
+bool DqnFile::OpenW(const wchar_t *const path, const u32 permissionFlags_,
                     const enum DqnFileAction action)
 {
 	return DqnFile_OpenW(path, this, permissionFlags, action);
@@ -5527,7 +5577,7 @@ size_t DqnFile::Write(u8 *const buffer, const size_t numBytesToWrite, const size
 
 size_t DqnFile::Read(u8 *const buffer, const size_t numBytesToRead)
 {
-	return DqnFile_Read(*this, buffer, numBytesToRead);
+	return DqnFile_Read(this, buffer, numBytesToRead);
 }
 
 void DqnFile::Close() { DqnFile_Close(this); }
@@ -5895,16 +5945,16 @@ DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file,
 	return numBytesWritten;
 }
 
-DQN_FILE_SCOPE size_t DqnFile_Read(DqnFile file, u8 *const buffer,
+DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile *const file, u8 *const buffer,
                                    const size_t numBytesToRead)
 {
 	size_t numBytesRead = 0;
-	if (file.handle && buffer)
+	if (file && file->handle && buffer)
 	{
 #if defined(DQN_WIN32_PLATFORM)
 		DWORD bytesToRead = (DWORD)numBytesToRead;
 		DWORD bytesRead    = 0;
-		HANDLE win32Handle = file.handle;
+		HANDLE win32Handle = file->handle;
 
 		BOOL result = ReadFile(win32Handle, (void *)buffer, bytesToRead,
 		                       &bytesRead, NULL);
@@ -5919,10 +5969,10 @@ DQN_FILE_SCOPE size_t DqnFile_Read(DqnFile file, u8 *const buffer,
 #elif defined(DQN_UNIX_PLATFORM)
 		// TODO(doyle): Syscall version
 		const size_t ITEMS_TO_READ = 1;
-		if (fread(buffer, numBytesToRead, ITEMS_TO_READ, (FILE *)file.handle) ==
+		if (fread(buffer, numBytesToRead, ITEMS_TO_READ, (FILE *)file->handle) ==
 		    ITEMS_TO_READ)
 		{
-			rewind((FILE *)file.handle);
+			rewind((FILE *)file->handle);
 			numBytesRead = ITEMS_TO_READ * numBytesToRead;
 		}
 		else
@@ -6100,10 +6150,31 @@ void DqnLock_Delete(DqnLock *const lock)
 ////////////////////////////////////////////////////////////////////////////////
 // Win32Platform > #DqnLock CPP Implementation
 ////////////////////////////////////////////////////////////////////////////////
-bool DqnLock::Init(const u32 spinCount) { return DqnLock_Init(this, spinCount); }
-void DqnLock::Acquire()                 {        DqnLock_Acquire(this); }
-void DqnLock::Release()                 {        DqnLock_Release(this); }
-void DqnLock::Delete()                  {        DqnLock_Delete (this); }
+void DqnLock::Acquire() { DqnLock_Acquire(this); }
+void DqnLock::Release() { DqnLock_Release(this); }
+void DqnLock::Delete()  { DqnLock_Delete (this); }
+
+////////////////////////////////////////////////////////////////////////////////
+// Win32Platform > #DqnLockGuard CPP Implementation
+////////////////////////////////////////////////////////////////////////////////
+DqnLockGuard::DqnLockGuard(DqnLock *const lock_, bool *const succeeded)
+{
+	if (lock_)
+	{
+		this->lock = lock_;
+		this->lock->Acquire();
+		if (succeeded) *succeeded = true;
+	}
+	else
+	{
+		if (succeeded) *succeeded = false;
+	}
+}
+
+DqnLockGuard::~DqnLockGuard()
+{
+	if (this->lock) this->lock->Release();
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Win32Platform > #DqnAtomic Implementation
@@ -6234,8 +6305,16 @@ DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob jo
 	return true;
 }
 
+DQN_FILE_SCOPE void DqnJobQueue_BlockAndCompleteAllJobs(DqnJobQueue *const queue)
+{
+	while (DqnJobQueue_TryExecuteNextJob(queue) || !DqnJobQueue_AllJobsComplete(queue))
+		;
+}
+
 DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue)
 {
+	if (!queue) return false;
+
 	u32 originalJobToExecute = queue->jobToExecuteIndex;
 	if (originalJobToExecute != queue->jobInsertIndex)
 	{
@@ -6262,6 +6341,8 @@ DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue)
 
 DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete(DqnJobQueue *const queue)
 {
+	if (!queue) return false;
+
 	bool result = (queue->numJobsToComplete == 0);
 	return result;
 }
@@ -6269,15 +6350,16 @@ DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete(DqnJobQueue *const queue)
 ////////////////////////////////////////////////////////////////////////////////
 // Win32Platform > #DqnJobQueue CPP Implementation
 ////////////////////////////////////////////////////////////////////////////////
-bool DqnJobQueue::Init(DqnJob const *const jobList_, const u32 jobListSize, const u32 numThreads)
+bool DqnJobQueue::Init(const DqnJob *const jobList_, const u32 jobListSize, const u32 numThreads)
 {
 	bool result = DqnJobQueue_Init(this, jobList, jobListSize, numThreads);
 	return result;
 }
 
-bool DqnJobQueue::AddJob           (const DqnJob job) { return DqnJobQueue_AddJob(this, job);       }
-bool DqnJobQueue::TryExecuteNextJob()                 { return DqnJobQueue_TryExecuteNextJob(this); }
-bool DqnJobQueue::AllJobsComplete  ()                 { return DqnJobQueue_AllJobsComplete(this);   }
+bool DqnJobQueue::AddJob           (const DqnJob job) { return DqnJobQueue_AddJob(this, job);             }
+void DqnJobQueue::BlockAndCompleteAllJobs()           {        DqnJobQueue_BlockAndCompleteAllJobs(this); }
+bool DqnJobQueue::TryExecuteNextJob()                 { return DqnJobQueue_TryExecuteNextJob(this);       }
+bool DqnJobQueue::AllJobsComplete  ()                 { return DqnJobQueue_AllJobsComplete(this);         }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Win32Platform > #DqnWin32 Implementation

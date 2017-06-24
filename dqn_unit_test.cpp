@@ -1576,11 +1576,23 @@ void FileTest()
 			               expectedSize);
 
 			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
-			DQN_ASSERT(DqnFile_Read(file, buffer, (u32)file.size) == file.size);
+			DQN_ASSERT(DqnFile_Read(&file, buffer, (u32)file.size) == file.size);
 			free(buffer);
 
 			DqnFile_Close(&file);
 			DQN_ASSERT(!file.handle && file.size == 0 && file.permissionFlags == 0);
+
+			if (1)
+			{
+				DqnFile raiiFile = DqnFile(true);
+				if (raiiFile.Open(FILE_TO_OPEN,
+				                  DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read,
+				                  DqnFileAction_OpenOnly))
+				{
+					i32 breakHereToTestRaii = 0;
+					(void)breakHereToTestRaii;
+				}
+			}
 		}
 
 		// Test invalid file
@@ -1637,7 +1649,7 @@ void FileTest()
 			u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, file->size);
 			DQN_ASSERT(buffer);
 
-			size_t bytesRead = DqnFile_Read(files[i], buffer, file->size);
+			size_t bytesRead = DqnFile_Read(&files[i], buffer, file->size);
 			DQN_ASSERT(bytesRead == file->size);
 
 			// Verify the data is the same as we wrote out
@@ -1687,24 +1699,29 @@ void FileTest()
 
 #ifdef DQN_WIN32_IMPLEMENTATION
 FILE_SCOPE u32 volatile globalDebugCounter;
-FILE_SCOPE bool volatile globalDebugCounterMemoize[2048];
 FILE_SCOPE DqnLock globalJobQueueLock;
+const u32 QUEUE_SIZE = 256;
 FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
                                                       void *const userData)
 {
-	DqnLock_Acquire(&globalJobQueueLock);
-	DQN_ASSERT(!globalDebugCounterMemoize[globalDebugCounter]);
-	globalDebugCounterMemoize[globalDebugCounter] = true;
-	globalDebugCounter++;
-	u32 number = globalDebugCounter;
-	DqnLock_Release(&globalJobQueueLock);
+	DQN_ASSERT(queue->size == QUEUE_SIZE);
+	{
+		bool succeeded;
+		DqnLockGuard guard = DqnLockGuard(&globalJobQueueLock, &succeeded);
+		DQN_ASSERT(succeeded);
 
-	printf("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n",
-	       GetCurrentThreadId(), number);
+		globalDebugCounter++;
+		u32 number = globalDebugCounter;
+		printf("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n",
+		       GetCurrentThreadId(), number);
+	}
+
 }
 
 FILE_SCOPE void JobQueueTest()
 {
+	globalDebugCounter = 0;
+
 	DqnMemStack memStack = {};
 	DQN_ASSERT_HARD(memStack.Init(DQN_MEGABYTE(1), true));
 
@@ -1713,13 +1730,13 @@ FILE_SCOPE void JobQueueTest()
 	DQN_ASSERT(numThreads > 0 && numCores > 0);
 	i32 totalThreads = (numCores - 1) * numThreads;
 
-	const i32 QUEUE_SIZE = 256;
 	DqnJobQueue jobQueue = {};
 	DqnJob *jobList      = (DqnJob *)memStack.Push(sizeof(*jobQueue.jobList) * QUEUE_SIZE);
 	DQN_ASSERT(DqnJobQueue_Init(&jobQueue, jobList, QUEUE_SIZE, totalThreads));
 
+	const u32 WORK_ENTRIES = 2048;
 	DQN_ASSERT(DqnLock_Init(&globalJobQueueLock));
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(globalDebugCounterMemoize); i++)
+	for (i32 i = 0; i < WORK_ENTRIES; i++)
 	{
 		DqnJob job   = {};
 		job.callback = JobQueueDebugCallbackIncrementCounter;
@@ -1729,22 +1746,17 @@ FILE_SCOPE void JobQueueTest()
 		}
 	}
 
-	while (DqnJobQueue_TryExecuteNextJob(&jobQueue))
-		;
-
-	for (i32 i = 0; i < DQN_ARRAY_COUNT(globalDebugCounterMemoize); i++)
-		DQN_ASSERT(globalDebugCounterMemoize[i]);
-
-	while (DqnJobQueue_TryExecuteNextJob(&jobQueue) && !DqnJobQueue_AllJobsComplete(&jobQueue))
-		;
+	DqnJobQueue_BlockAndCompleteAllJobs(&jobQueue);
 
 	printf("\nJobQueueTest(): Final incremented value: %d\n", globalDebugCounter);
-	DQN_ASSERT(globalDebugCounter == DQN_ARRAY_COUNT(globalDebugCounterMemoize));
+	DQN_ASSERT(globalDebugCounter == WORK_ENTRIES);
+	DqnLock_Delete(&globalJobQueueLock);
 }
 #endif
 
 int main(void)
 {
+#if 1
 	StringsTest();
 	RandomTest();
 	MathTest();
@@ -1752,6 +1764,7 @@ int main(void)
 	VecTest();
 	ArrayTest();
 	MemStackTest();
+#endif
 
 #ifdef DQN_XPLATFORM_LAYER
 	FileTest();
