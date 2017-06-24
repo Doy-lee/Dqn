@@ -998,6 +998,14 @@ typedef struct DqnFile
 	u32     permissionFlags;
 	void   *handle;
 	size_t  size;
+
+#if defined(DQN_CPP_MODE)
+	bool   Open (char    const *const path, const u32 permissionFlags_, const enum DqnFileAction action);
+	bool   OpenW(wchar_t const *const path, const u32 permissionFlags_, const enum DqnFileAction action);
+	size_t Write(u8 *const buffer, const size_t numBytesToWrite, const size_t fileOffset);
+	size_t Read (u8 *const buffer, const size_t numBytesToRead);
+	void   Close();
+#endif
 } DqnFile;
 
 // NOTE: W(ide) versions of functions only work on Win32, since Unix is UTF-8 compatible.
@@ -1055,6 +1063,13 @@ DQN_FILE_SCOPE f64  DqnTimer_NowInS ();
 typedef struct DqnLock
 {
 	CRITICAL_SECTION win32Handle;
+
+#if defined(DQN_CPP_MODE)
+	bool Init(const u32 spinCount = 16000);
+	void Acquire();
+	void Release();
+	void Delete();
+#endif
 } DqnLock;
 
 DQN_FILE_SCOPE bool DqnLock_Init   (DqnLock *const lock, const u32 spinCount = 16000);
@@ -5491,6 +5506,33 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
+// XPlatform > #DqnFileInternal CPP Implementation
+////////////////////////////////////////////////////////////////////////////////
+bool DqnFile::Open(char const *const path, const u32 permissionFlags_,
+                   const enum DqnFileAction action)
+{
+	return DqnFile_Open(path, this, permissionFlags, action);
+}
+
+bool DqnFile::OpenW(wchar_t const *const path, const u32 permissionFlags_,
+                    const enum DqnFileAction action)
+{
+	return DqnFile_OpenW(path, this, permissionFlags, action);
+}
+
+size_t DqnFile::Write(u8 *const buffer, const size_t numBytesToWrite, const size_t fileOffset)
+{
+	return DqnFile_Write(this, buffer, numBytesToWrite, fileOffset);
+}
+
+size_t DqnFile::Read(u8 *const buffer, const size_t numBytesToRead)
+{
+	return DqnFile_Read(*this, buffer, numBytesToRead);
+}
+
+void DqnFile::Close() { DqnFile_Close(this); }
+
+////////////////////////////////////////////////////////////////////////////////
 // XPlatform > #DqnFileInternal Implementation
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef DQN_WIN32_PLATFORM
@@ -6054,6 +6096,14 @@ void DqnLock_Delete(DqnLock *const lock)
 	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
 #endif
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Win32Platform > #DqnLock CPP Implementation
+////////////////////////////////////////////////////////////////////////////////
+bool DqnLock::Init(const u32 spinCount) { return DqnLock_Init(this, spinCount); }
+void DqnLock::Acquire()                 {        DqnLock_Acquire(this); }
+void DqnLock::Release()                 {        DqnLock_Release(this); }
+void DqnLock::Delete()                  {        DqnLock_Delete (this); }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Win32Platform > #DqnAtomic Implementation
