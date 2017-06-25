@@ -1697,7 +1697,6 @@ void FileTest()
 }
 #endif
 
-#ifdef DQN_WIN32_IMPLEMENTATION
 FILE_SCOPE u32 volatile globalDebugCounter;
 FILE_SCOPE DqnLock globalJobQueueLock;
 const u32 QUEUE_SIZE = 256;
@@ -1706,14 +1705,16 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
 {
 	DQN_ASSERT(queue->size == QUEUE_SIZE);
 	{
-		bool succeeded;
-		DqnLockGuard guard = DqnLockGuard(&globalJobQueueLock, &succeeded);
-		DQN_ASSERT(succeeded);
-
+		DqnLockGuard guard = globalJobQueueLock.LockGuard();
 		globalDebugCounter++;
 		u32 number = globalDebugCounter;
+#if defined(DQN_WIN32_IMPLEMENTATION)
 		printf("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n",
 		       GetCurrentThreadId(), number);
+#elif defined(DQN_UNIX_IMPLEMENTATION)
+		printf("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d\n",
+		       number);
+#endif
 	}
 
 }
@@ -1725,10 +1726,12 @@ FILE_SCOPE void JobQueueTest()
 	DqnMemStack memStack = {};
 	DQN_ASSERT_HARD(memStack.Init(DQN_MEGABYTE(1), true));
 
-	i32 numThreads, numCores;
-	DqnWin32_GetNumThreadsAndCores(&numCores, &numThreads);
+	u32 numThreads, numCores;
+	DqnPlatform_GetNumThreadsAndCores(&numCores, &numThreads);
 	DQN_ASSERT(numThreads > 0 && numCores > 0);
-	i32 totalThreads = (numCores - 1) * numThreads;
+
+	u32 totalThreads = (numCores - 1) * numThreads;
+	if (totalThreads == 0) totalThreads = 1;
 
 	DqnJobQueue jobQueue = {};
 	DqnJob *jobList      = (DqnJob *)memStack.Push(sizeof(*jobQueue.jobList) * QUEUE_SIZE);
@@ -1736,7 +1739,7 @@ FILE_SCOPE void JobQueueTest()
 
 	const u32 WORK_ENTRIES = 2048;
 	DQN_ASSERT(DqnLock_Init(&globalJobQueueLock));
-	for (i32 i = 0; i < WORK_ENTRIES; i++)
+	for (u32 i = 0; i < WORK_ENTRIES; i++)
 	{
 		DqnJob job   = {};
 		job.callback = JobQueueDebugCallbackIncrementCounter;
@@ -1752,11 +1755,9 @@ FILE_SCOPE void JobQueueTest()
 	DQN_ASSERT(globalDebugCounter == WORK_ENTRIES);
 	DqnLock_Delete(&globalJobQueueLock);
 }
-#endif
 
 int main(void)
 {
-#if 1
 	StringsTest();
 	RandomTest();
 	MathTest();
@@ -1764,14 +1765,10 @@ int main(void)
 	VecTest();
 	ArrayTest();
 	MemStackTest();
-#endif
 
 #ifdef DQN_XPLATFORM_LAYER
 	FileTest();
 	OtherTest();
-#endif
-
-#ifdef DQN_WIN32_IMPLEMENTATION
 	JobQueueTest();
 #endif
 
