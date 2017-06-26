@@ -1093,13 +1093,15 @@ typedef struct DqnLock
 	void Release();
 	void Delete ();
 
+	// Create a lock guard on the lock this is invoked on.
 	struct DqnLockGuard LockGuard();
 #endif
 } DqnLock;
 
 #if defined(DQN_CPP_MODE)
-// Lock guard automatically acquires a lock on construction and releases a lock
-// on destruction.
+// Lock guard automatically acquires a lock on construction and releases the associated lock on
+// destruction. If the lock is unable to be acquired, the program blocks at construction until it
+// can.
 struct DqnLockGuard
 {
 	// lock: Takes a pointer to a pre-existing and already initialised lock
@@ -1153,8 +1155,8 @@ typedef struct DqnJobQueue
 	u32     size;
 
 	// NOTE(doyle): Modified by main+worker threads
-	u32   volatile jobToExecuteIndex;
-	u32   volatile numJobsToComplete;
+	i32   volatile jobToExecuteIndex;
+	i32   volatile numJobsToComplete;
 
 #if defined(DQN_WIN32_PLATFORM)
 	void *semaphore;
@@ -1167,9 +1169,8 @@ typedef struct DqnJobQueue
 
 #endif
 
-
 	// NOTE: Modified by main thread ONLY
-	u32 volatile jobInsertIndex;
+	i32 volatile jobInsertIndex;
 
 #if defined(DQN_CPP_MODE)
 	bool Init             (const DqnJob *const jobList_, const u32 jobListSize, const u32 numThreads);
@@ -1217,15 +1218,11 @@ DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete  (DqnJobQueue *const queue);
 // swapVal:    The value to put into "dest", IF at point of read, "dest" has the value of "compareVal"
 // compareVal: The value to check in "dest"
 // return:     Return the original value that was in "dest"
-DQN_FILE_SCOPE u32 DqnAtomic_CompareSwap32(u32 volatile *const dest, const u32 swapVal, const u32 compareVal);
+DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *const dest, const i32 swapVal, const i32 compareVal);
 
-// Increment the value at src by 1
-// return: The incremented value
-DQN_FILE_SCOPE u32 DqnAtomic_Add32(u32 volatile *const src);
-
-// Decrement the value at src by 1
-// return: The decremented value
-DQN_FILE_SCOPE u32 DqnAtomic_Sub32(u32 volatile *const src);
+// Add "value" to src
+// return: The new value at src
+DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *const src, const i32 value);
 
 ////////////////////////////////////////////////////////////////////////////////
 // XPlatform > #DqnPlatform Public API - Common Platform API Helpers
@@ -6426,12 +6423,12 @@ DQN_FILE_SCOPE bool DqnJobQueue_Init(DqnJobQueue *const queue, DqnJob *const job
 
 DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob job)
 {
-	u32 newJobInsertIndex = (queue->jobInsertIndex + 1) % queue->size;
+	i32 newJobInsertIndex = (queue->jobInsertIndex + 1) % queue->size;
 	if (newJobInsertIndex == queue->jobToExecuteIndex) return false;
 
 	queue->jobList[queue->jobInsertIndex] = job;
 
-	DqnAtomic_Add32(&queue->numJobsToComplete);
+	DqnAtomic_Add32(&queue->numJobsToComplete, 1);
 	DQN_ASSERT(DqnJobQueueInternal_ReleaseSemaphore(queue));
 
 	queue->jobInsertIndex = newJobInsertIndex;
@@ -6448,11 +6445,11 @@ DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue)
 {
 	if (!queue) return false;
 
-	u32 originalJobToExecute = queue->jobToExecuteIndex;
+	i32 originalJobToExecute = queue->jobToExecuteIndex;
 	if (originalJobToExecute != queue->jobInsertIndex)
 	{
-		u32 newJobIndexForNextThread = (originalJobToExecute + 1) % queue->size;
-		u32 index = DqnAtomic_CompareSwap32(&queue->jobToExecuteIndex, newJobIndexForNextThread,
+		i32 newJobIndexForNextThread = (originalJobToExecute + 1) % queue->size;
+		i32 index = DqnAtomic_CompareSwap32(&queue->jobToExecuteIndex, newJobIndexForNextThread,
 		                                    originalJobToExecute);
 
 		// NOTE: If we weren't successful at the interlock, another thread has
@@ -6463,7 +6460,7 @@ DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue)
 		{
 			DqnJob job = queue->jobList[index];
 			job.callback(queue, job.userData);
-			DqnAtomic_Sub32(&queue->numJobsToComplete);
+			DqnAtomic_Add32(&queue->numJobsToComplete, -1);
 		}
 
 		return true;
@@ -6497,13 +6494,17 @@ bool DqnJobQueue::AllJobsComplete  ()                 { return DqnJobQueue_AllJo
 ////////////////////////////////////////////////////////////////////////////////
 // XPlatform > #DqnAtomic Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE u32 DqnAtomic_CompareSwap32(u32 volatile *const dest, const u32 swapVal,
-                                           const u32 compareVal)
-{
-	u32 result = 0;
+
 #if defined(DQN_WIN32_PLATFORM)
-	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
-	result = (u32)InterlockedCompareExchange((LONG volatile *)dest, (LONG)swapVal, (LONG)compareVal);
+	DQN_COMPILE_ASSERT(sizeof(LONG) == sizeof(i32));
+#endif
+
+DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *const dest, const i32 swapVal,
+                                           const i32 compareVal)
+{
+	i32 result = 0;
+#if defined(DQN_WIN32_PLATFORM)
+	result = (i32)InterlockedCompareExchange((LONG volatile *)dest, (LONG)swapVal, (LONG)compareVal);
 
 #elif defined(DQN_UNIX_PLATFORM)
 	result = __sync_val_compare_and_swap(dest, compareVal, swapVal);
@@ -6515,33 +6516,14 @@ DQN_FILE_SCOPE u32 DqnAtomic_CompareSwap32(u32 volatile *const dest, const u32 s
 	return result;
 }
 
-DQN_FILE_SCOPE u32 DqnAtomic_Add32(u32 volatile *const src)
+DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *const src, const i32 value)
 {
-	u32 result = 0;
+	i32 result = 0;
 #if defined(DQN_WIN32_PLATFORM)
-	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
-	result = (u32)InterlockedIncrement((LONG volatile *)src);
+	result = (i32)InterlockedAdd((LONG volatile *)src, value);
 
 #elif defined(DQN_UNIX_PLATFORM)
-	result = __sync_add_and_fetch(src, 1);
-
-#else
-	#error Unsupported platform
-
-#endif
-
-	return result;
-}
-
-DQN_FILE_SCOPE u32 DqnAtomic_Sub32(u32 volatile *const src)
-{
-	u32 result = 0;
-#if defined(DQN_WIN32_PLATFORM)
-	DQN_ASSERT(sizeof(LONG) == sizeof(u32));
-	result = (u32)InterlockedDecrement((LONG volatile *)src);
-
-#elif defined(DQN_UNIX_PLATFORM)
-	result = __sync_sub_and_fetch(src, 1);
+	result = __sync_add_and_fetch(src, value);
 
 #else
 	#error Unsupported platform
