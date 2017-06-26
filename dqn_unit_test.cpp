@@ -1548,6 +1548,16 @@ void FileTest()
 				expectedSize = fileStat.st_size;
 			}
 
+			if (1)
+			{
+				// NOTE: cpuinfo is generated when queried, so a normal 'stat'
+				// should give us zero, but we fall back to manual byte checking
+				// which should give us the proper size.
+				size_t size = 0;
+				DQN_ASSERT(DqnFile_GetFileSize("/proc/cpuinfo", &size));
+				DQN_ASSERT(size > 0);
+			}
+
 #elif defined(DQN_WIN32_IMPLEMENTATION)
 			{
 				HANDLE handle = CreateFile(FILE_TO_OPEN, GENERIC_READ, 0, NULL, OPEN_EXISTING,
@@ -1565,6 +1575,13 @@ void FileTest()
 				expectedSize = size.LowPart;
 			}
 #endif
+
+			if (1)
+			{
+				size_t size = 0;
+				DQN_ASSERT_HARD(DqnFile_GetFileSize(FILE_TO_OPEN, &size));
+				DQN_ASSERT_HARD(size == expectedSize);
+			}
 
 			DqnFile file = {};
 			DQN_ASSERT(DqnFile_Open(".clang-format", &file,
@@ -1641,23 +1658,43 @@ void FileTest()
 		// Read data back in
 		for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
 		{
-			u32 permissions = DqnFilePermissionFlag_Read;
-			DqnFile *file   = files + i;
-			bool result     = DqnFile_Open(fileNames[i], file, permissions, DqnFileAction_OpenOnly);
-			DQN_ASSERT(result);
+			// Manual read the file contents
+			{
+				u32 permissions = DqnFilePermissionFlag_Read;
+				DqnFile *file = files + i;
+				bool result = DqnFile_Open(fileNames[i], file, permissions, DqnFileAction_OpenOnly);
+				DQN_ASSERT(result);
 
-			u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, file->size);
-			DQN_ASSERT(buffer);
+				u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, file->size);
+				DQN_ASSERT(buffer);
 
-			size_t bytesRead = DqnFile_Read(&files[i], buffer, file->size);
-			DQN_ASSERT(bytesRead == file->size);
+				size_t bytesRead = DqnFile_Read(&files[i], buffer, file->size);
+				DQN_ASSERT(bytesRead == file->size);
 
-			// Verify the data is the same as we wrote out
-			DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i])) == 0);
+				// Verify the data is the same as we wrote out
+				DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i])) == 0);
 
-			// Delete when we're done with it
-			DQN_ASSERT(DqnMemStack_Pop(&memStack, buffer, file->size));
-			DqnFile_Close(file);
+				// Delete when we're done with it
+				DQN_ASSERT(DqnMemStack_Pop(&memStack, buffer, file->size));
+				DqnFile_Close(file);
+			}
+
+			// Read using the ReadEntireFile api which doesn't need a file handle as an argument
+			{
+				size_t reqSize;
+				DQN_ASSERT(DqnFile_GetFileSize(fileNames[i], &reqSize));
+
+				u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, reqSize);
+				DQN_ASSERT(buffer);
+
+				size_t bytesRead = 0;
+				DQN_ASSERT(DqnFile_ReadEntireFile(fileNames[i], buffer, reqSize, &bytesRead));
+				DQN_ASSERT(bytesRead == reqSize);
+
+				// Verify the data is the same as we wrote out
+				DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i])) == 0);
+				DQN_ASSERT(DqnMemStack_Pop(&memStack, buffer, reqSize));
+			}
 
 			DQN_ASSERT(DqnFile_Delete(fileNames[i]));
 		}

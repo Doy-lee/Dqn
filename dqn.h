@@ -60,6 +60,10 @@
 // #DqnIni       Simple INI Config File API (Public Domain lib by Mattias Gustavsson)
 // #DqnSprintf   Cross-platform Sprintf Implementation (Public Domain lib stb_sprintf)
 
+// TODO
+// - Win32
+//   - Get rid of reliance on MAX_PATH
+
 ////////////////////////////////////////////////////////////////////////////////
 // Preprocessor Checks
 ////////////////////////////////////////////////////////////////////////////////
@@ -1033,7 +1037,7 @@ typedef struct DqnFile
 #endif
 } DqnFile;
 
-// NOTE: W(ide) versions of functions only work on Win32, since Unix is UTF-8 compatible.
+// NOTE: W(ide) versions of functions only work on Win32, since Unix is already UTF-8 compatible.
 
 // Open a handle for file read and writing. Deleting files does not need a handle. Handles should be
 // closed before deleting files otherwise the OS may not be able to delete the file.
@@ -1048,8 +1052,24 @@ DQN_FILE_SCOPE size_t DqnFile_Write(const DqnFile *const file, u8 *const buffer,
 // return: The number of bytes read. 0 if invalid args or it failed to read.
 DQN_FILE_SCOPE size_t DqnFile_Read (const DqnFile *const file, u8 *const buffer, const size_t numBytesToRead);
 
+// Read the entire file at path into the given buffer. To determine the necessary buffer size, use
+// DqnFile_GetFileSize()
+// buffer:     The buffer to put data into.
+// bufferSize: The size of the given buffer.
+// bytesRead:  (Optionally) Pass in a pointer to a size_t to get how many bytes of the buffer was
+//             used. Will be valid only if function returns true. This is basically the return value
+//             of DqnFile_Read()
+// return:     FALSE if insufficient bufferSize OR file access failure OR invalid args (i.e nullptr)
+DQN_FILE_SCOPE bool DqnFile_ReadEntireFile(const char *const path, u8 *const buffer,
+                                           const size_t bufferSize, size_t *const bytesRead);
+
 // File close invalidates the handle after it is called.
 DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file);
+
+// size: Pass in a pointer to a size_t where the file size gets put into. It holds invalid data if
+// function returns false.
+DQN_FILE_SCOPE bool DqnFile_GetFileSize (const char *const path, size_t *const size);
+DQN_FILE_SCOPE bool DqnFile_GetFileSizeW(const wchar_t *const path, size_t *const size);
 
 // NOTE: You can't delete a file unless the handle has been closed to it on Win32.
 DQN_FILE_SCOPE bool DqnFile_Delete (const char *const path);
@@ -5792,9 +5812,34 @@ DQN_FILE_SCOPE char **DqnDirInternal_PlatformRead(const char *const dir,
 		return list;
 	}
 }
+
 #endif // DQN_WIN32_PLATFORM
 
 #ifdef DQN_UNIX_PLATFORM
+FILE_SCOPE bool DqnFileInternal_UnixGetFileSizeWithStat(const char *const path, size_t *const size)
+{
+	struct stat fileStat = {0};
+	if (stat(path, &fileStat)) return false;
+	*size = fileStat.st_size;
+
+	return true;
+}
+
+FILE_SCOPE size_t DqnFileInternal_UnixGetFileSizeManual(FILE *const handle, const bool rewindHandle)
+{
+	u64 fileSizeInBytes = 0;
+
+	DQN_ASSERT_HARD(handle);
+	char c = fgetc(handle);
+	while (c != EOF)
+	{
+		fileSizeInBytes++;
+		c = fgetc(handle);
+	}
+	if (rewindHandle) rewind(handle);
+	return fileSizeInBytes;
+}
+
 FILE_SCOPE bool DqnFileInternal_UnixOpen(const char *const path,
                                          DqnFile *const file,
                                          const u32 permissionFlags,
@@ -5851,8 +5896,7 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(const char *const path,
 	FILE *handle = fopen(path, mode);
 	if (!handle) return false;
 
-	struct stat fileStat = {0};
-	if (stat(path, &fileStat))
+	if (!DqnFileInternal_UnixGetFileSizeWithStat(path, &file->size))
 	{
 		// TODO(doyle): Logging
 		fclose(handle);
@@ -5863,16 +5907,10 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(const char *const path,
 	file->permissionFlags = permissionFlags;
 
 	// NOTE: Can occur in some instances where files are generated on demand,
-	//       i.e. /proc/cpuinfo
-	if (fileStat.st_size == 0)
-	{
-		// TODO
-		file->size = fileStat.st_size;
-	}
-	else
-	{
-		file->size = fileStat.st_size;
-	}
+	//       i.e. /proc/cpuinfo. But there can also be zero-byte files, we can't
+	//       be sure. So manual check by counting bytes
+	if (file->size == 0)
+		file->size = DqnFileInternal_UnixGetFileSizeManual((FILE *)file->handle, true);
 
 	return true;
 }
@@ -5944,6 +5982,7 @@ DQN_FILE_SCOPE char **DqnDirInternal_PlatformRead(const char *const dir,
 		return list;
 	}
 }
+
 #endif // DQN_UNIX_PLATFORM
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -5956,6 +5995,7 @@ bool DqnFile_Open(const char *const path, DqnFile *const file,
 	if (!file || !path) return false;
 
 #if defined(DQN_WIN32_PLATFORM)
+	// TODO(doyle): MAX PATH is baad
 	wchar_t widePath[MAX_PATH] = {0};
 	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
 	return DqnFileInternal_Win32OpenW(widePath, file, permissionFlags, action);
@@ -6061,6 +6101,35 @@ DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile *const file, u8 *const buffer,
 	return numBytesRead;
 }
 
+DQN_FILE_SCOPE bool DqnFile_ReadEntireFile(const char *const path, u8 *const buffer,
+                                           const size_t bufferSize, size_t *const bytesRead)
+{
+	if (!path || !buffer) return false;
+
+	bool result = true;
+	size_t bytesReadInternal;
+
+	// TODO(doyle): Logging
+	DqnFile file = {};
+	result       = DqnFile_Open(path, &file, DqnFilePermissionFlag_Read, DqnFileAction_OpenOnly);
+	if (!result) goto cleanup;
+
+	if (file.size > bufferSize)
+	{
+		result = false;
+		goto cleanup;
+	}
+
+	bytesReadInternal = DqnFile_Read(&file, buffer, file.size);
+	DQN_ASSERT_HARD(bytesReadInternal == file.size);
+
+	if (bytesRead) *bytesRead = bytesReadInternal;
+
+cleanup:
+	DqnFile_Close(&file);
+	return result;
+}
+
 DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
 {
 	if (file && file->handle)
@@ -6076,11 +6145,74 @@ DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
 	}
 }
 
+#if defined(DQN_WIN32_PLATFORM)
+	DQN_COMPILE_ASSERT(sizeof(DWORD)  == sizeof(u32));
+	DQN_COMPILE_ASSERT(sizeof(size_t) >= sizeof(u64));
+#endif
+
+DQN_FILE_SCOPE bool DqnFile_GetFileSizeW(const wchar_t *const path, size_t *const size)
+{
+
+#if defined(DQN_WIN32_PLATFORM)
+	WIN32_FILE_ATTRIBUTE_DATA attribData = {};
+	if (GetFileAttributesExW(path, GetFileExInfoStandard, &attribData))
+	{
+		LARGE_INTEGER largeInt = {};
+		largeInt.HighPart      = attribData.nFileSizeHigh;
+		largeInt.LowPart       = attribData.nFileSizeLow;
+		*size                  = largeInt.QuadPart;
+		return true;
+	}
+
+#elif defined(DQN_UNIX_PLATFORM)
+	// NOTE: Not supported on unix
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+
+#endif
+
+	return false;
+}
+
+DQN_FILE_SCOPE bool DqnFile_GetFileSize(const char *const path, size_t *const size)
+{
+	if (!path || !size) return false;
+
+	// TODO(doyle): Logging
+#if defined(DQN_WIN32_PLATFORM)
+	// TODO(doyle): MAX PATH is baad
+	wchar_t widePath[MAX_PATH] = {0};
+	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
+	return DqnFile_GetFileSizeW(widePath, size);
+
+#elif defined(DQN_UNIX_PLATFORM)
+	// TODO(doyle): Error logging
+	if (!DqnFileInternal_UnixGetFileSizeWithStat(path, size)) return false;
+
+	// NOTE: 0 size can occur in some instances where files are generated on demand,
+	//       i.e. /proc/cpuinfo
+	if (*size == 0)
+	{
+		// If stat fails, then do a manual byte count
+		DqnFile file = {};
+		if (!DqnFileInternal_UnixOpen(path, &file, DqnFilePermissionFlag_Read,
+		                              DqnFileAction_OpenOnly))
+		{
+			return false;
+		}
+
+		*size = DqnFileInternal_UnixGetFileSizeManual((FILE *)file.handle, false);
+		DqnFile_Close(&file);
+	}
+
+	return true;
+#endif
+}
+
 DQN_FILE_SCOPE bool DqnFile_Delete(const char *const path)
 {
 	if (!path) return false;
 
-	// TODO(doyle): Logging
+// TODO(doyle): Logging
 #if defined(DQN_WIN32_PLATFORM)
 	return DeleteFileA(path);
 
@@ -6093,6 +6225,20 @@ DQN_FILE_SCOPE bool DqnFile_Delete(const char *const path)
 #endif
 }
 
+DQN_FILE_SCOPE bool DqnFile_DeleteW(const wchar_t *const path)
+{
+	if (!path) return false;
+
+	// TODO(doyle): Logging
+#if defined(DQN_WIN32_PLATFORM)
+	return DeleteFileW(path);
+
+#elif defined(DQN_UNIX_PLATFORM)
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	return false;
+
+#endif
+}
 ////////////////////////////////////////////////////////////////////////////////
 // XPlatform > #DqnDir Implementation
 ////////////////////////////////////////////////////////////////////////////////
@@ -6546,17 +6692,6 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 	DqnFile file = {};
 	DQN_ASSERT_HARD(
 	    DqnFile_Open("/proc/cpuinfo", &file, DqnFilePermissionFlag_Read, DqnFileAction_OpenOnly));
-
-	// NOTE: cpuinfo is generated by kernel when queried, so we don't actually know the size.
-	DQN_ASSERT_HARD(file.size == 0);
-
-	char c = fgetc((FILE *)file.handle);
-	while(c != EOF)
-	{
-		file.size++;
-		c = fgetc((FILE *)file.handle);
-	}
-	rewind((FILE *)file.handle);
 	DQN_ASSERT_HARD(file.size > 0);
 
 	u8 *readBuffer = (u8 *)DqnMem_Calloc(file.size);
