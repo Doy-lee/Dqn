@@ -42,6 +42,7 @@
 // #DqnWChar     WChar Operations (IsDigit(), IsAlpha() etc)
 // #DqnWStr      WStr  Operations (WStr_Len() etc)
 // #DqnRnd       Random Number Generator (ints and floats)
+// #Dqn_*        Dqn_QuickSort
 
 // #XPlatform (Win32 & Unix)
 // #DqnFile      File I/O (Read, Write, Delete)
@@ -61,8 +62,14 @@
 // #DqnSprintf   Cross-platform Sprintf Implementation (Public Domain lib stb_sprintf)
 
 // TODO
+// - DqnMemStack
+//   - Allow 0 size memblock stack initialisation/block-less stack for situations where you don't
+//     care about specifying a size upfront
+//
 // - Win32
 //   - Get rid of reliance on MAX_PATH
+//
+// - Make lib compile and run on Linux with GCC using -03
 
 ////////////////////////////////////////////////////////////////////////////////
 // Preprocessor Checks
@@ -972,6 +979,90 @@ DQN_FILE_SCOPE u32  DqnRnd_PCGNext (DqnRandPCGState *pcg);
 DQN_FILE_SCOPE f32  DqnRnd_PCGNextf(DqnRandPCGState *pcg);
 // return: A random integer N between [min, max]
 DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
+
+////////////////////////////////////////////////////////////////////////////////
+// #Dqn_* Public API
+////////////////////////////////////////////////////////////////////////////////
+typedef bool Dqn_QuickSortLessThanCallback(const void *const val1, const void *const val2);
+typedef void Dqn_QuickSortSwapCallback    (void *const val1, void *const val2);
+DQN_FILE_SCOPE void Dqn_QuickSortC(void *const array, const u32 itemSize, const u32 size,
+                                   Dqn_QuickSortLessThanCallback *const IsLessThan,
+                                   Dqn_QuickSortSwapCallback *const Swap);
+
+template <typename T>
+DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const u32 size,
+                                  Dqn_QuickSortLessThanCallback *const IsLessThan)
+{
+	if (!array || size == 0 || size == 1 || !IsLessThan) return;
+
+	// Insertion Sort, under 24->32 is an optimal amount
+	const u32 QUICK_SORT_THRESHOLD = 24;
+	if (size < QUICK_SORT_THRESHOLD)
+	{
+		u32 itemToInsertIndex = 1;
+		while (itemToInsertIndex < size)
+		{
+			for (u32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
+			{
+				if (!IsLessThan(&array[checkIndex], &array[itemToInsertIndex]))
+				{
+					T itemToInsert = array[itemToInsertIndex];
+					for (u32 i   = itemToInsertIndex; i > checkIndex; i--)
+						array[i] = array[i - 1];
+
+					array[checkIndex] = itemToInsert;
+					break;
+				}
+			}
+			itemToInsertIndex++;
+		}
+
+		return;
+	}
+
+	DqnRandPCGState state = {};
+	DqnRnd_PCGInit(&state);
+
+	u32 pivotIndex     = DqnRnd_PCGRange(&state, 0, size - 1);
+	u32 partitionIndex = 0;
+	u32 startIndex     = 0;
+
+	// Swap pivot with last index, so pivot is always at the end of the array.
+	// This makes logic much simpler.
+	{
+		u32 lastIndex = size - 1;
+		DQN_SWAP(T, array[lastIndex], array[pivotIndex]);
+		pivotIndex = lastIndex;
+	}
+
+	// 4^, 8, 7, 5, 2, 3, 6
+	if (IsLessThan(&array[startIndex], &array[pivotIndex])) partitionIndex++;
+	startIndex++;
+
+	// 4, |8, 7, 5^, 2, 3, 6*
+	// 4, 5, |7, 8, 2^, 3, 6*
+	// 4, 5, 2, |8, 7, ^3, 6*
+	// 4, 5, 2, 3, |7, 8, ^6*
+	for (u32 checkIndex = startIndex; checkIndex < size; checkIndex++)
+	{
+		if (IsLessThan(&array[checkIndex], &array[pivotIndex]))
+		{
+			DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
+			partitionIndex++;
+		}
+	}
+
+	// Move pivot to right of partition
+	// 4, 5, 2, 3, |6, 8, ^7*
+	DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
+	Dqn_QuickSort(array, partitionIndex, IsLessThan);
+
+	// Skip the value at partion index since that is guaranteed to be sorted.
+	// 4, 5, 2, 3, (x), 8, 7
+	u32 oneAfterPartitionIndex = partitionIndex + 1;
+	Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex), IsLessThan);
+}
+
 #endif  /* DQN_H */
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1899,9 +1990,10 @@ DqnMemStackInternal_AllocateBlock(u32 byteAlign, size_t size, const bool zeroCle
 
 	if (!result) return NULL;
 
-	result->memory = (u8 *)DQN_ALIGN_POW_N((u8 *)result + sizeof(*result), byteAlign);
-	result->size   = alignedSize;
-	result->used   = 0;
+	result->memory    = (u8 *)DQN_ALIGN_POW_N((u8 *)result + sizeof(*result), byteAlign);
+	result->size      = alignedSize;
+	result->used      = 0;
+	result->prevBlock = NULL;
 	return result;
 }
 
@@ -1966,6 +2058,8 @@ DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedMem(DqnMemStack *const stack, u8 *c
 	const u32 DEFAULT_ALIGNMENT = 4;
 	stack->tempRegionCount      = 0;
 	stack->byteAlign = (byteAlign == 0) ? DEFAULT_ALIGNMENT : byteAlign;
+
+	DQN_ASSERT(!stack->block->prevBlock);
 	return true;
 }
 
@@ -1976,6 +2070,7 @@ DQN_FILE_SCOPE bool DqnMemStack_InitWithFixedSize(DqnMemStack *const stack, size
 	if (result)
 	{
 		stack->flags |= DqnMemStackFlag_IsNotExpandable;
+		DQN_ASSERT(!stack->block->prevBlock);
 		return true;
 	}
 
@@ -1996,6 +2091,7 @@ DQN_FILE_SCOPE bool DqnMemStack_Init(DqnMemStack *const stack, size_t size, cons
 	stack->tempRegionCount = 0;
 	stack->byteAlign       = byteAlign;
 	stack->flags           = 0;
+	DQN_ASSERT(!stack->block->prevBlock);
 	return true;
 }
 
@@ -2067,6 +2163,10 @@ DQN_FILE_SCOPE bool DqnMemStack_Pop(DqnMemStack *const stack, void *ptr, size_t 
 		if (DQN_ASSERT_MSG(calcSize == sizeAligned, "'ptr' was not the last item allocated to memStack"))
 		{
 			stack->block->used -= sizeAligned;
+			if (stack->block->used == 0 && stack->block->prevBlock)
+			{
+				return DQN_ASSERT(DqnMemStack_FreeLastBlock(stack));
+			}
 			return true;
 		}
 	}
@@ -3928,6 +4028,65 @@ DQN_FILE_SCOPE i32 DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// #Dqn_* Implementation
+////////////////////////////////////////////////////////////////////////////////
+FILE_SCOPE void *DqnInternal_QuickSortGetArrayItemPtr(void *const array, const u32 index,
+                                                      const u32 size)
+{
+	u8 *byteArray = (u8 *)array;
+	void *result = (void *)(byteArray + (index * size));
+	return result;
+}
+
+DQN_FILE_SCOPE void Dqn_QuickSortC(void *const array, const u32 itemSize, const u32 size,
+                                   Dqn_QuickSortLessThanCallback *const IsLessThan,
+                                   Dqn_QuickSortSwapCallback *const Swap)
+{
+	// NOTE: See <template> version for better implementation comments since here we need to use
+	// void * for generics in C making it harder in general to comprehend.
+	if (!array || size == 0 || size == 1) return;
+
+	DqnRandPCGState state = {};
+	DqnRnd_PCGInit(&state);
+
+	u32 pivotIndex     = DqnRnd_PCGRange(&state, 0, size - 1);
+	u32 partitionIndex = 0;
+	u32 startIndex     = 0;
+
+	{
+		void *lastItemPtr = DqnInternal_QuickSortGetArrayItemPtr(array, size - 1, itemSize);
+		void *pivotItemPtr = DqnInternal_QuickSortGetArrayItemPtr(array, pivotIndex, itemSize);
+		Swap(lastItemPtr, pivotItemPtr);
+		pivotIndex = size - 1;
+	}
+
+	void *startItemPtr = DqnInternal_QuickSortGetArrayItemPtr(array, startIndex, itemSize);
+	void *pivotItemPtr = DqnInternal_QuickSortGetArrayItemPtr(array, pivotIndex, itemSize);
+	if (IsLessThan(startItemPtr, pivotItemPtr)) partitionIndex++;
+	startIndex++;
+
+	for (u32 checkIndex = startIndex; checkIndex < size; checkIndex++)
+	{
+		void *checkItemPtr = DqnInternal_QuickSortGetArrayItemPtr(array, checkIndex, itemSize);
+		if (IsLessThan(checkItemPtr, pivotItemPtr))
+		{
+			void *partitionItemPtr = DqnInternal_QuickSortGetArrayItemPtr(array, partitionIndex, itemSize);
+			Swap(partitionItemPtr, checkItemPtr);
+			partitionIndex++;
+		}
+	}
+
+	void *partitionItemPtr = DqnInternal_QuickSortGetArrayItemPtr(array, partitionIndex, itemSize);
+	Swap(partitionItemPtr, pivotItemPtr);
+
+	Dqn_QuickSortC(array, itemSize, partitionIndex, IsLessThan, Swap);
+
+	u32 oneAfterPartitionIndex = partitionIndex + 1;
+	void *oneAfterPartionIndexPtr = DqnInternal_QuickSortGetArrayItemPtr(array, oneAfterPartitionIndex, itemSize);
+	Dqn_QuickSortC(oneAfterPartionIndexPtr, itemSize, (size - oneAfterPartitionIndex), IsLessThan, Swap);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // #External Code
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -5639,11 +5798,24 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 	#include <unistd.h>   // unlink()
 #endif
 
+#ifdef DQN_CPP_MODE
 ////////////////////////////////////////////////////////////////////////////////
 // XPlatform > #DqnFile CPP Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DqnFile::DqnFile (const bool raiiCleanup) { this->raiiCleanup = raiiCleanup;      }
-DqnFile::~DqnFile()                       { if (this->raiiCleanup) this->Close(); }
+// NOTE(doyle): This is necessary since we supply a default constructor, some uninitialised values
+// were put in when using DqnFile file = {};
+DqnFile::DqnFile(const bool raiiCleanup)
+: permissionFlags(0)
+, handle(0)
+, size(0)
+, raiiCleanup(raiiCleanup)
+{
+}
+
+DqnFile::~DqnFile()
+{
+	if (this->raiiCleanup) this->Close();
+}
 
 bool DqnFile::Open(const char *const path, const u32 permissionFlags_,
                    const enum DqnFileAction action)
@@ -5666,8 +5838,8 @@ size_t DqnFile::Read(u8 *const buffer, const size_t numBytesToRead)
 {
 	return DqnFile_Read(this, buffer, numBytesToRead);
 }
-
 void DqnFile::Close() { DqnFile_Close(this); }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // XPlatform > #DqnFileInternal Implementation
@@ -6167,7 +6339,7 @@ DQN_FILE_SCOPE bool DqnFile_GetFileSizeW(const wchar_t *const path, size_t *cons
 		LARGE_INTEGER largeInt = {};
 		largeInt.HighPart      = attribData.nFileSizeHigh;
 		largeInt.LowPart       = attribData.nFileSizeLow;
-		*size                  = largeInt.QuadPart;
+		*size                  = (size_t)largeInt.QuadPart;
 		return true;
 	}
 
@@ -6308,8 +6480,7 @@ DQN_FILE_SCOPE f64 DqnTimer_NowInMs()
 	}
 	else
 	{
-		printf("tv_nsec: %ld\n", timeSpec.tv_nsec);
-		result = ((f64)timeSpec.tv_sec * 1000.0f) + ((f64)timeSpec.tv_nsec / 100000.0f);
+		result = (f64)((timeSpec.tv_sec * 1000.0f) + (timeSpec.tv_nsec / 1000000.0f));
 	}
 
 #else

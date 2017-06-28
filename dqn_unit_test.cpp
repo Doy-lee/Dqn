@@ -17,6 +17,18 @@
 
 #include <limits.h>
 #include <stdio.h>
+
+FILE_SCOPE void PrintHeader(const char *const header)
+{
+	DQN_ASSERT_HARD(header);
+
+	char buf[1024] = {};
+	DQN_ASSERT(Dqn_sprintf(buf, "// %s", header) < (i32)DQN_ARRAY_COUNT(buf));
+	printf("//////////////////////////////////////////////////////////////////\n");
+	printf("%s\n", buf);
+	printf("//////////////////////////////////////////////////////////////////\n");
+}
+
 void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 {
 	f32 *hmmMatf = (f32 *)&hmmMat;
@@ -40,6 +52,7 @@ void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 
 void HandmadeMathTest()
 {
+	PrintHeader("DqnMath vs HandmadeMath Test");
 	// Test Perspective/Projection matrix values
 	if (1)
 	{
@@ -114,6 +127,7 @@ void HandmadeMathTest()
 
 void StringsTest()
 {
+	PrintHeader("Strings Test");
 	// Char Checks
 	if (1)
 	{
@@ -525,7 +539,7 @@ void StringsTest()
 
 void OtherTest()
 {
-
+	PrintHeader("Other Test");
 	if (1)
 	{
 #if defined(DQN_UNIX_PLATFORM)
@@ -552,7 +566,7 @@ void OtherTest()
 
 void RandomTest()
 {
-
+	PrintHeader("Random Number Generator Test");
 	DqnRandPCGState pcg;
 	DqnRnd_PCGInit(&pcg);
 	for (i32 i = 0; i < 10; i++)
@@ -572,6 +586,7 @@ void RandomTest()
 
 void MathTest()
 {
+	PrintHeader("Math Test");
 	if (1)
 	{ // Lerp
 		if (1)
@@ -604,6 +619,7 @@ void MathTest()
 
 void VecTest()
 {
+	PrintHeader("Math Vector Test");
 	if (1)
 	{ // V2
 
@@ -964,6 +980,7 @@ void VecTest()
 
 void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 {
+	PrintHeader("Array with Default Mem API Test");
 	if (1)
 	{
 		DQN_ASSERT(DqnArray_Init(array, 1, memAPI));
@@ -1139,6 +1156,7 @@ void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 
 void ArrayTest()
 {
+	PrintHeader("Array Test");
 	DqnArray<DqnV2> array = {};
 	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseCalloc());
 	printf("ArrayTest(): Completed successfully\n");
@@ -1146,6 +1164,7 @@ void ArrayTest()
 
 void MemStackTest()
 {
+	PrintHeader("MemStack Test");
 	// Test over allocation, alignments, temp regions
 	if (1)
 	{
@@ -1250,6 +1269,7 @@ void MemStackTest()
 		DQN_ASSERT(stack.block->size == allocSize);
 		DQN_ASSERT(stack.block->used == sizeA);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
+		DQN_ASSERT(!stack.block->prevBlock);
 
 		// Free once more to release stack A memory
 		DqnMemStack_FreeLastBlock(&stack);
@@ -1532,6 +1552,7 @@ void MemStackTest()
 #ifdef DQN_XPLATFORM_LAYER
 void FileTest()
 {
+	PrintHeader("File Test");
 	// File i/o
 	if (1)
 	{
@@ -1740,10 +1761,13 @@ const u32 QUEUE_SIZE = 256;
 FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
                                                       void *const userData)
 {
+	(void)userData;
 	DQN_ASSERT(queue->size == QUEUE_SIZE);
 	{
 		DqnLockGuard guard = globalJobQueueLock.LockGuard();
 		globalDebugCounter++;
+
+#if 0
 		u32 number = globalDebugCounter;
 #if defined(DQN_WIN32_IMPLEMENTATION)
 		printf("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n",
@@ -1752,12 +1776,14 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
 		printf("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d\n",
 		       number);
 #endif
+#endif
 	}
 
 }
 
 FILE_SCOPE void JobQueueTest()
 {
+	PrintHeader("Job Queue Multithreading Test");
 	globalDebugCounter = 0;
 
 	DqnMemStack memStack = {};
@@ -1788,9 +1814,131 @@ FILE_SCOPE void JobQueueTest()
 
 	DqnJobQueue_BlockAndCompleteAllJobs(&jobQueue);
 
-	printf("\nJobQueueTest(): Final incremented value: %d\n", globalDebugCounter);
+	printf("JobQueueTest(): Final incremented value: %d\n", globalDebugCounter);
 	DQN_ASSERT(globalDebugCounter == WORK_ENTRIES);
 	DqnLock_Delete(&globalJobQueueLock);
+}
+
+FILE_SCOPE inline bool Dqn_QuickSortLessThanU32(const void *const val1, const void *const val2)
+{
+	const u32 *const a = (u32 *)val1;
+	const u32 *const b = (u32 *)val2;
+	return (*a) < (*b);
+}
+
+FILE_SCOPE inline void Dqn_QuickSortSwapU32(void *const val1, void *const val2)
+{
+	u32 *a = (u32 *)val1;
+	u32 *b = (u32 *)val2;
+	DQN_SWAP(u32, *a, *b);
+}
+
+#include <algorithm>
+void SortTest()
+{
+	{
+		u32 array[] = {4, 8, 7, 5, 2, 3, 6};
+		Dqn_QuickSortC(array, sizeof(array[0]), DQN_ARRAY_COUNT(array), Dqn_QuickSortLessThanU32,
+		              Dqn_QuickSortSwapU32);
+
+		for (u32 i = 0; i < DQN_ARRAY_COUNT(array) - 1; i++)
+		{
+			DQN_ASSERT(array[i] <= array[i + 1]);
+		}
+	}
+
+	PrintHeader("DqnSort vs std::Sort");
+	DqnRandPCGState state = {};
+	DqnRnd_PCGInit(&state);
+	if (1)
+	{
+		DqnMemStack stack = {};
+		DQN_ASSERT(stack.Init(DQN_KILOBYTE(1), false));
+
+		// Create array of ints
+		u32 numInts     = 1000000;
+		u32 sizeInBytes = sizeof(u32) * numInts;
+		u32 *dqnCArray   = (u32 *)stack.Push(sizeInBytes);
+		u32 *dqnCPPArray = (u32 *)stack.Push(sizeInBytes);
+		u32 *stdArray    = (u32 *)stack.Push(sizeInBytes);
+		DQN_ASSERT(dqnCArray && dqnCPPArray && stdArray);
+
+		f64 dqnCTimings[10]                              = {};
+		f64 dqnCPPTimings[DQN_ARRAY_COUNT(dqnCTimings)] = {};
+		f64 stdTimings[DQN_ARRAY_COUNT(dqnCTimings)]    = {};
+
+		f64 dqnCAverage   = 0;
+		f64 dqnCPPAverage = 0;
+		f64 stdAverage    = 0;
+
+		for (u32 timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(dqnCTimings); timingsIndex++)
+		{
+			// Populate with random numbers
+			for (u32 i = 0; i < numInts; i++)
+			{
+				dqnCArray[i]   = DqnRnd_PCGNext(&state);
+				dqnCPPArray[i] = dqnCArray[i];
+				stdArray[i]    = dqnCPPArray[i];
+			}
+
+			// Time Dqn_QuickSortC
+			{
+				f64 start = DqnTimer_NowInS();
+				Dqn_QuickSortC(dqnCArray, sizeof(dqnCArray[0]), numInts, Dqn_QuickSortLessThanU32,
+				               Dqn_QuickSortSwapU32);
+				f64 duration = DqnTimer_NowInS() - start;
+
+				dqnCTimings[timingsIndex] = duration;
+				dqnCAverage += duration;
+
+				printf("[%02d]Dqn_QuickSortC: %f vs ", timingsIndex, dqnCTimings[timingsIndex]);
+			}
+
+			// Time Dqn_QuickSortC
+			{
+				f64 start = DqnTimer_NowInS();
+				Dqn_QuickSort(dqnCPPArray, numInts, Dqn_QuickSortLessThanU32);
+				f64 duration = DqnTimer_NowInS() - start;
+
+				dqnCPPTimings[timingsIndex] = duration;
+				dqnCPPAverage += duration;
+				printf("Dqn_QuickSort: %f vs ", dqnCPPTimings[timingsIndex]);
+			}
+
+			// Time std::sort
+			{
+				f64 start = DqnTimer_NowInS();
+				std::sort(stdArray, stdArray + numInts);
+				f64 duration = DqnTimer_NowInS() - start;
+
+				stdTimings[timingsIndex] = duration;
+				stdAverage += duration;
+
+				printf("std::sort: %f\n", stdTimings[timingsIndex]);
+			}
+
+			for (u32 i = 0; i < numInts; i++)
+			{
+				DQN_ASSERT_MSG(dqnCArray[i] == stdArray[i], "DqnArray[%d]: %d, stdArray[%d]: %d", i,
+				               dqnCArray[i], stdArray[i], i);
+			}
+		}
+
+		// Print averages
+		if (1)
+		{
+			dqnCAverage /= (f64)DQN_ARRAY_COUNT(dqnCTimings);
+			dqnCPPAverage /= (f64)DQN_ARRAY_COUNT(dqnCPPTimings);
+			stdAverage /= (f64)DQN_ARRAY_COUNT(stdTimings);
+			printf("\n- Average Timings\n");
+			printf("    Dqn_QuickSortC: %f vs Dqn_QuickSort: %f vs std::sort: %f\n\n", dqnCAverage,
+			       dqnCPPAverage, stdAverage);
+		}
+		stack.Pop(stdArray, sizeInBytes);
+		stack.Pop(dqnCPPArray, sizeInBytes);
+		stack.Pop(dqnCArray, sizeInBytes);
+		stack.Free();
+	}
 }
 
 int main(void)
@@ -1802,6 +1950,7 @@ int main(void)
 	VecTest();
 	ArrayTest();
 	MemStackTest();
+	SortTest();
 
 #ifdef DQN_XPLATFORM_LAYER
 	FileTest();
