@@ -3951,13 +3951,22 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 
 // Convert a randomized u32 value to a float value x in the range 0.0f <= x
 // < 1.0f. Contributed by Jonatan Hedborg
+
+// NOTE: This is to abide to strict aliasing rules.
+union DqnRndInternal_U32F32
+{
+	u32 unsigned32;
+	f32 float32;
+};
+
 FILE_SCOPE f32 DqnRnd_F32NormalizedFromU32Internal(u32 value)
 {
 	u32 exponent = 127;
 	u32 mantissa = value >> 9;
-	u32 result   = (exponent << 23) | mantissa;
-	f32 fresult  = *(f32 *)(&result);
-	return fresult - 1.0f;
+
+	union DqnRndInternal_U32F32 uf;
+	uf.unsigned32 = (exponent << 23 | mantissa);
+	return uf.float32 - 1.0f;
 }
 
 FILE_SCOPE u64 DqnRnd_Murmur3Avalanche64Internal(u64 h)
@@ -4145,6 +4154,7 @@ PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
 #ifdef __GNUC__
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+	#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif
 
 #include <stdlib.h>  // for va_arg()

@@ -343,7 +343,7 @@ void StringsTest()
 
 			char e[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(SMALLEST_NUM, e, DQN_ARRAY_COUNT(e));
-			DQN_ASSERT(DqnStr_Cmp(e, "-9223372036854775808") == 0);
+			DQN_ASSERT_MSG(DqnStr_Cmp(e, "-9223372036854775808") == 0, "e: %s", e);
 
 			printf("StringsTest(): I64ToStr: Completed successfully\n");
 		}
@@ -569,18 +569,17 @@ void RandomTest()
 	PrintHeader("Random Number Generator Test");
 	DqnRandPCGState pcg;
 	DqnRnd_PCGInit(&pcg);
-	for (i32 i = 0; i < 10; i++)
+	for (i32 i = 0; i < 1000000; i++)
 	{
 		i32 min    = -100;
-		i32 max    = 100000;
+		i32 max    = 1000000000;
 		i32 result = DqnRnd_PCGRange(&pcg, min, max);
 		DQN_ASSERT(result >= min && result <= max);
 
 		f32 randF32 = DqnRnd_PCGNextf(&pcg);
 		DQN_ASSERT(randF32 >= 0.0f && randF32 <= 1.0f);
-		printf("RandomTest(): RndPCG: Completed successfully\n");
 	}
-
+	printf("RandomTest(): RndPCG: Completed successfully\n");
 	printf("RandomTest(): Completed successfully\n");
 }
 
