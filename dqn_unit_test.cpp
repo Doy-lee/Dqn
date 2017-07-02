@@ -8,6 +8,11 @@
 	#define HANDMADE_MATH_NO_SSE
 #endif
 
+#if defined(__GNUC__)
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
+#endif
+
 #define DQN_IMPLEMENTATION
 #include "dqn.h"
 
@@ -341,9 +346,12 @@ void StringsTest()
 			DQN_ASSERT(DqnStr_Cmp(d, "18446744073709551615") == 0);
 #endif
 
-			char e[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
-			Dqn_I64ToStr(SMALLEST_NUM, e, DQN_ARRAY_COUNT(e));
-			DQN_ASSERT_MSG(DqnStr_Cmp(e, "-9223372036854775808") == 0, "e: %s", e);
+			if (sizeof(size_t) == sizeof(u64))
+			{
+				char e[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+				Dqn_I64ToStr(SMALLEST_NUM, e, DQN_ARRAY_COUNT(e));
+				DQN_ASSERT_MSG(DqnStr_Cmp(e, "-9223372036854775808") == 0, "e: %s", e);
+			}
 
 			printf("StringsTest(): I64ToStr: Completed successfully\n");
 		}
@@ -1962,4 +1970,8 @@ int main(void)
 
 	return 0;
 }
+
+#if defined(__GNUC__)
+	#pragma GCC diagnostic pop
+#endif
 

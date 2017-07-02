@@ -6336,7 +6336,6 @@ DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file)
 
 #if defined(DQN_WIN32_PLATFORM)
 	DQN_COMPILE_ASSERT(sizeof(DWORD)  == sizeof(u32));
-	DQN_COMPILE_ASSERT(sizeof(size_t) >= sizeof(u64));
 #endif
 
 DQN_FILE_SCOPE bool DqnFile_GetFileSizeW(const wchar_t *const path, size_t *const size)
@@ -6346,6 +6345,7 @@ DQN_FILE_SCOPE bool DqnFile_GetFileSizeW(const wchar_t *const path, size_t *cons
 	WIN32_FILE_ATTRIBUTE_DATA attribData = {};
 	if (GetFileAttributesExW(path, GetFileExInfoStandard, &attribData))
 	{
+		// TODO(doyle): What if size_t is < Quad.part?
 		LARGE_INTEGER largeInt = {};
 		largeInt.HighPart      = attribData.nFileSizeHigh;
 		largeInt.LowPart       = attribData.nFileSizeLow;
