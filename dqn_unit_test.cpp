@@ -13,6 +13,7 @@
 	#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
 #endif
 
+#define DQN_PLATFORM_HEADER
 #define DQN_IMPLEMENTATION
 #include "dqn.h"
 

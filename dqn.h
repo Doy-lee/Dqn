@@ -4,7 +4,11 @@
 /*
 	#define DQN_IMPLEMENTATION       // Enable the implementation
 
+	// Define this wherever you want access to DQN code that uses the platform.
+	#define DQN_PLATFORM_HEADER      // Enable function prototypes for xplatform/platform code
+
 	// NOTE: For platform code, it's one or the other or you will get compilation problems.
+	// Define this in ONE and only ONE file to enable the implementation of platform code.
 	#define DQN_WIN32_IMPLEMENTATION // Enable Win32 Code, but only if _WIN32 or _WIN64 is already defined. Also requires DQN_IMPLEMENTATION.
 	#define DQN_UNIX_IMPLEMENTATION  // Enable Unix Code, but only if __linux__ is already defined. Also requires DQN_IMPLEMENTATION.
 
@@ -77,16 +81,22 @@
 // This needs to be above the portable layer so  that, if the user requests
 // a platform implementation, platform specific implementations in the portable
 // layer will get activated.
-#if (defined(_WIN32) || defined(_WIN64)) && defined(DQN_WIN32_IMPLEMENTATION)
-	#define DQN_XPLATFORM_LAYER
-	#define DQN_WIN32_PLATFORM
-#elif defined(__linux__) && defined(DQN_UNIX_IMPLEMENTATION)
-	#define DQN_XPLATFORM_LAYER
-	#define DQN_UNIX_PLATFORM
+#if (defined(_WIN32) || defined(_WIN64))
+	#define DQN_IS_WIN32 1
+#elif defined(__linux__)
+	#define DQN_IS_UNIX 1
+#endif
+
+#if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+	#define DQN_XPLATFORM_LAYER 1
+	#define DQN_WIN32_PLATFORM 1
+#elif defined(DQN_IS_UNIX) && defined(DQN_UNIX_IMPLEMENTATION)
+	#define DQN_XPLATFORM_LAYER 1
+	#define DQN_UNIX_PLATFORM 1
 #endif
 
 #if defined(__cplusplus)
-	#define DQN_CPP_MODE
+	#define DQN_CPP_MODE 1
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1070,13 +1080,20 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const u32 size,
 ////////////////////////////////////////////////////////////////////////////////
 // Functions in the Cross Platform are guaranteed to be supported in both Unix
 // and Win32
-#ifdef DQN_XPLATFORM_LAYER
 
-#if defined(DQN_WIN32_PLATFORM)
-	#define WIN32_LEAN_AND_MEAN
+// NOTE(doyle): DQN_PLATFORM_HEADER is enabled by the user to have the function prototypes be
+// visible. DQN_PLATFORM_H is like a normal header guard that ensures singular declaration of
+// functions.
+#ifdef DQN_PLATFORM_HEADER
+
+#ifndef DQN_PLATFORM_H
+#define DQN_PLATFORM_H
+
+#if defined(DQN_IS_WIN32)
+	#define WIN32_LEAN_AND_MEAN 1
 	#include <Windows.h>
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN_IS_UNIX)
 	#include <pthread.h>
 	#include <semaphore.h>
 
@@ -1186,11 +1203,14 @@ DQN_FILE_SCOPE f64  DqnTimer_NowInS ();
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct DqnLock
 {
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN_IS_WIN32)
 	CRITICAL_SECTION win32Handle;
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN_IS_UNIX)
 	pthread_mutex_t unixHandle;
+
+#else
+	#error Unknown platform
 
 #endif
 
@@ -1269,10 +1289,10 @@ typedef struct DqnJobQueue
 	i32   volatile jobToExecuteIndex;
 	i32   volatile numJobsToComplete;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN_IS_WIN32)
 	void *semaphore;
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN_IS_UNIX)
 	sem_t semaphore;
 
 #else
@@ -1342,8 +1362,6 @@ DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *const src, const i32 value);
 // numCores: numThreadsPerCore: Can be NULL, the function will just skip it.
 DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *const numCores, u32 *const numThreadsPerCore);
 
-#endif // DQN_XPLATFORM_LAYER
-
 ////////////////////////////////////////////////////////////////////////////////
 // #Platform Public API
 ////////////////////////////////////////////////////////////////////////////////
@@ -1353,7 +1371,7 @@ DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *const numCores, u32 *
 ////////////////////////////////////////////////////////////////////////////////
 // #Win32Platform Public API
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef DQN_WIN32_PLATFORM
+#if defined(DQN_IS_WIN32)
 ////////////////////////////////////////////////////////////////////////////////
 // Platform > #DqnWin32 Public API - Common Win32 API Helpers
 ////////////////////////////////////////////////////////////////////////////////
@@ -1385,8 +1403,10 @@ DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
 // buf:    Filled with the path to the executable file.
 // return: The offset to the last backslash. -1 if bufLen was not large enough or buf is null.
 DQN_FILE_SCOPE i32  DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen);
+#endif // DQN_IS_WIN32
+#endif // DQN_PLATFORM_H
+#endif // DQN_PLATFORM_HEADER
 
-#endif // DQN_WIN32_PLATFORM
 
 ////////////////////////////////////////////////////////////////////////////////
 // #External Code
