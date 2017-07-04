@@ -69,6 +69,7 @@
 // - DqnMemStack
 //   - Allow 0 size memblock stack initialisation/block-less stack for situations where you don't
 //     care about specifying a size upfront
+//   - Default block size for when new blocks are required
 //
 // - Win32
 //   - Get rid of reliance on MAX_PATH
@@ -3091,7 +3092,7 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Perspective(f32 fovYDegrees, f32 aspectRatio, f32
 	f32 zNearSubZFar        = zNear - zFar;
 
 	DqnMat4 result = DqnMat4_Identity();
-	result.e[0][0] = 1.0f / (tanFovYRadiansOver2 * aspectRatio);
+	result.e[0][0] = 1.0f / (aspectRatio * tanFovYRadiansOver2);
 	result.e[1][1] = 1.0f / tanFovYRadiansOver2;
 	result.e[2][2] = (zNear + zFar) / zNearSubZFar;
 	result.e[2][3] = -1.0f;
@@ -3144,17 +3145,19 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate(f32 radians, f32 x, f32 y, f32 z)
 	f32 cosVal         = cosf(radians);
 	f32 oneMinusCosVal = 1 - cosVal;
 
-	result.e[0][0] = (DQN_SQUARED(x) * oneMinusCosVal) + cosVal;
-	result.e[0][1] = (x * y          * oneMinusCosVal) + (z * sinVal);
-	result.e[0][2] = (x * z          * oneMinusCosVal) - (y * sinVal);
+	DqnV3 axis = DqnV3_Normalise(DqnV3_3f(x, y, z));
 
-	result.e[1][0] = (y * x          * oneMinusCosVal) - (z * sinVal);
-	result.e[1][1] = (DQN_SQUARED(y) * oneMinusCosVal) + cosVal;
-	result.e[1][2] = (y * z          * oneMinusCosVal) + (x * sinVal);
+	result.e[0][0] = (axis.x * axis.x * oneMinusCosVal) + cosVal;
+	result.e[0][1] = (axis.x * axis.y * oneMinusCosVal) + (axis.z * sinVal);
+	result.e[0][2] = (axis.x * axis.z * oneMinusCosVal) - (axis.y * sinVal);
 
-	result.e[2][0] = (z * x          * oneMinusCosVal) + (y * sinVal);
-	result.e[2][1] = (z * y          * oneMinusCosVal) - (x * sinVal);
-	result.e[2][2] = (DQN_SQUARED(z) * oneMinusCosVal) + cosVal;
+	result.e[1][0] = (axis.y * axis.x * oneMinusCosVal) - (axis.z * sinVal);
+	result.e[1][1] = (axis.y * axis.y * oneMinusCosVal) + cosVal;
+	result.e[1][2] = (axis.y * axis.z * oneMinusCosVal) + (axis.x * sinVal);
+
+	result.e[2][0] = (axis.z * axis.x * oneMinusCosVal) + (axis.y * sinVal);
+	result.e[2][1] = (axis.z * axis.y * oneMinusCosVal) - (axis.x * sinVal);
+	result.e[2][2] = (axis.z * axis.z * oneMinusCosVal) + cosVal;
 
 	return result;
 }

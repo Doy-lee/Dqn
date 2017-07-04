@@ -79,15 +79,13 @@ void HandmadeMathTest()
 		hmm_mat4 hmmTranslate = HMM_Translate(hmmVec);
 		HandmadeMathVerifyMat4(dqnTranslate, hmmTranslate);
 
-#if 0
 		hmm_vec3 hmmAxis      = HMM_Vec3(0.5f, 0.2f, 0.7f);
 		DqnV3 dqnAxis         = DqnV3_3f(0.5f, 0.2f, 0.7f);
 		f32 rotationInDegrees = 80.0f;
 
-		// TODO(doyle): ?? Handmade Math does it a rotations in a different way
-		// way, they normalise the given axis producing different results.
-		// HandmadeMathVerifyMat4(dqnRotate, hmmRotate);
-#endif
+		DqnMat4 dqnRotate = DqnMat4_Rotate(DQN_DEGREES_TO_RADIANS(rotationInDegrees), dqnAxis.x, dqnAxis.y, dqnAxis.z);
+		hmm_mat4 hmmRotate = HMM_Rotate(rotationInDegrees, hmmAxis);
+		HandmadeMathVerifyMat4(dqnRotate, hmmRotate);
 
 		dqnVec *= 2;
 		hmmVec *= 2;
