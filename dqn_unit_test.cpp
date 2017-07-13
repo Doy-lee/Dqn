@@ -1563,6 +1563,7 @@ void FileTest()
 	if (1)
 	{
 
+			printf("start file tests");
 		// Test file open
 		if (1)
 		{
@@ -1708,7 +1709,7 @@ void FileTest()
 
 			// Read using the ReadEntireFile api which doesn't need a file handle as an argument
 			{
-				size_t reqSize;
+				size_t reqSize = 0;
 				DQN_ASSERT(DqnFile_GetFileSize(fileNames[i], &reqSize));
 
 				u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, reqSize);
