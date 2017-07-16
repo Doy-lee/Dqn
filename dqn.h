@@ -885,7 +885,8 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Orthographic(f32 left, f32 right, f32 bottom, f32
 DQN_FILE_SCOPE DqnMat4 DqnMat4_Perspective (f32 fovYDegrees, f32 aspectRatio, f32 zNear, f32 zFar);
 DQN_FILE_SCOPE DqnMat4 DqnMat4_LookAt      (DqnV3 eye, DqnV3 center, DqnV3 up);
 
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate   (f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate3f (f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_TranslateV3 (DqnV3 vec);
 DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate      (f32 radians, f32 x, f32 y, f32 z);
 DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale       (f32 x, f32 y, f32 z);
 DQN_FILE_SCOPE DqnMat4 DqnMat4_ScaleV3     (DqnV3 scale);
@@ -1933,7 +1934,7 @@ DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file,
 		const char *const formatStrWithMsg = "DqnAssert() failed: %s|%d| (%s): %s\n";
 		const char *const formatStr        = (msg) ? formatStrWithMsg : formatStrNoMsg;
 
-		char userMsg[512] = {};
+		char userMsg[2048] = {};
 		if (msg)
 		{
 			va_list argList;
@@ -3117,29 +3118,38 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_LookAt(DqnV3 eye, DqnV3 center, DqnV3 up)
 
 	result.e[0][0] = s.x;
 	result.e[0][1] = u.x;
-	result.e[0][2] = f.x;
+	result.e[0][2] = -f.x;
 
 	result.e[1][0] = s.y;
 	result.e[1][1] = u.y;
-	result.e[1][2] = f.y;
+	result.e[1][2] = -f.y;
 
 	result.e[2][0] = s.z;
 	result.e[2][1] = u.z;
-	result.e[2][2] = f.z;
+	result.e[2][2] = -f.z;
 
-	result.e[3][0] = DqnV3_Dot(s, eye);
-	result.e[3][1] = DqnV3_Dot(u, eye);
-	result.e[3][2] = -DqnV3_Dot(f, eye);
+	result.e[3][0] = -DqnV3_Dot(s, eye);
+	result.e[3][1] = -DqnV3_Dot(u, eye);
+	result.e[3][2] = DqnV3_Dot(f, eye);
 	result.e[3][3] = 1.0f;
 	return result;
 }
 
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate(f32 x, f32 y, f32 z)
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate3f(f32 x, f32 y, f32 z)
 {
 	DqnMat4 result = DqnMat4_Identity();
 	result.e[3][0] = x;
 	result.e[3][1] = y;
 	result.e[3][2] = z;
+	return result;
+}
+
+DQN_FILE_SCOPE DqnMat4 DqnMat4_TranslateV3(DqnV3 vec)
+{
+	DqnMat4 result = DqnMat4_Identity();
+	result.e[3][0] = vec.x;
+	result.e[3][1] = vec.y;
+	result.e[3][2] = vec.z;
 	return result;
 }
 
@@ -6169,7 +6179,6 @@ DQN_FILE_SCOPE char **DqnDirInternal_PlatformRead(const char *const dir,
 			// TODO(doyle): Logging
 			DQN_ASSERT(DQN_INVALID_CODE_PATH);
 			*numFiles = 0;
-			closedir(dirHandle);
 			return NULL;
 		}
 
@@ -6184,7 +6193,6 @@ DQN_FILE_SCOPE char **DqnDirInternal_PlatformRead(const char *const dir,
 
 				// TODO(doyle): Logging
 				*numFiles = 0;
-				closedir(dirHandle);
 				return NULL;
 			}
 		}
@@ -7117,9 +7125,10 @@ DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix)
 	}
 }
 
+const i32 DQN_WIN32_INTERNAL_ERROR_MSG_SIZE = 2048;
 DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *const errorPrefix)
 {
-	char errorMsg[1024] = {0};
+	char errorMsg[DQN_WIN32_INTERNAL_ERROR_MSG_SIZE] = {0};
 	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 	               NULL, error, 0, errorMsg, DQN_ARRAY_COUNT(errorMsg), NULL);
 
@@ -7130,7 +7139,7 @@ DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *con
 
 DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
 {
-	char str[1024] = {0};
+	char str[DQN_WIN32_INTERNAL_ERROR_MSG_SIZE] = {0};
 
 	va_list argList;
 	va_start(argList, formatStr);

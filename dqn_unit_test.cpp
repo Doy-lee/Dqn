@@ -75,7 +75,7 @@ void HandmadeMathTest()
 	{
 		hmm_vec3 hmmVec       = HMM_Vec3i(1, 2, 3);
 		DqnV3 dqnVec          = DqnV3_3i(1, 2, 3);
-		DqnMat4 dqnTranslate  = DqnMat4_Translate(dqnVec.x, dqnVec.y, dqnVec.z);
+		DqnMat4 dqnTranslate  = DqnMat4_Translate3f(dqnVec.x, dqnVec.y, dqnVec.z);
 		hmm_mat4 hmmTranslate = HMM_Translate(hmmVec);
 		HandmadeMathVerifyMat4(dqnTranslate, hmmTranslate);
 
@@ -115,17 +115,6 @@ void HandmadeMathTest()
 		}
 
 		printf("HandmadeMathTest(): Translate/Scale/Rotate Mat4_Mul: Completed successfully\n");
-	}
-
-	// Test LookAt/Camera/View matrix returns same results
-	if (1)
-	{
-		DqnMat4 dqnViewMatrix = DqnMat4_LookAt(DqnV3_3f(4, 3, 3), DqnV3_1f(0), DqnV3_3f(0, 1, 0));
-		hmm_mat4 hmmViewMatrix =
-		    HMM_LookAt(HMM_Vec3(4, 3, 3), HMM_Vec3(0, 0, 0), HMM_Vec3(0, 1, 0));
-
-		HandmadeMathVerifyMat4(dqnViewMatrix, hmmViewMatrix);
-		printf("HandmadeMathTest(): LookAt: Completed successfully\n");
 	}
 }
 
