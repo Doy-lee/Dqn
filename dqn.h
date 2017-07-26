@@ -46,7 +46,7 @@
 // #DqnWChar     WChar Operations (IsDigit(), IsAlpha() etc)
 // #DqnWStr      WStr  Operations (WStr_Len() etc)
 // #DqnRnd       Random Number Generator (ints and floats)
-// #Dqn_*        Dqn_QuickSort
+// #Dqn_*        Utility code, (qsort, quick file reading)
 
 // #XPlatform (Win32 & Unix)
 // #DqnFile      File I/O (Read, Write, Delete)
@@ -676,7 +676,6 @@ template <typename T> T*   DqnArray<T>::Get  (const u64 index)                  
 template <typename T> bool DqnArray<T>::Clear()                                        { return DqnArray_Clear (this); }
 template <typename T> bool DqnArray<T>::Remove      (const u64 index)                  { return DqnArray_Remove(this, index); }
 template <typename T> bool DqnArray<T>::RemoveStable(const u64 index)                  { return DqnArray_RemoveStable(this, index); }
-
 #endif // DQN_CPP_MODE
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -930,15 +929,15 @@ DQN_FILE_SCOPE bool DqnChar_IsAlphanum(char c);
 DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *const a, const char *const b);
 
 // return: String length not including the NULL terminator. 0 if invalid args.
-DQN_FILE_SCOPE i32   DqnStr_Len           (const char *const a);
+DQN_FILE_SCOPE i32 DqnStr_Len(const char *const a);
 
 // Get the String length starting from a, up to and not including the first delimiter character.
-DQN_FILE_SCOPE i32   DqnStr_LenDelimitWith(char *const a, const char delimiter);
+DQN_FILE_SCOPE i32 DqnStr_LenDelimitWith(char *const a, const char delimiter);
 
 // return: The dest argument, NULL if args invalid (i.e. NULL pointers or numChars < 0)
 DQN_FILE_SCOPE char *DqnStr_Copy(char *const dest, const char *const src, const i32 numChars);
 
-DQN_FILE_SCOPE bool DqnStr_Reverse           (char *const buf, const i32 bufSize);
+DQN_FILE_SCOPE void DqnStr_Reverse(char *const buf, const u32 bufSize);
 
 // return: The offset into the src to first char of the found string. Returns -1 if not found
 DQN_FILE_SCOPE i32  DqnStr_FindFirstOccurence(const char *const src, const i32 srcLen, const char *const find, const i32 findLen);
@@ -948,8 +947,7 @@ DQN_FILE_SCOPE bool DqnStr_HasSubstring      (const char *const src, const i32 s
 #define DQN_64BIT_NUM_MAX_STR_SIZE 21
 // Return the len of the derived string. If buf is NULL and or bufSize is 0 the function returns the
 // required string length for the integer
-// TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work
-// atm.
+// TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work atm.
 DQN_FILE_SCOPE i32   Dqn_I64ToStr(const i64 value, char *const buf, const i32 bufSize);
 DQN_FILE_SCOPE i64   Dqn_StrToI64(const char *const buf, const i32 bufSize);
 // WARNING: Not robust, precision errors and whatnot but good enough!
@@ -965,10 +963,13 @@ DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, const u32 character);
 DQN_FILE_SCOPE bool    DqnWChar_IsDigit(const wchar_t c);
 DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c);
 
-DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *const a);
-DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *const a, const wchar_t *const b);
+DQN_FILE_SCOPE i32  DqnWStr_Cmp               (const wchar_t *const a, const wchar_t *const b);
+DQN_FILE_SCOPE i32  DqnWStr_FindFirstOccurence(const wchar_t *const src, const i32 srcLen, const wchar_t *const find, const i32 findLen);
+DQN_FILE_SCOPE bool DqnWStr_HasSubstring      (const wchar_t *const src, const i32 srcLen, const wchar_t *const find, const i32 findLen);
+DQN_FILE_SCOPE i32  DqnWStr_Len               (const wchar_t *const a);
+DQN_FILE_SCOPE i32  DqnWStr_LenDelimitWith    (const wchar_t *const a, const wchar_t delimiter);
+DQN_FILE_SCOPE void DqnWStr_Reverse           (wchar_t *const buf, const u32 bufSize);
 
-DQN_FILE_SCOPE bool Dqn_WStrReverse(wchar_t *buf, const i32 bufSize);
 DQN_FILE_SCOPE i32  Dqn_WStrToI32(const wchar_t *const buf, const i32 bufSize);
 DQN_FILE_SCOPE i32  Dqn_I32ToWStr(i32 value, wchar_t *buf, i32 bufSize);
 
@@ -996,6 +997,7 @@ DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
 ////////////////////////////////////////////////////////////////////////////////
 // #Dqn_* Public API
 ////////////////////////////////////////////////////////////////////////////////
+
 typedef bool Dqn_QuickSortLessThanCallback(const void *const val1, const void *const val2);
 typedef void Dqn_QuickSortSwapCallback    (void *const val1, void *const val2);
 DQN_FILE_SCOPE void Dqn_QuickSortC(void *const array, const u32 itemSize, const u32 size,
@@ -1173,6 +1175,10 @@ DQN_FILE_SCOPE size_t DqnFile_Read (const DqnFile *const file, u8 *const buffer,
 // return:     FALSE if insufficient bufferSize OR file access failure OR invalid args (i.e nullptr)
 DQN_FILE_SCOPE bool DqnFile_ReadEntireFile(const char *const path, u8 *const buffer,
                                            const size_t bufferSize, size_t *const bytesRead);
+
+// Allocates using malloc. Returns NULL if file could not be read, malloc failed or string.
+// Free the buffer using free() when it is no longer needed.
+DQN_FILE_SCOPE u8 *DqnFile_ReadEntireFileSimple(const char *const path);
 
 // File close invalidates the handle after it is called.
 DQN_FILE_SCOPE void DqnFile_Close(DqnFile *const file);
@@ -1464,7 +1470,7 @@ Creating a new ini file
 
 int main()
 {
-	DqnIni *ini = DqnInit_Create();
+	DqnIni *ini = DqnIni_Create();
 	DqnIni_PropertyAdd(ini, DQN_INI_GLOBAL_SECTION, "FirstSetting", "Test");
 	DqnIni_PropertyAdd(ini, DQN_INI_GLOBAL_SECTION, "SecondSetting", "2");
 	int section = DqnIni_SectionAdd(ini, "MySection");
@@ -1489,7 +1495,7 @@ int main()
 
 typedef struct DqnIni DqnIni;
 
-DqnIni *DqnInit_Create(void *memctx);
+DqnIni *DqnIni_Create(void *memctx);
 DqnIni *DqnIni_Load  (char const *data, void *memctx);
 
 int  DqnIni_Save   (DqnIni const *ini, char *data, int size);
@@ -1532,7 +1538,7 @@ following code:
 
 where `my_custom_malloc` and `my_custom_free` are your own memory
 allocation/deallocation functions. The `ctx` parameter is an optional parameter
-of type `void*`. When `DqnInit_Create` or `DqnIni_Load` is called, you can pass
+of type `void*`. When `DqnIni_Create` or `DqnIni_Load` is called, you can pass
 in a `memctx` parameter, which can be a pointer to anything you like, and which
 will be passed through as the `ctx` parameter to every
 `DQN_INI_MALLOC`/`DQN_INI_FREE` call. For example, if you are doing memory
@@ -1557,10 +1563,10 @@ an example:
 If no custom function is defined, ini.h will default to the C runtime library equivalent.
 
 
-DqnInit_Create
+DqnIni_Create
 ----------
 
-    DqnIni* DqnInit_Create( void* memctx )
+    DqnIni* DqnIni_Create( void* memctx )
 
 Instantiates a new, empty ini structure, which can be manipulated with other API
 calls, to fill it with data. To save it out to an ini-file string, use
@@ -1603,7 +1609,7 @@ DqnIni_Destroy
     void DqnIni_Destroy( DqnIni* ini )
 
 Destroy an `DqnIni` instance created by calling `DqnIni_Load` or
-`DqnInit_Create`, releasing the memory allocated by it. No further API calls are
+`DqnIni_Create`, releasing the memory allocated by it. No further API calls are
 valid on an `DqnIni` instance after calling `DqnIni_Destroy` on it.
 
 
@@ -3412,9 +3418,9 @@ DQN_FILE_SCOPE char *DqnStr_Copy(char *const dest, const char *const src, const 
 	return dest;
 }
 
-DQN_FILE_SCOPE bool DqnStr_Reverse(char *const buf, const i32 bufSize)
+DQN_FILE_SCOPE void DqnStr_Reverse(char *const buf, const u32 bufSize)
 {
-	if (!buf) return false;
+	if (!buf) return;
 	i32 mid = bufSize / 2;
 
 	for (i32 i = 0; i < mid; i++)
@@ -3423,8 +3429,6 @@ DQN_FILE_SCOPE bool DqnStr_Reverse(char *const buf, const i32 bufSize)
 		buf[i]                 = buf[(bufSize - 1) - i];
 		buf[(bufSize - 1) - i] = tmp;
 	}
-
-	return true;
 }
 
 DQN_FILE_SCOPE i32 DqnStr_FindFirstOccurence(const char *const src, const i32 srcLen,
@@ -3866,13 +3870,6 @@ DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnWStr Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *const a)
-{
-	i32 result = 0;
-	while (a && a[result]) result++;
-	return result;
-}
-
 DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *const a, const wchar_t *const b)
 {
 	if (!a && !b) return -1;
@@ -3892,9 +3889,73 @@ DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *const a, const wchar_t *const b)
 	return (((*aPtr) < (*bPtr)) ? -1 : 1);
 }
 
-DQN_FILE_SCOPE bool Dqn_WStrReverse(wchar_t *buf, const i32 bufSize)
+DQN_FILE_SCOPE i32 DqnWStr_FindFirstOccurence(const wchar_t *const src, const i32 srcLen,
+                                              const wchar_t *const find, const i32 findLen)
 {
-	if (!buf) return false;
+	if (!src || !find)               return -1;
+	if (srcLen == 0 || findLen == 0) return -1;
+	if (srcLen < findLen)            return -1;
+
+	for (i32 indexIntoSrc = 0; indexIntoSrc < srcLen; indexIntoSrc++)
+	{
+		// NOTE: As we scan through, if the src string we index into becomes
+		// shorter than the substring we're checking then the substring is not
+		// contained in the src string.
+		i32 remainingLenInSrcStr = srcLen - indexIntoSrc;
+		if (remainingLenInSrcStr < findLen) break;
+
+		const wchar_t *srcSubStr = &src[indexIntoSrc];
+		i32 index = 0;
+		for (;;)
+		{
+			if (DqnWChar_ToLower(srcSubStr[index]) ==
+			    DqnWChar_ToLower(find[index]))
+			{
+				index++;
+				if (index >= findLen || !find[index])
+				{
+					return indexIntoSrc;
+				}
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+
+	// NOTE(doyle): We have early exit, if we reach here, then the substring was
+	// not found.
+	return -1;
+}
+
+DQN_FILE_SCOPE bool DqnWStr_HasSubstring(const wchar_t *const src, const i32 srcLen,
+                                         const wchar_t *const find, const i32 findLen)
+{
+	if (DqnWStr_FindFirstOccurence(src, srcLen, find, findLen) == -1)
+		return false;
+
+	return true;
+}
+
+
+DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *const a)
+{
+	i32 result = 0;
+	while (a && a[result]) result++;
+	return result;
+}
+
+DQN_FILE_SCOPE i32 DqnWStr_LenDelimitWith(const wchar_t *a, const wchar_t delimiter)
+{
+	i32 result = 0;
+	while (a && a[result] && a[result] != delimiter) result++;
+	return result;
+}
+
+DQN_FILE_SCOPE void DqnWStr_Reverse(wchar_t *const buf, const u32 bufSize)
+{
+	if (!buf) return;
 	i32 mid = bufSize / 2;
 
 	for (i32 i = 0; i < mid; i++)
@@ -3903,8 +3964,6 @@ DQN_FILE_SCOPE bool Dqn_WStrReverse(wchar_t *buf, const i32 bufSize)
 		buf[i]                 = buf[(bufSize - 1) - i];
 		buf[(bufSize - 1) - i] = tmp;
 	}
-
-	return true;
 }
 
 DQN_FILE_SCOPE i32 Dqn_WStrToI32(const wchar_t *const buf, const i32 bufSize)
@@ -3971,11 +4030,11 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 	// from the second character, so we don't put the negative sign at the end
 	if (negative)
 	{
-		Dqn_WStrReverse(buf + 1, charIndex - 1);
+		DqnWStr_Reverse(buf + 1, charIndex - 1);
 	}
 	else
 	{
-		Dqn_WStrReverse(buf, charIndex);
+		DqnWStr_Reverse(buf, charIndex);
 	}
 
 	return charIndex;
@@ -5278,7 +5337,7 @@ static int DqnIni_InternalPropertyIndex(DqnIni const *ini, int section,
 	return DQN_INI_NOT_FOUND;
 }
 
-DqnIni *DqnInit_Create(void *memctx)
+DqnIni *DqnIni_Create(void *memctx)
 {
 	DqnIni *ini;
 
@@ -5306,7 +5365,7 @@ DqnIni *DqnIni_Load(char const *data, void *memctx)
 	char const *start2;
 	int l;
 
-	ini = DqnInit_Create(memctx);
+	ini = DqnIni_Create(memctx);
 
 	ptr = data;
 	if (ptr)
@@ -6326,6 +6385,26 @@ DQN_FILE_SCOPE size_t DqnFile_Read(const DqnFile *const file, u8 *const buffer,
 #endif
 	}
 	return numBytesRead;
+}
+
+DQN_FILE_SCOPE u8 *DqnFile_ReadEntireFileSimple(const char *const path) {
+	// TODO(doyle): Logging
+
+	size_t requiredSize = 0;
+	if (!DqnFile_GetFileSize(path, &requiredSize)) return NULL;
+
+	u8 *buffer = (u8 *)malloc(requiredSize);
+	if (!buffer) return NULL;
+
+	size_t bytesRead = 0;
+	if (DqnFile_ReadEntireFile(path, buffer, requiredSize, &bytesRead))
+	{
+		DQN_ASSERT(bytesRead == requiredSize);
+		return buffer;
+	}
+
+	free(buffer);
+	return NULL;
 }
 
 DQN_FILE_SCOPE bool DqnFile_ReadEntireFile(const char *const path, u8 *const buffer,

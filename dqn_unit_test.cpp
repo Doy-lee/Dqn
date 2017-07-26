@@ -245,19 +245,19 @@ void StringsTest()
 			if (1)
 			{
 				char a[] = "aba";
-				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
+				DqnStr_Reverse(a, DqnStr_Len(a));
 				DQN_ASSERT(DqnStr_Cmp(a, "aba") == 0);
 
-				DQN_ASSERT(DqnStr_Reverse(a, 2) == true);
+				DqnStr_Reverse(a, 2);
 				DQN_ASSERT(DqnStr_Cmp(a, "baa") == 0);
 
-				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
+				DqnStr_Reverse(a, DqnStr_Len(a));
 				DQN_ASSERT(DqnStr_Cmp(a, "aab") == 0);
 
-				DQN_ASSERT(DqnStr_Reverse(&a[1], 2) == true);
+				DqnStr_Reverse(&a[1], 2);
 				DQN_ASSERT(DqnStr_Cmp(a, "aba") == 0);
 
-				DQN_ASSERT(DqnStr_Reverse(a, 0) == true);
+				DqnStr_Reverse(a, 0);
 				DQN_ASSERT(DqnStr_Cmp(a, "aba") == 0);
 			}
 
@@ -265,7 +265,7 @@ void StringsTest()
 			if (1)
 			{
 				char a[] = "";
-				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
+				DqnStr_Reverse(a, DqnStr_Len(a));
 				DQN_ASSERT(DqnStr_Cmp(a, "") == 0);
 			}
 
@@ -273,10 +273,10 @@ void StringsTest()
 			if (1)
 			{
 				char a[] = "a";
-				DQN_ASSERT(DqnStr_Reverse(a, DqnStr_Len(a)) == true);
+				DqnStr_Reverse(a, DqnStr_Len(a));
 				DQN_ASSERT(DqnStr_Cmp(a, "a") == 0);
 
-				DQN_ASSERT(DqnStr_Reverse(a, 0) == true);
+				DqnStr_Reverse(a, 0);
 				DQN_ASSERT(DqnStr_Cmp(a, "a") == 0);
 			}
 
