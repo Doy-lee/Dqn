@@ -973,143 +973,96 @@ void VecTest()
 	printf("VecTest(): Completed successfully\n");
 }
 
-void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
+void ArrayTestMemAPIInternal(const DqnMemAPI memAPI)
 {
-	PrintHeader("Array with Default Mem API Test");
+	printf("Array with Default Mem API Test");
+	DqnArray<DqnV2> array = {};
 	if (1)
 	{
-		DQN_ASSERT(DqnArray_Init(array, 1, memAPI));
-		DQN_ASSERT(array->capacity == 1);
-		DQN_ASSERT(array->count == 0);
+		DQN_ASSERT(array.Init(1, memAPI));
+		DQN_ASSERT(array.max == 1);
+		DQN_ASSERT(array.count == 0);
 
 		// Test basic insert
 		if (1)
 		{
 			DqnV2 va = DqnV2_2f(5, 10);
-			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array.Push(va));
 
-			DqnV2 vb = array->data[0];
+			DqnV2 vb = array.data[0];
 			DQN_ASSERT(DqnV2_Equals(va, vb));
 
-			DQN_ASSERT(array->capacity == 1);
-			DQN_ASSERT(array->count == 1);
+			DQN_ASSERT(array.max == 1);
+			DQN_ASSERT(array.count == 1);
 		}
 
 		// Test array resizing and freeing
 		if (1)
 		{
 			DqnV2 va = DqnV2_2f(10, 15);
-			DQN_ASSERT(DqnArray_Push(array, va));
+			DQN_ASSERT(array.Push(va));
 
-			DqnV2 vb = array->data[0];
+			DqnV2 vb = array.data[0];
 			DQN_ASSERT(DqnV2_Equals(va, vb) == false);
 
-			vb = array->data[1];
+			vb = array.data[1];
 			DQN_ASSERT(DqnV2_Equals(va, vb) == true);
 
-			DQN_ASSERT(array->capacity == 2);
-			DQN_ASSERT(array->count == 2);
+			DQN_ASSERT(array.max == 2);
+			DQN_ASSERT(array.count == 2);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 3);
-			DQN_ASSERT(array->count == 3);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 3);
+			DQN_ASSERT(array.count == 3);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 4);
-			DQN_ASSERT(array->count == 4);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 4);
+			DQN_ASSERT(array.count == 4);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 5);
-			DQN_ASSERT(array->count == 5);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 5);
+			DQN_ASSERT(array.count == 5);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 6);
-			DQN_ASSERT(array->count == 6);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 6);
+			DQN_ASSERT(array.count == 6);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 7);
-			DQN_ASSERT(array->count == 7);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 7);
+			DQN_ASSERT(array.count == 7);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 8);
-			DQN_ASSERT(array->count == 8);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 8);
+			DQN_ASSERT(array.count == 8);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 9);
-			DQN_ASSERT(array->count == 9);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 9);
+			DQN_ASSERT(array.count == 9);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 10);
-			DQN_ASSERT(array->count == 10);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 10);
+			DQN_ASSERT(array.count == 10);
 
-			DQN_ASSERT(DqnArray_Push(array, va));
-			DQN_ASSERT(array->capacity == 12);
-			DQN_ASSERT(array->count == 11);
+			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.max == 11);
+			DQN_ASSERT(array.count == 11);
 
 			DqnV2 vc = DqnV2_2f(90, 100);
-			DQN_ASSERT(DqnArray_Push(array, vc));
-			DQN_ASSERT(array->capacity == 12);
-			DQN_ASSERT(array->count == 12);
-			DQN_ASSERT(DqnV2_Equals(vc, array->data[11]));
+			DQN_ASSERT(array.Push(vc));
+			DQN_ASSERT(array.max == 12);
+			DQN_ASSERT(array.count == 12);
+			DQN_ASSERT(DqnV2_Equals(vc, array.data[11]));
 		}
 	}
-	DQN_ASSERT(DqnArray_Free(array));
+	DQN_ASSERT(array.Free());
 
 	if (1)
 	{
-		DQN_ASSERT(DqnArray_Init(array, 1, memAPI));
-		DQN_ASSERT(array->capacity == 1);
-		DQN_ASSERT(array->count == 0);
+		DQN_ASSERT(array.Init(1, memAPI));
+		DQN_ASSERT(array.max == 1);
+		DQN_ASSERT(array.count == 0);
 	}
-	DQN_ASSERT(DqnArray_Free(array));
-
-	if (1)
-	{
-		DqnV2 a = DqnV2_2f(1, 2);
-		DqnV2 b = DqnV2_2f(3, 4);
-		DqnV2 c = DqnV2_2f(5, 6);
-		DqnV2 d = DqnV2_2f(7, 8);
-
-		DQN_ASSERT(DqnArray_Init(array, 16, memAPI));
-		DQN_ASSERT(DqnArray_Remove(array, 0) == false);
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 0);
-
-		DQN_ASSERT(DqnArray_Clear(array));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 0);
-
-		DQN_ASSERT(DqnArray_Push(array, a));
-		DQN_ASSERT(DqnArray_Push(array, b));
-		DQN_ASSERT(DqnArray_Push(array, c));
-		DQN_ASSERT(DqnArray_Push(array, d));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 4);
-
-		DQN_ASSERT(DqnArray_Remove(array, 0));
-		DQN_ASSERT(DqnV2_Equals(array->data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array->data[1], b));
-		DQN_ASSERT(DqnV2_Equals(array->data[2], c));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 3);
-
-		DQN_ASSERT(DqnArray_Remove(array, 2));
-		DQN_ASSERT(DqnV2_Equals(array->data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array->data[1], b));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 2);
-
-		DQN_ASSERT(DqnArray_Remove(array, 100) == false);
-		DQN_ASSERT(DqnV2_Equals(array->data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array->data[1], b));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 2);
-
-		DQN_ASSERT(DqnArray_Clear(array));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 0);
-	}
-	DQN_ASSERT(DqnArray_Free(array));
+	DQN_ASSERT(array.Free());
 
 	if (1)
 	{
@@ -1118,42 +1071,147 @@ void ArrayTestMemAPIInternal(DqnArray<DqnV2> *array, DqnMemAPI memAPI)
 		DqnV2 c = DqnV2_2f(5, 6);
 		DqnV2 d = DqnV2_2f(7, 8);
 
-		DQN_ASSERT(DqnArray_Init(array, 16, memAPI));
+		DQN_ASSERT(array.Init(16, memAPI));
+		DQN_ASSERT(array.Remove(0) == false);
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 0);
 
-		DQN_ASSERT(DqnArray_Push(array, a));
-		DQN_ASSERT(DqnArray_Push(array, b));
-		DQN_ASSERT(DqnArray_Push(array, c));
-		DQN_ASSERT(DqnArray_Push(array, d));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 4);
+		array.Clear();
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 0);
 
-		DqnArray_RemoveStable(array, 0);
-		DQN_ASSERT(DqnV2_Equals(array->data[0], b));
-		DQN_ASSERT(DqnV2_Equals(array->data[1], c));
-		DQN_ASSERT(DqnV2_Equals(array->data[2], d));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 3);
+		DQN_ASSERT(array.Push(a));
+		DQN_ASSERT(array.Push(b));
+		DQN_ASSERT(array.Push(c));
+		DQN_ASSERT(array.Push(d));
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 4);
 
-		DqnArray_RemoveStable(array, 1);
-		DQN_ASSERT(DqnV2_Equals(array->data[0], b));
-		DQN_ASSERT(DqnV2_Equals(array->data[1], d));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 2);
+		DQN_ASSERT(array.Remove(0));
+		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
+		DQN_ASSERT(DqnV2_Equals(array.data[2], c));
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 3);
 
-		DqnArray_RemoveStable(array, 1);
-		DQN_ASSERT(DqnV2_Equals(array->data[0], b));
-		DQN_ASSERT(array->capacity == 16);
-		DQN_ASSERT(array->count == 1);
+		DQN_ASSERT(array.Remove(2));
+		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 2);
+
+		DQN_ASSERT(array.Remove(100) == false);
+		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 2);
+
+		array.Clear();
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 0);
 	}
-	DQN_ASSERT(DqnArray_Free(array));
+	DQN_ASSERT(array.Free());
+
+	if (1)
+	{
+		DqnV2 a = DqnV2_2f(1, 2);
+		DqnV2 b = DqnV2_2f(3, 4);
+		DqnV2 c = DqnV2_2f(5, 6);
+		DqnV2 d = DqnV2_2f(7, 8);
+
+		DQN_ASSERT(array.Init(16, memAPI));
+
+		DQN_ASSERT(array.Push(a));
+		DQN_ASSERT(array.Push(b));
+		DQN_ASSERT(array.Push(c));
+		DQN_ASSERT(array.Push(d));
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 4);
+
+		array.RemoveStable(0);
+		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], c));
+		DQN_ASSERT(DqnV2_Equals(array.data[2], d));
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 3);
+
+		array.RemoveStable(1);
+		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
+		DQN_ASSERT(DqnV2_Equals(array.data[1], d));
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 2);
+
+		array.RemoveStable(1);
+		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
+		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.count == 1);
+	}
+	DQN_ASSERT(array.Free());
 	printf("ArrayTestMemAPIInternal(): Completed successfully\n");
+}
+
+void ArrayTestRealData(DqnArray<char> *array)
+{
+#ifdef DQN_XPLATFORM_LAYER
+	size_t bufSize = 0;
+	u8 *buf        = DqnFile_ReadEntireFileSimple("tests/google-10000-english.txt", &bufSize);
+	DQN_ASSERT(buf);
+
+	for (auto i = 0; i < bufSize; i++)
+		array->Push(buf[i]);
+
+	DQN_ASSERT((size_t)array->count == bufSize);
+	for (auto i = 0; i < array->count; i++)
+		DQN_ASSERT(array->data[i] == buf[i]);
+
+	DQN_ASSERT(array->Free());
+	free(buf);
+	printf("ArrayTestRealData(): Completed successfully\n");
+#endif
 }
 
 void ArrayTest()
 {
 	PrintHeader("Array Test");
-	DqnArray<DqnV2> array = {};
-	ArrayTestMemAPIInternal(&array, DqnMemAPI_DefaultUseCalloc());
+	if (1)
+	{
+		ArrayTestMemAPIInternal(DqnMemAPI_HeapAllocator());
+	}
+
+	if (1)
+	{
+		if (1)
+		{
+			DqnArray<char> array = {};
+			DQN_ASSERT(array.Init(1));
+			ArrayTestRealData(&array);
+		}
+
+		if (1)
+		{
+			DqnMemStack stack = {}; stack.Init(DQN_MEGABYTE(1), true, 4);
+			DqnMemAPI memAPI  = DqnMemAPI_StackAllocator(&stack);
+
+			if (1)
+			{
+				auto memGuard0 = stack.TempRegionGuard();
+				DqnArray<char> array = {};
+				DQN_ASSERT(array.Init(1, memAPI));
+				ArrayTestRealData(&array);
+			}
+
+			// Test reallocing strategies for memory stacks
+			if (1)
+			{
+				auto memGuard0 = stack.TempRegionGuard();
+				DqnArray<char> array = {};
+				DQN_ASSERT(array.Init(128, memAPI));
+				ArrayTestRealData(&array);
+			}
+
+			stack.Free();
+		}
+	}
 	printf("ArrayTest(): Completed successfully\n");
 }
 
@@ -1166,7 +1224,7 @@ void MemStackTest()
 		size_t allocSize    = DQN_KILOBYTE(1);
 		DqnMemStack stack   = {};
 		const u32 ALIGNMENT = 4;
-		DqnMemStack_Init(&stack, allocSize, false, ALIGNMENT);
+		stack.Init(allocSize, false, ALIGNMENT);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == allocSize);
 		DQN_ASSERT(stack.block->used == 0);
@@ -1174,9 +1232,8 @@ void MemStackTest()
 
 		// Alocate A
 		size_t sizeA    = (size_t)(allocSize * 0.5f);
-		void *resultA   = DqnMemStack_Push(&stack, sizeA);
-		u64 resultAddrA = *((u64 *)resultA);
-		DQN_ASSERT(resultAddrA % ALIGNMENT == 0);
+		void *resultA   = stack.Push(sizeA);
+		DQN_ASSERT(((intptr_t)resultA % ALIGNMENT) == 0);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == allocSize);
 		DQN_ASSERT(stack.block->used >= sizeA + 0 && stack.block->used <= sizeA + 3);
@@ -1189,9 +1246,8 @@ void MemStackTest()
 		DqnMemStackBlock *blockA = stack.block;
 		// Alocate B
 		size_t sizeB    = (size_t)(allocSize * 2.0f);
-		void *resultB   = DqnMemStack_Push(&stack, sizeB);
-		u64 resultAddrB = *((u64 *)resultB);
-		DQN_ASSERT(resultAddrB % ALIGNMENT == 0);
+		void *resultB   = stack.Push(sizeB);
+		DQN_ASSERT(((intptr_t)resultB % ALIGNMENT) == 0);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == DQN_KILOBYTE(2));
 
@@ -1212,13 +1268,11 @@ void MemStackTest()
 		DqnMemStackBlock *blockB = stack.block;
 
 		// Check temp regions work
-		DqnMemStackTempRegion tempBuffer;
-		DQN_ASSERT(DqnMemStackTempRegion_Begin(&tempBuffer, &stack));
+		DqnMemStackTempRegion tempBuffer = stack.TempRegionBegin();
 
 		size_t sizeC    = 1024 + 1;
-		void *resultC   = DqnMemStack_Push(tempBuffer.stack, sizeC);
-		u64 resultAddrC = *((u64 *)resultC);
-		DQN_ASSERT(resultAddrC % ALIGNMENT == 0);
+		void *resultC   = stack.Push(sizeC);
+		DQN_ASSERT(((intptr_t)resultC % ALIGNMENT) == 0);
 		DQN_ASSERT(stack.block != blockB && stack.block != blockA);
 		DQN_ASSERT(stack.block->used >= sizeC + 0 && stack.block->used <= sizeC + 3);
 		DQN_ASSERT(stack.tempRegionCount == 1);
@@ -1243,7 +1297,7 @@ void MemStackTest()
 			DQN_ASSERT(ptrC[i] == 3);
 
 		// End temp region which should revert back to 2 linked stacks, A and B
-		DqnMemStackTempRegion_End(tempBuffer);
+		stack.TempRegionEnd(tempBuffer);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == sizeB);
 		DQN_ASSERT(stack.block->used >= sizeB + 0 && stack.block->used <= sizeB + 3);
@@ -1256,7 +1310,7 @@ void MemStackTest()
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// Release the last linked stack from the push stack
-		DqnMemStack_FreeLastBlock(&stack);
+		stack.FreeLastBlock();
 
 		// Which should return back to the 1st allocation
 		DQN_ASSERT(stack.block == blockA);
@@ -1267,7 +1321,7 @@ void MemStackTest()
 		DQN_ASSERT(!stack.block->prevBlock);
 
 		// Free once more to release stack A memory
-		DqnMemStack_FreeLastBlock(&stack);
+		stack.FreeLastBlock();
 		DQN_ASSERT(!stack.block);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 		DQN_ASSERT(stack.tempRegionCount == 0);
@@ -1279,18 +1333,18 @@ void MemStackTest()
 		u8 memory[DQN_KILOBYTE(1)] = {};
 		DqnMemStack stack          = {};
 		const u32 ALIGNMENT        = 4;
-		DqnMemStack_InitWithFixedMem(&stack, memory, DQN_ARRAY_COUNT(memory), ALIGNMENT);
+		stack.InitWithFixedMem(memory, DQN_ARRAY_COUNT(memory), ALIGNMENT);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
 		DQN_ASSERT(stack.block->used == 0);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// Allocation larger than stack mem size should fail
-		DQN_ASSERT(!DqnMemStack_Push(&stack, DQN_ARRAY_COUNT(memory) * 2));
+		DQN_ASSERT(!stack.Push(DQN_ARRAY_COUNT(memory) * 2));
 
 		// Check free does nothing
-		DqnMemStack_Free(&stack);
-		DqnMemStack_FreeLastBlock(&stack);
+		stack.Free();
+		stack.FreeLastBlock();
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
 		DQN_ASSERT(stack.block->used == 0);
@@ -1304,20 +1358,20 @@ void MemStackTest()
 		size_t allocSize    = DQN_KILOBYTE(1);
 		DqnMemStack stack   = {};
 		const u32 ALIGNMENT = 4;
-		DqnMemStack_InitWithFixedSize(&stack, allocSize, false, ALIGNMENT);
+		stack.InitWithFixedSize(allocSize, false, ALIGNMENT);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == allocSize);
 		DQN_ASSERT(stack.block->used == 0);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
-		void *result = DqnMemStack_Push(&stack, (size_t)(0.5f * allocSize));
+		void *result = stack.Push((size_t)(0.5f * allocSize));
 		DQN_ASSERT(result);
 
 		// Allocating more should fail
-		DQN_ASSERT(!DqnMemStack_Push(&stack, allocSize));
+		DQN_ASSERT(!stack.Push(allocSize));
 
 		// Freeing should work
-		DqnMemStack_Free(&stack);
+		stack.Free();
 		DQN_ASSERT(!stack.block);
 	}
 
@@ -1327,13 +1381,13 @@ void MemStackTest()
 		size_t firstBlockSize = DQN_KILOBYTE(1);
 		DqnMemStack stack     = {};
 		const u32 ALIGNMENT   = 16;
-		DqnMemStack_Init(&stack, firstBlockSize, false, ALIGNMENT);
+		stack.Init(firstBlockSize, false, ALIGNMENT);
 
 		DqnMemStackBlock *firstBlock = stack.block;
 		u8 *first                    = NULL;
 		{
 			u32 allocate40Bytes = 40;
-			u8 *data            = (u8 *)DqnMemStack_Push(&stack, allocate40Bytes);
+			u8 *data            = (u8 *)stack.Push(allocate40Bytes);
 
 			// Test that the allocation got aligned to 16 byte boundary
 			DQN_ASSERT(data);
@@ -1344,7 +1398,7 @@ void MemStackTest()
 				data[i] = 'a';
 
 			// Clear the block, but don't zero it out
-			DqnMemStack_ClearCurrBlock(&stack, false);
+			stack.ClearCurrBlock(false);
 			for (u32 i = 0; i < allocate40Bytes; i++)
 				DQN_ASSERT(data[i] == 'a');
 
@@ -1353,7 +1407,7 @@ void MemStackTest()
 			DQN_ASSERT(stack.block->size == firstBlockSize);
 
 			// Reallocate the data
-			data = (u8 *)DqnMemStack_Push(&stack, firstBlockSize);
+			data = (u8 *)stack.Push(firstBlockSize);
 			DQN_ASSERT(stack.block->size == firstBlockSize);
 			DQN_ASSERT((size_t)data % ALIGNMENT == 0);
 
@@ -1362,7 +1416,7 @@ void MemStackTest()
 				data[i] = 'b';
 
 			// Clear block and zero it out
-			DqnMemStack_ClearCurrBlock(&stack, true);
+			stack.ClearCurrBlock(true);
 			for (u32 i = 0; i < firstBlockSize; i++)
 				DQN_ASSERT(data[i] == 0);
 
@@ -1374,7 +1428,7 @@ void MemStackTest()
 			DQN_ASSERT(stack.block->size == firstBlockSize);
 
 			// Write out data to current block
-			data = (u8 *)DqnMemStack_Push(&stack, firstBlockSize);
+			data = (u8 *)stack.Push(firstBlockSize);
 			for (u32 i  = 0; i < firstBlockSize; i++)
 				data[i] = 'c';
 
@@ -1383,19 +1437,19 @@ void MemStackTest()
 
 		// Force it to allocate three new blocks and write out data to each
 		size_t secondBlockSize        = DQN_KILOBYTE(2);
-		u8 *second                    = (u8 *)DqnMemStack_Push(&stack, secondBlockSize);
+		u8 *second                    = (u8 *)stack.Push(secondBlockSize);
 		DqnMemStackBlock *secondBlock = stack.block;
 		for (u32 i    = 0; i < secondBlockSize; i++)
 			second[i] = 'd';
 
 		size_t thirdBlockSize        = DQN_KILOBYTE(3);
-		u8 *third                    = (u8 *)DqnMemStack_Push(&stack, thirdBlockSize);
+		u8 *third                    = (u8 *)stack.Push(thirdBlockSize);
 		DqnMemStackBlock *thirdBlock = stack.block;
 		for (u32 i   = 0; i < thirdBlockSize; i++)
 			third[i] = 'e';
 
 		size_t fourthBlockSize        = DQN_KILOBYTE(4);
-		u8 *fourth                    = (u8 *)DqnMemStack_Push(&stack, fourthBlockSize);
+		u8 *fourth                    = (u8 *)stack.Push(fourthBlockSize);
 		DqnMemStackBlock *fourthBlock = stack.block;
 		for (u32 i    = 0; i < fourthBlockSize; i++)
 			fourth[i] = 'f';
@@ -1414,7 +1468,7 @@ void MemStackTest()
 		fakeBlock.memory                 = fakeBlockMem;
 		fakeBlock.size                   = DQN_ARRAY_COUNT(fakeBlockMem);
 		fakeBlock.used                   = 0;
-		DQN_ASSERT(!DqnMemStack_FreeMemBlock(&stack, &fakeBlock));
+		DQN_ASSERT(!stack.FreeMemBlock(&fakeBlock));
 
 		// Ensure that the actual blocks are still valid and freeing did nothing
 		DQN_ASSERT(firstBlock->size == firstBlockSize);
@@ -1447,7 +1501,7 @@ void MemStackTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the first block
-		DqnMemStack_FreeMemBlock(&stack, firstBlock);
+		stack.FreeMemBlock(firstBlock);
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
@@ -1473,7 +1527,7 @@ void MemStackTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the third block
-		DqnMemStack_FreeMemBlock(&stack, thirdBlock);
+		stack.FreeMemBlock(thirdBlock);
 
 		// Revalidate state
 		DQN_ASSERT(secondBlock->size == secondBlockSize);
@@ -1493,7 +1547,7 @@ void MemStackTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the second block
-		DqnMemStack_FreeMemBlock(&stack, secondBlock);
+		stack.FreeMemBlock(secondBlock);
 
 		// Revalidate state
 		DQN_ASSERT(fourthBlock->size == fourthBlockSize);
@@ -1504,7 +1558,7 @@ void MemStackTest()
 			DQN_ASSERT(fourth[i] == 'f');
 
 		// Free the stack
-		DqnMemStack_Free(&stack);
+		stack.Free();
 		DQN_ASSERT(!stack.block);
 	}
 
@@ -1515,15 +1569,15 @@ void MemStackTest()
 		if (1)
 		{
 			DqnMemStack stack = {};
-			DqnMemStack_Init(&stack, DQN_KILOBYTE(1), true);
+			stack.Init(DQN_KILOBYTE(1), true);
 
 			size_t allocSize = 512;
-			void *alloc      = DqnMemStack_Push(&stack, allocSize);
+			void *alloc      = stack.Push(allocSize);
 			DQN_ASSERT(stack.block->used == allocSize);
 
-			DQN_ASSERT(DqnMemStack_Pop(&stack, alloc, allocSize));
+			DQN_ASSERT(stack.Pop(alloc, allocSize));
 			DQN_ASSERT(stack.block->used == 0);
-			DqnMemStack_Free(&stack);
+			stack.Free();
 		}
 
 		// Test pop on a non-byte aligned allocation. This checks to see if
@@ -1531,15 +1585,15 @@ void MemStackTest()
 		if (1)
 		{
 			DqnMemStack stack = {};
-			DqnMemStack_Init(&stack, DQN_KILOBYTE(1), true);
+			stack.Init(DQN_KILOBYTE(1), true);
 
 			size_t allocSize = 1;
-			void *alloc      = DqnMemStack_Push(&stack, allocSize);
+			void *alloc      = stack.Push(allocSize);
 			DQN_ASSERT(stack.block->used == DQN_ALIGN_POW_N(allocSize, stack.byteAlign));
 
-			DQN_ASSERT(DqnMemStack_Pop(&stack, alloc, allocSize));
+			DQN_ASSERT(stack.Pop(alloc, allocSize));
 			DQN_ASSERT(stack.block->used == 0);
-			DqnMemStack_Free(&stack);
+			stack.Free();
 		}
 	}
 }
@@ -1671,7 +1725,7 @@ void FileTest()
 		}
 
 		DqnMemStack memStack = {};
-		DQN_ASSERT(DqnMemStack_Init(&memStack, DQN_MEGABYTE(1), true));
+		DQN_ASSERT(memStack.Init(DQN_MEGABYTE(1), true));
 		// Read data back in
 		for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
 		{
@@ -1682,7 +1736,7 @@ void FileTest()
 				bool result = DqnFile_Open(fileNames[i], file, permissions, DqnFileAction_OpenOnly);
 				DQN_ASSERT(result);
 
-				u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, file->size);
+				u8 *buffer = (u8 *)memStack.Push(file->size);
 				DQN_ASSERT(buffer);
 
 				size_t bytesRead = DqnFile_Read(&files[i], buffer, file->size);
@@ -1692,7 +1746,7 @@ void FileTest()
 				DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i])) == 0);
 
 				// Delete when we're done with it
-				DQN_ASSERT(DqnMemStack_Pop(&memStack, buffer, file->size));
+				DQN_ASSERT(memStack.Pop(buffer, file->size));
 				DqnFile_Close(file);
 			}
 
@@ -1701,7 +1755,7 @@ void FileTest()
 				size_t reqSize = 0;
 				DQN_ASSERT(DqnFile_GetFileSize(fileNames[i], &reqSize));
 
-				u8 *buffer = (u8 *)DqnMemStack_Push(&memStack, reqSize);
+				u8 *buffer = (u8 *)memStack.Push(reqSize);
 				DQN_ASSERT(buffer);
 
 				size_t bytesRead = 0;
@@ -1710,7 +1764,7 @@ void FileTest()
 
 				// Verify the data is the same as we wrote out
 				DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i])) == 0);
-				DQN_ASSERT(DqnMemStack_Pop(&memStack, buffer, reqSize));
+				DQN_ASSERT(memStack.Pop(buffer, reqSize));
 			}
 
 			DQN_ASSERT(DqnFile_Delete(fileNames[i]));
@@ -1725,7 +1779,7 @@ void FileTest()
 			    DqnFile_Open(fileNames[i], &dummy, permissions, DqnFileAction_OpenOnly);
 			DQN_ASSERT(!fileExists);
 		}
-		DqnMemStack_Free(&memStack);
+		memStack.Free();
 	}
 
 	////////////////////////////////////////////////////////////////////////////
@@ -1815,34 +1869,9 @@ FILE_SCOPE void JobQueueTest()
 	DqnLock_Delete(&globalJobQueueLock);
 }
 
-FILE_SCOPE inline bool Dqn_QuickSortLessThanU32(const void *const val1, const void *const val2)
-{
-	const u32 *const a = (u32 *)val1;
-	const u32 *const b = (u32 *)val2;
-	return (*a) < (*b);
-}
-
-FILE_SCOPE inline void Dqn_QuickSortSwapU32(void *const val1, void *const val2)
-{
-	u32 *a = (u32 *)val1;
-	u32 *b = (u32 *)val2;
-	DQN_SWAP(u32, *a, *b);
-}
-
 #include <algorithm>
 void SortTest()
 {
-	{
-		u32 array[] = {4, 8, 7, 5, 2, 3, 6};
-		Dqn_QuickSortC(array, sizeof(array[0]), DQN_ARRAY_COUNT(array), Dqn_QuickSortLessThanU32,
-		              Dqn_QuickSortSwapU32);
-
-		for (u32 i = 0; i < DQN_ARRAY_COUNT(array) - 1; i++)
-		{
-			DQN_ASSERT(array[i] <= array[i + 1]);
-		}
-	}
-
 	PrintHeader("DqnSort vs std::Sort");
 	DqnRandPCGState state = {};
 	DqnRnd_PCGInit(&state);
@@ -1852,48 +1881,34 @@ void SortTest()
 		DQN_ASSERT(stack.Init(DQN_KILOBYTE(1), false));
 
 		// Create array of ints
-		u32 numInts     = 1000000;
-		u32 sizeInBytes = sizeof(u32) * numInts;
-		u32 *dqnCArray   = (u32 *)stack.Push(sizeInBytes);
+		u32 numInts      = 1000000;
+		u32 sizeInBytes  = sizeof(u32) * numInts;
 		u32 *dqnCPPArray = (u32 *)stack.Push(sizeInBytes);
 		u32 *stdArray    = (u32 *)stack.Push(sizeInBytes);
-		DQN_ASSERT(dqnCArray && dqnCPPArray && stdArray);
+		DQN_ASSERT(dqnCPPArray && stdArray);
 
-		f64 dqnCTimings[10]                              = {};
-		f64 dqnCPPTimings[DQN_ARRAY_COUNT(dqnCTimings)] = {};
-		f64 stdTimings[DQN_ARRAY_COUNT(dqnCTimings)]    = {};
+		f64 dqnCPPTimings[2]                           = {};
+		f64 stdTimings[DQN_ARRAY_COUNT(dqnCPPTimings)] = {};
 
-		f64 dqnCAverage   = 0;
 		f64 dqnCPPAverage = 0;
 		f64 stdAverage    = 0;
 
-		for (u32 timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(dqnCTimings); timingsIndex++)
+		for (u32 timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(dqnCPPTimings); timingsIndex++)
 		{
 			// Populate with random numbers
 			for (u32 i = 0; i < numInts; i++)
 			{
-				dqnCArray[i]   = DqnRnd_PCGNext(&state);
-				dqnCPPArray[i] = dqnCArray[i];
+				dqnCPPArray[i] = DqnRnd_PCGNext(&state);
 				stdArray[i]    = dqnCPPArray[i];
 			}
 
-			// Time Dqn_QuickSortC
+			// Time Dqn_QuickSort
 			{
 				f64 start = DqnTimer_NowInS();
-				Dqn_QuickSortC(dqnCArray, sizeof(dqnCArray[0]), numInts, Dqn_QuickSortLessThanU32,
-				               Dqn_QuickSortSwapU32);
-				f64 duration = DqnTimer_NowInS() - start;
+				Dqn_QuickSort<u32>(
+				    dqnCPPArray, numInts,
+				    [](const u32 *const a, const u32 *const b) -> bool { return *a < *b; });
 
-				dqnCTimings[timingsIndex] = duration;
-				dqnCAverage += duration;
-
-				printf("[%02d]Dqn_QuickSortC: %f vs ", timingsIndex, dqnCTimings[timingsIndex]);
-			}
-
-			// Time Dqn_QuickSortC
-			{
-				f64 start = DqnTimer_NowInS();
-				Dqn_QuickSort(dqnCPPArray, numInts, Dqn_QuickSortLessThanU32);
 				f64 duration = DqnTimer_NowInS() - start;
 
 				dqnCPPTimings[timingsIndex] = duration;
@@ -1913,26 +1928,22 @@ void SortTest()
 				printf("std::sort: %f\n", stdTimings[timingsIndex]);
 			}
 
+			// Validate algorithm is correct
 			for (u32 i = 0; i < numInts; i++)
 			{
-				DQN_ASSERT_MSG(dqnCArray[i] == stdArray[i], "DqnArray[%d]: %d, stdArray[%d]: %d", i,
-				               dqnCArray[i], stdArray[i], i);
+				DQN_ASSERT_MSG(dqnCPPArray[i] == stdArray[i], "DqnArray[%d]: %d, stdArray[%d]: %d", i,
+				               dqnCPPArray[i], stdArray[i], i);
 			}
 		}
 
 		// Print averages
 		if (1)
 		{
-			dqnCAverage /= (f64)DQN_ARRAY_COUNT(dqnCTimings);
 			dqnCPPAverage /= (f64)DQN_ARRAY_COUNT(dqnCPPTimings);
-			stdAverage /= (f64)DQN_ARRAY_COUNT(stdTimings);
+			stdAverage    /= (f64)DQN_ARRAY_COUNT(stdTimings);
 			printf("\n- Average Timings\n");
-			printf("    Dqn_QuickSortC: %f vs Dqn_QuickSort: %f vs std::sort: %f\n\n", dqnCAverage,
-			       dqnCPPAverage, stdAverage);
+			printf("    Dqn_QuickSort: %f vs std::sort: %f\n\n", dqnCPPAverage, stdAverage);
 		}
-		stack.Pop(stdArray, sizeInBytes);
-		stack.Pop(dqnCPPArray, sizeInBytes);
-		stack.Pop(dqnCArray, sizeInBytes);
 		stack.Free();
 	}
 }
