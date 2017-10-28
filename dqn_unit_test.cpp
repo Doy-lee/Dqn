@@ -975,12 +975,12 @@ void VecTest()
 
 void ArrayTestMemAPIInternal(const DqnMemAPI memAPI)
 {
-	printf("Array with Default Mem API Test");
+	printf("Array with Default Mem API Test\n");
 	DqnArray<DqnV2> array = {};
 	if (1)
 	{
 		DQN_ASSERT(array.Init(1, memAPI));
-		DQN_ASSERT(array.max == 1);
+		DQN_ASSERT(array.max >= 1);
 		DQN_ASSERT(array.count == 0);
 
 		// Test basic insert
@@ -992,7 +992,7 @@ void ArrayTestMemAPIInternal(const DqnMemAPI memAPI)
 			DqnV2 vb = array.data[0];
 			DQN_ASSERT(DqnV2_Equals(va, vb));
 
-			DQN_ASSERT(array.max == 1);
+			DQN_ASSERT(array.max >= 1);
 			DQN_ASSERT(array.count == 1);
 		}
 
@@ -1008,48 +1008,48 @@ void ArrayTestMemAPIInternal(const DqnMemAPI memAPI)
 			vb = array.data[1];
 			DQN_ASSERT(DqnV2_Equals(va, vb) == true);
 
-			DQN_ASSERT(array.max == 2);
+			DQN_ASSERT(array.max >= 2);
 			DQN_ASSERT(array.count == 2);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 3);
+			DQN_ASSERT(array.max >= 3);
 			DQN_ASSERT(array.count == 3);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 4);
+			DQN_ASSERT(array.max >= 4);
 			DQN_ASSERT(array.count == 4);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 5);
+			DQN_ASSERT(array.max >= 5);
 			DQN_ASSERT(array.count == 5);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 6);
+			DQN_ASSERT(array.max >= 6);
 			DQN_ASSERT(array.count == 6);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 7);
+			DQN_ASSERT(array.max >= 7);
 			DQN_ASSERT(array.count == 7);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 8);
+			DQN_ASSERT(array.max >= 8);
 			DQN_ASSERT(array.count == 8);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 9);
+			DQN_ASSERT(array.max >= 9);
 			DQN_ASSERT(array.count == 9);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 10);
+			DQN_ASSERT(array.max >= 10);
 			DQN_ASSERT(array.count == 10);
 
 			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max == 11);
+			DQN_ASSERT(array.max >= 11);
 			DQN_ASSERT(array.count == 11);
 
 			DqnV2 vc = DqnV2_2f(90, 100);
 			DQN_ASSERT(array.Push(vc));
-			DQN_ASSERT(array.max == 12);
+			DQN_ASSERT(array.max >= 12);
 			DQN_ASSERT(array.count == 12);
 			DQN_ASSERT(DqnV2_Equals(vc, array.data[11]));
 		}
@@ -1059,7 +1059,7 @@ void ArrayTestMemAPIInternal(const DqnMemAPI memAPI)
 	if (1)
 	{
 		DQN_ASSERT(array.Init(1, memAPI));
-		DQN_ASSERT(array.max == 1);
+		DQN_ASSERT(array.max >= 1);
 		DQN_ASSERT(array.count == 0);
 	}
 	DQN_ASSERT(array.Free());
@@ -1073,41 +1073,41 @@ void ArrayTestMemAPIInternal(const DqnMemAPI memAPI)
 
 		DQN_ASSERT(array.Init(16, memAPI));
 		DQN_ASSERT(array.Remove(0) == false);
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 0);
 
 		array.Clear();
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 0);
 
 		DQN_ASSERT(array.Push(a));
 		DQN_ASSERT(array.Push(b));
 		DQN_ASSERT(array.Push(c));
 		DQN_ASSERT(array.Push(d));
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 4);
 
 		DQN_ASSERT(array.Remove(0));
 		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
 		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
 		DQN_ASSERT(DqnV2_Equals(array.data[2], c));
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 3);
 
 		DQN_ASSERT(array.Remove(2));
 		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
 		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 2);
 
 		DQN_ASSERT(array.Remove(100) == false);
 		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
 		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 2);
 
 		array.Clear();
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 0);
 	}
 	DQN_ASSERT(array.Free());
@@ -1125,25 +1125,25 @@ void ArrayTestMemAPIInternal(const DqnMemAPI memAPI)
 		DQN_ASSERT(array.Push(b));
 		DQN_ASSERT(array.Push(c));
 		DQN_ASSERT(array.Push(d));
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 4);
 
 		array.RemoveStable(0);
 		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
 		DQN_ASSERT(DqnV2_Equals(array.data[1], c));
 		DQN_ASSERT(DqnV2_Equals(array.data[2], d));
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 3);
 
 		array.RemoveStable(1);
 		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
 		DQN_ASSERT(DqnV2_Equals(array.data[1], d));
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 2);
 
 		array.RemoveStable(1);
 		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
-		DQN_ASSERT(array.max == 16);
+		DQN_ASSERT(array.max >= 16);
 		DQN_ASSERT(array.count == 1);
 	}
 	DQN_ASSERT(array.Free());
@@ -1206,6 +1206,7 @@ void ArrayTest()
 				auto memGuard0 = stack.TempRegionGuard();
 				DqnArray<char> array = {};
 				DQN_ASSERT(array.Init(128, memAPI));
+				stack.Push(1024);
 				ArrayTestRealData(&array);
 			}
 
