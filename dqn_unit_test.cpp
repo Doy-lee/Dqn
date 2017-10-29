@@ -2067,6 +2067,185 @@ void DqnQuickSort_Test()
 	}
 }
 
+void DqnHashTable_Test()
+{
+	LogHeader("DqnHashTable");
+	DqnHashTable<u32> hashTable = {};
+	hashTable.Init(1);
+
+	{
+		hashTable.AddNewEntriesToFreeList(+2);
+		DQN_ASSERT(hashTable.freeList && hashTable.freeList->next);
+		DQN_ASSERT(hashTable.numFreeEntries == 2);
+
+		hashTable.AddNewEntriesToFreeList(-1);
+		DQN_ASSERT(hashTable.freeList && !hashTable.freeList->next);
+		DQN_ASSERT(hashTable.numFreeEntries == 1);
+	}
+
+	{
+		DQN_ASSERT(hashTable.Get("hello world") == nullptr);
+		DQN_ASSERT(hashTable.Get("collide key") == nullptr);
+		DQN_ASSERT(hashTable.Get("crash again") == nullptr);
+
+		bool entryAlreadyExisted = true;
+		auto helloEntry = hashTable.Make("hello world", -1, &entryAlreadyExisted);
+		DQN_ASSERT(entryAlreadyExisted == false);
+
+		entryAlreadyExisted = true;
+		auto collideEntry   = hashTable.Make("collide key", -1, &entryAlreadyExisted);
+		DQN_ASSERT(entryAlreadyExisted == false);
+
+		entryAlreadyExisted = true;
+		auto crashEntry     = hashTable.Make("crash again", -1, &entryAlreadyExisted);
+		DQN_ASSERT(entryAlreadyExisted == false);
+
+		helloEntry->data   = 5;
+		collideEntry->data = 10;
+		crashEntry->data   = 15;
+
+		DQN_ASSERT(hashTable.numFreeEntries == 0);
+
+		DqnHashTable<u32>::Entry *entry = *hashTable.entries;
+		DQN_ASSERT(entry->data == 15);
+
+		entry = entry->next;
+		DQN_ASSERT(entry->data == 10);
+
+		entry = entry->next;
+		DQN_ASSERT(entry->data == 5);
+
+		DQN_ASSERT(hashTable.usedEntriesIndex == 1);
+		DQN_ASSERT(hashTable.usedEntries[0] == 0);
+		DQN_ASSERT(hashTable.numFreeEntries == 0);
+	}
+
+	hashTable.Remove("hello world");
+	DQN_ASSERT(hashTable.ChangeNumEntries(512));
+
+	{
+		auto helloEntry  = hashTable.Get("hello world");
+		DQN_ASSERT(helloEntry == nullptr);
+
+		auto collideEntry  = hashTable.Get("collide key");
+		DQN_ASSERT(collideEntry->data == 10);
+
+		auto crashEntry  = hashTable.Get("crash again");
+		DQN_ASSERT(crashEntry->data == 15);
+
+		bool entryAlreadyExisted = false;
+		collideEntry = hashTable.Make("collide key", -1, &entryAlreadyExisted);
+		DQN_ASSERT(entryAlreadyExisted == true);
+
+		entryAlreadyExisted = false;
+		crashEntry = hashTable.Make("crash again", -1, &entryAlreadyExisted);
+		DQN_ASSERT(entryAlreadyExisted == true);
+	}
+
+	hashTable.Free();
+	LogSuccess("DqnHashTable()");
+}
+
+void Dqn_BinarySearch_Test()
+{
+	LogHeader("Dqn_BinarySearch");
+	if (1)
+	{
+		auto compare = [](const u32 &a, const u32 &b) -> bool {
+			bool result = a < b;
+			return result;
+		};
+
+		u32 array[] = {1, 2, 3};
+		i64 result = Dqn_BinarySearch<u32>(array, DQN_ARRAY_COUNT(array), 1, compare);
+		DQN_ASSERT(result == 0);
+
+		result = Dqn_BinarySearch<u32>(array, DQN_ARRAY_COUNT(array), 2, compare);
+		DQN_ASSERT(result == 1);
+
+		result = Dqn_BinarySearch<u32>(array, DQN_ARRAY_COUNT(array), 3, compare);
+		DQN_ASSERT(result == 2);
+
+		result = Dqn_BinarySearch<u32>(array, DQN_ARRAY_COUNT(array), 4, compare);
+		DQN_ASSERT(result == -1);
+		LogSuccess("Dqn_BinarySearch(): With odd sized array and custom compare");
+	}
+
+	if (1)
+	{
+		u32 array[] = {1, 2, 3, 4};
+		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1);
+		DQN_ASSERT(result == 0);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2);
+		DQN_ASSERT(result == 1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3);
+		DQN_ASSERT(result == 2);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4);
+		DQN_ASSERT(result == 3);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5);
+		DQN_ASSERT(result == -1);
+		LogSuccess("Dqn_BinarySearch(): With even sized array");
+	}
+
+	if (1)
+	{
+		i32 array[] = {1, 2, 3};
+
+		const bool LOWER_BOUND = true;
+		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 0, LOWER_BOUND);
+		DQN_ASSERT(result == -1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1, LOWER_BOUND);
+		DQN_ASSERT(result == -1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2, LOWER_BOUND);
+		DQN_ASSERT(result == 0);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3, LOWER_BOUND);
+		DQN_ASSERT(result == 1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4, LOWER_BOUND);
+		DQN_ASSERT(result == 2);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5, LOWER_BOUND);
+		DQN_ASSERT(result == 2);
+		LogSuccess("Dqn_BinarySearch(): Lower bound with odd sized array");
+	}
+
+	if (1)
+	{
+		i32 array[] = {1, 2, 3, 4};
+
+		const bool LOWER_BOUND = true;
+		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 0, LOWER_BOUND);
+		DQN_ASSERT(result == -1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1, LOWER_BOUND);
+		DQN_ASSERT(result == -1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2, LOWER_BOUND);
+		DQN_ASSERT(result == 0);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3, LOWER_BOUND);
+		DQN_ASSERT(result == 1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4, LOWER_BOUND);
+		DQN_ASSERT(result == 2);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5, LOWER_BOUND);
+		DQN_ASSERT(result == 3);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 6, LOWER_BOUND);
+		DQN_ASSERT(result == 3);
+
+		LogSuccess("Dqn_BinarySearch(): Lower bound with even sized array");
+	}
+}
+
 int main(void)
 {
 	DqnString_Test();
@@ -2078,6 +2257,8 @@ int main(void)
 	DqnArray_Test();
 	DqnMemStack_Test();
 	DqnQuickSort_Test();
+	DqnHashTable_Test();
+	Dqn_BinarySearch_Test();
 
 #ifdef DQN_XPLATFORM_LAYER
 	DqnFile_Test();
