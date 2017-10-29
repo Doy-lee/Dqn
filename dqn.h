@@ -51,7 +51,6 @@
 
 // #XPlatform (Win32 & Unix)
 // #DqnFile      File I/O (Read, Write, Delete)
-// #DqnDir       Directory Querying
 // #DqnTimer     High Resolution Timer
 // #DqnLock      Mutex Synchronisation
 // #DqnJobQueue  Multithreaded Job Queue
@@ -1222,14 +1221,11 @@ DQN_FILE_SCOPE bool DqnFile_GetFileSizeW(const wchar_t *const path, size_t *cons
 DQN_FILE_SCOPE bool DqnFile_Delete (const char *const path);
 DQN_FILE_SCOPE bool DqnFile_DeleteW(const wchar_t *const path);
 
-////////////////////////////////////////////////////////////////////////////////
-// XPlatform > #DqnDir Public API - Directory Querying
-////////////////////////////////////////////////////////////////////////////////
 // numFiles: Pass in a pointer to a u32. The function fills it out with the number of entries.
 // return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
-//           allocated with malloc and must be freed using free() or the helper function DqnDir_ReadFree()
-DQN_FILE_SCOPE char **DqnDir_Read    (const char *const dir, u32 *const numFiles);
-DQN_FILE_SCOPE void   DqnDir_ReadFree(char **fileList, u32 numFiles);
+//           allocated with malloc and must be freed using free() or the helper function DqnFile_ReadFree()
+DQN_FILE_SCOPE char **DqnFile_ListDir    (const char *const dir, u32 *const numFiles);
+DQN_FILE_SCOPE void   DqnFile_ListDirFree(char **fileList, u32 numFiles);
 
 ////////////////////////////////////////////////////////////////////////////////
 // XPlatform > #DqnTimer Public API - High Resolution Timer
@@ -4355,7 +4351,7 @@ DQN_FILE_SCOPE bool DqnString::InitSize(const i32 size, const DqnMemAPI api)
 
 DQN_FILE_SCOPE bool DqnString::InitFixedMem(char *const memory, const i32 sizeInBytes)
 {
-	if (!str || !memory) return false;
+	if (!memory || sizeInBytes == 0) return false;
 
 	this->str        = (char *)memory;
 	this->len        = 0;
@@ -4420,7 +4416,7 @@ DQN_FILE_SCOPE bool DqnString::InitWLiteral(const wchar_t *const cstr, const Dqn
 
 DQN_FILE_SCOPE bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
 {
-	if (!str || !cstr) return false;
+	if (!cstr) return false;
 
 	this->str = cstr;
 	if (cstrLen == -1)
@@ -6477,8 +6473,7 @@ FILE_SCOPE bool DqnFileInternal_Win32OpenW(const wchar_t *const path,
 	return true;
 }
 
-DQN_FILE_SCOPE char **DqnDirInternal_PlatformRead(const char *const dir,
-                                                  u32 *const numFiles)
+DQN_FILE_SCOPE char **DqnFileInternal_PlatformListDir(const char *const dir, u32 *const numFiles)
 {
 	if (!dir || !numFiles) return NULL;
 
@@ -6676,8 +6671,7 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(const char *const path,
 	return true;
 }
 
-DQN_FILE_SCOPE char **DqnDirInternal_PlatformRead(const char *const dir,
-                                                  u32 *const numFiles)
+DQN_FILE_SCOPE char **DqnFileInternal_PlatformListDir(const char *const dir, u32 *const numFiles)
 {
 	if (!dir || !numFiles) return NULL;
 
@@ -7072,16 +7066,14 @@ DQN_FILE_SCOPE bool DqnFile_DeleteW(const wchar_t *const path)
 
 #endif
 }
-////////////////////////////////////////////////////////////////////////////////
-// XPlatform > #DqnDir Implementation
-////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE char **DqnDir_Read(const char *const dir, u32 *const numFiles)
+
+DQN_FILE_SCOPE char **DqnFile_ListDir(const char *const dir, u32 *const numFiles)
 {
-	char **result = DqnDirInternal_PlatformRead(dir, numFiles);
+	char **result = DqnFileInternal_PlatformListDir(dir, numFiles);
 	return result;
 }
 
-DQN_FILE_SCOPE void DqnDir_ReadFree(char **fileList, u32 numFiles)
+DQN_FILE_SCOPE void DqnFile_ListDirFree(char **fileList, u32 numFiles)
 {
 	if (fileList)
 	{
