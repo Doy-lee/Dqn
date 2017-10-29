@@ -975,7 +975,6 @@ struct DqnString
 	i32 len;          // Len of the string in bytes not including null-terminator
 	i32 max;          // The maximum capacity not including space for null-terminator.
 	DqnMemAPI memAPI;
-	bool isFreeable;
 
 	bool InitSize    (const i32 size, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
 	bool InitFixedMem(char *const memory, const i32 sizeInBytes);
@@ -4344,7 +4343,6 @@ DQN_FILE_SCOPE bool DqnString::InitSize(const i32 size, const DqnMemAPI api)
 
 	this->len        = 0;
 	this->max        = size;
-	this->isFreeable = true;
 	this->memAPI     = api;
 	return true;
 }
@@ -4357,7 +4355,6 @@ DQN_FILE_SCOPE bool DqnString::InitFixedMem(char *const memory, const i32 sizeIn
 	this->len        = 0;
 	this->max        = sizeInBytes - 1;
 	this->memAPI     = {};
-	this->isFreeable = false;
 
 	return true;
 }
@@ -4379,7 +4376,6 @@ DQN_FILE_SCOPE bool DqnString::InitLiteral(const char *const cstr, const DqnMemA
 	for (i32 i = 0; i < this->len; i++) this->str[i] = cstr[i];
 
 	this->str[this->len] = 0;
-	this->isFreeable    = true;
 
 	return true;
 }
@@ -4404,7 +4400,6 @@ DQN_FILE_SCOPE bool DqnString::InitWLiteral(const wchar_t *const cstr, const Dqn
 	DQN_ASSERT(convertResult != -1);
 
 	this->str[this->len] = 0;
-	this->isFreeable    = true;
 	return true;
 
 #else
@@ -4437,7 +4432,6 @@ DQN_FILE_SCOPE bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
 
 DQN_FILE_SCOPE bool DqnString::Expand(const i32 newMax)
 {
-	if (!this->isFreeable)      return false;
 	if (!this->memAPI.callback) return false;
 	if (newMax < this->max)     return true;
 
@@ -4513,7 +4507,7 @@ DQN_FILE_SCOPE void DqnString::Free()
 {
 	if (this->str)
 	{
-		if (this->isFreeable)
+		if (this->memAPI.callback)
 		{
 			DqnMemAPICallbackInfo info =
 			    DqnMemAPIInternal_CallbackInfoAskFree(this->memAPI, this->str, this->len);
@@ -4523,7 +4517,6 @@ DQN_FILE_SCOPE void DqnString::Free()
 		this->str        = NULL;
 		this->len        = 0;
 		this->max        = 0;
-		this->isFreeable = false;
 	}
 }
 
