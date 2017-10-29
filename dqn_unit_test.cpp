@@ -1338,8 +1338,8 @@ void DqnMemStack_Test()
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// Alocate A
-		size_t sizeA    = (size_t)(allocSize * 0.5f);
-		void *resultA   = stack.Push(sizeA);
+		size_t sizeA  = (size_t)(allocSize * 0.5f);
+		void *resultA = stack.Push(sizeA);
 		DQN_ASSERT(((intptr_t)resultA % ALIGNMENT) == 0);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == allocSize);
@@ -1350,10 +1350,10 @@ void DqnMemStack_Test()
 		for (u32 i  = 0; i < sizeA; i++)
 			ptrA[i] = 1;
 
-		DqnMemStackBlock *blockA = stack.block;
+		DqnMemStack::Block *blockA = stack.block;
 		// Alocate B
-		size_t sizeB    = (size_t)(allocSize * 2.0f);
-		void *resultB   = stack.Push(sizeB);
+		size_t sizeB  = (size_t)(allocSize * 2.0f);
+		void *resultB = stack.Push(sizeB);
 		DQN_ASSERT(((intptr_t)resultB % ALIGNMENT) == 0);
 		DQN_ASSERT(stack.block && stack.block->memory);
 		DQN_ASSERT(stack.block->size == DQN_KILOBYTE(2));
@@ -1372,13 +1372,13 @@ void DqnMemStack_Test()
 		DQN_ASSERT(stack.block != blockA);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 		DQN_ASSERT(blockA->used == sizeA);
-		DqnMemStackBlock *blockB = stack.block;
+		DqnMemStack::Block *blockB = stack.block;
 
 		// Check temp regions work
 		DqnMemStackTempRegion tempBuffer = stack.TempRegionBegin();
 
-		size_t sizeC    = 1024 + 1;
-		void *resultC   = stack.Push(sizeC);
+		size_t sizeC  = 1024 + 1;
+		void *resultC = stack.Push(sizeC);
 		DQN_ASSERT(((intptr_t)resultC % ALIGNMENT) == 0);
 		DQN_ASSERT(stack.block != blockB && stack.block != blockA);
 		DQN_ASSERT(stack.block->used >= sizeC + 0 && stack.block->used <= sizeC + 3);
@@ -1443,7 +1443,7 @@ void DqnMemStack_Test()
 		const u32 ALIGNMENT        = 4;
 		stack.InitWithFixedMem(memory, DQN_ARRAY_COUNT(memory), ALIGNMENT);
 		DQN_ASSERT(stack.block && stack.block->memory);
-		DQN_ASSERT(stack.block->size == DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
+		DQN_ASSERT(stack.block->size == DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStack::Block));
 		DQN_ASSERT(stack.block->used == 0);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
@@ -1454,7 +1454,7 @@ void DqnMemStack_Test()
 		stack.Free();
 		stack.FreeLastBlock();
 		DQN_ASSERT(stack.block && stack.block->memory);
-		DQN_ASSERT(stack.block->size == DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStackBlock));
+		DQN_ASSERT(stack.block->size == DQN_ARRAY_COUNT(memory) - sizeof(DqnMemStack::Block));
 		DQN_ASSERT(stack.block->used == 0);
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 		LogSuccess("DqnMemStack(): Test stack with fixed memory does not allocate more");
@@ -1482,7 +1482,9 @@ void DqnMemStack_Test()
 		// Freeing should work
 		stack.Free();
 		DQN_ASSERT(!stack.block);
-		LogSuccess("DqnMemStack(): Test stack with fixed size allocates one from platform but does not grow further");
+		LogSuccess(
+		    "DqnMemStack(): Test stack with fixed size allocates one from platform but does not "
+		    "grow further");
 	}
 
 	// Test freeing/clear block and alignment
@@ -1493,8 +1495,8 @@ void DqnMemStack_Test()
 		const u32 ALIGNMENT   = 16;
 		stack.Init(firstBlockSize, false, ALIGNMENT);
 
-		DqnMemStackBlock *firstBlock = stack.block;
-		u8 *first                    = NULL;
+		DqnMemStack::Block *firstBlock = stack.block;
+		u8 *first                      = NULL;
 		{
 			u32 allocate40Bytes = 40;
 			u8 *data            = (u8 *)stack.Push(allocate40Bytes);
@@ -1546,21 +1548,21 @@ void DqnMemStack_Test()
 		}
 
 		// Force it to allocate three new blocks and write out data to each
-		size_t secondBlockSize        = DQN_KILOBYTE(2);
-		u8 *second                    = (u8 *)stack.Push(secondBlockSize);
-		DqnMemStackBlock *secondBlock = stack.block;
+		size_t secondBlockSize          = DQN_KILOBYTE(2);
+		u8 *second                      = (u8 *)stack.Push(secondBlockSize);
+		DqnMemStack::Block *secondBlock = stack.block;
 		for (u32 i    = 0; i < secondBlockSize; i++)
 			second[i] = 'd';
 
-		size_t thirdBlockSize        = DQN_KILOBYTE(3);
-		u8 *third                    = (u8 *)stack.Push(thirdBlockSize);
-		DqnMemStackBlock *thirdBlock = stack.block;
+		size_t thirdBlockSize          = DQN_KILOBYTE(3);
+		u8 *third                      = (u8 *)stack.Push(thirdBlockSize);
+		DqnMemStack::Block *thirdBlock = stack.block;
 		for (u32 i   = 0; i < thirdBlockSize; i++)
 			third[i] = 'e';
 
-		size_t fourthBlockSize        = DQN_KILOBYTE(4);
-		u8 *fourth                    = (u8 *)stack.Push(fourthBlockSize);
-		DqnMemStackBlock *fourthBlock = stack.block;
+		size_t fourthBlockSize          = DQN_KILOBYTE(4);
+		u8 *fourth                      = (u8 *)stack.Push(fourthBlockSize);
+		DqnMemStack::Block *fourthBlock = stack.block;
 		for (u32 i    = 0; i < fourthBlockSize; i++)
 			fourth[i] = 'f';
 
@@ -1574,7 +1576,7 @@ void DqnMemStack_Test()
 		// NOTE: Making blocks manually is not really recommended ..
 		// Try and free an invalid block by mocking a fake block
 		u8 fakeBlockMem[DQN_KILOBYTE(3)] = {};
-		DqnMemStackBlock fakeBlock       = {};
+		DqnMemStack::Block fakeBlock     = {};
 		fakeBlock.memory                 = fakeBlockMem;
 		fakeBlock.size                   = DQN_ARRAY_COUNT(fakeBlockMem);
 		fakeBlock.used                   = 0;
