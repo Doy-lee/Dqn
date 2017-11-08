@@ -539,7 +539,8 @@ bool DqnArray<T>::Free()
 template <typename T>
 bool DqnArray<T>::Resize(i64 newMax)
 {
-	if (!this->data) return false;
+	if (!this->data)            return false;
+	if (!this->memAPI.callback) return false;
 
 	i64 oldSize = this->max * sizeof(T);
 	i64 newSize = newMax * sizeof(T);
@@ -1468,22 +1469,18 @@ DQN_FILE_SCOPE i32  Dqn_I32ToWStr(i32 value, wchar_t *buf, i32 bufSize);
 // #DqnRnd Public API - Random Number Generator
 ////////////////////////////////////////////////////////////////////////////////
 // PCG (Permuted Congruential Generator) Random Number Generator
-typedef struct DqnRandPCGState
+class DqnRndPCG
 {
+public:
 	u64 state[2];
-} DqnRandPCGState;
 
-// pcg: Pass in a pointer to a zero-cleared DqnRandPCGState
-DQN_FILE_SCOPE void DqnRnd_PCGInitWithSeed(DqnRandPCGState *pcg, u32 seed);
-// Uses __rdtsc() to create a seed. TODO(doyle): This requires the platform layer.
-DQN_FILE_SCOPE void DqnRnd_PCGInit(DqnRandPCGState *pcg);
+	void Init        ();          // Uses rdstc to create a seed
+	void InitWithSeed(u32 seed);
 
-// return: A random number N between [0, 0xFFFFFFFF]
-DQN_FILE_SCOPE u32  DqnRnd_PCGNext (DqnRandPCGState *pcg);
-// return: A random float N between [0.0, 1.0f]
-DQN_FILE_SCOPE f32  DqnRnd_PCGNextf(DqnRandPCGState *pcg);
-// return: A random integer N between [min, max]
-DQN_FILE_SCOPE i32  DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max);
+	u32 Next ();                 // return: A random number  N between [0, 0xFFFFFFFF]
+	f32 Nextf();                 // return: A random float   N between [0.0, 1.0f]
+	i32 Range(i32 min, i32 max); // return: A random integer N between [min, max]
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // #Dqn_* Public API
@@ -1525,11 +1522,10 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i32 size,
 	}
 #endif
 
-	DqnRandPCGState state = {};
-	DqnRnd_PCGInit(&state);
+	DqnRndPCG state; state.Init();
 
 	i32 lastIndex      = size - 1;
-	i32 pivotIndex     = DqnRnd_PCGRange(&state, 0, lastIndex);
+	i32 pivotIndex     = state.Range(0, lastIndex);
 	i32 partitionIndex = 0;
 	i32 startIndex     = 0;
 
@@ -5169,7 +5165,7 @@ union DqnRndInternal_U32F32
 	f32 float32;
 };
 
-FILE_SCOPE f32 DqnRnd_F32NormalizedFromU32Internal(u32 value)
+FILE_SCOPE f32 DqnRndInternal_F32NormalizedFromU32(u32 value)
 {
 	u32 exponent = 127;
 	u32 mantissa = value >> 9;
@@ -5179,7 +5175,7 @@ FILE_SCOPE f32 DqnRnd_F32NormalizedFromU32Internal(u32 value)
 	return uf.float32 - 1.0f;
 }
 
-FILE_SCOPE u64 DqnRnd_Murmur3Avalanche64Internal(u64 h)
+FILE_SCOPE u64 DqnRndInternal_Murmur3Avalanche64(u64 h)
 {
 	h ^= h >> 33;
 	h *= 0xff51afd7ed558ccd;
@@ -5193,7 +5189,7 @@ FILE_SCOPE u64 DqnRnd_Murmur3Avalanche64Internal(u64 h)
 	#include <x86intrin.h> // __rdtsc
 #endif
 
-FILE_SCOPE u32 DqnRnd_MakeSeedInternal()
+FILE_SCOPE u32 DqnRndInternal_MakeSeed()
 {
 #if defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM)
 	i64 numClockCycles = __rdtsc();
@@ -5207,43 +5203,46 @@ FILE_SCOPE u32 DqnRnd_MakeSeedInternal()
 #endif
 }
 
-DQN_FILE_SCOPE void DqnRnd_PCGInitWithSeed(DqnRandPCGState *pcg, u32 seed)
+void DqnRndPCG::InitWithSeed(u32 seed)
 {
 	u64 value     = (((u64)seed) << 1ULL) | 1ULL;
-	value         = DqnRnd_Murmur3Avalanche64Internal(value);
-	pcg->state[0] = 0U;
-	pcg->state[1] = (value << 1ULL) | 1ULL;
-	DqnRnd_PCGNext(pcg);
-	pcg->state[0] += DqnRnd_Murmur3Avalanche64Internal(value);
-	DqnRnd_PCGNext(pcg);
+	value         = DqnRndInternal_Murmur3Avalanche64(value);
+	this->state[0] = 0U;
+	this->state[1] = (value << 1ULL) | 1ULL;
+	this->Next();
+	this->state[0] += DqnRndInternal_Murmur3Avalanche64(value);
+	this->Next();
 }
 
-DQN_FILE_SCOPE void DqnRnd_PCGInit(DqnRandPCGState *pcg)
+void DqnRndPCG::Init()
 {
-	u32 seed = DqnRnd_MakeSeedInternal();
-	DqnRnd_PCGInitWithSeed(pcg, seed);
+	u32 seed = DqnRndInternal_MakeSeed();
+	this->InitWithSeed(seed);
 }
 
-DQN_FILE_SCOPE u32 DqnRnd_PCGNext(DqnRandPCGState *pcg)
+u32 DqnRndPCG::Next()
 {
-	u64 oldstate   = pcg->state[0];
-	pcg->state[0]  = oldstate * 0x5851f42d4c957f2dULL + pcg->state[1];
+	u64 oldstate   = this->state[0];
+	this->state[0] = oldstate * 0x5851f42d4c957f2dULL + this->state[1];
 	u32 xorshifted = (u32)(((oldstate >> 18ULL) ^ oldstate) >> 27ULL);
 	u32 rot        = (u32)(oldstate >> 59ULL);
 	return (xorshifted >> rot) | (xorshifted << ((-(i32)rot) & 31));
 }
 
-DQN_FILE_SCOPE f32 DqnRnd_PCGNextf(DqnRandPCGState *pcg)
+f32 DqnRndPCG::Nextf()
 {
-	return DqnRnd_F32NormalizedFromU32Internal(DqnRnd_PCGNext(pcg));
+	f32 result = DqnRndInternal_F32NormalizedFromU32(this->Next());
+	return result;
 }
 
-DQN_FILE_SCOPE i32 DqnRnd_PCGRange(DqnRandPCGState *pcg, i32 min, i32 max)
+i32 DqnRndPCG::Range(i32 min, i32 max)
 {
 	i32 const range = (max - min) + 1;
 	if (range <= 0) return min;
-	i32 const value = (i32)(DqnRnd_PCGNextf(pcg) * range);
-	return min + value;
+
+	i32 const value = (i32)(this->Nextf() * range);
+	i32 result      = min + value;
+	return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

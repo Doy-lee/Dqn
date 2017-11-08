@@ -641,18 +641,19 @@ void DqnTimer_Test()
 void DqnRnd_Test()
 {
 	LogHeader("Random Number Generator Test");
-	DqnRandPCGState pcg;
-	DqnRnd_PCGInit(&pcg);
+
+	DqnRndPCG pcg; pcg.Init();
 	for (i32 i = 0; i < 1000000; i++)
 	{
 		i32 min    = -100;
 		i32 max    = 1000000000;
-		i32 result = DqnRnd_PCGRange(&pcg, min, max);
+		i32 result = pcg.Range(min, max);
 		DQN_ASSERT(result >= min && result <= max);
 
-		f32 randF32 = DqnRnd_PCGNextf(&pcg);
+		f32 randF32 = pcg.Nextf();
 		DQN_ASSERT(randF32 >= 0.0f && randF32 <= 1.0f);
 	}
+
 	printf("RandomTest(): RndPCG: Completed successfully\n");
 	printf("RandomTest(): Completed successfully\n");
 }
@@ -1992,8 +1993,7 @@ FILE_SCOPE void DqnJobQueue_Test()
 void DqnQuickSort_Test()
 {
 	LogHeader("DqnSort vs std::Sort");
-	DqnRandPCGState state = {};
-	DqnRnd_PCGInit(&state);
+	DqnRndPCG state; state.Init();
 	if (1)
 	{
 		DqnMemStack stack = {};
@@ -2017,7 +2017,7 @@ void DqnQuickSort_Test()
 			// Populate with random numbers
 			for (u32 i = 0; i < numInts; i++)
 			{
-				dqnCPPArray[i] = DqnRnd_PCGNext(&state);
+				dqnCPPArray[i] = state.Next();
 				stdArray[i]    = dqnCPPArray[i];
 			}
 
