@@ -82,6 +82,7 @@
 //   - Get rid of reliance on MAX_PATH
 //
 // - Make lib compile and run on Linux with GCC using -03
+// - Make DqnV* operations be static to class for consistency?
 
 ////////////////////////////////////////////////////////////////////////////////
 // Preprocessor Checks
@@ -1164,25 +1165,42 @@ DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max);
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV2 Public API - 2D Math Vectors
 ////////////////////////////////////////////////////////////////////////////////
-typedef union DqnV2 {
-	struct { f32 x, y; };
-	struct { f32 w, h; };
-	struct { f32 min, max; };
-	f32 e[2];
-} DqnV2;
+class DqnV2i
+{
+public:
+	union
+	{
+		struct { i32 x, y; };
+		struct { i32 w, h; };
+		struct { i32 min, max; };
+		i32 e[2];
+	};
 
-typedef union DqnV2i {
-	struct { i32 x, y; };
-	struct { i32 w, h; };
-	struct { i32 min, max; };
-	i32 e[2];
-} DqnV2i;
+	DqnV2i();
+	DqnV2i(i32 x_, i32 y_);
+	DqnV2i(f32 x_, f32 y_);
+	DqnV2i(class DqnV2 a);
 
-// DqnV2
-DQN_FILE_SCOPE DqnV2 DqnV2_1f (f32 xy);
-DQN_FILE_SCOPE DqnV2 DqnV2_2f (f32 x, f32 y);
-DQN_FILE_SCOPE DqnV2 DqnV2_2i (i32 x, i32 y); // Typecasts 2 integers to 2 floats
-DQN_FILE_SCOPE DqnV2 DqnV2_V2i(DqnV2i a);
+};
+
+class DqnV2
+{
+public:
+	union
+	{
+		struct { f32 x, y; };
+		struct { f32 w, h; };
+		struct { f32 min, max; };
+		f32 e[2];
+	};
+
+	DqnV2();
+	DqnV2(f32 xy);
+	DqnV2(f32 x_, f32 y_);
+	DqnV2(i32 x_, i32 y_);
+	DqnV2(DqnV2i a);
+
+};
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Add     (DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE DqnV2 DqnV2_Sub     (DqnV2 a, DqnV2 b);
@@ -1192,11 +1210,11 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Hadamard(DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE f32   DqnV2_Dot     (DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE bool  DqnV2_Equals  (DqnV2 a, DqnV2 b);
 
-DQN_FILE_SCOPE f32   DqnV2_LengthSquared(DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE f32   DqnV2_Length       (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Normalise    (DqnV2 a);
-DQN_FILE_SCOPE bool  DqnV2_Overlaps     (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(DqnV2 a);
+DQN_FILE_SCOPE f32   DqnV2_LengthSquared(const DqnV2 a, const DqnV2 b);
+DQN_FILE_SCOPE f32   DqnV2_Length       (const DqnV2 a, const DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Normalise    (const DqnV2 a);
+DQN_FILE_SCOPE bool  DqnV2_Overlaps     (      DqnV2 a,       DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(const DqnV2 a);
 
 DQN_FILE_SCOPE DqnV2 DqnV2_ResizeKeepAspectRatio(DqnV2 srcSize, DqnV2 targetSize);
 DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio     (DqnV2 dim, DqnV2 ratio); // Resize the dimension to fit the aspect ratio provided. Downscale only.
@@ -1214,10 +1232,6 @@ DQN_FILE_SCOPE inline DqnV2 &operator+=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_A
 DQN_FILE_SCOPE inline bool   operator==(DqnV2  a, DqnV2 b) { return      DqnV2_Equals  (a, b);  }
 
 // DqnV2i
-DQN_FILE_SCOPE DqnV2i DqnV2i_2i(i32 x, i32 y);
-DQN_FILE_SCOPE DqnV2i DqnV2i_2f(f32 x, f32 y); // Typecasts 2 floats to 2 integers
-DQN_FILE_SCOPE DqnV2i DqnV2i_V2(DqnV2 a);
-
 DQN_FILE_SCOPE DqnV2i DqnV2i_Add     (DqnV2i a, DqnV2i b);
 DQN_FILE_SCOPE DqnV2i DqnV2i_Sub     (DqnV2i a, DqnV2i b);
 DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei  (DqnV2i a, i32 b);
@@ -1239,27 +1253,38 @@ DQN_FILE_SCOPE inline bool    operator==(DqnV2i  a, DqnV2i b) { return      DqnV
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV3 Public API - 3D Math Vectors
 ////////////////////////////////////////////////////////////////////////////////
-typedef union DqnV3
+class DqnV3
 {
-	struct { f32 x, y, z; };
-    DqnV2 xy;
+public:
+	union
+	{
+		struct { f32 x, y, z; };
+		DqnV2 xy;
+		struct { f32 r, g, b; };
+		f32 e[3];
+	};
 
-    struct { f32 r, g, b; };
-	f32 e[3];
-} DqnV3;
+	DqnV3();
+	DqnV3(f32 xyz);
+	DqnV3(f32 x_, f32 y_, f32 z_);
+	DqnV3(i32 x_, i32 y_, i32 z_);
+};
 
-typedef union DqnV3i
+class DqnV3i
 {
-	struct { i32 x, y, z; };
-    struct { i32 r, g, b; };
-	i32 e[3];
-} DqnV3i;
+public:
+	union
+	{
+		struct { i32 x, y, z; };
+		struct { i32 r, g, b; };
+		i32 e[3];
+	};
+
+	DqnV3i(i32 x_, i32 y_, i32 z_);
+	DqnV3i(f32 x_, f32 y_, f32 z_);
+};
 
 // DqnV3
-DQN_FILE_SCOPE DqnV3 DqnV3_1f(f32 xyz);
-DQN_FILE_SCOPE DqnV3 DqnV3_3f(f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnV3 DqnV3_3i(i32 x, i32 y, i32 z); // Create a vector using ints and typecast to floats
-
 DQN_FILE_SCOPE DqnV3 DqnV3_Add     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Sub     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Scalei  (DqnV3 a, i32 b);
@@ -1275,7 +1300,7 @@ DQN_FILE_SCOPE f32   DqnV3_LengthSquared(DqnV3 a, DqnV3 b);
 
 DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);           }
-DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3_1f(b)); }
+DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3(b)); }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, i32   b) { return      DqnV3_Scalei  (a, b);           }
@@ -1287,32 +1312,32 @@ DQN_FILE_SCOPE inline DqnV3 &operator-=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_S
 DQN_FILE_SCOPE inline DqnV3 &operator+=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Add     (a, b));          }
 DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_Equals  (a, b);           }
 
-// DqnV3i
-DQN_FILE_SCOPE DqnV3i DqnV3i_3i(i32 x, i32 y, i32 z);
-DQN_FILE_SCOPE DqnV3i DqnV3i_3f(f32 x, f32 y, f32 z);
-
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV4 Public API - 4D Math Vectors
 ////////////////////////////////////////////////////////////////////////////////
-typedef union DqnV4 {
-	struct
+class DqnV4
+{
+public:
+	union
 	{
-		f32 x, y, z, w;
+		struct { f32 x, y, z, w; };
+		DqnV3 xyz;
+		DqnV2 xy;
+
+		struct { f32 r, g, b, a; };
+		DqnV3 rgb;
+
+		f32    e[4];
+		DqnV2 v2[2];
 	};
-	DqnV3 xyz;
-	DqnV2 xy;
 
-	struct { f32 r, g, b, a; };
-	DqnV3 rgb;
+	DqnV4();
+	DqnV4(f32 xyzw);
+	DqnV4(f32 x_, f32 y_, f32 z_, f32 w_);
+	DqnV4(i32 x_, i32 y_, i32 z_, i32 w_);
+	DqnV4(DqnV3 a, f32 w);
 
-	f32    e[4];
-	DqnV2 v2[2];
-} DqnV4;
-
-DQN_FILE_SCOPE DqnV4 DqnV4_1f(f32 xyzw);
-DQN_FILE_SCOPE DqnV4 DqnV4_4f(f32 x, f32 y, f32 z, f32 w);
-DQN_FILE_SCOPE DqnV4 DqnV4_4i(i32 x, i32 y, i32 z, f32 w); // Create a vector using ints and typecast to floats
-DQN_FILE_SCOPE DqnV4 DqnV4_V3(DqnV3 a, f32 w);
+};
 
 DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE DqnV4 DqnV4_Sub     (DqnV4 a, DqnV4 b);
@@ -1324,7 +1349,7 @@ DQN_FILE_SCOPE bool  DqnV4_Equals  (DqnV4 a, DqnV4 b);
 
 DQN_FILE_SCOPE inline DqnV4  operator- (DqnV4  a, DqnV4 b) { return      DqnV4_Sub     (a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, DqnV4 b) { return      DqnV4_Add     (a, b);            }
-DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4_1f(b));  }
+DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4(b));     }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, DqnV4 b) { return      DqnV4_Hadamard(a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, f32   b) { return      DqnV4_Scalef  (a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, i32   b) { return      DqnV4_Scalei  (a, b);            }
@@ -1363,23 +1388,25 @@ DQN_FILE_SCOPE DqnV4   DqnMat4_MulV4       (DqnMat4 a, DqnV4 b);
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnRect Public API - Rectangles
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct DqnRect
+class DqnRect
 {
+public:
 	DqnV2 min;
 	DqnV2 max;
-} DqnRect;
 
-DQN_FILE_SCOPE DqnRect DqnRect_4f       (f32 minX, f32 minY, f32 maxX, f32 maxY);
-DQN_FILE_SCOPE DqnRect DqnRect_4i       (i32 minX, i32 minY, i32 maxX, i32 maxY);
-DQN_FILE_SCOPE DqnRect DqnRect_Init     (DqnV2 origin, DqnV2 size);
+	DqnRect();
+	DqnRect(DqnV2 origin, DqnV2 size);
+	DqnRect(f32 x, f32 y, f32 w, f32 h);
+	DqnRect(i32 x, i32 y, i32 w, i32 h);
 
-DQN_FILE_SCOPE void    DqnRect_GetSize2f(DqnRect rect, f32 *width, f32 *height);
-DQN_FILE_SCOPE void    DqnRect_GetSize2i(DqnRect rect, i32 *width, i32 *height);
-DQN_FILE_SCOPE DqnV2   DqnRect_GetSizeV2(DqnRect rect);
-DQN_FILE_SCOPE DqnV2   DqnRect_GetCenter(DqnRect rect);
-DQN_FILE_SCOPE DqnRect DqnRect_ClipRect (DqnRect rect, DqnRect clip);
-DQN_FILE_SCOPE DqnRect DqnRect_Move     (DqnRect rect, DqnV2 shift);
-DQN_FILE_SCOPE bool    DqnRect_ContainsP(DqnRect rect, DqnV2 p);
+	void  GetSize  (f32 *const width, f32 *const height) const;
+	DqnV2 GetSize  ()                                    const;
+	DqnV2 GetCenter()                                    const;
+
+	DqnRect ClipRect (const DqnRect clip) const;
+	DqnRect Move     (const DqnV2 shift)  const;
+	bool    ContainsP(const DqnV2 p)      const;
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnChar Public API - Char Operations
@@ -3227,46 +3254,20 @@ DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// #DqnV2 Init Implementation
+// #DqnV2 Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV2 DqnV2_1f(f32 xy)
-{
-	DqnV2 result = {0};
-	result.x  = xy;
-	result.y  = xy;
-
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV2 DqnV2_2f(f32 x, f32 y)
-{
-	DqnV2 result = {0};
-	result.x  = x;
-	result.y  = y;
-
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV2 DqnV2_2i(i32 x, i32 y)
-{
-	DqnV2 result = DqnV2_2f((f32)x, (f32)y);
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV2 DqnV2_V2i(DqnV2i a)
-{
-	DqnV2 result = {0};
-	result.x = (f32)a.x;
-	result.y = (f32)a.y;
-	return result;
-}
+DqnV2::DqnV2()                                          { }
+DqnV2::DqnV2(f32 xy)         : x(xy)      , y(xy)       { }
+DqnV2::DqnV2(f32 x_, f32 y_) : x(x_)      , y(y_)       { }
+DqnV2::DqnV2(i32 x_, i32 y_) : x((f32)x_) , y((f32)y_)  { }
+DqnV2::DqnV2(DqnV2i a)       : x((f32)a.x), y((f32)a.y) { }
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV2 Arithmetic Implementation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE DqnV2 DqnV2_Add(DqnV2 a, DqnV2 b)
 {
-	DqnV2 result = {0};
+	DqnV2 result = {};
 	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] + b.e[i];
 
@@ -3275,7 +3276,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Add(DqnV2 a, DqnV2 b)
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Sub(DqnV2 a, DqnV2 b)
 {
-	DqnV2 result = {0};
+	DqnV2 result = {};
 	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] - b.e[i];
 
@@ -3284,7 +3285,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Sub(DqnV2 a, DqnV2 b)
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Scalei(DqnV2 a, i32 b)
 {
-	DqnV2 result = {0};
+	DqnV2 result = {};
 	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
@@ -3293,7 +3294,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Scalei(DqnV2 a, i32 b)
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Scalef(DqnV2 a, f32 b)
 {
-	DqnV2 result = {0};
+	DqnV2 result = {};
 	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b;
 
@@ -3302,7 +3303,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Scalef(DqnV2 a, f32 b)
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Hadamard(DqnV2 a, DqnV2 b)
 {
-	DqnV2 result = {0};
+	DqnV2 result = {};
 	for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
 		result.e[i] = a.e[i] * b.e[i];
 
@@ -3333,15 +3334,15 @@ DQN_FILE_SCOPE bool DqnV2_Equals(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE f32 DqnV2_LengthSquared(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE f32 DqnV2_LengthSquared(const DqnV2 a, const DqnV2 b)
 {
-	f32 x      = b.x - a.x;
-	f32 y      = b.y - a.y;
-	f32 result = (DQN_SQUARED(x) + DQN_SQUARED(y));
+	f32 x_     = b.x - a.x;
+	f32 y_     = b.y - a.y;
+	f32 result = (DQN_SQUARED(x_) + DQN_SQUARED(y_));
 	return result;
 }
 
-DQN_FILE_SCOPE f32 DqnV2_Length(DqnV2 a, DqnV2 b)
+DQN_FILE_SCOPE f32 DqnV2_Length(const DqnV2 a, const DqnV2 b)
 {
 	f32 lengthSq = DqnV2_LengthSquared(a, b);
 	if (lengthSq == 0) return 0;
@@ -3350,31 +3351,30 @@ DQN_FILE_SCOPE f32 DqnV2_Length(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 DqnV2_Normalise(DqnV2 a)
+DQN_FILE_SCOPE DqnV2 DqnV2_Normalise(const DqnV2 a)
 {
-	f32 magnitude = DqnV2_Length(DqnV2_2f(0, 0), a);
-	if (magnitude == 0) return DqnV2_1f(0.0f);
+	f32 magnitude = DqnV2_Length(DqnV2(0, 0), a);
+	if (magnitude == 0) return DqnV2(0.0f);
 
-	DqnV2 result = DqnV2_Scalef(a, 1 / magnitude);
+	DqnV2 result = a * (1.0f / magnitude);
 	return result;
 }
 
 DQN_FILE_SCOPE bool DqnV2_Overlaps(DqnV2 a, DqnV2 b)
 {
 	bool result = false;
-	
+
 	f32 lenOfA = a.max - a.min;
 	f32 lenOfB = b.max - b.min;
 
 	if (lenOfA > lenOfB)
 	{
 		DqnV2 tmp = a;
-		a          = b;
-		b          = tmp;
+		a         = b;
+		b         = tmp;
 	}
 
-	if ((a.min >= b.min && a.min <= b.max) ||
-	    (a.max >= b.min && a.max <= b.max))
+	if ((a.min >= b.min && a.min <= b.max) || (a.max >= b.min && a.max <= b.max))
 	{
 		result = true;
 	}
@@ -3382,12 +3382,11 @@ DQN_FILE_SCOPE bool DqnV2_Overlaps(DqnV2 a, DqnV2 b)
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(DqnV2 a)
+DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(const DqnV2 a)
 {
-	DqnV2 result = DqnV2_2f(a.y, -a.x);
+	DqnV2 result = DqnV2(a.y, -a.x);
 	return result;
 }
-
 
 DQN_FILE_SCOPE DqnV2 DqnV2_ResizeKeepAspectRatio(DqnV2 srcSize, DqnV2 targetSize)
 {
@@ -3413,33 +3412,12 @@ DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// #DqnV2i Init Implementation
+// #DqnV2i Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV2i DqnV2i_2i(i32 x, i32 y)
-{
-	DqnV2i result = {0};
-	result.x      = x;
-	result.y      = y;
-	return result;
-}
+DqnV2i::DqnV2i(i32 x_, i32 y_) : x(x_)      , y(y_)       { }
+DqnV2i::DqnV2i(f32 x_, f32 y_) : x((i32)x_) , y((i32)y_)  { }
+DqnV2i::DqnV2i(DqnV2 a)        : x((i32)a.x), y((i32)a.y) { }
 
-DQN_FILE_SCOPE DqnV2i DqnV2i_2f(f32 x, f32 y)
-{
-	DqnV2i result = DqnV2i_2i((i32)x, (i32)y);
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV2i DqnV2i_V2(DqnV2 a)
-{
-	DqnV2i result = {0};
-	result.x      = (i32)a.x;
-	result.y      = (i32)a.y;
-	return result;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// #DqnV2i Arithmetic Implementation
-////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE DqnV2i DqnV2i_Add(DqnV2i a, DqnV2i b)
 {
 	DqnV2i result = {0};
@@ -3510,29 +3488,13 @@ DQN_FILE_SCOPE bool DqnV2i_Equals(DqnV2i a, DqnV2i b)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// #DqnV3 Init Implementation
+// #DqnV3 Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV3 DqnV3_1f(f32 xyz)
-{
-	DqnV3 result = {xyz, xyz, xyz};
-	return result;
-}
+DqnV3::DqnV3() { }
+DqnV3::DqnV3(f32 xyz)                : x(xyz)    , y(xyz)    , z(xyz)     { }
+DqnV3::DqnV3(f32 x_, f32 y_, f32 z_) : x(x_)     , y(y_)     , z(z_)      { }
+DqnV3::DqnV3(i32 x_, i32 y_, i32 z_) : x((f32)x_), y((f32)y_), z((f32)z_) { }
 
-DQN_FILE_SCOPE DqnV3 DqnV3_3f(f32 x, f32 y, f32 z)
-{
-	DqnV3 result = {x, y, z};
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV3 DqnV3_3i(i32 x, i32 y, i32 z)
-{
-	DqnV3 result = {(f32)x, (f32)y, (f32)z};
-	return result;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// #DqnV3 Arithmetic Implementation
-////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE DqnV3 DqnV3_Add(DqnV3 a, DqnV3 b)
 {
 	DqnV3 result = {0};
@@ -3646,49 +3608,19 @@ DQN_FILE_SCOPE f32 DqnV3_Length(DqnV3 a, DqnV3 b)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// #DqnV3i Init Implementation
+// #DqnV3i Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV3i DqnV3i_3i(i32 x, i32 y, i32 z)
-{
-	DqnV3i result = {x, y, z};
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV3i DqnV3i_3f(f32 x, f32 y, f32 z)
-{
-	DqnV3i result = {(i32)x, (i32)y, (i32)z};
-	return result;
-}
+DqnV3i::DqnV3i(i32 x_, i32 y_, i32 z_) : x(x_)     , y(y_)     , z(z_)      { }
+DqnV3i::DqnV3i(f32 x_, f32 y_, f32 z_) : x((i32)x_), y((i32)y_), z((i32)z_) { }
 
 ////////////////////////////////////////////////////////////////////////////////
-// #DqnV4 Init Implementation
+// #DqnV4 Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnV4 DqnV4_1f(f32 xyzw)
-{
-	DqnV4 result = {xyzw, xyzw, xyzw, xyzw};
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV4 DqnV4_4f(f32 x, f32 y, f32 z, f32 w)
-{
-	DqnV4 result = {x, y, z, w};
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV4 DqnV4_4i(i32 x, i32 y, i32 z, i32 w)
-{
-	DqnV4 result = DqnV4_4f((f32)x, (f32)y, (f32)z, (f32)w);
-	return result;
-}
-
-DQN_FILE_SCOPE DqnV4 DqnV4_V3(DqnV3 a, f32 w)
-{
-	DqnV4 result;
-	result.xyz = a;
-	result.w   = w;
-	return result;
-}
-
+DqnV4::DqnV4() {};
+DqnV4::DqnV4(f32 xyzw)                       : x(xyzw)   , y(xyzw)   , z(xyzw)   , w(xyzw)    { }
+DqnV4::DqnV4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_)     , y(y_)     , z(z_)     , w(w_)      { }
+DqnV4::DqnV4(i32 x_, i32 y_, i32 z_, i32 w_) : x((f32)x_), y((f32)y_), z((f32)z_), w((f32)w_) { }
+DqnV4::DqnV4(DqnV3 a, f32 w)                 :  x(a.x)   , y(a.y)    , z(a.z)    , w(w)       { }
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV4 Arithmetic Implementation
 ////////////////////////////////////////////////////////////////////////////////
@@ -3766,7 +3698,7 @@ DQN_FILE_SCOPE bool DqnV4_Equals(DqnV4 a, DqnV4 b)
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity()
 {
-	DqnMat4 result = {0};
+	DqnMat4 result = {0, 0, 0, 0};
 	result.e[0][0] = 1;
 	result.e[1][1] = 1;
 	result.e[2][2] = 1;
@@ -3809,7 +3741,7 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Perspective(f32 fovYDegrees, f32 aspectRatio, f32
 
 DQN_FILE_SCOPE DqnMat4 DqnMat4_LookAt(DqnV3 eye, DqnV3 center, DqnV3 up)
 {
-	DqnMat4 result = {0};
+	DqnMat4 result = {0, 0, 0, 0};
 
 	DqnV3 f = DqnV3_Normalise(DqnV3_Sub(eye, center));
 	DqnV3 s = DqnV3_Normalise(DqnV3_Cross(up, f));
@@ -3859,7 +3791,7 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate(f32 radians, f32 x, f32 y, f32 z)
 	f32 cosVal         = cosf(radians);
 	f32 oneMinusCosVal = 1 - cosVal;
 
-	DqnV3 axis = DqnV3_Normalise(DqnV3_3f(x, y, z));
+	DqnV3 axis = DqnV3_Normalise(DqnV3(x, y, z));
 
 	result.e[0][0] = (axis.x * axis.x * oneMinusCosVal) + cosVal;
 	result.e[0][1] = (axis.x * axis.y * oneMinusCosVal) + (axis.z * sinVal);
@@ -3878,7 +3810,7 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate(f32 radians, f32 x, f32 y, f32 z)
 
 DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale(f32 x, f32 y, f32 z)
 {
-	DqnMat4 result = {0};
+	DqnMat4 result = {0, 0, 0, 0};
 	result.e[0][0] = x;
 	result.e[1][1] = y;
 	result.e[2][2] = z;
@@ -3888,7 +3820,7 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale(f32 x, f32 y, f32 z)
 
 DQN_FILE_SCOPE DqnMat4 DqnMat4_ScaleV3(DqnV3 scale)
 {
-	DqnMat4 result = {0};
+	DqnMat4 result = {0, 0, 0, 0};
 	result.e[0][0] = scale.x;
 	result.e[1][1] = scale.y;
 	result.e[2][2] = scale.z;
@@ -3924,95 +3856,77 @@ DQN_FILE_SCOPE DqnV4 DqnMat4_MulV4(DqnMat4 a, DqnV4 b)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// #DqnRect Init Implementation
-////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnRect DqnRect_4f(f32 minX, f32 minY, f32 maxX, f32 maxY)
-{
-	DqnRect result = {0};
-	result.min     = DqnV2_2f(minX, minY);
-	result.max     = DqnV2_2f(maxX, maxY);
-
-	return result;
-}
-
-DQN_FILE_SCOPE DqnRect DqnRect_4i(i32 minX, i32 minY, i32 maxX, i32 maxY)
-{
-	DqnRect result = {0};
-	result.min     = DqnV2_2i(minX, minY);
-	result.max     = DqnV2_2i(maxX, maxY);
-
-	return result;
-}
-
-DQN_FILE_SCOPE DqnRect DqnRect_Init(DqnV2 origin, DqnV2 size)
-{
-	DqnRect result = {0};
-	result.min      = origin;
-	result.max      = DqnV2_Add(origin, size);
-
-	return result;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // #DqnRect Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE void DqnRect_GetSize2f(DqnRect rect, f32 *width, f32 *height)
+DqnRect::DqnRect() {}
+DqnRect::DqnRect(DqnV2 origin, DqnV2 size)
 {
-	*width  = rect.max.x - rect.min.x;
-	*height = rect.max.y - rect.min.y;
+	this->min = origin;
+	this->max = this->min + size;
 }
 
-DQN_FILE_SCOPE void DqnRect_GetSize2i(DqnRect rect, i32 *width, i32 *height)
+DqnRect::DqnRect(f32 x, f32 y, f32 w, f32 h)
 {
-	*width  = (i32)(rect.max.x - rect.min.x);
-	*height = (i32)(rect.max.y - rect.min.y);
+	this->min = DqnV2(x, y);
+	this->max = DqnV2(x + w, y + h);
 }
 
-DQN_FILE_SCOPE DqnV2 DqnRect_GetSizeV2(DqnRect rect)
+DqnRect::DqnRect(i32 x, i32 y, i32 w, i32 h)
 {
-	f32 width     = rect.max.x - rect.min.x;
-	f32 height    = rect.max.y - rect.min.y;
-	DqnV2 result  = DqnV2_2f(width, height);
+	this->min = DqnV2(x, y);
+	this->max = DqnV2(x + w, y + h);
+}
+
+void DqnRect::GetSize(f32 *const width, f32 *const height) const
+{
+	if (width)  *width  = this->max.x - this->min.x;
+	if (height) *height = this->max.y - this->min.y;
+}
+
+DqnV2 DqnRect::GetSize() const
+{
+	f32 width     = this->max.x - this->min.x;
+	f32 height    = this->max.y - this->min.y;
+	DqnV2 result  = DqnV2(width, height);
 	return result;
 }
 
-DQN_FILE_SCOPE DqnV2 DqnRect_GetCentre(DqnRect rect)
+DqnV2 DqnRect::GetCenter() const
 {
-	f32 sumX  = rect.min.x + rect.max.x;
-	f32 sumY  = rect.min.y + rect.max.y;
-	DqnV2 result = DqnV2_Scalef(DqnV2_2f(sumX, sumY), 0.5f);
+	f32 sumX     = this->min.x + this->max.x;
+	f32 sumY     = this->min.y + this->max.y;
+	DqnV2 result = DqnV2(sumX, sumY) * 0.5f;
 	return result;
 }
 
-DQN_FILE_SCOPE DqnRect DqnRect_ClipRect(DqnRect rect, DqnRect clip)
+DqnRect DqnRect::ClipRect(const DqnRect clip) const
 {
-	DqnRect result = {0};
-	DqnV2 clipSize = DqnRect_GetSizeV2(clip);
+	DqnV2 clipSize = clip.GetSize();
 
-	result.max.x = DQN_MIN(rect.max.x, clipSize.w);
-	result.max.y = DQN_MIN(rect.max.y, clipSize.h);
-	result.min.x = DQN_MAX(clip.min.x, rect.min.x);
-	result.min.y = DQN_MAX(clip.min.y, rect.min.y);
+	DqnRect result;
+	result.max.x = DQN_MIN(this->max.x, clipSize.w);
+	result.max.y = DQN_MIN(this->max.y, clipSize.h);
+	result.min.x = DQN_MAX(clip.min.x, this->min.x);
+	result.min.y = DQN_MAX(clip.min.y, this->min.y);
 	return result;
 }
 
-DQN_FILE_SCOPE DqnRect DqnRect_Move(DqnRect rect, DqnV2 shift)
+DqnRect DqnRect::Move(const DqnV2 shift) const
 {
-	DqnRect result = {0};
-	result.min       = DqnV2_Add(rect.min, shift);
-	result.max       = DqnV2_Add(rect.max, shift);
-
+	DqnRect result;
+	result.min = this->min + shift;
+	result.max = this->max + shift;
 	return result;
 }
 
-DQN_FILE_SCOPE bool DqnRect_ContainsP(DqnRect rect, DqnV2 p)
+bool DqnRect::ContainsP(const DqnV2 p) const
 {
 	bool outsideOfRectX = false;
-	if (p.x < rect.min.x || p.x > rect.max.w)
+	if (p.x < this->min.x || p.x > this->max.w)
 		outsideOfRectX = true;
 
 	bool outsideOfRectY = false;
-	if (p.y < rect.min.y || p.y > rect.max.h)
+	if (p.y < this->min.y || p.y > this->max.h)
 		outsideOfRectY = true;
 
 	if (outsideOfRectX || outsideOfRectY) return false;
