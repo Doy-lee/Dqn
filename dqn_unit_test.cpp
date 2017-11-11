@@ -1069,185 +1069,326 @@ void DqnRect_Test()
 
 void DqnArray_TestInternal(const DqnMemAPI memAPI)
 {
-	DqnArray<DqnV2> array = {};
 	if (1)
 	{
-		DQN_ASSERT(array.Init(1, memAPI));
-		DQN_ASSERT(array.max >= 1);
-		DQN_ASSERT(array.count == 0);
-
-		// Test basic insert
+		DqnArray<DqnV2> array = {};
 		if (1)
 		{
-			DqnV2 va = DqnV2(5, 10);
-			DQN_ASSERT(array.Push(va));
-
-			DqnV2 vb = array.data[0];
-			DQN_ASSERT(DqnV2_Equals(va, vb));
-
+			DQN_ASSERT(array.Init(1, memAPI));
 			DQN_ASSERT(array.max >= 1);
-			DQN_ASSERT(array.count == 1);
-			LogSuccess("DqnArray(): Test basic insert");
-		}
+			DQN_ASSERT(array.count == 0);
 
-		// Test array resizing and freeing
+			// Test basic insert
+			if (1)
+			{
+				DqnV2 va = DqnV2(5, 10);
+				DQN_ASSERT(array.Push(va));
+
+				DqnV2 vb = array.data[0];
+				DQN_ASSERT(DqnV2_Equals(va, vb));
+
+				DQN_ASSERT(array.max >= 1);
+				DQN_ASSERT(array.count == 1);
+				LogSuccess("DqnArray(): Test basic insert");
+			}
+
+			// Test array resizing and freeing
+			if (1)
+			{
+				DqnV2 va = DqnV2(10, 15);
+				DQN_ASSERT(array.Push(va));
+
+				DqnV2 vb = array.data[0];
+				DQN_ASSERT(DqnV2_Equals(va, vb) == false);
+
+				vb = array.data[1];
+				DQN_ASSERT(DqnV2_Equals(va, vb) == true);
+
+				DQN_ASSERT(array.max >= 2);
+				DQN_ASSERT(array.count == 2);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 3);
+				DQN_ASSERT(array.count == 3);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 4);
+				DQN_ASSERT(array.count == 4);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 5);
+				DQN_ASSERT(array.count == 5);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 6);
+				DQN_ASSERT(array.count == 6);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 7);
+				DQN_ASSERT(array.count == 7);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 8);
+				DQN_ASSERT(array.count == 8);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 9);
+				DQN_ASSERT(array.count == 9);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 10);
+				DQN_ASSERT(array.count == 10);
+
+				DQN_ASSERT(array.Push(va));
+				DQN_ASSERT(array.max >= 11);
+				DQN_ASSERT(array.count == 11);
+
+				DqnV2 vc = DqnV2(90, 100);
+				DQN_ASSERT(array.Push(vc));
+				DQN_ASSERT(array.max >= 12);
+				DQN_ASSERT(array.count == 12);
+				DQN_ASSERT(DqnV2_Equals(vc, array.data[11]));
+
+				LogSuccess("DqnArray(): Test resizing and free");
+			}
+		}
+		DQN_ASSERT(array.Free());
+
 		if (1)
 		{
-			DqnV2 va = DqnV2(10, 15);
-			DQN_ASSERT(array.Push(va));
+			DQN_ASSERT(array.Init(1, memAPI));
+			DQN_ASSERT(array.max >= 1);
+			DQN_ASSERT(array.count == 0);
+			LogSuccess("DqnArray(): Empty array");
+		}
+		DQN_ASSERT(array.Free());
 
-			DqnV2 vb = array.data[0];
-			DQN_ASSERT(DqnV2_Equals(va, vb) == false);
+		if (1)
+		{
+			DqnV2 a = DqnV2(1, 2);
+			DqnV2 b = DqnV2(3, 4);
+			DqnV2 c = DqnV2(5, 6);
+			DqnV2 d = DqnV2(7, 8);
 
-			vb = array.data[1];
-			DQN_ASSERT(DqnV2_Equals(va, vb) == true);
+			DQN_ASSERT(array.Init(16, memAPI));
+			DQN_ASSERT(array.Remove(0) == false);
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 0);
 
-			DQN_ASSERT(array.max >= 2);
-			DQN_ASSERT(array.count == 2);
+			array.Clear();
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 0);
 
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 3);
-			DQN_ASSERT(array.count == 3);
-
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 4);
+			DQN_ASSERT(array.Push(a));
+			DQN_ASSERT(array.Push(b));
+			DQN_ASSERT(array.Push(c));
+			DQN_ASSERT(array.Push(d));
+			DQN_ASSERT(array.max >= 16);
 			DQN_ASSERT(array.count == 4);
 
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 5);
-			DQN_ASSERT(array.count == 5);
+			DQN_ASSERT(array.Remove(0));
+			DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+			DQN_ASSERT(DqnV2_Equals(array.data[1], b));
+			DQN_ASSERT(DqnV2_Equals(array.data[2], c));
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 3);
 
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 6);
-			DQN_ASSERT(array.count == 6);
+			DQN_ASSERT(array.Remove(2));
+			DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+			DQN_ASSERT(DqnV2_Equals(array.data[1], b));
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 2);
 
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 7);
-			DQN_ASSERT(array.count == 7);
+			DQN_ASSERT(array.Remove(100) == false);
+			DQN_ASSERT(DqnV2_Equals(array.data[0], d));
+			DQN_ASSERT(DqnV2_Equals(array.data[1], b));
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 2);
 
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 8);
-			DQN_ASSERT(array.count == 8);
-
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 9);
-			DQN_ASSERT(array.count == 9);
-
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 10);
-			DQN_ASSERT(array.count == 10);
-
-			DQN_ASSERT(array.Push(va));
-			DQN_ASSERT(array.max >= 11);
-			DQN_ASSERT(array.count == 11);
-
-			DqnV2 vc = DqnV2(90, 100);
-			DQN_ASSERT(array.Push(vc));
-			DQN_ASSERT(array.max >= 12);
-			DQN_ASSERT(array.count == 12);
-			DQN_ASSERT(DqnV2_Equals(vc, array.data[11]));
-
-			LogSuccess("DqnArray(): Test resizing and free");
+			array.Clear();
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 0);
+			LogSuccess("DqnArray(): Test removal");
 		}
+		DQN_ASSERT(array.Free());
+
+		if (1)
+		{
+			DqnV2 a = DqnV2(1, 2);
+			DqnV2 b = DqnV2(3, 4);
+			DqnV2 c = DqnV2(5, 6);
+			DqnV2 d = DqnV2(7, 8);
+
+			DQN_ASSERT(array.Init(16, memAPI));
+
+			DQN_ASSERT(array.Push(a));
+			DQN_ASSERT(array.Push(b));
+			DQN_ASSERT(array.Push(c));
+			DQN_ASSERT(array.Push(d));
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 4);
+
+			array.RemoveStable(0);
+			DQN_ASSERT(DqnV2_Equals(array.data[0], b));
+			DQN_ASSERT(DqnV2_Equals(array.data[1], c));
+			DQN_ASSERT(DqnV2_Equals(array.data[2], d));
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 3);
+
+			array.RemoveStable(1);
+			DQN_ASSERT(DqnV2_Equals(array.data[0], b));
+			DQN_ASSERT(DqnV2_Equals(array.data[1], d));
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 2);
+
+			array.RemoveStable(1);
+			DQN_ASSERT(DqnV2_Equals(array.data[0], b));
+			DQN_ASSERT(array.max >= 16);
+			DQN_ASSERT(array.count == 1);
+
+			LogSuccess("DqnArray(): Test stable removal");
+		}
+		DQN_ASSERT(array.Free());
 	}
-	DQN_ASSERT(array.Free());
 
 	if (1)
 	{
-		DQN_ASSERT(array.Init(1, memAPI));
-		DQN_ASSERT(array.max >= 1);
-		DQN_ASSERT(array.count == 0);
-		LogSuccess("DqnArray(): Empty array");
+		// Test normal remove list scenario
+		if (1)
+		{
+			i64 indexesToFree[] = {3, 2, 1, 0};
+			i32 intList[]       = {128, 32, 29, 31};
+
+			DqnArray<i32> array;
+			array.Init(DQN_ARRAY_COUNT(intList), memAPI);
+			array.Push(intList, DQN_ARRAY_COUNT(intList));
+			array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+			DQN_ASSERT(array.count == 0);
+			array.Free();
+		}
+
+		// Test all indexes invalid
+		if (1)
+		{
+			i64 indexesToFree[] = {100, 200, 300, 400};
+			i32 intList[]       = {128, 32, 29, 31};
+
+			DqnArray<i32> array;
+			array.Init(DQN_ARRAY_COUNT(intList), memAPI);
+			array.Push(intList, DQN_ARRAY_COUNT(intList));
+			array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+			DQN_ASSERT(array.count == 4);
+			DQN_ASSERT(array.data[0] == 128);
+			DQN_ASSERT(array.data[1] == 32);
+			DQN_ASSERT(array.data[2] == 29);
+			DQN_ASSERT(array.data[3] == 31);
+			array.Free();
+		}
+
+		// Test remove singular index
+		if (1)
+		{
+			i64 indexesToFree[] = {1};
+			i32 intList[]       = {128, 32, 29, 31};
+
+			DqnArray<i32> array;
+			array.Init(DQN_ARRAY_COUNT(intList), memAPI);
+			array.Push(intList, DQN_ARRAY_COUNT(intList));
+			array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+			DQN_ASSERT(array.count == 3);
+			DQN_ASSERT(array.data[0] == 128);
+			DQN_ASSERT(array.data[1] == 29);
+			DQN_ASSERT(array.data[2] == 31);
+			array.Free();
+		}
+
+		// Test remove singular invalid index
+		if (1)
+		{
+			i64 indexesToFree[] = {100};
+			i32 intList[]       = {128, 32, 29, 31};
+
+			DqnArray<i32> array;
+			array.Init(DQN_ARRAY_COUNT(intList), memAPI);
+			array.Push(intList, DQN_ARRAY_COUNT(intList));
+			array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+			DQN_ASSERT(array.count == 4);
+			DQN_ASSERT(array.data[0] == 128);
+			DQN_ASSERT(array.data[1] == 32);
+			DQN_ASSERT(array.data[2] == 29);
+			DQN_ASSERT(array.data[3] == 31);
+			array.Free();
+		}
+
+		// Test remove second last index
+		if (1)
+		{
+			i64 indexesToFree[] = {2};
+			i32 intList[]       = {128, 32, 29, 31};
+
+			DqnArray<i32> array;
+			array.Init(DQN_ARRAY_COUNT(intList), memAPI);
+			array.Push(intList, DQN_ARRAY_COUNT(intList));
+			array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+			DQN_ASSERT(array.count == 3);
+			DQN_ASSERT(array.data[0] == 128);
+			DQN_ASSERT(array.data[1] == 32);
+			DQN_ASSERT(array.data[2] == 31);
+			array.Free();
+		}
+
+		// Test remove last 2 indexes
+		if (1)
+		{
+			i64 indexesToFree[] = {2, 3};
+			i32 intList[]       = {128, 32, 29, 31};
+
+			DqnArray<i32> array;
+			array.Init(DQN_ARRAY_COUNT(intList), memAPI);
+			array.Push(intList, DQN_ARRAY_COUNT(intList));
+			array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+			DQN_ASSERT(array.count == 2);
+			DQN_ASSERT(array.data[0] == 128);
+			DQN_ASSERT(array.data[1] == 32);
+			array.Free();
+		}
+
+		// Test invalid free index doesn't delete out of bounds
+		if (1)
+		{
+			i64 indexesToFree[] = {30, 1, 3};
+			i32 intList[]       = {128, 32, 29, 31};
+
+			DqnArray<i32> array;
+			array.Init(DQN_ARRAY_COUNT(intList), memAPI);
+			array.Push(intList, DQN_ARRAY_COUNT(intList));
+			array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+
+			DQN_ASSERT(array.count == 2);
+			DQN_ASSERT(array.data[0] == 128);
+			DQN_ASSERT(array.data[1] == 29);
+			array.Free();
+		}
+
+		// Test a free list including the first index
+		if (1)
+		{
+			i64 indexesToFree[] = {0, 1, 2};
+			i32 intList[]       = {128, 32, 29, 31};
+
+			DqnArray<i32> array;
+			array.Init(DQN_ARRAY_COUNT(intList), memAPI);
+			array.Push(intList, DQN_ARRAY_COUNT(intList));
+			array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+
+			DQN_ASSERT(array.count == 1);
+			DQN_ASSERT(array.data[0] == 31);
+			array.Free();
+		}
+
+
+		LogSuccess("DqnArray(): Test stable removal with list of indexes");
 	}
-	DQN_ASSERT(array.Free());
-
-	if (1)
-	{
-		DqnV2 a = DqnV2(1, 2);
-		DqnV2 b = DqnV2(3, 4);
-		DqnV2 c = DqnV2(5, 6);
-		DqnV2 d = DqnV2(7, 8);
-
-		DQN_ASSERT(array.Init(16, memAPI));
-		DQN_ASSERT(array.Remove(0) == false);
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 0);
-
-		array.Clear();
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 0);
-
-		DQN_ASSERT(array.Push(a));
-		DQN_ASSERT(array.Push(b));
-		DQN_ASSERT(array.Push(c));
-		DQN_ASSERT(array.Push(d));
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 4);
-
-		DQN_ASSERT(array.Remove(0));
-		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
-		DQN_ASSERT(DqnV2_Equals(array.data[2], c));
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 3);
-
-		DQN_ASSERT(array.Remove(2));
-		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 2);
-
-		DQN_ASSERT(array.Remove(100) == false);
-		DQN_ASSERT(DqnV2_Equals(array.data[0], d));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], b));
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 2);
-
-		array.Clear();
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 0);
-		LogSuccess("DqnArray(): Test removal");
-	}
-	DQN_ASSERT(array.Free());
-
-	if (1)
-	{
-		DqnV2 a = DqnV2(1, 2);
-		DqnV2 b = DqnV2(3, 4);
-		DqnV2 c = DqnV2(5, 6);
-		DqnV2 d = DqnV2(7, 8);
-
-		DQN_ASSERT(array.Init(16, memAPI));
-
-		DQN_ASSERT(array.Push(a));
-		DQN_ASSERT(array.Push(b));
-		DQN_ASSERT(array.Push(c));
-		DQN_ASSERT(array.Push(d));
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 4);
-
-		array.RemoveStable(0);
-		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], c));
-		DQN_ASSERT(DqnV2_Equals(array.data[2], d));
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 3);
-
-		array.RemoveStable(1);
-		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
-		DQN_ASSERT(DqnV2_Equals(array.data[1], d));
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 2);
-
-		array.RemoveStable(1);
-		DQN_ASSERT(DqnV2_Equals(array.data[0], b));
-		DQN_ASSERT(array.max >= 16);
-		DQN_ASSERT(array.count == 1);
-
-		LogSuccess("DqnArray(): Test stable removal");
-	}
-
-	DQN_ASSERT(array.Free());
 }
 
 void DqnArray_TestRealDataInternal(DqnArray<char> *array)
@@ -1999,7 +2140,7 @@ void DqnQuickSort_Test()
 		u32 *stdArray    = (u32 *)stack.Push(sizeInBytes);
 		DQN_ASSERT(dqnCPPArray && stdArray);
 
-		f64 dqnCPPTimings[2]                           = {};
+		f64 dqnCPPTimings[5]                           = {};
 		f64 stdTimings[DQN_ARRAY_COUNT(dqnCPPTimings)] = {};
 
 		f64 dqnCPPAverage = 0;
@@ -2017,12 +2158,9 @@ void DqnQuickSort_Test()
 			// Time Dqn_QuickSort
 			{
 				f64 start = DqnTimer_NowInS();
-				Dqn_QuickSort<u32>(
-				    dqnCPPArray, numInts,
-				    [](const u32 *const a, const u32 *const b) -> bool { return *a < *b; });
+				Dqn_QuickSort(dqnCPPArray, numInts);
 
 				f64 duration = DqnTimer_NowInS() - start;
-
 				dqnCPPTimings[timingsIndex] = duration;
 				dqnCPPAverage += duration;
 				printf("Dqn_QuickSort: %f vs ", dqnCPPTimings[timingsIndex]);
@@ -2187,24 +2325,22 @@ void Dqn_BinarySearch_Test()
 	if (1)
 	{
 		i32 array[] = {1, 2, 3};
-
-		const bool LOWER_BOUND = true;
-		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 0, LOWER_BOUND);
+		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 0, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == -1);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == -1);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 0);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 1);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 2);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 2);
 		LogSuccess("Dqn_BinarySearch(): Lower bound with odd sized array");
 	}
@@ -2213,29 +2349,77 @@ void Dqn_BinarySearch_Test()
 	{
 		i32 array[] = {1, 2, 3, 4};
 
-		const bool LOWER_BOUND = true;
-		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 0, LOWER_BOUND);
+		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 0, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == -1);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == -1);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 0);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 1);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 2);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 3);
 
-		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 6, LOWER_BOUND);
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 6, Dqn_BinarySearchBound_Lower);
 		DQN_ASSERT(result == 3);
-
 		LogSuccess("Dqn_BinarySearch(): Lower bound with even sized array");
+	}
+
+	if (1)
+	{
+		i32 array[] = {1, 2, 3};
+		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 0, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == 0);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == 1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == 2);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == -1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == -1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == -1);
+		LogSuccess("Dqn_BinarySearch(): Higher bound with odd sized array");
+	}
+
+	if (1)
+	{
+		i32 array[] = {1, 2, 3, 4};
+
+		i64 result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 0, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == 0);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 1, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == 1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 2, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == 2);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 3, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == 3);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 4, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == -1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == -1);
+
+		result = Dqn_BinarySearch(array, DQN_ARRAY_COUNT(array), 6, Dqn_BinarySearchBound_Higher);
+		DQN_ASSERT(result == -1);
+		LogSuccess("Dqn_BinarySearch(): Higher bound with even sized array");
 	}
 }
 

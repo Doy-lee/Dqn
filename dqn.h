@@ -474,6 +474,9 @@ struct DqnString
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnArray Public API - CPP Dynamic Array with Templates
 ////////////////////////////////////////////////////////////////////////////////
+#define DQN_FOR_ARRAY(indexName, arrayPtr)                                                         \
+	for (auto indexName = 0; indexName < (arrayPtr)->count; indexName++)
+
 template <typename T>
 struct DqnArray
 {
@@ -497,17 +500,21 @@ struct DqnArray
 	void  Clear       (const bool clearMemory = false);
 	bool  Remove      (const i64 index);
 	bool  RemoveStable(const i64 index);
+	void  RemoveStable(i64 *indexList, const i64 numIndexes);
 };
 
 template <typename T>
 bool DqnArray<T>::Init(const i64 size, const DqnMemAPI api = DqnMemAPI_HeapAllocator())
 {
-	if (this->data) this->Free();
+	DQN_ASSERT_HARD(size >= 0);
 
-	i64 allocateSize        = size * sizeof(T);
-	DqnMemAPI::Request info = DqnMemAPI::RequestAlloc(api, allocateSize);
-	this->data              = (T *)api.callback(info);
-	if (!this->data) return false;
+	if (size > 0)
+	{
+		i64 allocateSize        = size * sizeof(T);
+		DqnMemAPI::Request info = DqnMemAPI::RequestAlloc(api, allocateSize, /*zeroClear*/ false);
+		this->data              = (T *)api.callback(info);
+		if (!this->data) return false;
+	}
 
 	this->memAPI = api;
 	this->count  = 0;
@@ -578,7 +585,7 @@ template <typename T>
 T *DqnArray<T>::Push(const T *item, const i64 num)
 {
 	i64 newSize = this->count + num;
-	if (newSize > this->max)
+	if (!this->data || newSize > this->max)
 	{
 		if (!this->Grow()) return nullptr;
 	}
@@ -668,6 +675,76 @@ bool DqnArray<T>::RemoveStable(const i64 index)
 
 	this->count--;
 	return true;
+}
+
+template <typename T>
+void DqnArray<T>::RemoveStable(i64 *indexList, const i64 numIndexes)
+{
+	if (numIndexes == 0 || !indexList) return;
+
+	// NOTE: Sort the index list and ensure we only remove indexes up to the size of our array
+	Dqn_QuickSort<i64>(indexList, numIndexes);
+
+	i64 arrayHighestIndex = this->count - 1;
+	i64 realCount         = numIndexes;
+	if (indexList[numIndexes - 1] > arrayHighestIndex)
+	{
+		i64 realNumIndexes = Dqn_BinarySearch<i64>(indexList, numIndexes, arrayHighestIndex,
+		                                           Dqn_BinarySearchBound_Lower);
+		// NOTE: If -1, then there's no index in the indexlist that is within the range of our array
+		// i.e. no index we can remove without out of array bounds access
+		if (realNumIndexes == -1)
+			return;
+
+		if (indexList[realNumIndexes] == arrayHighestIndex)
+		{
+			realCount = realNumIndexes++;
+		}
+		else
+		{
+			realCount = realNumIndexes += 2;
+		}
+		realCount = DQN_MIN(numIndexes, realCount);
+	}
+
+	if (realCount == 1)
+	{
+		this->RemoveStable(indexList[0]);
+	}
+	else
+	{
+		i64 indexListIndex  = 0;
+		i64 indexToCopyTo   = indexList[indexListIndex++];
+		i64 indexToCopyFrom = indexToCopyTo + 1;
+		i64 deadIndex       = indexList[indexListIndex++];
+
+		bool breakLoop = false;
+		for (;
+		     indexToCopyFrom < this->count;
+		     indexToCopyTo++, indexToCopyFrom++)
+		{
+			while (indexToCopyFrom == deadIndex)
+			{
+				deadIndex = indexList[indexListIndex++];
+				indexToCopyFrom++;
+
+				breakLoop |= (indexToCopyFrom >= this->count);
+				breakLoop |= (indexListIndex > realCount);
+				if (breakLoop) break;
+			}
+			if (breakLoop) break;
+
+			this->data[indexToCopyTo] = this->data[indexToCopyFrom];
+		}
+
+		for (; indexToCopyFrom < this->count; indexToCopyTo++, indexToCopyFrom++)
+		{
+			this->data[indexToCopyTo] = this->data[indexToCopyFrom];
+		}
+
+		this->count -= realCount;
+		DQN_ASSERT(this->count >= 0);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -897,7 +974,7 @@ typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(const char *const key, i3
 		if (!this->entries[hashIndex])
 		{
 			i64 index =
-			    Dqn_BinarySearch<i64>(this->usedEntries, this->usedEntriesIndex, hashIndex, true);
+			    Dqn_BinarySearch<i64>(this->usedEntries, this->usedEntriesIndex, hashIndex, Dqn_BinarySearchBound_Lower);
 			i64 indexToEndAt              = index;
 			if (index == -1) indexToEndAt = 0;
 
@@ -951,7 +1028,7 @@ void DqnHashTable<T>::Remove(const char *const key, i32 keyLen)
 			{
 				// Unique entry, so remove this index from the used list as well.
 				i64 indexToRemove = Dqn_BinarySearch<i64>(this->usedEntries, this->usedEntriesIndex,
-				                                          hashIndex, true);
+				                                          hashIndex, Dqn_BinarySearchBound_Lower);
 
 				for (i64 i = indexToRemove; i < this->usedEntriesIndex - 1; i++)
 					this->usedEntries[i] = this->usedEntries[i + 1];
@@ -1517,7 +1594,7 @@ template <typename T>
 using Dqn_QuickSortLessThanCallback = bool (*)(const T *const , const T *const);
 
 template <typename T>
-DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i32 size,
+DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i64 size,
                                   Dqn_QuickSortLessThanCallback<T> IsLessThan)
 {
 	if (!array || size <= 1 || !IsLessThan) return;
@@ -1551,10 +1628,10 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i32 size,
 
 	DqnRndPCG state; state.Init();
 
-	i32 lastIndex      = size - 1;
-	i32 pivotIndex     = state.Range(0, lastIndex);
-	i32 partitionIndex = 0;
-	i32 startIndex     = 0;
+	auto lastIndex      = size - 1;
+	auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex);
+	auto partitionIndex = 0;
+	auto startIndex     = 0;
 
 	// Swap pivot with last index, so pivot is always at the end of the array.
 	// This makes logic much simpler.
@@ -1569,7 +1646,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i32 size,
 	// 4, 5, |7, 8, 2^, 3, 6*
 	// 4, 5, 2, |8, 7, ^3, 6*
 	// 4, 5, 2, 3, |7, 8, ^6*
-	for (i32 checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
+	for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
 	{
 		if (IsLessThan(&array[checkIndex], &array[pivotIndex]))
 		{
@@ -1590,15 +1667,96 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i32 size,
 }
 
 template <typename T>
+DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i64 size)
+{
+	if (!array || size <= 1) return;
+
+#if 1
+	// Insertion Sort, under 24->32 is an optimal amount
+	const i32 QUICK_SORT_THRESHOLD = 24;
+	if (size < QUICK_SORT_THRESHOLD)
+	{
+		i32 itemToInsertIndex = 1;
+		while (itemToInsertIndex < size)
+		{
+			for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
+			{
+				if (!(array[checkIndex] < array[itemToInsertIndex]))
+				{
+					T itemToInsert = array[itemToInsertIndex];
+					for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
+						array[i] = array[i - 1];
+
+					array[checkIndex] = itemToInsert;
+					break;
+				}
+			}
+			itemToInsertIndex++;
+		}
+
+		return;
+	}
+#endif
+
+	DqnRndPCG state; state.Init();
+
+	auto lastIndex      = size - 1;
+	auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex); // TODO(doyle): RNG 64bit
+	auto partitionIndex = 0;
+	auto startIndex     = 0;
+
+	// Swap pivot with last index, so pivot is always at the end of the array.
+	// This makes logic much simpler.
+	DQN_SWAP(T, array[lastIndex], array[pivotIndex]);
+	pivotIndex = lastIndex;
+
+	// 4^, 8, 7, 5, 2, 3, 6
+	if (array[startIndex] < array[pivotIndex]) partitionIndex++;
+	startIndex++;
+
+	// 4, |8, 7, 5^, 2, 3, 6*
+	// 4, 5, |7, 8, 2^, 3, 6*
+	// 4, 5, 2, |8, 7, ^3, 6*
+	// 4, 5, 2, 3, |7, 8, ^6*
+	for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
+	{
+		if (array[checkIndex] < array[pivotIndex])
+		{
+			DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
+			partitionIndex++;
+		}
+	}
+
+	// Move pivot to right of partition
+	// 4, 5, 2, 3, |6, 8, ^7*
+	DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
+	Dqn_QuickSort(array, partitionIndex);
+
+	// Skip the value at partion index since that is guaranteed to be sorted.
+	// 4, 5, 2, 3, (x), 8, 7
+	i32 oneAfterPartitionIndex = partitionIndex + 1;
+	Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex));
+}
+
+template <typename T>
 using Dqn_BinarySearchLessThanCallback = bool (*)(const T&, const T&);
 
-// lowerBound: If true, the return value is the first element lower than the value to find.
-//            -1 if there is no element lower than the find value (i.e. the 0th element is the find val).
-// return:    -1 if element not found, otherwise index of the element.
+enum Dqn_BinarySearchBound
+{
+	Dqn_BinarySearchBound_Normal, // Return the index of the first item that matches the find value
+	Dqn_BinarySearchBound_Lower,  // Return the index of the first item lower than the find value
+	Dqn_BinarySearchBound_Higher, // Return the index of the first item higher than the find value
+};
+
+// bound: The behaviour of the binary search,
+// return: -1 if element not found, otherwise index of the element.
+//         For higher and lower bounds return -1 if there is no element higher/lower than the
+//         find value (i.e. -1 if the 0th element is the find val for lower bound).
 template <typename T>
-DQN_FILE_SCOPE i64 Dqn_BinarySearch(T *const array, const i64 size, const T &find,
-                                    const Dqn_BinarySearchLessThanCallback<T> IsLessThan,
-                                    const bool lowerBound = false)
+DQN_FILE_SCOPE i64
+Dqn_BinarySearch(T *const array, const i64 size, const T &find,
+                 const Dqn_BinarySearchLessThanCallback<T> IsLessThan,
+                 const Dqn_BinarySearchBound bound = Dqn_BinarySearchBound_Normal)
 {
 	if (size == 0 || !array) return -1;
 
@@ -1608,15 +1766,37 @@ DQN_FILE_SCOPE i64 Dqn_BinarySearch(T *const array, const i64 size, const T &fin
 
 	while (start <= end)
 	{
-		if      (array[mid] == find)           return (lowerBound) ? (mid - 1) : mid;
+		if (array[mid] == find)
+		{
+			if (bound == Dqn_BinarySearchBound_Lower)
+			{
+				// NOTE: We can always -1 because at worst case, 0 index will go to -1 which is
+				// correct behaviour.
+				return mid - 1;
+			}
+			else if (bound == Dqn_BinarySearchBound_Higher)
+			{
+				if ((mid + 1) >= size) return -1;
+				return mid + 1;
+			}
+			else
+			{
+				return mid;
+			}
+		}
 		else if (IsLessThan(array[mid], find)) start = mid + 1;
 		else                                   end   = mid - 1;
 		mid = (i64)((start + end) * 0.5f);
 	}
 
-	if (lowerBound)
+	if (bound == Dqn_BinarySearchBound_Lower)
 	{
 		if (find < array[mid]) return -1;
+		return mid;
+	}
+	else if (bound == Dqn_BinarySearchBound_Higher)
+	{
+		if (find > array[mid]) return -1;
 		return mid;
 	}
 	else
@@ -1626,8 +1806,9 @@ DQN_FILE_SCOPE i64 Dqn_BinarySearch(T *const array, const i64 size, const T &fin
 }
 
 template <typename T>
-DQN_FILE_SCOPE i64 Dqn_BinarySearch(T *const array, const i64 size, const i64 &find,
-                                    const bool lowerBound = false)
+DQN_FILE_SCOPE i64
+Dqn_BinarySearch(T *const array, const i64 size, const i64 &find,
+                 const Dqn_BinarySearchBound bound = Dqn_BinarySearchBound_Normal)
 {
 	if (size == 0 || !array) return -1;
 
@@ -1637,15 +1818,35 @@ DQN_FILE_SCOPE i64 Dqn_BinarySearch(T *const array, const i64 size, const i64 &f
 
 	while (start <= end)
 	{
-		if      (array[mid] == find) return (lowerBound) ? (mid - 1) : mid;
+		if (array[mid] == find)
+		{
+			if (bound == Dqn_BinarySearchBound_Lower)
+			{
+				return mid - 1;
+			}
+			else if (bound == Dqn_BinarySearchBound_Higher)
+			{
+				if ((mid + 1) >= size) return -1;
+				return mid + 1;
+			}
+			else
+			{
+				return mid;
+			}
+		}
 		else if (array[mid] <  find) start = mid + 1;
 		else                         end   = mid - 1;
 		mid = (i64)((start + end) * 0.5f);
 	}
 
-	if (lowerBound)
+	if (bound == Dqn_BinarySearchBound_Lower)
 	{
 		if (find < array[mid]) return -1;
+		return mid;
+	}
+	else if (bound == Dqn_BinarySearchBound_Higher)
+	{
+		if (find > array[mid]) return -1;
 		return mid;
 	}
 	else
