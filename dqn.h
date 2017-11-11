@@ -3615,6 +3615,7 @@ DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV2i Implementation
 ////////////////////////////////////////////////////////////////////////////////
+DqnV2i::DqnV2i() {}
 DqnV2i::DqnV2i(i32 x_, i32 y_) : x(x_)      , y(y_)       { }
 DqnV2i::DqnV2i(f32 x_, f32 y_) : x((i32)x_) , y((i32)y_)  { }
 DqnV2i::DqnV2i(DqnV2 a)        : x((i32)a.x), y((i32)a.y) { }
