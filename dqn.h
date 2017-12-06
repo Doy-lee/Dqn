@@ -209,7 +209,9 @@ DQN_FILE_SCOPE void *DqnMem_Calloc (const size_t size);
 DQN_FILE_SCOPE void  DqnMem_Clear  (void *const memory, const u8 clearValue, const size_t size);
 DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, const size_t newSize);
 DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
-DQN_FILE_SCOPE void  DqnMem_Copy   (u8 *const dest, u8 *const src, const i64 numBytesToCopy);
+DQN_FILE_SCOPE void  DqnMem_Copy   (void *const dest, void *const src, const i64 numBytesToCopy);
+DQN_FILE_SCOPE void *DqnMem_Set    (void *const dest, u8 value, const i64 numBytesToSet);
+DQN_FILE_SCOPE void *DqnMem_Set64  (void *const dest, u8 value, const i64 numBytesToSet);
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnMemAPI Public API - Custom memory API for Dqn Data Structures
@@ -448,19 +450,26 @@ struct DqnString
 	i32 max;          // The maximum capacity not including space for null-terminator.
 	DqnMemAPI memAPI;
 
+	bool InitSize    (const i32 size, DqnMemStack *const stack);
 	bool InitSize    (const i32 size, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
+
 	bool InitFixedMem(char *const memory, const i32 sizeInBytes);
-	bool InitLiteral (const char    *const cstr, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
+
+	bool InitLiteral (const char *const cstr, DqnMemStack *const stack);
+	bool InitLiteral (const char *const cstr, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
+
+	bool InitWLiteral(const wchar_t *const cstr, DqnMemStack *const stack);
 	bool InitWLiteral(const wchar_t *const cstr, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
 
 	bool InitLiteralNoAlloc(char *const cstr, i32 cstrLen = -1);
 
 	bool Expand(const i32 newMax);
 
+	void Sprintf   (char const *fmt, ...);
 	bool AppendStr (const DqnString strToAppend, i32 bytesToCopy = -1);
 	bool AppendCStr(const char *const cstr,      i32 bytesToCopy = -1);
 	void Clear();
-	void Free();
+	bool Free();
 
 	// The function automatically null-terminates the output string.
 	// bufSize: The size of the buffer in wchar_t characters.
@@ -488,13 +497,17 @@ struct DqnArray
 	i64 max;
 	T   *data;
 
+	T &operator[](i32 x) { return this->data[x]; }
+
 	// API
+	bool  Init        (const i64 size, DqnMemStack *const stack);
 	bool  Init        (const i64 size, DqnMemAPI api = DqnMemAPI_HeapAllocator());
 	bool  Free        ();
 	bool  Resize      (const i64 newMax);
 	bool  Grow        ();
 	T    *Push        (const T *item, const i64 num);
 	T    *Push        (const T item);
+	T    *Insert      (const T item, i64 index);
 	void  Pop         ();
 	T    *Get         (const i64 index);
 	void  Clear       (const bool clearMemory = false);
@@ -502,6 +515,18 @@ struct DqnArray
 	bool  RemoveStable(const i64 index);
 	void  RemoveStable(i64 *indexList, const i64 numIndexes);
 };
+
+template <typename T>
+bool DqnArray<T>::Init(const i64 size, DqnMemStack *const stack)
+{
+	bool result = false;
+	if (stack)
+	{
+		result = this->Init(size, DqnMemAPI_StackAllocator(stack));
+	}
+
+	return result;
+}
 
 template <typename T>
 bool DqnArray<T>::Init(const i64 size, const DqnMemAPI api = DqnMemAPI_HeapAllocator())
@@ -590,19 +615,49 @@ T *DqnArray<T>::Push(const T *item, const i64 num)
 		if (!this->Grow()) return nullptr;
 	}
 
-	DQN_ASSERT(this->count < this->max);
 	for (auto i = 0; i < num; i++)
 	{
 		this->data[this->count++] = item[i];
 	}
 
-	return &this->data[this->count-1];
+	DQN_ASSERT(this->count <= this->max);
+	T *result = this->data + (this->count - 1);
+	return result;
 }
 
 template <typename T>
 T *DqnArray<T>::Push(const T item)
 {
 	T* result = this->Push(&item, 1);
+	return result;
+}
+
+template <typename T>
+T *DqnArray<T>::Insert(const T item, i64 index)
+{
+	if (index >= this->count)
+	{
+		T *result = this->Push(item);
+		return result;
+	}
+
+	index       = DQN_MAX(index, 0);
+	i64 newSize = this->count + 1;
+	if (!this->data || newSize > this->max)
+	{
+		if (!this->Grow()) return nullptr;
+	}
+
+	this->count++;
+	for (auto i = this->count - 1; (i - 1) >= index; i--)
+	{
+		this->data[i] = this->data[i - 1];
+	}
+
+	this->data[index] = item;
+	T *result         = this->data + index;
+
+	DQN_ASSERT(this->count < this->max);
 	return result;
 }
 
@@ -689,8 +744,8 @@ void DqnArray<T>::RemoveStable(i64 *indexList, const i64 numIndexes)
 	i64 realCount         = numIndexes;
 	if (indexList[numIndexes - 1] > arrayHighestIndex)
 	{
-		i64 realNumIndexes = Dqn_BinarySearch<i64>(indexList, numIndexes, arrayHighestIndex,
-		                                           Dqn_BinarySearchBound_Lower);
+		i64 realNumIndexes =
+		    Dqn_BSearch(indexList, numIndexes, arrayHighestIndex, Dqn_BSearchBound_Lower);
 		// NOTE: If -1, then there's no index in the indexlist that is within the range of our array
 		// i.e. no index we can remove without out of array bounds access
 		if (realNumIndexes == -1)
@@ -973,8 +1028,8 @@ typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(const char *const key, i3
 		// If entry for hashIndex not used yet, mark it down as a used slot.
 		if (!this->entries[hashIndex])
 		{
-			i64 index =
-			    Dqn_BinarySearch<i64>(this->usedEntries, this->usedEntriesIndex, hashIndex, Dqn_BinarySearchBound_Lower);
+			i64 index = Dqn_BSearch(this->usedEntries, this->usedEntriesIndex, hashIndex,
+			                        Dqn_BSearchBound_Lower);
 			i64 indexToEndAt              = index;
 			if (index == -1) indexToEndAt = 0;
 
@@ -1027,8 +1082,8 @@ void DqnHashTable<T>::Remove(const char *const key, i32 keyLen)
 			if (entryToFree == entry)
 			{
 				// Unique entry, so remove this index from the used list as well.
-				i64 indexToRemove = Dqn_BinarySearch<i64>(this->usedEntries, this->usedEntriesIndex,
-				                                          hashIndex, Dqn_BinarySearchBound_Lower);
+				i64 indexToRemove = Dqn_BSearch(this->usedEntries, this->usedEntriesIndex,
+				                                hashIndex, Dqn_BSearchBound_Lower);
 
 				for (i64 i = indexToRemove; i < this->usedEntriesIndex - 1; i++)
 					this->usedEntries[i] = this->usedEntries[i + 1];
@@ -1242,42 +1297,27 @@ DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max);
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV2 Public API - 2D Math Vectors
 ////////////////////////////////////////////////////////////////////////////////
-class DqnV2i
+union DqnV2i
 {
-public:
-	union
-	{
-		struct { i32 x, y; };
-		struct { i32 w, h; };
-		struct { i32 min, max; };
-		i32 e[2];
-	};
-
-	DqnV2i();
-	DqnV2i(i32 x_, i32 y_);
-	DqnV2i(f32 x_, f32 y_);
-	DqnV2i(class DqnV2 a);
+	struct { i32 x, y; };
+	struct { i32 w, h; };
+	struct { i32 min, max; };
+	i32 e[2];
 
 };
 
-class DqnV2
+union DqnV2
 {
-public:
-	union
-	{
-		struct { f32 x, y; };
-		struct { f32 w, h; };
-		struct { f32 min, max; };
-		f32 e[2];
-	};
-
-	DqnV2();
-	DqnV2(f32 xy);
-	DqnV2(f32 x_, f32 y_);
-	DqnV2(i32 x_, i32 y_);
-	DqnV2(DqnV2i a);
-
+	struct { f32 x, y; };
+	struct { f32 w, h; };
+	struct { f32 min, max; };
+	f32 e[2];
 };
+
+DQN_FILE_SCOPE DqnV2 DqnV2_(f32 xy);
+DQN_FILE_SCOPE DqnV2 DqnV2_(f32 x, f32 y);
+DQN_FILE_SCOPE DqnV2 DqnV2_(i32 x, i32 y);
+DQN_FILE_SCOPE DqnV2 DqnV2_(DqnV2i a);
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Add     (DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE DqnV2 DqnV2_Sub     (DqnV2 a, DqnV2 b);
@@ -1296,6 +1336,30 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(const DqnV2 a);
 DQN_FILE_SCOPE DqnV2 DqnV2_ResizeKeepAspectRatio(DqnV2 srcSize, DqnV2 targetSize);
 DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio     (DqnV2 dim, DqnV2 ratio); // Resize the dimension to fit the aspect ratio provided. Downscale only.
 
+bool operator>(const DqnV2 &a, const DqnV2 &b)
+{
+	bool result = (a.x > b.x) && (a.y > b.y);
+	return result;
+}
+
+bool operator<(const DqnV2 &a, const DqnV2 &b)
+{
+	bool result = (a.x < b.x) && (a.y < b.y);
+	return result;
+}
+
+bool operator<=(const DqnV2 &a, const DqnV2 &b)
+{
+	bool result = (a.x <= b.x) && (a.y <= b.y);
+	return result;
+}
+
+bool operator>=(const DqnV2 &a, const DqnV2 &b)
+{
+	bool result = (a.x >= b.x) && (a.y >= b.y);
+	return result;
+}
+
 DQN_FILE_SCOPE inline DqnV2  operator- (DqnV2  a, DqnV2 b) { return      DqnV2_Sub     (a, b);  }
 DQN_FILE_SCOPE inline DqnV2  operator+ (DqnV2  a, DqnV2 b) { return      DqnV2_Add     (a, b);  }
 DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, DqnV2 b) { return      DqnV2_Hadamard(a, b);  }
@@ -1309,6 +1373,10 @@ DQN_FILE_SCOPE inline DqnV2 &operator+=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_A
 DQN_FILE_SCOPE inline bool   operator==(DqnV2  a, DqnV2 b) { return      DqnV2_Equals  (a, b);  }
 
 // DqnV2i
+DQN_FILE_SCOPE DqnV2i DqnV2i_(i32 x_, i32 y_);
+DQN_FILE_SCOPE DqnV2i DqnV2i_(f32 x_, f32 y_);
+DQN_FILE_SCOPE DqnV2i DqnV2i_(DqnV2 a);
+
 DQN_FILE_SCOPE DqnV2i DqnV2i_Add     (DqnV2i a, DqnV2i b);
 DQN_FILE_SCOPE DqnV2i DqnV2i_Sub     (DqnV2i a, DqnV2i b);
 DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei  (DqnV2i a, i32 b);
@@ -1330,38 +1398,26 @@ DQN_FILE_SCOPE inline bool    operator==(DqnV2i  a, DqnV2i b) { return      DqnV
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV3 Public API - 3D Math Vectors
 ////////////////////////////////////////////////////////////////////////////////
-class DqnV3
+union DqnV3
 {
-public:
-	union
-	{
 		struct { f32 x, y, z; };
 		DqnV2 xy;
 		struct { f32 r, g, b; };
 		f32 e[3];
-	};
-
-	DqnV3();
-	DqnV3(f32 xyz);
-	DqnV3(f32 x_, f32 y_, f32 z_);
-	DqnV3(i32 x_, i32 y_, i32 z_);
 };
 
-class DqnV3i
+union DqnV3i
 {
-public:
-	union
-	{
-		struct { i32 x, y, z; };
-		struct { i32 r, g, b; };
-		i32 e[3];
-	};
-
-	DqnV3i(i32 x_, i32 y_, i32 z_);
-	DqnV3i(f32 x_, f32 y_, f32 z_);
+	struct { i32 x, y, z; };
+	struct { i32 r, g, b; };
+	i32 e[3];
 };
 
 // DqnV3
+DQN_FILE_SCOPE DqnV3 DqnV3_(f32 xyz);
+DQN_FILE_SCOPE DqnV3 DqnV3_(f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnV3 DqnV3_(i32 x, i32 y, i32 z);
+
 DQN_FILE_SCOPE DqnV3 DqnV3_Add     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Sub     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Scalei  (DqnV3 a, i32 b);
@@ -1377,7 +1433,7 @@ DQN_FILE_SCOPE f32   DqnV3_LengthSquared(DqnV3 a, DqnV3 b);
 
 DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);           }
-DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3(b)); }
+DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3_(b));   }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, i32   b) { return      DqnV3_Scalei  (a, b);           }
@@ -1389,32 +1445,30 @@ DQN_FILE_SCOPE inline DqnV3 &operator-=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_S
 DQN_FILE_SCOPE inline DqnV3 &operator+=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Add     (a, b));          }
 DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_Equals  (a, b);           }
 
+DQN_FILE_SCOPE DqnV3i DqnV3i_(i32 x, i32 y, i32 z);
+DQN_FILE_SCOPE DqnV3i DqnV3i_(f32 x, f32 y, f32 z);
+
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV4 Public API - 4D Math Vectors
 ////////////////////////////////////////////////////////////////////////////////
-class DqnV4
+union DqnV4
 {
-public:
-	union
-	{
-		struct { f32 x, y, z, w; };
-		DqnV3 xyz;
-		DqnV2 xy;
+	struct { f32 x, y, z, w; };
+	DqnV3 xyz;
+	DqnV2 xy;
 
-		struct { f32 r, g, b, a; };
-		DqnV3 rgb;
+	struct { f32 r, g, b, a; };
+	DqnV3 rgb;
 
-		f32    e[4];
-		DqnV2 v2[2];
-	};
-
-	DqnV4();
-	DqnV4(f32 xyzw);
-	DqnV4(f32 x_, f32 y_, f32 z_, f32 w_);
-	DqnV4(i32 x_, i32 y_, i32 z_, i32 w_);
-	DqnV4(DqnV3 a, f32 w);
-
+	f32    e[4];
+	DqnV2 v2[2];
 };
+
+DQN_FILE_SCOPE DqnV4 DqnV4_();
+DQN_FILE_SCOPE DqnV4 DqnV4_(f32 xyzw);
+DQN_FILE_SCOPE DqnV4 DqnV4_(f32 x, f32 y, f32 z, f32 w);
+DQN_FILE_SCOPE DqnV4 DqnV4_(i32 x, i32 y, i32 z, i32 w);
+DQN_FILE_SCOPE DqnV4 DqnV4_(DqnV3 a, f32 w);
 
 DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE DqnV4 DqnV4_Sub     (DqnV4 a, DqnV4 b);
@@ -1426,7 +1480,7 @@ DQN_FILE_SCOPE bool  DqnV4_Equals  (DqnV4 a, DqnV4 b);
 
 DQN_FILE_SCOPE inline DqnV4  operator- (DqnV4  a, DqnV4 b) { return      DqnV4_Sub     (a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, DqnV4 b) { return      DqnV4_Add     (a, b);            }
-DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4(b));     }
+DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4_(b));    }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, DqnV4 b) { return      DqnV4_Hadamard(a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, f32   b) { return      DqnV4_Scalef  (a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, i32   b) { return      DqnV4_Scalei  (a, b);            }
@@ -1435,7 +1489,7 @@ DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, f32   b) { return (a = DqnV4_S
 DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, i32   b) { return (a = DqnV4_Scalei  (a, b));           }
 DQN_FILE_SCOPE inline DqnV4 &operator-=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Sub     (a, b));           }
 DQN_FILE_SCOPE inline DqnV4 &operator+=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Add     (a, b));           }
-DQN_FILE_SCOPE inline bool   operator==(DqnV4  a, DqnV4 b) { return      DqnV4_Equals  (a, b);            }
+DQN_FILE_SCOPE inline bool   operator==(DqnV4 &a, DqnV4 b) { return      DqnV4_Equals  (a, b);            }
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnMat4 Public API - 4x4 Math Matrix
@@ -1471,19 +1525,20 @@ public:
 	DqnV2 min;
 	DqnV2 max;
 
-	DqnRect();
-	DqnRect(DqnV2 origin, DqnV2 size);
-	DqnRect(f32 x, f32 y, f32 w, f32 h);
-	DqnRect(i32 x, i32 y, i32 w, i32 h);
-
+	f32   GetWidth ()                                    const { return max.w - min.w; }
+	f32   GetHeight()                                    const { return max.h - min.h; }
+	DqnV2 GetSize  ()                                    const { return max - min;     }
 	void  GetSize  (f32 *const width, f32 *const height) const;
-	DqnV2 GetSize  ()                                    const;
 	DqnV2 GetCenter()                                    const;
 
 	DqnRect ClipRect (const DqnRect clip) const;
 	DqnRect Move     (const DqnV2 shift)  const;
 	bool    ContainsP(const DqnV2 p)      const;
 };
+
+DQN_FILE_SCOPE DqnRect DqnRect_(DqnV2 origin, DqnV2 size);
+DQN_FILE_SCOPE DqnRect DqnRect_(f32 x, f32 y, f32 w, f32 h);
+DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h);
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnChar Public API - Char Operations
@@ -1585,6 +1640,9 @@ public:
 	f32 Nextf();                 // return: A random float   N between [0.0, 1.0f]
 	i32 Range(i32 min, i32 max); // return: A random integer N between [min, max]
 };
+
+DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_();         // Uses rdtsc to create a seed
+DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed);
 
 ////////////////////////////////////////////////////////////////////////////////
 // #Dqn_* Public API
@@ -1739,13 +1797,19 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i64 size)
 }
 
 template <typename T>
-using Dqn_BinarySearchLessThanCallback = bool (*)(const T&, const T&);
+using Dqn_BSearchLessThanCallback = bool (*)(const T&, const T&);
 
-enum Dqn_BinarySearchBound
+template <typename T>
+using Dqn_BSearchEqualsCallback   = bool (*)(const T&, const T&);
+
+enum Dqn_BSearchBound
 {
-	Dqn_BinarySearchBound_Normal, // Return the index of the first item that matches the find value
-	Dqn_BinarySearchBound_Lower,  // Return the index of the first item lower than the find value
-	Dqn_BinarySearchBound_Higher, // Return the index of the first item higher than the find value
+	Dqn_BSearchBound_Normal, // Return the index of the first item that matches the find value
+	Dqn_BSearchBound_Lower,  // Return the index of the first item lower than the find value
+	Dqn_BSearchBound_Higher, // Return the index of the first item higher than the find value
+
+	Dqn_BSearchBound_NormalLower,  // Return the index of the matching item if not found the first item lower
+	Dqn_BSearchBound_NormalHigher, // Return the index of the matching item if not found the first item higher
 };
 
 // bound: The behaviour of the binary search,
@@ -1753,10 +1817,10 @@ enum Dqn_BinarySearchBound
 //         For higher and lower bounds return -1 if there is no element higher/lower than the
 //         find value (i.e. -1 if the 0th element is the find val for lower bound).
 template <typename T>
-DQN_FILE_SCOPE i64
-Dqn_BinarySearch(T *const array, const i64 size, const T &find,
-                 const Dqn_BinarySearchLessThanCallback<T> IsLessThan,
-                 const Dqn_BinarySearchBound bound = Dqn_BinarySearchBound_Normal)
+DQN_FILE_SCOPE i64 Dqn_BSearch(T *const array, const i64 size, const T &find,
+                               const Dqn_BSearchEqualsCallback<T> Equals,
+                               const Dqn_BSearchLessThanCallback<T> IsLessThan,
+                               const Dqn_BSearchBound bound = Dqn_BSearchBound_Normal)
 {
 	if (size == 0 || !array) return -1;
 
@@ -1766,22 +1830,24 @@ Dqn_BinarySearch(T *const array, const i64 size, const T &find,
 
 	while (start <= end)
 	{
-		if (array[mid] == find)
+		if (Equals(array[mid], find))
 		{
-			if (bound == Dqn_BinarySearchBound_Lower)
+			if (bound == Dqn_BSearchBound_Normal ||
+			    bound == Dqn_BSearchBound_NormalLower ||
+			    bound == Dqn_BSearchBound_NormalHigher)
+			{
+				return mid;
+			}
+			else if (bound == Dqn_BSearchBound_Lower)
 			{
 				// NOTE: We can always -1 because at worst case, 0 index will go to -1 which is
 				// correct behaviour.
 				return mid - 1;
 			}
-			else if (bound == Dqn_BinarySearchBound_Higher)
+			else
 			{
 				if ((mid + 1) >= size) return -1;
 				return mid + 1;
-			}
-			else
-			{
-				return mid;
 			}
 		}
 		else if (IsLessThan(array[mid], find)) start = mid + 1;
@@ -1789,26 +1855,25 @@ Dqn_BinarySearch(T *const array, const i64 size, const T &find,
 		mid = (i64)((start + end) * 0.5f);
 	}
 
-	if (bound == Dqn_BinarySearchBound_Lower)
+	if (bound == Dqn_BSearchBound_Normal)
 	{
-		if (find < array[mid]) return -1;
-		return mid;
+		return -1;
 	}
-	else if (bound == Dqn_BinarySearchBound_Higher)
+	if (bound == Dqn_BSearchBound_Lower || bound == Dqn_BSearchBound_NormalLower)
 	{
-		if (find > array[mid]) return -1;
+		if (IsLessThan(find, array[mid])) return -1;
 		return mid;
 	}
 	else
 	{
-		return -1;
+		if (IsLessThan(array[mid], find)) return -1;
+		return mid;
 	}
 }
 
-template <typename T>
 DQN_FILE_SCOPE i64
-Dqn_BinarySearch(T *const array, const i64 size, const i64 &find,
-                 const Dqn_BinarySearchBound bound = Dqn_BinarySearchBound_Normal)
+Dqn_BSearch(i64 *const array, const i64 size, const i64 &find,
+                 const Dqn_BSearchBound bound = Dqn_BSearchBound_Normal)
 {
 	if (size == 0 || !array) return -1;
 
@@ -1820,18 +1885,20 @@ Dqn_BinarySearch(T *const array, const i64 size, const i64 &find,
 	{
 		if (array[mid] == find)
 		{
-			if (bound == Dqn_BinarySearchBound_Lower)
+			if (bound == Dqn_BSearchBound_Normal ||
+			    bound == Dqn_BSearchBound_NormalLower ||
+			    bound == Dqn_BSearchBound_NormalHigher)
+			{
+				return mid;
+			}
+			else if (bound == Dqn_BSearchBound_Lower)
 			{
 				return mid - 1;
 			}
-			else if (bound == Dqn_BinarySearchBound_Higher)
+			else
 			{
 				if ((mid + 1) >= size) return -1;
 				return mid + 1;
-			}
-			else
-			{
-				return mid;
 			}
 		}
 		else if (array[mid] <  find) start = mid + 1;
@@ -1839,19 +1906,19 @@ Dqn_BinarySearch(T *const array, const i64 size, const i64 &find,
 		mid = (i64)((start + end) * 0.5f);
 	}
 
-	if (bound == Dqn_BinarySearchBound_Lower)
+	if (bound == Dqn_BSearchBound_Normal)
+	{
+		return -1;
+	}
+	if (bound == Dqn_BSearchBound_Lower || bound == Dqn_BSearchBound_NormalLower)
 	{
 		if (find < array[mid]) return -1;
 		return mid;
 	}
-	else if (bound == Dqn_BinarySearchBound_Higher)
+	else
 	{
 		if (find > array[mid]) return -1;
 		return mid;
-	}
-	else
-	{
-		return -1;
 	}
 }
 
@@ -2775,11 +2842,45 @@ DQN_FILE_SCOPE void DqnMem_Free(void *memory)
 	if (memory) free(memory);
 }
 
-DQN_FILE_SCOPE void DqnMem_Copy(u8 *const dest, u8 *const src, const i64 numBytesToCopy)
+DQN_FILE_SCOPE void DqnMem_Copy(void *const dest, void *const src, const i64 numBytesToCopy)
 {
+	auto *to   = (u8 *)dest;
+	auto *from = (u8 *)src;
 	for (auto i = 0; i < numBytesToCopy; i++)
-		dest[i] = src[i];
+		to[i]   = from[i];
 }
+
+DQN_FILE_SCOPE void *DqnMem_Set(void *const dest, u8 value, const i64 numBytesToSet)
+{
+	auto *ptr = (u8 *)dest;
+	for (auto i = 0; i < numBytesToSet; i++)
+		ptr[i]  = value;
+
+	return dest;
+}
+
+DQN_FILE_SCOPE void *DqnMem_Set64(void *const dest, u8 value, const i64 numBytesToCopy)
+{
+#if defined(DQN_WIN32_PLATFORM)
+	u64 valueU64 = value;
+	valueU64 |= valueU64 << 8;
+	valueU64 |= valueU64 << 16;
+	valueU64 |= valueU64 << 32;
+
+	auto *const destU64      = (u64 *)dest;
+	i64   const numU64ToCopy = numBytesToCopy / sizeof(u64);
+	__stosq(destU64, valueU64, numU64ToCopy);
+
+	const u64 remainingMask   = sizeof(u64) - 1;
+	auto   *const destU8      = (u8 *)dest + (numBytesToCopy & ~remainingMask);
+	u8      const valueU8     = value;
+	size_t  const numU8ToCopy = numBytesToCopy & (remainingMask);
+	__stosb(destU8, valueU8, numU8ToCopy);
+#else
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH)
+#endif
+	return dest;
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnMemAPIInternal Implementation
@@ -3087,19 +3188,27 @@ DQN_FILE_SCOPE bool DqnMemStack::InitWithFixedSize(size_t size, const bool zeroC
 
 DQN_FILE_SCOPE bool DqnMemStack::Init(size_t size, const bool zeroClear, const u32 byteAlign_, const DqnMemAPI memAPI_)
 {
-	if (!this || size <= 0) return false;
+	if (!this || size < 0) return false;
 	if (!DQN_ASSERT_MSG(!this->block, "MemStack has pre-existing block already attached"))
 		return false;
 
-	this->block = DqnMemStackInternal_AllocateBlock(byteAlign_, size, zeroClear, memAPI_);
-	if (!DQN_ASSERT_MSG(this->block, "MemStack failed to allocate block, not enough memory"))
-		return false;
+	if (size == 0)
+	{
+		this->block = nullptr;
+	}
+	else
+	{
+		this->block = DqnMemStackInternal_AllocateBlock(byteAlign_, size, zeroClear, memAPI_);
+		if (!DQN_ASSERT_MSG(this->block, "MemStack failed to allocate block, not enough memory"))
+			return false;
+
+		DQN_ASSERT(!this->block->prevBlock);
+	}
 
 	this->tempRegionCount = 0;
 	this->byteAlign       = byteAlign_;
 	this->flags           = 0;
 	this->memAPI          = memAPI_;
-	DQN_ASSERT(!this->block->prevBlock);
 	return true;
 }
 
@@ -3111,15 +3220,17 @@ DQN_FILE_SCOPE void *DqnMemStack::Push(size_t size)
 	if (size == 0) return nullptr;
 
 	size_t alignedSize = DQN_ALIGN_POW_N(size, this->byteAlign);
-	if (!this->block ||
-	    (this->block->used + alignedSize) > this->block->size)
+	if (!this->block || (this->block->used + alignedSize) > this->block->size)
 	{
 		size_t newBlockSize;
+
 		// TODO(doyle): Allocate block size based on the aligned size or
 		// a minimum block size? Not allocate based on the current block
 		// size
-		if (this->block) newBlockSize = DQN_MAX(alignedSize, this->block->size);
-		else newBlockSize = alignedSize;
+		if (this->block)
+			newBlockSize = DQN_MAX(alignedSize, this->block->size);
+		else
+			newBlockSize = alignedSize;
 
 		DqnMemStack::Block *newBlock = this->AllocateCompatibleBlock(newBlockSize, true);
 		if (newBlock)
@@ -3161,20 +3272,22 @@ DQN_FILE_SCOPE void *DqnMemStack::Push(size_t size)
 DQN_FILE_SCOPE bool DqnMemStack::Pop(void *const ptr, size_t size)
 {
 	if (!this->block) return false;
-
-	u8 *currPtr = this->block->memory + this->block->used;
-	if (DQN_ASSERT_MSG((u8 *)ptr >= this->block->memory && ptr < currPtr,
+	u8 *currPtr = block->memory + block->used;
+	if (DQN_ASSERT_MSG((u8 *)ptr >= block->memory && ptr < currPtr,
 	                   "'ptr' to pop does not belong to current memStack attached block"))
 	{
 		size_t calcSize = (size_t)currPtr - (size_t)ptr;
 		size_t sizeAligned = DQN_ALIGN_POW_N(size, this->byteAlign);
-		if (DQN_ASSERT_MSG(calcSize == sizeAligned, "'ptr' was not the last item allocated to memStack"))
+
+		if (calcSize == sizeAligned)
 		{
 			this->block->used -= sizeAligned;
-			if (this->block->used == 0 && this->block->prevBlock)
+			if (this->block->used == 0 && block->prevBlock)
 			{
-				return DQN_ASSERT(this->FreeLastBlock());
+				bool result = this->FreeLastBlock();
+				return result;
 			}
+
 			return true;
 		}
 	}
@@ -3214,7 +3327,7 @@ DQN_FILE_SCOPE bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 	if (*blockPtr)
 	{
 		DqnMemStack::Block *blockToFree = *blockPtr;
-		(*blockPtr)                    = blockToFree->prevBlock;
+		(*blockPtr)                     = blockToFree->prevBlock;
 		DqnMem_Free(blockToFree);
 
 		// No more blocks, then last block has been freed
@@ -3457,11 +3570,29 @@ DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV2 Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DqnV2::DqnV2()                                          { }
-DqnV2::DqnV2(f32 xy)         : x(xy)      , y(xy)       { }
-DqnV2::DqnV2(f32 x_, f32 y_) : x(x_)      , y(y_)       { }
-DqnV2::DqnV2(i32 x_, i32 y_) : x((f32)x_) , y((f32)y_)  { }
-DqnV2::DqnV2(DqnV2i a)       : x((f32)a.x), y((f32)a.y) { }
+DQN_FILE_SCOPE DqnV2 DqnV2_(f32 xy)
+{
+	DqnV2 result = {xy, xy};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2 DqnV2_(f32 x, f32 y)
+{
+	DqnV2 result = {x, y};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2 DqnV2_(i32 x, i32 y)
+{
+	DqnV2 result = {(f32)x, (f32)y};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2 DqnV2_(DqnV2i a)
+{
+	DqnV2 result = {(f32)a.x, (f32)a.y};
+	return result;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV2 Arithmetic Implementation
@@ -3554,8 +3685,8 @@ DQN_FILE_SCOPE f32 DqnV2_Length(const DqnV2 a, const DqnV2 b)
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Normalise(const DqnV2 a)
 {
-	f32 magnitude = DqnV2_Length(DqnV2(0, 0), a);
-	if (magnitude == 0) return DqnV2(0.0f);
+	f32 magnitude = DqnV2_Length(DqnV2_(0, 0), a);
+	if (magnitude == 0) return DqnV2_(0.0f);
 
 	DqnV2 result = a * (1.0f / magnitude);
 	return result;
@@ -3585,7 +3716,7 @@ DQN_FILE_SCOPE bool DqnV2_Overlaps(DqnV2 a, DqnV2 b)
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(const DqnV2 a)
 {
-	DqnV2 result = DqnV2(a.y, -a.x);
+	DqnV2 result = DqnV2_(a.y, -a.x);
 	return result;
 }
 
@@ -3615,10 +3746,23 @@ DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV2i Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DqnV2i::DqnV2i() {}
-DqnV2i::DqnV2i(i32 x_, i32 y_) : x(x_)      , y(y_)       { }
-DqnV2i::DqnV2i(f32 x_, f32 y_) : x((i32)x_) , y((i32)y_)  { }
-DqnV2i::DqnV2i(DqnV2 a)        : x((i32)a.x), y((i32)a.y) { }
+DQN_FILE_SCOPE DqnV2i DqnV2i_(i32 x, i32 y)
+{
+	DqnV2i result = {x, y};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_(f32 x, f32 y)
+{
+	DqnV2i result = {(i32)x, (i32)y};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_(DqnV2 a)
+{
+	DqnV2i result = {(i32)a.x, (i32)a.y};
+	return result;
+}
 
 DQN_FILE_SCOPE DqnV2i DqnV2i_Add(DqnV2i a, DqnV2i b)
 {
@@ -3692,10 +3836,23 @@ DQN_FILE_SCOPE bool DqnV2i_Equals(DqnV2i a, DqnV2i b)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV3 Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DqnV3::DqnV3() { }
-DqnV3::DqnV3(f32 xyz)                : x(xyz)    , y(xyz)    , z(xyz)     { }
-DqnV3::DqnV3(f32 x_, f32 y_, f32 z_) : x(x_)     , y(y_)     , z(z_)      { }
-DqnV3::DqnV3(i32 x_, i32 y_, i32 z_) : x((f32)x_), y((f32)y_), z((f32)z_) { }
+DQN_FILE_SCOPE DqnV3 DqnV3_(f32 xyz)
+{
+	DqnV3 result = {xyz, xyz, xyz};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV3 DqnV3_(f32 x, f32 y, f32 z)
+{
+	DqnV3 result = {x, y, z};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV3 DqnV3_(i32 x, i32 y, i32 z)
+{
+	DqnV3 result = {(f32)x, (f32)y, (f32)z};
+	return result;
+}
 
 DQN_FILE_SCOPE DqnV3 DqnV3_Add(DqnV3 a, DqnV3 b)
 {
@@ -3812,17 +3969,45 @@ DQN_FILE_SCOPE f32 DqnV3_Length(DqnV3 a, DqnV3 b)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV3i Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DqnV3i::DqnV3i(i32 x_, i32 y_, i32 z_) : x(x_)     , y(y_)     , z(z_)      { }
-DqnV3i::DqnV3i(f32 x_, f32 y_, f32 z_) : x((i32)x_), y((i32)y_), z((i32)z_) { }
+DQN_FILE_SCOPE DqnV3i DqnV3i_(i32 x, i32 y, i32 z)
+{
+	DqnV3i result = {x, y, z};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV3i DqnV3i_(f32 x, f32 y, f32 z)
+{
+	DqnV3i result = {(i32)x, (i32)y, (i32)z};
+	return result;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV4 Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DqnV4::DqnV4() {};
-DqnV4::DqnV4(f32 xyzw)                       : x(xyzw)   , y(xyzw)   , z(xyzw)   , w(xyzw)    { }
-DqnV4::DqnV4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_)     , y(y_)     , z(z_)     , w(w_)      { }
-DqnV4::DqnV4(i32 x_, i32 y_, i32 z_, i32 w_) : x((f32)x_), y((f32)y_), z((f32)z_), w((f32)w_) { }
-DqnV4::DqnV4(DqnV3 a, f32 w)                 :  x(a.x)   , y(a.y)    , z(a.z)    , w(w)       { }
+DQN_FILE_SCOPE DqnV4 DqnV4_(f32 xyzw)
+{
+	DqnV4 result = {xyzw, xyzw, xyzw, xyzw};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV4 DqnV4_(f32 x, f32 y, f32 z, f32 w)
+{
+	DqnV4 result = {x, y, z, w};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV4 DqnV4_(i32 x, i32 y, i32 z, i32 w)
+{
+	DqnV4 result = {(f32)x, (f32)y, (f32)z, (f32)w};
+	return result;
+}
+
+DQN_FILE_SCOPE DqnV4 DqnV4_(DqnV3 a, f32 w)
+{
+	DqnV4 result = {a.x, a.y, a.z, w};
+	return result;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnV4 Arithmetic Implementation
 ////////////////////////////////////////////////////////////////////////////////
@@ -3993,7 +4178,7 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate(f32 radians, f32 x, f32 y, f32 z)
 	f32 cosVal         = cosf(radians);
 	f32 oneMinusCosVal = 1 - cosVal;
 
-	DqnV3 axis = DqnV3_Normalise(DqnV3(x, y, z));
+	DqnV3 axis = DqnV3_Normalise(DqnV3_(x, y, z));
 
 	result.e[0][0] = (axis.x * axis.x * oneMinusCosVal) + cosVal;
 	result.e[0][1] = (axis.x * axis.y * oneMinusCosVal) + (axis.z * sinVal);
@@ -4060,61 +4245,90 @@ DQN_FILE_SCOPE DqnV4 DqnMat4_MulV4(DqnMat4 a, DqnV4 b)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnRect Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DqnRect::DqnRect() {}
-DqnRect::DqnRect(DqnV2 origin, DqnV2 size)
+DQN_FILE_SCOPE DqnRect DqnRect_(DqnV2 origin, DqnV2 size)
 {
-	this->min = origin;
-	this->max = this->min + size;
+	DqnRect result;
+	result.min = origin;
+	result.max = result.min + size;
+
+	DQN_ASSERT_HARD(result.min <= result.max);
+	return result;
 }
 
-DqnRect::DqnRect(f32 x, f32 y, f32 w, f32 h)
+DQN_FILE_SCOPE DqnRect DqnRect_(f32 x, f32 y, f32 w, f32 h)
 {
-	this->min = DqnV2(x, y);
-	this->max = DqnV2(x + w, y + h);
+	DqnRect result;
+	result.min = DqnV2_(x, y);
+	result.max = DqnV2_(x + w, y + h);
+
+	DQN_ASSERT_HARD(result.min <= result.max);
+	return result;
 }
 
-DqnRect::DqnRect(i32 x, i32 y, i32 w, i32 h)
+DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h)
 {
-	this->min = DqnV2(x, y);
-	this->max = DqnV2(x + w, y + h);
+	DqnRect result;
+	result.min = DqnV2_(x, y);
+	result.max = DqnV2_(x + w, y + h);
+
+	DQN_ASSERT_HARD(result.min <= result.max);
+	return result;
 }
 
 void DqnRect::GetSize(f32 *const width, f32 *const height) const
 {
-	if (width)  *width  = this->max.x - this->min.x;
+	DQN_ASSERT_HARD(this->min <= this->max);
+	if (width) *width   = this->max.x - this->min.x;
 	if (height) *height = this->max.y - this->min.y;
-}
-
-DqnV2 DqnRect::GetSize() const
-{
-	f32 width     = this->max.x - this->min.x;
-	f32 height    = this->max.y - this->min.y;
-	DqnV2 result  = DqnV2(width, height);
-	return result;
 }
 
 DqnV2 DqnRect::GetCenter() const
 {
+	DQN_ASSERT_HARD(this->min <= this->max);
 	f32 sumX     = this->min.x + this->max.x;
 	f32 sumY     = this->min.y + this->max.y;
-	DqnV2 result = DqnV2(sumX, sumY) * 0.5f;
+	DqnV2 result = DqnV2_(sumX, sumY) * 0.5f;
 	return result;
 }
 
 DqnRect DqnRect::ClipRect(const DqnRect clip) const
 {
-	DqnV2 clipSize = clip.GetSize();
+	DQN_ASSERT_HARD(this->min <= this->max);
+	DQN_ASSERT_HARD(clip.min <= clip.max);
+	DqnRect result = *this;
 
-	DqnRect result;
-	result.max.x = DQN_MIN(this->max.x, clipSize.w);
-	result.max.y = DQN_MIN(this->max.y, clipSize.h);
-	result.min.x = DQN_MAX(clip.min.x, this->min.x);
-	result.min.y = DQN_MAX(clip.min.y, this->min.y);
+	DqnV2 clipSize = clip.GetSize();
+	if (clip.min.x > this->min.x && clip.min.x < this->max.x)
+	{
+		if (clip.min.y > this->min.y && clip.min.y < this->max.y)
+		{
+			result.min = clip.min;
+		}
+		else if (clip.max.y > this->min.y)
+		{
+			result.min.x = clip.min.x;
+		}
+	}
+
+	if (clip.max.x > this->min.x && clip.max.x < this->max.x)
+	{
+		if (clip.max.y > this->min.y && clip.max.y < this->max.y)
+		{
+			result.max = clip.max;
+		}
+		else if (clip.min.y < this->max.y)
+		{
+			result.max.x = clip.max.x;
+		}
+	}
+
 	return result;
 }
 
 DqnRect DqnRect::Move(const DqnV2 shift) const
 {
+	DQN_ASSERT_HARD(this->min <= this->max);
+
 	DqnRect result;
 	result.min = this->min + shift;
 	result.max = this->max + shift;
@@ -4123,6 +4337,8 @@ DqnRect DqnRect::Move(const DqnV2 shift) const
 
 bool DqnRect::ContainsP(const DqnV2 p) const
 {
+	DQN_ASSERT_HARD(this->min <= this->max);
+
 	bool outsideOfRectX = false;
 	if (p.x < this->min.x || p.x > this->max.w)
 		outsideOfRectX = true;
@@ -5037,7 +5253,13 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnString Impleemntation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE bool DqnString::InitSize(const i32 size, const DqnMemAPI api)
+bool DqnString::InitSize(const i32 size, DqnMemStack *const stack)
+{
+	bool result = this->InitSize(size, DqnMemAPI_StackAllocator(stack));
+	return result;
+}
+
+bool DqnString::InitSize(const i32 size, const DqnMemAPI api)
 {
 	size_t allocSize        = sizeof(*(this->str)) * (size + 1);
 	DqnMemAPI::Request info = DqnMemAPI::RequestAlloc(api, allocSize);
@@ -5051,7 +5273,7 @@ DQN_FILE_SCOPE bool DqnString::InitSize(const i32 size, const DqnMemAPI api)
 	return true;
 }
 
-DQN_FILE_SCOPE bool DqnString::InitFixedMem(char *const memory, const i32 sizeInBytes)
+bool DqnString::InitFixedMem(char *const memory, const i32 sizeInBytes)
 {
 	if (!memory || sizeInBytes == 0) return false;
 
@@ -5063,7 +5285,13 @@ DQN_FILE_SCOPE bool DqnString::InitFixedMem(char *const memory, const i32 sizeIn
 	return true;
 }
 
-DQN_FILE_SCOPE bool DqnString::InitLiteral(const char *const cstr, const DqnMemAPI api)
+bool DqnString::InitLiteral(const char *const cstr, DqnMemStack *const stack)
+{
+	bool result = this->InitLiteral(cstr, DqnMemAPI_StackAllocator(stack));
+	return result;
+}
+
+bool DqnString::InitLiteral(const char *const cstr, const DqnMemAPI api)
 {
 	i32 utf8LenInBytes = 0;
 	this->len           = DqnStr_LenUTF8((u32 *)cstr, &utf8LenInBytes);
@@ -5083,7 +5311,13 @@ DQN_FILE_SCOPE bool DqnString::InitLiteral(const char *const cstr, const DqnMemA
 	return true;
 }
 
-DQN_FILE_SCOPE bool DqnString::InitWLiteral(const wchar_t *const cstr, const DqnMemAPI api)
+bool DqnString::InitWLiteral(const wchar_t *const cstr, DqnMemStack *const stack)
+{
+	bool result = this->InitWLiteral(cstr, DqnMemAPI_StackAllocator(stack));
+	return result;
+}
+
+bool DqnString::InitWLiteral(const wchar_t *const cstr, const DqnMemAPI api)
 {
 #if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
 	i32 requiredLen = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
@@ -5111,7 +5345,7 @@ DQN_FILE_SCOPE bool DqnString::InitWLiteral(const wchar_t *const cstr, const Dqn
 #endif
 }
 
-DQN_FILE_SCOPE bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
+bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
 {
 	if (!cstr) return false;
 
@@ -5132,7 +5366,7 @@ DQN_FILE_SCOPE bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
 	return true;
 }
 
-DQN_FILE_SCOPE bool DqnString::Expand(const i32 newMax)
+bool DqnString::Expand(const i32 newMax)
 {
 	if (!this->memAPI.callback) return false;
 	if (newMax < this->max)     return true;
@@ -5180,7 +5414,22 @@ DQN_FILE_SCOPE bool DqnStringInternal_AppendCStr(DqnString *const str, const cha
 	return true;
 }
 
-DQN_FILE_SCOPE bool DqnString::AppendCStr(const char *const cstr, i32 bytesToCopy)
+void DqnString::Sprintf(char const *fmt, ...)
+{
+	va_list argList;
+	va_start(argList, fmt);
+	{
+		char *bufStart = this->str + this->len;
+		i32 numCopied  = Dqn_vsprintf(bufStart, fmt, argList);
+		i32 newLen     = this->len + numCopied;
+		DQN_ASSERT_HARD(newLen < this->max);
+
+		this->len = newLen;
+	}
+	va_end(argList);
+}
+
+bool DqnString::AppendCStr(const char *const cstr, i32 bytesToCopy)
 {
 	i32 cstrLen = 0;
 	if (bytesToCopy == -1)
@@ -5198,20 +5447,20 @@ DQN_FILE_SCOPE bool DqnString::AppendCStr(const char *const cstr, i32 bytesToCop
 	return result;
 }
 
-DQN_FILE_SCOPE bool DqnString::AppendStr(const DqnString strToAppend, i32 bytesToCopy)
+bool DqnString::AppendStr(const DqnString strToAppend, i32 bytesToCopy)
 {
 	i32 cstrLen = (bytesToCopy == -1) ? strToAppend.len : bytesToCopy;
 	bool result = DqnStringInternal_AppendCStr(this, strToAppend.str, cstrLen);
 	return result;
 }
 
-DQN_FILE_SCOPE void DqnString::Clear()
+void DqnString::Clear()
 {
 	this->len    = 0;
 	this->str[0] = 0;
 }
 
-DQN_FILE_SCOPE void DqnString::Free()
+bool DqnString::Free()
 {
 	if (this->str)
 	{
@@ -5220,15 +5469,19 @@ DQN_FILE_SCOPE void DqnString::Free()
 			DqnMemAPI::Request info =
 			    DqnMemAPI::RequestFree(this->memAPI, this->str, this->len);
 			this->memAPI.callback(info);
-		}
 
-		this->str = nullptr;
-		this->len = 0;
-		this->max = 0;
+			this->str = nullptr;
+			this->len = 0;
+			this->max = 0;
+
+			return true;
+		}
 	}
+
+	return false;
 }
 
-DQN_FILE_SCOPE i32 DqnString::ToWCharUseBuf(wchar_t *const buf, const i32 bufSize)
+i32 DqnString::ToWCharUseBuf(wchar_t *const buf, const i32 bufSize)
 {
 #if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
 	i32 result = DqnWin32_UTF8ToWChar(this->str, buf, bufSize);
@@ -5241,7 +5494,7 @@ DQN_FILE_SCOPE i32 DqnString::ToWCharUseBuf(wchar_t *const buf, const i32 bufSiz
 #endif
 }
 
-DQN_FILE_SCOPE wchar_t *DqnString::ToWChar(const DqnMemAPI api)
+wchar_t *DqnString::ToWChar(const DqnMemAPI api)
 {
 	// TODO(doyle): Should the "in" string allow specifyign len? probably
 	// Otherwise a c-string and a literal initiated string might have different lengths
@@ -5317,6 +5570,20 @@ FILE_SCOPE u32 DqnRndInternal_MakeSeed()
 	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
 	return 0;
 #endif
+}
+
+DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_()
+{
+	DqnRndPCG result;
+	result.Init();
+	return result;
+}
+
+DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed)
+{
+	DqnRndPCG result;
+	result.InitWithSeed(seed);
+	return result;
 }
 
 void DqnRndPCG::InitWithSeed(u32 seed)
