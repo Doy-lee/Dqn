@@ -1395,7 +1395,7 @@ void DqnArray_TestRealDataInternal(DqnArray<char> *array)
 {
 #ifdef DQN_XPLATFORM_LAYER
 	size_t bufSize = 0;
-	u8 *buf        = DqnFile_ReadEntireFileSimple("tests/google-10000-english.txt", &bufSize);
+	u8 *buf        = DqnFile::ReadEntireFileSimple("tests/google-10000-english.txt", bufSize);
 	DQN_ASSERT(buf);
 
 	for (auto i = 0; i < bufSize; i++)
@@ -1899,32 +1899,32 @@ void DqnFile_Test()
 			if (1)
 			{
 				size_t size = 0;
-				DQN_ASSERT_HARD(DqnFile_GetFileSize(FILE_TO_OPEN, &size));
+				DQN_ASSERT_HARD(DqnFile::GetFileSize(FILE_TO_OPEN, size));
 				DQN_ASSERT_HARD(size == expectedSize);
 			}
 
 			DqnFile file = {};
-			DQN_ASSERT(DqnFile_Open(".clang-format", &file,
-			                        (DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
-			                        DqnFileAction_OpenOnly));
+			DQN_ASSERT(file.Open(".clang-format",
+			                        (DqnFile::PermissionFlag::FileWrite | DqnFile::PermissionFlag::FileRead),
+			                        DqnFile::Action::OpenOnly));
 
 			DQN_ASSERT_MSG(file.size == expectedSize,
 			               "DqnFileOpen() failed: file.size: %d, expected:%d\n", file.size,
 			               expectedSize);
 
 			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
-			DQN_ASSERT(DqnFile_Read(&file, buffer, (u32)file.size) == file.size);
+			DQN_ASSERT(file.Read(*buffer, (u32)file.size) == file.size);
 			free(buffer);
 
-			DqnFile_Close(&file);
-			DQN_ASSERT(!file.handle && file.size == 0 && file.permissionFlags == 0);
+			file.Close();
+			DQN_ASSERT(!file.handle && file.size == 0 && file.flags == 0);
 
 			if (1)
 			{
 				DqnFile raiiFile = DqnFile(true);
 				if (raiiFile.Open(FILE_TO_OPEN,
-				                  DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read,
-				                  DqnFileAction_OpenOnly))
+				                  DqnFile::PermissionFlag::FileWrite | DqnFile::PermissionFlag::FileRead,
+				                  DqnFile::Action::OpenOnly))
 				{
 					i32 breakHereToTestRaii = 0;
 					(void)breakHereToTestRaii;
@@ -1938,11 +1938,11 @@ void DqnFile_Test()
 		if (1)
 		{
 			DqnFile file = {};
-			DQN_ASSERT(!DqnFile_Open("asdljasdnel;kajdf", &file,
-			                         (DqnFilePermissionFlag_Write | DqnFilePermissionFlag_Read),
-			                         DqnFileAction_OpenOnly));
+			DQN_ASSERT(!file.Open("asdljasdnel;kajdf", (DqnFile::PermissionFlag::FileWrite |
+			                                            DqnFile::PermissionFlag::FileRead),
+			                      DqnFile::Action::OpenOnly));
 			DQN_ASSERT(file.size == 0);
-			DQN_ASSERT(file.permissionFlags == 0);
+			DQN_ASSERT(file.flags == 0);
 			DQN_ASSERT(!file.handle);
 			LogSuccess("DqnFile(): Invalid file test");
 		}
@@ -1960,19 +1960,20 @@ void DqnFile_Test()
 		// Write data out to some files
 		for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
 		{
-			u32 permissions = DqnFilePermissionFlag_Read | DqnFilePermissionFlag_Write;
-			if (!DqnFile_Open(fileNames[i], files + i, permissions, DqnFileAction_ClearIfExist))
+			u32 permissions = DqnFile::PermissionFlag::FileRead | DqnFile::PermissionFlag::FileWrite;
+			DqnFile *file = files + i;
+			if (!file->Open(fileNames[i], permissions, DqnFile::Action::ClearIfExist))
 			{
-				bool result = DqnFile_Open(fileNames[i], files + i, permissions,
-				                           DqnFileAction_CreateIfNotExist);
+				bool result =
+				    file->Open(fileNames[i], permissions, DqnFile::Action::CreateIfNotExist);
 				DQN_ASSERT(result);
 			}
 
 			size_t bytesToWrite = DqnStr_Len(writeData[i]);
 			u8 *dataToWrite     = (u8 *)(writeData[i]);
-			size_t bytesWritten = DqnFile_Write(files + i, dataToWrite, bytesToWrite, 0);
+			size_t bytesWritten = file->Write(*dataToWrite, bytesToWrite, 0);
 			DQN_ASSERT(bytesWritten == bytesToWrite);
-			DqnFile_Close(&files[i]);
+			file->Close();
 		}
 
 		DqnMemStack memStack = {};
@@ -1982,15 +1983,15 @@ void DqnFile_Test()
 		{
 			// Manual read the file contents
 			{
-				u32 permissions = DqnFilePermissionFlag_Read;
+				u32 permissions = DqnFile::PermissionFlag::FileRead;
 				DqnFile *file = files + i;
-				bool result = DqnFile_Open(fileNames[i], file, permissions, DqnFileAction_OpenOnly);
+				bool result = file->Open(fileNames[i], permissions, DqnFile::Action::OpenOnly);
 				DQN_ASSERT(result);
 
 				u8 *buffer = (u8 *)memStack.Push(file->size);
 				DQN_ASSERT(buffer);
 
-				size_t bytesRead = DqnFile_Read(&files[i], buffer, file->size);
+				size_t bytesRead = file->Read(*buffer, file->size);
 				DQN_ASSERT(bytesRead == file->size);
 
 				// Verify the data is the same as we wrote out
@@ -1998,19 +1999,19 @@ void DqnFile_Test()
 
 				// Delete when we're done with it
 				DQN_ASSERT(memStack.Pop(buffer, file->size));
-				DqnFile_Close(file);
+				file->Close();
 			}
 
 			// Read using the ReadEntireFile api which doesn't need a file handle as an argument
 			{
 				size_t reqSize = 0;
-				DQN_ASSERT(DqnFile_GetFileSize(fileNames[i], &reqSize));
+				DQN_ASSERT(DqnFile::GetFileSize(fileNames[i], reqSize));
 
 				u8 *buffer = (u8 *)memStack.Push(reqSize);
 				DQN_ASSERT(buffer);
 
 				size_t bytesRead = 0;
-				DQN_ASSERT(DqnFile_ReadEntireFile(fileNames[i], buffer, reqSize, &bytesRead));
+				DQN_ASSERT(DqnFile::ReadEntireFile(fileNames[i], *buffer, reqSize, bytesRead));
 				DQN_ASSERT(bytesRead == reqSize);
 
 				// Verify the data is the same as we wrote out
@@ -2018,16 +2019,15 @@ void DqnFile_Test()
 				DQN_ASSERT(memStack.Pop(buffer, reqSize));
 			}
 
-			DQN_ASSERT(DqnFile_Delete(fileNames[i]));
+			DQN_ASSERT(DqnFile::Delete(fileNames[i]));
 		}
 
 		// Then check delete actually worked, files should not exist.
 		for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
 		{
 			DqnFile dummy   = {};
-			u32 permissions = DqnFilePermissionFlag_Read;
-			bool fileExists =
-			    DqnFile_Open(fileNames[i], &dummy, permissions, DqnFileAction_OpenOnly);
+			u32 permissions = DqnFile::PermissionFlag::FileRead;
+			bool fileExists = dummy.Open(fileNames[i], permissions, DqnFile::Action::OpenOnly);
 			DQN_ASSERT(!fileExists);
 		}
 		memStack.Free();
@@ -2040,18 +2040,18 @@ void DqnFile_Test()
 	////////////////////////////////////////////////////////////////////////////
 	if (1)
 	{
-		u32 numFiles;
+		i32 numFiles;
 #if defined(DQN_UNIX_IMPLEMENTATION)
-		char **filelist = DqnFile_ListDir(".", &numFiles);
+		char **filelist = DqnFile::ListDir(".", numFiles);
 #elif defined(DQN_WIN32_IMPLEMENTATION)
-		char **filelist = DqnFile_ListDir("*", &numFiles);
+		char **filelist = DqnFile::ListDir("*", numFiles);
 #endif
 
 		printf("DqnFile(): Display read files\n");
-		for (u32 i = 0; i < numFiles; i++)
+		for (auto i = 0; i < numFiles; i++)
 			printf("DqnFile(): DirRead: %s\n", filelist[i]);
 
-		DqnFile_ListDirFree(filelist, numFiles);
+		DqnFile::ListDirFree(filelist, numFiles);
 		LogSuccess("DqnFile(): List directory files");
 	}
 
