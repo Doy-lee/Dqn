@@ -1424,6 +1424,25 @@ void DqnArray_Test()
 	{
 		if (1)
 		{
+			DqnArray<char> array1 = DqnArray_<char>(3);
+			DQN_ASSERT(array1.count == 0);
+			DQN_ASSERT(array1.max == 3);
+			array1.Free();
+
+			array1 = DqnArray_<char>();
+			DQN_ASSERT(array1.count == 0);
+			DQN_ASSERT(array1.max == 0);
+
+			array1.Push('c');
+			DQN_ASSERT(array1.count == 1);
+			DQN_ASSERT(array1.max == 1);
+			array1.Free();
+
+			LogSuccess("DqnArray(): Testing faux-array constructors DqnArray_()");
+		}
+
+		if (1)
+		{
 			DqnArray<char> array = {};
 			DQN_ASSERT(array.Init(1));
 			DqnArray_TestRealDataInternal(&array);

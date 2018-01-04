@@ -274,9 +274,9 @@ public:
 
 	typedef u8 *Allocator(DqnMemAPI::Request request);
 
-	static Request RequestRealloc(const DqnMemAPI memAPI, void *const oldMemPtr, const size_t oldSize, const size_t newSize);
-	static Request RequestAlloc  (const DqnMemAPI memAPI, const size_t size, const bool clearToZero);
-	static Request RequestFree   (const DqnMemAPI memAPI, void *const ptrToFree, const size_t sizeToFree);
+	static Request RequestRealloc(const DqnMemAPI memAPI, void *const oldMemPtr, size_t const oldSize, size_t const newSize);
+	static Request RequestAlloc  (const DqnMemAPI memAPI, size_t const size, const bool clearToZero = true);
+	static Request RequestFree   (const DqnMemAPI memAPI, void *const ptrToFree, size_t const sizeToFree);
 
 	bool IsValid() const { return (callback != nullptr); }
 
@@ -349,17 +349,17 @@ struct DqnMemStack
 	// mem:       Memory to use for the memory stack
 	// byteAlign: Set the alignment of memory addresses for all allocated items from the memory stack.
 	// return:    FALSE if args are invalid, or insufficient memSize.
-	bool InitWithFixedMem(u8 *const mem, const size_t memSize, const u32 byteAlign_ = 4);
+	bool InitWithFixedMem(u8 *const mem, size_t const memSize, u32 const byteAlign_ = 4);
 
 	// The memory stack uses 1 initial allocation from the DqnMem_Alloc(). No further allocations are
 	// made. All allocations are suballocated from the first allocation.
 	// size: The amount of memory to allocate. Size gets aligned to the next "byteAlign"ed value.
-	bool InitWithFixedSize(const size_t size, const bool zeroClear, const u32 byteAlign_ = 4, const DqnMemAPI memAPI_ = DqnMemAPI_HeapAllocator());
+	bool InitWithFixedSize(size_t const size, bool const zeroClear, u32 const byteAlign_ = 4, DqnMemAPI const memAPI_ = DqnMemAPI_HeapAllocator());
 
 	// Dynamically expandable stack. Akin to DqnMemStack_InitWithFixedSize() except if the MemStack does
 	// not have enough space for allocation it will automatically attach another MemBlock using
 	// DqnMem_Calloc().
-	bool Init(const size_t size, const bool zeroClear, const u32 byteAlign_ = 4, const DqnMemAPI memAPI_ = DqnMemAPI_HeapAllocator());
+	bool Init(size_t const size, bool const zeroClear, u32 const byteAlign_ = 4, DqnMemAPI const memAPI_ = DqnMemAPI_HeapAllocator());
 
 	// -- Memory API
 	// Allocate memory from the MemStack.
@@ -382,7 +382,7 @@ struct DqnMemStack
 	bool  FreeLastBlock();
 
 	// Reset the current memory block usage to 0.
-	void  ClearCurrBlock(const bool zeroClear);
+	void  ClearCurrBlock(bool const zeroClear);
 
 	// -- Temporary Regions API
 	// region: Takes pointer to a zero-cleared DqnMemStackTempRegion struct.
@@ -396,7 +396,7 @@ struct DqnMemStack
 	// -- Advanced API
 	// These are useful for forcing a new block to be used. AllocateCompatibleBlock() will fail if the
 	// supplied stack has flags set such that the stack is not allowed to have new blocks.
-	Block *AllocateCompatibleBlock(size_t size, const bool zeroClear);
+	Block *AllocateCompatibleBlock(size_t size, bool const zeroClear);
 	bool   AttachBlock            (Block *const newBlock);
 	bool   DetachBlock            (Block *const detachBlock);
 
@@ -639,8 +639,16 @@ bool DqnArray<T>::Resize(i64 newMax)
 	i64 oldSize = this->max * sizeof(T);
 	i64 newSize = newMax * sizeof(T);
 
-	DqnMemAPI::Request info =
-	    DqnMemAPI::RequestRealloc(this->memAPI, this->data, oldSize, newSize);
+	DqnMemAPI::Request info;
+	if (oldSize == 0)
+	{
+		info = DqnMemAPI::RequestAlloc(this->memAPI, newSize, /*zeroClear*/ false);
+	}
+	else
+	{
+	    info = DqnMemAPI::RequestRealloc(this->memAPI, this->data, oldSize, newSize);
+	}
+
 	u8 *result = this->memAPI.callback(info);
 	if (result)
 	{
@@ -3049,8 +3057,8 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI::Request info)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnMemAPI Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DqnMemAPI::Request DqnMemAPI::RequestRealloc(const DqnMemAPI memAPI, void *const oldMemPtr,
-                                             const size_t oldSize, const size_t newSize)
+DqnMemAPI::Request DqnMemAPI::RequestRealloc(DqnMemAPI const memAPI, void *const oldMemPtr,
+                                             size_t const oldSize, size_t const newSize)
 {
 	DqnMemAPI::Request info = {};
 	info.type               = Type::Realloc;
@@ -3062,8 +3070,8 @@ DqnMemAPI::Request DqnMemAPI::RequestRealloc(const DqnMemAPI memAPI, void *const
 	return info;
 }
 
-DqnMemAPI::Request DqnMemAPI::RequestAlloc(const DqnMemAPI memAPI, const size_t size,
-                                           const bool clearToZero = true)
+DqnMemAPI::Request DqnMemAPI::RequestAlloc(DqnMemAPI const memAPI, size_t const size,
+                                           bool const clearToZero)
 {
 	DqnMemAPI::Request result = {};
 	result.type               = DqnMemAPI::Type::Alloc;
@@ -3073,8 +3081,8 @@ DqnMemAPI::Request DqnMemAPI::RequestAlloc(const DqnMemAPI memAPI, const size_t 
 	return result;
 }
 
-DqnMemAPI::Request DqnMemAPI::RequestFree(const DqnMemAPI memAPI, void *const ptrToFree,
-                                          const size_t sizeToFree)
+DqnMemAPI::Request DqnMemAPI::RequestFree(DqnMemAPI const memAPI, void *const ptrToFree,
+                                          size_t const sizeToFree)
 {
 	DqnMemAPI::Request result = {};
 	result.type               = DqnMemAPI::Type::Free;
@@ -3105,8 +3113,8 @@ DQN_FILE_SCOPE DqnMemAPI DqnMemAPI_StackAllocator(DqnMemStack *const stack)
 // #DqnMemStackInternal Implementation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE DqnMemStack::Block *DqnMemStackInternal_AllocateBlock(u32 byteAlign, size_t size,
-                                                                     const bool zeroClear,
-                                                                     const DqnMemAPI &memAPI)
+                                                                     bool const zeroClear,
+                                                                     DqnMemAPI const &memAPI)
 {
 	if (!memAPI.callback) return nullptr;
 
@@ -3129,8 +3137,8 @@ DQN_FILE_SCOPE DqnMemStack::Block *DqnMemStackInternal_AllocateBlock(u32 byteAli
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnMemStack Initialisation Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE bool DqnMemStack::InitWithFixedMem(u8 *const mem, const size_t memSize,
-                                                  const u32 byteAlign_)
+DQN_FILE_SCOPE bool DqnMemStack::InitWithFixedMem(u8 *const mem, size_t const memSize,
+                                                  u32 const byteAlign_)
 {
 	// TODO(doyle): Logging
 	if (!mem) return false;
@@ -3159,8 +3167,8 @@ DQN_FILE_SCOPE bool DqnMemStack::InitWithFixedMem(u8 *const mem, const size_t me
 	return true;
 }
 
-DQN_FILE_SCOPE bool DqnMemStack::InitWithFixedSize(size_t size, const bool zeroClear,
-                                                   const u32 byteAlign_, const DqnMemAPI memAPI_)
+DQN_FILE_SCOPE bool DqnMemStack::InitWithFixedSize(size_t size, bool const zeroClear,
+                                                   u32 const byteAlign_, DqnMemAPI const memAPI_)
 {
 	bool result = this->Init(size, zeroClear, byteAlign_, memAPI_);
 	if (result)
@@ -3173,7 +3181,7 @@ DQN_FILE_SCOPE bool DqnMemStack::InitWithFixedSize(size_t size, const bool zeroC
 	return false;
 }
 
-DQN_FILE_SCOPE bool DqnMemStack::Init(size_t size, const bool zeroClear, const u32 byteAlign_, const DqnMemAPI memAPI_)
+DQN_FILE_SCOPE bool DqnMemStack::Init(size_t size, bool const zeroClear, u32 const byteAlign_, DqnMemAPI const memAPI_)
 {
 	if (!this || size < 0) return false;
 	if (!DQN_ASSERT_MSG(!this->block, "MemStack has pre-existing block already attached"))
@@ -3331,7 +3339,7 @@ DQN_FILE_SCOPE bool DqnMemStack::FreeLastBlock()
 	return result;
 }
 
-DQN_FILE_SCOPE void DqnMemStack::ClearCurrBlock(const bool zeroClear)
+DQN_FILE_SCOPE void DqnMemStack::ClearCurrBlock(bool const zeroClear)
 {
 	if (this->block)
 	{
@@ -3396,7 +3404,7 @@ DqnMemStackTempRegionGuard::~DqnMemStackTempRegionGuard()
 // #DqnMemStack Advanced API Implementation
 ////////////////////////////////////////////////////////////////////////////////
 DQN_FILE_SCOPE DqnMemStack::Block *DqnMemStack::AllocateCompatibleBlock(size_t size,
-                                                                        const bool zeroClear)
+                                                                        bool const zeroClear)
 {
 	if (this->flags & DqnMemStack::Flag::IsFixedMemoryFromUser) return nullptr;
 	if (this->flags & DqnMemStack::Flag::IsNotExpandable)       return nullptr;
