@@ -147,6 +147,7 @@ typedef float  f32;
 #define DQN_ALIGN_POW_4(val)        DQN_ALIGN_POW_N(val, 4)
 
 #define DQN_INVALID_CODE_PATH 0
+#define DQN_CHAR_COUNT(charArray) DQN_ARRAY_COUNT(charArray) - 1
 #define DQN_ARRAY_COUNT(array) (sizeof(array) / sizeof(array[0]))
 
 #define DQN_PI 3.14159265359f
@@ -271,11 +272,13 @@ public:
 		};
 	};
 
+	typedef u8 *Allocator(DqnMemAPI::Request request);
+
 	static Request RequestRealloc(const DqnMemAPI memAPI, void *const oldMemPtr, const size_t oldSize, const size_t newSize);
 	static Request RequestAlloc  (const DqnMemAPI memAPI, const size_t size, const bool clearToZero);
 	static Request RequestFree   (const DqnMemAPI memAPI, void *const ptrToFree, const size_t sizeToFree);
 
-	typedef u8 *Allocator(DqnMemAPI::Request request);
+	bool IsValid() const { return (callback != nullptr); }
 
 	Allocator *callback;
 	void      *userContext;
@@ -438,30 +441,34 @@ private:
 // String allocates +1 extra byte for the null-terminator to be completely compatible with
 // C style strings, but this is not reflected in the capacity or len, and is hidden from the user.
 
+// NOTE: Pasting tokens doesn't do anything with preprocessor directives IF the preprocessor finds
+//       a stringify or paste operation (# or ##) so we need this level of indirection.
+#define DQN_TOKEN_COMBINE(x, y) x ## y
+#define DQN_TOKEN_COMBINE2(x, y) DQN_TOKEN_COMBINE(x, y)
+
 // Usage: DqnString example = DQN_STRING_LITERAL(example, "hello world");
-#define DQN_STRING_LITERAL(dqnstring, literal)                                                     \
-	{};                                                                                            \
-	char dqnstring##_[] = literal;                                                                 \
-	dqnstring.InitLiteralNoAlloc(dqnstring##_, DQN_ARRAY_COUNT(dqnstring##_) - 1);
+#define DQN_STRING_LITERAL(srcVariable, literal)                                                   \
+	DQN_STRING_LITERAL_INTERNAL1(srcVariable, literal, DQN_TOKEN_COMBINE2(dqnstring_, __COUNTER__))
 
 class DqnString
 {
 public:
 	char *str;
-	i32 len;          // Len of the string in bytes not including null-terminator
-	i32 max;          // The maximum capacity not including space for null-terminator.
+	i32 len; // Len of the string in bytes not including null-terminator
+	i32 max; // The maximum capacity not including space for null-terminator.
 	DqnMemAPI memAPI;
 
-	bool InitSize    (const i32 size, DqnMemStack *const stack);
-	bool InitSize    (const i32 size, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
+	bool InitSize(const i32 size, DqnMemStack *const stack);
+	bool InitSize(const i32 size, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
 
 	bool InitFixedMem(char *const memory, const i32 sizeInBytes);
 
-	bool InitLiteral (char const *const cstr, DqnMemStack *const stack);
-	bool InitLiteral (char const *const cstr, DqnMemAPI const api = DqnMemAPI_HeapAllocator());
+	bool InitLiteral(char const *const cstr, DqnMemStack *const stack);
+	bool InitLiteral(char const *const cstr, DqnMemAPI const api = DqnMemAPI_HeapAllocator());
 
-	bool InitLiteral (char const *const cstr, i32 const lenInBytes, DqnMemStack *const stack);
-	bool InitLiteral (char const *const cstr, i32 const lenInBytes, DqnMemAPI const api = DqnMemAPI_HeapAllocator());
+	bool InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemStack *const stack);
+	bool InitLiteral(char const *const cstr, i32 const lenInBytes,
+	                 DqnMemAPI const api = DqnMemAPI_HeapAllocator());
 
 	bool InitWLiteral(const wchar_t *const cstr, DqnMemStack *const stack);
 	bool InitWLiteral(const wchar_t *const cstr, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
@@ -470,23 +477,38 @@ public:
 
 	bool Expand(const i32 newMax);
 
-	bool Sprintf   (char const *fmt, ...);
-	bool AppendStr (const DqnString strToAppend, i32 bytesToCopy = -1);
-	bool AppendCStr(const char *const cstr,      i32 bytesToCopy = -1);
+	bool Sprintf(char const *fmt, ...);
+	bool AppendStr(const DqnString strToAppend, i32 bytesToCopy = -1);
+	bool AppendCStr(const char *const cstr, i32 bytesToCopy = -1);
 	void Clear();
 	bool Free();
 
 	// The function automatically null-terminates the output string.
 	// bufSize: The size of the buffer in wchar_t characters.
-	// return: -1 if invalid, or if bufSize is 0 the required buffer length in wchar_t characters
+	// return: -1 if invalid, or if bufSize is 0 the required buffer length in wchar_t
+	// characters
 	i32 ToWCharUseBuf(wchar_t *const buf, const i32 bufSize);
 
 	// returns a malloc() string, needs to be freed using free(..);
 	wchar_t *ToWChar(DqnMemAPI api = DqnMemAPI_HeapAllocator());
 };
 
-DQN_FILE_SCOPE DqnString DqnString_(const DqnMemAPI api);
+// returns: Initialised string,
+DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemAPI    const api = DqnMemAPI_HeapAllocator());
+DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemStack *const stack);
+
+DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI    const api = DqnMemAPI_HeapAllocator());
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
+
+// NOTE: First level of indirection needs to turn the combined dqnstring_(guid) into a name. Otherwise
+//       each use of literalVarName will increment __COUNTER__
+#define DQN_STRING_LITERAL_INTERNAL1(srcVariable, literal, literalVarName)                         \
+	DQN_STRING_LITERAL_INTERNAL2(srcVariable, literal, literalVarName)
+
+#define DQN_STRING_LITERAL_INTERNAL2(srcVariable, literal, literalVarName)                         \
+	{};                                                                                            \
+	char literalVarName[] = literal;                                                               \
+	srcVariable.InitLiteralNoAlloc(literalVarName, DQN_CHAR_COUNT(literalVarName))
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnArray Public API - CPP Dynamic Array with Templates
@@ -523,6 +545,37 @@ struct DqnArray
 	bool  RemoveStable(const i64 index);
 	void  RemoveStable(i64 *indexList, const i64 numIndexes);
 };
+
+template <typename T>
+DQN_FILE_SCOPE DqnArray<T> DqnArray_(i64 const size,
+                                     DqnMemAPI const api = DqnMemAPI_HeapAllocator())
+{
+	DqnArray<T> result;
+	bool init = result.Init(size, api);
+	DQN_ASSERT_HARD(init);
+	return result;
+}
+
+template <typename T>
+DQN_FILE_SCOPE DqnArray<T> DqnArray_(i64 const size, DqnMemStack *const stack)
+{
+	DqnArray<T> result = DqnArray_<T>(size, DqnMemAPI_StackAllocator(stack));
+	return result;
+}
+
+template <typename T>
+DQN_FILE_SCOPE DqnArray<T> DqnArray_(DqnMemAPI const api = DqnMemAPI_HeapAllocator())
+{
+	DqnArray<T> result = DqnArray_<T>(0, api);
+	return result;
+}
+
+template <typename T>
+DQN_FILE_SCOPE DqnArray<T> DqnArray_(DqnMemStack *const stack)
+{
+	DqnArray<T> result = DqnArray_<T>(0, stack);
+	return result;
+}
 
 template <typename T>
 bool DqnArray<T>::Init(const i64 size, DqnMemStack *const stack)
@@ -1947,10 +2000,10 @@ struct DqnFile
 
 	// fileOffset: The byte offset to starting writing from.
 	// return:     The number of bytes written. 0 if invalid args or it failed to write.
-	size_t Write(u8 const &buf, size_t const numBytesToWrite, size_t const fileOffset);
+	size_t Write(u8 const *const buf, size_t const numBytesToWrite, size_t const fileOffset);
 
 	// return: The number of bytes read. 0 if invalid args or it failed to read.
-	size_t Read (u8 &buf, size_t const numBytesToRead);
+	size_t Read (u8 *const buf, size_t const numBytesToRead);
 
 	// File close invalidates the handle after it is called.
 	void   Close();
@@ -1962,8 +2015,8 @@ struct DqnFile
 	//            used. Will be valid only if function returns true. This is basically the return value
 	//            of Read()
 	// return:    FALSE if insufficient bufferSize OR file access failure OR invalid args (i.e nullptr)
-	static bool ReadEntireFile (char    const *const path, u8 &buf, size_t const bufSize, size_t &bytesRead);
-	static bool ReadEntireFileW(wchar_t const *const path, u8 &buf, size_t const bufSize, size_t &bytesRead);
+	static bool ReadEntireFile (char    const *const path, u8 *const buf, size_t const bufSize, size_t &bytesRead);
+	static bool ReadEntireFileW(wchar_t const *const path, u8 *const buf, size_t const bufSize, size_t &bytesRead);
 
 	// bufSize: Pass in ref to a size_t to fill out with the size of the returned buffer. Holds invalid data
 	//          if the returned ptr is null.
@@ -2737,12 +2790,7 @@ DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file,
 			va_end(argList);
 		}
 
-#ifdef DQN_WIN32_PLATFORM
-		DqnWin32_OutputDebugString(formatStr, file, lineNum, expr, userMsg);
-#else
 		printf(formatStr, file, lineNum, expr, userMsg);
-#endif
-
 		(*((i32 *)0)) = 0;
 	}
 	return result;
@@ -5192,19 +5240,29 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnString Impleemntation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnString DqnString_(const DqnMemAPI api)
+DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemAPI const api)
 {
 	DqnString result;
-	bool init = result.InitSize(0, api);
+	bool init = result.InitSize(len, api);
 	DQN_ASSERT_HARD(init);
+	return result;
+}
+
+DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemStack *const stack)
+{
+	DqnString result = DqnString_(len, DqnMemAPI_StackAllocator(stack));
+	return result;
+}
+
+DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI const api)
+{
+	DqnString result = DqnString_(0, api);
 	return result;
 }
 
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack)
 {
-	DqnString result;
-	bool init = result.InitSize(0, stack);
-	DQN_ASSERT_HARD(init);
+	DqnString result = DqnString_(0, stack);
 	return result;
 }
 
@@ -5216,22 +5274,33 @@ bool DqnString::InitSize(const i32 size, DqnMemStack *const stack)
 
 bool DqnString::InitSize(const i32 size, const DqnMemAPI api)
 {
-	DQN_ASSERT_HARD(size >= 0);
+	DQN_ASSERT(size >= 0);
+	if (size < 0)
+	{
+		DqnString nullString = {};
+		*this = nullString;
+		return false;
+	}
+
 	if (size > 0)
 	{
 		size_t allocSize        = sizeof(*(this->str)) * (size + 1);
 		DqnMemAPI::Request info = DqnMemAPI::RequestAlloc(api, allocSize);
 		this->str               = (char *)api.callback(info);
-		if (!this->str) return false;
+
+		if (!this->str)
+		{
+			return false;
+		}
 	}
-	else
+	else // size == 0
 	{
 		this->str = nullptr;
 	}
 
-	this->len        = 0;
-	this->max        = size;
-	this->memAPI     = api;
+	this->max    = size;
+	this->len    = 0;
+	this->memAPI = api;
 	return true;
 }
 
@@ -5239,10 +5308,10 @@ bool DqnString::InitFixedMem(char *const memory, i32 const sizeInBytes)
 {
 	if (!memory || sizeInBytes == 0) return false;
 
-	this->str        = (char *)memory;
-	this->len        = 0;
-	this->max        = sizeInBytes - 1;
-	this->memAPI     = {};
+	this->str    = (char *)memory;
+	this->len    = 0;
+	this->max    = sizeInBytes - 1;
+	this->memAPI = {};
 
 	return true;
 }
@@ -5266,8 +5335,8 @@ bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMem
 	this->str               = (char *)api.callback(info);
 	if (!this->str) return false;
 
-	this->max    = this->len;
 	this->len    = lenInBytes;
+	this->max    = lenInBytes;
 	this->memAPI = api;
 
 	for (i32 i = 0; i < this->len; i++) this->str[i] = cstr[i];
@@ -5295,7 +5364,6 @@ bool DqnString::InitWLiteral(wchar_t const *const cstr, DqnMemAPI const api)
 {
 #if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
 	i32 requiredLen = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
-
 	this->len = requiredLen - 1;
 
 	size_t allocSize        = sizeof(*(this->str)) * (this->len + 1);
@@ -5350,7 +5418,7 @@ bool DqnString::Expand(const i32 newMax)
 
 	if (this->str)
 	{
-		info = DqnMemAPI::RequestRealloc(this->memAPI, this->str, this->len, allocSize);
+		info = DqnMemAPI::RequestRealloc(this->memAPI, this->str, this->max, allocSize);
 	}
 	else
 	{
@@ -7757,7 +7825,7 @@ bool DqnFile::OpenW(const wchar_t *const path, u32 const flags_, Action const ac
 #endif
 }
 
-size_t DqnFile::Write(u8 const &buf, size_t const numBytesToWrite, size_t const fileOffset)
+size_t DqnFile::Write(u8 const *const buf, size_t const numBytesToWrite, size_t const fileOffset)
 {
 	// TODO(doyle): Implement when it's needed
 	if (!DQN_ASSERT_MSG(fileOffset == 0, "'fileOffset' not implemented yet")) return 0;
@@ -7765,7 +7833,7 @@ size_t DqnFile::Write(u8 const &buf, size_t const numBytesToWrite, size_t const 
 #if defined(DQN_WIN32_PLATFORM)
 	DWORD bytesToWrite = (DWORD)numBytesToWrite;
 	DWORD bytesWritten;
-	BOOL result            = WriteFile(this->handle, (void *)&buf, bytesToWrite, &bytesWritten, nullptr);
+	BOOL result            = WriteFile(this->handle, (void *)buf, bytesToWrite, &bytesWritten, nullptr);
 
 	size_t numBytesWritten = (size_t)bytesWritten;
 	// TODO(doyle): Better logging system
@@ -7787,7 +7855,7 @@ size_t DqnFile::Write(u8 const &buf, size_t const numBytesToWrite, size_t const 
 	return numBytesWritten;
 }
 
-size_t DqnFile::Read(u8 &buf, size_t const numBytesToRead)
+size_t DqnFile::Read(u8 *const buf, size_t const numBytesToRead)
 {
 	size_t numBytesRead = 0;
 	if (this->handle)
@@ -7797,7 +7865,7 @@ size_t DqnFile::Read(u8 &buf, size_t const numBytesToRead)
 		DWORD bytesRead    = 0;
 		HANDLE win32Handle = this->handle;
 
-		BOOL result = ReadFile(win32Handle, (void *)&buf, bytesToRead, &bytesRead, nullptr);
+		BOOL result = ReadFile(win32Handle, (void *)buf, bytesToRead, &bytesRead, nullptr);
 
 		numBytesRead = (size_t)bytesRead;
 		// TODO(doyle): 0 also means it is completing async, but still valid
@@ -7837,7 +7905,7 @@ u8 *DqnFile::ReadEntireFileSimpleW(wchar_t const *const path, size_t &bufSize, D
 	if (!buf) return nullptr;
 
 	size_t bytesRead = 0;
-	if (DqnFile::ReadEntireFileW(path, *buf, requiredSize, bytesRead))
+	if (DqnFile::ReadEntireFileW(path, buf, requiredSize, bytesRead))
 	{
 		bufSize = requiredSize;
 		DQN_ASSERT(bytesRead == requiredSize);
@@ -7860,7 +7928,7 @@ u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t &bufSize, DqnMe
 	if (!buf) return nullptr;
 
 	size_t bytesRead = 0;
-	if (DqnFile::ReadEntireFile(path, *buf, requiredSize, bytesRead))
+	if (DqnFile::ReadEntireFile(path, buf, requiredSize, bytesRead))
 	{
 		bufSize = requiredSize;
 		DQN_ASSERT(bytesRead == requiredSize);
@@ -7871,7 +7939,7 @@ u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t &bufSize, DqnMe
 	return nullptr;
 }
 
-bool DqnFile::ReadEntireFileW(wchar_t const *const path, u8 &buf, size_t const bufSize,
+bool DqnFile::ReadEntireFileW(wchar_t const *const path, u8 *const buf, size_t const bufSize,
                               size_t &bytesRead)
 {
 	if (!path) return false;
@@ -7896,7 +7964,7 @@ cleanup:
 	return result;
 }
 
-bool DqnFile::ReadEntireFile(const char *const path, u8 &buf, size_t const bufSize,
+bool DqnFile::ReadEntireFile(const char *const path, u8 *const buf, size_t const bufSize,
                              size_t &bytesRead)
 {
 	if (!path) return false;

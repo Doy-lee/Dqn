@@ -1913,7 +1913,7 @@ void DqnFile_Test()
 			               expectedSize);
 
 			u8 *buffer = (u8 *)calloc(1, (size_t)file.size * sizeof(u8));
-			DQN_ASSERT(file.Read(*buffer, (u32)file.size) == file.size);
+			DQN_ASSERT(file.Read(buffer, (u32)file.size) == file.size);
 			free(buffer);
 
 			file.Close();
@@ -1971,7 +1971,7 @@ void DqnFile_Test()
 
 			size_t bytesToWrite = DqnStr_Len(writeData[i]);
 			u8 *dataToWrite     = (u8 *)(writeData[i]);
-			size_t bytesWritten = file->Write(*dataToWrite, bytesToWrite, 0);
+			size_t bytesWritten = file->Write(dataToWrite, bytesToWrite, 0);
 			DQN_ASSERT(bytesWritten == bytesToWrite);
 			file->Close();
 		}
@@ -1991,7 +1991,7 @@ void DqnFile_Test()
 				u8 *buffer = (u8 *)memStack.Push(file->size);
 				DQN_ASSERT(buffer);
 
-				size_t bytesRead = file->Read(*buffer, file->size);
+				size_t bytesRead = file->Read(buffer, file->size);
 				DQN_ASSERT(bytesRead == file->size);
 
 				// Verify the data is the same as we wrote out
@@ -2011,7 +2011,7 @@ void DqnFile_Test()
 				DQN_ASSERT(buffer);
 
 				size_t bytesRead = 0;
-				DQN_ASSERT(DqnFile::ReadEntireFile(fileNames[i], *buffer, reqSize, bytesRead));
+				DQN_ASSERT(DqnFile::ReadEntireFile(fileNames[i], buffer, reqSize, bytesRead));
 				DQN_ASSERT(bytesRead == reqSize);
 
 				// Verify the data is the same as we wrote out
