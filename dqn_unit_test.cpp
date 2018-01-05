@@ -573,15 +573,15 @@ void DqnString_Test()
 		DqnString str = {};
 		DQN_ASSERT(str.InitFixedMem(space, DQN_ARRAY_COUNT(space)));
 
-		DQN_ASSERT(str.AppendCStr("test_doesnt_fit") == false);
-		DQN_ASSERT(str.AppendCStr("tooo") == false);
-		DQN_ASSERT(str.AppendCStr("fit") == true);
-		DQN_ASSERT(str.AppendCStr("test_doesnt_fit") == false);
-		DQN_ASSERT(str.AppendCStr("1") == false);
+		DQN_ASSERT(str.Append("test_doesnt_fit") == false);
+		DQN_ASSERT(str.Append("tooo") == false);
+		DQN_ASSERT(str.Append("fit") == true);
+		DQN_ASSERT(str.Append("test_doesnt_fit") == false);
+		DQN_ASSERT(str.Append("1") == false);
 
 		DQN_ASSERT(str.str[str.len] == 0);
 		DQN_ASSERT(str.len <= str.max);
-		LogSuccess("DqnString->AppendCStr(): Check fixed mem string doesn't expand and fails.");
+		LogSuccess("DqnString->Append(): Check fixed mem string doesn't expand and fails.");
 	}
 
 	// Try expanding string
@@ -589,8 +589,8 @@ void DqnString_Test()
 	{
 		DqnString str = {};
 		DQN_ASSERT(str.InitLiteral("hello world"));
-		DQN_ASSERT(str.AppendCStr(", hello again"));
-		DQN_ASSERT(str.AppendCStr(", and hello again"));
+		DQN_ASSERT(str.Append(", hello again"));
+		DQN_ASSERT(str.Append(", and hello again"));
 
 		DQN_ASSERT(str.str[str.len] == 0);
 		DQN_ASSERT(str.len <= str.max);
@@ -605,7 +605,7 @@ void DqnString_Test()
 		char *literal = "this is a literal string";
 		DqnString str = {};
 		DQN_ASSERT(str.InitLiteralNoAlloc(literal));
-		DQN_ASSERT(str.AppendCStr(", hello again")     == false);
+		DQN_ASSERT(str.Append(", hello again")     == false);
 		str.Free();
 		LogSuccess("DqnString(): Try init literl no alloc, no further expansion");
 	}

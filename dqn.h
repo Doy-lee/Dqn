@@ -467,8 +467,7 @@ public:
 	bool InitLiteral(char const *const cstr, DqnMemAPI const api = DqnMemAPI_HeapAllocator());
 
 	bool InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemStack *const stack);
-	bool InitLiteral(char const *const cstr, i32 const lenInBytes,
-	                 DqnMemAPI const api = DqnMemAPI_HeapAllocator());
+	bool InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemAPI const api = DqnMemAPI_HeapAllocator());
 
 	bool InitWLiteral(const wchar_t *const cstr, DqnMemStack *const stack);
 	bool InitWLiteral(const wchar_t *const cstr, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
@@ -478,10 +477,10 @@ public:
 	bool Expand(const i32 newMax);
 
 	bool Sprintf(char const *fmt, ...);
-	bool AppendStr(const DqnString strToAppend, i32 bytesToCopy = -1);
-	bool AppendCStr(const char *const cstr, i32 bytesToCopy = -1);
-	void Clear();
-	bool Free();
+	bool Append (DqnString const strToAppend, i32 bytesToCopy = -1);
+	bool Append (char const *const cstr     , i32 bytesToCopy = -1);
+	void Clear  ();
+	bool Free   ();
 
 	// The function automatically null-terminates the output string.
 	// bufSize: The size of the buffer in wchar_t characters.
@@ -578,7 +577,7 @@ DQN_FILE_SCOPE DqnArray<T> DqnArray_(DqnMemStack *const stack)
 }
 
 template <typename T>
-bool DqnArray<T>::Init(const i64 size, DqnMemStack *const stack)
+bool DqnArray<T>::Init(i64 const size, DqnMemStack *const stack)
 {
 	bool result = false;
 	if (stack)
@@ -590,7 +589,7 @@ bool DqnArray<T>::Init(const i64 size, DqnMemStack *const stack)
 }
 
 template <typename T>
-bool DqnArray<T>::Init(const i64 size, const DqnMemAPI api = DqnMemAPI_HeapAllocator())
+bool DqnArray<T>::Init(i64 const size, DqnMemAPI const api)
 {
 	DQN_ASSERT_HARD(size >= 0);
 
@@ -911,12 +910,12 @@ struct DqnHashTable
 	i64 *usedEntries;     // Tracks the indexes used in the entries.
 	i64 usedEntriesIndex;
 
-	bool Init(const i64 numTableEntries = 1024, const DqnMemAPI api = DqnMemAPI_HeapAllocator());
+	bool Init(i64 const numTableEntries = 1024, DqnMemAPI const api = DqnMemAPI_HeapAllocator());
 
 	// keyLen: Len of string not including null-terminator, if -1, utf8 strlen will be used to determine length.
 	// return: Pre-existing entry if it exists, otherwise a nullptr.
 	Entry *Get(DqnString key);
-	Entry *Get(const char *const key, i32 keyLen = -1);
+	Entry *Get(char const *const key, i32 keyLen = -1);
 
 	// keyLen: Len of string not including null-terminator, if -1, utf8 strlen will be used to determine length.
 	// entryAlreadyExisted: Pass in a bool that indicates true if a new entry was created, or false
@@ -924,11 +923,11 @@ struct DqnHashTable
 	// return: Pre-existing entry if it exists, otherwise create a new entry suitable for key.
 	//         nullptr if out of memory.
 	Entry *Make(DqnString key,                          bool *entryAlreadyExisted = nullptr);
-	Entry *Make(const char *const key, i32 keyLen = -1, bool *entryAlreadyExisted = nullptr);
+	Entry *Make(char const *const key, i32 keyLen = -1, bool *entryAlreadyExisted = nullptr);
 
 	// keyLen: Len of string not including null-terminator, if -1, utf8 strlen will be used to determine length.
 	void Remove(DqnString key);
-	void Remove(const char *const key, i32 keyLen = -1);
+	void Remove(char const *const key, i32 keyLen = -1);
 
 	void Free  ();
 
@@ -941,7 +940,7 @@ struct DqnHashTable
 };
 
 template <typename T>
-bool DqnHashTable<T>::Init(const i64 numTableEntries, const DqnMemAPI api = DqnMemAPI_HeapAllocator())
+bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemAPI const api)
 {
 	size_t arrayOfPtrsSize             = sizeof(*this->entries) * numTableEntries;
 	DqnMemAPI::Request arrayOfPtrsInfo = DqnMemAPI::RequestAlloc(api, arrayOfPtrsSize);
@@ -1009,14 +1008,14 @@ DqnHashTableInternal_GetFreeEntry(DqnHashTable<T> *table)
 
 template <typename T>
 FILE_SCOPE inline i64 DqnHashTableInternal_GetHashIndex(DqnHashTable<T> *table,
-                                                        const char *const key, i32 keyLen)
+                                                        char const *const key, i32 keyLen)
 {
 	u64 hash      = DqnHash_Murmur64(key, keyLen);
 	i64 hashIndex = hash % table->numEntries;
 	return hashIndex;
 }
 
-FILE_SCOPE inline i64 DqnHashTableInternal_GetHashIndex(i64 numEntries, const char *const key,
+FILE_SCOPE inline i64 DqnHashTableInternal_GetHashIndex(i64 numEntries, char const *const key,
                                                         i32 keyLen)
 {
 	u64 hash      = DqnHash_Murmur64(key, keyLen);
@@ -1026,7 +1025,7 @@ FILE_SCOPE inline i64 DqnHashTableInternal_GetHashIndex(i64 numEntries, const ch
 
 template <typename T>
 typename DqnHashTable<T>::Entry *
-DqnHashTableInternal_FindMatchingKey(typename DqnHashTable<T>::Entry *entry, const char *const key,
+DqnHashTableInternal_FindMatchingKey(typename DqnHashTable<T>::Entry *entry, char const *const key,
                                      i32 keyLen,
                                      typename DqnHashTable<T>::Entry **prevEntry = nullptr)
 {
@@ -1048,7 +1047,7 @@ DqnHashTableInternal_FindMatchingKey(typename DqnHashTable<T>::Entry *entry, con
 
 template <typename T>
 DQN_FILE_SCOPE inline typename DqnHashTable<T>::Entry *
-DqnHashTableInternal_Get(DqnHashTable<T> *table, const char *const key, i32 keyLen, i64 hashIndex)
+DqnHashTableInternal_Get(DqnHashTable<T> *table, char const *const key, i32 keyLen, i64 hashIndex)
 {
 	DqnHashTable<T>::Entry *entry  = table->entries[hashIndex];
 	if (entry)
@@ -1061,7 +1060,7 @@ DqnHashTableInternal_Get(DqnHashTable<T> *table, const char *const key, i32 keyL
 }
 
 template <typename T>
-typename DqnHashTable<T>::Entry *DqnHashTable<T>::Get(const char *const key, i32 keyLen)
+typename DqnHashTable<T>::Entry *DqnHashTable<T>::Get(char const *const key, i32 keyLen)
 {
 	if (keyLen == -1) DqnStr_LenUTF8((u32 *)key, &keyLen);
 	i64 hashIndex = DqnHashTableInternal_GetHashIndex(this, key, keyLen);
@@ -1077,7 +1076,7 @@ typename DqnHashTable<T>::Entry *DqnHashTable<T>::Get(DqnString key)
 }
 
 template <typename T>
-typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(const char *const key, i32 keyLen,
+typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(char const *const key, i32 keyLen,
                                                        bool *entryAlreadyExisted)
 {
 	// NOTE: Internal_Get() function because we want a way to allow re-using the hashIndex
@@ -1110,7 +1109,7 @@ typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(const char *const key, i3
 		}
 
 		newEntry->key.InitSize(keyLen, this->memAPI);
-		newEntry->key.AppendCStr(key, keyLen);
+		newEntry->key.Append(key, keyLen);
 		newEntry->next           = this->entries[hashIndex];
 		this->entries[hashIndex] = newEntry;
 
@@ -1131,7 +1130,7 @@ typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(DqnString key, bool *entr
 }
 
 template <typename T>
-void DqnHashTable<T>::Remove(const char *const key, i32 keyLen)
+void DqnHashTable<T>::Remove(char const *const key, i32 keyLen)
 {
 	if (keyLen == -1) DqnStr_LenUTF8((u32 *)key, &keyLen);
 
@@ -1184,7 +1183,7 @@ void DqnHashTable<T>::Remove(DqnString key)
 template <typename T>
 void DqnHashTable<T>::Free()
 {
-	const size_t ENTRY_SIZE = sizeof(*this->entries);
+	size_t const ENTRY_SIZE = sizeof(*this->entries);
 	for (i64 i = 0; i < usedEntriesIndex; i++)
 	{
 		i64 indexToFree    = usedEntries[i];
@@ -5286,7 +5285,7 @@ bool DqnString::InitSize(const i32 size, const DqnMemAPI api)
 	if (size < 0)
 	{
 		DqnString nullString = {};
-		*this = nullString;
+		*this                = nullString;
 		return false;
 	}
 
@@ -5338,18 +5337,28 @@ bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMem
 
 bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemAPI const api)
 {
-	size_t allocSize        = sizeof(*(this->str)) * (lenInBytes + 1);
-	DqnMemAPI::Request info = DqnMemAPI::RequestAlloc(api, allocSize);
-	this->str               = (char *)api.callback(info);
-	if (!this->str) return false;
+	if (lenInBytes < 0) return false;
 
-	this->len    = lenInBytes;
-	this->max    = lenInBytes;
-	this->memAPI = api;
+	if (lenInBytes > 0)
+	{
+		size_t allocSize        = sizeof(*(this->str)) * (lenInBytes + 1);
+		DqnMemAPI::Request info = DqnMemAPI::RequestAlloc(api, allocSize);
 
-	for (i32 i = 0; i < this->len; i++) this->str[i] = cstr[i];
+		this->str = (char *)api.callback(info);
+		if (!this->str) return false;
 
-	this->str[this->len] = 0;
+		this->str[lenInBytes] = 0;
+	}
+
+	this->len             = lenInBytes;
+	this->max             = lenInBytes;
+	this->memAPI          = api;
+
+	for (i32 i = 0; i < this->len; i++)
+	{
+		this->str[i] = cstr[i];
+	}
+
 
 	return true;
 }
@@ -5444,8 +5453,8 @@ bool DqnString::Expand(const i32 newMax)
 	return false;
 }
 
-DQN_FILE_SCOPE bool DqnStringInternal_AppendCStr(DqnString *const str, const char *const cstr,
-                                                 const i32 bytesToCopy)
+DQN_FILE_SCOPE bool DqnStringInternal_Append(DqnString *const str, char const *const cstr,
+                                             i32 const bytesToCopy)
 {
 
 	// Check and reserve space if needed
@@ -5497,7 +5506,7 @@ bool DqnString::Sprintf(char const *fmt, ...)
 	return true;
 }
 
-bool DqnString::AppendCStr(const char *const cstr, i32 bytesToCopy)
+bool DqnString::Append(char const *const cstr, i32 bytesToCopy)
 {
 	i32 cstrLen = 0;
 	if (bytesToCopy == -1)
@@ -5511,21 +5520,25 @@ bool DqnString::AppendCStr(const char *const cstr, i32 bytesToCopy)
 		cstrLen = bytesToCopy;
 	}
 
-	bool result = DqnStringInternal_AppendCStr(this, cstr, cstrLen);
+	bool result = DqnStringInternal_Append(this, cstr, cstrLen);
 	return result;
 }
 
-bool DqnString::AppendStr(const DqnString strToAppend, i32 bytesToCopy)
+bool DqnString::Append(DqnString const strToAppend, i32 bytesToCopy)
 {
 	i32 cstrLen = (bytesToCopy == -1) ? strToAppend.len : bytesToCopy;
-	bool result = DqnStringInternal_AppendCStr(this, strToAppend.str, cstrLen);
+	bool result = DqnStringInternal_Append(this, strToAppend.str, cstrLen);
 	return result;
 }
 
 void DqnString::Clear()
 {
 	this->len    = 0;
-	this->str[0] = 0;
+
+	if (this->str)
+	{
+		this->str[0] = 0;
+	}
 }
 
 bool DqnString::Free()
