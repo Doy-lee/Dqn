@@ -605,7 +605,7 @@ void DqnString_Test()
 		char *literal = "this is a literal string";
 		DqnString str = {};
 		DQN_ASSERT(str.InitLiteralNoAlloc(literal));
-		DQN_ASSERT(str.Append(", hello again")     == false);
+		DQN_ASSERT(str.Append(", hello again") == false);
 		str.Free();
 		LogSuccess("DqnString(): Try init literl no alloc, no further expansion");
 	}

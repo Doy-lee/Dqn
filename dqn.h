@@ -5456,6 +5456,10 @@ bool DqnString::Expand(const i32 newMax)
 DQN_FILE_SCOPE bool DqnStringInternal_Append(DqnString *const str, char const *const cstr,
                                              i32 const bytesToCopy)
 {
+	if (bytesToCopy <= 0)
+	{
+		return true;
+	}
 
 	// Check and reserve space if needed
 	i32 totalLen = str->len + bytesToCopy;
