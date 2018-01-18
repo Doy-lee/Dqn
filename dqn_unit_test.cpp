@@ -1484,7 +1484,7 @@ void DqnArray_Test()
 	LogHeader("DqnArray_Test");
 	if (1)
 	{
-		DqnArray_TestInternal(DqnMemAPI_HeapAllocator());
+		DqnArray_TestInternal(DqnMemAPI::HeapAllocator());
 	}
 
 	if (1)
@@ -1518,7 +1518,7 @@ void DqnArray_Test()
 		if (1)
 		{
 			DqnMemStack stack = {}; stack.Init(DQN_MEGABYTE(1), true, 4);
-			DqnMemAPI memAPI  = DqnMemAPI_StackAllocator(&stack);
+			DqnMemAPI memAPI  = DqnMemAPI::StackAllocator(&stack);
 
 			if (1)
 			{
@@ -1596,7 +1596,7 @@ void DqnMemStack_Test()
 		DqnMemStack::Block *blockB = stack.block;
 
 		// Check temp regions work
-		DqnMemStackTempRegion tempBuffer = stack.TempRegionBegin();
+		DqnMemStack::TempRegion tempBuffer = stack.TempRegionBegin();
 
 		size_t sizeC  = 1024 + 1;
 		void *resultC = stack.Push(sizeC);
@@ -1985,7 +1985,7 @@ void DqnFile_Test()
 			if (1)
 			{
 				size_t size = 0;
-				DQN_ASSERT_HARD(DqnFile::GetFileSize(FILE_TO_OPEN, size));
+				DQN_ASSERT_HARD(DqnFile::GetFileSize(FILE_TO_OPEN, &size));
 				DQN_ASSERT_HARD(size == expectedSize);
 			}
 
@@ -2091,13 +2091,13 @@ void DqnFile_Test()
 			// Read using the ReadEntireFile api which doesn't need a file handle as an argument
 			{
 				size_t reqSize = 0;
-				DQN_ASSERT(DqnFile::GetFileSize(fileNames[i], reqSize));
+				DQN_ASSERT(DqnFile::GetFileSize(fileNames[i], &reqSize));
 
 				u8 *buffer = (u8 *)memStack.Push(reqSize);
 				DQN_ASSERT(buffer);
 
 				size_t bytesRead = 0;
-				DQN_ASSERT(DqnFile::ReadEntireFile(fileNames[i], buffer, reqSize, bytesRead));
+				DQN_ASSERT(DqnFile::ReadEntireFile(fileNames[i], buffer, reqSize, &bytesRead));
 				DQN_ASSERT(bytesRead == reqSize);
 
 				// Verify the data is the same as we wrote out
