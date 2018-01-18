@@ -517,6 +517,7 @@ void DqnStr_Test()
 			DQN_ASSERT(DqnStr_HasSubstring(b, lenB, a, lenA) == false);
 			LogSuccess("DqnStr_HasSubstring(): Check string with non-matching substring");
 		}
+
 	}
 }
 
@@ -560,6 +561,72 @@ void DqnChar_Test()
 		DQN_ASSERT(DqnChar_ToUpper(L'a') == L'A');
 		DQN_ASSERT(DqnChar_ToUpper(L' ') == L' ');
 		LogSuccess("DqnChar_ToUpper()");
+	}
+
+	// Trim white space test
+	if (1)
+	{
+		if (1)
+		{
+			char a[]     = "";
+			i32 newLen   = 0;
+			auto *result = DqnChar_TrimWhitespaceAround(a, DQN_CHAR_COUNT(a), &newLen);
+
+			DQN_ASSERT(newLen == 0);
+			DQN_ASSERT(result == nullptr);
+		}
+
+		if (1)
+		{
+			char a[]     = "a";
+			i32 newLen   = 0;
+			auto *result = DqnChar_TrimWhitespaceAround(a, DQN_CHAR_COUNT(a), &newLen);
+
+			DQN_ASSERT(newLen == 1);
+			DQN_ASSERT(result == a);
+		}
+
+		if (1)
+		{
+			char a[]     = " abc";
+			i32 newLen   = 0;
+			auto *result = DqnChar_TrimWhitespaceAround(a, DQN_CHAR_COUNT(a), &newLen);
+
+			DQN_ASSERT(newLen == 3);
+			DQN_ASSERT(result == (a + 1));
+		}
+
+		if (1)
+		{
+			char a[]     = "abc ";
+			i32 newLen   = 0;
+			auto *result = DqnChar_TrimWhitespaceAround(a, DQN_CHAR_COUNT(a), &newLen);
+
+			DQN_ASSERT(newLen == 3);
+			DQN_ASSERT(result == a);
+		}
+
+		if (1)
+		{
+			char a[]     = "   abc ";
+			i32 newLen   = 0;
+			auto *result = DqnChar_TrimWhitespaceAround(a, DQN_CHAR_COUNT(a), &newLen);
+
+			DQN_ASSERT(newLen == 3);
+			DQN_ASSERT(result == a + 3);
+		}
+
+		if (1)
+		{
+			char a[]     = "         ";
+			i32 newLen   = 0;
+			auto *result = DqnChar_TrimWhitespaceAround(a, DQN_CHAR_COUNT(a), &newLen);
+
+			DQN_ASSERT(newLen == 0);
+			DQN_ASSERT(result == nullptr);
+		}
+
+		LogSuccess("DqnChar_TrimAroundWhitespace()");
 	}
 }
 
@@ -1395,7 +1462,7 @@ void DqnArray_TestRealDataInternal(DqnArray<char> *array)
 {
 #ifdef DQN_XPLATFORM_LAYER
 	size_t bufSize = 0;
-	u8 *buf        = DqnFile::ReadEntireFileSimple("tests/google-10000-english.txt", bufSize);
+	u8 *buf        = DqnFile::ReadEntireFileSimple("tests/google-10000-english.txt", &bufSize);
 	DQN_ASSERT(buf);
 
 	for (auto i = 0; i < bufSize; i++)

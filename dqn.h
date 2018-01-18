@@ -9,7 +9,7 @@
 
 	// NOTE: For platform code, it's one or the other or you will get compilation problems.
 	// Define this in ONE and only ONE file to enable the implementation of platform code.
-	// On Win32 you must link against user32.lib
+	// On Win32 you must link against user32.lib and kernel32.lib
 	#define DQN_WIN32_IMPLEMENTATION // Enable Win32 Code, but only if _WIN32 or _WIN64 is already defined. Also requires DQN_IMPLEMENTATION.
 	#define DQN_UNIX_IMPLEMENTATION  // Enable Unix Code, but only if __linux__ is already defined. Also requires DQN_IMPLEMENTATION.
 
@@ -385,10 +385,12 @@ struct DqnMemStack
 	void  ClearCurrBlock(bool const zeroClear);
 
 	// -- Temporary Regions API
-	// region: Takes pointer to a zero-cleared DqnMemStackTempRegion struct.
-	// return: FALSE if arguments are invalid.
+	// Revert all memory transactions between the Begin() and End() regions.
 	struct DqnMemStackTempRegion TempRegionBegin();
 	void                         TempRegionEnd  (DqnMemStackTempRegion region);
+
+	// Keep the memory transactions that have occurred since Begin().
+	void  TempRegionKeepChanges(DqnMemStackTempRegion region);
 
 	// -- Scoped Temporary Regions API
 	struct DqnMemStackTempRegionGuard TempRegionGuard();
@@ -414,7 +416,7 @@ struct DqnMemStack
 
 // TODO(doyle): Look into a way of "preventing/guarding" against anual calls to free/clear in temp
 // regions
-typedef struct DqnMemStackTempRegion
+struct DqnMemStackTempRegion
 {
 	// The stack associated with this TempRegion
 	DqnMemStack *stack;
@@ -422,15 +424,17 @@ typedef struct DqnMemStackTempRegion
 	// Store memBlock state to revert back to on DqnMemStackTempRegion_End()
 	DqnMemStack::Block *startingBlock;
 	size_t used;
-} DqnMemStackTempRegion;
+};
 
-// Region guard automatically starts a region on construction and ends a region on destruction.
+// Region guard automatically starts a region on construction and ends a region on destruction, except
+// if keepChanges is set to true.
 struct DqnMemStackTempRegionGuard
 {
 	// stack: Takes a pointer to a pre-existing and already initialised stack
 	DqnMemStackTempRegionGuard(DqnMemStack *const stack);
 	~DqnMemStackTempRegionGuard();
 
+	bool keepChanges = false;
 private:
 	DqnMemStackTempRegion memRegion;
 };
@@ -911,6 +915,7 @@ struct DqnHashTable
 	i64 usedEntriesIndex;
 
 	bool Init(i64 const numTableEntries = 1024, DqnMemAPI const api = DqnMemAPI_HeapAllocator());
+	bool Init(i64 const numTableEntries, DqnMemStack *const stack);
 
 	// keyLen: Len of string not including null-terminator, if -1, utf8 strlen will be used to determine length.
 	// return: Pre-existing entry if it exists, otherwise a nullptr.
@@ -967,6 +972,16 @@ bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemAPI const api)
 	this->usedEntriesIndex = 0;
 
 	return true;
+}
+
+template <typename T>
+bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemStack *const stack)
+{
+	if (!stack) return false;
+
+	DqnMemAPI memAPI_ = DqnMemAPI_StackAllocator(stack);
+	bool result = Init(numTableEntries, memAPI_);
+	return result;
 }
 
 template <typename T>
@@ -1611,13 +1626,16 @@ DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h);
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnChar Public API - Char Operations
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE char DqnChar_ToLower   (char c);
-DQN_FILE_SCOPE char DqnChar_ToUpper   (char c);
-DQN_FILE_SCOPE bool DqnChar_IsDigit   (char c);
-DQN_FILE_SCOPE bool DqnChar_IsAlpha   (char c);
-DQN_FILE_SCOPE bool DqnChar_IsAlphanum(char c);
+DQN_FILE_SCOPE char DqnChar_ToLower     (char c);
+DQN_FILE_SCOPE char DqnChar_ToUpper     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsDigit     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsAlpha     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsAlphaNum  (char c);
+DQN_FILE_SCOPE bool DqnChar_IsEndOfLine (char c);
+DQN_FILE_SCOPE bool DqnChar_IsWhitespace(char c);
 
-DQN_FILE_SCOPE char *DqnChar_SkipWhitespace(char *ptr);
+DQN_FILE_SCOPE char *DqnChar_TrimWhitespaceAround(char const *src, i32 srcLen, i32 *newLen);
+DQN_FILE_SCOPE char *DqnChar_SkipWhitespace      (char const *ptr);
 
 // TODO(doyle): this is NOT UTF8 safe
 // ch:        Char to find
@@ -1626,9 +1644,11 @@ DQN_FILE_SCOPE char *DqnChar_SkipWhitespace(char *ptr);
 // return:    The ptr to the last char, null if it could not find.
 DQN_FILE_SCOPE char *DqnChar_FindLastChar  (char *ptr, char const ch, i32 len, u32 *const lenToChar);
 
+// Finds up to the first [\r]\n and destroy the line, giving you a null terminated line at the newline.
 // returns: The value to advance the ptr by, this can be different from the line
 //          length if there are new lines or leading whitespaces in the next line
-DQN_FILE_SCOPE i32   DqnChar_GetNextLine (char const *ptr, i32 *lineLength);
+DQN_FILE_SCOPE i32   DqnChar_FindNextLine(char *ptr, i32 *lineLength);
+DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *lineLength);
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnStr Public API - Str Operations
@@ -1653,10 +1673,10 @@ DQN_FILE_SCOPE void DqnStr_Reverse(char *const buf, u32 const bufSize);
 DQN_FILE_SCOPE i32 DqnStr_ReadUTF8Codepoint(u32 const *const a, u32 *outCodepoint);
 
 // return: The offset into the src to first char of the found string. Returns -1 if not found
-DQN_FILE_SCOPE i32   DqnStr_FindFirstOccurence(char const *const src, i32 const srcLen, char const *const find, i32 const findLen, bool ignoreCase = false);
+DQN_FILE_SCOPE i32   DqnStr_FindFirstOccurence(char const *src, i32 const srcLen, char const *find, i32 const findLen, bool ignoreCase = false);
 // return: Helper function that returns the pointer to the first occurence, nullptr if not found.
-DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence(char *const src, i32 const srcLen, char *const find, i32 const findLen, bool ignoreCase = false);
-DQN_FILE_SCOPE bool  DqnStr_HasSubstring     (char const *const src, i32 const srcLen, char const *const find, i32 const findLen, bool ignoreCase = false);
+DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence(char const *src, i32 const srcLen, char const *find, i32 const findLen, bool ignoreCase = false);
+DQN_FILE_SCOPE bool  DqnStr_HasSubstring     (char const *src, i32 const srcLen, char const *find, i32 const findLen, bool ignoreCase = false);
 
 #define DQN_32BIT_NUM_MAX_STR_SIZE 11
 #define DQN_64BIT_NUM_MAX_STR_SIZE 21
@@ -1987,6 +2007,14 @@ struct DqnFile
 		ForceCreate,      // Always create, even if it exists
 	};
 
+	struct Info
+	{
+		size_t size;
+		u64 createTimeInS;
+		u64 lastWriteTimeInS;
+		u64 lastAccessTimeInS;
+	};
+
 	u32     flags;
 	void   *handle;
 	size_t  size;
@@ -2029,13 +2057,18 @@ struct DqnFile
 	//          if the returned ptr is null.
 	// returns: nullptr if file could not be read, malloc failed or string.
 	//          Free the buffer using the memAPI, if default heap allocator, this is just free().
-	static u8 *ReadEntireFileSimple (char    const *const path, size_t &bufSize, DqnMemAPI const memAPI = DqnMemAPI_HeapAllocator());
-	static u8 *ReadEntireFileSimpleW(wchar_t const *const path, size_t &bufSize, DqnMemAPI const memAPI = DqnMemAPI_HeapAllocator());
+	static u8 *ReadEntireFileSimple (char    const *const path, size_t *bufSize, DqnMemAPI const memAPI = DqnMemAPI_HeapAllocator());
+	static u8 *ReadEntireFileSimpleW(wchar_t const *const path, size_t *bufSize, DqnMemAPI const memAPI = DqnMemAPI_HeapAllocator());
 
 	// size: Pass in a pointer to a size_t where the file size gets put into. It holds invalid data if
 	// function returns false.
 	static bool GetFileSize (char    const *const path, size_t &size);
 	static bool GetFileSizeW(wchar_t const *const path, size_t &size);
+
+	// info: Pass in a pointer to a info where file attributes gets put into
+	// function returns false.
+	static bool GetInfo (char    const *const path, Info *info);
+	static bool GetInfoW(wchar_t const *const path, Info *info);
 
 	// NOTE: You can't delete a file unless the handle has been closed to it on Win32.
 	static bool Delete (char    const *const path);
@@ -2797,6 +2830,10 @@ DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file,
 			va_end(argList);
 		}
 
+#if defined(DQN_WIN32_PLATFORM)
+		DqnWin32_OutputDebugString(formatStr, file, lineNum, expr, userMsg);
+#endif
+
 		printf(formatStr, file, lineNum, expr, userMsg);
 		(*((i32 *)0)) = 0;
 	}
@@ -3353,7 +3390,7 @@ DQN_FILE_SCOPE void DqnMemStack::ClearCurrBlock(bool const zeroClear)
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnMemStackTempRegion Implementation
 ////////////////////////////////////////////////////////////////////////////////
-DQN_FILE_SCOPE DqnMemStackTempRegion DqnMemStack::TempRegionBegin()
+DqnMemStackTempRegion DqnMemStack::TempRegionBegin()
 {
 	DqnMemStackTempRegion result;
 	result.stack         = this;
@@ -3364,7 +3401,7 @@ DQN_FILE_SCOPE DqnMemStackTempRegion DqnMemStack::TempRegionBegin()
 	return result;
 }
 
-DQN_FILE_SCOPE void DqnMemStack::TempRegionEnd(DqnMemStackTempRegion region)
+void DqnMemStack::TempRegionEnd(DqnMemStackTempRegion region)
 {
 	DqnMemStack *stack = region.stack;
 	DQN_ASSERT(stack == this);
@@ -3377,6 +3414,15 @@ DQN_FILE_SCOPE void DqnMemStack::TempRegionEnd(DqnMemStackTempRegion region)
 		DQN_ASSERT_HARD(this->block->used >= region.used);
 		this->block->used = region.used;
 	}
+
+	this->tempRegionCount--;
+	DQN_ASSERT_HARD(this->tempRegionCount >= 0);
+}
+
+void DqnMemStack::TempRegionKeepChanges(DqnMemStackTempRegion region)
+{
+	DqnMemStack *stack = region.stack;
+	DQN_ASSERT(stack == this);
 
 	this->tempRegionCount--;
 	DQN_ASSERT_HARD(this->tempRegionCount >= 0);
@@ -3396,7 +3442,15 @@ DqnMemStackTempRegionGuard::~DqnMemStackTempRegionGuard()
 {
 	const DqnMemStackTempRegion &region = this->memRegion;
 	DqnMemStack *const stack            = region.stack;
-	stack->TempRegionEnd(region);
+
+	if (this->keepChanges)
+	{
+		stack->TempRegionKeepChanges(region);
+	}
+	else
+	{
+		stack->TempRegionEnd(region);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4369,6 +4423,49 @@ DQN_FILE_SCOPE char DqnChar_ToUpper(char c)
 	return c;
 }
 
+DQN_FILE_SCOPE bool DqnChar_IsEndOfLine(char c)
+{
+	bool result = (c == '\n');
+	return result;
+}
+
+DQN_FILE_SCOPE bool DqnChar_IsWhitespace(char c)
+{
+	bool result = (c == ' ' || c == '\r' || c == '\n' || c == '\t');
+	return result;
+}
+
+DQN_FILE_SCOPE char *DqnChar_TrimWhitespaceAround(char const *src, i32 srcLen, i32 *newLen)
+{
+	if (!src)       return nullptr;
+	if (srcLen < 0) return (char *)src;
+
+	char const *start = src;
+	char const *end   = start + (srcLen - 1);
+	while(start[0] && DqnChar_IsWhitespace(start[0]))
+	{
+		start++;
+	}
+
+	i32 charsSkipped = (i32)(start - src);
+	i32 updatedLen   = srcLen - charsSkipped;
+	if (updatedLen == 0)
+	{
+		if (newLen) *newLen = 0;
+		return nullptr;
+	}
+
+	while(end[0] && DqnChar_IsWhitespace(end[0]))
+	{
+		end--;
+	}
+
+	charsSkipped = (i32)((src + srcLen - 1) - end);
+	updatedLen   = updatedLen - charsSkipped;
+
+	if (newLen) *newLen = updatedLen;
+	return (char *)start;
+}
 
 DQN_FILE_SCOPE bool DqnChar_IsDigit(char c)
 {
@@ -4388,10 +4485,10 @@ DQN_FILE_SCOPE bool DqnChar_IsAlphaNum(char c)
 	return false;
 }
 
-DQN_FILE_SCOPE char *DqnChar_SkipWhitespace(char *ptr)
+DQN_FILE_SCOPE char *DqnChar_SkipWhitespace(char const *ptr)
 {
-	while (ptr && (*ptr == ' ' || *ptr == '\r' || *ptr == '\n')) ptr++;
-	return ptr;
+	while (ptr && (*ptr == ' ' || *ptr == '\r' || *ptr == '\n' || *ptr == '\t')) ptr++;
+	return (char *)ptr;
 }
 
 DQN_FILE_SCOPE char *DqnChar_FindLastChar(char *ptr, const char ch, i32 len, u32 *const lenToChar)
@@ -4408,7 +4505,7 @@ DQN_FILE_SCOPE char *DqnChar_FindLastChar(char *ptr, const char ch, i32 len, u32
 	return nullptr;
 }
 
-DQN_FILE_SCOPE i32 DqnChar_GetNextLine(char *ptr, i32 *lineLength)
+DQN_FILE_SCOPE i32 DqnChar_FindNextLine(char *ptr, i32 *lineLength)
 {
 	i32 len = 0;
 	ptr     = DqnChar_SkipWhitespace(ptr);
@@ -4438,6 +4535,20 @@ DQN_FILE_SCOPE i32 DqnChar_GetNextLine(char *ptr, i32 *lineLength)
 	if (lineLength) *lineLength = len;
 	return len + extraChars;
 }
+
+DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *lineLength)
+{
+	i32 offsetToNextLine = DqnChar_FindNextLine(ptr, lineLength);
+
+	char *result = nullptr;
+	if (offsetToNextLine != -1)
+	{
+		result = ptr + offsetToNextLine;
+	}
+
+	return result;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnStr Implementation
@@ -4590,8 +4701,8 @@ DQN_FILE_SCOPE void DqnStr_Reverse(char *const buf, const u32 bufSize)
 	}
 }
 
-DQN_FILE_SCOPE i32 DqnStr_FindFirstOccurence(const char *const src, const i32 srcLen,
-                                             const char *const find, const i32 findLen, bool ignoreCase)
+DQN_FILE_SCOPE i32 DqnStr_FindFirstOccurence(char const *src, i32 const srcLen,
+                                             char const *find, i32 const findLen, bool ignoreCase)
 {
 	if (!src || !find)               return -1;
 	if (srcLen == 0 || findLen == 0) return -1;
@@ -4617,18 +4728,18 @@ DQN_FILE_SCOPE i32 DqnStr_FindFirstOccurence(const char *const src, const i32 sr
 	return -1;
 }
 
-DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence(char *const src, i32 const srcLen, char *const find,
+DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence(char const *src, i32 const srcLen, char const *find,
                                               i32 const findLen, bool ignoreCase)
 {
 	i32 offset = DqnStr_FindFirstOccurence(src, srcLen, find, findLen, ignoreCase);
 	if (offset == -1) return nullptr;
 
-	char *result = src + offset;
+	char *result = (char *)(src + offset);
 	return result;
 }
 
-DQN_FILE_SCOPE bool DqnStr_HasSubstring(char const *const src, i32 const srcLen,
-                                        char const *const find, i32 const findLen, bool ignoreCase)
+DQN_FILE_SCOPE bool DqnStr_HasSubstring(char const *src, i32 const srcLen,
+                                        char const *find, i32 const findLen, bool ignoreCase)
 {
 	if (DqnStr_FindFirstOccurence(src, srcLen, find, findLen, ignoreCase) == -1)
 		return false;
@@ -5537,8 +5648,7 @@ bool DqnString::Append(DqnString const strToAppend, i32 bytesToCopy)
 
 void DqnString::Clear()
 {
-	this->len    = 0;
-
+	this->len = 0;
 	if (this->str)
 	{
 		this->str[0] = 0;
@@ -7918,7 +8028,7 @@ size_t DqnFile::Read(u8 *const buf, size_t const numBytesToRead)
 	return numBytesRead;
 }
 
-u8 *DqnFile::ReadEntireFileSimpleW(wchar_t const *const path, size_t &bufSize, DqnMemAPI const memAPI)
+u8 *DqnFile::ReadEntireFileSimpleW(wchar_t const *const path, size_t *bufSize, DqnMemAPI const memAPI)
 {
 	// TODO(doyle): Logging
 
@@ -7932,7 +8042,7 @@ u8 *DqnFile::ReadEntireFileSimpleW(wchar_t const *const path, size_t &bufSize, D
 	size_t bytesRead = 0;
 	if (DqnFile::ReadEntireFileW(path, buf, requiredSize, bytesRead))
 	{
-		bufSize = requiredSize;
+		*bufSize = requiredSize;
 		DQN_ASSERT(bytesRead == requiredSize);
 		return buf;
 	}
@@ -7941,7 +8051,7 @@ u8 *DqnFile::ReadEntireFileSimpleW(wchar_t const *const path, size_t &bufSize, D
 	return nullptr;
 }
 
-u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t &bufSize, DqnMemAPI const memAPI)
+u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t *bufSize, DqnMemAPI const memAPI)
 {
 	// TODO(doyle): Logging
 
@@ -7955,7 +8065,7 @@ u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t &bufSize, DqnMe
 	size_t bytesRead = 0;
 	if (DqnFile::ReadEntireFile(path, buf, requiredSize, bytesRead))
 	{
-		bufSize = requiredSize;
+		*bufSize = requiredSize;
 		DQN_ASSERT(bytesRead == requiredSize);
 		return buf;
 	}
@@ -8036,24 +8146,12 @@ void DqnFile::Close()
 
 bool DqnFile::GetFileSizeW(wchar_t const *const path, size_t &size)
 {
-#if defined(DQN_WIN32_PLATFORM)
-	WIN32_FILE_ATTRIBUTE_DATA attribData = {};
-	if (GetFileAttributesExW(path, GetFileExInfoStandard, &attribData))
+	Info info = {};
+	if (GetInfoW(path, &info))
 	{
-		// TODO(doyle): What if size_t is < Quad.part?
-		LARGE_INTEGER largeInt = {};
-		largeInt.HighPart      = attribData.nFileSizeHigh;
-		largeInt.LowPart       = attribData.nFileSizeLow;
-
-		size = (size_t)largeInt.QuadPart;
+		size = info.size;
 		return true;
 	}
-
-#elif defined(DQN_UNIX_PLATFORM)
-	// NOTE: Not supported on unix
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-
-#endif
 
 	return false;
 }
@@ -8086,6 +8184,62 @@ bool DqnFile::GetFileSize(char const *const path, size_t &size)
 	return true;
 #endif
 }
+
+bool DqnFile::GetInfoW(wchar_t const *const path, Info *info)
+{
+	if (!path || !info) return false;
+
+#if defined(DQN_WIN32_PLATFORM)
+	auto FileTimeToSeconds = [](FILETIME const *time) -> i64 {
+		ULARGE_INTEGER timeLargeInt = {};
+		timeLargeInt.LowPart        = time->dwLowDateTime;
+		timeLargeInt.HighPart       = time->dwHighDateTime;
+
+		u64 result = (timeLargeInt.QuadPart / 10000000ULL) - 11644473600ULL;
+		return result;
+	};
+
+	WIN32_FILE_ATTRIBUTE_DATA attribData = {};
+	if (GetFileAttributesExW(path, GetFileExInfoStandard, &attribData))
+	{
+		info->createTimeInS     = FileTimeToSeconds(&attribData.ftCreationTime);
+		info->lastAccessTimeInS = FileTimeToSeconds(&attribData.ftLastAccessTime);
+		info->lastWriteTimeInS  = FileTimeToSeconds(&attribData.ftLastWriteTime);
+
+		// TODO(doyle): What if size_t is < Quad.part?
+		LARGE_INTEGER largeInt = {};
+		largeInt.HighPart      = attribData.nFileSizeHigh;
+		largeInt.LowPart       = attribData.nFileSizeLow;
+		info->size            = (size_t)largeInt.QuadPart;
+
+		return true;
+	}
+
+#elif defined(DQN_UNIX_PLATFORM)
+	// NOTE: Not supported on unix
+	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+
+#endif
+
+	return false;
+}
+
+bool DqnFile::GetInfo(char const *const path, Info *info)
+{
+	if (!path) return false;
+
+	// TODO(doyle): Logging
+#if defined(DQN_WIN32_PLATFORM)
+	// TODO(doyle): MAX PATH is baad
+	wchar_t widePath[MAX_PATH] = {0};
+	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
+	return DqnFile::GetInfoW(widePath, info);
+
+#elif defined(DQN_UNIX_PLATFORM)
+#error UNIX implementation not completed.
+#endif
+}
+
 
 bool DqnFile::Delete(char const *const path)
 {
