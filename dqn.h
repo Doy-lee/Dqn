@@ -435,16 +435,18 @@ struct DqnMemStack
 
 class DqnString
 {
-	char       sso[128];
 
 public:
 	DqnMemAPI  memAPI;
-	char      *str;
 	i32        len;              // Len of the string in bytes not including null-terminator
 	i32        max;              // The maximum capacity not including space for null-terminator.
+	char      *str;
 
 	// Initialisation API
 	// =============================================================================================
+	void Init              (DqnMemAPI api = DqnMemAPI::HeapAllocator());
+	void Init              (DqnMemStack *const stack);
+
 	// return: False if (size < 0) or (memAPI allocation failed).
 	bool InitSize          (i32 size, DqnMemStack *const stack);
 	bool InitSize          (i32 size, DqnMemAPI api = DqnMemAPI::HeapAllocator());
@@ -485,11 +487,6 @@ struct DqnSmartString : public DqnString
 {
 	~DqnSmartString() { this->Free(); }
 };
-
-// TODO(doyle): Remove this? I only want it to return the string if we can guarantee initialisation.
-// returns: Initialised string,
-DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemAPI    const api = DqnMemAPI::HeapAllocator());
-DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemStack *const stack);
 
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI    const api = DqnMemAPI::HeapAllocator());
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
@@ -5289,30 +5286,41 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 
 // #DqnString Impleemntation
 // =================================================================================================
-DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemAPI api)
-{
-	DqnString result;
-	bool init = result.InitSize(len, api);
-	DQN_ASSERT_HARD(init);
-	return result;
-}
-
-DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemStack *const stack)
-{
-	DqnString result = DqnString_(len, DqnMemAPI::StackAllocator(stack));
-	return result;
-}
+// TODO(doyle): SSO requires handling assign/copy op when copying strings, we need to reassign the
+//              str to point to the new copy's SSO buffer which sort of breaks the way I want to use
+//              strings. So disabled for now.
+// #define DQN_STRING_ENABLE_SSO
 
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI api)
 {
-	DqnString result = DqnString_(0, api);
+	DqnString result;
+	result.Init(api);
+
 	return result;
 }
 
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack)
 {
-	DqnString result = DqnString_(0, stack);
+	DqnString result;
+	result.Init(stack);
 	return result;
+}
+
+void DqnString::Init(DqnMemAPI api)
+{
+	this->memAPI = api;
+#if defined(DQN_STRING_ENABLE_SSO)
+	this->sso[0] = 0;
+#endif
+	this->str    = nullptr;
+	this->len    = 0;
+	this->max    = 0;
+}
+
+void DqnString::Init(DqnMemStack *const stack)
+{
+	DqnMemAPI api = DqnMemAPI::StackAllocator(stack);
+	this->Init(api);
 }
 
 bool DqnString::InitSize(const i32 size, DqnMemStack *const stack)
@@ -5325,11 +5333,13 @@ bool DqnString::InitSize(i32 size, DqnMemAPI api)
 {
 	// NOTE: CHAR_COUNT is (ARRAY_COUNT - 1) to leave the last spot as the implicit null-terminator.
 	DQN_ASSERT(size >= 0);
+#if defined(DQN_STRING_ENABLE_SSO)
 	if (size < DQN_CHAR_COUNT(this->sso))
 	{
 		this->str = &(this->sso[0]);
 	}
 	else
+#endif
 	{
 		size_t allocSize = sizeof(*(this->str)) * (size + 1);
 		this->str        = (char *)api.Alloc(allocSize, /*zeroClear*/false);
@@ -5452,10 +5462,12 @@ bool DqnString::Expand(const i32 newMax)
 		return false;
 	}
 
+#if defined(DQN_STRING_ENABLE_SSO)
 	if (newMax < DQN_CHAR_COUNT(this->sso))
 	{
 		DQN_ASSERT(this->memAPI.IsValid());
-		DQN_ASSERT(this->sso == this->str);
+		DQN_ASSERT(this->sso == this->str || this->str == nullptr);
+		this->str = this->sso;
 		this->max = newMax;
 		return true;
 	}
@@ -5466,6 +5478,7 @@ bool DqnString::Expand(const i32 newMax)
 		DQN_ASSERT(newMax >= DQN_CHAR_COUNT(this->sso));
 		this->str = nullptr;
 	}
+#endif
 
 	size_t allocSize = sizeof(*(this->str)) * (newMax + 1);
 	char *result     = nullptr;
@@ -5475,19 +5488,23 @@ bool DqnString::Expand(const i32 newMax)
 
 	if (result)
 	{
+#if defined(DQN_STRING_ENABLE_SSO)
 		if (usingSSO)
 			DqnMem_Copy(result, this->sso, this->max);
+#endif
 
 		this->str = (char *)result;
 		this->max = newMax;
 		return true;
 	}
+#if defined(DQN_STRING_ENABLE_SSO)
 	else
 	{
 		// Restore the pointer to the SSO to return to the original state from before this call.
 		if (usingSSO)
 			this->str = this->sso;
 	}
+#endif
 
 	return false;
 }
@@ -5587,12 +5604,15 @@ void DqnString::Free()
 {
 	if (this->str)
 	{
+#if defined(DQN_STRING_ENABLE_SSO)
 		if (this->str == this->sso)
 		{
 			this->sso[0] = '\0';
 			this->str    = nullptr;
 		}
-		else if (this->memAPI.IsValid())
+		else
+#endif
+		if (this->memAPI.IsValid())
 		{
 			this->memAPI.Free(this->str, this->len);
 			this->str = nullptr;
