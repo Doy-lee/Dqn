@@ -1573,11 +1573,10 @@ void DqnMemStack_Test()
 
 		DqnMemStack::Block *blockA = stack.block;
 		// Alocate B
-		size_t sizeB  = (size_t)(allocSize * 2.0f);
+		size_t sizeB  = DqnMemStack::MINIMUM_BLOCK_SIZE;
 		void *resultB = stack.Push(sizeB);
 		DQN_ASSERT(((intptr_t)resultB % ALIGNMENT) == 0);
 		DQN_ASSERT(stack.block && stack.block->memory);
-		DQN_ASSERT(stack.block->size == DQN_KILOBYTE(2));
 
 		// Since we alignment the pointers we return they can be within 0-3
 		// bytes of what we expect and since this is in a new block as well used
@@ -1598,7 +1597,7 @@ void DqnMemStack_Test()
 		// Check temp regions work
 		DqnMemStack::TempRegion tempBuffer = stack.TempRegionBegin();
 
-		size_t sizeC  = 1024 + 1;
+		size_t sizeC  = DQN_ALIGN_POW_N(DqnMemStack::MINIMUM_BLOCK_SIZE + 1, ALIGNMENT);
 		void *resultC = stack.Push(sizeC);
 		DQN_ASSERT(((intptr_t)resultC % ALIGNMENT) == 0);
 		DQN_ASSERT(stack.block != blockB && stack.block != blockA);
@@ -1607,7 +1606,7 @@ void DqnMemStack_Test()
 		DQN_ASSERT(stack.byteAlign == ALIGNMENT);
 
 		// NOTE: Allocation should be aligned to 4 byte boundary
-		DQN_ASSERT(tempBuffer.stack->block->size == 2048);
+		DQN_ASSERT(tempBuffer.stack->block->size == sizeC);
 		u8 *ptrC = (u8 *)resultC;
 		for (u32 i  = 0; i < sizeC; i++)
 			ptrC[i] = 3;
@@ -1769,19 +1768,19 @@ void DqnMemStack_Test()
 		}
 
 		// Force it to allocate three new blocks and write out data to each
-		size_t secondBlockSize          = DQN_KILOBYTE(2);
+		size_t secondBlockSize          = DQN_ALIGN_POW_N(DqnMemStack::MINIMUM_BLOCK_SIZE, stack.byteAlign);
 		u8 *second                      = (u8 *)stack.Push(secondBlockSize);
 		DqnMemStack::Block *secondBlock = stack.block;
 		for (u32 i    = 0; i < secondBlockSize; i++)
 			second[i] = 'd';
 
-		size_t thirdBlockSize          = DQN_KILOBYTE(3);
+		size_t thirdBlockSize          = DQN_ALIGN_POW_N(DqnMemStack::MINIMUM_BLOCK_SIZE, stack.byteAlign);
 		u8 *third                      = (u8 *)stack.Push(thirdBlockSize);
 		DqnMemStack::Block *thirdBlock = stack.block;
 		for (u32 i   = 0; i < thirdBlockSize; i++)
 			third[i] = 'e';
 
-		size_t fourthBlockSize          = DQN_KILOBYTE(4);
+		size_t fourthBlockSize          = DQN_ALIGN_POW_N(DqnMemStack::MINIMUM_BLOCK_SIZE, stack.byteAlign);
 		u8 *fourth                      = (u8 *)stack.Push(fourthBlockSize);
 		DqnMemStack::Block *fourthBlock = stack.block;
 		for (u32 i    = 0; i < fourthBlockSize; i++)

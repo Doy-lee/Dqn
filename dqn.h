@@ -152,6 +152,14 @@ typedef float  f32;
 #define DQN_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define DQN_SWAP(type, a, b) do { type tmp = a; a = b; b = tmp; } while(0)
 
+// NOTE: Directives don't get replaced if there's a stringify or paste (# or ##) so TOKEN_COMBINE2 is needed
+//       to let directives get expanded (i.e. __COUNTER__), then we can combine.
+#define DQN_TOKEN_COMBINE(x, y) x ## y
+#define DQN_TOKEN_COMBINE2(x, y) DQN_TOKEN_COMBINE(x, y)
+
+// Produce a unique name with prefix and counter. i.e. data => data1
+#define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE2(prefix, __COUNTER__)
+
 // #DqnAssert API
 // =================================================================================================
 // DQN_ASSERT() & DQN_ASSERT_MSG() will hard break the program but it can be
@@ -188,9 +196,9 @@ DQN_FILE_SCOPE void *DqnMem_Calloc (const size_t size);
 DQN_FILE_SCOPE void  DqnMem_Clear  (void *const memory, const u8 clearValue, const size_t size);
 DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, const size_t newSize);
 DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
-DQN_FILE_SCOPE void  DqnMem_Copy   (void *const dest, void *const src, const i64 numBytesToCopy);
-DQN_FILE_SCOPE void *DqnMem_Set    (void *const dest, u8 value, const i64 numBytesToSet);
-DQN_FILE_SCOPE void *DqnMem_Set64  (void *const dest, u8 value, const i64 numBytesToSet);
+DQN_FILE_SCOPE void  DqnMem_Copy   (void *const dest, void const *const src, i64 const numBytesToCopy);
+DQN_FILE_SCOPE void *DqnMem_Set    (void *const dest, u8 const value,        i64 const numBytesToSet);
+DQN_FILE_SCOPE void *DqnMem_Set64  (void *const dest, u8 const value,        i64 const numBytesToSet);
 
 // #DqnMemAPI API
 // =================================================================================================
@@ -288,8 +296,19 @@ public:
 //      BeginTempRegion and EndTempRegion functions. Specifically freeing
 //      individual items is typically not generalisable in this scheme.
 
+// Usage: DqnMemStack example = DQN_MEM_STACK_FIXED_MEM(example, DQN_KILOBYTES(512), 4);
+#define DQN_MEM_STACK_FIXED_MEM(memStack, sizeInBytes, align)                                      \
+	DQN_MEM_STACK_FIXED_MEM_INTERNAL(memStack, sizeInBytes, align, DQN_UNIQUE_NAME(memory_))
+
+#define DQN_MEM_STACK_FIXED_MEM_INTERNAL(memStack, sizeInBytes, align, uniqueName)                 \
+	{};                                                                                            \
+	u8 uniqueName[sizeInBytes];                                                                          \
+	memStack.InitWithFixedMem(uniqueName, sizeInBytes, align);
+
 struct DqnMemStack
 {
+	static const i32 MINIMUM_BLOCK_SIZE = DQN_KILOBYTE(32);
+
 	enum Flag
 	{
 		IsNotExpandable       = (1 << 0),
@@ -390,7 +409,7 @@ struct DqnMemStack
 	TempRegionGuard_ TempRegionGuard      (); // RAII Temp Region
 
 	// Keep allocations that have occurred since Begin(). End() does not need to be called anymore.
-	void            TempRegionKeepChanges(TempRegion region);
+	void             TempRegionKeepChanges(TempRegion region);
 
 	// Advanced
 	// =============================================================================================
@@ -410,28 +429,25 @@ struct DqnMemStack
 // String allocates +1 extra byte for the null-terminator to be completely compatible with
 // C style strings, but this is not reflected in the capacity or len, and is hidden from the user.
 
-// NOTE: Pasting tokens doesn't do anything with preprocessor directives IF the preprocessor finds
-//       a stringify or paste operation (# or ##) so we need this level of indirection.
-#define DQN_TOKEN_COMBINE(x, y) x ## y
-#define DQN_TOKEN_COMBINE2(x, y) DQN_TOKEN_COMBINE(x, y)
-
 // Usage: DqnString example = DQN_STRING_LITERAL(example, "hello world");
 #define DQN_STRING_LITERAL(srcVariable, literal)                                                   \
-	DQN_STRING_LITERAL_INTERNAL1(srcVariable, literal, DQN_TOKEN_COMBINE2(dqnstring_, __COUNTER__))
+	DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, DQN_UNIQUE_NAME(dqnstring_))
 
 class DqnString
 {
+	char       sso[128];
+
 public:
-	char      *str;
-	i32        len;    // Len of the string in bytes not including null-terminator
-	i32        max;    // The maximum capacity not including space for null-terminator.
 	DqnMemAPI  memAPI;
+	char      *str;
+	i32        len;              // Len of the string in bytes not including null-terminator
+	i32        max;              // The maximum capacity not including space for null-terminator.
 
 	// Initialisation API
 	// =============================================================================================
 	// return: False if (size < 0) or (memAPI allocation failed).
-	bool InitSize          (const i32 size, DqnMemStack *const stack);
-	bool InitSize          (const i32 size, DqnMemAPI api = DqnMemAPI::HeapAllocator());
+	bool InitSize          (i32 size, DqnMemStack *const stack);
+	bool InitSize          (i32 size, DqnMemAPI api = DqnMemAPI::HeapAllocator());
 
 	// return: False if arguments are invalid.
 	bool InitFixedMem      (char *const memory, const i32 sizeInBytes);
@@ -465,6 +481,11 @@ public:
 	wchar_t *ToWChar(DqnMemAPI api = DqnMemAPI::HeapAllocator());
 };
 
+struct DqnSmartString : public DqnString
+{
+	~DqnSmartString() { this->Free(); }
+};
+
 // TODO(doyle): Remove this? I only want it to return the string if we can guarantee initialisation.
 // returns: Initialised string,
 DQN_FILE_SCOPE DqnString DqnString_(i32 const len, DqnMemAPI    const api = DqnMemAPI::HeapAllocator());
@@ -475,10 +496,7 @@ DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
 
 // NOTE: First level of indirection needs to turn the combined dqnstring_(guid) into a name. Otherwise
 //       each use of literalVarName will increment __COUNTER__
-#define DQN_STRING_LITERAL_INTERNAL1(srcVariable, literal, literalVarName)                         \
-	DQN_STRING_LITERAL_INTERNAL2(srcVariable, literal, literalVarName)
-
-#define DQN_STRING_LITERAL_INTERNAL2(srcVariable, literal, literalVarName)                         \
+#define DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, literalVarName)                          \
 	{};                                                                                            \
 	char literalVarName[] = literal;                                                               \
 	srcVariable.InitLiteralNoAlloc(literalVarName, DQN_CHAR_COUNT(literalVarName))
@@ -1661,8 +1679,26 @@ public:
 DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_();         // Uses rdtsc to create a seed
 DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed);
 
-// #Dqn API
+// #Dqn_ API
 // =================================================================================================
+
+inline bool Dqn_BitIsSet(u32 const bits, u32 const flag)
+{
+	bool result = ((bits & flag) == flag);
+	return result;
+}
+
+inline u32 Dqn_BitSet(u32 const bits, u32 const flag)
+{
+	u32 result = (bits | flag);
+	return result;
+}
+
+inline u32 Dqn_BitUnset(u32 const bits, u32 const flag)
+{
+	u32 result = (bits & ~flag);
+	return result;
+}
 
 template <typename T>
 using Dqn_QuickSortLessThanCallback = bool (*)(const T *const , const T *const);
@@ -2780,7 +2816,7 @@ DQN_FILE_SCOPE void DqnMem_Free(void *memory)
 	if (memory) free(memory);
 }
 
-DQN_FILE_SCOPE void DqnMem_Copy(void *const dest, void *const src, const i64 numBytesToCopy)
+DQN_FILE_SCOPE void DqnMem_Copy(void *const dest, void const *const src, i64 const numBytesToCopy)
 {
 	auto *to   = (u8 *)dest;
 	auto *from = (u8 *)src;
@@ -2788,7 +2824,7 @@ DQN_FILE_SCOPE void DqnMem_Copy(void *const dest, void *const src, const i64 num
 		to[i]   = from[i];
 }
 
-DQN_FILE_SCOPE void *DqnMem_Set(void *const dest, u8 value, const i64 numBytesToSet)
+DQN_FILE_SCOPE void *DqnMem_Set(void *const dest, u8 const value, i64 const numBytesToSet)
 {
 	auto *ptr = (u8 *)dest;
 	for (auto i = 0; i < numBytesToSet; i++)
@@ -2797,7 +2833,7 @@ DQN_FILE_SCOPE void *DqnMem_Set(void *const dest, u8 value, const i64 numBytesTo
 	return dest;
 }
 
-DQN_FILE_SCOPE void *DqnMem_Set64(void *const dest, u8 value, const i64 numBytesToCopy)
+DQN_FILE_SCOPE void *DqnMem_Set64(void *const dest, u8 const value, i64 const numBytesToCopy)
 {
 #if defined(DQN_WIN32_PLATFORM)
 	u64 valueU64 = value;
@@ -3111,6 +3147,7 @@ bool DqnMemStack::InitWithFixedSize(size_t size, bool const zeroClear, u32 const
 bool DqnMemStack::Init(size_t size, bool const zeroClear, u32 const byteAlign_, DqnMemAPI memAPI_)
 {
 	if (!this || size < 0) return false;
+
 	if (!DQN_ASSERT_MSG(!this->block, "MemStack has pre-existing block already attached"))
 		return false;
 
@@ -3139,7 +3176,8 @@ void *DqnMemStack::Push(size_t size)
 	if (size == 0) return nullptr;
 
 	size_t alignedSize = DQN_ALIGN_POW_N(size, this->byteAlign);
-	if (!this->block || (this->block->used + alignedSize) > this->block->size)
+	size_t newUsage    = this->block->used + alignedSize;
+	if (!this->block || newUsage > this->block->size)
 	{
 		size_t newBlockSize;
 
@@ -3147,9 +3185,17 @@ void *DqnMemStack::Push(size_t size)
 		// a minimum block size? Not allocate based on the current block
 		// size
 		if (this->block)
+		{
+#if 0
 			newBlockSize = DQN_MAX(alignedSize, this->block->size);
+#else
+			newBlockSize = DQN_MAX(alignedSize, DqnMemStack::MINIMUM_BLOCK_SIZE);
+#endif
+		}
 		else
+		{
 			newBlockSize = alignedSize;
+		}
 
 		DqnMemStack::Block *newBlock = this->AllocateCompatibleBlock(newBlockSize, true);
 		if (newBlock)
@@ -3188,29 +3234,47 @@ void *DqnMemStack::Push(size_t size)
 	return result;
 }
 
-bool DqnMemStack::Pop(void *const ptr, size_t size)
+FILE_SCOPE bool DqnMemStackInternal_TryPopPtrInBlock(DqnMemStack::Block *block, u32 const byteAlign,
+                                                     void *const ptr, size_t size)
 {
-	if (!this->block) return false;
 	u8 *currPtr = block->memory + block->used;
-	if (DQN_ASSERT_MSG((u8 *)ptr >= block->memory && ptr < currPtr,
-	                   "'ptr' to pop does not belong to current memStack attached block"))
+	if ((size_t)ptr >= (size_t)block->memory && (size_t)ptr < (size_t)currPtr)
 	{
-		size_t calcSize = (size_t)currPtr - (size_t)ptr;
-		size_t sizeAligned = DQN_ALIGN_POW_N(size, this->byteAlign);
-
+		auto calcSize      = (size_t)currPtr - (size_t)ptr;
+		size_t sizeAligned = DQN_ALIGN_POW_N(size, byteAlign);
 		if (calcSize == sizeAligned)
 		{
-			this->block->used -= sizeAligned;
-			if (this->block->used == 0 && block->prevBlock)
-			{
-				bool result = this->FreeLastBlock();
-				return result;
-			}
-
+			block->used -= sizeAligned;
 			return true;
+		}
+		else
+		{
+			// printf("The ptr to free and its size aligned to byteAlign does not match.
+			// This
+			// ptr is not a valid address to free. We got: %d, expected: %d", calcSize,
+			// alignedSized);
+			DQN_ASSERT(DQN_INVALID_CODE_PATH);
 		}
 	}
 
+	return false;
+}
+
+bool DqnMemStack::Pop(void *const ptr, size_t size)
+{
+	if (!this->block) return false;
+
+	if (DqnMemStackInternal_TryPopPtrInBlock(this->block, this->byteAlign, ptr, size))
+	{
+		if (this->block->used == 0 && this->block->prevBlock)
+		{
+			bool result = this->FreeLastBlock();
+			return result;
+		}
+		return true;
+	}
+
+	// printf("Ptr (%x) does not belong to the newest memory blocks", ptr);
 	return false;
 }
 
@@ -3247,7 +3311,7 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 	{
 		DqnMemStack::Block *blockToFree = *blockPtr;
 		(*blockPtr)                     = blockToFree->prevBlock;
-		DqnMem_Free(blockToFree);
+		this->memAPI.Free(blockToFree, blockToFree->size);
 
 		// No more blocks, then last block has been freed
 		if (!this->block) DQN_ASSERT_HARD(this->tempRegionCount == 0);
@@ -5257,31 +5321,22 @@ bool DqnString::InitSize(const i32 size, DqnMemStack *const stack)
 	return result;
 }
 
-bool DqnString::InitSize(const i32 size, DqnMemAPI api)
+bool DqnString::InitSize(i32 size, DqnMemAPI api)
 {
+	// NOTE: CHAR_COUNT is (ARRAY_COUNT - 1) to leave the last spot as the implicit null-terminator.
 	DQN_ASSERT(size >= 0);
-	if (size < 0)
+	if (size < DQN_CHAR_COUNT(this->sso))
 	{
-		DqnString nullString = {};
-		*this                = nullString;
-		return false;
+		this->str = &(this->sso[0]);
 	}
-
-	if (size > 0)
+	else
 	{
 		size_t allocSize = sizeof(*(this->str)) * (size + 1);
 		this->str        = (char *)api.Alloc(allocSize, /*zeroClear*/false);
-
-		if (!this->str)
-		{
-			return false;
-		}
-	}
-	else // size == 0
-	{
-		this->str = nullptr;
+		if (!this->str) return false;
 	}
 
+	this->str[0] = 0;
 	this->max    = size;
 	this->len    = 0;
 	this->memAPI = api;
@@ -5314,25 +5369,15 @@ bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMem
 
 bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemAPI api)
 {
-	if (lenInBytes < 0) return false;
-
-	if (lenInBytes > 0)
+	if (!this->InitSize(lenInBytes, api))
 	{
-		size_t allocSize = sizeof(*(this->str)) * (lenInBytes + 1);
-		this->str        = (char *)api.Alloc(allocSize, /*zeroClear*/ false);
-		if (!this->str) return false;
-
-		this->str[lenInBytes] = 0;
+		return false;
 	}
 
+	this->str[lenInBytes] = 0;
 	this->len             = lenInBytes;
-	this->max             = lenInBytes;
-	this->memAPI          = api;
-
-	for (i32 i = 0; i < this->len; i++)
-	{
-		this->str[i] = cstr[i];
-	}
+	this->max             = this->len;
+	DqnMem_Copy(this->str, cstr, lenInBytes);
 
 	return true;
 }
@@ -5354,20 +5399,18 @@ bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemStack *const stack)
 bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI api)
 {
 #if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
-	i32 requiredLen = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
-	this->len = requiredLen - 1;
+	i32 reqLenInclNullTerminator = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
+	if (!this->InitSize(reqLenInclNullTerminator - 1, api))
+	{
+		return false;
+	}
 
-	size_t allocSize        = sizeof(*(this->str)) * (this->len + 1);
-	this->str               = (char *)api.Alloc(allocSize, /*zeroClear*/false);
-	if (!this->str) return false;
-
-	this->max    = this->len;
-	this->memAPI = api;
-
+	this->len         = reqLenInclNullTerminator - 1;
+	this->max         = this->len;
 	i32 convertResult = DqnWin32_WCharToUTF8(cstr, this->str, this->len + 1);
 	DQN_ASSERT(convertResult != -1);
-
 	this->str[this->len] = 0;
+
 	return true;
 
 #else
@@ -5394,14 +5437,35 @@ bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
 	}
 
 	this->max = this->len;
-
 	return true;
 }
 
 bool DqnString::Expand(const i32 newMax)
 {
-	if (!this->memAPI.IsValid()) return false;
-	if (newMax < this->max)     return true;
+	if (newMax < this->max)
+	{
+		return true;
+	}
+
+	if (!this->memAPI.IsValid())
+	{
+		return false;
+	}
+
+	if (newMax < DQN_CHAR_COUNT(this->sso))
+	{
+		DQN_ASSERT(this->memAPI.IsValid());
+		DQN_ASSERT(this->sso == this->str);
+		this->max = newMax;
+		return true;
+	}
+
+	bool usingSSO = (this->str == this->sso);
+	if (usingSSO)
+	{
+		DQN_ASSERT(newMax >= DQN_CHAR_COUNT(this->sso));
+		this->str = nullptr;
+	}
 
 	size_t allocSize = sizeof(*(this->str)) * (newMax + 1);
 	char *result     = nullptr;
@@ -5411,9 +5475,18 @@ bool DqnString::Expand(const i32 newMax)
 
 	if (result)
 	{
+		if (usingSSO)
+			DqnMem_Copy(result, this->sso, this->max);
+
 		this->str = (char *)result;
 		this->max = newMax;
 		return true;
+	}
+	else
+	{
+		// Restore the pointer to the SSO to return to the original state from before this call.
+		if (usingSSO)
+			this->str = this->sso;
 	}
 
 	return false;
@@ -5435,8 +5508,8 @@ DQN_FILE_SCOPE bool DqnStringInternal_Append(DqnString *const str, char const *c
 		if (!result) return false;
 	}
 
-	// Append
-	for (i32 i = 0; i < bytesToCopy; i++) str->str[str->len + i] = cstr[i];
+	char *dest = str->str + str->len;
+	DqnMem_Copy(dest, cstr, bytesToCopy);
 
 	str->len           = totalLen;
 	str->str[totalLen] = 0;
@@ -5512,10 +5585,19 @@ void DqnString::Clear()
 
 void DqnString::Free()
 {
-	if (this->str && this->memAPI.IsValid())
+	if (this->str)
 	{
-		this->memAPI.Free(this->str, this->len);
-		this->str = nullptr;
+		if (this->str == this->sso)
+		{
+			this->sso[0] = '\0';
+			this->str    = nullptr;
+		}
+		else if (this->memAPI.IsValid())
+		{
+			this->memAPI.Free(this->str, this->len);
+			this->str = nullptr;
+		}
+
 		this->len = 0;
 		this->max = 0;
 	}
