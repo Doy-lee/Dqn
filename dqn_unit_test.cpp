@@ -26,7 +26,7 @@
 
 FILE_SCOPE void LogHeader(const char *const header)
 {
-	DQN_ASSERT_HARD(header);
+	DQN_ASSERT(header);
 
 	char buf[1024] = {};
 	DQN_ASSERT(Dqn_sprintf(buf, "// %s", header) < (i32)DQN_ARRAY_COUNT(buf));
@@ -37,7 +37,7 @@ FILE_SCOPE void LogHeader(const char *const header)
 
 FILE_SCOPE void LogSuccess(const char *const functionName)
 {
-	DQN_ASSERT_HARD(functionName);
+	DQN_ASSERT(functionName);
 
 	char buf[1024] = {};
 	DQN_ASSERT(Dqn_sprintf(buf, "%s", functionName) < (i32)DQN_ARRAY_COUNT(buf));
@@ -60,7 +60,7 @@ void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 		const f32 EPSILON = 0.001f;
 		f32 diff          = hmmMatf[i] - dqnMatf[i];
 		diff              = DQN_ABS(diff);
-		DQN_ASSERT_MSG(diff < EPSILON, "hmmMatf[%d]: %f, dqnMatf[%d]: %f\n", i, hmmMatf[i], i,
+		DQN_ASSERTM(diff < EPSILON, "hmmMatf[%d]: %f, dqnMatf[%d]: %f\n", i, hmmMatf[i], i,
 		               dqnMatf[i]);
 	}
 }
@@ -187,7 +187,7 @@ void Dqn_Test()
 		{
 			char e[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
 			Dqn_I64ToStr(SMALLEST_NUM, e, DQN_ARRAY_COUNT(e));
-			DQN_ASSERT_MSG(DqnStr_Cmp(e, "-9223372036854775808") == 0, "e: %s", e);
+			DQN_ASSERTM(DqnStr_Cmp(e, "-9223372036854775808") == 0, "e: %s", e);
 		}
 
 		LogSuccess("Dqn_I64ToStr()");
@@ -858,9 +858,9 @@ void DqnVX_Test()
 			f32 normY        = b.y / 5.0f;
 			f32 diffNormX    = normalised.x - normX;
 			f32 diffNormY    = normalised.y - normY;
-			DQN_ASSERT_MSG(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x,
+			DQN_ASSERTM(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x,
 			               normX);
-			DQN_ASSERT_MSG(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y,
+			DQN_ASSERTM(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y,
 			               normY);
 
 			DqnV2 c = DqnV2_(3.5f, 8.0f);
@@ -1134,7 +1134,7 @@ void DqnRect_Test()
 	}
 }
 
-void DqnArray_TestInternal(const DqnMemAPI memAPI)
+void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 {
 	if (1)
 	{
@@ -1484,7 +1484,8 @@ void DqnArray_Test()
 	LogHeader("DqnArray_Test");
 	if (1)
 	{
-		DqnArray_TestInternal(DqnMemAPI::HeapAllocator());
+		auto allocator = DqnMemAPI::HeapAllocator();
+		DqnArray_TestInternal(&allocator);
 	}
 
 	if (1)
@@ -1524,7 +1525,7 @@ void DqnArray_Test()
 			{
 				auto memGuard0 = stack.TempRegionGuard();
 				DqnArray<char> array = {};
-				DQN_ASSERT(array.Init(1, memAPI));
+				DQN_ASSERT(array.Init(1, &stack.myAPI));
 				DqnArray_TestRealDataInternal(&array);
 			}
 
@@ -1533,7 +1534,7 @@ void DqnArray_Test()
 			{
 				auto memGuard0 = stack.TempRegionGuard();
 				DqnArray<char> array = {};
-				DQN_ASSERT(array.Init(128, memAPI));
+				DQN_ASSERT(array.Init(128, &stack.myAPI));
 				stack.Push(1024);
 				DqnArray_TestRealDataInternal(&array);
 			}
@@ -1984,8 +1985,8 @@ void DqnFile_Test()
 			if (1)
 			{
 				size_t size = 0;
-				DQN_ASSERT_HARD(DqnFile::GetFileSize(FILE_TO_OPEN, &size));
-				DQN_ASSERT_HARD(size == expectedSize);
+				DQN_ASSERT(DqnFile::GetFileSize(FILE_TO_OPEN, &size));
+				DQN_ASSERT(size == expectedSize);
 			}
 
 			DqnFile file = {};
@@ -1993,7 +1994,7 @@ void DqnFile_Test()
 			                        (DqnFile::PermissionFlag::FileWrite | DqnFile::PermissionFlag::FileRead),
 			                        DqnFile::Action::OpenOnly));
 
-			DQN_ASSERT_MSG(file.size == expectedSize,
+			DQN_ASSERTM(file.size == expectedSize,
 			               "DqnFileOpen() failed: file.size: %d, expected:%d\n", file.size,
 			               expectedSize);
 
@@ -2175,7 +2176,7 @@ FILE_SCOPE void DqnJobQueue_Test()
 	globalDebugCounter = 0;
 
 	DqnMemStack memStack = {};
-	DQN_ASSERT_HARD(memStack.Init(DQN_MEGABYTE(1), true));
+	DQN_ASSERT(memStack.Init(DQN_MEGABYTE(1), true));
 
 	u32 numThreads, numCores;
 	DqnPlatform_GetNumThreadsAndCores(&numCores, &numThreads);
@@ -2266,7 +2267,7 @@ void DqnQuickSort_Test()
 			// Validate algorithm is correct
 			for (u32 i = 0; i < numInts; i++)
 			{
-				DQN_ASSERT_MSG(dqnCPPArray[i] == stdArray[i], "DqnArray[%d]: %d, stdArray[%d]: %d", i,
+				DQN_ASSERTM(dqnCPPArray[i] == stdArray[i], "DqnArray[%d]: %d, stdArray[%d]: %d", i,
 				               dqnCPPArray[i], stdArray[i], i);
 			}
 		}

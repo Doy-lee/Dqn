@@ -29,7 +29,7 @@
 // The first match is the public API, the next matche(s) are the implementation
 
 // #Portable Code
-// #DqnAssert    Assertions
+// #DqnAssert    Assertions and Logging
 // #DqnMem       Memory Allocation
 // #DqnMemAPI    Custom memory API for Dqn Data Structures
 // #DqnMemStack  Memory Allocator, Push, Pop Style
@@ -157,36 +157,35 @@ typedef float  f32;
 #define DQN_TOKEN_COMBINE(x, y) x ## y
 #define DQN_TOKEN_COMBINE2(x, y) DQN_TOKEN_COMBINE(x, y)
 
-// Produce a unique name with prefix and counter. i.e. data => data1
+// Produce a unique name with prefix and counter. i.e. where prefix is "data" then it gives "data1"
 #define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE2(prefix, __COUNTER__)
 
 // #DqnAssert API
 // =================================================================================================
-// DQN_ASSERT() & DQN_ASSERT_MSG() will hard break the program but it can be
-// disabled in DqnAssertInternal() for release whilst still allowing the assert
-// expressions to be evaluated and instead send diagnostics to console.
-
 // NOTE: "## __VA_ARGS__" is a GCC hack. Zero variadic arguments won't compile
 // because there will be a trailing ',' at the end. Pasting it swallows it. MSVC
 // implicitly swallows the trailing comma.
 
-// returns: If the expr was true or not.
-#define DQN_ASSERT(expr)               DqnAssertInternal(expr, __FILE__, __LINE__, #expr, nullptr)
-#define DQN_ASSERT_MSG(expr, msg, ...) DqnAssertInternal(expr, __FILE__, __LINE__, #expr, msg, ## __VA_ARGS__)
+#define DQN_ASSERT(expr) DQN_ASSERTM(expr, "");
+#define DQN_ASSERTM(expr, msg, ...)                                                                \
+	do                                                                                             \
+	{                                                                                              \
+		if (!(expr))                                                                               \
+		{                                                                                          \
+			DqnLog(__FILE__, __func__, __LINE__, #expr, msg, ##__VA_ARGS__);                       \
+			(*((int *)0)) = 0;                                                                     \
+		}                                                                                          \
+	} while (0)
 
-// Internal implementation should not be used as the macro above will handle it, but is required in
-// header for visibility to external functions calling it.
-// returns: If the expr was true or not.
-DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file, const i32 lineNum,
-                                      const char *const expr, const char *const msg, ...);
+#define DQN_LOGE(msg, ...) DqnLog(__FILE__, __func__, __LINE__, nullptr, msg, ##__VA_ARGS__);
 
-// TODO(doyle): Remove assert_hard, use only one assert because this adds to much burden when writing code to decide between "safe" asserts and catastrophic asserts.
-//              Write library code that is able to recover itself and provide error logs.
-#define DQN_ASSERT_HARD(expr) if (!(expr)) { *((int *)0) = 0; }
+// Use macro above.
+DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum,
+                           char const *const expr, char const *const msg, ...);
 
 // Assert at compile time by making a type that is invalid depending on the expression result
-#define DQN_COMPILE_ASSERT(expr)                DQN_COMPILE_ASSERT_INTERNAL(expr, __COUNTER__)
-#define DQN_COMPILE_ASSERT_INTERNAL(expr, guid) typedef char DqnCompileAssertInternal_##guid[((int)(expr)) * 2 - 1];
+#define DQN_COMPILE_ASSERT(expr)                DQN_COMPILE_ASSERT_INTERNAL(expr, DQN_UNIQUE_NAME(DqnCompileAssertInternal_))
+#define DQN_COMPILE_ASSERT_INTERNAL(expr, name) typedef char name[((int)(expr)) * 2 - 1];
 
 // #DqnMem API
 // =================================================================================================
@@ -228,41 +227,45 @@ public:
 		Free
 	};
 
-	// TODO(doyle): Set header, then cast to the appropriate type so the debugger doesn't just spit out all the fields in the union.
 	struct Request
 	{
 		void *userContext;
 		Type type;
-		union {
-			// DqnMemAPI::Type::Alloc / DqnMemAPI::Type::Calloc
-			struct
+		union
+		{
+			struct Alloc_
 			{
 				bool clearToZero;
 				size_t requestSize;
-			};
+			} alloc;
 
-			// DqnMemAPI::Type::Free
-			struct
+			struct Free_
 			{
-				void *ptrToFree;
+				void  *ptrToFree;
 				size_t sizeToFree;
-			};
+			} free;
 
-			// DqnMemAPI::Type::Realloc
-			struct
+			struct Realloc_
 			{
 				size_t newRequestSize;
-				void *oldMemPtr;
 				size_t oldSize;
-			};
+				void *oldMemPtr;
+			} realloc;
 		};
 	};
 
-	typedef u8 *Allocator(DqnMemAPI::Request request);
+	typedef u8 *Allocator(DqnMemAPI *, DqnMemAPI::Request);
+
 	Allocator *allocator;
 	void      *userContext;
 
+	size_t     bytesAllocated;
+	size_t     lifetimeBytesAllocated;
+	size_t     lifetimeBytesFreed;
+
 	static DqnMemAPI HeapAllocator ();
+
+	// TODO(doyle): No longer necessary now that stack creates its own on init?
 	static DqnMemAPI StackAllocator(struct DqnMemStack *const stack);
 
 	void *Realloc(void   *const oldPtr,    size_t const oldSize, size_t const newSize);
@@ -271,7 +274,7 @@ public:
 	bool  IsValid() const { return (this->allocator != nullptr); }
 };
 
-
+FILE_SCOPE DqnMemAPI DQN_DEFAULT_HEAP_ALLOCATOR = DqnMemAPI::HeapAllocator();
 // #DqnMemStack API
 // =================================================================================================
 // DqnMemStack is an memory allocator in a stack like, push-pop style. It pre-allocates a block of
@@ -334,7 +337,8 @@ struct DqnMemStack
 		Block  *prevBlock; // Uses a linked list approach for additional blocks
 	};
 
-	DqnMemAPI  memAPI;          // Allocation scheme
+	DqnMemAPI *memAPI;          // API used to add additional memory blocks to this stack.
+	DqnMemAPI  myAPI;           // API for data structures to allocate using this stack's memory.
 	Block     *block;           // The memory block allocated for the stack
 	u32        flags;
 	i32        tempRegionCount;
@@ -353,10 +357,10 @@ struct DqnMemStack
 
 	// Use 1 initial allocation from MemAPI. Stack can not be expanded after it is full.
 	// size: The amount of memory to allocate. Size gets aligned to the next "byteAlign"ed value.
-	bool InitWithFixedSize(size_t const size, bool const zeroClear, u32 const byteAlign_ = 4, DqnMemAPI memAPI_ = DqnMemAPI::HeapAllocator());
+	bool InitWithFixedSize(size_t const size, bool const zeroClear, u32 const byteAlign_ = 4, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 
 	// Dynamically expandable stack. When full, another block is allocated using MemAPI.
-	bool Init(size_t const size, bool const zeroClear, u32 const byteAlign_ = 4, DqnMemAPI memAPI_ = DqnMemAPI::HeapAllocator());
+	bool Init(size_t const size, bool const zeroClear, u32 const byteAlign_ = 4, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 
 	// Allocation API
 	// =============================================================================================
@@ -437,30 +441,30 @@ class DqnString
 {
 
 public:
-	DqnMemAPI  memAPI;
+	DqnMemAPI *memAPI;
 	i32        len;              // Len of the string in bytes not including null-terminator
 	i32        max;              // The maximum capacity not including space for null-terminator.
 	char      *str;
 
 	// Initialisation API
 	// =============================================================================================
-	void Init              (DqnMemAPI api = DqnMemAPI::HeapAllocator());
+	void Init              (DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 	void Init              (DqnMemStack *const stack);
 
 	// return: False if (size < 0) or (memAPI allocation failed).
 	bool InitSize          (i32 size, DqnMemStack *const stack);
-	bool InitSize          (i32 size, DqnMemAPI api = DqnMemAPI::HeapAllocator());
+	bool InitSize          (i32 size, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 
 	// return: False if arguments are invalid.
 	bool InitFixedMem      (char *const memory, const i32 sizeInBytes);
 
 	bool InitLiteral       (char    const *const cstr, i32 const lenInBytes, DqnMemStack *const stack);
 	bool InitLiteral       (char    const *const cstr,                       DqnMemStack *const stack);
-	bool InitLiteral       (char    const *const cstr, i32 const lenInBytes, DqnMemAPI    const api = DqnMemAPI::HeapAllocator());
-	bool InitLiteral       (char    const *const cstr,                       DqnMemAPI    const api = DqnMemAPI::HeapAllocator());
+	bool InitLiteral       (char    const *const cstr, i32 const lenInBytes, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	bool InitLiteral       (char    const *const cstr,                       DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 
 	bool InitLiteral       (wchar_t const *const cstr, DqnMemStack *const stack);
-	bool InitLiteral       (wchar_t const *const cstr, DqnMemAPI    const api = DqnMemAPI::HeapAllocator());
+	bool InitLiteral       (wchar_t const *const cstr, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 
 	// return: False if cstr is nullptr.
 	bool InitLiteralNoAlloc(char *const cstr, i32 cstrLen = -1);
@@ -480,15 +484,10 @@ public:
 	i32      ToWChar(wchar_t *const buf, i32 const bufSize);
 
 	// return: String allocated using api.
-	wchar_t *ToWChar(DqnMemAPI api = DqnMemAPI::HeapAllocator());
+	wchar_t *ToWChar(DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 };
 
-struct DqnSmartString : public DqnString
-{
-	~DqnSmartString() { this->Free(); }
-};
-
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI    const api = DqnMemAPI::HeapAllocator());
+DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
 
 // NOTE: First level of indirection needs to turn the combined dqnstring_(guid) into a name. Otherwise
@@ -508,7 +507,7 @@ class DqnArray
 {
 public:
 	// Function pointers to custom allocators
-	DqnMemAPI memAPI;
+	DqnMemAPI *memAPI;
 
 	// Array state
 	i64 count;
@@ -519,7 +518,7 @@ public:
 
 	// API
 	bool  Init        (const i64 size, DqnMemStack *const stack);
-	bool  Init        (const i64 size, DqnMemAPI api = DqnMemAPI::HeapAllocator());
+	bool  Init        (const i64 size, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 	bool  Free        ();
 	bool  Resize      (const i64 newMax);
 	bool  Grow        ();
@@ -536,23 +535,23 @@ public:
 
 template <typename T>
 DQN_FILE_SCOPE DqnArray<T> DqnArray_(i64 const size,
-                                     DqnMemAPI api = DqnMemAPI::HeapAllocator())
+                                     DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR)
 {
 	DqnArray<T> result;
 	bool init = result.Init(size, api);
-	DQN_ASSERT_HARD(init);
+	DQN_ASSERT(init);
 	return result;
 }
 
 template <typename T>
 DQN_FILE_SCOPE DqnArray<T> DqnArray_(i64 const size, DqnMemStack *const stack)
 {
-	DqnArray<T> result = DqnArray_<T>(size, DqnMemAPI::StackAllocator(stack));
+	DqnArray<T> result = DqnArray_<T>(size, &stack->myAPI);
 	return result;
 }
 
 template <typename T>
-DQN_FILE_SCOPE DqnArray<T> DqnArray_(DqnMemAPI api = DqnMemAPI::HeapAllocator())
+DQN_FILE_SCOPE DqnArray<T> DqnArray_(DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR)
 {
 	DqnArray<T> result = DqnArray_<T>(0, api);
 	return result;
@@ -571,21 +570,21 @@ bool DqnArray<T>::Init(i64 const size, DqnMemStack *const stack)
 	bool result = false;
 	if (stack)
 	{
-		result = this->Init(size, DqnMemAPI::StackAllocator(stack));
+		result = this->Init(size, &stack->myAPI);
 	}
 
 	return result;
 }
 
 template <typename T>
-bool DqnArray<T>::Init(i64 const size, DqnMemAPI api)
+bool DqnArray<T>::Init(i64 const size, DqnMemAPI *const api)
 {
-	DQN_ASSERT_HARD(size >= 0);
+	DQN_ASSERT(size >= 0);
 
 	if (size > 0)
 	{
 		i64 allocateSize        = size * sizeof(T);
-		this->data              = (T *)api.Alloc(allocateSize, /*zeroClear*/ false);
+		this->data              = (T *)api->Alloc(allocateSize, /*zeroClear*/ false);
 		if (!this->data) return false;
 	}
 
@@ -604,7 +603,7 @@ bool DqnArray<T>::Free()
 	{
 		// TODO(doyle): Right now we assume free always works, and it probably should?
 		i64 sizeToFree = this->max * sizeof(T);
-		this->memAPI.Free(this->data, sizeToFree);
+		this->memAPI->Free(this->data, sizeToFree);
 		this->data = nullptr;
 
 		this->count = 0;
@@ -619,14 +618,14 @@ template <typename T>
 bool DqnArray<T>::Resize(i64 newMax)
 {
 	if (!this->data)            return false;
-	if (!this->memAPI.IsValid()) return false;
+	if (!this->memAPI->IsValid()) return false;
 
 	i64 oldSize = this->max * sizeof(T);
 	i64 newSize = newMax * sizeof(T);
 
 	T *result = nullptr;
-	if (oldSize == 0) result = (T *)this->memAPI.Alloc  (newSize, /*zeroClear*/ false);
-	else              result = (T *)this->memAPI.Realloc(this->data, oldSize, newSize);
+	if (oldSize == 0) result = (T *)this->memAPI->Alloc  (newSize, /*zeroClear*/ false);
+	else              result = (T *)this->memAPI->Realloc(this->data, oldSize, newSize);
 
 	if (result)
 	{
@@ -876,7 +875,7 @@ struct DqnHashTable
 		Entry     *next;
 	};
 
-	DqnMemAPI memAPI;
+	DqnMemAPI *memAPI;
 
 	Entry **entries;
 	i64     numEntries;
@@ -887,7 +886,7 @@ struct DqnHashTable
 
 	// Initialisation API
 	// =============================================================================================
-	bool Init(i64 const numTableEntries = 1024, DqnMemAPI    const api = DqnMemAPI::HeapAllocator());
+	bool Init(i64 const numTableEntries = 1024, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 	bool Init(i64 const numTableEntries,        DqnMemStack *const stack);
 
 	// API
@@ -916,17 +915,17 @@ struct DqnHashTable
 };
 
 template <typename T>
-bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemAPI api)
+bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemAPI *const api)
 {
 	size_t arrayOfPtrsSize = sizeof(*this->entries) * numTableEntries;
-	auto *arrayOfPtrs      = (u8 *)api.Alloc(arrayOfPtrsSize);
+	auto *arrayOfPtrs      = (u8 *)api->Alloc(arrayOfPtrsSize);
 	if (!arrayOfPtrs) return false;
 
 	size_t usedEntriesSize = sizeof(*this->usedEntries) * numTableEntries;
-	auto *usedEntriesPtr   = (u8 *)api.Alloc(usedEntriesSize);
+	auto *usedEntriesPtr   = (u8 *)api->Alloc(usedEntriesSize);
 	if (!usedEntriesPtr)
 	{
-		api.Free((void *)arrayOfPtrs, arrayOfPtrsSize);
+		api->Free((void *)arrayOfPtrs, arrayOfPtrsSize);
 		return false;
 	}
 
@@ -945,16 +944,14 @@ template <typename T>
 bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemStack *const stack)
 {
 	if (!stack) return false;
-
-	DqnMemAPI memAPI_ = DqnMemAPI::StackAllocator(stack);
-	bool result = Init(numTableEntries, memAPI_);
+	bool result = Init(numTableEntries, &stack->myAPI);
 	return result;
 }
 
 template <typename T>
 typename DqnHashTable<T>::Entry *DqnHashTableInternal_AllocateEntry(DqnHashTable<T> *table)
 {
-	auto *result = (DqnHashTable<T>::Entry *)table->memAPI.Alloc(sizeof(DqnHashTable<T>::Entry));
+	auto *result = (DqnHashTable<T>::Entry *)table->memAPI->Alloc(sizeof(DqnHashTable<T>::Entry));
 
 	if (result)
 	{
@@ -963,8 +960,8 @@ typename DqnHashTable<T>::Entry *DqnHashTableInternal_AllocateEntry(DqnHashTable
 			return result;
 		}
 
-		DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Out of memory error");
-		table->memAPI.Free(result, sizeof(*result));
+		DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Out of memory error");
+		table->memAPI->Free(result, sizeof(*result));
 		return nullptr;
 	}
 	else
@@ -1104,7 +1101,7 @@ typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(char const *const key, i3
 	}
 	else
 	{
-		DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "DqnHashTable_Get() failed: Out of memory.");
+		DQN_ASSERTM(DQN_INVALID_CODE_PATH, "DqnHashTable_Get() failed: Out of memory.");
 		return nullptr;
 	}
 }
@@ -1177,13 +1174,13 @@ void DqnHashTable<T>::Free()
 		Entry *entryToFree = *(this->entries + indexToFree);
 
 		entryToFree->key.Free();
-		this->memAPI.Free(entryToFree, ENTRY_SIZE);
+		this->memAPI->Free(entryToFree, ENTRY_SIZE);
 	}
 
 	// Free usedEntries list
 	{
 		size_t sizeToFree = sizeof(*this->usedEntries) * this->numEntries;
-		this->memAPI.Free(this->usedEntries, sizeToFree);
+		this->memAPI->Free(this->usedEntries, sizeToFree);
 	}
 
 	// Free freeList
@@ -1195,14 +1192,14 @@ void DqnHashTable<T>::Free()
 			entry              = entry->next;
 
 			entryToFree->key.Free();
-			this->memAPI.Free(entryToFree, ENTRY_SIZE);
+			this->memAPI->Free(entryToFree, ENTRY_SIZE);
 		}
 	}
 
 	// Free the array of ptrs
 	{
 		size_t sizeToFree = ENTRY_SIZE * this->numEntries;
-		this->memAPI.Free(this->entries, sizeToFree);
+		this->memAPI->Free(this->entries, sizeToFree);
 	}
 
 }
@@ -1219,7 +1216,7 @@ bool DqnHashTable<T>::AddNewEntriesToFreeList(i64 num)
 			if (entryToFree)
 			{
 				this->freeList = entryToFree->next;
-				this->memAPI.Free(entryToFree, sizeof(*this->freeList));
+				this->memAPI->Free(entryToFree, sizeof(*this->freeList));
 			}
 		}
 
@@ -1258,7 +1255,7 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
 	// NOTE: If you change allocation order, be sure to change the free order.
 	// Allocate newEntries
 	{
-		auto *newEntriesPtr = (u8 *)this->memAPI.Alloc(newEntriesSize);
+		auto *newEntriesPtr = (u8 *)this->memAPI->Alloc(newEntriesSize);
 		if (!newEntriesPtr) return false;
 
 		newEntries = (Entry **)newEntriesPtr;
@@ -1266,10 +1263,10 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
 
 	// Allocate usedEntries
 	{
-		auto *usedEntriesPtr    = (u8 *)this->memAPI.Alloc(newUsedEntriesSize);
+		auto *usedEntriesPtr    = (u8 *)this->memAPI->Alloc(newUsedEntriesSize);
 		if (!usedEntriesPtr)
 		{
-			this->memAPI.Free(newEntries, newEntriesSize);
+			this->memAPI->Free(newEntries, newEntriesSize);
 			return false;
 		}
 
@@ -1307,13 +1304,13 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
 	// Free the old entry list
 	{
 		size_t freeSize = sizeof(*this->entries) * this->numEntries;
-		this->memAPI.Free(this->entries, freeSize);
+		this->memAPI->Free(this->entries, freeSize);
 	}
 
 	// Free the old used entry list
 	{
 		size_t freeSize = sizeof(*this->usedEntries) * this->numEntries;
-		this->memAPI.Free(this->usedEntries, freeSize);
+		this->memAPI->Free(this->usedEntries, freeSize);
 	}
 
 	this->entries          = newEntries;
@@ -2016,8 +2013,8 @@ struct DqnFile
 
 	// Buffer should be freed when done with.
 	// return: False if file access failure OR nullptr arguments.
-	static u8    *ReadEntireFileSimple(char    const *const path, size_t *const bufSize, DqnMemAPI memAPI = DqnMemAPI::HeapAllocator());
-	static u8    *ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSize, DqnMemAPI memAPI = DqnMemAPI::HeapAllocator());
+	static u8    *ReadEntireFileSimple(char    const *const path, size_t *const bufSize, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	static u8    *ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSize, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 
 	// return: False if file access failure OR nullptr arguments.
 	static bool   GetFileSize         (char    const *const path, size_t *const size);
@@ -2748,37 +2745,58 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 // #define DQN_INI_IMPLEMENTATION
 #define DQN_INI_STRLEN(s) DqnStr_Len(s)
 
-// #DqnAssert
+// #DqnLog
 // =================================================================================================
-DQN_FILE_SCOPE bool DqnAssertInternal(const bool result, const char *const file, const i32 lineNum,
-                                      const char *const expr, const char *const msg, ...)
+DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum,
+                           char const *const expr, char const *const msg, ...)
 {
-	if (!(result))
+	auto fileLen = DqnStr_Len(file);
+	for (auto i = fileLen - 1; i >= 0; i--)
 	{
-		const char *const formatStrNoMsg   = "DqnAssert() failed: %s|%d| (%s)\n";
-		const char *const formatStrWithMsg = "DqnAssert() failed: %s|%d| (%s): %s\n";
-		const char *const formatStr        = (msg) ? formatStrWithMsg : formatStrNoMsg;
-
-		char userMsg[2048] = {};
-		if (msg)
+		if (file[i] == '\\')
 		{
-			va_list argList;
-			va_start(argList, msg);
-			{
-				u32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
-				DQN_ASSERT_HARD(numCopied < DQN_ARRAY_COUNT(userMsg));
-			}
-			va_end(argList);
+			file = file + i + 1;
+			break;
 		}
-
-#if defined(DQN_WIN32_PLATFORM)
-		DqnWin32_OutputDebugString(formatStr, file, lineNum, expr, userMsg);
-#endif
-
-		printf(formatStr, file, lineNum, expr, userMsg);
-		(*((i32 *)0)) = 0;
 	}
-	return result;
+
+	char userMsg[2048];
+	userMsg[0] = '\0';
+
+	if (msg)
+	{
+		va_list argList;
+		va_start(argList, msg);
+		{
+			u32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
+			if (numCopied > DQN_ARRAY_COUNT(userMsg))
+			{
+				(*((int *)0)) = 0;
+			}
+		}
+		va_end(argList);
+	}
+
+	bool hasExpr = !(expr == nullptr);
+	if (hasExpr)
+	{
+		char const *const formatStr = "DqnLog:%s:%s,%d(%s): %s";
+		fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
+
+		#if defined(DQN_WIN32_PLATFORM)
+			DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, expr, userMsg);
+		#endif
+	}
+	else
+	{
+		char const *const formatStr = "DqnLog:%s:%s,%d: %s";
+		fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
+
+		#if defined(DQN_WIN32_PLATFORM)
+			DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, userMsg);
+		#endif
+	}
+
 }
 
 // #DqnMemory
@@ -2848,176 +2866,211 @@ DQN_FILE_SCOPE void *DqnMem_Set64(void *const dest, u8 const value, i64 const nu
 	size_t  const numU8ToCopy = numBytesToCopy & (remainingMask);
 	__stosb(destU8, valueU8, numU8ToCopy);
 #else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH)
+	DQN_ASSERT(DQN_INVALID_CODE_PATH)
 #endif
 	return dest;
 };
 
 // #DqnMemAPI
 // =================================================================================================
-FILE_SCOPE void DqnMemAPIInternal_ValidateRequest(DqnMemAPI::Request request)
+FILE_SCOPE void DqnMemAPIInternal_ValidateRequest(DqnMemAPI::Request request_)
 {
-	DQN_ASSERT_HARD(request.type != DqnMemAPI::Type::Uninitialised);
+	DQN_ASSERT(request_.type != DqnMemAPI::Type::Uninitialised);
 
-	switch(request.type)
+	if (request_.type == DqnMemAPI::Type::Alloc)
 	{
-		case DqnMemAPI::Type::Alloc:
-		{
-			DQN_ASSERT_HARD(request.requestSize > 0);
-		}
-		break;
+		auto *request = &request_.alloc;
+		DQN_ASSERT(request->requestSize > 0);
+		return;
+	}
 
-		case DqnMemAPI::Type::Realloc:
-		{
-			DQN_ASSERT_HARD(request.oldSize > 0);
-			DQN_ASSERT_HARD(request.requestSize > 0);
-			DQN_ASSERT_HARD(request.oldMemPtr);
-		}
-		break;
-
-		case DqnMemAPI::Type::Free:
-		{
-			// nothing to validate
-		}
-		break;
-
-		default:
-		{
-			DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
-		}
-		break;
+	if (request_.type == DqnMemAPI::Type::Realloc)
+	{
+		auto *request = &request_.realloc;
+		DQN_ASSERT(request->oldSize > 0);
+		DQN_ASSERT(request->newRequestSize > 0);
+		DQN_ASSERT(request->oldMemPtr);
+		return;
 	}
 }
 
-FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI::Request request)
+FILE_SCOPE void DqnMemAPIInternal_UpdateAPIStatistics(DqnMemAPI *api, DqnMemAPI::Request *request_)
 {
-	DQN_ASSERT_HARD(!request.userContext);
-	u8 *result = nullptr;
-
-	DqnMemAPIInternal_ValidateRequest(request);
-	switch(request.type)
+	if (request_->type == DqnMemAPI::Type::Alloc)
 	{
-		case DqnMemAPI::Type::Alloc:
-		{
-			if (request.clearToZero) result = (u8 *)DqnMem_Calloc(request.requestSize);
-			else                     result = (u8 *)DqnMem_Alloc (request.requestSize);
-		}
-		break;
+		auto *request = &request_->alloc;
+		api->bytesAllocated += request->requestSize;
+		api->lifetimeBytesAllocated += request->requestSize;
+		return;
+	}
 
-		case DqnMemAPI::Type::Realloc:
-		{
-			result = (u8 *)DqnMem_Realloc(request.oldMemPtr, request.newRequestSize);
-		}
-		break;
+	if (request_->type == DqnMemAPI::Type::Realloc)
+	{
+		auto *request = &request_->realloc;
+		api->lifetimeBytesAllocated += request->newRequestSize;
+		api->lifetimeBytesFreed += request->oldSize;
 
-		case DqnMemAPI::Type::Free:
-		{
-			DqnMem_Free(request.ptrToFree);
-		}
-		break;
+		api->bytesAllocated += request->newRequestSize;
+		api->bytesAllocated -= request->oldSize;
+		return;
+	}
 
-		default:
+	if (request_->type == DqnMemAPI::Type::Free)
+	{
+		auto *request = &request_->free;
+		api->lifetimeBytesFreed += request->sizeToFree;
+		return;
+	}
+}
+
+FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI::Request request_)
+{
+	DqnMemAPIInternal_ValidateRequest(request_);
+	DQN_ASSERT(!request_.userContext);
+
+	u8 *result   = nullptr;
+	bool success = false;
+
+	if (request_.type == DqnMemAPI::Type::Alloc)
+	{
+		auto const *request = &request_.alloc;
+
+		if (request->clearToZero) result = (u8 *)DqnMem_Calloc(request->requestSize);
+		else                      result = (u8 *)DqnMem_Alloc(request->requestSize);
+
+		success = (result != nullptr);
+	}
+	else if (request_.type == DqnMemAPI::Type::Realloc)
+	{
+		auto const *request = &request_.realloc;
+		if (request->newRequestSize == request->oldSize)
 		{
-			DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+			result = (u8 *)request->oldMemPtr;
 		}
-		break;
+		else
+		{
+			result  = (u8 *)DqnMem_Realloc(request->oldMemPtr, request->newRequestSize);
+			success = (result != nullptr);
+		}
+	}
+	else if (request_.type == DqnMemAPI::Type::Free)
+	{
+		auto *request = &request_.free;
+		DqnMem_Free(request->ptrToFree);
+		success = (request->ptrToFree != nullptr);
+	}
+	else
+	{
+		DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	}
+
+	if (success)
+	{
+		DqnMemAPIInternal_UpdateAPIStatistics(api, &request_);
 	}
 
 	return result;
 }
 
-FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI::Request info)
+// TODO(doyle): Revisit the memAPI statistics for stack allocator. Currently it represents the exact
+// amount requested by the client. But the actual usage is different depending on if the stack
+// needed to allocate additional blocks, padding and so forth. That information is generally opaque
+// to the client except where the client gets the statistics from the actual memory stack. Whether
+// or not this behaviour is intuitive is something to figure out.
+FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAPI::Request request_)
 {
-	DQN_ASSERT_HARD(info.userContext);
-	DqnMemStack *const stack = static_cast<DqnMemStack *>(info.userContext);
-	u8 *result               = nullptr;
+	DqnMemAPIInternal_ValidateRequest(request_);
+	DQN_ASSERT(request_.userContext);
 
-	DqnMemAPIInternal_ValidateRequest(info);
-	switch(info.type)
+	auto *const stack = (DqnMemStack *)(request_.userContext);
+	u8 *result        = nullptr;
+	bool success      = false;
+
+	if (request_.type == DqnMemAPI::Type::Alloc)
 	{
-		case DqnMemAPI::Type::Alloc:
-		{
-			result = (u8 *)stack->Push(info.requestSize);
+		auto *request = &request_.alloc;
+		result = (u8 *)stack->Push(request->requestSize);
 
-			if (info.clearToZero)
-			{
-				DqnMem_Clear(result, 0, info.requestSize);
-			}
+		if (result)
+		{
+			success = true;
+			if (request->clearToZero) DqnMem_Clear(result, 0, request->requestSize);
 		}
-		break;
+	}
+	else if (request_.type == DqnMemAPI::Type::Realloc)
+	{
+		auto *request = &request_.realloc;
 
-		case DqnMemAPI::Type::Realloc:
-		case DqnMemAPI::Type::Free:
+		// IMPORTANT: This is a _naive_ realloc scheme for stack allocation.
+		DqnMemStack::Block *block = stack->block;
+		u8 *currUsagePtr          = (u8 *)(block->memory + block->used);
+		u8 *checkPtr              = currUsagePtr - DQN_ALIGN_POW_N(request->oldSize, stack->byteAlign);
+
+		// Last allocation, can safely allocate the remainder space.
+		if (checkPtr == (u8 *)request->oldMemPtr || request->oldMemPtr == block->memory)
 		{
-			// IMPORTANT: This is a _naive_ realloc scheme for stack allocation.
-			DqnMemStack::Block *block = stack->block;
-			u8 *currUsagePtr        = (u8 *)(block->memory + block->used);
-			u8 *checkPtr            = currUsagePtr - DQN_ALIGN_POW_N(info.oldSize, stack->byteAlign);
+			size_t remainingBytesToAlloc = request->newRequestSize - request->oldSize;
+			DQN_ASSERT(remainingBytesToAlloc > 0);
 
-			if (info.type == DqnMemAPI::Type::Realloc)
+			bool enoughSpace =
+			    (currUsagePtr + remainingBytesToAlloc) < (block->memory + block->size);
+
+			if (enoughSpace)
 			{
-				// Last allocation, can safely allocate the remainder space.
-				if (checkPtr == (u8 *)info.oldMemPtr || info.oldMemPtr == block->memory)
-				{
-					size_t remainingBytesToAlloc = info.newRequestSize - info.oldSize;
-					DQN_ASSERT_HARD(remainingBytesToAlloc > 0);
-
-					bool enoughSpace =
-					    (currUsagePtr + remainingBytesToAlloc) < (block->memory + block->size);
-
-					if (enoughSpace)
-					{
-						result       = (u8 *)info.oldMemPtr;
-						u8 *startPtr = (u8 *)stack->Push(remainingBytesToAlloc);
-						DQN_ASSERT_HARD(stack->block == block);
-
-						if (info.clearToZero)
-						{
-							DqnMem_Clear(startPtr, 0, remainingBytesToAlloc);
-						}
-
-						return result;
-					}
-
-					// Else, last allocation but not enough space in block. Create a new block and
-					// copy
-					DqnMemStack::Block *newBlock =
-					    stack->AllocateCompatibleBlock(info.newRequestSize, info.clearToZero);
-					if (newBlock)
-					{
-						DqnMem_Copy(result, (u8 *)info.oldMemPtr, info.oldSize);
-						stack->Pop(info.oldMemPtr, info.oldSize);
-
-						stack->AttachBlock(block);
-						result = stack->block->memory;
-					}
-				}
-				else
-				{
-					// NOTE: Lost memory when this case occurs.
-					result = (u8 *)stack->Push(info.newRequestSize);
-
-					if (result)
-					{
-						DqnMem_Copy(result, (u8 *)info.oldMemPtr, info.oldSize);
-					}
-				}
-
-				return result;
+				result       = (u8 *)request->oldMemPtr;
+				u8 *startPtr = (u8 *)stack->Push(remainingBytesToAlloc);
+				DQN_ASSERT(startPtr);
+				DQN_ASSERT(stack->block == block);
+				success = true;
 			}
 			else
 			{
-				if (checkPtr == (u8 *)info.oldMemPtr)
-					stack->Pop(info.oldMemPtr, info.oldSize);
+
+				// TODO(doyle): Does realloc need clear to zero flag as well?
+				// Else, last allocation but not enough space in block. Create a new block and
+				// copy
+				DqnMemStack::Block *newBlock =
+				    stack->AllocateCompatibleBlock(request->newRequestSize, false);
+				if (newBlock)
+				{
+					success = true;
+					DqnMem_Copy(result, (u8 *)request->oldMemPtr, request->oldSize);
+					stack->Pop(request->oldMemPtr, request->oldSize);
+
+					stack->AttachBlock(block);
+					result = stack->block->memory;
+				}
 			}
 		}
-		break;
-
-		default:
+		else
 		{
-			DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+			// NOTE: Lost memory when this case occurs.
+			result = (u8 *)stack->Push(request->newRequestSize);
+			if (result)
+			{
+				success = true;
+				DqnMem_Copy(result, (u8 *)request->oldMemPtr, request->oldSize);
+			}
 		}
-		break;
+	}
+	else
+	{
+		auto *request = &request_.free;
+
+		DqnMemStack::Block *block = stack->block;
+		u8 *currUsagePtr          = (u8 *)(block->memory + block->used);
+
+		DQN_ASSERT(request_.type == DqnMemAPI::Type::Free);
+		if (currUsagePtr == (u8 *)request->ptrToFree)
+		{
+			success = true;
+			stack->Pop(request->ptrToFree, request->sizeToFree);
+		}
+	}
+
+	if (success)
+	{
+		DqnMemAPIInternal_UpdateAPIStatistics(api, &request_);
 	}
 
 	return result;
@@ -3028,34 +3081,34 @@ void *DqnMemAPI::Realloc(void *const oldPtr, size_t const oldSize, size_t const 
 	Request request        = {};
 	request.type           = Type::Realloc;
 	request.userContext    = this->userContext;
-	request.newRequestSize = newSize;
-	request.oldMemPtr      = oldPtr;
-	request.oldSize        = oldSize;
+	request.realloc.newRequestSize = newSize;
+	request.realloc.oldMemPtr      = oldPtr;
+	request.realloc.oldSize        = oldSize;
 
-	void *result = (void *)this->allocator(request);
+	void *result = (void *)this->allocator(this, request);
 	return result;
 }
 
 void *DqnMemAPI::Alloc(size_t const size, bool const clearToZero)
 {
-	Request request     = {};
-	request.type        = Type::Alloc;
-	request.userContext = this->userContext;
-	request.clearToZero = clearToZero;
-	request.requestSize = size;
+	Request request           = {};
+	request.type              = Type::Alloc;
+	request.userContext       = this->userContext;
+	request.alloc.clearToZero = clearToZero;
+	request.alloc.requestSize = size;
 
-	void *result = (void *)this->allocator(request);
+	void *result = (void *)this->allocator(this, request);
 	return result;
 }
 
 void DqnMemAPI::Free(void *const ptrToFree, size_t const sizeToFree)
 {
-	Request request     = {};
-	request.type        = Type::Free;
-	request.userContext = this->userContext;
-	request.ptrToFree   = ptrToFree;
-	request.sizeToFree  = sizeToFree;
-	this->allocator(request);
+	Request request         = {};
+	request.type            = Type::Free;
+	request.userContext     = this->userContext;
+	request.free.ptrToFree  = ptrToFree;
+	request.free.sizeToFree = sizeToFree;
+	this->allocator(this, request);
 }
 
 DqnMemAPI DqnMemAPI::HeapAllocator()
@@ -3068,7 +3121,7 @@ DqnMemAPI DqnMemAPI::HeapAllocator()
 
 DqnMemAPI DqnMemAPI::StackAllocator(struct DqnMemStack *const stack)
 {
-	DQN_ASSERT_HARD(stack);
+	DQN_ASSERT(stack);
 	DqnMemAPI result   = {0};
 	result.allocator   = DqnMemAPIInternal_StackAllocatorCallback;
 	result.userContext = stack;
@@ -3079,16 +3132,20 @@ DqnMemAPI DqnMemAPI::StackAllocator(struct DqnMemStack *const stack)
 // =================================================================================================
 DQN_FILE_SCOPE DqnMemStack::Block *DqnMemStackInternal_AllocateBlock(u32 byteAlign, size_t size,
                                                                      bool const zeroClear,
-                                                                     DqnMemAPI *memAPI)
+                                                                     DqnMemAPI *const api)
 {
-	if (!memAPI->IsValid()) return nullptr;
+	if (!api || !api->IsValid())
+	{
+		DQN_LOGE("Could not allocate block with api, api is null or is valid check failed.");
+		return nullptr;
+	}
 
 	size_t alignedSize = DQN_ALIGN_POW_N(size, byteAlign);
 	size_t totalSize   = alignedSize + sizeof(DqnMemStack::Block) + (byteAlign -1);
 
 	// NOTE(doyle): Total size includes another (byteAlign-1) since we also want
 	// to align the base pointer to memory that we receive.
-	auto *result = (DqnMemStack::Block *)memAPI->Alloc(totalSize, zeroClear);
+	auto *result = (DqnMemStack::Block *)api->Alloc(totalSize, zeroClear);
 	if (!result) return nullptr;
 
 	result->memory    = (u8 *)DQN_ALIGN_POW_N((u8 *)result + sizeof(*result), byteAlign);
@@ -3100,14 +3157,18 @@ DQN_FILE_SCOPE DqnMemStack::Block *DqnMemStackInternal_AllocateBlock(u32 byteAli
 
 bool DqnMemStack::InitWithFixedMem(u8 *const mem, size_t const memSize, u32 const byteAlign_)
 {
-	// TODO(doyle): Logging
-	if (!mem) return false;
-
-	if (!DQN_ASSERT_MSG(
-	        memSize > sizeof(DqnMemStack::Block),
-	        "memSize is insufficient to initialise a memstack, memSize: %d, requiredSize: %d",
-	        memSize, sizeof(DqnMemStack::Block)))
+	if (!mem)
 	{
+		DQN_LOGE("Supplied fixed memory buffer is nullptr, initialise with fixed memory failed.\n");
+		return false;
+	}
+
+	if (memSize < sizeof(DqnMemStack::Block))
+	{
+		DQN_LOGE(
+		    "Memory size is too small to store the memory block metadata, we received: %$d, the "
+		    "memory block requires at minimum: %$d\n",
+		    memSize, sizeof(*this->block));
 		return false;
 	}
 
@@ -3128,9 +3189,9 @@ bool DqnMemStack::InitWithFixedMem(u8 *const mem, size_t const memSize, u32 cons
 }
 
 bool DqnMemStack::InitWithFixedSize(size_t size, bool const zeroClear, u32 const byteAlign_,
-                                    DqnMemAPI memAPI_)
+                                    DqnMemAPI *const api)
 {
-	bool result = this->Init(size, zeroClear, byteAlign_, memAPI_);
+	bool result = this->Init(size, zeroClear, byteAlign_, api);
 	if (result)
 	{
 		this->flags |= DqnMemStack::Flag::IsNotExpandable;
@@ -3141,12 +3202,15 @@ bool DqnMemStack::InitWithFixedSize(size_t size, bool const zeroClear, u32 const
 	return false;
 }
 
-bool DqnMemStack::Init(size_t size, bool const zeroClear, u32 const byteAlign_, DqnMemAPI memAPI_)
+bool DqnMemStack::Init(size_t size, bool const zeroClear, u32 const byteAlign_, DqnMemAPI *const api)
 {
 	if (!this || size < 0) return false;
 
-	if (!DQN_ASSERT_MSG(!this->block, "MemStack has pre-existing block already attached"))
+	if (this->block)
+	{
+		DQN_LOGE("Memory stack has pre-existing block attached: %x\n", this->block);
 		return false;
+	}
 
 	if (size == 0)
 	{
@@ -3154,17 +3218,21 @@ bool DqnMemStack::Init(size_t size, bool const zeroClear, u32 const byteAlign_, 
 	}
 	else
 	{
-		this->block = DqnMemStackInternal_AllocateBlock(byteAlign_, size, zeroClear, &memAPI_);
-		if (!DQN_ASSERT_MSG(this->block, "MemStack failed to allocate block, not enough memory"))
+		this->block = DqnMemStackInternal_AllocateBlock(byteAlign_, size, zeroClear, api);
+		if (!this->block)
+		{
+			DQN_LOGE("Memory stack could not allocated memory error, requested: %d bytes\n", size);
 			return false;
+		}
 
-		DQN_ASSERT(!this->block->prevBlock);
+		DQN_ASSERTM(!this->block->prevBlock, "Newly allocated block already has previous block attached: %x\n", this->block->prevBlock);
 	}
 
 	this->tempRegionCount = 0;
 	this->byteAlign       = byteAlign_;
 	this->flags           = 0;
-	this->memAPI          = memAPI_;
+	this->memAPI          = api;
+	this->myAPI           = DqnMemAPI::StackAllocator(this);
 	return true;
 }
 
@@ -3204,7 +3272,7 @@ void *DqnMemStack::Push(size_t size)
 
 			// But if we somehow reach this, we need to free the block
 			// otherwise memory is leaked.
-			DQN_ASSERT_HARD(blockAttachResult);
+			DQN_ASSERT(blockAttachResult);
 		}
 		else
 		{
@@ -3223,11 +3291,11 @@ void *DqnMemStack::Push(size_t size)
 	// subsequent allocations should also be aligned automatically.
 	// TODO(doyle): In the future, do we want to allow arbitrary alignment PER
 	// allocation, not per MemStack?
-	DQN_ASSERT_HARD(alignmentOffset == 0);
+	DQN_ASSERT(alignmentOffset == 0);
 
 	void *result = alignedResult;
 	this->block->used += (alignedSize + alignmentOffset);
-	DQN_ASSERT_HARD(this->block->used <= this->block->size);
+	DQN_ASSERT(this->block->used <= this->block->size);
 	return result;
 }
 
@@ -3281,7 +3349,7 @@ void DqnMemStack::Free()
 	// do is clear the block.
 	if (this->flags & DqnMemStack::Flag::IsFixedMemoryFromUser)
 	{
-		DQN_ASSERT_HARD(!this->block->prevBlock);
+		DQN_ASSERT(!this->block->prevBlock);
 		this->ClearCurrBlock(false);
 		return;
 	}
@@ -3308,10 +3376,10 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 	{
 		DqnMemStack::Block *blockToFree = *blockPtr;
 		(*blockPtr)                     = blockToFree->prevBlock;
-		this->memAPI.Free(blockToFree, blockToFree->size);
+		this->memAPI->Free(blockToFree, blockToFree->size);
 
 		// No more blocks, then last block has been freed
-		if (!this->block) DQN_ASSERT_HARD(this->tempRegionCount == 0);
+		if (!this->block) DQN_ASSERT(this->tempRegionCount == 0);
 		return true;
 	}
 
@@ -3371,12 +3439,12 @@ void DqnMemStack::TempRegionEnd(TempRegion region)
 
 	if (this->block)
 	{
-		DQN_ASSERT_HARD(this->block->used >= region.used);
+		DQN_ASSERT(this->block->used >= region.used);
 		this->block->used = region.used;
 	}
 
 	this->tempRegionCount--;
-	DQN_ASSERT_HARD(this->tempRegionCount >= 0);
+	DQN_ASSERT(this->tempRegionCount >= 0);
 }
 
 void DqnMemStack::TempRegionKeepChanges(TempRegion region)
@@ -3385,7 +3453,7 @@ void DqnMemStack::TempRegionKeepChanges(TempRegion region)
 	DQN_ASSERT(stack == this);
 
 	this->tempRegionCount--;
-	DQN_ASSERT_HARD(this->tempRegionCount >= 0);
+	DQN_ASSERT(this->tempRegionCount >= 0);
 }
 
 DqnMemStack::TempRegionGuard_ DqnMemStack::TempRegionGuard()
@@ -3413,7 +3481,7 @@ DqnMemStack::Block *DqnMemStack::AllocateCompatibleBlock(size_t size, bool const
 	if (this->flags & DqnMemStack::Flag::IsNotExpandable)       return nullptr;
 
 	DqnMemStack::Block *memBlock =
-	    DqnMemStackInternal_AllocateBlock(this->byteAlign, size, zeroClear, &this->memAPI);
+	    DqnMemStackInternal_AllocateBlock(this->byteAlign, size, zeroClear, this->memAPI);
 	return memBlock;
 }
 
@@ -4234,7 +4302,7 @@ DQN_FILE_SCOPE DqnRect DqnRect_(DqnV2 origin, DqnV2 size)
 	result.min = origin;
 	result.max = result.min + size;
 
-	DQN_ASSERT_HARD(result.min <= result.max);
+	DQN_ASSERT(result.min <= result.max);
 	return result;
 }
 
@@ -4244,7 +4312,7 @@ DQN_FILE_SCOPE DqnRect DqnRect_(f32 x, f32 y, f32 w, f32 h)
 	result.min = DqnV2_(x, y);
 	result.max = DqnV2_(x + w, y + h);
 
-	DQN_ASSERT_HARD(result.min <= result.max);
+	DQN_ASSERT(result.min <= result.max);
 	return result;
 }
 
@@ -4254,20 +4322,20 @@ DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h)
 	result.min = DqnV2_(x, y);
 	result.max = DqnV2_(x + w, y + h);
 
-	DQN_ASSERT_HARD(result.min <= result.max);
+	DQN_ASSERT(result.min <= result.max);
 	return result;
 }
 
 void DqnRect::GetSize(f32 *const width, f32 *const height) const
 {
-	DQN_ASSERT_HARD(this->min <= this->max);
+	DQN_ASSERT(this->min <= this->max);
 	if (width) *width   = this->max.x - this->min.x;
 	if (height) *height = this->max.y - this->min.y;
 }
 
 DqnV2 DqnRect::GetCenter() const
 {
-	DQN_ASSERT_HARD(this->min <= this->max);
+	DQN_ASSERT(this->min <= this->max);
 	f32 sumX     = this->min.x + this->max.x;
 	f32 sumY     = this->min.y + this->max.y;
 	DqnV2 result = DqnV2_(sumX, sumY) * 0.5f;
@@ -4276,8 +4344,8 @@ DqnV2 DqnRect::GetCenter() const
 
 DqnRect DqnRect::ClipRect(const DqnRect clip) const
 {
-	DQN_ASSERT_HARD(this->min <= this->max);
-	DQN_ASSERT_HARD(clip.min <= clip.max);
+	DQN_ASSERT(this->min <= this->max);
+	DQN_ASSERT(clip.min <= clip.max);
 	DqnRect result = *this;
 
 	DqnV2 clipSize = clip.GetSize();
@@ -4310,7 +4378,7 @@ DqnRect DqnRect::ClipRect(const DqnRect clip) const
 
 DqnRect DqnRect::Move(const DqnV2 shift) const
 {
-	DQN_ASSERT_HARD(this->min <= this->max);
+	DQN_ASSERT(this->min <= this->max);
 
 	DqnRect result;
 	result.min = this->min + shift;
@@ -4320,7 +4388,7 @@ DqnRect DqnRect::Move(const DqnV2 shift) const
 
 bool DqnRect::ContainsP(const DqnV2 p) const
 {
-	DQN_ASSERT_HARD(this->min <= this->max);
+	DQN_ASSERT(this->min <= this->max);
 
 	bool outsideOfRectX = false;
 	if (p.x < this->min.x || p.x > this->max.w)
@@ -4708,7 +4776,7 @@ DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufS
 		// it is for positives, so ABS will fail.
 		lastDigitDecremented = true;
 		val                  = DQN_ABS(val - 1);
-		DQN_ASSERT_HARD(val >= 0);
+		DQN_ASSERT(val >= 0);
 	}
 
 	if (validBuffer)
@@ -4824,7 +4892,7 @@ DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize)
 			if (i < bufSize)
 			{
 				if (buf[i + 1] == '-') digitShiftIsPositive = false;
-				DQN_ASSERT_HARD(buf[i + 1] == '-' || buf[i + 1] == '+');
+				DQN_ASSERT(buf[i + 1] == '-' || buf[i + 1] == '+');
 				i += 2;
 			}
 
@@ -4850,7 +4918,7 @@ DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize)
 			// NOTE(doyle): If exponent not specified but this branch occurred,
 			// the float string has a malformed scientific notation in the
 			// string, i.e. "e" followed by no number.
-			DQN_ASSERT_HARD(scientificNotation);
+			DQN_ASSERT(scientificNotation);
 
 			if (digitShiftIsPositive)
 			{
@@ -5291,11 +5359,10 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 //              strings. So disabled for now.
 // #define DQN_STRING_ENABLE_SSO
 
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI api)
+DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI *const api)
 {
 	DqnString result;
 	result.Init(api);
-
 	return result;
 }
 
@@ -5306,8 +5373,10 @@ DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack)
 	return result;
 }
 
-void DqnString::Init(DqnMemAPI api)
+void DqnString::Init(DqnMemAPI *const api)
 {
+	DQN_ASSERT(api);
+
 	this->memAPI = api;
 #if defined(DQN_STRING_ENABLE_SSO)
 	this->sso[0] = 0;
@@ -5319,17 +5388,16 @@ void DqnString::Init(DqnMemAPI api)
 
 void DqnString::Init(DqnMemStack *const stack)
 {
-	DqnMemAPI api = DqnMemAPI::StackAllocator(stack);
-	this->Init(api);
+	this->Init(&stack->myAPI);
 }
 
 bool DqnString::InitSize(const i32 size, DqnMemStack *const stack)
 {
-	bool result = this->InitSize(size, DqnMemAPI::StackAllocator(stack));
+	bool result = this->InitSize(size, &stack->myAPI);
 	return result;
 }
 
-bool DqnString::InitSize(i32 size, DqnMemAPI api)
+bool DqnString::InitSize(i32 size, DqnMemAPI *const api)
 {
 	// NOTE: CHAR_COUNT is (ARRAY_COUNT - 1) to leave the last spot as the implicit null-terminator.
 	DQN_ASSERT(size >= 0);
@@ -5342,7 +5410,7 @@ bool DqnString::InitSize(i32 size, DqnMemAPI api)
 #endif
 	{
 		size_t allocSize = sizeof(*(this->str)) * (size + 1);
-		this->str        = (char *)api.Alloc(allocSize, /*zeroClear*/false);
+		this->str        = (char *)api->Alloc(allocSize, /*zeroClear*/false);
 		if (!this->str) return false;
 	}
 
@@ -5367,17 +5435,17 @@ bool DqnString::InitFixedMem(char *const memory, i32 const sizeInBytes)
 
 bool DqnString::InitLiteral(char const *const cstr, DqnMemStack *const stack)
 {
-	bool result = this->InitLiteral(cstr, DqnMemAPI::StackAllocator(stack));
+	bool result = this->InitLiteral(cstr, &stack->myAPI);
 	return result;
 }
 
 bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemStack *const stack)
 {
-	bool result = this->InitLiteral(cstr, lenInBytes, DqnMemAPI::StackAllocator(stack));
+	bool result = this->InitLiteral(cstr, lenInBytes, &stack->myAPI);
 	return result;
 }
 
-bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemAPI api)
+bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemAPI *const api)
 {
 	if (!this->InitSize(lenInBytes, api))
 	{
@@ -5392,7 +5460,7 @@ bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMem
 	return true;
 }
 
-bool DqnString::InitLiteral(char const *const cstr, DqnMemAPI api)
+bool DqnString::InitLiteral(char const *const cstr, DqnMemAPI *const api)
 {
 	i32 utf8LenInBytes = 0;
 	DqnStr_LenUTF8((u32 *)cstr, &utf8LenInBytes);
@@ -5402,11 +5470,11 @@ bool DqnString::InitLiteral(char const *const cstr, DqnMemAPI api)
 
 bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemStack *const stack)
 {
-	bool result = this->InitLiteral(cstr, DqnMemAPI::StackAllocator(stack));
+	bool result = this->InitLiteral(cstr, &stack->myAPI);
 	return result;
 }
 
-bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI api)
+bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI *const api)
 {
 #if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
 	i32 reqLenInclNullTerminator = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
@@ -5424,7 +5492,7 @@ bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI api)
 	return true;
 
 #else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return false;
 
 #endif
@@ -5457,7 +5525,7 @@ bool DqnString::Expand(const i32 newMax)
 		return true;
 	}
 
-	if (!this->memAPI.IsValid())
+	if (!this->memAPI || !this->memAPI->IsValid())
 	{
 		return false;
 	}
@@ -5465,7 +5533,7 @@ bool DqnString::Expand(const i32 newMax)
 #if defined(DQN_STRING_ENABLE_SSO)
 	if (newMax < DQN_CHAR_COUNT(this->sso))
 	{
-		DQN_ASSERT(this->memAPI.IsValid());
+		DQN_ASSERT(this->memAPI->IsValid());
 		DQN_ASSERT(this->sso == this->str || this->str == nullptr);
 		this->str = this->sso;
 		this->max = newMax;
@@ -5483,8 +5551,8 @@ bool DqnString::Expand(const i32 newMax)
 	size_t allocSize = sizeof(*(this->str)) * (newMax + 1);
 	char *result     = nullptr;
 
-	if (this->str) result = (char *)this->memAPI.Realloc(this->str, this->max, allocSize);
-	else           result = (char *)this->memAPI.Alloc(allocSize, /*zeroClear*/false);
+	if (this->str) result = (char *)this->memAPI->Realloc(this->str, this->max, allocSize);
+	else           result = (char *)this->memAPI->Alloc(allocSize, /*zeroClear*/false);
 
 	if (result)
 	{
@@ -5560,7 +5628,7 @@ bool DqnString::Sprintf(char const *fmt, ...)
 		char *bufStart = this->str + this->len;
 		i32 numCopied  = Dqn_vsprintf(bufStart, fmt, argList);
 		this->len += numCopied;
-		DQN_ASSERT_HARD(this->len <= this->max);
+		DQN_ASSERT(this->len <= this->max);
 	}
 	va_end(argList);
 
@@ -5612,9 +5680,9 @@ void DqnString::Free()
 		}
 		else
 #endif
-		if (this->memAPI.IsValid())
+		if (this->memAPI && this->memAPI->IsValid())
 		{
-			this->memAPI.Free(this->str, this->len);
+			this->memAPI->Free(this->str, this->len);
 			this->str = nullptr;
 		}
 
@@ -5630,12 +5698,12 @@ i32 DqnString::ToWChar(wchar_t *const buf, i32 const bufSize)
 	return result;
 
 #else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return -1;
 #endif
 }
 
-wchar_t *DqnString::ToWChar(DqnMemAPI api)
+wchar_t *DqnString::ToWChar(DqnMemAPI *const api)
 {
 	// TODO(doyle): Should the "in" string allow specifyign len? probably
 	// Otherwise a c-string and a literal initiated string might have different lengths
@@ -5644,7 +5712,7 @@ wchar_t *DqnString::ToWChar(DqnMemAPI api)
 	i32 requiredLenInclNull = DqnWin32_UTF8ToWChar(this->str, nullptr, 0);
 
 	i32 allocSize = sizeof(wchar_t) * requiredLenInclNull;
-	auto *result  = (wchar_t *)api.Alloc(allocSize);
+	auto *result  = (wchar_t *)api->Alloc(allocSize);
 	if (!result) return nullptr;
 
 	DqnWin32_UTF8ToWChar(this->str, result, requiredLenInclNull);
@@ -5652,7 +5720,7 @@ wchar_t *DqnString::ToWChar(DqnMemAPI api)
 	return result;
 
 #else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return nullptr;
 
 #endif
@@ -5703,10 +5771,10 @@ FILE_SCOPE u32 DqnRndInternal_MakeSeed()
 	i64 numClockCycles = __rdtsc();
 	return (u32)numClockCycles;
 #elif __ANDROID__
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Android path not implemented yet");
+	DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Android path not implemented yet");
 	return 0;
 #else
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
+	DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
 	return 0;
 #endif
 }
@@ -7690,7 +7758,7 @@ FILE_SCOPE size_t DqnFileInternal_UnixGetFileSizeManual(FILE *const handle, bool
 {
 	u64 fileSizeInBytes = 0;
 
-	DQN_ASSERT_HARD(handle);
+	DQN_ASSERT(handle);
 	char c = fgetc(handle);
 	while (c != EOF)
 	{
@@ -7712,7 +7780,7 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *const path, DqnFile *const 
 		updateFlag = true;
 		switch (action)
 		{
-			default: DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+			default: DQN_ASSERT(DQN_INVALID_CODE_PATH);
 			case DqnFile::Action::OpenOnly:
 			{
 				operation   = 'r';
@@ -7738,7 +7806,7 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *const path, DqnFile *const 
 		}
 		operation = 'r';
 	}
-	DQN_ASSERT_HARD(operation != 0);
+	DQN_ASSERT(operation != 0);
 
 	// TODO(doyle): What about not reading as a binary file and appending to end
 	// of file.
@@ -7749,7 +7817,7 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *const path, DqnFile *const 
 	if (updateFlag) mode[modeIndex++] = '+';
 
 	mode[modeIndex++] = 'b';
-	DQN_ASSERT_HARD(modeIndex <= DQN_ARRAY_COUNT(mode) - 1);
+	DQN_ASSERT(modeIndex <= DQN_ARRAY_COUNT(mode) - 1);
 
 	// TODO(doyle): Use open syscall
 	// TODO(doyle): Query errno
@@ -7872,7 +7940,7 @@ bool DqnFile::Open(char const *const path, u32 const flags_, Action const action
 	return DqnFileInternal_UnixOpen(path, this, flags_, action);
 
 #else
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return false;
 
 #endif
@@ -7888,14 +7956,13 @@ bool DqnFile::Open(const wchar_t *const path, u32 const flags_, Action const act
 #else
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return false;
-
 #endif
 }
 
 size_t DqnFile::Write(u8 const *const buf, size_t const numBytesToWrite, size_t const fileOffset)
 {
 	// TODO(doyle): Implement when it's needed
-	if (!DQN_ASSERT_MSG(fileOffset == 0, "'fileOffset' not implemented yet")) return 0;
+	DQN_ASSERTM(fileOffset == 0, "File writing into offset is not implemented.");
 
 #if defined(DQN_WIN32_PLATFORM)
 	DWORD bytesToWrite = (DWORD)numBytesToWrite;
@@ -7954,13 +8021,13 @@ size_t DqnFile::Read(u8 *const buf, size_t const numBytesToRead)
 			// TODO(doyle): Logging, failed read
 		}
 #else
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Win32/Unix path not implemented");
+	DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Non Win32/Unix path not implemented");
 #endif
 	}
 	return numBytesRead;
 }
 
-u8 *DqnFile::ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSize, DqnMemAPI memAPI)
+u8 *DqnFile::ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSize, DqnMemAPI *const api)
 {
 	// TODO(doyle): Logging
 	if (!path || !bufSize) return false;
@@ -7968,7 +8035,7 @@ u8 *DqnFile::ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSi
 	size_t requiredSize = 0;
 	if (!DqnFile::GetFileSize(path, &requiredSize)) return nullptr;
 
-	auto *buf = (u8 *)memAPI.Alloc(requiredSize, /*zeroClear*/ false);
+	auto *buf = (u8 *)api->Alloc(requiredSize, /*zeroClear*/ false);
 	if (!buf) return nullptr;
 
 	size_t bytesRead = 0;
@@ -7979,18 +8046,18 @@ u8 *DqnFile::ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSi
 		return buf;
 	}
 
-	memAPI.Free(buf, requiredSize);
+	api->Free(buf, requiredSize);
 	return nullptr;
 }
 
-u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t *const bufSize, DqnMemAPI memAPI)
+u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t *const bufSize, DqnMemAPI *const api)
 {
 	// TODO(doyle): Logging
 
 	size_t requiredSize = 0;
 	if (!DqnFile::GetFileSize(path, &requiredSize)) return nullptr;
 
-	auto *buf = (u8 *)memAPI.Alloc(requiredSize, /*zeroClear*/ false);
+	auto *buf = (u8 *)api->Alloc(requiredSize, /*zeroClear*/ false);
 	if (!buf) return nullptr;
 
 	size_t bytesRead = 0;
@@ -8001,7 +8068,7 @@ u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t *const bufSize,
 		return buf;
 	}
 
-	memAPI.Free(buf, requiredSize);
+	api->Free(buf, requiredSize);
 	return nullptr;
 }
 
@@ -8023,7 +8090,7 @@ bool DqnFile::ReadEntireFile(wchar_t const *const path, u8 *const buf, size_t co
 	}
 
 	*bytesRead = file.Read(buf, file.size);
-	DQN_ASSERT_HARD(*bytesRead == file.size);
+	DQN_ASSERT(*bytesRead == file.size);
 
 cleanup:
 	file.Close();
@@ -8048,7 +8115,7 @@ bool DqnFile::ReadEntireFile(const char *const path, u8 *const buf, size_t const
 	}
 
 	*bytesRead = file.Read(buf, file.size);
-	DQN_ASSERT_HARD(*bytesRead == file.size);
+	DQN_ASSERT(*bytesRead == file.size);
 
 cleanup:
 	file.Close();
@@ -8149,7 +8216,7 @@ bool DqnFile::GetInfo(wchar_t const *const path, Info *const info)
 
 #elif defined(DQN_UNIX_PLATFORM)
 	// NOTE: Not supported on unix
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 
 #endif
 
@@ -8199,7 +8266,7 @@ bool DqnFile::Delete(wchar_t const *const path)
 	return DeleteFileW(path);
 
 #elif defined(DQN_UNIX_PLATFORM)
-	DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return false;
 
 #endif
@@ -8234,7 +8301,7 @@ FILE_SCOPE f64 DqnTimerInternal_Win32QueryPerfCounterTimeInMs()
 	if (queryPerformanceFrequency.QuadPart == 0)
 	{
 		QueryPerformanceFrequency(&queryPerformanceFrequency);
-		DQN_ASSERT_HARD(queryPerformanceFrequency.QuadPart != 0);
+		DQN_ASSERT(queryPerformanceFrequency.QuadPart != 0);
 	}
 
 	LARGE_INTEGER qpcResult;
@@ -8259,7 +8326,7 @@ DQN_FILE_SCOPE f64 DqnTimer_NowInMs()
 	if (clock_gettime(CLOCK_MONOTONIC, &timeSpec))
 	{
 		// TODO(doyle): Failed logging
-		DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+		DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	}
 	else
 	{
@@ -8267,7 +8334,7 @@ DQN_FILE_SCOPE f64 DqnTimer_NowInMs()
 	}
 
 #else
-	DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Non Unix/Win32 path not implemented yet");
+	DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Non Unix/Win32 path not implemented yet");
 
 #endif
 	return result;
@@ -8310,7 +8377,7 @@ void DqnLock_Acquire(DqnLock *const lock)
 #elif defined(DQN_UNIX_PLATFORM)
 	// TODO(doyle): Better error handling
 	i32 error = pthread_mutex_lock(&lock->unixHandle);
-	DQN_ASSERT_HARD(error == 0);
+	DQN_ASSERT(error == 0);
 
 #else
 	#error Unsupported platform
@@ -8328,7 +8395,7 @@ void DqnLock_Release(DqnLock *const lock)
 #elif defined (DQN_UNIX_PLATFORM)
 	// TODO(doyle): better error handling
 	i32 error = pthread_mutex_unlock(&lock->unixHandle);
-	DQN_ASSERT_HARD(error == 0);
+	DQN_ASSERT(error == 0);
 
 #else
 	#error Unsupported platform
@@ -8345,7 +8412,7 @@ void DqnLock_Delete(DqnLock *const lock)
 
 #elif defined(DQN_UNIX_PLATFORM)
 	i32 error = pthread_mutex_destroy(&lock->unixHandle);
-	DQN_ASSERT_HARD(error == 0);
+	DQN_ASSERT(error == 0);
 
 #else
 	#error Unsupported platform
@@ -8395,7 +8462,7 @@ FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(const size_t stackSize,
 	u32 numThreadsCreated = 0;
 
 #if defined(DQN_WIN32_PLATFORM)
-	DQN_ASSERT_HARD(stackSize == 0 || !threadCallback);
+	DQN_ASSERT(stackSize == 0 || !threadCallback);
 	for (u32 i = 0; i < numThreads; i++)
 	{
 		HANDLE handle = CreateThread(nullptr, stackSize, (LPTHREAD_START_ROUTINE)threadCallback,
@@ -8459,17 +8526,17 @@ FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *const queue, co
 
 #if defined(DQN_WIN32_PLATFORM)
 	queue->semaphore = (void *)CreateSemaphore(nullptr, initSignalCount, maxSignalCount, nullptr);
-	DQN_ASSERT_HARD(queue->semaphore);
+	DQN_ASSERT(queue->semaphore);
 
 #elif defined(DQN_UNIX_PLATFORM)
 	// TODO(doyle): Use max count for unix
 	// TODO(doyle): Error handling
 	const u32 UNIX_DONT_SHARE_BETWEEN_PROCESSES = 0;
 	i32 error = sem_init(&queue->semaphore, UNIX_DONT_SHARE_BETWEEN_PROCESSES, 0);
-	DQN_ASSERT_HARD(error == 0);
+	DQN_ASSERT(error == 0);
 
 	for (u32 i = 0; i < initSignalCount; i++)
-		DQN_ASSERT_HARD(sem_post(&queue->semaphore) == 0);
+		DQN_ASSERT(sem_post(&queue->semaphore) == 0);
 
 #else
 	#error Unknown platform
@@ -8489,7 +8556,7 @@ FILE_SCOPE bool DqnJobQueueInternal_ReleaseSemaphore(DqnJobQueue *const queue)
 
 #elif defined(DQN_UNIX_PLATFORM)
 	// TODO(doyle): Error handling
-	DQN_ASSERT_HARD(sem_post(&queue->semaphore) == 0);
+	DQN_ASSERT(sem_post(&queue->semaphore) == 0);
 
 #else
 	#error Unknown platform
@@ -8512,7 +8579,7 @@ DQN_FILE_SCOPE bool DqnJobQueue_Init(DqnJobQueue *const queue, DqnJob *const job
 	u32 numThreadsCreated = DqnJobQueueInternal_ThreadCreate(
 	    DQN_JOB_QUEUE_INTERNAL_THREAD_DEFAULT_STACK_SIZE, DqnJobQueueInternal_ThreadCallback,
 	    (void *)queue, numThreads);
-	DQN_ASSERT_HARD(numThreads == numThreadsCreated);
+	DQN_ASSERT(numThreads == numThreadsCreated);
 
 	return true;
 }
@@ -8635,15 +8702,15 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 
 	// TODO(doyle): Not exactly standard
 	DqnFile file = {};
-	DQN_ASSERT_HARD(
+	DQN_ASSERT(
 	    DqnFile_Open("/proc/cpuinfo", &file, DqnFile::PermissionFlag::FileRead, DqnFile::Action::OpenOnly));
-	DQN_ASSERT_HARD(file.size > 0);
+	DQN_ASSERT(file.size > 0);
 
 	u8 *readBuffer = (u8 *)DqnMem_Calloc(file.size);
 	if (readBuffer)
 	{
 		size_t bytesRead = DqnFile_Read(&file, readBuffer, file.size);
-		DQN_ASSERT_HARD(bytesRead == file.size);
+		DQN_ASSERT(bytesRead == file.size);
 
 		const char *srcPtr = (char *)readBuffer;
 		u32 srcLen   = file.size;
@@ -8659,12 +8726,12 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 			const char processorStr[] = "processor";
 			i32 processorOffset       = DqnStr_FindFirstOccurence(srcPtr, srcLen, processorStr,
 			                                                          DQN_ARRAY_COUNT(processorStr));
-			DQN_ASSERT_HARD(processorOffset != -1);
+			DQN_ASSERT(processorOffset != -1);
 			DQN_ADVANCE_CHAR_PTR_AND_LEN_INTERNAL(srcPtr, srcLen, processorOffset);
 
 			// Find the offset to the colon delimiter and advance to 1 after it
 			i32 colonOffset = DqnStr_FindFirstOccurence(srcPtr, srcLen, ":", 1) + 1;
-			DQN_ASSERT_HARD(colonOffset != -1);
+			DQN_ASSERT(colonOffset != -1);
 			DQN_ADVANCE_CHAR_PTR_AND_LEN_INTERNAL(srcPtr, srcLen, colonOffset);
 
 			// Read num processors, i.e. logical cores/hyper threads
@@ -8679,12 +8746,12 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 			const char cpuCoresStr[] = "cpu cores";
 			i32 cpuCoresOffset       = DqnStr_FindFirstOccurence(srcPtr, srcLen, cpuCoresStr,
 			                                               DQN_ARRAY_COUNT(cpuCoresStr));
-			DQN_ASSERT_HARD(cpuCoresOffset != -1);
+			DQN_ASSERT(cpuCoresOffset != -1);
 			DQN_ADVANCE_CHAR_PTR_AND_LEN_INTERNAL(srcPtr, srcLen, cpuCoresOffset);
 
 			// Find the offset to the colon delimiter and advance to 1 after it
 			i32 colonOffset = DqnStr_FindFirstOccurence(srcPtr, srcLen, ":", 1) + 1;
-			DQN_ASSERT_HARD(colonOffset != -1);
+			DQN_ASSERT(colonOffset != -1);
 			DQN_ADVANCE_CHAR_PTR_AND_LEN_INTERNAL(srcPtr, srcLen, colonOffset);
 
 			// Read num cores value, i.e. physical cores
@@ -8696,7 +8763,7 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 	else
 	{
 		// TODO(doyle): Out of mem
-		DQN_ASSERT_HARD(DQN_INVALID_CODE_PATH);
+		DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	}
 }
 #endif // DQN_UNIX_PLATFORM
@@ -8721,9 +8788,10 @@ FILE_SCOPE void DqnPlatformInternal_Win32GetNumCoresAndThreads(u32 *const numCor
 		    RelationProcessorCore, (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)insufficientBuffer,
 		    &requiredSize);
 
-		u8 *rawProcInfoArray = (u8 *)DqnMem_Calloc(requiredSize);
-		if (!DQN_ASSERT_MSG(rawProcInfoArray, "Calloc failed, could not allocate memory"))
+		auto *rawProcInfoArray = (u8 *)DqnMem_Calloc(requiredSize);
+		if (!rawProcInfoArray)
 		{
+			DQN_LOGE("Could not allocate memory for array required: %$d\n");
 			return;
 		}
 
@@ -8741,8 +8809,8 @@ FILE_SCOPE void DqnPlatformInternal_Win32GetNumCoresAndThreads(u32 *const numCor
 				PROCESSOR_RELATIONSHIP *procInfo = &logicalProcInfo->Processor;
 				// u32 efficiency                   = procInfo->EfficiencyClass;
 				(*numCores)++;
-				DQN_ASSERT_HARD(logicalProcInfo->Relationship == RelationProcessorCore);
-				DQN_ASSERT_HARD(procInfo->GroupCount == 1);
+				DQN_ASSERT(logicalProcInfo->Relationship == RelationProcessorCore);
+				DQN_ASSERT(procInfo->GroupCount == 1);
 
 				bytesRead += logicalProcInfo->Size;
 				logicalProcInfo =
@@ -8863,7 +8931,7 @@ DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
 	va_start(argList, formatStr);
 	{
 		i32 numCopied = Dqn_vsprintf(str, formatStr, argList);
-		DQN_ASSERT_HARD(numCopied < DQN_ARRAY_COUNT(str));
+		DQN_ASSERT(numCopied < DQN_ARRAY_COUNT(str));
 	}
 	va_end(argList);
 
