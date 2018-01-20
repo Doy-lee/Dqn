@@ -2918,6 +2918,7 @@ FILE_SCOPE void DqnMemAPIInternal_UpdateAPIStatistics(DqnMemAPI *api, DqnMemAPI:
 	if (request_->type == DqnMemAPI::Type::Free)
 	{
 		auto *request = &request_->free;
+		api->bytesAllocated     -= request->sizeToFree;
 		api->lifetimeBytesFreed += request->sizeToFree;
 		return;
 	}
@@ -3140,6 +3141,7 @@ DQN_FILE_SCOPE DqnMemStack::Block *DqnMemStackInternal_AllocateBlock(u32 byteAli
 		return nullptr;
 	}
 
+	// TODO(doyle): Maybe remove this? and just do 2 allocations, this increases complexity by alot.
 	size_t alignedSize = DQN_ALIGN_POW_N(size, byteAlign);
 	size_t totalSize   = alignedSize + sizeof(DqnMemStack::Block) + (byteAlign -1);
 
@@ -3376,7 +3378,11 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 	{
 		DqnMemStack::Block *blockToFree = *blockPtr;
 		(*blockPtr)                     = blockToFree->prevBlock;
-		this->memAPI->Free(blockToFree, blockToFree->size);
+
+		// TODO(doyle): Maybe remove this? and just do 2 allocations, this increases complexity by alot.
+		size_t alignedSize = DQN_ALIGN_POW_N  (blockToFree->size, this->byteAlign);
+		size_t realSize = alignedSize + sizeof(DqnMemStack::Block) + (this->byteAlign - 1);
+		this->memAPI->Free(blockToFree, realSize);
 
 		// No more blocks, then last block has been freed
 		if (!this->block) DQN_ASSERT(this->tempRegionCount == 0);
