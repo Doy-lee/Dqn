@@ -902,6 +902,7 @@ struct DqnHashTable
 
 	void   Remove                 (DqnString   const key);
 	void   Remove                 (char const *const key, i32 keyLen = -1);
+	void   Clear                  ();
 	void   Free                   ();
 
 	// num: If num > 0, allocate num entries to free list. If num < 0, remove num entries from free list.
@@ -1036,7 +1037,8 @@ DqnHashTableInternal_Get(DqnHashTable<T> const *table, char const *const key, i3
 	if (entry)
 	{
 		DqnHashTable<T>::Entry *matchingEntry = DqnHashTableInternal_FindMatchingKey<T>(entry, key, (i64)keyLen);
-		if (matchingEntry) return matchingEntry;
+		if (matchingEntry)
+			return matchingEntry;
 	}
 
 	return nullptr;
@@ -1120,7 +1122,6 @@ void DqnHashTable<T>::Remove(char const *const key, i32 keyLen)
 	i64 hashIndex = DqnHashTableInternal_GetHashIndex(this, key, keyLen);
 	Entry *entry  = this->entries[hashIndex];
 
-	// TODO(doyle): This is wrong, doesn't update before pointers
 	if (entry)
 	{
 		Entry prevEntry_;
@@ -1144,7 +1145,7 @@ void DqnHashTable<T>::Remove(char const *const key, i32 keyLen)
 
 			if (prevEntry)
 			{
-				prevEntry->next = nullptr;
+				prevEntry->next = entryToFree->next;
 			}
 
 			entryToFree->key.Clear();
@@ -1161,6 +1162,32 @@ template <typename T>
 void DqnHashTable<T>::Remove(DqnString key)
 {
 	Entry result = this->Remove(key.str, key.len);
+}
+
+template <typename T>
+void DqnHashTable<T>::Clear()
+{
+	for (auto usedIndex = 0; usedIndex < this->usedEntriesIndex; usedIndex++)
+	{
+		auto entryIndex  = this->usedEntries[usedIndex];
+		Entry *baseEntry = this->entries[entryIndex];
+
+		for (Entry *entry = baseEntry; entry;)
+		{
+			Entry *entryToFree = entry;
+			entry              = entryToFree->next;
+
+			entryToFree->key.Clear();
+			entryToFree->data = {};
+			entryToFree->next = this->freeList;
+			this->freeList    = entryToFree;
+			this->numFreeEntries++;
+		}
+
+		this->entries[entryIndex] = nullptr;
+	}
+
+	this->usedEntriesIndex = 0;
 }
 
 template <typename T>
