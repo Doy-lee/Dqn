@@ -235,7 +235,7 @@ public:
 		{
 			struct Alloc_
 			{
-				bool clearToZero;
+				bool zeroClear;
 				size_t requestSize;
 			} alloc;
 
@@ -269,7 +269,7 @@ public:
 	static DqnMemAPI StackAllocator(struct DqnMemStack *const stack);
 
 	void *Realloc(void   *const oldPtr,    size_t const oldSize, size_t const newSize);
-	void *Alloc  (size_t  const size,      bool   const clearToZero = true);
+	void *Alloc  (size_t  const size,      bool   const zeroClear = true);
 	void  Free   (void   *const ptrToFree, size_t const sizeToFree);
 	bool  IsValid() const { return (this->allocator != nullptr); }
 };
@@ -348,7 +348,7 @@ struct DqnMemStack
 
 	// Initialisation API
 	// =============================================================================================
-	// Uses fixed buffer, allocations will be soruced from the buffer and fail after buffer is full.
+	// Uses fixed buffer, allocations will be sourced from the buffer and fail after buffer is full.
 	// stack:     A pointer to a zero cleared struct.
 	// mem:       Memory to use for the memory stack
 	// byteAlign: Set the alignment of memory addresses for all allocated items from the memory stack.
@@ -517,19 +517,19 @@ public:
 	T &operator[](i32 x) { return this->data[x]; }
 
 	// API
-	bool  Init        (const i64 size, DqnMemStack *const stack);
-	bool  Init        (const i64 size, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	bool  Init        (i64 const size, DqnMemStack *const stack);
+	bool  Init        (i64 const size, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 	bool  Free        ();
-	bool  Resize      (const i64 newMax);
+	bool  Resize      (i64 const newMax);
 	bool  Grow        ();
-	T    *Push        (const T *item, const i64 num);
-	T    *Push        (const T item);
-	T    *Insert      (const T item, i64 index);
+	T    *Push        (T const *item, i64 const num);
+	T    *Push        (T const  item);
+	T    *Insert      (T const  item, i64 index);
 	void  Pop         ();
-	T    *Get         (const i64 index);
-	void  Clear       (const bool clearMemory = false);
-	bool  Remove      (const i64 index);
-	bool  RemoveStable(const i64 index);
+	T    *Get         (i64  const index);
+	void  Clear       (bool const zeroClear = false);
+	bool  Remove      (i64  const index);
+	bool  RemoveStable(i64  const index);
 	void  RemoveStable(i64 *indexList, const i64 numIndexes);
 };
 
@@ -710,22 +710,21 @@ T *DqnArray<T>::Insert(const T item, i64 index)
 template <typename T>
 void DqnArray<T>::Pop()
 {
-	if (this->count == 0) return;
-	this->count--;
+	this->Remove(this->count - 1);
 }
 
 template <typename T>
-T *DqnArray<T>::Get(const i64 index)
+T *DqnArray<T>::Get(i64 const index)
 {
 	T *result = nullptr;
-	if (index >= 0 && index <= this->count) result = &this->data[index];
+	if (index >= 0 && index < this->count) result = &this->data[index];
 	return result;
 }
 
 template <typename T>
-void DqnArray<T>::Clear(bool clearMemory)
+void DqnArray<T>::Clear(bool const zeroClear)
 {
-	if (clearMemory)
+	if (zeroClear)
 	{
 		i64 sizeToClear = sizeof(T) * this->count;
 		DqnMem_Clear(this->data, 0, sizeToClear);
@@ -734,9 +733,9 @@ void DqnArray<T>::Clear(bool clearMemory)
 }
 
 template <typename T>
-bool DqnArray<T>::Remove(const i64 index)
+bool DqnArray<T>::Remove(i64 const index)
 {
-	if (index >= this->count) return false;
+	if (index >= this->count || index < 0) return false;
 
 	bool firstElementAndOnlyElement = (index == 0 && this->count == 1);
 	bool isLastElement              = (index == (this->count - 1));
@@ -752,9 +751,9 @@ bool DqnArray<T>::Remove(const i64 index)
 }
 
 template <typename T>
-bool DqnArray<T>::RemoveStable(const i64 index)
+bool DqnArray<T>::RemoveStable(i64 const index)
 {
-	if (index >= this->count) return false;
+	if (index >= this->count || index < 0) return false;
 
 	bool firstElementAndOnlyElement = (index == 0 && this->count == 1);
 	bool isLastElement              = (index == (this->count - 1));
@@ -2936,8 +2935,8 @@ FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI
 	{
 		auto const *request = &request_.alloc;
 
-		if (request->clearToZero) result = (u8 *)DqnMem_Calloc(request->requestSize);
-		else                      result = (u8 *)DqnMem_Alloc(request->requestSize);
+		if (request->zeroClear) result = (u8 *)DqnMem_Calloc(request->requestSize);
+		else                    result = (u8 *)DqnMem_Alloc(request->requestSize);
 
 		success = (result != nullptr);
 	}
@@ -2995,7 +2994,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 		if (result)
 		{
 			success = true;
-			if (request->clearToZero) DqnMem_Clear(result, 0, request->requestSize);
+			if (request->zeroClear) DqnMem_Clear(result, 0, request->requestSize);
 		}
 	}
 	else if (request_.type == DqnMemAPI::Type::Realloc)
@@ -3079,9 +3078,9 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 
 void *DqnMemAPI::Realloc(void *const oldPtr, size_t const oldSize, size_t const newSize)
 {
-	Request request        = {};
-	request.type           = Type::Realloc;
-	request.userContext    = this->userContext;
+	Request request                = {};
+	request.type                   = Type::Realloc;
+	request.userContext            = this->userContext;
 	request.realloc.newRequestSize = newSize;
 	request.realloc.oldMemPtr      = oldPtr;
 	request.realloc.oldSize        = oldSize;
@@ -3090,12 +3089,12 @@ void *DqnMemAPI::Realloc(void *const oldPtr, size_t const oldSize, size_t const 
 	return result;
 }
 
-void *DqnMemAPI::Alloc(size_t const size, bool const clearToZero)
+void *DqnMemAPI::Alloc(size_t const size, bool const zeroClear)
 {
 	Request request           = {};
 	request.type              = Type::Alloc;
 	request.userContext       = this->userContext;
-	request.alloc.clearToZero = clearToZero;
+	request.alloc.zeroClear   = zeroClear;
 	request.alloc.requestSize = size;
 
 	void *result = (void *)this->allocator(this, request);
