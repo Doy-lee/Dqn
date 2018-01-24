@@ -115,18 +115,21 @@
 #define LOCAL_PERSIST static
 #define FILE_SCOPE    static
 
-typedef uint64_t u64;
-typedef uint32_t u32;
-typedef uint16_t u16;
-typedef uint8_t  u8;
+using usize = size_t;
+using isize = ptrdiff_t;
 
-typedef int64_t i64;
-typedef int32_t i32;
-typedef int16_t i16;
-typedef int8_t  i8;
+using u64 = uint64_t;
+using u32 = uint32_t;
+using u16 = uint16_t;
+using u8  = uint8_t;
 
-typedef double f64;
-typedef float  f32;
+using i64 = int64_t;
+using i32 = int32_t;
+using i16 = int16_t;
+using i8  = int8_t;
+
+using f64 = double;
+using f32 = float;
 
 #define DQN_F32_MIN -FLT_MAX
 
@@ -177,15 +180,17 @@ typedef float  f32;
 		}                                                                                          \
 	} while (0)
 
-#define DQN_LOGE(msg, ...) DqnLog(__FILE__, __func__, __LINE__, nullptr, msg, ##__VA_ARGS__);
+#define DQN_LOGE(msg, ...) DqnLog(__FILE__, __func__, __LINE__, msg, ##__VA_ARGS__);
 
 // Use macro above.
-DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum,
-                           char const *const expr, char const *const msg, ...);
+DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum, char const *const msg, ...);
+DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum, char const *const expr, char const *const msg, ...);
 
 // Assert at compile time by making a type that is invalid depending on the expression result
 #define DQN_COMPILE_ASSERT(expr)                DQN_COMPILE_ASSERT_INTERNAL(expr, DQN_UNIQUE_NAME(DqnCompileAssertInternal_))
 #define DQN_COMPILE_ASSERT_INTERNAL(expr, name) typedef char name[((int)(expr)) * 2 - 1];
+
+DQN_COMPILE_ASSERT(sizeof(isize) == sizeof(usize));
 
 // #DqnMem API
 // =================================================================================================
@@ -506,17 +511,13 @@ template <typename T>
 class DqnArray
 {
 public:
-	// Function pointers to custom allocators
 	DqnMemAPI *memAPI;
-
-	// Array state
-	i64 count;
-	i64 max;
-	T   *data;
-
-	T &operator[](i32 x) { return this->data[x]; }
+	isize      count;
+	isize      max;
+	T         *data;
 
 	// API
+	// =============================================================================================
 	bool  Init        (i64 const size, DqnMemStack *const stack);
 	bool  Init        (i64 const size, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 	bool  Free        ();
@@ -531,6 +532,22 @@ public:
 	bool  Remove      (i64  const index);
 	bool  RemoveStable(i64  const index);
 	void  RemoveStable(i64 *indexList, const i64 numIndexes);
+
+	// C++ Iterator
+	// =============================================================================================
+	class Iterator
+	{
+		T *data;
+	public:
+		Iterator(T *data_) : data(data_) {}
+		bool      operator!=(Iterator const &other) const { return this->data != other.data; }
+		T        *operator* ()                      const { return data; }
+		Iterator  operator++()                            { data++; return *this; }
+	};
+
+	T &operator[] (isize index) const { return this->data[index]; }
+	Iterator begin()            const { return Iterator(this->data); }
+	Iterator end  ()            const { return Iterator(this->data + this->count); }
 };
 
 template <typename T>
@@ -1361,6 +1378,12 @@ union DqnV2i
 	struct { i32 min, max; };
 	i32 e[2];
 
+	bool operator==(DqnV2i const &b) const { return (this->x == b.x) && (this->y == b.y); }
+	bool operator!=(DqnV2i const &b) const { return !(*this == b); }
+	bool operator>=(DqnV2i const &b) const { return (this->x >= b.x) && (this->y >= b.y); }
+	bool operator<=(DqnV2i const &b) const { return (this->x <= b.x) && (this->y <= b.y); }
+	bool operator< (DqnV2i const &b) const { return (this->x <  b.x) && (this->y <  b.y); }
+	bool operator> (DqnV2i const &b) const { return (this->x >  b.x) && (this->y >  b.y); }
 };
 
 union DqnV2
@@ -1369,6 +1392,13 @@ union DqnV2
 	struct { f32 w, h; };
 	struct { f32 min, max; };
 	f32 e[2];
+
+	bool operator==(DqnV2 const &b) const { return (this->x == b.x) && (this->y == b.y); }
+	bool operator!=(DqnV2 const &b) const { return !(*this == b); }
+	bool operator>=(DqnV2 const &b) const { return (this->x >= b.x) && (this->y >= b.y); }
+	bool operator<=(DqnV2 const &b) const { return (this->x <= b.x) && (this->y <= b.y); }
+	bool operator< (DqnV2 const &b) const { return (this->x <  b.x) && (this->y <  b.y); }
+	bool operator> (DqnV2 const &b) const { return (this->x >  b.x) && (this->y >  b.y); }
 };
 
 DQN_FILE_SCOPE DqnV2 DqnV2_(f32 xy);
@@ -1393,30 +1423,6 @@ DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(const DqnV2 a);
 DQN_FILE_SCOPE DqnV2 DqnV2_ResizeKeepAspectRatio(DqnV2 srcSize, DqnV2 targetSize);
 DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio     (DqnV2 dim, DqnV2 ratio); // Resize the dimension to fit the aspect ratio provided. Downscale only.
 
-inline bool operator>(DqnV2 const &a, DqnV2 const &b)
-{
-	bool result = (a.x > b.x) && (a.y > b.y);
-	return result;
-}
-
-inline bool operator<(DqnV2 const &a, DqnV2 const &b)
-{
-	bool result = (a.x < b.x) && (a.y < b.y);
-	return result;
-}
-
-inline bool operator<=(DqnV2 const &a, DqnV2 const &b)
-{
-	bool result = (a.x <= b.x) && (a.y <= b.y);
-	return result;
-}
-
-inline bool operator>=(DqnV2 const &a, DqnV2 const &b)
-{
-	bool result = (a.x >= b.x) && (a.y >= b.y);
-	return result;
-}
-
 DQN_FILE_SCOPE inline DqnV2  operator- (DqnV2  a, DqnV2 b) { return      DqnV2_Sub     (a, b);  }
 DQN_FILE_SCOPE inline DqnV2  operator+ (DqnV2  a, DqnV2 b) { return      DqnV2_Add     (a, b);  }
 DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, DqnV2 b) { return      DqnV2_Hadamard(a, b);  }
@@ -1427,7 +1433,6 @@ DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, f32   b) { return (a = DqnV2_S
 DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, i32   b) { return (a = DqnV2_Scalei  (a, b)); }
 DQN_FILE_SCOPE inline DqnV2 &operator-=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Sub     (a, b)); }
 DQN_FILE_SCOPE inline DqnV2 &operator+=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Add     (a, b)); }
-DQN_FILE_SCOPE inline bool   operator==(DqnV2  a, DqnV2 b) { return      DqnV2_Equals  (a, b);  }
 
 // DqnV2i
 DQN_FILE_SCOPE DqnV2i DqnV2i_(i32 x_, i32 y_);
@@ -1450,7 +1455,6 @@ DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, i32    b) { return      DqnV
 DQN_FILE_SCOPE inline DqnV2i &operator*=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Hadamard(a, b)); }
 DQN_FILE_SCOPE inline DqnV2i &operator-=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Sub     (a, b)); }
 DQN_FILE_SCOPE inline DqnV2i &operator+=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Add     (a, b)); }
-DQN_FILE_SCOPE inline bool    operator==(DqnV2i  a, DqnV2i b) { return      DqnV2i_Equals  (a, b);  }
 
 // #DqnV3 API
 // =================================================================================================
@@ -1724,7 +1728,7 @@ template <typename T>
 using Dqn_QuickSortLessThanCallback = bool (*)(const T *const , const T *const);
 
 template <typename T>
-DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i64 size,
+DQN_FILE_SCOPE void Dqn_QuickSort(T *array, const i64 size,
                                   Dqn_QuickSortLessThanCallback<T> IsLessThan)
 {
 	if (!array || size <= 1 || !IsLessThan) return;
@@ -1797,7 +1801,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i64 size,
 }
 
 template <typename T>
-DQN_FILE_SCOPE void Dqn_QuickSort(T *const array, const i64 size)
+DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 const size)
 {
 	if (!array || size <= 1) return;
 
@@ -1961,7 +1965,10 @@ DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *const array, i64 const size, i64 const find,
 #define DQN_PLATFORM_H
 
 #if defined(DQN_IS_WIN32)
-	#define WIN32_LEAN_AND_MEAN 1
+	#ifndef WIN32_LEAN_AND_MEAN
+		#define WIN32_LEAN_AND_MEAN 1
+	#endif
+
 	#include <Windows.h>
 
 #elif defined(DQN_IS_UNIX)
@@ -2055,6 +2062,8 @@ struct DqnFile
 	// return: False if file access failure OR nullptr arguments.
 	static bool   Delete              (char    const *const path);
 	static bool   Delete              (wchar_t const *const path);
+	static bool   Copy                (char    const *const src, char    const *const dest);
+	static bool   Copy                (wchar_t const *const src, wchar_t const *const dest);
 
 	// numFiles: Pass in a ref to a i32. The function fills it out with the number of entries.
 	// return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
@@ -2774,12 +2783,13 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 // #DqnLog
 // =================================================================================================
 DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum,
-                           char const *const expr, char const *const msg, ...)
+                           char const *const msg, ...)
 {
+	// TODO(doyle): Compress this
 	auto fileLen = DqnStr_Len(file);
 	for (auto i = fileLen - 1; i >= 0; i--)
 	{
-		if (file[i] == '\\')
+		if (file[i] == '\\' || file[i] == '/')
 		{
 			file = file + i + 1;
 			break;
@@ -2803,26 +2813,50 @@ DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const
 		va_end(argList);
 	}
 
-	bool hasExpr = !(expr == nullptr);
-	if (hasExpr)
-	{
-		char const *const formatStr = "DqnLog:%s:%s,%d(%s): %s";
-		fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
-
-		#if defined(DQN_WIN32_PLATFORM)
-			DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, expr, userMsg);
-		#endif
-	}
-	else
-	{
 		char const *const formatStr = "DqnLog:%s:%s,%d: %s";
 		fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
 
 		#if defined(DQN_WIN32_PLATFORM)
 			DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, userMsg);
 		#endif
+}
+
+DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum,
+                           char const *const expr, char const *const msg, ...)
+{
+	auto fileLen = DqnStr_Len(file);
+	for (auto i = fileLen - 1; i >= 0; i--)
+	{
+		if (file[i] == '\\' || file[i] == '/')
+		{
+			file = file + i + 1;
+			break;
+		}
 	}
 
+	char userMsg[2048];
+	userMsg[0] = '\0';
+
+	if (msg)
+	{
+		va_list argList;
+		va_start(argList, msg);
+		{
+			u32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
+			if (numCopied > DQN_ARRAY_COUNT(userMsg))
+			{
+				(*((int *)0)) = 0;
+			}
+		}
+		va_end(argList);
+	}
+
+	char const *const formatStr = "DqnLog:%s:%s,%d(%s): %s";
+	fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
+
+	#if defined(DQN_WIN32_PLATFORM)
+		DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, expr, userMsg);
+	#endif
 }
 
 // #DqnMemory
@@ -8296,6 +8330,41 @@ bool DqnFile::Delete(wchar_t const *const path)
 	// TODO(doyle): Logging
 #if defined(DQN_WIN32_PLATFORM)
 	return DeleteFileW(path);
+
+#elif defined(DQN_UNIX_PLATFORM)
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	return false;
+
+#endif
+}
+
+bool DqnFile::Copy(char const *const src, char const *const dest)
+{
+	if (!src || !dest) return false;
+
+	// TODO(doyle): Logging
+#if defined(DQN_WIN32_PLATFORM)
+	BOOL result = (CopyFileA(src, dest, /*FailIfExist*/false) != 0);
+	if (result == 0)
+	{
+		DqnWin32_DisplayLastError("CopyFile failed: ");
+	}
+	return (result != 0);
+
+#elif defined(DQN_UNIX_PLATFORM)
+	DQN_ASSERT(DQN_INVALID_CODE_PATH);
+	return false;
+
+#endif
+}
+
+bool DqnFile::Copy(wchar_t const *const src, wchar_t const *const dest)
+{
+	if (!src || !dest) return false;
+
+	// TODO(doyle): Logging
+#if defined(DQN_WIN32_PLATFORM)
+	return (CopyFileW(src, dest, /*FailIfExist*/false) != 0);
 
 #elif defined(DQN_UNIX_PLATFORM)
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
