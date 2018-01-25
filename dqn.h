@@ -1725,11 +1725,11 @@ inline u32 Dqn_BitUnset(u32 const bits, u32 const flag)
 }
 
 template <typename T>
-using Dqn_QuickSortLessThanCallback = bool (*)(const T *const , const T *const);
+using Dqn_QuickSortLessThanCallback = bool (*)(T const *, T const *, void *);
 
 template <typename T>
 DQN_FILE_SCOPE void Dqn_QuickSort(T *array, const i64 size,
-                                  Dqn_QuickSortLessThanCallback<T> IsLessThan)
+                                  Dqn_QuickSortLessThanCallback<T> IsLessThan, void *userContext = nullptr)
 {
 	if (!array || size <= 1 || !IsLessThan) return;
 
@@ -1743,7 +1743,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, const i64 size,
 		{
 			for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
 			{
-				if (!IsLessThan(&array[checkIndex], &array[itemToInsertIndex]))
+				if (!IsLessThan(&array[checkIndex], &array[itemToInsertIndex], userContext))
 				{
 					T itemToInsert = array[itemToInsertIndex];
 					for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
@@ -1773,7 +1773,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, const i64 size,
 	pivotIndex = lastIndex;
 
 	// 4^, 8, 7, 5, 2, 3, 6
-	if (IsLessThan(&array[startIndex], &array[pivotIndex])) partitionIndex++;
+	if (IsLessThan(&array[startIndex], &array[pivotIndex], userContext)) partitionIndex++;
 	startIndex++;
 
 	// 4, |8, 7, 5^, 2, 3, 6*
@@ -1782,7 +1782,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, const i64 size,
 	// 4, 5, 2, 3, |7, 8, ^6*
 	for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
 	{
-		if (IsLessThan(&array[checkIndex], &array[pivotIndex]))
+		if (IsLessThan(&array[checkIndex], &array[pivotIndex], userContext))
 		{
 			DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
 			partitionIndex++;
@@ -1792,12 +1792,12 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, const i64 size,
 	// Move pivot to right of partition
 	// 4, 5, 2, 3, |6, 8, ^7*
 	DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
-	Dqn_QuickSort(array, partitionIndex, IsLessThan);
+	Dqn_QuickSort(array, partitionIndex, IsLessThan, userContext);
 
 	// Skip the value at partion index since that is guaranteed to be sorted.
 	// 4, 5, 2, 3, (x), 8, 7
 	i32 oneAfterPartitionIndex = partitionIndex + 1;
-	Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex), IsLessThan);
+	Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex), IsLessThan, userContext);
 }
 
 template <typename T>
