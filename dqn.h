@@ -5474,13 +5474,19 @@ bool DqnString::InitSize(i32 size, DqnMemAPI *const api)
 	}
 	else
 #endif
+	if (size == 0)
+	{
+		this->str = nullptr;
+	}
+	else
 	{
 		size_t allocSize = sizeof(*(this->str)) * (size + 1);
 		this->str        = (char *)api->Alloc(allocSize, /*zeroClear*/false);
 		if (!this->str) return false;
+
+		this->str[0] = 0;
 	}
 
-	this->str[0] = 0;
 	this->max    = size;
 	this->len    = 0;
 	this->memAPI = api;
@@ -5518,9 +5524,13 @@ bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMem
 		return false;
 	}
 
-	this->str[lenInBytes] = 0;
-	this->len             = lenInBytes;
-	this->max             = this->len;
+	if (lenInBytes > 0)
+	{
+		this->str[lenInBytes] = 0;
+	}
+
+	this->len = lenInBytes;
+	this->max = this->len;
 	DqnMem_Copy(this->str, cstr, lenInBytes);
 
 	return true;
@@ -5530,7 +5540,9 @@ bool DqnString::InitLiteral(char const *const cstr, DqnMemAPI *const api)
 {
 	i32 utf8LenInBytes = 0;
 	DqnStr_LenUTF8((u32 *)cstr, &utf8LenInBytes);
+
 	bool result = this->InitLiteral(cstr, utf8LenInBytes, api);
+
 	return result;
 }
 
