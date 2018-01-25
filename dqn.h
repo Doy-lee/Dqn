@@ -5748,7 +5748,7 @@ void DqnString::Free()
 #endif
 		if (this->memAPI && this->memAPI->IsValid())
 		{
-			this->memAPI->Free(this->str, this->len);
+			this->memAPI->Free(this->str, (this->max + 1));
 			this->str = nullptr;
 		}
 
