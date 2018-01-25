@@ -13,7 +13,7 @@
 	</Type>
 
 	<Type Name="DqnMemStack::Block">
-		<DisplayString>{{size={size}/{used} prevBlock={prevBlock}}}</DisplayString>
+		<DisplayString>{{used={used}/{size} prevBlock={prevBlock}}}</DisplayString>
 	</Type>
 
 	<Type Name="DqnMemAPI">
@@ -22,11 +22,6 @@
 
 	<Type Name="DqnHashTable&lt;*&gt;">
 		<DisplayString>{{numEntries={numEntries} numFreeEntries={numFreeEntries} usedEntriesIndex={usedEntriesIndex}}}</DisplayString>
-		<Expand>
-			<Item Name="[numEntries]">numEntries</Item>
-			<Item Name="[numFreeEntries]">numFreeEntries</Item>
-			<Item Name="[usedEntriesIndex]">usedEntriesIndex</Item>
-		</Expand>
 	</Type>
 
 	<Type Name="DqnString">
