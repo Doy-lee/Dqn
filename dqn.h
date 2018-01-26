@@ -181,6 +181,7 @@ using f32 = float;
 	} while (0)
 
 #define DQN_LOGE(msg, ...) DqnLog(__FILE__, __func__, __LINE__, msg, ##__VA_ARGS__);
+#define DQN_LOGD(msg, ...) DqnLog(__FILE__, __func__, __LINE__, msg, ##__VA_ARGS__);
 
 // Use macro above.
 DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum, char const *const msg, ...);
@@ -518,20 +519,26 @@ public:
 
 	// API
 	// =============================================================================================
-	bool  Init        (i64 const size, DqnMemStack *const stack);
-	bool  Init        (i64 const size, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
-	bool  Free        ();
-	bool  Resize      (i64 const newMax);
-	bool  Grow        ();
-	T    *Push        (T const *item, i64 const num);
+	void  Init        (T           *const data_, isize max_, isize count_ = 0);
+	void  Init        (DqnMemAPI   *const memAPI_ = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	void  Init        (DqnMemStack *const stack);
+	bool  InitSize    (isize size_, DqnMemAPI   *const memAPI_ = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	bool  InitSize    (isize size_, DqnMemStack *const stack);
+
+	void  Free        ();
+	bool  Resize      (isize newMax);
+	bool  Grow        (isize multiplier = 2);
+	T    *Push        (T const *item, isize num);
 	T    *Push        (T const  item);
-	T    *Insert      (T const  item, i64 index);
+	T    *Insert      (T const  item, isize index);
 	void  Pop         ();
-	T    *Get         (i64  const index);
-	void  Clear       (bool const zeroClear = false);
-	bool  Remove      (i64  const index);
-	bool  RemoveStable(i64  const index);
-	void  RemoveStable(i64 *indexList, const i64 numIndexes);
+	T    *Get         (isize index);
+	void  Clear       (bool  zeroClear = false);
+	bool  Remove      (isize index);
+	bool  RemoveStable(isize index);
+
+	 // indexList: Array of indexes to remove. This list gets sorted.
+	void  RemoveStable(isize *indexList, isize numIndexes);
 
 	// C++ Iterator
 	// =============================================================================================
@@ -551,98 +558,106 @@ public:
 };
 
 template <typename T>
-DQN_FILE_SCOPE DqnArray<T> DqnArray_(i64 const size,
-                                     DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR)
+class DqnSmartArray : public DqnArray<T>
 {
-	DqnArray<T> result;
-	bool init = result.Init(size, api);
-	DQN_ASSERT(init);
+	~DqnSmartArray() { if (data && memAPI) memAPI->Free(data); }
+};
+
+template <typename T>
+void DqnArray<T>::Init(DqnMemAPI *const memAPI_)
+{
+	memAPI = memAPI_;
+	count = max = 0;
+	data        = nullptr;
+}
+
+template <typename T>
+void DqnArray<T>::Init(T *data_, isize max_, isize count_)
+{
+	DQN_ASSERT(data_);
+	memAPI = nullptr;
+	count  = count_;
+	max    = max_;
+	data   = data_;
+}
+
+template <typename T>
+void DqnArray<T>::Init(DqnMemStack *const stack)
+{
+	this->Init(stack->myAPI);
+}
+
+template <typename T>
+bool DqnArray<T>::InitSize(isize size_, DqnMemAPI *const memAPI_)
+{
+	this->Init(memAPI_);
+	bool result = this->Resize(size_);
 	return result;
 }
 
 template <typename T>
-DQN_FILE_SCOPE DqnArray<T> DqnArray_(i64 const size, DqnMemStack *const stack)
+bool DqnArray<T>::InitSize(isize size_, DqnMemStack *const stack)
 {
-	DqnArray<T> result = DqnArray_<T>(size, &stack->myAPI);
+	bool result = this->InitSize(size_, &stack->myAPI);
 	return result;
-}
-
-template <typename T>
-DQN_FILE_SCOPE DqnArray<T> DqnArray_(DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR)
-{
-	DqnArray<T> result = DqnArray_<T>(0, api);
-	return result;
-}
-
-template <typename T>
-DQN_FILE_SCOPE DqnArray<T> DqnArray_(DqnMemStack *const stack)
-{
-	DqnArray<T> result = DqnArray_<T>(0, stack);
-	return result;
-}
-
-template <typename T>
-bool DqnArray<T>::Init(i64 const size, DqnMemStack *const stack)
-{
-	bool result = false;
-	if (stack)
-	{
-		result = this->Init(size, &stack->myAPI);
-	}
-
-	return result;
-}
-
-template <typename T>
-bool DqnArray<T>::Init(i64 const size, DqnMemAPI *const api)
-{
-	DQN_ASSERT(size >= 0);
-
-	if (size > 0)
-	{
-		i64 allocateSize        = size * sizeof(T);
-		this->data              = (T *)api->Alloc(allocateSize, /*zeroClear*/ false);
-		if (!this->data) return false;
-	}
-
-	this->memAPI = api;
-	this->count  = 0;
-	this->max    = size;
-	return true;
 }
 
 // Implementation taken from Milton, developed by Serge at
 // https://github.com/serge-rgb/milton#license
 template <typename T>
-bool DqnArray<T>::Free()
+void DqnArray<T>::Free()
 {
 	if (this->data)
 	{
-		// TODO(doyle): Right now we assume free always works, and it probably should?
-		i64 sizeToFree = this->max * sizeof(T);
-		this->memAPI->Free(this->data, sizeToFree);
-		this->data = nullptr;
+		if (this->memAPI)
+		{
+			auto sizeToFree = this->max * sizeof(T);
+			this->memAPI->Free(this->data, sizeToFree);
+		}
 
+		this->data  = nullptr;
 		this->count = 0;
 		this->max   = 0;
-		return true;
 	}
-
-	return false;
 }
 
 template <typename T>
-bool DqnArray<T>::Resize(i64 newMax)
+bool DqnArray<T>::Resize(isize newMax)
 {
-	if (!this->data)            return false;
-	if (!this->memAPI->IsValid()) return false;
+	if (!this->memAPI)
+	{
+		DQN_LOGE("DqnArray has no memory api assigned. Resize to %d items failed.", newMax);
+		return false;
+	}
 
-	i64 oldSize = this->max * sizeof(T);
-	i64 newSize = newMax * sizeof(T);
+	if (newMax == 0)
+	{
+		DQN_LOGD(
+		    "DqnArray tried to resize to 0 items. Not allowed? TODO(doyle): Maybe just free the "
+		    "array then?");
+		return false;
+	}
+
+
+	if (newMax < this->count)
+	{
+		DQN_LOGE(
+		    "DqnArray has %d items but requested a resize to: %d and will destroy the remaining "
+		    "items in the array!", this->count, newMax);
+	}
+
+	auto oldSize = this->max * sizeof(T);
+	auto newSize = newMax * sizeof(T);
 
 	T *result = nullptr;
-	if (oldSize == 0) result = (T *)this->memAPI->Alloc  (newSize, /*zeroClear*/ false);
-	else              result = (T *)this->memAPI->Realloc(this->data, oldSize, newSize);
+	if (this->data)
+	{
+		result = (T *)this->memAPI->Realloc(this->data, oldSize, newSize);
+	}
+	else
+	{
+		result = (T *)this->memAPI->Alloc(newSize, /*zeroClear*/ false);
+	}
 
 	if (result)
 	{
@@ -652,36 +667,34 @@ bool DqnArray<T>::Resize(i64 newMax)
 	}
 	else
 	{
+		DQN_LOGE("DqnArray out of memory error. Failed to request: %d bytes.", newSize);
 		return false;
 	}
 }
 
 template <typename T>
-bool DqnArray<T>::Grow()
+bool DqnArray<T>::Grow(isize multiplier)
 {
-	if (!this->data) return false;
-
-	const f32 GROWTH_FACTOR = 2.0f;
-	i64 newMax              = (i64)(this->max * GROWTH_FACTOR);
-	if (newMax == this->max) newMax++;
-
+	isize newMax = this->max * multiplier;
+	newMax       = (newMax == 0) ? 8 : newMax;
 	bool result = this->Resize(newMax);
 	return result;
 }
 
 template <typename T>
-T *DqnArray<T>::Push(const T *item, const i64 num)
+T *DqnArray<T>::Push(T const *item, isize num)
 {
-	i64 newSize = this->count + num;
-	if (!this->data || newSize > this->max)
+	if (!this->data || (this->count + num) >= this->max)
 	{
-		if (!this->Grow()) return nullptr;
+		if (!this->Grow())
+		{
+			DQN_LOGE("DqnArray could not push %d item(s) onto array because growing failed.", num);
+			return nullptr;
+		}
 	}
 
 	for (auto i = 0; i < num; i++)
-	{
 		this->data[this->count++] = item[i];
-	}
 
 	DQN_ASSERT(this->count <= this->max);
 	T *result = this->data + (this->count - 1);
@@ -689,33 +702,34 @@ T *DqnArray<T>::Push(const T *item, const i64 num)
 }
 
 template <typename T>
-T *DqnArray<T>::Push(const T item)
+T *DqnArray<T>::Push(T const item)
 {
 	T* result = this->Push(&item, 1);
 	return result;
 }
 
 template <typename T>
-T *DqnArray<T>::Insert(const T item, i64 index)
+T *DqnArray<T>::Insert(T const item, isize index)
 {
+	index = DQN_MAX(index, 0);
 	if (index >= this->count)
 	{
 		T *result = this->Push(item);
 		return result;
 	}
 
-	index       = DQN_MAX(index, 0);
-	i64 newSize = this->count + 1;
-	if (!this->data || newSize > this->max)
+	if (!this->data || (this->count + 1) > this->max)
 	{
-		if (!this->Grow()) return nullptr;
+		if (!this->Grow())
+		{
+			DQN_LOGE("DqnArray could not insert at index %d because growing failed.", index);
+			return nullptr;
+		}
 	}
 
 	this->count++;
 	for (auto i = this->count - 1; (i - 1) >= index; i--)
-	{
 		this->data[i] = this->data[i - 1];
-	}
 
 	this->data[index] = item;
 	T *result         = this->data + index;
@@ -731,7 +745,7 @@ void DqnArray<T>::Pop()
 }
 
 template <typename T>
-T *DqnArray<T>::Get(i64 const index)
+T *DqnArray<T>::Get(isize index)
 {
 	T *result = nullptr;
 	if (index >= 0 && index < this->count) result = &this->data[index];
@@ -739,51 +753,53 @@ T *DqnArray<T>::Get(i64 const index)
 }
 
 template <typename T>
-void DqnArray<T>::Clear(bool const zeroClear)
+void DqnArray<T>::Clear(bool zeroClear)
 {
 	if (zeroClear)
 	{
-		i64 sizeToClear = sizeof(T) * this->count;
+		isize sizeToClear = sizeof(T) * this->count;
 		DqnMem_Clear(this->data, 0, sizeToClear);
 	}
 	this->count = 0;
 }
 
 template <typename T>
-bool DqnArray<T>::Remove(i64 const index)
+bool DqnArray<T>::Remove(isize index)
 {
-	if (index >= this->count || index < 0) return false;
+	if (index >= this->count || index < 0)
+		return false;
 
-	bool firstElementAndOnlyElement = (index == 0 && this->count == 1);
-	bool isLastElement              = (index == (this->count - 1));
-	if (firstElementAndOnlyElement || isLastElement)
+	bool isLastElement = (index == (this->count - 1));
+	if (isLastElement && this->count == 1)
 	{
 		this->count--;
-		return true;
+	}
+	else
+	{
+		this->data[index] = this->data[this->count - 1];
+		this->count--;
 	}
 
-	this->data[index] = this->data[this->count - 1];
-	this->count--;
 	return true;
 }
 
 template <typename T>
-bool DqnArray<T>::RemoveStable(i64 const index)
+bool DqnArray<T>::RemoveStable(isize index)
 {
-	if (index >= this->count || index < 0) return false;
+	if (index >= this->count || index < 0)
+		return false;
 
-	bool firstElementAndOnlyElement = (index == 0 && this->count == 1);
-	bool isLastElement              = (index == (this->count - 1));
-	if (firstElementAndOnlyElement || isLastElement)
+	bool isLastElement = (index == (this->count - 1));
+	if (isLastElement && this->count == 1)
 	{
 		this->count--;
 		return true;
 	}
 
-	i64 itemToRemoveByteOffset         = index * sizeof(T);
-	i64 oneAfterItemToRemoveByteOffset = (index + 1)  * sizeof(T);
-	i64 lastItemByteOffset             = this->count * sizeof(T);
-	i64 numBytesToMove                 = lastItemByteOffset - oneAfterItemToRemoveByteOffset;
+	auto itemToRemoveByteOffset         = index * sizeof(T);
+	auto oneAfterItemToRemoveByteOffset = (index + 1)  * sizeof(T);
+	auto lastItemByteOffset             = this->count * sizeof(T);
+	auto numBytesToMove                 = lastItemByteOffset - oneAfterItemToRemoveByteOffset;
 
 	u8 *bytePtr = (u8 *)this->data;
 	u8 *dest    = &bytePtr[itemToRemoveByteOffset];
@@ -795,18 +811,18 @@ bool DqnArray<T>::RemoveStable(i64 const index)
 }
 
 template <typename T>
-void DqnArray<T>::RemoveStable(i64 *indexList, const i64 numIndexes)
+void DqnArray<T>::RemoveStable(isize *indexList, isize numIndexes)
 {
 	if (numIndexes == 0 || !indexList) return;
 
 	// NOTE: Sort the index list and ensure we only remove indexes up to the size of our array
-	Dqn_QuickSort<i64>(indexList, numIndexes);
+	Dqn_QuickSort<isize>(indexList, numIndexes);
 
-	i64 arrayHighestIndex = this->count - 1;
-	i64 realCount         = numIndexes;
+	auto arrayHighestIndex = this->count - 1;
+	auto realCount         = numIndexes;
 	if (indexList[numIndexes - 1] > arrayHighestIndex)
 	{
-		i64 realNumIndexes =
+		auto realNumIndexes =
 		    Dqn_BSearch(indexList, numIndexes, arrayHighestIndex, Dqn_BSearchBound_Lower);
 		// NOTE: If -1, then there's no index in the indexlist that is within the range of our array
 		// i.e. no index we can remove without out of array bounds access
@@ -830,10 +846,10 @@ void DqnArray<T>::RemoveStable(i64 *indexList, const i64 numIndexes)
 	}
 	else
 	{
-		i64 indexListIndex  = 0;
-		i64 indexToCopyTo   = indexList[indexListIndex++];
-		i64 indexToCopyFrom = indexToCopyTo + 1;
-		i64 deadIndex       = indexList[indexListIndex++];
+		auto indexListIndex  = 0;
+		auto indexToCopyTo   = indexList[indexListIndex++];
+		auto indexToCopyFrom = indexToCopyTo + 1;
+		auto deadIndex       = indexList[indexListIndex++];
 
 		bool breakLoop = false;
 		for (;
@@ -2813,7 +2829,7 @@ DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const
 		va_end(argList);
 	}
 
-		char const *const formatStr = "DqnLog:%s:%s,%d: %s";
+		char const *const formatStr = "DqnLog:%s:%s,%d: %s\n";
 		fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
 
 		#if defined(DQN_WIN32_PLATFORM)
@@ -2851,7 +2867,7 @@ DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const
 		va_end(argList);
 	}
 
-	char const *const formatStr = "DqnLog:%s:%s,%d(%s): %s";
+	char const *const formatStr = "DqnLog:%s:%s,%d(%s): %s\n";
 	fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
 
 	#if defined(DQN_WIN32_PLATFORM)
