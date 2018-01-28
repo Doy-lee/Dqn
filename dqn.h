@@ -478,19 +478,26 @@ public:
 	// API
 	// =============================================================================================
 	// return: These functions return false if allocation failed. String is preserved.
-	bool     Expand (const i32 newMax);
-	bool     Sprintf(char      const *const fmt, ...);
-	bool     Append (DqnString const        string);
-	bool     Append (char      const *const cstr, i32 bytesToCopy = -1);
+	bool     Expand  (i32 newMax);
+	bool     Sprintf (char      const *const fmt, ...);
+	bool     VSprintf(char      const *const fmt, va_list argList);
+	bool     Append  (DqnString const        string);
+	bool     Append  (char      const *const cstr, i32 bytesToCopy = -1);
 
-	void     Clear  ();
-	void     Free   ();
+	void     Clear   ();
+	void     Free    ();
 
 	// return: -1 if invalid, or if bufSize is 0 the required buffer length in wchar_t characters
 	i32      ToWChar(wchar_t *const buf, i32 const bufSize);
 
 	// return: String allocated using api.
 	wchar_t *ToWChar(DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+};
+
+class DqnSmartString : public DqnString
+{
+public:
+	~DqnSmartString() { this->Free(); }
 };
 
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
@@ -526,8 +533,9 @@ public:
 	bool  InitSize    (isize size_, DqnMemStack *const stack);
 
 	void  Free        ();
-	bool  Resize      (isize newMax);
+	bool  Resize      (isize newMax);              // If (newMax < count), it will destroy the left over elements.
 	bool  Grow        (isize multiplier = 2);
+	T    *Make        ();                          // Get a ptr to the next free element in the array, increment count.
 	T    *Push        (T const *item, isize num);
 	T    *Push        (T const  item);
 	T    *Insert      (T const  item, isize index);
@@ -679,6 +687,24 @@ bool DqnArray<T>::Grow(isize multiplier)
 	newMax       = (newMax == 0) ? 8 : newMax;
 	bool result = this->Resize(newMax);
 	return result;
+}
+
+template <typename T>
+T *DqnArray<T>::Make()
+{
+	bool accessible = true;
+	if (!this->data || this->count >= this->max)
+	{
+		accessible = this->Grow();
+	}
+
+	if (accessible)
+	{
+		T *result = this->data[this->count++];
+		return result;
+	}
+
+	return nullptr;
 }
 
 template <typename T>
@@ -2815,26 +2841,23 @@ DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const
 	char userMsg[2048];
 	userMsg[0] = '\0';
 
-	if (msg)
+	va_list argList;
+	va_start(argList, msg);
 	{
-		va_list argList;
-		va_start(argList, msg);
+		u32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
+		if (numCopied > DQN_ARRAY_COUNT(userMsg))
 		{
-			u32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
-			if (numCopied > DQN_ARRAY_COUNT(userMsg))
-			{
-				(*((int *)0)) = 0;
-			}
+			(*((int *)0)) = 0;
 		}
-		va_end(argList);
 	}
+	va_end(argList);
 
-		char const *const formatStr = "DqnLog:%s:%s,%d: %s\n";
-		fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
+	char const *const formatStr = "DqnLog:%s:%s,%d: %s\n";
+	fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
 
-		#if defined(DQN_WIN32_PLATFORM)
-			DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, userMsg);
-		#endif
+	#if defined(DQN_WIN32_PLATFORM)
+		DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, userMsg);
+	#endif
 }
 
 DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum,
@@ -2853,19 +2876,16 @@ DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const
 	char userMsg[2048];
 	userMsg[0] = '\0';
 
-	if (msg)
+	va_list argList;
+	va_start(argList, msg);
 	{
-		va_list argList;
-		va_start(argList, msg);
+		u32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
+		if (numCopied > DQN_ARRAY_COUNT(userMsg))
 		{
-			u32 numCopied = Dqn_vsprintf(userMsg, msg, argList);
-			if (numCopied > DQN_ARRAY_COUNT(userMsg))
-			{
-				(*((int *)0)) = 0;
-			}
+			(*((int *)0)) = 0;
 		}
-		va_end(argList);
 	}
+	va_end(argList);
 
 	char const *const formatStr = "DqnLog:%s:%s,%d(%s): %s\n";
 	fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
@@ -3084,7 +3104,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 		u8 *checkPtr              = currUsagePtr - DQN_ALIGN_POW_N(request->oldSize, stack->byteAlign);
 
 		// Last allocation, can safely allocate the remainder space.
-		if (checkPtr == (u8 *)request->oldMemPtr || request->oldMemPtr == block->memory)
+		if (checkPtr == (u8 *)request->oldMemPtr)
 		{
 			size_t remainingBytesToAlloc = request->newRequestSize - request->oldSize;
 			DQN_ASSERT(remainingBytesToAlloc > 0);
@@ -5612,7 +5632,7 @@ bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
 	return true;
 }
 
-bool DqnString::Expand(const i32 newMax)
+bool DqnString::Expand(i32 newMax)
 {
 	if (newMax < this->max)
 	{
@@ -5697,6 +5717,16 @@ DQN_FILE_SCOPE bool DqnStringInternal_Append(DqnString *const str, char const *c
 
 bool DqnString::Sprintf(char const *fmt, ...)
 {
+	va_list argList;
+	va_start(argList, fmt);
+	bool result = this->VSprintf(fmt, argList);
+	va_end(argList);
+
+	return result;
+}
+
+bool DqnString::VSprintf(char const *fmt, va_list argList)
+{
 	LOCAL_PERSIST char tmp[STB_SPRINTF_MIN];
 
 	auto PrintCallback = [](char *buf, void *user, int len) -> char *
@@ -5705,26 +5735,21 @@ bool DqnString::Sprintf(char const *fmt, ...)
 		return buf;
 	};
 
-	va_list argList;
-	va_start(argList, fmt);
+	i32  const reqLen          = Dqn_vsprintfcb(PrintCallback, nullptr, tmp, fmt, argList);
+	auto const remainingSpace  = this->max - this->len;
+	if (reqLen > remainingSpace)
 	{
-		i32  const reqLen          = Dqn_vsprintfcb(PrintCallback, nullptr, tmp, fmt, argList);
-		auto const remainingSpace  = this->max - this->len;
-		if (reqLen > remainingSpace)
+		i32 const newMax = this->max + reqLen;
+		if (!this->Expand(newMax))
 		{
-			i32 const newMax = this->max + reqLen;
-			if (!this->Expand(newMax))
-			{
-				return false;
-			}
+			return false;
 		}
-
-		char *bufStart = this->str + this->len;
-		i32 numCopied  = Dqn_vsprintf(bufStart, fmt, argList);
-		this->len += numCopied;
-		DQN_ASSERT(this->len <= this->max);
 	}
-	va_end(argList);
+
+	char *bufStart = this->str + this->len;
+	i32 numCopied = Dqn_vsprintf(bufStart, fmt, argList);
+	this->len += numCopied;
+	DQN_ASSERT(this->len <= this->max);
 
 	return true;
 }
