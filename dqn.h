@@ -482,16 +482,17 @@ public:
 	bool     Sprintf (char      const *const fmt, ...);
 	bool     VSprintf(char      const *const fmt, va_list argList);
 	bool     Append  (DqnString const        string);
+	bool     Append  (DqnString const       *string);
 	bool     Append  (char      const *const cstr, i32 bytesToCopy = -1);
 
 	void     Clear   ();
 	void     Free    ();
 
 	// return: -1 if invalid, or if bufSize is 0 the required buffer length in wchar_t characters
-	i32      ToWChar(wchar_t *const buf, i32 const bufSize);
+	i32      ToWChar(wchar_t *const buf, i32 const bufSize) const;
 
 	// return: String allocated using api.
-	wchar_t *ToWChar(DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	wchar_t *ToWChar(DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR) const;
 };
 
 class DqnSmartString : public DqnString
@@ -1671,6 +1672,10 @@ DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *lineLength);
 // return:            0 if equal. 0 < if a is before b, > 0 if a is after b
 DQN_FILE_SCOPE i32   DqnStr_Cmp               (char const *const a, char const *const b, i32 numBytesToCompare = -1, bool ignoreCase = false);
 
+// strLen: Len of string, if -1, StrLen is used.
+// return: Pointer in str to the last slash, if none then the original string.
+DQN_FILE_SCOPE char *DqnStr_GetPtrToLastSlash (char const *str, i32 strLen = -1);
+
 // return: String length not including the nullptr terminator. 0 if invalid args.
 DQN_FILE_SCOPE i32   DqnStr_Len               (char const *const a);
 DQN_FILE_SCOPE i32   DqnStr_LenUTF8           (u32 const *const a, i32 *const lenInBytes = nullptr);
@@ -2050,14 +2055,6 @@ struct DqnFile
 	void   *handle;
 	size_t  size;
 
-	// Initialisation API
-	// ==============================================================================================
-	// If raiiCleanup is true, close() is called in the destructor on scope exit. Can be changed at
-	// any point by user.
-	bool    raiiCleanup = false;
-	DqnFile (bool const raiiCleanup = false);
-	~DqnFile();
-
 	// API
 	// ==============================================================================================
 	// NOTE: W(ide) versions of functions only work on Win32, since Unix is already UTF-8 compatible.
@@ -2065,7 +2062,7 @@ struct DqnFile
 	// Open a handle for file read and writing. Deleting files does not need a handle. Handles should be
 	// closed before deleting files otherwise the OS may not be able to delete the file.
 	// return: FALSE if invalid args or failed to get handle (i.e. insufficient permissions)
-	bool   Open (const char    *const path, u32 const flags_, Action const action);
+	bool   Open(const char    *const path, u32 const flags_, Action const action);
 	bool   Open(const wchar_t *const path, u32 const flags_, Action const action);
 
 	// fileOffset: The byte offset to starting writing from.
@@ -2083,35 +2080,41 @@ struct DqnFile
 	// Read entire file into the given buffer. To determine required bufSize size, use GetFileSize.
 	// bytesRead: Pass in to get how many bytes of the buf was used. Basically the return value of Read
 	// return:    False if insufficient bufSize OR file access failure OR nullptr arguments.
-	static bool   ReadEntireFile      (char    const *const path, u8 *const buf, size_t const bufSize, size_t *const bytesRead);
-	static bool   ReadEntireFile      (wchar_t const *const path, u8 *const buf, size_t const bufSize, size_t *const bytesRead);
+	static bool   ReadEntireFile(char    const *const path, u8 *const buf, size_t const bufSize, size_t *const bytesRead);
+	static bool   ReadEntireFile(wchar_t const *const path, u8 *const buf, size_t const bufSize, size_t *const bytesRead);
 
 	// Buffer should be freed when done with.
 	// return: False if file access failure OR nullptr arguments.
-	static u8    *ReadEntireFileSimple(char    const *const path, size_t *const bufSize, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
-	static u8    *ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSize, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	static u8    *ReadEntireFile(char    const *const path, size_t *const bufSize, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	static u8    *ReadEntireFile(wchar_t const *const path, size_t *const bufSize, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 
 	// return: False if file access failure OR nullptr arguments.
-	static bool   GetFileSize         (char    const *const path, size_t *const size);
-	static bool   GetFileSize         (wchar_t const *const path, size_t *const size);
+	static bool   GetFileSize   (char    const *const path, size_t *const size);
+	static bool   GetFileSize   (wchar_t const *const path, size_t *const size);
 
 	// info:   Pass in to fill with file attributes.
 	// return: False if file access failure OR nullptr arguments.
-	static bool   GetInfo             (char    const *const path, Info *const info);
-	static bool   GetInfo             (wchar_t const *const path, Info *const info);
+	static bool   GetInfo       (char    const *const path, Info *const info);
+	static bool   GetInfo       (wchar_t const *const path, Info *const info);
 
 	// NOTE: You can't delete a file unless the handle has been closed to it on Win32.
 	// return: False if file access failure OR nullptr arguments.
-	static bool   Delete              (char    const *const path);
-	static bool   Delete              (wchar_t const *const path);
-	static bool   Copy                (char    const *const src, char    const *const dest);
-	static bool   Copy                (wchar_t const *const src, wchar_t const *const dest);
+	static bool   Delete        (char    const *const path);
+	static bool   Delete        (wchar_t const *const path);
+	static bool   Copy          (char    const *const src, char    const *const dest);
+	static bool   Copy          (wchar_t const *const src, wchar_t const *const dest);
 
 	// numFiles: Pass in a ref to a i32. The function fills it out with the number of entries.
 	// return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
 	//           allocated with malloc and must be freed using free() or the helper function ListDirFree()
-	static char **ListDir             (char const *const dir, i32 &numFiles);
-	static void   ListDirFree         (char **fileList,       i32 const numFiles);
+	static char **ListDir       (char const *const dir, i32 &numFiles);
+	static void   ListDirFree   (char **fileList,       i32 const numFiles);
+};
+
+class DqnSmartFile : public DqnFile
+{
+public:
+	~DqnSmartFile() { this->Close(); }
 };
 
 // XPlatform > #DqnTimer API
@@ -4553,7 +4556,7 @@ DQN_FILE_SCOPE char *DqnChar_TrimWhitespaceAround(char const *src, i32 srcLen, i
 
 	i32 charsSkipped = (i32)(start - src);
 	i32 updatedLen   = srcLen - charsSkipped;
-	if (updatedLen == 0)
+	if (updatedLen <= 0)
 	{
 		if (newLen) *newLen = 0;
 		return nullptr;
@@ -4692,6 +4695,22 @@ DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *const a, const char *const b, i32 numB
 	}
 
 	return (((*aPtr) < (*bPtr)) ? -1 : 1);
+}
+
+DQN_FILE_SCOPE char *DqnStr_GetPtrToLastSlash(char const *str, i32 strLen)
+{
+	char const *result       = str;
+	if (strLen == -1) strLen = DqnStr_Len(str);
+
+	for (auto i = strLen - 1; i >= 0; i--)
+	{
+		if (result[i] == '\\' || result[i] == '/')
+		{
+			result = result + i + 1;
+			break;
+		}
+	}
+	return (char *)result;
 }
 
 DQN_FILE_SCOPE i32 DqnStr_Len(const char *const a)
@@ -5778,6 +5797,12 @@ bool DqnString::Append(DqnString const string)
 	return result;
 }
 
+bool DqnString::Append(DqnString const *string)
+{
+	bool result = DqnStringInternal_Append(this, string->str, string->len);
+	return result;
+}
+
 void DqnString::Clear()
 {
 	this->len = 0;
@@ -5810,7 +5835,7 @@ void DqnString::Free()
 	}
 }
 
-i32 DqnString::ToWChar(wchar_t *const buf, i32 const bufSize)
+i32 DqnString::ToWChar(wchar_t *const buf, i32 const bufSize) const
 {
 #if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
 	i32 result = DqnWin32_UTF8ToWChar(this->str, buf, bufSize);
@@ -5822,7 +5847,7 @@ i32 DqnString::ToWChar(wchar_t *const buf, i32 const bufSize)
 #endif
 }
 
-wchar_t *DqnString::ToWChar(DqnMemAPI *const api)
+wchar_t *DqnString::ToWChar(DqnMemAPI *const api) const
 {
 	// TODO(doyle): Should the "in" string allow specifyign len? probably
 	// Otherwise a c-string and a literal initiated string might have different lengths
@@ -8029,22 +8054,6 @@ DQN_FILE_SCOPE char **DqnFileInternal_PlatformListDir(char const *const dir, u32
 }
 
 #endif // DQN_UNIX_PLATFORM
-DqnFile::DqnFile(bool const raiiCleanup)
-: flags(0)
-, handle(nullptr)
-, size(0)
-, raiiCleanup(raiiCleanup)
-{
-}
-
-DqnFile::~DqnFile()
-{
-	if (raiiCleanup)
-	{
-		this->Close();
-	}
-}
-
 bool DqnFile::Open(char const *const path, u32 const flags_, Action const action)
 {
 	if (!path) return false;
@@ -8146,13 +8155,13 @@ size_t DqnFile::Read(u8 *const buf, size_t const numBytesToRead)
 	return numBytesRead;
 }
 
-u8 *DqnFile::ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSize, DqnMemAPI *const api)
+u8 *DqnFile::ReadEntireFile(wchar_t const *const path, size_t *const bufSize, DqnMemAPI *const api)
 {
 	// TODO(doyle): Logging
 	if (!path || !bufSize) return false;
 
 	size_t requiredSize = 0;
-	if (!DqnFile::GetFileSize(path, &requiredSize)) return nullptr;
+	if (!DqnFile::GetFileSize(path, &requiredSize) || requiredSize == 0) return nullptr;
 
 	auto *buf = (u8 *)api->Alloc(requiredSize, /*zeroClear*/ false);
 	if (!buf) return nullptr;
@@ -8169,12 +8178,12 @@ u8 *DqnFile::ReadEntireFileSimple(wchar_t const *const path, size_t *const bufSi
 	return nullptr;
 }
 
-u8 *DqnFile::ReadEntireFileSimple(char const *const path, size_t *const bufSize, DqnMemAPI *const api)
+u8 *DqnFile::ReadEntireFile(char const *const path, size_t *const bufSize, DqnMemAPI *const api)
 {
 	// TODO(doyle): Logging
 
 	size_t requiredSize = 0;
-	if (!DqnFile::GetFileSize(path, &requiredSize)) return nullptr;
+	if (!DqnFile::GetFileSize(path, &requiredSize) || requiredSize == 0) return nullptr;
 
 	auto *buf = (u8 *)api->Alloc(requiredSize, /*zeroClear*/ false);
 	if (!buf) return nullptr;

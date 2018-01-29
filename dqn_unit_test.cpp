@@ -1462,7 +1462,7 @@ void DqnArray_TestRealDataInternal(DqnArray<char> *array)
 {
 #ifdef DQN_XPLATFORM_LAYER
 	size_t bufSize = 0;
-	u8 *buf        = DqnFile::ReadEntireFileSimple("tests/google-10000-english.txt", &bufSize);
+	u8 *buf        = DqnFile::ReadEntireFile("tests/google-10000-english.txt", &bufSize);
 	DQN_ASSERT(buf);
 
 	for (auto i = 0; i < bufSize; i++)
@@ -2007,7 +2007,7 @@ void DqnFile_Test()
 
 			if (1)
 			{
-				DqnFile raiiFile = DqnFile(true);
+				DqnSmartFile raiiFile = {};
 				if (raiiFile.Open(FILE_TO_OPEN,
 				                  DqnFile::PermissionFlag::FileWrite | DqnFile::PermissionFlag::FileRead,
 				                  DqnFile::Action::OpenOnly))
