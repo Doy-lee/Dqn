@@ -33,10 +33,8 @@
 // #DqnMem       Memory Allocation
 // #DqnMemAPI    Custom memory API for Dqn Data Structures
 // #DqnMemStack  Memory Allocator, Push, Pop Style
-// #DqnString    String library
 // #DqnArray     Dynamic Array using Templates
 // #DqnHash      Hashing using Murmur
-// #DqnHashTable Hash Tables using Templates
 // #DqnMath      Simple Math Helpers (Lerp etc.)
 // #DqnV2        2D  Math Vectors
 // #DqnV3        3D  Math Vectors
@@ -46,6 +44,8 @@
 // #DqnChar      Char  Operations (IsDigit(), IsAlpha() etc)
 // #DqnStr       Str   Operations (Str_Len(), Str_Copy() etc)
 // #DqnWChar     WChar Operations (IsDigit(), IsAlpha() etc)
+// #DqnString    String library
+// #DqnHashTable Hash Tables using Templates
 // #DqnRnd       Random Number Generator (ints and floats)
 // #Dqn_*        Utility code, (qsort, quick file reading)
 
@@ -175,7 +175,7 @@ using f32 = float;
 	{                                                                                              \
 		if (!(expr))                                                                               \
 		{                                                                                          \
-			DqnLog(__FILE__, __func__, __LINE__, #expr, msg, ##__VA_ARGS__);                       \
+			DqnLogExpr(__FILE__, __func__, __LINE__, #expr, msg, ##__VA_ARGS__);                       \
 			(*((int *)0)) = 0;                                                                     \
 		}                                                                                          \
 	} while (0)
@@ -185,7 +185,7 @@ using f32 = float;
 
 // Use macro above.
 DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum, char const *const msg, ...);
-DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum, char const *const expr, char const *const msg, ...);
+DQN_FILE_SCOPE void DqnLogExpr(char *file, char const *const functionName, i32 const lineNum, char const *const expr, char const *const msg, ...);
 
 // Assert at compile time by making a type that is invalid depending on the expression result
 #define DQN_COMPILE_ASSERT(expr)                DQN_COMPILE_ASSERT_INTERNAL(expr, DQN_UNIQUE_NAME(DqnCompileAssertInternal_))
@@ -434,83 +434,6 @@ struct DqnMemStack
     void   FreeDetachedBlock      (Block *memBlock);
 };
 
-// #DqnString Public API - String library
-// =================================================================================================
-// String allocates +1 extra byte for the null-terminator to be completely compatible with
-// C style strings, but this is not reflected in the capacity or len, and is hidden from the user.
-
-// Usage: DqnString example = DQN_STRING_LITERAL(example, "hello world");
-#define DQN_STRING_LITERAL(srcVariable, literal)                                                   \
-	DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, DQN_UNIQUE_NAME(dqnstring_))
-
-class DqnString
-{
-
-public:
-	DqnMemAPI *memAPI;
-	i32        len;              // Len of the string in bytes not including null-terminator
-	i32        max;              // The maximum capacity not including space for null-terminator.
-	char      *str;
-
-	// Initialisation API
-	// =============================================================================================
-	void Init              (DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
-	void Init              (DqnMemStack *const stack);
-
-	// return: False if (size < 0) or (memAPI allocation failed).
-	bool InitSize          (i32 size, DqnMemStack *const stack);
-	bool InitSize          (i32 size, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
-
-	// return: False if arguments are invalid.
-	bool InitFixedMem      (char *const memory, const i32 sizeInBytes);
-
-	bool InitLiteral       (char    const *const cstr, i32 const lenInBytes, DqnMemStack *const stack);
-	bool InitLiteral       (char    const *const cstr,                       DqnMemStack *const stack);
-	bool InitLiteral       (char    const *const cstr, i32 const lenInBytes, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
-	bool InitLiteral       (char    const *const cstr,                       DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
-
-	bool InitLiteral       (wchar_t const *const cstr, DqnMemStack *const stack);
-	bool InitLiteral       (wchar_t const *const cstr, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
-
-	// return: False if cstr is nullptr.
-	bool InitLiteralNoAlloc(char *const cstr, i32 cstrLen = -1);
-
-	// API
-	// =============================================================================================
-	// return: These functions return false if allocation failed. String is preserved.
-	bool     Expand  (i32 newMax);
-	bool     Sprintf (char      const *const fmt, ...);
-	bool     VSprintf(char      const *const fmt, va_list argList);
-	bool     Append  (DqnString const        string);
-	bool     Append  (DqnString const       *string);
-	bool     Append  (char      const *const cstr, i32 bytesToCopy = -1);
-
-	void     Clear   ();
-	void     Free    ();
-
-	// return: -1 if invalid, or if bufSize is 0 the required buffer length in wchar_t characters
-	i32      ToWChar(wchar_t *const buf, i32 const bufSize) const;
-
-	// return: String allocated using api.
-	wchar_t *ToWChar(DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR) const;
-};
-
-class DqnSmartString : public DqnString
-{
-public:
-	~DqnSmartString() { this->Free(); }
-};
-
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
-
-// NOTE: First level of indirection needs to turn the combined dqnstring_(guid) into a name. Otherwise
-//       each use of literalVarName will increment __COUNTER__
-#define DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, literalVarName)                          \
-	{};                                                                                            \
-	char literalVarName[] = literal;                                                               \
-	srcVariable.InitLiteralNoAlloc(literalVarName, DQN_CHAR_COUNT(literalVarName))
-
 // #DqnArray API
 // =================================================================================================
 #define DQN_FOR_ARRAY(indexName, arrayPtr)                                                         \
@@ -644,7 +567,7 @@ bool DqnArray<T>::Resize(isize newMax)
 		DQN_LOGD(
 		    "DqnArray tried to resize to 0 items. Not allowed? TODO(doyle): Maybe just free the "
 		    "array then?");
-		return false;
+		return true;
 	}
 
 
@@ -921,6 +844,417 @@ DQN_FILE_SCOPE inline u64 DqnHash_Murmur64(void const *data, size_t len)
 {
 	return DqnHash_Murmur64Seed(data, len, 0x9747b28c);
 }
+
+// #DqnMath API
+// =================================================================================================
+DQN_FILE_SCOPE f32 DqnMath_Lerp  (f32 a, f32 t, f32 b);
+DQN_FILE_SCOPE f32 DqnMath_Sqrtf (f32 a);
+DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max);
+
+// #DqnV2 API
+// =================================================================================================
+union DqnV2i
+{
+	struct { i32 x, y; };
+	struct { i32 w, h; };
+	struct { i32 min, max; };
+	i32 e[2];
+
+	bool operator==(DqnV2i const &b) const { return (this->x == b.x) && (this->y == b.y); }
+	bool operator!=(DqnV2i const &b) const { return !(*this == b); }
+	bool operator>=(DqnV2i const &b) const { return (this->x >= b.x) && (this->y >= b.y); }
+	bool operator<=(DqnV2i const &b) const { return (this->x <= b.x) && (this->y <= b.y); }
+	bool operator< (DqnV2i const &b) const { return (this->x <  b.x) && (this->y <  b.y); }
+	bool operator> (DqnV2i const &b) const { return (this->x >  b.x) && (this->y >  b.y); }
+};
+
+union DqnV2
+{
+	struct { f32 x, y; };
+	struct { f32 w, h; };
+	struct { f32 min, max; };
+	f32 e[2];
+
+	bool operator==(DqnV2 const &b) const { return (this->x == b.x) && (this->y == b.y); }
+	bool operator!=(DqnV2 const &b) const { return !(*this == b); }
+	bool operator>=(DqnV2 const &b) const { return (this->x >= b.x) && (this->y >= b.y); }
+	bool operator<=(DqnV2 const &b) const { return (this->x <= b.x) && (this->y <= b.y); }
+	bool operator< (DqnV2 const &b) const { return (this->x <  b.x) && (this->y <  b.y); }
+	bool operator> (DqnV2 const &b) const { return (this->x >  b.x) && (this->y >  b.y); }
+};
+
+DQN_FILE_SCOPE DqnV2 DqnV2_(f32 xy);
+DQN_FILE_SCOPE DqnV2 DqnV2_(f32 x, f32 y);
+DQN_FILE_SCOPE DqnV2 DqnV2_(i32 x, i32 y);
+DQN_FILE_SCOPE DqnV2 DqnV2_(DqnV2i a);
+
+DQN_FILE_SCOPE DqnV2 DqnV2_Add     (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Sub     (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Scalei  (DqnV2 a, i32 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Scalef  (DqnV2 a, f32 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Hadamard(DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE f32   DqnV2_Dot     (DqnV2 a, DqnV2 b);
+DQN_FILE_SCOPE bool  DqnV2_Equals  (DqnV2 a, DqnV2 b);
+
+DQN_FILE_SCOPE f32   DqnV2_LengthSquared(const DqnV2 a, const DqnV2 b);
+DQN_FILE_SCOPE f32   DqnV2_Length       (const DqnV2 a, const DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Normalise    (const DqnV2 a);
+DQN_FILE_SCOPE bool  DqnV2_Overlaps     (      DqnV2 a,       DqnV2 b);
+DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(const DqnV2 a);
+
+DQN_FILE_SCOPE DqnV2 DqnV2_ResizeKeepAspectRatio(DqnV2 srcSize, DqnV2 targetSize);
+DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio     (DqnV2 dim, DqnV2 ratio); // Resize the dimension to fit the aspect ratio provided. Downscale only.
+
+DQN_FILE_SCOPE inline DqnV2  operator- (DqnV2  a, DqnV2 b) { return      DqnV2_Sub     (a, b);  }
+DQN_FILE_SCOPE inline DqnV2  operator+ (DqnV2  a, DqnV2 b) { return      DqnV2_Add     (a, b);  }
+DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, DqnV2 b) { return      DqnV2_Hadamard(a, b);  }
+DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, f32   b) { return      DqnV2_Scalef  (a, b);  }
+DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, i32   b) { return      DqnV2_Scalei  (a, b);  }
+DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Hadamard(a, b)); }
+DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, f32   b) { return (a = DqnV2_Scalef  (a, b)); }
+DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, i32   b) { return (a = DqnV2_Scalei  (a, b)); }
+DQN_FILE_SCOPE inline DqnV2 &operator-=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Sub     (a, b)); }
+DQN_FILE_SCOPE inline DqnV2 &operator+=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Add     (a, b)); }
+
+// DqnV2i
+DQN_FILE_SCOPE DqnV2i DqnV2i_(i32 x_, i32 y_);
+DQN_FILE_SCOPE DqnV2i DqnV2i_(f32 x_, f32 y_);
+DQN_FILE_SCOPE DqnV2i DqnV2i_(DqnV2 a);
+
+DQN_FILE_SCOPE DqnV2i DqnV2i_Add     (DqnV2i a, DqnV2i b);
+DQN_FILE_SCOPE DqnV2i DqnV2i_Sub     (DqnV2i a, DqnV2i b);
+DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei  (DqnV2i a, i32 b);
+DQN_FILE_SCOPE DqnV2i DqnV2i_Scalef  (DqnV2i a, f32 b);
+DQN_FILE_SCOPE DqnV2i DqnV2i_Hadamard(DqnV2i a, DqnV2i b);
+DQN_FILE_SCOPE f32    DqnV2i_Dot     (DqnV2i a, DqnV2i b);
+DQN_FILE_SCOPE bool   DqnV2i_Equals  (DqnV2i a, DqnV2i b);
+
+DQN_FILE_SCOPE inline DqnV2i  operator- (DqnV2i  a, DqnV2i b) { return      DqnV2i_Sub     (a, b);  }
+DQN_FILE_SCOPE inline DqnV2i  operator+ (DqnV2i  a, DqnV2i b) { return      DqnV2i_Add     (a, b);  }
+DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, DqnV2i b) { return      DqnV2i_Hadamard(a, b);  }
+DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, f32    b) { return      DqnV2i_Scalef  (a, b);  }
+DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, i32    b) { return      DqnV2i_Scalei  (a, b);  }
+DQN_FILE_SCOPE inline DqnV2i &operator*=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Hadamard(a, b)); }
+DQN_FILE_SCOPE inline DqnV2i &operator-=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Sub     (a, b)); }
+DQN_FILE_SCOPE inline DqnV2i &operator+=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Add     (a, b)); }
+
+// #DqnV3 API
+// =================================================================================================
+union DqnV3
+{
+		struct { f32 x, y, z; };
+		DqnV2 xy;
+		struct { f32 r, g, b; };
+		f32 e[3];
+};
+
+union DqnV3i
+{
+	struct { i32 x, y, z; };
+	struct { i32 r, g, b; };
+	i32 e[3];
+};
+
+// DqnV3
+DQN_FILE_SCOPE DqnV3 DqnV3_(f32 xyz);
+DQN_FILE_SCOPE DqnV3 DqnV3_(f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnV3 DqnV3_(i32 x, i32 y, i32 z);
+
+DQN_FILE_SCOPE DqnV3 DqnV3_Add     (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Sub     (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Scalei  (DqnV3 a, i32 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Scalef  (DqnV3 a, f32 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Hadamard(DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE f32   DqnV3_Dot     (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE bool  DqnV3_Equals  (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE DqnV3 DqnV3_Cross   (DqnV3 a, DqnV3 b);
+
+DQN_FILE_SCOPE DqnV3 DqnV3_Normalise    (DqnV3 a);
+DQN_FILE_SCOPE f32   DqnV3_Length       (DqnV3 a, DqnV3 b);
+DQN_FILE_SCOPE f32   DqnV3_LengthSquared(DqnV3 a, DqnV3 b);
+
+DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3_(b));   }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, i32   b) { return      DqnV3_Scalei  (a, b);           }
+DQN_FILE_SCOPE inline DqnV3  operator/ (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, (1.0f/b));    }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Hadamard(a, b));          }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, f32   b) { return (a = DqnV3_Scalef  (a, b));          }
+DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, i32   b) { return (a = DqnV3_Scalei  (a, b));          }
+DQN_FILE_SCOPE inline DqnV3 &operator-=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Sub     (a, b));          }
+DQN_FILE_SCOPE inline DqnV3 &operator+=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Add     (a, b));          }
+DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_Equals  (a, b);           }
+
+DQN_FILE_SCOPE DqnV3i DqnV3i_(i32 x, i32 y, i32 z);
+DQN_FILE_SCOPE DqnV3i DqnV3i_(f32 x, f32 y, f32 z);
+
+// #DqnV4 API
+// =================================================================================================
+union DqnV4
+{
+	struct { f32 x, y, z, w; };
+	DqnV3 xyz;
+	DqnV2 xy;
+
+	struct { f32 r, g, b, a; };
+	DqnV3 rgb;
+
+	f32    e[4];
+	DqnV2 v2[2];
+};
+
+DQN_FILE_SCOPE DqnV4 DqnV4_();
+DQN_FILE_SCOPE DqnV4 DqnV4_(f32 xyzw);
+DQN_FILE_SCOPE DqnV4 DqnV4_(f32 x, f32 y, f32 z, f32 w);
+DQN_FILE_SCOPE DqnV4 DqnV4_(i32 x, i32 y, i32 z, i32 w);
+DQN_FILE_SCOPE DqnV4 DqnV4_(DqnV3 a, f32 w);
+
+DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Sub     (DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Scalef  (DqnV4 a, f32 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Scalei  (DqnV4 a, i32 b);
+DQN_FILE_SCOPE DqnV4 DqnV4_Hadamard(DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE f32   DqnV4_Dot     (DqnV4 a, DqnV4 b);
+DQN_FILE_SCOPE bool  DqnV4_Equals  (DqnV4 a, DqnV4 b);
+
+DQN_FILE_SCOPE inline DqnV4  operator- (DqnV4  a, DqnV4 b) { return      DqnV4_Sub     (a, b);            }
+DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, DqnV4 b) { return      DqnV4_Add     (a, b);            }
+DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4_(b));    }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, DqnV4 b) { return      DqnV4_Hadamard(a, b);            }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, f32   b) { return      DqnV4_Scalef  (a, b);            }
+DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, i32   b) { return      DqnV4_Scalei  (a, b);            }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Hadamard(a, b));           }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, f32   b) { return (a = DqnV4_Scalef  (a, b));           }
+DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, i32   b) { return (a = DqnV4_Scalei  (a, b));           }
+DQN_FILE_SCOPE inline DqnV4 &operator-=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Sub     (a, b));           }
+DQN_FILE_SCOPE inline DqnV4 &operator+=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Add     (a, b));           }
+DQN_FILE_SCOPE inline bool   operator==(DqnV4 &a, DqnV4 b) { return      DqnV4_Equals  (a, b);            }
+
+// #DqnMat4 API
+// =================================================================================================
+typedef union DqnMat4
+{
+	// TODO(doyle): Row/column instead? More cache friendly since multiplication
+	// prefers rows.
+	DqnV4 col[4];
+	f32   e[4][4]; // Column/row
+} DqnMat4;
+
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity    ();
+
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Perspective (f32 fovYDegrees, f32 aspectRatio, f32 zNear, f32 zFar);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_LookAt      (DqnV3 eye, DqnV3 center, DqnV3 up);
+
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate3f (f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_TranslateV3 (DqnV3 vec);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate      (f32 radians, f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale       (f32 x, f32 y, f32 z);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_ScaleV3     (DqnV3 scale);
+DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul         (DqnMat4 a, DqnMat4 b);
+DQN_FILE_SCOPE DqnV4   DqnMat4_MulV4       (DqnMat4 a, DqnV4 b);
+
+// #DqnRect API
+// =================================================================================================
+class DqnRect
+{
+public:
+	DqnV2 min;
+	DqnV2 max;
+
+	f32   GetWidth ()                                    const { return max.w - min.w; }
+	f32   GetHeight()                                    const { return max.h - min.h; }
+	DqnV2 GetSize  ()                                    const { return max - min;     }
+	void  GetSize  (f32 *const width, f32 *const height) const;
+	DqnV2 GetCenter()                                    const;
+
+	DqnRect ClipRect (DqnRect const clip) const;
+	DqnRect Move     (DqnV2   const shift)  const;
+	bool    ContainsP(DqnV2   const p)      const;
+};
+
+DQN_FILE_SCOPE DqnRect DqnRect_(DqnV2 origin, DqnV2 size);
+DQN_FILE_SCOPE DqnRect DqnRect_(f32 x, f32 y, f32 w, f32 h);
+DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h);
+
+// #DqnChar API
+// =================================================================================================
+DQN_FILE_SCOPE char DqnChar_ToLower     (char c);
+DQN_FILE_SCOPE char DqnChar_ToUpper     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsDigit     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsAlpha     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsAlphaNum  (char c);
+DQN_FILE_SCOPE bool DqnChar_IsEndOfLine (char c);
+DQN_FILE_SCOPE bool DqnChar_IsWhitespace(char c);
+
+DQN_FILE_SCOPE char *DqnChar_TrimWhitespaceAround(char const *src, i32 srcLen, i32 *newLen);
+DQN_FILE_SCOPE char *DqnChar_SkipWhitespace      (char const *ptr);
+
+// TODO(doyle): this is NOT UTF8 safe
+// ch:        Char to find
+// len:       The length of the string stored in ptr, (doesn't care if it includes null terminator)
+// lenToChar: The length to the char from end of the ptr, i.e. (ptr + len)
+// return:    The ptr to the last char, null if it could not find.
+DQN_FILE_SCOPE char *DqnChar_FindLastChar  (char *ptr, char const ch, i32 len, u32 *const lenToChar);
+
+// Finds up to the first [\r]\n and destroy the line, giving you a null terminated line at the newline.
+// returns: The value to advance the ptr by, this can be different from the line
+//          length if there are new lines or leading whitespaces in the next line
+DQN_FILE_SCOPE i32   DqnChar_FindNextLine(char *ptr, i32 *lineLength);
+DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *lineLength);
+
+// #DqnStr API
+// =================================================================================================
+// numBytesToCompare: If -1, cmp runs until \0 is encountered.
+// return:            0 if equal. 0 < if a is before b, > 0 if a is after b
+DQN_FILE_SCOPE i32   DqnStr_Cmp               (char const *const a, char const *const b, i32 numBytesToCompare = -1, bool ignoreCase = false);
+
+// strLen: Len of string, if -1, StrLen is used.
+// return: Pointer in str to the last slash, if none then the original string.
+DQN_FILE_SCOPE char *DqnStr_GetPtrToLastSlash (char const *str, i32 strLen = -1);
+
+// return: String length not including the nullptr terminator. 0 if invalid args.
+DQN_FILE_SCOPE i32   DqnStr_Len               (char const *const a);
+DQN_FILE_SCOPE i32   DqnStr_LenUTF8           (u32 const *const a, i32 *const lenInBytes = nullptr);
+
+// return: String length starting from a, up to and not including the first delimiter character.
+DQN_FILE_SCOPE i32   DqnStr_LenDelimitWith    (char *const a, char const delimiter);
+
+// return: The dest argument, nullptr if args invalid (i.e. nullptr pointers or numChars < 0)
+DQN_FILE_SCOPE char *DqnStr_Copy              (char *const dest, char const *const src, i32 const numChars);
+DQN_FILE_SCOPE void  DqnStr_Reverse           (char *const buf, i32 const bufSize);
+
+// return: Number of bytes in codepoint, 0 if *a becomes invalid or end of stream.
+DQN_FILE_SCOPE i32   DqnStr_ReadUTF8Codepoint (u32 const *const a, u32 *outCodepoint);
+
+// return: The offset into the src to first char of the found string. Returns -1 if not found
+DQN_FILE_SCOPE i32   DqnStr_FindFirstOccurence(char const *src, i32 srcLen, char const *find, i32 findLen, bool ignoreCase = false);
+DQN_FILE_SCOPE bool  DqnStr_EndsWith          (char const *src, i32 srcLen, char const *find, i32 findLen, bool ignoreCase = false);
+
+// return: Helper function that returns the pointer to the first occurence, nullptr if not found.
+DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence (char const *src, i32 srcLen, char const *find, i32 findLen, bool ignoreCase = false);
+DQN_FILE_SCOPE bool  DqnStr_HasSubstring      (char const *src, i32 srcLen, char const *find, i32 findLen, bool ignoreCase = false);
+
+#define DQN_32BIT_NUM_MAX_STR_SIZE 11
+#define DQN_64BIT_NUM_MAX_STR_SIZE 21
+// Return the len of the derived string. If buf is nullptr and or bufSize is 0 the function returns the
+// required string length for the integer
+// TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work atm.
+DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufSize);
+DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *const buf, i64 const bufSize);
+// WARNING: Not robust, precision errors and whatnot but good enough!
+DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize);
+
+// Both return the number of bytes read, return 0 if invalid codepoint or UTF8
+DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, u32 const character);
+DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, u32 const character);
+
+// #DqnWChar API
+// =================================================================================================
+// NOTE: See above for documentation
+DQN_FILE_SCOPE bool     DqnWChar_IsDigit          (wchar_t const c);
+DQN_FILE_SCOPE wchar_t  DqnWChar_ToLower          (wchar_t const c);
+
+DQN_FILE_SCOPE wchar_t *DqnWChar_SkipWhitespace   (wchar_t *ptr);
+DQN_FILE_SCOPE wchar_t *DqnWChar_FindLastChar     (wchar_t *ptr, const wchar_t ch, i32 len, u32 *const lenToChar);
+DQN_FILE_SCOPE i32      DqnWChar_GetNextLine      (const wchar_t *ptr, i32 *lineLength);
+
+DQN_FILE_SCOPE i32      DqnWStr_Cmp               (wchar_t const *const a, const wchar_t *const b);
+DQN_FILE_SCOPE i32      DqnWStr_FindFirstOccurence(wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
+DQN_FILE_SCOPE bool     DqnWStr_HasSubstring      (wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
+DQN_FILE_SCOPE i32      DqnWStr_Len               (wchar_t const *const a);
+DQN_FILE_SCOPE i32      DqnWStr_LenDelimitWith    (wchar_t const *const a, wchar_t const delimiter);
+DQN_FILE_SCOPE void     DqnWStr_Reverse           (wchar_t *const buf, u32 const bufSize);
+
+DQN_FILE_SCOPE i32      Dqn_WStrToI32             (wchar_t const *const buf, i32 const bufSize);
+DQN_FILE_SCOPE i32      Dqn_I32ToWStr             (i32 value, wchar_t *buf, i32 bufSize);
+
+// #DqnString Public API - String library
+// =================================================================================================
+// String allocates +1 extra byte for the null-terminator to be completely compatible with
+// C style strings, but this is not reflected in the capacity or len, and is hidden from the user.
+
+// Usage: DqnString example = DQN_STRING_LITERAL(example, "hello world");
+#define DQN_STRING_LITERAL(srcVariable, literal)                                                   \
+	DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, DQN_UNIQUE_NAME(dqnstring_))
+
+class DqnString
+{
+
+public:
+	DqnMemAPI *memAPI;
+	i32        len;              // Len of the string in bytes not including null-terminator
+	i32        max;              // The maximum capacity not including space for null-terminator.
+	char      *str;
+
+	// Initialisation API
+	// =============================================================================================
+	void Init              (DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	void Init              (DqnMemStack *const stack);
+
+	// return: False if (size < 0) or (memAPI allocation failed).
+	bool InitSize          (i32 size, DqnMemStack *const stack);
+	bool InitSize          (i32 size, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+
+	// return: False if arguments are invalid.
+	bool InitFixedMem      (char *const memory, const i32 sizeInBytes);
+
+	bool InitLiteral       (char    const *const cstr, i32 const lenInBytes, DqnMemStack *const stack);
+	bool InitLiteral       (char    const *const cstr,                       DqnMemStack *const stack);
+	bool InitLiteral       (char    const *const cstr, i32 const lenInBytes, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+	bool InitLiteral       (char    const *const cstr,                       DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+
+	bool InitLiteral       (wchar_t const *const cstr, DqnMemStack *const stack);
+	bool InitLiteral       (wchar_t const *const cstr, DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+
+	// return: False if cstr is nullptr.
+	bool InitLiteralNoAlloc(char *const cstr, i32 cstrLen = -1);
+
+	// API
+	// =============================================================================================
+	// return: These functions return false if allocation failed. String is preserved.
+	bool     Expand  (i32 newMax);
+	bool     Sprintf (char      const *const fmt, ...);
+	bool     VSprintf(char      const *const fmt, va_list argList);
+	bool     Append  (DqnString const        string);
+	bool     Append  (DqnString const       *string);
+	bool     Append  (char      const *const cstr, i32 bytesToCopy = -1);
+
+	void     Clear   ();
+	void     Free    ();
+
+	// return: -1 if invalid, or if bufSize is 0 the required buffer length in wchar_t characters
+	i32      ToWChar(wchar_t *const buf, i32 const bufSize) const;
+
+	// return: String allocated using api.
+	wchar_t *ToWChar(DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR) const;
+
+	// Statics
+	// =============================================================================================
+	static bool Cmp(DqnString const *a, DqnString const *b, bool ignoreCase = false)
+	{
+		bool result = (a->len == b->len) && (DqnStr_Cmp(a->str, b->str, a->len, ignoreCase) == 0);
+		return result;
+	}
+};
+
+class DqnSmartString : public DqnString
+{
+public:
+	~DqnSmartString() { this->Free(); }
+};
+
+DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI   *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
+DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
+
+// NOTE: First level of indirection needs to turn the combined dqnstring_(guid) into a name. Otherwise
+//       each use of literalVarName will increment __COUNTER__
+#define DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, literalVarName)                          \
+	{};                                                                                            \
+	char literalVarName[] = literal;                                                               \
+	srcVariable.InitLiteralNoAlloc(literalVarName, DQN_CHAR_COUNT(literalVarName))
 
 // #DqnHashTable API
 // =================================================================================================
@@ -1405,331 +1739,6 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
 	this->usedEntriesIndex = newUsedEntriesIndex;
 	return true;
 }
-
-// #DqnMath API
-// =================================================================================================
-DQN_FILE_SCOPE f32 DqnMath_Lerp  (f32 a, f32 t, f32 b);
-DQN_FILE_SCOPE f32 DqnMath_Sqrtf (f32 a);
-DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max);
-
-// #DqnV2 API
-// =================================================================================================
-union DqnV2i
-{
-	struct { i32 x, y; };
-	struct { i32 w, h; };
-	struct { i32 min, max; };
-	i32 e[2];
-
-	bool operator==(DqnV2i const &b) const { return (this->x == b.x) && (this->y == b.y); }
-	bool operator!=(DqnV2i const &b) const { return !(*this == b); }
-	bool operator>=(DqnV2i const &b) const { return (this->x >= b.x) && (this->y >= b.y); }
-	bool operator<=(DqnV2i const &b) const { return (this->x <= b.x) && (this->y <= b.y); }
-	bool operator< (DqnV2i const &b) const { return (this->x <  b.x) && (this->y <  b.y); }
-	bool operator> (DqnV2i const &b) const { return (this->x >  b.x) && (this->y >  b.y); }
-};
-
-union DqnV2
-{
-	struct { f32 x, y; };
-	struct { f32 w, h; };
-	struct { f32 min, max; };
-	f32 e[2];
-
-	bool operator==(DqnV2 const &b) const { return (this->x == b.x) && (this->y == b.y); }
-	bool operator!=(DqnV2 const &b) const { return !(*this == b); }
-	bool operator>=(DqnV2 const &b) const { return (this->x >= b.x) && (this->y >= b.y); }
-	bool operator<=(DqnV2 const &b) const { return (this->x <= b.x) && (this->y <= b.y); }
-	bool operator< (DqnV2 const &b) const { return (this->x <  b.x) && (this->y <  b.y); }
-	bool operator> (DqnV2 const &b) const { return (this->x >  b.x) && (this->y >  b.y); }
-};
-
-DQN_FILE_SCOPE DqnV2 DqnV2_(f32 xy);
-DQN_FILE_SCOPE DqnV2 DqnV2_(f32 x, f32 y);
-DQN_FILE_SCOPE DqnV2 DqnV2_(i32 x, i32 y);
-DQN_FILE_SCOPE DqnV2 DqnV2_(DqnV2i a);
-
-DQN_FILE_SCOPE DqnV2 DqnV2_Add     (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Sub     (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Scalei  (DqnV2 a, i32 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Scalef  (DqnV2 a, f32 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Hadamard(DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE f32   DqnV2_Dot     (DqnV2 a, DqnV2 b);
-DQN_FILE_SCOPE bool  DqnV2_Equals  (DqnV2 a, DqnV2 b);
-
-DQN_FILE_SCOPE f32   DqnV2_LengthSquared(const DqnV2 a, const DqnV2 b);
-DQN_FILE_SCOPE f32   DqnV2_Length       (const DqnV2 a, const DqnV2 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Normalise    (const DqnV2 a);
-DQN_FILE_SCOPE bool  DqnV2_Overlaps     (      DqnV2 a,       DqnV2 b);
-DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(const DqnV2 a);
-
-DQN_FILE_SCOPE DqnV2 DqnV2_ResizeKeepAspectRatio(DqnV2 srcSize, DqnV2 targetSize);
-DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio     (DqnV2 dim, DqnV2 ratio); // Resize the dimension to fit the aspect ratio provided. Downscale only.
-
-DQN_FILE_SCOPE inline DqnV2  operator- (DqnV2  a, DqnV2 b) { return      DqnV2_Sub     (a, b);  }
-DQN_FILE_SCOPE inline DqnV2  operator+ (DqnV2  a, DqnV2 b) { return      DqnV2_Add     (a, b);  }
-DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, DqnV2 b) { return      DqnV2_Hadamard(a, b);  }
-DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, f32   b) { return      DqnV2_Scalef  (a, b);  }
-DQN_FILE_SCOPE inline DqnV2  operator* (DqnV2  a, i32   b) { return      DqnV2_Scalei  (a, b);  }
-DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Hadamard(a, b)); }
-DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, f32   b) { return (a = DqnV2_Scalef  (a, b)); }
-DQN_FILE_SCOPE inline DqnV2 &operator*=(DqnV2 &a, i32   b) { return (a = DqnV2_Scalei  (a, b)); }
-DQN_FILE_SCOPE inline DqnV2 &operator-=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Sub     (a, b)); }
-DQN_FILE_SCOPE inline DqnV2 &operator+=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Add     (a, b)); }
-
-// DqnV2i
-DQN_FILE_SCOPE DqnV2i DqnV2i_(i32 x_, i32 y_);
-DQN_FILE_SCOPE DqnV2i DqnV2i_(f32 x_, f32 y_);
-DQN_FILE_SCOPE DqnV2i DqnV2i_(DqnV2 a);
-
-DQN_FILE_SCOPE DqnV2i DqnV2i_Add     (DqnV2i a, DqnV2i b);
-DQN_FILE_SCOPE DqnV2i DqnV2i_Sub     (DqnV2i a, DqnV2i b);
-DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei  (DqnV2i a, i32 b);
-DQN_FILE_SCOPE DqnV2i DqnV2i_Scalef  (DqnV2i a, f32 b);
-DQN_FILE_SCOPE DqnV2i DqnV2i_Hadamard(DqnV2i a, DqnV2i b);
-DQN_FILE_SCOPE f32    DqnV2i_Dot     (DqnV2i a, DqnV2i b);
-DQN_FILE_SCOPE bool   DqnV2i_Equals  (DqnV2i a, DqnV2i b);
-
-DQN_FILE_SCOPE inline DqnV2i  operator- (DqnV2i  a, DqnV2i b) { return      DqnV2i_Sub     (a, b);  }
-DQN_FILE_SCOPE inline DqnV2i  operator+ (DqnV2i  a, DqnV2i b) { return      DqnV2i_Add     (a, b);  }
-DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, DqnV2i b) { return      DqnV2i_Hadamard(a, b);  }
-DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, f32    b) { return      DqnV2i_Scalef  (a, b);  }
-DQN_FILE_SCOPE inline DqnV2i  operator* (DqnV2i  a, i32    b) { return      DqnV2i_Scalei  (a, b);  }
-DQN_FILE_SCOPE inline DqnV2i &operator*=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Hadamard(a, b)); }
-DQN_FILE_SCOPE inline DqnV2i &operator-=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Sub     (a, b)); }
-DQN_FILE_SCOPE inline DqnV2i &operator+=(DqnV2i &a, DqnV2i b) { return (a = DqnV2i_Add     (a, b)); }
-
-// #DqnV3 API
-// =================================================================================================
-union DqnV3
-{
-		struct { f32 x, y, z; };
-		DqnV2 xy;
-		struct { f32 r, g, b; };
-		f32 e[3];
-};
-
-union DqnV3i
-{
-	struct { i32 x, y, z; };
-	struct { i32 r, g, b; };
-	i32 e[3];
-};
-
-// DqnV3
-DQN_FILE_SCOPE DqnV3 DqnV3_(f32 xyz);
-DQN_FILE_SCOPE DqnV3 DqnV3_(f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnV3 DqnV3_(i32 x, i32 y, i32 z);
-
-DQN_FILE_SCOPE DqnV3 DqnV3_Add     (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE DqnV3 DqnV3_Sub     (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE DqnV3 DqnV3_Scalei  (DqnV3 a, i32 b);
-DQN_FILE_SCOPE DqnV3 DqnV3_Scalef  (DqnV3 a, f32 b);
-DQN_FILE_SCOPE DqnV3 DqnV3_Hadamard(DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE f32   DqnV3_Dot     (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE bool  DqnV3_Equals  (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE DqnV3 DqnV3_Cross   (DqnV3 a, DqnV3 b);
-
-DQN_FILE_SCOPE DqnV3 DqnV3_Normalise    (DqnV3 a);
-DQN_FILE_SCOPE f32   DqnV3_Length       (DqnV3 a, DqnV3 b);
-DQN_FILE_SCOPE f32   DqnV3_LengthSquared(DqnV3 a, DqnV3 b);
-
-DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);           }
-DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);           }
-DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3_(b));   }
-DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);           }
-DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, b);           }
-DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, i32   b) { return      DqnV3_Scalei  (a, b);           }
-DQN_FILE_SCOPE inline DqnV3  operator/ (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, (1.0f/b));    }
-DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Hadamard(a, b));          }
-DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, f32   b) { return (a = DqnV3_Scalef  (a, b));          }
-DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, i32   b) { return (a = DqnV3_Scalei  (a, b));          }
-DQN_FILE_SCOPE inline DqnV3 &operator-=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Sub     (a, b));          }
-DQN_FILE_SCOPE inline DqnV3 &operator+=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Add     (a, b));          }
-DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_Equals  (a, b);           }
-
-DQN_FILE_SCOPE DqnV3i DqnV3i_(i32 x, i32 y, i32 z);
-DQN_FILE_SCOPE DqnV3i DqnV3i_(f32 x, f32 y, f32 z);
-
-// #DqnV4 API
-// =================================================================================================
-union DqnV4
-{
-	struct { f32 x, y, z, w; };
-	DqnV3 xyz;
-	DqnV2 xy;
-
-	struct { f32 r, g, b, a; };
-	DqnV3 rgb;
-
-	f32    e[4];
-	DqnV2 v2[2];
-};
-
-DQN_FILE_SCOPE DqnV4 DqnV4_();
-DQN_FILE_SCOPE DqnV4 DqnV4_(f32 xyzw);
-DQN_FILE_SCOPE DqnV4 DqnV4_(f32 x, f32 y, f32 z, f32 w);
-DQN_FILE_SCOPE DqnV4 DqnV4_(i32 x, i32 y, i32 z, i32 w);
-DQN_FILE_SCOPE DqnV4 DqnV4_(DqnV3 a, f32 w);
-
-DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE DqnV4 DqnV4_Sub     (DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE DqnV4 DqnV4_Scalef  (DqnV4 a, f32 b);
-DQN_FILE_SCOPE DqnV4 DqnV4_Scalei  (DqnV4 a, i32 b);
-DQN_FILE_SCOPE DqnV4 DqnV4_Hadamard(DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE f32   DqnV4_Dot     (DqnV4 a, DqnV4 b);
-DQN_FILE_SCOPE bool  DqnV4_Equals  (DqnV4 a, DqnV4 b);
-
-DQN_FILE_SCOPE inline DqnV4  operator- (DqnV4  a, DqnV4 b) { return      DqnV4_Sub     (a, b);            }
-DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, DqnV4 b) { return      DqnV4_Add     (a, b);            }
-DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4_(b));    }
-DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, DqnV4 b) { return      DqnV4_Hadamard(a, b);            }
-DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, f32   b) { return      DqnV4_Scalef  (a, b);            }
-DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, i32   b) { return      DqnV4_Scalei  (a, b);            }
-DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Hadamard(a, b));           }
-DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, f32   b) { return (a = DqnV4_Scalef  (a, b));           }
-DQN_FILE_SCOPE inline DqnV4 &operator*=(DqnV4 &a, i32   b) { return (a = DqnV4_Scalei  (a, b));           }
-DQN_FILE_SCOPE inline DqnV4 &operator-=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Sub     (a, b));           }
-DQN_FILE_SCOPE inline DqnV4 &operator+=(DqnV4 &a, DqnV4 b) { return (a = DqnV4_Add     (a, b));           }
-DQN_FILE_SCOPE inline bool   operator==(DqnV4 &a, DqnV4 b) { return      DqnV4_Equals  (a, b);            }
-
-// #DqnMat4 API
-// =================================================================================================
-typedef union DqnMat4
-{
-	// TODO(doyle): Row/column instead? More cache friendly since multiplication
-	// prefers rows.
-	DqnV4 col[4];
-	f32   e[4][4]; // Column/row
-} DqnMat4;
-
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Identity    ();
-
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 zNear, f32 zFar);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Perspective (f32 fovYDegrees, f32 aspectRatio, f32 zNear, f32 zFar);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_LookAt      (DqnV3 eye, DqnV3 center, DqnV3 up);
-
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Translate3f (f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_TranslateV3 (DqnV3 vec);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate      (f32 radians, f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Scale       (f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_ScaleV3     (DqnV3 scale);
-DQN_FILE_SCOPE DqnMat4 DqnMat4_Mul         (DqnMat4 a, DqnMat4 b);
-DQN_FILE_SCOPE DqnV4   DqnMat4_MulV4       (DqnMat4 a, DqnV4 b);
-
-// #DqnRect API
-// =================================================================================================
-class DqnRect
-{
-public:
-	DqnV2 min;
-	DqnV2 max;
-
-	f32   GetWidth ()                                    const { return max.w - min.w; }
-	f32   GetHeight()                                    const { return max.h - min.h; }
-	DqnV2 GetSize  ()                                    const { return max - min;     }
-	void  GetSize  (f32 *const width, f32 *const height) const;
-	DqnV2 GetCenter()                                    const;
-
-	DqnRect ClipRect (DqnRect const clip) const;
-	DqnRect Move     (DqnV2   const shift)  const;
-	bool    ContainsP(DqnV2   const p)      const;
-};
-
-DQN_FILE_SCOPE DqnRect DqnRect_(DqnV2 origin, DqnV2 size);
-DQN_FILE_SCOPE DqnRect DqnRect_(f32 x, f32 y, f32 w, f32 h);
-DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h);
-
-// #DqnChar API
-// =================================================================================================
-DQN_FILE_SCOPE char DqnChar_ToLower     (char c);
-DQN_FILE_SCOPE char DqnChar_ToUpper     (char c);
-DQN_FILE_SCOPE bool DqnChar_IsDigit     (char c);
-DQN_FILE_SCOPE bool DqnChar_IsAlpha     (char c);
-DQN_FILE_SCOPE bool DqnChar_IsAlphaNum  (char c);
-DQN_FILE_SCOPE bool DqnChar_IsEndOfLine (char c);
-DQN_FILE_SCOPE bool DqnChar_IsWhitespace(char c);
-
-DQN_FILE_SCOPE char *DqnChar_TrimWhitespaceAround(char const *src, i32 srcLen, i32 *newLen);
-DQN_FILE_SCOPE char *DqnChar_SkipWhitespace      (char const *ptr);
-
-// TODO(doyle): this is NOT UTF8 safe
-// ch:        Char to find
-// len:       The length of the string stored in ptr, (doesn't care if it includes null terminator)
-// lenToChar: The length to the char from end of the ptr, i.e. (ptr + len)
-// return:    The ptr to the last char, null if it could not find.
-DQN_FILE_SCOPE char *DqnChar_FindLastChar  (char *ptr, char const ch, i32 len, u32 *const lenToChar);
-
-// Finds up to the first [\r]\n and destroy the line, giving you a null terminated line at the newline.
-// returns: The value to advance the ptr by, this can be different from the line
-//          length if there are new lines or leading whitespaces in the next line
-DQN_FILE_SCOPE i32   DqnChar_FindNextLine(char *ptr, i32 *lineLength);
-DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *lineLength);
-
-// #DqnStr API
-// =================================================================================================
-// numBytesToCompare: If -1, cmp runs until \0 is encountered.
-// return:            0 if equal. 0 < if a is before b, > 0 if a is after b
-DQN_FILE_SCOPE i32   DqnStr_Cmp               (char const *const a, char const *const b, i32 numBytesToCompare = -1, bool ignoreCase = false);
-
-// strLen: Len of string, if -1, StrLen is used.
-// return: Pointer in str to the last slash, if none then the original string.
-DQN_FILE_SCOPE char *DqnStr_GetPtrToLastSlash (char const *str, i32 strLen = -1);
-
-// return: String length not including the nullptr terminator. 0 if invalid args.
-DQN_FILE_SCOPE i32   DqnStr_Len               (char const *const a);
-DQN_FILE_SCOPE i32   DqnStr_LenUTF8           (u32 const *const a, i32 *const lenInBytes = nullptr);
-
-// return: String length starting from a, up to and not including the first delimiter character.
-DQN_FILE_SCOPE i32   DqnStr_LenDelimitWith    (char *const a, char const delimiter);
-
-// return: The dest argument, nullptr if args invalid (i.e. nullptr pointers or numChars < 0)
-DQN_FILE_SCOPE char *DqnStr_Copy              (char *const dest, char const *const src, i32 const numChars);
-DQN_FILE_SCOPE void  DqnStr_Reverse           (char *const buf, i32 const bufSize);
-
-// return: Number of bytes in codepoint, 0 if *a becomes invalid or end of stream.
-DQN_FILE_SCOPE i32   DqnStr_ReadUTF8Codepoint (u32 const *const a, u32 *outCodepoint);
-
-// return: The offset into the src to first char of the found string. Returns -1 if not found
-DQN_FILE_SCOPE i32   DqnStr_FindFirstOccurence(char const *src, i32 const srcLen, char const *find, i32 const findLen, bool ignoreCase = false);
-
-// return: Helper function that returns the pointer to the first occurence, nullptr if not found.
-DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence (char const *src, i32 const srcLen, char const *find, i32 const findLen, bool ignoreCase = false);
-DQN_FILE_SCOPE bool  DqnStr_HasSubstring      (char const *src, i32 const srcLen, char const *find, i32 const findLen, bool ignoreCase = false);
-
-#define DQN_32BIT_NUM_MAX_STR_SIZE 11
-#define DQN_64BIT_NUM_MAX_STR_SIZE 21
-// Return the len of the derived string. If buf is nullptr and or bufSize is 0 the function returns the
-// required string length for the integer
-// TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work atm.
-DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufSize);
-DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *const buf, i64 const bufSize);
-// WARNING: Not robust, precision errors and whatnot but good enough!
-DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize);
-
-// Both return the number of bytes read, return 0 if invalid codepoint or UTF8
-DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, u32 const character);
-DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, u32 const character);
-
-// #DqnWChar API
-// =================================================================================================
-// NOTE: See above for documentation
-DQN_FILE_SCOPE bool     DqnWChar_IsDigit          (wchar_t const c);
-DQN_FILE_SCOPE wchar_t  DqnWChar_ToLower          (wchar_t const c);
-
-DQN_FILE_SCOPE wchar_t *DqnWChar_SkipWhitespace   (wchar_t *ptr);
-DQN_FILE_SCOPE wchar_t *DqnWChar_FindLastChar     (wchar_t *ptr, const wchar_t ch, i32 len, u32 *const lenToChar);
-DQN_FILE_SCOPE i32      DqnWChar_GetNextLine      (const wchar_t *ptr, i32 *lineLength);
-
-DQN_FILE_SCOPE i32      DqnWStr_Cmp               (wchar_t const *const a, const wchar_t *const b);
-DQN_FILE_SCOPE i32      DqnWStr_FindFirstOccurence(wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
-DQN_FILE_SCOPE bool     DqnWStr_HasSubstring      (wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
-DQN_FILE_SCOPE i32      DqnWStr_Len               (wchar_t const *const a);
-DQN_FILE_SCOPE i32      DqnWStr_LenDelimitWith    (wchar_t const *const a, wchar_t const delimiter);
-DQN_FILE_SCOPE void     DqnWStr_Reverse           (wchar_t *const buf, u32 const bufSize);
-
-DQN_FILE_SCOPE i32      Dqn_WStrToI32             (wchar_t const *const buf, i32 const bufSize);
-DQN_FILE_SCOPE i32      Dqn_I32ToWStr             (i32 value, wchar_t *buf, i32 bufSize);
 
 // #DqnRnd API
 // =================================================================================================
@@ -2863,7 +2872,7 @@ DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const
 	#endif
 }
 
-DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum,
+DQN_FILE_SCOPE void DqnLogExpr(char *file, char const *const functionName, i32 const lineNum,
                            char const *const expr, char const *const msg, ...)
 {
 	auto fileLen = DqnStr_Len(file);
@@ -4808,7 +4817,7 @@ DQN_FILE_SCOPE i32 DqnStr_ReadUTF8Codepoint(const u32 *const a, u32 *outCodepoin
 	return 0;
 }
 
-DQN_FILE_SCOPE void DqnStr_Reverse(char *const buf, const i32 bufSize)
+DQN_FILE_SCOPE void DqnStr_Reverse(char *const buf, i32 bufSize)
 {
 	if (!buf) return;
 	i32 mid = bufSize / 2;
@@ -4821,8 +4830,23 @@ DQN_FILE_SCOPE void DqnStr_Reverse(char *const buf, const i32 bufSize)
 	}
 }
 
-DQN_FILE_SCOPE i32 DqnStr_FindFirstOccurence(char const *src, i32 const srcLen,
-                                             char const *find, i32 const findLen, bool ignoreCase)
+DQN_FILE_SCOPE bool DqnStr_EndsWith(char const *src, i32 srcLen, char const *find, i32 findLen,
+                                    bool ignoreCase)
+{
+	if (!src || !find || findLen < 0 || srcLen < 0) return false;
+
+	if (srcLen < findLen)
+		return false;
+
+	char const *srcEnd       = src + (srcLen - 1);
+	char const *checkSrcFrom = srcEnd - findLen;
+
+	bool result = (DqnStr_Cmp(checkSrcFrom, find, findLen, ignoreCase) == 0);
+	return result;
+}
+
+DQN_FILE_SCOPE i32 DqnStr_FindFirstOccurence(char const *src, i32 srcLen,
+                                             char const *find, i32 findLen, bool ignoreCase)
 {
 	if (!src || !find)               return -1;
 	if (srcLen == 0 || findLen == 0) return -1;
@@ -4848,8 +4872,8 @@ DQN_FILE_SCOPE i32 DqnStr_FindFirstOccurence(char const *src, i32 const srcLen,
 	return -1;
 }
 
-DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence(char const *src, i32 const srcLen, char const *find,
-                                              i32 const findLen, bool ignoreCase)
+DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence(char const *src, i32 srcLen, char const *find,
+                                              i32 findLen, bool ignoreCase)
 {
 	i32 offset = DqnStr_FindFirstOccurence(src, srcLen, find, findLen, ignoreCase);
 	if (offset == -1) return nullptr;
@@ -4858,8 +4882,8 @@ DQN_FILE_SCOPE char *DqnStr_GetFirstOccurence(char const *src, i32 const srcLen,
 	return result;
 }
 
-DQN_FILE_SCOPE bool DqnStr_HasSubstring(char const *src, i32 const srcLen,
-                                        char const *find, i32 const findLen, bool ignoreCase)
+DQN_FILE_SCOPE bool DqnStr_HasSubstring(char const *src, i32 srcLen,
+                                        char const *find, i32 findLen, bool ignoreCase)
 {
 	if (DqnStr_FindFirstOccurence(src, srcLen, find, findLen, ignoreCase) == -1)
 		return false;
