@@ -437,7 +437,7 @@ struct DqnMemStack
 	// Uses fixed buffer, allocations will be sourced from the buffer and fail after buffer is full.
 	// mem:       Memory to use for the memory stack
 	// return:    FALSE if args are invalid, or insufficient memSize.
-	bool Init(u8 *const mem, usize size, u32 flags_);
+	bool Init(u8 *const mem, usize size, u32 flags_ = 0);
 
 	// Memory Stack capable of expanding when full, but only if NonExpandable flag is not set.
 	bool Init(usize size, bool zeroClear, u32 flags_ = 0, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
@@ -3471,9 +3471,19 @@ void *DqnMemStack::Push(usize size, u8 alignment)
 	// =============================================================================================
 	DqnAllocatorMetadata *myMetadata = &this->metadata;
 	usize actualSize                 = myMetadata->GetAllocationSize(size, alignment);
-	u8 const *blockUsedUpTo          = this->block->memory + this->block->used;
-	u8 const *blockEnd               = this->block->memory + this->block->size;
-	if ((blockUsedUpTo + actualSize) > blockEnd)
+	bool needNewBlock                = false;
+	if (!block)
+	{
+		needNewBlock = true;
+	}
+	else
+	{
+		u8 const *blockUsedUpTo = this->block->memory + this->block->used;
+		u8 const *blockEnd      = this->block->memory + this->block->size;
+		needNewBlock = ((blockUsedUpTo + actualSize) > blockEnd);
+	}
+
+	if (needNewBlock)
 	{
 		if (Dqn_BitIsSet(this->flags, Flag::NonExpandable))
 		{
@@ -3581,11 +3591,14 @@ void DqnMemStack::Pop(void *const ptr, bool zeroClear)
 
 void DqnMemStack::Free()
 {
-	while (this->block)
-		this->FreeLastBlock();
-
 	if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
 		this->metadata.allocations.Free();
+
+	if (this->memAPI)
+	{
+		while (this->block)
+			this->FreeLastBlock();
+	}
 }
 
 bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)

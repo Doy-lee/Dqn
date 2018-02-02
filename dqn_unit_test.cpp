@@ -1652,11 +1652,6 @@ void DqnArray_Test()
 	}
 }
 
-void DqnMemStack_Test()
-{
-	LOG_HEADER();
-}
-
 #ifdef DQN_XPLATFORM_LAYER
 void DqnFile_Test()
 {
@@ -2344,19 +2339,263 @@ void DqnMemSet_Test()
 #endif
 	globalIndent--;
 
-	Log(Status::Ok, "Completed succesfully");
+	Log(Status::Ok, "MemSet");
 }
 
-FILE_SCOPE void Test()
+FILE_SCOPE void DqnMemStack_Test()
 {
-	DqnMemStack stack = {};
-	DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+	LOG_HEADER();
 
-	u8 *result = (u8 *)stack.Push(120, 16);
-	stack.Pop(result);
+	// Check Alignment
+	if (1)
+	{
+		DqnMemStack stack = {};
+		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+		stack.Free();
 
-	int break4 = 5;
-	(void)result; (void)break4;
+		i32 const ALIGN64 = 64;
+		i32 const ALIGN16 = 16;
+		i32 const ALIGN4  = 4;
+
+		if (1)
+		{
+			u8 *result1 = (u8 *)stack.Push(2, ALIGN4);
+			u8 *result2 = (u8 *)DQN_ALIGN_POW_N(result1, ALIGN4);
+			DQN_ASSERT(result1 == result2);
+			stack.Pop(result1);
+		}
+
+		if (1)
+		{
+			u8 *result1 = (u8 *)stack.Push(120, ALIGN16);
+			u8 *result2 = (u8 *)DQN_ALIGN_POW_N(result1, ALIGN16);
+			DQN_ASSERT(result1 == result2);
+			stack.Pop(result1);
+		}
+
+		if (1)
+		{
+			u8 *result1 = (u8 *)stack.Push(12, ALIGN64);
+			u8 *result2 = (u8 *)DQN_ALIGN_POW_N(result1, ALIGN64);
+			DQN_ASSERT(result1 == result2);
+			stack.Pop(result1);
+		}
+
+		Log(Status::Ok, "Check allocated alignment to 4, 16, 64");
+	}
+
+	// Check Non-Expandable
+	if (1)
+	{
+		DqnMemStack stack = {};
+		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::NonExpandable));
+		auto *result1 = stack.Push(DQN_MEGABYTE(2));
+		DQN_ASSERT(result1 == nullptr);
+		DQN_ASSERT(stack.block->prevBlock == nullptr);
+
+		stack.Free();
+		Log(Status::Ok, "Check non-expandable flag prevents expansion.");
+	}
+
+	// Check Expansion
+	if (1)
+	{
+		DqnMemStack stack = {};
+		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true));
+		DQN_ASSERT(stack.metadata.GetBoundsGuardSize() == 0);
+
+		auto *oldBlock = stack.block;
+		DQN_ASSERT(oldBlock);
+		DQN_ASSERT(oldBlock->size == DQN_MEGABYTE(1));
+		DQN_ASSERT(oldBlock->used == 0);
+		DQN_ASSERT(oldBlock->prevBlock == nullptr);
+
+		auto *result1 = stack.Push(DQN_MEGABYTE(2));
+		DQN_ASSERT(result1);
+		DQN_ASSERT(stack.block->prevBlock == oldBlock);
+		DQN_ASSERT(stack.block != oldBlock);
+
+		Log(Status::Ok, "Check memory stack allocates additional memory blocks.");
+		stack.Free();
+	}
+
+	// Temporary Regions
+	if (1)
+	{
+		DqnMemStack stack = {};
+		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true));
+
+		// Check temporary regions
+		if (1)
+		{
+			DqnMemStack::Block *blockToReturnTo = stack.block;
+			auto usedBefore                     = blockToReturnTo->used;
+			if (1)
+			{
+				auto memGuard1 = stack.TempRegionGuard();
+				auto *result2  = stack.Push(100);
+				auto *result3  = stack.Push(100);
+				auto *result4  = stack.Push(100);
+				DQN_ASSERT(result2 && result3 && result4);
+				DQN_ASSERT(stack.block->used > usedBefore);
+				DQN_ASSERT(stack.block->memory == blockToReturnTo->memory);
+
+				// Force allocation of new block
+				auto *result5 = stack.Push(DQN_MEGABYTE(5));
+				DQN_ASSERT(result5);
+				DQN_ASSERT(stack.block != blockToReturnTo);
+				DQN_ASSERT(stack.tempRegionCount == 1);
+			}
+
+			DQN_ASSERT(stack.block == blockToReturnTo);
+			DQN_ASSERT(stack.block->used == usedBefore);
+		}
+
+		// Check temporary regions keep state
+		if (1)
+		{
+			DqnMemStack::Block *blockToReturnTo = stack.block;
+			auto usedBefore                     = blockToReturnTo->used;
+			if (1)
+			{
+				auto memGuard1 = stack.TempRegionGuard();
+				auto *result2  = stack.Push(100);
+				auto *result3  = stack.Push(100);
+				auto *result4  = stack.Push(100);
+				DQN_ASSERT(result2 && result3 && result4);
+				DQN_ASSERT(stack.block->used > usedBefore);
+				DQN_ASSERT(stack.block->memory == blockToReturnTo->memory);
+
+				// Force allocation of new block
+				auto *result5 = stack.Push(DQN_MEGABYTE(5));
+				DQN_ASSERT(result5);
+				DQN_ASSERT(stack.block != blockToReturnTo);
+				DQN_ASSERT(stack.tempRegionCount == 1);
+				memGuard1.keepChanges = true;
+			}
+
+			DQN_ASSERT(stack.block != blockToReturnTo);
+			DQN_ASSERT(stack.block->prevBlock == blockToReturnTo);
+			DQN_ASSERT(stack.tempRegionCount == 0);
+		}
+		Log(Status::Ok, "Temporary regions return state and/or keep changes if requested.");
+		stack.Free();
+	}
+
+	// Check Fixed Mem Init
+	if (1)
+	{
+		// Check fail on insufficient size
+		if (1)
+		{
+			u8 memBuf[sizeof(DqnMemStack::Block) - 1] = {};
+			DqnMemStack stack                         = {};
+			auto result = stack.Init(&(memBuf[0]), DQN_ARRAY_COUNT(memBuf));
+
+			DQN_ASSERT(result == false);
+			DQN_ASSERT(stack.block == nullptr);
+			stack.Free();
+		}
+
+		// Check success
+		if (1)
+		{
+			i32 const bufSize  = sizeof(DqnMemStack::Block) * 5;
+			u8 memBuf[bufSize] = {};
+			DqnMemStack stack  = {};
+			auto result        = stack.Init(memBuf, bufSize);
+
+			DQN_ASSERT(result == true);
+			DQN_ASSERT(stack.block);
+			DQN_ASSERT(stack.block->prevBlock == false);
+			DQN_ASSERT(stack.tempRegionCount == 0);
+			DQN_ASSERT(stack.flags == DqnMemStack::Flag::NonExpandable);
+
+			auto *result1 = stack.Push(32);
+			DQN_ASSERT(result1);
+			stack.Pop(result1);
+
+			auto *result2 = stack.Push(bufSize * 2);
+			DQN_ASSERT(result2 == nullptr);
+			DQN_ASSERT(stack.block);
+			DQN_ASSERT(stack.block->prevBlock == false);
+			DQN_ASSERT(stack.tempRegionCount == 0);
+			DQN_ASSERT(stack.flags == DqnMemStack::Flag::NonExpandable);
+
+			stack.Free();
+		}
+
+		Log(Status::Ok, "Checked fixed mem initialisation");
+	}
+
+	// Check Freeing Blocks
+	if (1)
+	{
+		DqnMemStack stack    = {};
+		usize size           = 32;
+		usize additionalSize = DqnMemStack::MINIMUM_BLOCK_SIZE;
+		DqnMemAPI heap = DqnMemAPI::HeapAllocator();
+		DQN_ASSERT(stack.Init(size, true, 0, &heap));
+		auto *block1 = stack.block;
+
+		size += additionalSize;
+		auto *result1 = stack.Push(size);
+		auto *block2  = stack.block;
+
+		size += additionalSize;
+		auto *result2 = stack.Push(size);
+		auto *block3  = stack.block;
+
+		size += additionalSize;
+		auto *result3 = stack.Push(size);
+		auto *block4  = stack.block;
+
+		size += additionalSize;
+		auto *result4 = stack.Push(size);
+		auto *block5  = stack.block;
+
+		DQN_ASSERT(result1 && result2 && result3 && result4);
+		DQN_ASSERT(block1 && block2 && block3 && block4 && block5);
+		DQN_ASSERT(block5->prevBlock == block4);
+		DQN_ASSERT(block4->prevBlock == block3);
+		DQN_ASSERT(block3->prevBlock == block2);
+		DQN_ASSERT(block2->prevBlock == block1);
+		DQN_ASSERT(block1->prevBlock == nullptr);
+
+		DQN_ASSERT(stack.FreeMemBlock(block4));
+		DQN_ASSERT(stack.block == block5);
+		DQN_ASSERT(block5->prevBlock == block3);
+		DQN_ASSERT(block3->prevBlock == block2);
+		DQN_ASSERT(block2->prevBlock == block1);
+		DQN_ASSERT(block1->prevBlock == nullptr);
+
+		DQN_ASSERT(stack.FreeMemBlock(block5));
+		DQN_ASSERT(stack.block == block3);
+		DQN_ASSERT(block3->prevBlock == block2);
+		DQN_ASSERT(block2->prevBlock == block1);
+		DQN_ASSERT(block1->prevBlock == nullptr);
+
+		stack.Free();
+		DQN_ASSERT(stack.memAPI->bytesAllocated == 0);
+		DQN_ASSERT(stack.block == nullptr);
+		Log(Status::Ok, "Check freeing arbitrary blocks and freeing");
+	}
+
+	// Check bounds guard places magic values
+	if (1)
+	{
+		DqnMemStack stack = {};
+		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+		auto *result = stack.Push(64);
+
+		// TODO(doyle): check head and tail are adjacent to the bounds of the allocation
+		u32 *head = stack.metadata.PtrToHeadBoundsGuard((u8 *)result);
+		u32 *tail = stack.metadata.PtrToTailBoundsGuard((u8 *)result);
+		DQN_ASSERT(*head == DqnAllocatorMetadata::GUARD_VALUE);
+		DQN_ASSERT(*tail == DqnAllocatorMetadata::GUARD_VALUE);
+
+		Log(Status::Ok, "Bounds guards are placed adjacent and have magic values.");
+	}
 }
 
 int main(void)
@@ -2364,8 +2603,7 @@ int main(void)
 	globalIndent  = 1;
 	globalNewLine = true;
 
-	Test();
-
+	DqnMemStack_Test();
 	DqnString_Test();
 	DqnChar_Test();
 	DqnRnd_Test();
