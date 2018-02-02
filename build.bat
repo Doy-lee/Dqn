@@ -31,7 +31,7 @@ REM Zi enables debug data, Z7 combines the debug files into one.
 REM W4 warning level 4
 REM WX treat warnings as errors
 REM wd4201 ignore: nonstandard extension used: nameless struct/union
-set CompileFlags=-EHsc -GR- -Oi -MT -Z7 -W4 -WX -wd4201 -FC -Od -wd4127
+set CompileFlags=-EHsc -GR- -Oi -MT -Z7 -W4 -WX -wd4201 -FC -O2 -wd4127
 
 REM Include directories
 set IncludeFlags=

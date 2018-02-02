@@ -24,24 +24,113 @@
 #include <limits.h>
 #include <stdio.h>
 
-FILE_SCOPE void LogHeader(const char *const header)
+#define LOG_HEADER() LogHeader( __func__)
+FILE_SCOPE i32  globalIndent;
+FILE_SCOPE bool globalNewLine;
+
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define YEL   "\x1B[33m"
+#define BLU   "\x1B[34m"
+#define MAG   "\x1B[35m"
+#define CYN   "\x1B[36m"
+#define WHT   "\x1B[37m"
+#define RESET "\x1B[0m"
+
+enum class Status
 {
-	DQN_ASSERT(header);
+	None,
+	Ok,
+	Error
+};
+
+void Log(Status status, char *fmt, va_list argList)
+{
+	DQN_ASSERT(globalIndent >= 0);
+	LOCAL_PERSIST i32 lineLen = 0;
 
 	char buf[1024] = {};
-	DQN_ASSERT(Dqn_sprintf(buf, "// %s", header) < (i32)DQN_ARRAY_COUNT(buf));
-	printf("\n//////////////////////////////////////////////////////////////////\n");
-	printf("%s\n", buf);
-	printf("//////////////////////////////////////////////////////////////////\n");
+	i32 bufLen     = 0;
+	{
+		bufLen = Dqn_vsprintf(buf, fmt, argList);
+		DQN_ASSERT(bufLen < DQN_ARRAY_COUNT(buf));
+		lineLen += bufLen;
+	}
+
+	char indentStr[] = "    ";
+	i32 indentLen    = DQN_CHAR_COUNT(indentStr);
+	{
+		lineLen += (indentLen * globalIndent);
+		for (auto i = 0; i < globalIndent; i++)
+			printf("%s", indentStr);
+
+		printf("%s", &(buf[0]));
+	}
+
+	if (status == Status::Ok || status == Status::Error)
+	{
+		char okStatus[] = "OK";
+		char errStatus[] = "ERROR";
+		
+		char *statusStr;
+		i32 statusStrLen;
+		if (status == Status::Ok)
+		{
+			statusStr = okStatus;
+			statusStrLen = DQN_CHAR_COUNT(okStatus);
+		}
+		else
+		{
+			statusStr = errStatus;
+			statusStrLen = DQN_CHAR_COUNT(errStatus);
+		}
+		lineLen += statusStrLen;
+
+		i32 targetLen = 90;
+		i32 remaining = targetLen - lineLen;
+		remaining     = DQN_MAX(remaining, 0);
+
+		for (auto i = 0; i < remaining; i++)
+			putchar('.');
+
+		if (status == Status::Ok)
+		{
+			printf(GRN "%s" RESET, statusStr);
+		}
+		else
+		{
+			printf(RED "%s" RESET, statusStr);
+		}
+	}
+
+	if (globalNewLine)
+	{
+		lineLen = 0;
+		printf("\n");
+	}
 }
 
-FILE_SCOPE void LogSuccess(const char *const functionName)
+void Log(Status status, char *fmt, ...)
 {
-	DQN_ASSERT(functionName);
+	va_list argList;
+	va_start(argList, fmt);
+	Log(status, fmt, argList);
+	va_end(argList);
+}
 
-	char buf[1024] = {};
-	DQN_ASSERT(Dqn_sprintf(buf, "%s", functionName) < (i32)DQN_ARRAY_COUNT(buf));
-	printf("%s: Completed successfully\n", buf);
+void Log(char *fmt, ...)
+{
+	va_list argList;
+	va_start(argList, fmt);
+	Log(Status::None, fmt, argList);
+	va_end(argList);
+}
+
+void LogHeader(char *funcName)
+{
+	globalIndent--;
+	Log("\n[%s]", funcName);
+	globalIndent++;
 }
 
 void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
@@ -67,70 +156,13 @@ void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 
 void HandmadeMathTestInternal()
 {
-	LogHeader("DqnMath vs HandmadeMath Test");
+	LOG_HEADER();
 	// Test Perspective/Projection matrix values
-	if (1)
-	{
-		f32 aspectRatio         = 1;
-		DqnMat4 dqnPerspective  = DqnMat4_Perspective(90, aspectRatio, 100, 1000);
-		hmm_mat4 hmmPerspective = HMM_Perspective(90, aspectRatio, 100, 1000);
-		HandmadeMathVerifyMat4(dqnPerspective, hmmPerspective);
-
-		LogSuccess("HandmadeMathTest(): Perspective");
-	}
-
-	// Test Mat4 translate * scale
-	if (1)
-	{
-		hmm_vec3 hmmVec       = HMM_Vec3i(1, 2, 3);
-		DqnV3 dqnVec          = DqnV3_(1, 2, 3);
-		DqnMat4 dqnTranslate  = DqnMat4_Translate3f(dqnVec.x, dqnVec.y, dqnVec.z);
-		hmm_mat4 hmmTranslate = HMM_Translate(hmmVec);
-		HandmadeMathVerifyMat4(dqnTranslate, hmmTranslate);
-
-		hmm_vec3 hmmAxis      = HMM_Vec3(0.5f, 0.2f, 0.7f);
-		DqnV3 dqnAxis         = DqnV3_(0.5f, 0.2f, 0.7f);
-		f32 rotationInDegrees = 80.0f;
-
-		DqnMat4 dqnRotate = DqnMat4_Rotate(DQN_DEGREES_TO_RADIANS(rotationInDegrees), dqnAxis.x,
-		                                   dqnAxis.y, dqnAxis.z);
-		hmm_mat4 hmmRotate = HMM_Rotate(rotationInDegrees, hmmAxis);
-		HandmadeMathVerifyMat4(dqnRotate, hmmRotate);
-
-		dqnVec *= 2;
-		hmmVec *= 2;
-		DqnMat4 dqnScale  = DqnMat4_Scale(dqnVec.x, dqnVec.y, dqnVec.z);
-		hmm_mat4 hmmScale = HMM_Scale(hmmVec);
-		HandmadeMathVerifyMat4(dqnScale, hmmScale);
-
-		DqnMat4 dqnTSMatrix  = DqnMat4_Mul(dqnTranslate, dqnScale);
-		hmm_mat4 hmmTSMatrix = HMM_MultiplyMat4(hmmTranslate, hmmScale);
-		HandmadeMathVerifyMat4(dqnTSMatrix, hmmTSMatrix);
-
-		// Test Mat4 * MulV4
-		if (1)
-		{
-			DqnV4 dqnV4    = DqnV4_(1, 2, 3, 4);
-			hmm_vec4 hmmV4 = HMM_Vec4(1, 2, 3, 4);
-
-			DqnV4 dqnResult    = DqnMat4_MulV4(dqnTSMatrix, dqnV4);
-			hmm_vec4 hmmResult = HMM_MultiplyMat4ByVec4(hmmTSMatrix, hmmV4);
-
-			DQN_ASSERT(dqnResult.x == hmmResult.X);
-			DQN_ASSERT(dqnResult.y == hmmResult.Y);
-			DQN_ASSERT(dqnResult.z == hmmResult.Z);
-			DQN_ASSERT(dqnResult.w == hmmResult.W);
-
-			LogSuccess("HandmadeMathTest(): Mat4 * MulV4");
-		}
-
-		LogSuccess("HandmadeMathTest(): Translate/Scale/Rotate Mat4_Mul");
-	}
 }
 
 void Dqn_Test()
 {
-	LogHeader("Dqn_Test");
+	LOG_HEADER();
 
 	// const u64 LARGEST_NUM  = (u64)-1;
 	const i64 SMALLEST_NUM = LLONG_MIN;
@@ -159,7 +191,7 @@ void Dqn_Test()
 		const char *const f = "-9223372036854775808";
 		DQN_ASSERT(Dqn_StrToI64(f, DqnStr_Len(f)) == SMALLEST_NUM);
 
-		LogSuccess("Dqn_StrToI64()");
+		Log("Dqn_StrToI64()");
 	}
 
 	// i64 to str
@@ -190,7 +222,7 @@ void Dqn_Test()
 			DQN_ASSERTM(DqnStr_Cmp(e, "-9223372036854775808") == 0, "e: %s", e);
 		}
 
-		LogSuccess("Dqn_I64ToStr()");
+		Log("Dqn_I64ToStr()");
 	}
 
 	// StrToF32
@@ -269,7 +301,7 @@ void Dqn_Test()
 		f32 vR         = Dqn_StrToF32(r, DQN_ARRAY_COUNT(r));
 		DQN_ASSERT(DQN_ABS(vR) - DQN_ABS(9.64635e+05) < EPSILON);
 
-		LogSuccess("Dqn_StrToF32()");
+		Log("Dqn_StrToF32()");
 	}
 
 	// UCS <-> UTF8 Checks
@@ -289,7 +321,7 @@ void Dqn_Test()
 			DQN_ASSERT(string[0] >= 0 && string[0] < 0x80);
 			DQN_ASSERT(bytesUsed == 1);
 
-			LogSuccess("Dqn_UTF8ToUCS(): Test ascii characters");
+			Log("Dqn_UTF8ToUCS(): Test ascii characters");
 		}
 
 		// Test 2 byte characters
@@ -306,7 +338,7 @@ void Dqn_Test()
 			DQN_ASSERT(string[0] == codepoint);
 			DQN_ASSERT(bytesUsed == 2);
 
-			LogSuccess("Dqn_UTF8ToUCS(): Test 2 byte characters");
+			Log("Dqn_UTF8ToUCS(): Test 2 byte characters");
 		}
 
 		// Test 3 byte characters
@@ -323,7 +355,7 @@ void Dqn_Test()
 			DQN_ASSERT(string[0] == codepoint);
 			DQN_ASSERT(bytesUsed == 3);
 
-			LogSuccess("Dqn_UTF8ToUCS(): Test 3 byte characters");
+			Log("Dqn_UTF8ToUCS(): Test 3 byte characters");
 		}
 
 		// Test 4 byte characters
@@ -340,7 +372,7 @@ void Dqn_Test()
 			DQN_ASSERT(string[0] == codepoint);
 			DQN_ASSERT(bytesUsed == 4);
 
-			LogSuccess("Dqn_UTF8ToUCS(): Test 4 byte characters");
+			Log("Dqn_UTF8ToUCS(): Test 4 byte characters");
 		}
 
 		if (1)
@@ -352,7 +384,7 @@ void Dqn_Test()
 			bytesUsed = Dqn_UTF8ToUCS(NULL, codepoint);
 			DQN_ASSERT(bytesUsed == 0);
 
-			LogSuccess("Dqn_UTF8ToUCS(): Test return result on on NULL output param");
+			Log("Dqn_UTF8ToUCS(): Test return result on on NULL output param");
 		}
 	}
 
@@ -363,7 +395,7 @@ void DqnStr_Test()
 	// String Checks
 	if (1)
 	{
-		LogHeader("DqnStr_Test");
+		LOG_HEADER();
 
 		// strcmp
 		if (1)
@@ -381,7 +413,7 @@ void DqnStr_Test()
 
 				// NOTE: Check that the string has not been trashed.
 				DQN_ASSERT(DqnStr_Cmp(a, "str_a") == +0);
-				LogSuccess("DqnStr_Cmp(): Check simple compares");
+				Log("DqnStr_Cmp(): Check simple compares");
 			}
 
 			// Check ops against null
@@ -390,7 +422,7 @@ void DqnStr_Test()
 				DQN_ASSERT(DqnStr_Cmp(NULL, NULL) != +0);
 				DQN_ASSERT(DqnStr_Cmp(a, NULL) != +0);
 				DQN_ASSERT(DqnStr_Cmp(NULL, a) != +0);
-				LogSuccess("DqnStr_Cmp(): Check ops against null");
+				Log("DqnStr_Cmp(): Check ops against null");
 			}
 		}
 
@@ -407,7 +439,7 @@ void DqnStr_Test()
 			DQN_ASSERT(DqnStr_Cmp(a, "str_a") == 0);
 			DQN_ASSERT(DqnStr_Len(NULL) == 0);
 
-			LogSuccess("DqnStr_Len()");
+			Log("DqnStr_Len()");
 		}
 
 		// strncpy
@@ -425,7 +457,7 @@ void DqnStr_Test()
 					DQN_ASSERT(DqnStr_Cmp(a, "str_a") == 0);
 					DQN_ASSERT(DqnStr_Cmp(result, "str_a") == 0);
 					DQN_ASSERT(DqnStr_Len(result) == 5);
-					LogSuccess("DqnStr_Copy(): Check copy into empty array");
+					Log("DqnStr_Copy(): Check copy into empty array");
 				}
 
 				// Check copy into array offset, overlap with old results
@@ -440,7 +472,7 @@ void DqnStr_Test()
 
 					DQN_ASSERT(DqnStr_Cmp(b, "sstr_a") == 0);
 					DQN_ASSERT(DqnStr_Len(b) == 6);
-					LogSuccess("DqnStr_Copy(): Check copy into array offset, overlap with old results");
+					Log("DqnStr_Copy(): Check copy into array offset, overlap with old results");
 				}
 			}
 		}
@@ -466,7 +498,7 @@ void DqnStr_Test()
 
 				DqnStr_Reverse(a, 0);
 				DQN_ASSERT(DqnStr_Cmp(a, "aba") == 0);
-				LogSuccess("DqnStr_Reverse(): Basic reverse operations");
+				Log("DqnStr_Reverse(): Basic reverse operations");
 			}
 
 			// Try reverse empty string
@@ -475,7 +507,7 @@ void DqnStr_Test()
 				char a[] = "";
 				DqnStr_Reverse(a, DqnStr_Len(a));
 				DQN_ASSERT(DqnStr_Cmp(a, "") == 0);
-				LogSuccess("DqnStr_Reverse(): Reverse empty string");
+				Log("DqnStr_Reverse(): Reverse empty string");
 			}
 
 			// Try reverse single char string
@@ -487,7 +519,7 @@ void DqnStr_Test()
 
 				DqnStr_Reverse(a, 0);
 				DQN_ASSERT(DqnStr_Cmp(a, "a") == 0);
-				LogSuccess("DqnStr_Reverse(): Reverse single char string");
+				Log("DqnStr_Reverse(): Reverse single char string");
 			}
 		}
 
@@ -504,7 +536,7 @@ void DqnStr_Test()
 			DQN_ASSERT(DqnStr_HasSubstring("", 0, "iro", 4) == false);
 			DQN_ASSERT(DqnStr_HasSubstring("", 0, "", 0) == false);
 			DQN_ASSERT(DqnStr_HasSubstring(NULL, 0, NULL, 0) == false);
-			LogSuccess("DqnStr_HasSubstring(): Check string with matching substring");
+			Log("DqnStr_HasSubstring(): Check string with matching substring");
 		}
 
 		if (1)
@@ -515,7 +547,7 @@ void DqnStr_Test()
 			i32 lenB            = DqnStr_Len(b);
 			DQN_ASSERT(DqnStr_HasSubstring(a, lenA, b, lenB) == false);
 			DQN_ASSERT(DqnStr_HasSubstring(b, lenB, a, lenA) == false);
-			LogSuccess("DqnStr_HasSubstring(): Check string with non-matching substring");
+			Log("DqnStr_HasSubstring(): Check string with non-matching substring");
 		}
 
 	}
@@ -523,7 +555,7 @@ void DqnStr_Test()
 
 void DqnChar_Test()
 {
-	LogHeader("DqnChar_Test");
+	LOG_HEADER();
 
 	// Char Checks
 	if (1)
@@ -534,7 +566,7 @@ void DqnChar_Test()
 		DQN_ASSERT(DqnChar_IsAlpha('@') == false);
 		DQN_ASSERT(DqnChar_IsAlpha(' ') == false);
 		DQN_ASSERT(DqnChar_IsAlpha('\n') == false);
-		LogSuccess("DqnChar_IsAlpha()");
+		Log(Status::Ok, "IsAlpha");
 
 		DQN_ASSERT(DqnChar_IsDigit('1') == true);
 		DQN_ASSERT(DqnChar_IsDigit('n') == false);
@@ -542,7 +574,7 @@ void DqnChar_Test()
 		DQN_ASSERT(DqnChar_IsDigit('*') == false);
 		DQN_ASSERT(DqnChar_IsDigit(' ') == false);
 		DQN_ASSERT(DqnChar_IsDigit('\n') == false);
-		LogSuccess("DqnChar_IsDigit()");
+		Log(Status::Ok, "IsDigit");
 
 		DQN_ASSERT(DqnChar_IsAlphaNum('1') == true);
 		DQN_ASSERT(DqnChar_IsAlphaNum('a') == true);
@@ -550,17 +582,23 @@ void DqnChar_Test()
 		DQN_ASSERT(DqnChar_IsAlphaNum('*') == false);
 		DQN_ASSERT(DqnChar_IsAlphaNum(' ') == false);
 		DQN_ASSERT(DqnChar_IsAlphaNum('\n') == false);
-		LogSuccess("DqnChar_IsAlphaNum()");
+		Log(Status::Ok, "IsAlphaNum");
 
 		DQN_ASSERT(DqnChar_ToLower(L'A') == L'a');
 		DQN_ASSERT(DqnChar_ToLower(L'a') == L'a');
 		DQN_ASSERT(DqnChar_ToLower(L' ') == L' ');
-		LogSuccess("DqnChar_ToLower()");
+		Log(Status::Ok, "ToLower");
 
 		DQN_ASSERT(DqnChar_ToUpper(L'A') == L'A');
 		DQN_ASSERT(DqnChar_ToUpper(L'a') == L'A');
 		DQN_ASSERT(DqnChar_ToUpper(L' ') == L' ');
-		LogSuccess("DqnChar_ToUpper()");
+		Log(Status::Ok, "ToUpper");
+
+		DQN_ASSERT(DqnChar_IsWhitespace(' '));
+		DQN_ASSERT(DqnChar_IsWhitespace('\r'));
+		DQN_ASSERT(DqnChar_IsWhitespace('\n'));
+		DQN_ASSERT(DqnChar_IsWhitespace('\t'));
+		Log(Status::Ok, "IsWhiteSpace");
 	}
 
 	// Trim white space test
@@ -626,13 +664,14 @@ void DqnChar_Test()
 			DQN_ASSERT(result == nullptr);
 		}
 
-		LogSuccess("DqnChar_TrimAroundWhitespace()");
+		Log(Status::Ok, "TrimWhitespaceAround");
 	}
 }
 
 void DqnString_Test()
 {
-	LogHeader("DqnString");
+	LOG_HEADER();
+
 	// Check fixed mem string doesn't allow string to expand and fail if try to append
 	if (1)
 	{
@@ -648,7 +687,7 @@ void DqnString_Test()
 
 		DQN_ASSERT(str.str[str.len] == 0);
 		DQN_ASSERT(str.len <= str.max);
-		LogSuccess("DqnString->Append(): Check fixed mem string doesn't expand and fails.");
+		Log(Status::Ok, "Append: Check fixed mem string doesn't expand and fails");
 	}
 
 	// Try expanding string
@@ -663,7 +702,7 @@ void DqnString_Test()
 		DQN_ASSERT(str.len <= str.max);
 
 		str.Free();
-		LogSuccess("DqnString(): Check storage expansion on append");
+		Log(Status::Ok, "Check expand on append");
 	}
 
 	// Try init literal no alloc
@@ -674,13 +713,13 @@ void DqnString_Test()
 		DQN_ASSERT(str.InitLiteralNoAlloc(literal));
 		DQN_ASSERT(str.Append(", hello again") == false);
 		str.Free();
-		LogSuccess("DqnString(): Try init literl no alloc, no further expansion");
+		Log(Status::Ok, "Try init literal no alloc, can't expand");
 	}
 }
 
 void DqnTimer_Test()
 {
-	LogHeader("DqnTimer");
+	LOG_HEADER();
 
 	if (1)
 	{
@@ -689,7 +728,7 @@ void DqnTimer_Test()
 		u32 sleepTimeInS = 1;
 		sleep(sleepTimeInS);
 		f64 endInS = DqnTimer_NowInS();
-		printf("start: %f, end: %f\n", startInS, endInS);
+		Log("start: %f, end: %f", startInS, endInS);
 		DQN_ASSERT((startInS + sleepTimeInS) <= endInS);
 
 #elif defined(DQN_WIN32_PLATFORM)
@@ -698,16 +737,18 @@ void DqnTimer_Test()
 		Sleep(sleepTimeInMs);
 		f64 endInMs = DqnTimer_NowInMs();
 
-		printf("start: %f, end: %f\n", startInMs, endInMs);
 		DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
 #endif
-		LogSuccess("DqnTimer(): Timer advanced in time over 1second");
+		Log(Status::Ok, "Timer advanced in time over 1 second");
+		globalIndent++;
+		Log("Start: %f, End: %f", startInMs, endInMs);
+		globalIndent--;
 	}
 }
 
 void DqnRnd_Test()
 {
-	LogHeader("Random Number Generator Test");
+	LOG_HEADER();
 
 	DqnRndPCG pcg; pcg.Init();
 	for (i32 i = 0; i < 1000000; i++)
@@ -720,14 +761,12 @@ void DqnRnd_Test()
 		f32 randF32 = pcg.Nextf();
 		DQN_ASSERT(randF32 >= 0.0f && randF32 <= 1.0f);
 	}
-
-	printf("RandomTest(): RndPCG: Completed successfully\n");
-	printf("RandomTest(): Completed successfully\n");
+	Log(Status::Ok, "DqnRndPCG");
 }
 
 void DqnMath_Test()
 {
-	LogHeader("DqnMath");
+	LOG_HEADER();
 
 	// Lerp
 	if (1)
@@ -748,41 +787,103 @@ void DqnMath_Test()
 			DQN_ASSERT(DqnMath_Lerp(start, t, end) == 30);
 		}
 
-		LogSuccess("DqnMath_Lerp()");
+		Log(Status::Ok, "Lerp");
 	}
 
-	 // sqrtf
+	 // Sqrtf
 	if (1)
 	{
 		DQN_ASSERT(DqnMath_Sqrtf(4.0f) == 2.0f);
-		LogSuccess("DqnMath_Sqrt()");
+		Log(Status::Ok, "Sqrtf");
 	}
 
-	HandmadeMathTestInternal();
+	// Handmade Math Test
+	if (1)
+	{
+		if (1)
+		{
+			f32 aspectRatio         = 1;
+			DqnMat4 dqnPerspective  = DqnMat4_Perspective(90, aspectRatio, 100, 1000);
+			hmm_mat4 hmmPerspective = HMM_Perspective(90, aspectRatio, 100, 1000);
+			HandmadeMathVerifyMat4(dqnPerspective, hmmPerspective);
+
+			Log(Status::Ok, "HandmadeMathTest: Perspective");
+		}
+
+		// Test Mat4 translate * scale
+		if (1)
+		{
+			hmm_vec3 hmmVec       = HMM_Vec3i(1, 2, 3);
+			DqnV3 dqnVec          = DqnV3_(1, 2, 3);
+			DqnMat4 dqnTranslate  = DqnMat4_Translate3f(dqnVec.x, dqnVec.y, dqnVec.z);
+			hmm_mat4 hmmTranslate = HMM_Translate(hmmVec);
+			HandmadeMathVerifyMat4(dqnTranslate, hmmTranslate);
+
+			hmm_vec3 hmmAxis      = HMM_Vec3(0.5f, 0.2f, 0.7f);
+			DqnV3 dqnAxis         = DqnV3_(0.5f, 0.2f, 0.7f);
+			f32 rotationInDegrees = 80.0f;
+
+			DqnMat4 dqnRotate = DqnMat4_Rotate(DQN_DEGREES_TO_RADIANS(rotationInDegrees), dqnAxis.x,
+			                                   dqnAxis.y, dqnAxis.z);
+			hmm_mat4 hmmRotate = HMM_Rotate(rotationInDegrees, hmmAxis);
+			HandmadeMathVerifyMat4(dqnRotate, hmmRotate);
+
+			dqnVec *= 2;
+			hmmVec *= 2;
+			DqnMat4 dqnScale  = DqnMat4_Scale(dqnVec.x, dqnVec.y, dqnVec.z);
+			hmm_mat4 hmmScale = HMM_Scale(hmmVec);
+			HandmadeMathVerifyMat4(dqnScale, hmmScale);
+
+			DqnMat4 dqnTSMatrix  = DqnMat4_Mul(dqnTranslate, dqnScale);
+			hmm_mat4 hmmTSMatrix = HMM_MultiplyMat4(hmmTranslate, hmmScale);
+			HandmadeMathVerifyMat4(dqnTSMatrix, hmmTSMatrix);
+
+			// Test Mat4 * MulV4
+			if (1)
+			{
+				DqnV4 dqnV4    = DqnV4_(1, 2, 3, 4);
+				hmm_vec4 hmmV4 = HMM_Vec4(1, 2, 3, 4);
+
+				DqnV4 dqnResult    = DqnMat4_MulV4(dqnTSMatrix, dqnV4);
+				hmm_vec4 hmmResult = HMM_MultiplyMat4ByVec4(hmmTSMatrix, hmmV4);
+
+				DQN_ASSERT(dqnResult.x == hmmResult.X);
+				DQN_ASSERT(dqnResult.y == hmmResult.Y);
+				DQN_ASSERT(dqnResult.z == hmmResult.Z);
+				DQN_ASSERT(dqnResult.w == hmmResult.W);
+
+				Log(Status::Ok, "HandmadeMathTest: Mat4 * MulV4");
+			}
+		}
+	}
 }
 
 void DqnVX_Test()
 {
-	LogHeader("Math Vector Test");
+	LOG_HEADER();
+
+	 // V2
 	if (1)
-	{ // V2
-
-		// V2 Creating
+	{
+		// Ctor
 		if (1)
 		{
-			DqnV2 vec = DqnV2_(5.5f, 5.0f);
-			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f);
-			DQN_ASSERT(vec.w == 5.5f && vec.h == 5.0f);
-			LogSuccess("DqnV2_(): Creating");
-		}
+			// Ctor with floats
+			if (1)
+			{
+				DqnV2 vec = DqnV2_(5.5f, 5.0f);
+				DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f);
+				DQN_ASSERT(vec.w == 5.5f && vec.h == 5.0f);
+			}
 
-		// V2 with 2 integers
-		if (1)
-		{
-			DqnV2 vec = DqnV2_(3, 5);
-			DQN_ASSERT(vec.x == 3 && vec.y == 5.0f);
-			DQN_ASSERT(vec.w == 3 && vec.h == 5.0f);
-			LogSuccess("DqnV2_(): with 2 integers");
+			// Ctor with 2 integers
+			if (1)
+			{
+				DqnV2 vec = DqnV2_(3, 5);
+				DQN_ASSERT(vec.x == 3 && vec.y == 5.0f);
+				DQN_ASSERT(vec.w == 3 && vec.h == 5.0f);
+			}
+			Log(Status::Ok, "DqnV2: Ctor");
 		}
 
 		// V2 Arithmetic
@@ -808,7 +909,7 @@ void DqnVX_Test()
 
 			f32 dotResult = DqnV2_Dot(DqnV2_(5, 10), DqnV2_(3, 4));
 			DQN_ASSERT(dotResult == 55);
-			LogSuccess("DqnV2_(): Arithmetic");
+			Log(Status::Ok, "DqnV2: Arithmetic");
 		}
 
 		// Test operator overloading
@@ -837,7 +938,7 @@ void DqnVX_Test()
 
 			result = result - DqnV2_(1, 1);
 			DQN_ASSERT((result == DqnV2_(250, 25)) == true);
-			LogSuccess("DqnV2_(): operator overloading");
+			Log(Status::Ok, "DqnV2: Operator Overloading");
 		}
 
 		// V2 Properties
@@ -858,10 +959,8 @@ void DqnVX_Test()
 			f32 normY        = b.y / 5.0f;
 			f32 diffNormX    = normalised.x - normX;
 			f32 diffNormY    = normalised.y - normY;
-			DQN_ASSERTM(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x,
-			               normX);
-			DQN_ASSERTM(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y,
-			               normY);
+			DQN_ASSERTM(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x, normX);
+			DQN_ASSERTM(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y, normY);
 
 			DqnV2 c = DqnV2_(3.5f, 8.0f);
 			DQN_ASSERT(DqnV2_Overlaps(b, c) == true);
@@ -870,97 +969,102 @@ void DqnVX_Test()
 			DqnV2 d = DqnV2_Perpendicular(c);
 			DQN_ASSERT(DqnV2_Dot(c, d) == 0);
 
-			LogSuccess("DqnV2_(): LengthSquared, Length, Normalize, Overlaps, Perp");
+			Log(Status::Ok, "DqnV2: LengthSquared, Length, Normalize, Overlaps, Perp");
 		}
 
-		// V2 ConstrainToRatio
+		// ConstrainToRatio
 		if (1)
 		{
 			DqnV2 ratio  = DqnV2_(16, 9);
 			DqnV2 dim    = DqnV2_(2000, 1080);
 			DqnV2 result = DqnV2_ConstrainToRatio(dim, ratio);
 			DQN_ASSERT(result.w == 1920 && result.h == 1080);
-			LogSuccess("DqnV2->ConstrainToRatio()");
+			Log(Status::Ok, "DqnV2: ConstrainToRatio");
 		}
 	}
 
 	// V3
 	if (1)
 	{
-		// V3i Creating
+		// Ctor
 		if (1)
 		{
-			DqnV3 vec = DqnV3_(5.5f, 5.0f, 5.875f);
-			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f);
-			DQN_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f);
-			LogSuccess("DqnV3_(): Creating");
+			// Floats
+			if (1)
+			{
+				DqnV3 vec = DqnV3_(5.5f, 5.0f, 5.875f);
+				DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f);
+				DQN_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f);
+			}
+
+			// Integers
+			if (1)
+			{
+				DqnV3 vec = DqnV3_(3, 4, 5);
+				DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5);
+				DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5);
+			}
+			Log(Status::Ok, "DqnV3: Ctor");
 		}
 
-		// V3i Creating
 		if (1)
 		{
-			DqnV3 vec = DqnV3_(3, 4, 5);
-			DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5);
-			DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5);
-			LogSuccess("DqnV3_(): Creating");
-		}
+			// Arithmetic
+			if (1)
+			{
+				DqnV3 vecA = DqnV3_(5, 10, 15);
+				DqnV3 vecB = DqnV3_(2, 3, 6);
+				DQN_ASSERT(DqnV3_Equals(vecA, vecB) == false);
+				DQN_ASSERT(DqnV3_Equals(vecA, DqnV3_(5, 10, 15)) == true);
+				DQN_ASSERT(DqnV3_Equals(vecB, DqnV3_(2, 3, 6)) == true);
 
-		// V3 Arithmetic
-		if (1)
-		{
-			DqnV3 vecA = DqnV3_(5, 10, 15);
-			DqnV3 vecB = DqnV3_(2, 3, 6);
-			DQN_ASSERT(DqnV3_Equals(vecA, vecB) == false);
-			DQN_ASSERT(DqnV3_Equals(vecA, DqnV3_(5, 10, 15)) == true);
-			DQN_ASSERT(DqnV3_Equals(vecB, DqnV3_(2, 3, 6)) == true);
+				DqnV3 result = DqnV3_Add(vecA, DqnV3_(5, 10, 15));
+				DQN_ASSERT(DqnV3_Equals(result, DqnV3_(10, 20, 30)) == true);
 
-			DqnV3 result = DqnV3_Add(vecA, DqnV3_(5, 10, 15));
-			DQN_ASSERT(DqnV3_Equals(result, DqnV3_(10, 20, 30)) == true);
+				result = DqnV3_Sub(result, DqnV3_(5, 10, 15));
+				DQN_ASSERT(DqnV3_Equals(result, DqnV3_(5, 10, 15)) == true);
 
-			result = DqnV3_Sub(result, DqnV3_(5, 10, 15));
-			DQN_ASSERT(DqnV3_Equals(result, DqnV3_(5, 10, 15)) == true);
+				result = DqnV3_Scalef(result, 5);
+				DQN_ASSERT(DqnV3_Equals(result, DqnV3_(25, 50, 75)) == true);
 
-			result = DqnV3_Scalef(result, 5);
-			DQN_ASSERT(DqnV3_Equals(result, DqnV3_(25, 50, 75)) == true);
+				result = DqnV3_Hadamard(result, DqnV3_(10.0f, 0.5f, 10.0f));
+				DQN_ASSERT(DqnV3_Equals(result, DqnV3_(250, 25, 750)) == true);
 
-			result = DqnV3_Hadamard(result, DqnV3_(10.0f, 0.5f, 10.0f));
-			DQN_ASSERT(DqnV3_Equals(result, DqnV3_(250, 25, 750)) == true);
+				f32 dotResult = DqnV3_Dot(DqnV3_(5, 10, 2), DqnV3_(3, 4, 6));
+				DQN_ASSERT(dotResult == 67);
 
-			f32 dotResult = DqnV3_Dot(DqnV3_(5, 10, 2), DqnV3_(3, 4, 6));
-			DQN_ASSERT(dotResult == 67);
+				DqnV3 cross = DqnV3_Cross(vecA, vecB);
+				DQN_ASSERT(DqnV3_Equals(cross, DqnV3_(15, 0, -5)) == true);
+			}
 
-			DqnV3 cross = DqnV3_Cross(vecA, vecB);
-			DQN_ASSERT(DqnV3_Equals(cross, DqnV3_(15, 0, -5)) == true);
-			LogSuccess("DqnV3_(): Arithmetic");
-		}
+			// Operator overloading
+			if (1)
+			{
+				DqnV3 vecA = DqnV3_(5, 10, 15);
+				DqnV3 vecB = DqnV3_(2, 3, 6);
+				DQN_ASSERT((vecA == vecB) == false);
+				DQN_ASSERT((vecA == DqnV3_(5, 10, 15)) == true);
+				DQN_ASSERT((vecB == DqnV3_(2, 3, 6)) == true);
 
-		// V3 More Arithmetic
-		if (1)
-		{
-			DqnV3 vecA = DqnV3_(5, 10, 15);
-			DqnV3 vecB = DqnV3_(2, 3, 6);
-			DQN_ASSERT((vecA == vecB) == false);
-			DQN_ASSERT((vecA == DqnV3_(5, 10, 15)) == true);
-			DQN_ASSERT((vecB == DqnV3_(2, 3, 6)) == true);
+				DqnV3 result = vecA + DqnV3_(5, 10, 15);
+				DQN_ASSERT((result == DqnV3_(10, 20, 30)) == true);
 
-			DqnV3 result = vecA + DqnV3_(5, 10, 15);
-			DQN_ASSERT((result == DqnV3_(10, 20, 30)) == true);
+				result -= DqnV3_(5, 10, 15);
+				DQN_ASSERT((result == DqnV3_(5, 10, 15)) == true);
 
-			result -= DqnV3_(5, 10, 15);
-			DQN_ASSERT((result == DqnV3_(5, 10, 15)) == true);
+				result = result * 5;
+				DQN_ASSERT((result == DqnV3_(25, 50, 75)) == true);
 
-			result = result * 5;
-			DQN_ASSERT((result == DqnV3_(25, 50, 75)) == true);
+				result *= DqnV3_(10.0f, 0.5f, 10.0f);
+				DQN_ASSERT((result == DqnV3_(250, 25, 750)) == true);
 
-			result *= DqnV3_(10.0f, 0.5f, 10.0f);
-			DQN_ASSERT((result == DqnV3_(250, 25, 750)) == true);
+				result = result - DqnV3_(1, 1, 1);
+				DQN_ASSERT((result == DqnV3_(249, 24, 749)) == true);
 
-			result = result - DqnV3_(1, 1, 1);
-			DQN_ASSERT((result == DqnV3_(249, 24, 749)) == true);
-
-			result += DqnV3_(1, 1, 1);
-			DQN_ASSERT((result == DqnV3_(250, 25, 750)) == true);
-			LogSuccess("DqnV3_(): More Arithmetic");
+				result += DqnV3_(1, 1, 1);
+				DQN_ASSERT((result == DqnV3_(250, 25, 750)) == true);
+			}
+			Log(Status::Ok, "DqnV3: Arithmetic");
 		}
 	}
 
@@ -968,83 +1072,88 @@ void DqnVX_Test()
 	if (1)
 	{
 
-		// V4 Creating
+		// Ctor
 		if (1)
 		{
-			DqnV4 vec = DqnV4_(5.5f, 5.0f, 5.875f, 5.928f);
-			DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f && vec.w == 5.928f);
-			DQN_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f && vec.a == 5.928f);
-			LogSuccess("DqnV4_(): Creating");
-		}
+			// Floats
+			if (1)
+			{
+				DqnV4 vec = DqnV4_(5.5f, 5.0f, 5.875f, 5.928f);
+				DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f && vec.w == 5.928f);
+				DQN_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f && vec.a == 5.928f);
+			}
 
-		// V4i Creating
-		if (1)
-		{
-			DqnV4 vec = DqnV4_(3, 4, 5, 6);
-			DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5 && vec.w == 6);
-			DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5 && vec.a == 6);
-			LogSuccess("DqnV4_(): Integer ctor creating");
+			// Integers
+			if (1)
+			{
+				DqnV4 vec = DqnV4_(3, 4, 5, 6);
+				DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5 && vec.w == 6);
+				DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5 && vec.a == 6);
+			}
+			Log(Status::Ok, "DqnV4: Ctor");
 		}
-
 		// V4 Arithmetic
 		if (1)
 		{
-			DqnV4 vecA = DqnV4_(5, 10, 15, 20);
-			DqnV4 vecB = DqnV4_(2, 3, 6, 8);
-			DQN_ASSERT(DqnV4_Equals(vecA, vecB) == false);
-			DQN_ASSERT(DqnV4_Equals(vecA, DqnV4_(5, 10, 15, 20)) == true);
-			DQN_ASSERT(DqnV4_Equals(vecB, DqnV4_(2, 3, 6, 8)) == true);
+			// Arithmetic
+			{
+				DqnV4 vecA = DqnV4_(5, 10, 15, 20);
+				DqnV4 vecB = DqnV4_(2, 3, 6, 8);
+				DQN_ASSERT(DqnV4_Equals(vecA, vecB) == false);
+				DQN_ASSERT(DqnV4_Equals(vecA, DqnV4_(5, 10, 15, 20)) == true);
+				DQN_ASSERT(DqnV4_Equals(vecB, DqnV4_(2, 3, 6, 8)) == true);
 
-			DqnV4 result = DqnV4_Add(vecA, DqnV4_(5, 10, 15, 20));
-			DQN_ASSERT(DqnV4_Equals(result, DqnV4_(10, 20, 30, 40)) == true);
+				DqnV4 result = DqnV4_Add(vecA, DqnV4_(5, 10, 15, 20));
+				DQN_ASSERT(DqnV4_Equals(result, DqnV4_(10, 20, 30, 40)) == true);
 
-			result = DqnV4_Sub(result, DqnV4_(5, 10, 15, 20));
-			DQN_ASSERT(DqnV4_Equals(result, DqnV4_(5, 10, 15, 20)) == true);
+				result = DqnV4_Sub(result, DqnV4_(5, 10, 15, 20));
+				DQN_ASSERT(DqnV4_Equals(result, DqnV4_(5, 10, 15, 20)) == true);
 
-			result = DqnV4_Scalef(result, 5);
-			DQN_ASSERT(DqnV4_Equals(result, DqnV4_(25, 50, 75, 100)) == true);
+				result = DqnV4_Scalef(result, 5);
+				DQN_ASSERT(DqnV4_Equals(result, DqnV4_(25, 50, 75, 100)) == true);
 
-			result = DqnV4_Hadamard(result, DqnV4_(10.0f, 0.5f, 10.0f, 0.25f));
-			DQN_ASSERT(DqnV4_Equals(result, DqnV4_(250, 25, 750, 25)) == true);
+				result = DqnV4_Hadamard(result, DqnV4_(10.0f, 0.5f, 10.0f, 0.25f));
+				DQN_ASSERT(DqnV4_Equals(result, DqnV4_(250, 25, 750, 25)) == true);
 
-			f32 dotResult = DqnV4_Dot(DqnV4_(5, 10, 2, 8), DqnV4_(3, 4, 6, 5));
-			DQN_ASSERT(dotResult == 107);
-			LogSuccess("DqnV4_(): Arithmetic");
-		}
+				f32 dotResult = DqnV4_Dot(DqnV4_(5, 10, 2, 8), DqnV4_(3, 4, 6, 5));
+				DQN_ASSERT(dotResult == 107);
+			}
 
-		// V4 More Arthmetic
-		if (1)
-		{
-			DqnV4 vecA = DqnV4_(5, 10, 15, 20);
-			DqnV4 vecB = DqnV4_(2, 3, 6, 8);
-			DQN_ASSERT((vecA == vecB) == false);
-			DQN_ASSERT((vecA == DqnV4_(5, 10, 15, 20)) == true);
-			DQN_ASSERT((vecB == DqnV4_(2, 3, 6, 8)) == true);
+			// Operator Overloading
+			if (1)
+			{
+				DqnV4 vecA = DqnV4_(5, 10, 15, 20);
+				DqnV4 vecB = DqnV4_(2, 3, 6, 8);
+				DQN_ASSERT((vecA == vecB) == false);
+				DQN_ASSERT((vecA == DqnV4_(5, 10, 15, 20)) == true);
+				DQN_ASSERT((vecB == DqnV4_(2, 3, 6, 8)) == true);
 
-			DqnV4 result = vecA + DqnV4_(5, 10, 15, 20);
-			DQN_ASSERT((result == DqnV4_(10, 20, 30, 40)) == true);
+				DqnV4 result = vecA + DqnV4_(5, 10, 15, 20);
+				DQN_ASSERT((result == DqnV4_(10, 20, 30, 40)) == true);
 
-			result = result - DqnV4_(5, 10, 15, 20);
-			DQN_ASSERT((result == DqnV4_(5, 10, 15, 20)) == true);
+				result = result - DqnV4_(5, 10, 15, 20);
+				DQN_ASSERT((result == DqnV4_(5, 10, 15, 20)) == true);
 
-			result = result * 5;
-			DQN_ASSERT((result == DqnV4_(25, 50, 75, 100)) == true);
+				result = result * 5;
+				DQN_ASSERT((result == DqnV4_(25, 50, 75, 100)) == true);
 
-			result *= DqnV4_(10.0f, 0.5f, 10.0f, 0.25f);
-			DQN_ASSERT((result == DqnV4_(250, 25, 750, 25)) == true);
+				result *= DqnV4_(10.0f, 0.5f, 10.0f, 0.25f);
+				DQN_ASSERT((result == DqnV4_(250, 25, 750, 25)) == true);
 
-			result += DqnV4_(1, 1, 1, 1);
-			DQN_ASSERT((result == DqnV4_(251, 26, 751, 26)) == true);
+				result += DqnV4_(1, 1, 1, 1);
+				DQN_ASSERT((result == DqnV4_(251, 26, 751, 26)) == true);
 
-			result -= DqnV4_(1, 1, 1, 1);
-			DQN_ASSERT((result == DqnV4_(250, 25, 750, 25)) == true);
-			LogSuccess("DqnV4_(): More Arthmetic");
+				result -= DqnV4_(1, 1, 1, 1);
+				DQN_ASSERT((result == DqnV4_(250, 25, 750, 25)) == true);
+			}
+			Log(Status::Ok, "DqnV4: Arithmetic");
 		}
 	}
 }
 
 void DqnRect_Test()
 {
+	LOG_HEADER();
 	// Rect
 	if (1)
 	{
@@ -1066,7 +1175,7 @@ void DqnRect_Test()
 			DqnRect rect = DqnRect_(-10, -10, 20, 20);
 			DQN_ASSERT(DqnV2_Equals(rect.min, DqnV2_(-10, -10)));
 			DQN_ASSERT(DqnV2_Equals(rect.max, DqnV2_(10, 10)));
-			LogSuccess("DqnRect_(): Test rect init functions");
+			Log(Status::Ok, "Ctor");
 		}
 
 		// Test rect get size function
@@ -1084,7 +1193,7 @@ void DqnRect_Test()
 
 				DqnV2 dim = rect.GetSize();
 				DQN_ASSERT(DqnV2_Equals(dim, DqnV2_(20, 20)));
-				LogSuccess("DqnRect->GetSize(): Test float rect");
+				Log(Status::Ok, "GetSize");
 			}
 		}
 
@@ -1092,14 +1201,14 @@ void DqnRect_Test()
 		DqnRect rect     = DqnRect_(DqnV2_(-10, -10), DqnV2_(20, 20));
 		DqnV2 rectCenter = rect.GetCenter();
 		DQN_ASSERT(DqnV2_Equals(rectCenter, DqnV2_(0, 0)));
-		LogSuccess("DqnRect->GetCentre()");
+		Log(Status::Ok, "GetCentre");
 
 		// Test clipping rect get centre
 		DqnRect clipRect   = DqnRect_(DqnV2_(-15, -15), DqnV2_(10, 10) + DqnV2_(15));
 		DqnRect clipResult = rect.ClipRect(clipRect);
 		DQN_ASSERT(clipResult.min.x == -10 && clipResult.min.y == -10);
 		DQN_ASSERT(clipResult.max.x == 10 && clipResult.max.y == 10);
-		LogSuccess("DqnRect->ClipRect()");
+		Log(Status::Ok, "ClipRect");
 
 		// Test shifting rect
 		if (1)
@@ -1129,7 +1238,7 @@ void DqnRect_Test()
 				DQN_ASSERT(!shiftedRect.ContainsP(outP));
 			}
 
-			LogSuccess("DqnRect->Move()");
+			Log(Status::Ok, "Move");
 		}
 	}
 }
@@ -1156,7 +1265,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 
 				DQN_ASSERT(array.max >= 1);
 				DQN_ASSERT(array.count == 1);
-				LogSuccess("DqnArray(): Test basic insert");
+				Log(Status::Ok, "Test basic insert");
 			}
 
 			// Test array resizing and freeing
@@ -1216,7 +1325,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 				DQN_ASSERT(array.count == 12);
 				DQN_ASSERT(DqnV2_Equals(vc, array.data[11]));
 
-				LogSuccess("DqnArray(): Test resizing and free");
+				Log(Status::Ok, "Test resizing and free");
 			}
 		}
 		array.Free();
@@ -1226,7 +1335,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 			DQN_ASSERT(array.InitSize(1, memAPI));
 			DQN_ASSERT(array.max >= 1);
 			DQN_ASSERT(array.count == 0);
-			LogSuccess("DqnArray(): Empty array");
+			Log(Status::Ok, "Empty array");
 		}
 		array.Free();
 
@@ -1275,7 +1384,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 			array.Clear();
 			DQN_ASSERT(array.max >= 16);
 			DQN_ASSERT(array.count == 0);
-			LogSuccess("DqnArray(): Test removal");
+			Log(Status::Ok, "Test removal");
 		}
 		array.Free();
 
@@ -1313,7 +1422,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 			DQN_ASSERT(array.max >= 16);
 			DQN_ASSERT(array.count == 1);
 
-			LogSuccess("DqnArray(): Test stable removal");
+			Log(Status::Ok, "Test stable removal");
 		}
 		array.Free();
 	}
@@ -1454,7 +1563,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 		}
 
 
-		LogSuccess("DqnArray(): Test stable removal with list of indexes");
+		Log(Status::Ok, "Test stable removal with list of indexes");
 	}
 }
 
@@ -1475,13 +1584,13 @@ void DqnArray_TestRealDataInternal(DqnArray<char> *array)
 	array->Free();
 	free(buf);
 
-	LogSuccess("DqnArray(): Testing real data");
+	Log(Status::Ok, "Testing real data");
 #endif
 }
 
 void DqnArray_Test()
 {
-	LogHeader("DqnArray_Test");
+	LOG_HEADER();
 	if (1)
 	{
 		auto allocator = DqnMemAPI::HeapAllocator();
@@ -1506,7 +1615,7 @@ void DqnArray_Test()
 			DQN_ASSERT(array1.count == 1);
 			array1.Free();
 
-			LogSuccess("DqnArray(): Testing faux-array constructors DqnArray_()");
+			Log(Status::Ok, "Testing faux-array constructors DqnArray_()");
 		}
 
 		if (1)
@@ -1545,13 +1654,13 @@ void DqnArray_Test()
 
 void DqnMemStack_Test()
 {
-	LogHeader("DqnMemStack_Test");
+	LOG_HEADER();
 }
 
 #ifdef DQN_XPLATFORM_LAYER
 void DqnFile_Test()
 {
-	LogHeader("DqnFile");
+	LOG_HEADER();
 	// File i/o
 	if (1)
 	{
@@ -1631,7 +1740,7 @@ void DqnFile_Test()
 				}
 			}
 
-			LogSuccess("DqnFile(): General test");
+			Log(Status::Ok, "General test");
 		}
 
 		// Test invalid file
@@ -1644,13 +1753,11 @@ void DqnFile_Test()
 			DQN_ASSERT(file.size == 0);
 			DQN_ASSERT(file.flags == 0);
 			DQN_ASSERT(!file.handle);
-			LogSuccess("DqnFile(): Invalid file test");
+			Log(Status::Ok, "Invalid file test");
 		}
 	}
 
-	////////////////////////////////////////////////////////////////////////////
 	// Write Test
-	////////////////////////////////////////////////////////////////////////////
 	if (1)
 	{
 		const char *fileNames[]                   = {"dqn_1", "dqn_2", "dqn_3", "dqn_4", "dqn_5"};
@@ -1732,12 +1839,10 @@ void DqnFile_Test()
 		}
 		memStack.Free();
 
-		LogSuccess("DqnFile(): Write file");
+		Log(Status::Ok, "Write file");
 	}
 
-	////////////////////////////////////////////////////////////////////////////
 	// Test directory listing
-	////////////////////////////////////////////////////////////////////////////
 	if (1)
 	{
 		i32 numFiles;
@@ -1747,12 +1852,14 @@ void DqnFile_Test()
 		char **filelist = DqnFile::ListDir("*", numFiles);
 #endif
 
-		printf("DqnFile(): Display read files\n");
+		Log("Test directory listing");
+		globalIndent++;
 		for (auto i = 0; i < numFiles; i++)
-			printf("DqnFile(): DirRead: %s\n", filelist[i]);
+			Log("%02d: %s", i, filelist[i]);
 
 		DqnFile::ListDirFree(filelist, numFiles);
-		LogSuccess("DqnFile(): List directory files");
+		globalIndent--;
+		Log(Status::Ok, "List directory files");
 	}
 
 }
@@ -1773,10 +1880,10 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
 #if 0
 		u32 number = globalDebugCounter;
 #if defined(DQN_WIN32_IMPLEMENTATION)
-		printf("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n",
+		Log("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n",
 		       GetCurrentThreadId(), number);
 #elif defined(DQN_UNIX_IMPLEMENTATION)
-		printf("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d\n",
+		Log("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d\n",
 		       number);
 #endif
 #endif
@@ -1786,7 +1893,7 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
 
 FILE_SCOPE void DqnJobQueue_Test()
 {
-	LogHeader("DqnJobQueue: Multithreading Test");
+	LOG_HEADER();
 	globalDebugCounter = 0;
 
 	DqnMemStack memStack = {};
@@ -1819,14 +1926,13 @@ FILE_SCOPE void DqnJobQueue_Test()
 	DQN_ASSERT(globalDebugCounter == WORK_ENTRIES);
 	DqnLock_Delete(&globalJobQueueLock);
 
-	printf("DqnJobQueue(): Final incremented value: %d\n", globalDebugCounter);
-	LogSuccess("DqnJobQueue()");
+	Log("Final incremented value: %d\n", globalDebugCounter);
 }
 
 #include <algorithm>
 void DqnQuickSort_Test()
 {
-	LogHeader("DqnSort vs std::Sort");
+	LOG_HEADER();
 	DqnRndPCG state; state.Init();
 	if (1)
 	{
@@ -1846,6 +1952,7 @@ void DqnQuickSort_Test()
 		f64 dqnCPPAverage = 0;
 		f64 stdAverage    = 0;
 
+		Log("Timings"); globalIndent++;
 		for (u32 timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(dqnCPPTimings); timingsIndex++)
 		{
 			// Populate with random numbers
@@ -1855,6 +1962,9 @@ void DqnQuickSort_Test()
 				stdArray[i]    = dqnCPPArray[i];
 			}
 
+			globalNewLine = false;
+			Log("%02d: ", timingsIndex);
+			globalIndent -= 2;
 			// Time Dqn_QuickSort
 			{
 				f64 start = DqnTimer_NowInS();
@@ -1863,10 +1973,11 @@ void DqnQuickSort_Test()
 				f64 duration = DqnTimer_NowInS() - start;
 				dqnCPPTimings[timingsIndex] = duration;
 				dqnCPPAverage += duration;
-				printf("Dqn_QuickSort: %f vs ", dqnCPPTimings[timingsIndex]);
+				Log("Dqn_QuickSort: %f vs ", dqnCPPTimings[timingsIndex]);
 			}
 
 			// Time std::sort
+			globalNewLine = true;
 			{
 				f64 start = DqnTimer_NowInS();
 				std::sort(stdArray, stdArray + numInts);
@@ -1875,32 +1986,37 @@ void DqnQuickSort_Test()
 				stdTimings[timingsIndex] = duration;
 				stdAverage += duration;
 
-				printf("std::sort: %f\n", stdTimings[timingsIndex]);
+				Log("std::sort: %f", stdTimings[timingsIndex]);
 			}
+			globalIndent += 2;
 
 			// Validate algorithm is correct
 			for (u32 i = 0; i < numInts; i++)
 			{
 				DQN_ASSERTM(dqnCPPArray[i] == stdArray[i], "DqnArray[%d]: %d, stdArray[%d]: %d", i,
-				               dqnCPPArray[i], stdArray[i], i);
+				            dqnCPPArray[i], stdArray[i], i);
 			}
 		}
+		globalIndent--;
 
 		// Print averages
 		if (1)
 		{
 			dqnCPPAverage /= (f64)DQN_ARRAY_COUNT(dqnCPPTimings);
 			stdAverage    /= (f64)DQN_ARRAY_COUNT(stdTimings);
-			printf("\n- Average Timings\n");
-			printf("    Dqn_QuickSort: %f vs std::sort: %f\n", dqnCPPAverage, stdAverage);
+			Log("Average Timings");
+			globalIndent++;
+			Log("Dqn_QuickSort: %f vs std::sort: %f\n", dqnCPPAverage, stdAverage);
+			globalIndent--;
 		}
 		stack.Free();
+		Log(Status::Ok, "QuickSort");
 	}
 }
 
 void DqnHashTable_Test()
 {
-	LogHeader("DqnHashTable");
+	LOG_HEADER();
 	DqnHashTable<u32> hashTable = {};
 	hashTable.Init(1);
 
@@ -1974,12 +2090,12 @@ void DqnHashTable_Test()
 	}
 
 	hashTable.Free();
-	LogSuccess("DqnHashTable()");
+	Log(Status::Ok, "HashTable");
 }
 
 void Dqn_BSearch_Test()
 {
-	LogHeader("Dqn_BSearch");
+	LOG_HEADER();
 	if (1)
 	{
 		auto IsLessThan = [](const u32 &a, const u32 &b) -> bool {
@@ -2005,7 +2121,7 @@ void Dqn_BSearch_Test()
 
 		result = Dqn_BSearch<u32>(array, DQN_ARRAY_COUNT(array), 4, Equals, IsLessThan);
 		DQN_ASSERT(result == -1);
-		LogSuccess("Dqn_BSearch(): With odd sized array and custom compare");
+		Log(Status::Ok, "With odd sized array and custom compare");
 	}
 
 	if (1)
@@ -2025,7 +2141,7 @@ void Dqn_BSearch_Test()
 
 		result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 5);
 		DQN_ASSERT(result == -1);
-		LogSuccess("Dqn_BSearch(): With even sized array");
+		Log(Status::Ok, "With even sized array");
 	}
 
 	if (1)
@@ -2048,7 +2164,7 @@ void Dqn_BSearch_Test()
 
 		result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BSearchBound_Lower);
 		DQN_ASSERT(result == 2);
-		LogSuccess("Dqn_BSearch(): Lower bound with odd sized array");
+		Log(Status::Ok, "Lower bound with odd sized array");
 	}
 
 	if (1)
@@ -2075,7 +2191,7 @@ void Dqn_BSearch_Test()
 
 		result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 6, Dqn_BSearchBound_Lower);
 		DQN_ASSERT(result == 3);
-		LogSuccess("Dqn_BSearch(): Lower bound with even sized array");
+		Log(Status::Ok, "Lower bound with even sized array");
 	}
 
 	if (1)
@@ -2098,7 +2214,7 @@ void Dqn_BSearch_Test()
 
 		result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BSearchBound_Higher);
 		DQN_ASSERT(result == -1);
-		LogSuccess("Dqn_BSearch(): Higher bound with odd sized array");
+		Log(Status::Ok, "Higher bound with odd sized array");
 	}
 
 	if (1)
@@ -2125,13 +2241,13 @@ void Dqn_BSearch_Test()
 
 		result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 6, Dqn_BSearchBound_Higher);
 		DQN_ASSERT(result == -1);
-		LogSuccess("Dqn_BSearch(): Higher bound with even sized array");
+		Log(Status::Ok, "Higher bound with even sized array");
 	}
 }
 
 void DqnMemSet_Test()
 {
-	LogHeader("DqnMemSet Test");
+	LOG_HEADER();
 	DqnRndPCG rnd = DqnRndPCG_();
 
 	const int NUM_TIMINGS = 5;
@@ -2144,12 +2260,17 @@ void DqnMemSet_Test()
 	void *buffers[DQN_ARRAY_COUNT(timings)]  = {};
 
 	const i32 NUM_ITERATIONS = DQN_ARRAY_COUNT(timings[0]);
+	Log("Timings");
 	for (auto i = 0; i < NUM_ITERATIONS; i++)
 	{
 		i32 size = rnd.Range(DQN_MEGABYTE(16), DQN_MEGABYTE(32));
 		u8 value = (u8)rnd.Range(0, 255);
 
-		printf("%04d:", i);
+		globalIndent++;
+		globalNewLine = false;
+		Log("%02d: ", i);
+		globalIndent--;
+		globalIndent--;
 
 		i32 timingsIndex = 0;
 		// DqnMem_Set
@@ -2161,7 +2282,7 @@ void DqnMemSet_Test()
 			f64 duration = DqnTimer_NowInMs() - start;
 
 			timings[timingsIndex++][i] = duration;
-			printf("DqnMem_Set: %8.3f vs ", duration);
+			Log("DqnMem_Set: %5.3f vs ", duration);
 		}
 
 #if defined(DQN_WIN32_IMPLEMENTATION)
@@ -2174,7 +2295,7 @@ void DqnMemSet_Test()
 			f64 duration = DqnTimer_NowInMs() - start;
 
 			timings[timingsIndex++][i] = duration;
-			printf("DqnMem_Set: %8.3f vs ", duration);
+			Log("DqnMem_Set64: %5.3f vs ", duration);
 		}
 #endif
 
@@ -2187,8 +2308,10 @@ void DqnMemSet_Test()
 			f64 duration = DqnTimer_NowInMs() - start;
 
 			timings[timingsIndex++][i] = duration;
-			printf("memset: %8.3f\n", duration);
+			Log("memset: %5.3f\n", duration);
 		}
+		globalIndent++;
+		globalNewLine = true;
 
 		for (auto testIndex = 0; testIndex < size; testIndex++)
 		{
@@ -2212,14 +2335,16 @@ void DqnMemSet_Test()
 		avgTimings[timingsIndex] = totalTime / (f64)NUM_ITERATIONS;
 	}
 
-	printf("\n- Average Timings\n");
+	Log("Average Timings");
+	globalIndent++;
 #if defined(DQN_WIN32_IMPLEMENTATION)
-	printf("    DqnMem_Set: %f vs DqnMem_Set64: %f vs memset: %f\n", avgTimings[0], avgTimings[1],
-	       avgTimings[2]);
+	Log("DqnMem_Set: %f vs DqnMem_Set64: %f vs memset: %f\n", 1, false, avgTimings[0], avgTimings[1], avgTimings[2]);
 #else
-	printf("    DqnMem_Set: %f vs memset: %f\n", avgTimings[0], avgTimings[1]);
+	Log("DqnMem_Set: %f vs memset: %f\n", 1, false, avgTimings[0], avgTimings[1]);
 #endif
-	LogSuccess("DqnMem_Set(): Completed succesfully");
+	globalIndent--;
+
+	Log(Status::Ok, "Completed succesfully");
 }
 
 FILE_SCOPE void Test()
@@ -2236,6 +2361,9 @@ FILE_SCOPE void Test()
 
 int main(void)
 {
+	globalIndent  = 1;
+	globalNewLine = true;
+
 	Test();
 
 	DqnString_Test();
@@ -2257,8 +2385,8 @@ int main(void)
 	DqnJobQueue_Test();
 #endif
 
-	printf("\nPress 'Enter' Key to Exit\n");
-	getchar();
+	// Log("\nPress 'Enter' Key to Exit\n");
+	// getchar();
 
 	return 0;
 }

@@ -357,6 +357,8 @@ struct DqnAllocatorMetadata
 	static u32 const ALIGNMENT_SIZE     = sizeof(u8);
 	static u32 const ALLOC_AMOUNT_SIZE  = sizeof(usize);
 
+	DqnArray<u8 *> allocations; // When BoundsGuard is enabled, tracks all allocations.
+
 	void   Init                (bool boundsGuard);
 	void   Free                ();
 	void   AddAllocation       (u8 *ptr)                        { DQN_ASSERT(allocations.Push(ptr) != nullptr); }
@@ -373,8 +375,6 @@ struct DqnAllocatorMetadata
 	u8    *PtrToOffsetToSrc    (u8 const *ptr)            const;
 	usize *PtrToAllocAmount    (u8 const *ptr)            const;
 	usize  GetAllocationSize   (usize size, u8 alignment) const { return GetAllocHeadSize() + size + GetAllocTailSize() + (alignment - 1); }
-
-	DqnArray<u8 *> allocations;
 
 private:
 	u32            boundsGuardSize; // sizeof(GUARD_VALUE) OR 0 if BoundsGuard is disabled.
@@ -393,18 +393,9 @@ private:
 // locality against optimal space usage.
 
 // How To Use:
-// 1. Create a DqnMemStack struct and pass it into an initialisation function
-//    - InitWithFixedMem() allows you to pass in your own memory which is
-//      converted to a memory block. This disables dynamic allocation.
-//      NOTE: Space is reserved in the given memory for MemStackBlock metadata.
-
-//    - InitWithFixedSize() allows you to to disable dynamic allocations and
-//      sub-allocate from the initial MemStack allocation size only.
-
-// 2. Use DqnMemStack_Push(..) to allocate memory for use.
-//    - "Freeing" memory is dealt by creating temporary MemStacks or using the
-//      BeginTempRegion and EndTempRegion functions. Specifically freeing
-//      individual items is typically not generalisable in this scheme.
+// DqnMemStack stack = {};
+//             stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard);
+// u8 *data =  stack.Push(128);
 
 struct DqnMemStack
 {
@@ -3592,6 +3583,9 @@ void DqnMemStack::Free()
 {
 	while (this->block)
 		this->FreeLastBlock();
+
+	if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
+		this->metadata.allocations.Free();
 }
 
 bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
@@ -3612,6 +3606,21 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 	{
 		DqnMemStack::Block *blockToFree = *blockPtr;
 		(*blockPtr)                     = blockToFree->prevBlock;
+
+		if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
+		{
+			u8 const *blockStart = blockToFree->memory;
+			u8 const *blockEnd   = blockToFree->memory + blockToFree->size;
+			for (auto index = 0; index < this->metadata.allocations.count; index++)
+			{
+				u8 *ptr = this->metadata.allocations.data[index];
+				if (ptr >= blockStart && ptr <= blockEnd)
+				{
+					this->metadata.allocations.RemoveStable(index);
+					index--;
+				}
+			}
+		}
 
 		usize realSize = blockToFree->size + sizeof(DqnMemStack::Block);
 		this->memAPI->Free(blockToFree, realSize);
