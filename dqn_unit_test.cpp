@@ -2354,7 +2354,6 @@ FILE_SCOPE void DqnMemStack_Test()
 	{
 		DqnMemStack stack = {};
 		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
-		stack.Free();
 
 		i32 const ALIGN64 = 64;
 		i32 const ALIGN16 = 16;
@@ -2384,6 +2383,7 @@ FILE_SCOPE void DqnMemStack_Test()
 			stack.Pop(result1);
 		}
 
+		stack.Free();
 		Log(Status::Ok, "Check allocated alignment to 4, 16, 64");
 	}
 
@@ -2410,7 +2410,8 @@ FILE_SCOPE void DqnMemStack_Test()
 		auto *oldBlock = stack.block;
 		DQN_ASSERT(oldBlock);
 		DQN_ASSERT(oldBlock->size == DQN_MEGABYTE(1));
-		DQN_ASSERT(oldBlock->used == 0);
+		DQN_ASSERT(oldBlock->head == oldBlock->head);
+		DQN_ASSERT(oldBlock->tail == oldBlock->tail);
 		DQN_ASSERT(oldBlock->prevBlock == nullptr);
 
 		auto *result1 = stack.Push(DQN_MEGABYTE(2));
@@ -2432,7 +2433,8 @@ FILE_SCOPE void DqnMemStack_Test()
 		if (1)
 		{
 			DqnMemStack::Block *blockToReturnTo = stack.block;
-			auto usedBefore                     = blockToReturnTo->used;
+			auto headBefore                     = blockToReturnTo->head;
+			auto tailBefore                     = blockToReturnTo->tail;
 			if (1)
 			{
 				auto memGuard1 = stack.TempRegionGuard();
@@ -2440,7 +2442,8 @@ FILE_SCOPE void DqnMemStack_Test()
 				auto *result3  = stack.Push(100);
 				auto *result4  = stack.Push(100);
 				DQN_ASSERT(result2 && result3 && result4);
-				DQN_ASSERT(stack.block->used > usedBefore);
+				DQN_ASSERT(stack.block->head != headBefore);
+				DQN_ASSERT(stack.block->tail == tailBefore);
 				DQN_ASSERT(stack.block->memory == blockToReturnTo->memory);
 
 				// Force allocation of new block
@@ -2451,14 +2454,16 @@ FILE_SCOPE void DqnMemStack_Test()
 			}
 
 			DQN_ASSERT(stack.block == blockToReturnTo);
-			DQN_ASSERT(stack.block->used == usedBefore);
+			DQN_ASSERT(stack.block->head == headBefore);
+			DQN_ASSERT(stack.block->tail == tailBefore);
 		}
 
 		// Check temporary regions keep state
 		if (1)
 		{
 			DqnMemStack::Block *blockToReturnTo = stack.block;
-			auto usedBefore                     = blockToReturnTo->used;
+			auto headBefore                     = blockToReturnTo->head;
+			auto tailBefore                     = blockToReturnTo->tail;
 			if (1)
 			{
 				auto memGuard1 = stack.TempRegionGuard();
@@ -2466,7 +2471,8 @@ FILE_SCOPE void DqnMemStack_Test()
 				auto *result3  = stack.Push(100);
 				auto *result4  = stack.Push(100);
 				DQN_ASSERT(result2 && result3 && result4);
-				DQN_ASSERT(stack.block->used > usedBefore);
+				DQN_ASSERT(stack.block->head != headBefore);
+				DQN_ASSERT(stack.block->tail == tailBefore);
 				DQN_ASSERT(stack.block->memory == blockToReturnTo->memory);
 
 				// Force allocation of new block
@@ -2597,7 +2603,19 @@ FILE_SCOPE void DqnMemStack_Test()
 		DQN_ASSERT(*head == DqnAllocatorMetadata::HEAD_GUARD_VALUE);
 		DQN_ASSERT(*tail == DqnAllocatorMetadata::TAIL_GUARD_VALUE);
 
+		stack.Free();
 		Log(Status::Ok, "Bounds guards are placed adjacent and have magic values.");
+	}
+
+	// Push to tail and head
+	if (1)
+	{
+		DqnMemStack stack = {};
+		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+
+		auto *result1 = stack.Push(100);
+		auto *result2 = stack.PushOnTail(100);
+		stack.Free();
 	}
 }
 
