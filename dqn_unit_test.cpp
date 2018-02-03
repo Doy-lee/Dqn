@@ -24,6 +24,9 @@
 #include <limits.h>
 #include <stdio.h>
 
+// TODO(doyle): Replace DQN_ASSERT with a non-halting assert that can connect to
+// some sort of testing framework to track successes and failures.
+
 #define LOG_HEADER() LogHeader( __func__)
 FILE_SCOPE i32  globalIndent;
 FILE_SCOPE bool globalNewLine;
@@ -2333,9 +2336,9 @@ void DqnMemSet_Test()
 	Log("Average Timings");
 	globalIndent++;
 #if defined(DQN_WIN32_IMPLEMENTATION)
-	Log("DqnMem_Set: %f vs DqnMem_Set64: %f vs memset: %f\n", 1, false, avgTimings[0], avgTimings[1], avgTimings[2]);
+	Log("DqnMem_Set: %f vs DqnMem_Set64: %f vs memset: %f\n", avgTimings[0], avgTimings[1], avgTimings[2]);
 #else
-	Log("DqnMem_Set: %f vs memset: %f\n", 1, false, avgTimings[0], avgTimings[1]);
+	Log("DqnMem_Set: %f vs memset: %f\n", avgTimings[0], avgTimings[1]);
 #endif
 	globalIndent--;
 
@@ -2603,7 +2606,6 @@ int main(void)
 	globalIndent  = 1;
 	globalNewLine = true;
 
-	DqnMemStack_Test();
 	DqnString_Test();
 	DqnChar_Test();
 	DqnRnd_Test();
