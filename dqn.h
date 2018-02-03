@@ -457,15 +457,16 @@ struct DqnMemStack
 
 	// Allocation API
 	// =============================================================================================
-	void *PushOnTail    (isize size, u8 alignment = 4);
 
 	// Allocate memory from the MemStack.
 	// alignment: Ptr returned from allocator is aligned to this value and MUST be power of 2.
 	// return: nullptr if out of space OR stack is using fixed memory/size OR stack full and platform malloc fails.
 	void *Push          (isize size, u8 alignment = 4);
+	void *PushOnTail    (isize size, u8 alignment = 4);
 
 	// Frees the given ptr. It MUST be the last allocated item in the stack, asserts otherwise.
 	void  Pop           (void *const ptr, bool zeroClear = false);
+	void  PopOnTail     (void *const ptr, bool zeroClear = false);
 
 	// Frees all blocks belonging to this stack.
 	void  Free          ();
@@ -3194,7 +3195,6 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 				if (enoughSpace)
 				{
 					stack->Pop(ptr, false);
-
 					result = (u8 *)stack->Push(request->newSize, alignment);
 					DQN_ASSERT(stack->block == block && result == request->oldMemPtr);
 					success = true;
@@ -3208,7 +3208,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 				enoughSpace = (block->tail - extraBytesReq) > block->head;
 				if (enoughSpace)
 				{
-					stack->Pop(ptr, false);
+					stack->PopOnTail(ptr, false);
 					result = (u8 *)stack->Push(request->newSize, alignment);
 					DqnMem_Copy(result, ptr, oldMemSize);
 					result[oldMemSize] = 0;
@@ -3243,7 +3243,9 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 					// Switch to old block, pop the ptr and return the new block on top.
 					auto *newBlock = stack->block;
 					stack->block   = oldBlock;
-					stack->Pop(ptr, false);
+
+					if (type == PtrType::Head) stack->Pop(ptr, false);
+					else                       stack->PopOnTail(ptr, false);
 					stack->block = newBlock;
 					success      = true;
 				}
@@ -3292,7 +3294,9 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 
 		if (PtrIsLastAllocationInBlock(&stack->metadata, block, ptr))
 		{
-			stack->Pop(ptr, false);
+			PtrType type = ClassifyPtr(block, ptr);
+			if (type == PtrType::Head) stack->Pop(ptr, false);
+			else                       stack->PopOnTail(ptr, false);
 		}
 		else
 		{
@@ -3709,16 +3713,17 @@ FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingInBlock(DqnAllocator
 	}
 }
 
-void DqnMemStack::Pop(void *const ptr, bool zeroClear)
+
+FILE_SCOPE void DqnMemStackInternal_Pop(DqnMemStack *stack, void *const ptr, bool zeroClear, bool popHead)
 {
 	if (!ptr) return;
-	DQN_ASSERT(this->block);
+	DQN_ASSERT(stack->block);
 
 	u8 *const bytePtr                = (u8 *)ptr;
-	DqnAllocatorMetadata *myMetadata = &this->metadata;
+	DqnAllocatorMetadata *myMetadata = &stack->metadata;
 
 	// Check instrumented data
-	if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
+	if (Dqn_BitIsSet(stack->flags, DqnMemStack::Flag::BoundsGuard))
 	{
 		myMetadata->CheckAllocations();
 		myMetadata->RemoveAllocation(bytePtr);
@@ -3731,30 +3736,41 @@ void DqnMemStack::Pop(void *const ptr, bool zeroClear)
 	isize actualSize         = myMetadata->GetAllocationSize(size, alignment);
 	u8 *const start          = bytePtr - offsetToSrc;
 	u8 *const end            = start + actualSize;
-	u8 const *const blockEnd = this->block->memory + this->block->size;
+	u8 const *const blockEnd = stack->block->memory + stack->block->size;
 
-	if (bytePtr >= this->block->memory && bytePtr < this->block->head)
+	if (popHead)
 	{
-		DQN_ASSERTM(end == this->block->head, "Pointer to pop was not the last allocation! %p != %p", end, this->block->head);
-
-		this->block->head -= actualSize;
-		DQN_ASSERT(this->block->head >= this->block->memory);
-	}
-	else if (bytePtr >= this->block->tail && bytePtr < blockEnd)
-	{
-		DQN_ASSERTM(start == this->block->tail, "Pointer to pop was not the last allocation! %p != %p", start,
-		            this->block->tail);
-
-		this->block->tail += actualSize;
-		DQN_ASSERT(this->block->tail <= blockEnd);
+		DQN_ASSERTM(end == stack->block->head, "Pointer to pop was not the last allocation! %p != %p", end, stack->block->head);
+		stack->block->head -= actualSize;
+		DQN_ASSERT(stack->block->head >= stack->block->memory);
 	}
 	else
 	{
-		DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Pointer to free does not belong to current block!");
+		DQN_ASSERTM(start == stack->block->tail, "Pointer to pop was not the last allocation! %p != %p", start, stack->block->tail);
+		stack->block->tail += actualSize;
+		DQN_ASSERT(stack->block->tail <= blockEnd);
 	}
 
 	if (zeroClear)
 		DqnMem_Set(start, 0, end - start);
+
+	if (stack->block->tail == blockEnd && stack->block->head == stack->block->memory)
+	{
+		if (stack->block->prevBlock)
+		{
+			stack->FreeLastBlock();
+		}
+	}
+}
+
+void DqnMemStack::Pop(void *const ptr, bool zeroClear)
+{
+	DqnMemStackInternal_Pop(this, ptr, zeroClear, true);
+}
+
+void DqnMemStack::PopOnTail(void *const ptr, bool zeroClear)
+{
+	DqnMemStackInternal_Pop(this, ptr, zeroClear, false);
 }
 
 void DqnMemStack::Free()

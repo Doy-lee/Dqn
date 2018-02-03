@@ -2426,12 +2426,12 @@ FILE_SCOPE void DqnMemStack_Test()
 	// Temporary Regions
 	if (1)
 	{
-		DqnMemStack stack = {};
-		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true));
-
 		// Check temporary regions
 		if (1)
 		{
+			DqnMemStack stack = {};
+			DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+
 			DqnMemStack::Block *blockToReturnTo = stack.block;
 			auto headBefore                     = blockToReturnTo->head;
 			auto tailBefore                     = blockToReturnTo->tail;
@@ -2456,11 +2456,16 @@ FILE_SCOPE void DqnMemStack_Test()
 			DQN_ASSERT(stack.block == blockToReturnTo);
 			DQN_ASSERT(stack.block->head == headBefore);
 			DQN_ASSERT(stack.block->tail == tailBefore);
+
+			stack.Free();
 		}
 
 		// Check temporary regions keep state
 		if (1)
 		{
+			DqnMemStack stack = {};
+			DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+
 			DqnMemStack::Block *blockToReturnTo = stack.block;
 			auto headBefore                     = blockToReturnTo->head;
 			auto tailBefore                     = blockToReturnTo->tail;
@@ -2486,9 +2491,55 @@ FILE_SCOPE void DqnMemStack_Test()
 			DQN_ASSERT(stack.block != blockToReturnTo);
 			DQN_ASSERT(stack.block->prevBlock == blockToReturnTo);
 			DQN_ASSERT(stack.tempRegionCount == 0);
+
+			stack.Free();
+		}
+
+		// Check temporary regions with tail and head pushes
+		if (1)
+		{
+			DqnMemStack stack = {};
+			DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+
+			auto *pop1 = stack.Push(222);
+			auto *pop2 = stack.PushOnTail(333);
+
+			DqnMemStack::Block *blockToReturnTo = stack.block;
+			auto headBefore = blockToReturnTo->head;
+			auto tailBefore = blockToReturnTo->tail;
+			if (1)
+			{
+				auto memGuard1 = stack.TempRegionGuard();
+				auto *result2  = stack.Push(100);
+				auto *result3  = stack.PushOnTail(100);
+				auto *result4  = stack.Push(100);
+				auto *result5  = stack.PushOnTail(100);
+				DQN_ASSERT(result2 && result3 && result4 && result5);
+				DQN_ASSERT(result3 > result5);
+				DQN_ASSERT(result2 < result4);
+				DQN_ASSERT(stack.block->head > headBefore && stack.block->head < stack.block->tail);
+				DQN_ASSERT(stack.block->tail >= stack.block->head && stack.block->tail < (stack.block->memory + stack.block->size));
+				DQN_ASSERT(stack.block->memory == blockToReturnTo->memory);
+
+				// Force allocation of new block
+				auto *result6 = stack.Push(DQN_MEGABYTE(5));
+				DQN_ASSERT(result6);
+				DQN_ASSERT(stack.block != blockToReturnTo);
+				DQN_ASSERT(stack.tempRegionCount == 1);
+			}
+
+			DQN_ASSERT(stack.block == blockToReturnTo);
+			DQN_ASSERT(stack.block->head == headBefore);
+			DQN_ASSERT(stack.block->tail == tailBefore);
+
+			stack.Pop(pop1);
+			stack.PopOnTail(pop2);
+			DQN_ASSERT(stack.block->head == stack.block->memory);
+			DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
+
+			stack.Free();
 		}
 		Log(Status::Ok, "Temporary regions return state and/or keep changes if requested.");
-		stack.Free();
 	}
 
 	// Check Fixed Mem Init
@@ -2607,15 +2658,97 @@ FILE_SCOPE void DqnMemStack_Test()
 		Log(Status::Ok, "Bounds guards are placed adjacent and have magic values.");
 	}
 
-	// Push to tail and head
 	if (1)
 	{
-		DqnMemStack stack = {};
-		DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+		// Push to tail and head
+		if (1)
+		{
+			DqnMemStack stack = {};
+			DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
 
-		auto *result1 = stack.Push(100);
-		auto *result2 = stack.PushOnTail(100);
-		stack.Free();
+			auto *result1    = stack.Push(100);
+			auto *result2    = stack.PushOnTail(100);
+			auto *headBefore = stack.block->head;
+			auto *tailBefore = stack.block->tail;
+			DQN_ASSERT(result2 && result1);
+			DQN_ASSERT(result2 != result1 && result1 < result2);
+
+			stack.PopOnTail(result2);
+			DQN_ASSERT(headBefore == stack.block->head)
+			DQN_ASSERT(tailBefore != stack.block->tail)
+
+			stack.Pop(result1);
+			DQN_ASSERT(stack.block->prevBlock == false);
+			DQN_ASSERT(stack.block->head == stack.block->memory);
+			DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
+			stack.Free();
+			Log(Status::Ok, "Push, pop to tail and head.");
+		}
+
+		// Expansion with tail
+		if (1)
+		{
+			// Push too much to tail causes expansion
+			if (1)
+			{
+				DqnMemStack stack = {};
+				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+
+				auto *result1 = stack.Push(100);
+				DQN_ASSERT(stack.block->prevBlock == nullptr);
+				DQN_ASSERT(stack.block->head > stack.block->memory && stack.block->head < stack.block->tail);
+				DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
+				auto *blockBefore = stack.block;
+
+				auto *result2 = stack.PushOnTail(DQN_MEGABYTE(1));
+				DQN_ASSERT(result2 && result1);
+				DQN_ASSERT(result2 != result1);
+				DQN_ASSERT(stack.block->prevBlock == blockBefore);
+				DQN_ASSERT(stack.block != blockBefore);
+
+				DQN_ASSERT(stack.block->head == stack.block->memory);
+				DQN_ASSERT(stack.block->tail < stack.block->memory + stack.block->size &&
+				           stack.block->tail >= stack.block->head);
+
+				stack.PopOnTail(result2);
+				DQN_ASSERT(blockBefore == stack.block);
+
+				stack.Pop(result1);
+				DQN_ASSERT(blockBefore == stack.block);
+
+				stack.Free();
+			}
+
+			// Push too much to tail fails to expand when non expandable
+			if (1)
+			{
+				DqnMemStack stack = {};
+				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::NonExpandable));
+
+				auto *result1 = stack.Push(100);
+				DQN_ASSERT(stack.block->prevBlock == nullptr);
+				DQN_ASSERT(stack.block->head != stack.block->memory);
+				DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
+				auto *blockBefore = stack.block;
+
+				auto *result2 = stack.PushOnTail(DQN_MEGABYTE(1));
+				DQN_ASSERT(result2 == nullptr);
+				DQN_ASSERT(stack.block->prevBlock == nullptr);
+				DQN_ASSERT(stack.block == blockBefore);
+				DQN_ASSERT(stack.block->head > stack.block->memory && stack.block->head < stack.block->tail);
+				DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
+
+				stack.PopOnTail(result2);
+				DQN_ASSERT(blockBefore == stack.block);
+
+				stack.Pop(result1);
+				DQN_ASSERT(blockBefore == stack.block);
+
+				stack.Free();
+			}
+
+			Log(Status::Ok, "Non-Expanding and expanding stack with tail push.");
+		}
 	}
 }
 
