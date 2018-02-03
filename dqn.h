@@ -345,14 +345,21 @@ class DqnSmartArray : public DqnArray<T>
 // #DqnAllocatorMetadata
 // =================================================================================================
 // Allocation Layout
-// +----------------------------------------------------------------------------------------------------------------------------+
-// |                     | Allocation Head                                           |                        | Allocation Tail |
-// +----------------------------------------------------------------------------------------------------------------------------+
+//                      +------------------------------------------------------------+                        +-----------------+
+//                      | Allocation Head                                            |                        | Allocation Tail |
+// +--------------------+------------------------------------------------------------+------------------------+-----------------+
 // | Ptr From Allocator | Offset To Src | Alignment | Alloc Amount | B. Guard (Opt.) | Aligned Ptr For Client | B. Guard (Opt.) |
 // +----------------------------------------------------------------------------------------------------------------------------+
+// Ptr From Allocator:     The pointer returned by the allocator, not aligned
+// Alignment:              The pointer given to the client is aligned to this power of two boundary
+// Alloc Amount:           The requested allocation amount by the client (so does not include metadata)
+// B. Guard:               Bounds Guard value.
+// Aligned Ptr For Client: The allocated memory for the client.
+// Offset To Src:          Number of bytes to subtract from the "Aligned Ptr For Client" to return to the "Ptr From ALlocator"
 struct DqnAllocatorMetadata
 {
-	static u32 const GUARD_VALUE        = 0xBEBAFECA;
+	static u32 const HEAD_GUARD_VALUE        = 0xCAFEBABE;
+	static u32 const TAIL_GUARD_VALUE        = 0xDEADBEEF;
 	static u32 const OFFSET_TO_SRC_SIZE = sizeof(u8);
 	static u32 const ALIGNMENT_SIZE     = sizeof(u8);
 	static u32 const ALLOC_AMOUNT_SIZE  = sizeof(usize);
@@ -369,12 +376,13 @@ struct DqnAllocatorMetadata
 	auto   GetAllocHeadSize    ()                         const { return allocHeadSize; }
 	auto   GetAllocTailSize    ()                         const { return allocTailSize; }
 
+	usize  GetAllocationSize   (usize size, u8 alignment) const { return GetAllocHeadSize() + size + GetAllocTailSize() + (alignment - 1); }
+
 	u32   *PtrToHeadBoundsGuard(u8 const *ptr)            const; // ptr: The ptr given to the client when allocating.
 	u32   *PtrToTailBoundsGuard(u8 const *ptr)            const; // IMPORTANT: Uses "Alloc Amount" metadata to find the tail!
 	u8    *PtrToAlignment      (u8 const *ptr)            const;
 	u8    *PtrToOffsetToSrc    (u8 const *ptr)            const;
 	usize *PtrToAllocAmount    (u8 const *ptr)            const;
-	usize  GetAllocationSize   (usize size, u8 alignment) const { return GetAllocHeadSize() + size + GetAllocTailSize() + (alignment - 1); }
 
 private:
 	u32            boundsGuardSize; // sizeof(GUARD_VALUE) OR 0 if BoundsGuard is disabled.
@@ -403,8 +411,10 @@ struct DqnMemStack
 
 	enum Flag
 	{
-		NonExpandable = (1 << 0), // Disallow additional memory blocks when full.
-		BoundsGuard   = (1 << 1), // Track, check and add guards on all allocations
+		NonExpandable       = (1 << 0), // Disallow additional memory blocks when full.
+		NonExpandableAssert = (1 << 1), // Assert when NonExpandable is set with allocation on a full stack.
+		BoundsGuard         = (1 << 2), // Track, check and add guards on all allocations
+		All                 = (NonExpandable | NonExpandableAssert | BoundsGuard),
 	};
 
 	struct Info // Statistics of the memory stack.
@@ -437,7 +447,7 @@ struct DqnMemStack
 	// Uses fixed buffer, allocations will be sourced from the buffer and fail after buffer is full.
 	// mem:       Memory to use for the memory stack
 	// return:    FALSE if args are invalid, or insufficient memSize.
-	bool Init(u8 *const mem, usize size, u32 flags_ = 0);
+	bool Init(void *const mem, usize size, bool zeroClear, u32 flags_ = 0);
 
 	// Memory Stack capable of expanding when full, but only if NonExpandable flag is not set.
 	bool Init(usize size, bool zeroClear, u32 flags_ = 0, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
@@ -3255,10 +3265,12 @@ DqnMemAPI DqnMemAPI::StackAllocator(struct DqnMemStack *const stack)
 // =================================================================================================
 void DqnAllocatorMetadata::Init(bool boundsGuard)
 {
+	// TODO(doyle): How to handle memory here.
 	if (boundsGuard)
 	{
-		this->boundsGuardSize = sizeof(GUARD_VALUE);
-		DQN_ASSERT(this->allocations.InitSize(128));
+		this->boundsGuardSize        = sizeof(HEAD_GUARD_VALUE);
+		LOCAL_PERSIST DqnMemAPI heap = DqnMemAPI::HeapAllocator();
+		DQN_ASSERT(this->allocations.InitSize(128, &heap));
 	}
 	else
 	{
@@ -3292,20 +3304,22 @@ void DqnAllocatorMetadata::RemoveAllocation(u8 *ptr)
 
 void DqnAllocatorMetadata::CheckAllocations() const
 {
-	for (u8 const *ptr : this->allocations)
+	for (auto index = 0; index < this->allocations.count; index++)
 	{
+		u8 const *ptr = this->allocations.data[index];
+
 		u32 const *headGuard = this->PtrToHeadBoundsGuard(ptr);
 		u32 const *tailGuard = this->PtrToTailBoundsGuard(ptr);
 
-		DQN_ASSERTM(*headGuard == GUARD_VALUE,
+		DQN_ASSERTM(*headGuard == HEAD_GUARD_VALUE,
 		            "Bounds guard has been destroyed at the head end of the allocation! Expected: "
 		            "%x, received: %x",
-		            GUARD_VALUE, *headGuard);
+		            HEAD_GUARD_VALUE, *headGuard);
 
-		DQN_ASSERTM(*tailGuard == GUARD_VALUE,
+		DQN_ASSERTM(*tailGuard == TAIL_GUARD_VALUE,
 		            "Bounds guard has been destroyed at the tail end of the allocation! Expected: "
 		            "%x, received: %x",
-		            GUARD_VALUE, *tailGuard);
+		            TAIL_GUARD_VALUE, *tailGuard);
 	}
 }
 
@@ -3388,7 +3402,7 @@ DQN_FILE_SCOPE DqnMemStack::Block *DqnMemStackInternal_AllocateBlock(usize size,
 	return result;
 }
 
-bool DqnMemStack::Init(u8 *const mem, usize size, u32 flags_)
+bool DqnMemStack::Init(void *const mem, usize size, bool zeroClear, u32 flags_)
 {
 	if (!mem)
 	{
@@ -3405,8 +3419,11 @@ bool DqnMemStack::Init(u8 *const mem, usize size, u32 flags_)
 		return false;
 	}
 
+	if (zeroClear)
+		DqnMem_Set(mem, 0, size);
+
 	this->block            = (DqnMemStack::Block *)mem;
-	this->block->memory    = mem + sizeof(DqnMemStack::Block);
+	this->block->memory    = (u8 *)mem + sizeof(DqnMemStack::Block);
 	this->block->used      = 0;
 	this->block->size      = size - sizeof(DqnMemStack::Block);
 	this->block->prevBlock = nullptr;
@@ -3488,6 +3505,9 @@ void *DqnMemStack::Push(usize size, u8 alignment)
 		if (Dqn_BitIsSet(this->flags, Flag::NonExpandable))
 		{
 			DQN_LOGE("Allocator is non-expandable and has run out of memory.");
+			if (Dqn_BitIsSet(this->flags, Flag::NonExpandableAssert))
+				DQN_ASSERT(DQN_INVALID_CODE_PATH);
+
 			return nullptr;
 		}
 
@@ -3532,8 +3552,8 @@ void *DqnMemStack::Push(usize size, u8 alignment)
 		{
 			auto *headGuard = myMetadata->PtrToHeadBoundsGuard(result);
 			auto *tailGuard = myMetadata->PtrToTailBoundsGuard(result);
-			*headGuard       = DqnAllocatorMetadata::GUARD_VALUE;
-			*tailGuard       = DqnAllocatorMetadata::GUARD_VALUE;
+			*headGuard       = DqnAllocatorMetadata::HEAD_GUARD_VALUE;
+			*tailGuard       = DqnAllocatorMetadata::TAIL_GUARD_VALUE;
 		}
 	}
 
@@ -3553,6 +3573,22 @@ void *DqnMemStack::Push(usize size, u8 alignment)
 	}
 
 	return result;
+}
+
+FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingInBlock(DqnAllocatorMetadata *metadata,
+                                                                    DqnMemStack::Block const *block)
+{
+	u8 const *blockStart = block->memory;
+	u8 const *blockEnd   = block->memory + block->size;
+	for (auto index = 0; index < metadata->allocations.count; index++)
+	{
+		u8 *ptr = metadata->allocations.data[index];
+		if (ptr >= blockStart && ptr <= blockEnd)
+		{
+			metadata->allocations.RemoveStable(index);
+			index--;
+		}
+	}
 }
 
 void DqnMemStack::Pop(void *const ptr, bool zeroClear)
@@ -3622,17 +3658,7 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 
 		if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
 		{
-			u8 const *blockStart = blockToFree->memory;
-			u8 const *blockEnd   = blockToFree->memory + blockToFree->size;
-			for (auto index = 0; index < this->metadata.allocations.count; index++)
-			{
-				u8 *ptr = this->metadata.allocations.data[index];
-				if (ptr >= blockStart && ptr <= blockEnd)
-				{
-					this->metadata.allocations.RemoveStable(index);
-					index--;
-				}
-			}
+			DqnMemStackInternal_KillMetadataPtrsExistingInBlock(&this->metadata, blockToFree);
 		}
 
 		usize realSize = blockToFree->size + sizeof(DqnMemStack::Block);
@@ -3656,11 +3682,17 @@ void DqnMemStack::ClearCurrBlock(bool zeroClear)
 {
 	if (this->block)
 	{
+		if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
+		{
+			DqnMemStackInternal_KillMetadataPtrsExistingInBlock(&this->metadata, this->block);
+		}
+
 		this->block->used = 0;
 		if (zeroClear)
 		{
 			DqnMem_Clear(this->block->memory, 0, this->block->size);
 		}
+
 	}
 }
 

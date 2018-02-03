@@ -2493,7 +2493,7 @@ FILE_SCOPE void DqnMemStack_Test()
 		{
 			u8 memBuf[sizeof(DqnMemStack::Block) - 1] = {};
 			DqnMemStack stack                         = {};
-			auto result = stack.Init(&(memBuf[0]), DQN_ARRAY_COUNT(memBuf));
+			auto result = stack.Init(&(memBuf[0]), DQN_ARRAY_COUNT(memBuf), false);
 
 			DQN_ASSERT(result == false);
 			DQN_ASSERT(stack.block == nullptr);
@@ -2506,7 +2506,7 @@ FILE_SCOPE void DqnMemStack_Test()
 			i32 const bufSize  = sizeof(DqnMemStack::Block) * 5;
 			u8 memBuf[bufSize] = {};
 			DqnMemStack stack  = {};
-			auto result        = stack.Init(memBuf, bufSize);
+			auto result        = stack.Init(&(memBuf[0]), bufSize, false);
 
 			DQN_ASSERT(result == true);
 			DQN_ASSERT(stack.block);
@@ -2594,8 +2594,8 @@ FILE_SCOPE void DqnMemStack_Test()
 		// TODO(doyle): check head and tail are adjacent to the bounds of the allocation
 		u32 *head = stack.metadata.PtrToHeadBoundsGuard((u8 *)result);
 		u32 *tail = stack.metadata.PtrToTailBoundsGuard((u8 *)result);
-		DQN_ASSERT(*head == DqnAllocatorMetadata::GUARD_VALUE);
-		DQN_ASSERT(*tail == DqnAllocatorMetadata::GUARD_VALUE);
+		DQN_ASSERT(*head == DqnAllocatorMetadata::HEAD_GUARD_VALUE);
+		DQN_ASSERT(*tail == DqnAllocatorMetadata::TAIL_GUARD_VALUE);
 
 		Log(Status::Ok, "Bounds guards are placed adjacent and have magic values.");
 	}
