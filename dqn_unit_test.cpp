@@ -2750,6 +2750,147 @@ FILE_SCOPE void DqnMemStack_Test()
 			Log(Status::Ok, "Non-Expanding and expanding stack with tail push.");
 		}
 	}
+
+	// Check stack allocator mem api callbacks
+	if (1)
+	{
+		// Realloc in same block and allow it to grow in place.
+		if (1)
+		{
+			// Using push on head
+			if (1)
+			{
+				DqnMemStack stack = {};
+				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+				auto *api = &stack.myAPI;
+
+				auto *blockBefore = stack.block;
+				auto *headBefore  = stack.block->head;
+
+				isize bufSize = 16;
+				char *buf     = (char *)stack.Push(bufSize);
+				DqnMem_Set(buf, 'X', bufSize);
+				for (auto i = 0; i < bufSize; i++) DQN_ASSERT(buf[i] == 'X');
+
+				isize oldBufSize = bufSize;
+				bufSize          = 32;
+				buf        = (char *)api->Realloc(buf, oldBufSize, bufSize);
+				for (auto i = 0; i < oldBufSize; i++) DQN_ASSERT(buf[i] == 'X');
+				DqnMem_Set(buf, '@', bufSize);
+
+				DQN_ASSERT(blockBefore == stack.block);
+				DQN_ASSERT(headBefore < stack.block->head);
+				stack.Pop(buf);
+
+				DQN_ASSERT(blockBefore == stack.block);
+				DQN_ASSERT(headBefore == stack.block->head);
+				DQN_ASSERT(headBefore == stack.block->memory);
+				stack.Free();
+			}
+
+			// Using push on tail
+			if (1)
+			{
+				DqnMemStack stack = {};
+				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+				auto *api = &stack.myAPI;
+
+				auto *blockBefore = stack.block;
+				auto *tailBefore  = stack.block->tail;
+
+				isize bufSize = 16;
+				char *buf     = (char *)stack.PushOnTail(bufSize);
+				DqnMem_Set(buf, 'X', bufSize);
+				for (auto i = 0; i < bufSize; i++) DQN_ASSERT(buf[i] == 'X');
+
+				isize oldBufSize = bufSize;
+				bufSize          = 32;
+				buf        = (char *)api->Realloc(buf, oldBufSize, bufSize);
+				for (auto i = 0; i < oldBufSize; i++) DQN_ASSERT(buf[i] == 'X');
+				DqnMem_Set(buf, '@', bufSize);
+
+				DQN_ASSERT(blockBefore == stack.block);
+				DQN_ASSERT(tailBefore > stack.block->tail);
+				stack.PopOnTail(buf, bufSize);
+
+				DQN_ASSERT(blockBefore == stack.block);
+				DQN_ASSERT(tailBefore == stack.block->tail);
+				DQN_ASSERT(stack.block->head == stack.block->memory);
+				stack.Free();
+			}
+			Log(Status::Ok, "Allocator MemAPI callback, realloc grow in place");
+		}
+
+		// Realloc in same block and insufficient size and expand
+		if (1)
+		{
+			// Using push on head
+			if (1)
+			{
+				DqnMemStack stack = {};
+				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+				auto *api = &stack.myAPI;
+
+				auto *blockBefore = stack.block;
+				auto *headBefore  = stack.block->head;
+
+				isize bufSize = 16;
+				char *buf     = (char *)stack.Push(bufSize);
+				DqnMem_Set(buf, 'X', bufSize);
+				for (auto i = 0; i < bufSize; i++) DQN_ASSERT(buf[i] == 'X');
+
+				isize oldBufSize = bufSize;
+				bufSize          = DQN_MEGABYTE(2);
+				buf              = (char *)api->Realloc(buf, oldBufSize, bufSize);
+				for (auto i = 0; i < oldBufSize; i++) DQN_ASSERT(buf[i] == 'X');
+				DqnMem_Set(buf, '@', bufSize);
+
+				DQN_ASSERT(blockBefore == stack.block->prevBlock);
+				stack.Pop(buf, bufSize);
+
+				DQN_ASSERT(blockBefore == stack.block);
+				DQN_ASSERT(headBefore == stack.block->head);
+				DQN_ASSERT(headBefore == stack.block->memory);
+				stack.Free();
+			}
+
+			// Using push on tail
+			if (1)
+			{
+				DqnMemStack stack = {};
+				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
+				auto *api = &stack.myAPI;
+
+				auto *blockBefore = stack.block;
+				auto *tailBefore  = stack.block->tail;
+
+				isize bufSize = 16;
+				char *buf     = (char *)stack.PushOnTail(bufSize);
+				DqnMem_Set(buf, 'X', bufSize);
+				for (auto i = 0; i < bufSize; i++) DQN_ASSERT(buf[i] == 'X');
+
+				isize oldBufSize = bufSize;
+				bufSize          = DQN_MEGABYTE(2);
+				buf              = (char *)api->Realloc(buf, oldBufSize, bufSize);
+				for (auto i = 0; i < oldBufSize; i++)
+					DQN_ASSERT(buf[i] == 'X');
+				DqnMem_Set(buf, '@', bufSize);
+
+				DQN_ASSERT(blockBefore != stack.block);
+				DQN_ASSERT(blockBefore == stack.block->prevBlock);
+				stack.PopOnTail(buf);
+
+				DQN_ASSERT(blockBefore == stack.block);
+				DQN_ASSERT(tailBefore == stack.block->tail);
+
+				DQN_ASSERT(stack.block->head == stack.block->memory);
+				stack.Free();
+			}
+			Log(Status::Ok, "Allocator MemAPI callback, realloc insufficient size so expand");
+		}
+
+		// TODO(doyle): Realloc to smaller size logic
+	}
 }
 
 int main(void)

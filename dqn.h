@@ -3144,7 +3144,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 		{
 			isize const oldMemSize = *(metadata->PtrToAllocAmount(ptr));
 			u8 const *ptrEnd       = ptr + oldMemSize + metadata->GetAllocTailSize();
-			result                 = (ptrEnd == block->head);
+			result                 = (ptrEnd == (block->head - 1));
 		}
 		else if (type == PtrType::Tail)
 		{
@@ -3209,7 +3209,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 				if (enoughSpace)
 				{
 					stack->PopOnTail(ptr, false);
-					result = (u8 *)stack->Push(request->newSize, alignment);
+					result = (u8 *)stack->PushOnTail(request->newSize, alignment);
 					DqnMem_Copy(result, ptr, oldMemSize);
 					result[oldMemSize] = 0;
 
