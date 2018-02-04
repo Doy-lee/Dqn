@@ -271,8 +271,12 @@ public:
 
 	static DqnMemAPI HeapAllocator ();
 
-	// TODO(doyle): No longer necessary now that stack creates its own on init?
-	static DqnMemAPI StackAllocator(struct DqnMemStack *const stack);
+	enum struct StackPushType
+	{
+		Head,
+		Tail,
+	};
+	static DqnMemAPI StackAllocator(struct DqnMemStack *const stack, StackPushType type = StackPushType::Head);
 
 	void *Realloc(void   *const oldPtr,    isize const oldSize, isize const newSize);
 	void *Alloc  (isize   const size,      bool   const zeroClear = true);
@@ -440,7 +444,8 @@ struct DqnMemStack
 
 	DqnAllocatorMetadata  metadata;
 	DqnMemAPI            *memAPI;          // API used to add additional memory blocks to this stack.
-	DqnMemAPI             myAPI;           // API for data structures to allocate using this stack's memory.
+	DqnMemAPI             myTailAPI;       // API for data structures to allocate to the tail of the stack
+	DqnMemAPI             myHeadAPI;       // API for data structures to allocate to the head of the stack
 	Block                *block;           // Memory block allocated for the stack
 	u32                   flags;
 	i32                   tempRegionCount;
@@ -479,6 +484,9 @@ struct DqnMemStack
 	// Next allocate will attach a block.
 	bool  FreeLastBlock ();
 
+	// Reverts the stack and its usage back to the first block
+	void  Reset();
+
 	// Reset the current memory block usage to 0.
 	void  ClearCurrBlock(bool zeroClear);
 	Info  GetInfo       ()                      const;
@@ -492,23 +500,21 @@ struct DqnMemStack
 		Block       *startingBlock;     // Remember the block to revert to and its memory usage.
 		u8          *startingBlockHead;
 		u8          *startingBlockTail;
-		isize        allocationCount;   // Debug only: For ensuring BoundsGuard allocation tracker reverts as well.
+		bool         keepHeadChanges = false;
+		bool         keepTailChanges = false;
 	};
 
-	class TempRegionGuard_
+	struct TempRegionGuard_
 	{
-	public:
-		TempRegionGuard_(DqnMemStack *const stack);
+		 TempRegionGuard_(DqnMemStack *const stack);
 		~TempRegionGuard_();
-		bool keepChanges = false;
-	private:
-		TempRegion memRegion;
+		TempRegion region;
 	};
 
-	// Revert all allocations between the Begin() and End() regions.
+	// Revert all allocations between the Begin() and End() regions. Guard version is RAII'ed.
 	TempRegion       TempRegionBegin      ();
 	void             TempRegionEnd        (TempRegion region);
-	TempRegionGuard_ TempRegionGuard      (); // RAII Temp Region
+	TempRegionGuard_ TempRegionGuard      ();
 
 	// Keep allocations that have occurred since Begin(). End() does not need to be called anymore.
 	void             TempRegionKeepChanges(TempRegion region);
@@ -535,7 +541,7 @@ void DqnArray<T>::Init(T *data_, isize max_, isize count_)
 template <typename T>
 void DqnArray<T>::Init(DqnMemStack *const stack)
 {
-	this->Init(stack->myAPI);
+	this->Init(stack->myHeadAPI);
 }
 
 template <typename T>
@@ -549,7 +555,7 @@ bool DqnArray<T>::InitSize(isize size_, DqnMemAPI *const memAPI_)
 template <typename T>
 bool DqnArray<T>::InitSize(isize size_, DqnMemStack *const stack)
 {
-	bool result = this->InitSize(size_, &stack->myAPI);
+	bool result = this->InitSize(size_, &stack->myHeadAPI);
 	return result;
 }
 
@@ -1357,7 +1363,7 @@ template <typename T>
 bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemStack *const stack)
 {
 	if (!stack) return false;
-	bool result = Init(numTableEntries, &stack->myAPI);
+	bool result = Init(numTableEntries, &stack->myHeadAPI);
 	return result;
 }
 
@@ -3103,7 +3109,20 @@ FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI
 	return result;
 }
 
-FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAPI::Request request_)
+struct DqnMemAPIInternal_DqnMemStackContext
+{
+	enum Mode
+	{
+		PushToHead,
+		PushToTail,
+	};
+
+	DqnMemStack *stack;
+	Mode         mode;
+};
+
+FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAPI::Request request_,
+                                                        bool pushToHead)
 {
 	DqnMemAPIInternal_ValidateRequest(request_);
 	DQN_ASSERT(request_.userContext);
@@ -3159,7 +3178,8 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 	if (request_.type == DqnMemAPI::Type::Alloc)
 	{
 		auto *request = &request_.alloc;
-		result = (u8 *)stack->Push(request->requestSize);
+		if (pushToHead) result = (u8 *)stack->Push(request->requestSize);
+		else            result = (u8 *)stack->PushOnTail(request->requestSize);
 
 		if (result)
 		{
@@ -3305,11 +3325,27 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 		}
 	}
 
+	// TODO(doyle): Stats. Irrelevant now?
+	(void)api;
+#if 0
 	if (success)
 	{
 		DqnMemAPIInternal_UpdateAPIStatistics(api, &request_);
 	}
+#endif
 
+	return result;
+}
+
+FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallbackPushToHead(DqnMemAPI *api, DqnMemAPI::Request request_)
+{
+	u8 *result = DqnMemAPIInternal_StackAllocatorCallback(api, request_, true);
+	return result;
+}
+
+FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallbackPushToTail(DqnMemAPI *api, DqnMemAPI::Request request_)
+{
+	u8 *result = DqnMemAPIInternal_StackAllocatorCallback(api, request_, false);
 	return result;
 }
 
@@ -3356,11 +3392,13 @@ DqnMemAPI DqnMemAPI::HeapAllocator()
 	return result;
 }
 
-DqnMemAPI DqnMemAPI::StackAllocator(struct DqnMemStack *const stack)
+DqnMemAPI DqnMemAPI::StackAllocator(struct DqnMemStack *const stack, StackPushType type)
 {
 	DQN_ASSERT(stack);
 	DqnMemAPI result   = {0};
-	result.allocator   = DqnMemAPIInternal_StackAllocatorCallback;
+	result.allocator   = (type == StackPushType::Head)
+	                       ? DqnMemAPIInternal_StackAllocatorCallbackPushToHead
+	                       : DqnMemAPIInternal_StackAllocatorCallbackPushToTail;
 	result.userContext = stack;
 	return result;
 }
@@ -3536,7 +3574,8 @@ bool DqnMemStack::Init(void *const mem, isize size, bool zeroClear, u32 flags_)
 	this->block->prevBlock = nullptr;
 
 	this->memAPI          = nullptr;
-	this->myAPI           = DqnMemAPI::StackAllocator(this);
+	this->myHeadAPI       = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Head);
+	this->myTailAPI       = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Tail);
 	this->flags           = (flags_ | Flag::NonExpandable);
 	this->tempRegionCount = 0;
 
@@ -3573,7 +3612,8 @@ bool DqnMemStack::Init(isize size, bool zeroClear, u32 flags_, DqnMemAPI *const 
 	this->tempRegionCount = 0;
 	this->flags           = flags_;
 	this->memAPI          = api;
-	this->myAPI           = DqnMemAPI::StackAllocator(this);
+	this->myHeadAPI       = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Head);
+	this->myTailAPI       = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Tail);
 
 	bool boundsGuard = Dqn_BitIsSet(this->flags, Flag::BoundsGuard);
 	this->metadata.Init(boundsGuard);
@@ -3646,6 +3686,7 @@ FILE_SCOPE void *DqnMemStackInternal_Push(DqnMemStack *stack, isize size, u8 ali
 		DQN_ASSERT(stack->block->tail >= stack->block->head);
 	}
 
+
 	// Instrument allocation with guards and metadata
 	// =============================================================================================
 	{
@@ -3697,15 +3738,15 @@ void *DqnMemStack::Push(isize size, u8 alignment)
 	return result;
 }
 
-FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingInBlock(DqnAllocatorMetadata *metadata,
-                                                                    DqnMemStack::Block const *block)
+FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingIn(DqnAllocatorMetadata *metadata,
+                                                               u8 const *start, u8 const *end)
 {
-	u8 const *blockStart = block->memory;
-	u8 const *blockEnd   = block->memory + block->size;
+	if (start >= end) return;
+
 	for (auto index = 0; index < metadata->allocations.count; index++)
 	{
 		u8 *ptr = metadata->allocations.data[index];
-		if (ptr >= blockStart && ptr <= blockEnd)
+		if (ptr >= start && ptr < end)
 		{
 			metadata->allocations.RemoveStable(index);
 			index--;
@@ -3713,6 +3754,13 @@ FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingInBlock(DqnAllocator
 	}
 }
 
+FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingInBlock(DqnAllocatorMetadata *metadata,
+                                                                    DqnMemStack::Block const *block)
+{
+	u8 const *blockStart = block->memory;
+	u8 const *blockEnd   = block->memory + block->size;
+	DqnMemStackInternal_KillMetadataPtrsExistingIn(metadata, blockStart, blockEnd);
+}
 
 FILE_SCOPE void DqnMemStackInternal_Pop(DqnMemStack *stack, void *const ptr, bool zeroClear, bool popHead)
 {
@@ -3793,7 +3841,6 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 	if (!this->memAPI)
 		return false;
 
-
 	DqnMemStack::Block **blockPtr = &this->block;
 
 	while (*blockPtr && (*blockPtr) != memBlock)
@@ -3819,6 +3866,16 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 
 	return false;
 }
+
+void DqnMemStack::Reset()
+{
+	while(this->block && this->block->prevBlock)
+	{
+		this->FreeLastBlock();
+	}
+	this->ClearCurrBlock(false);
+}
+
 
 bool DqnMemStack::FreeLastBlock()
 {
@@ -3876,56 +3933,92 @@ DqnMemStack::TempRegion DqnMemStack::TempRegionBegin()
 	result.startingBlockHead = (this->block) ? this->block->head : nullptr;
 	result.startingBlockTail = (this->block) ? this->block->tail : nullptr;
 
-	if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
-	{
-		result.allocationCount = this->metadata.allocations.count;
-	}
-
 	this->tempRegionCount++;
-
 	return result;
 }
 
 void DqnMemStack::TempRegionEnd(TempRegion region)
 {
-	DqnMemStack *stack = region.stack;
-	DQN_ASSERT(stack == this);
+	DQN_ASSERT(region.stack == this);
 
-	while (this->block != region.startingBlock)
-		this->FreeLastBlock();
+	this->tempRegionCount--;
+	DQN_ASSERT(this->tempRegionCount >= 0);
 
-	if (this->block)
+	if (region.keepHeadChanges && region.keepTailChanges)
 	{
-		// Debug checks
+		return;
+	}
+
+	// Free blocks until you find the first block with changes in the head or tail, this is the
+	// block we want to start preserving allocation data for keepHead/TailChanges.
+	if (region.keepHeadChanges)
+	{
+		while (this->block && this->block->head == this->block->memory)
+			this->FreeLastBlock();
+	}
+	else if (region.keepTailChanges)
+	{
+		while (this->block && this->block->tail == (this->block->memory + this->block->size))
+			this->FreeLastBlock();
+	}
+	else
+	{
+		while (this->block != region.startingBlock)
+			this->FreeLastBlock();
+	}
+
+	for (Block *block_ = this->block; block_; block_ = block_->prevBlock)
+	{
+		if (block_ == region.startingBlock)
 		{
-			u8 const *const start = this->block->memory;
-			u8 const *const end   = start + this->block->size;
-			DQN_ASSERT(region.startingBlockHead >= start && region.startingBlockHead <= end);
-			DQN_ASSERT(region.startingBlockTail >= start && region.startingBlockTail <= end);
+			if (region.keepHeadChanges)
+			{
+				block_->tail = region.startingBlockTail;
+			}
+			else if (region.keepTailChanges)
+			{
+				block_->head = region.startingBlockHead;
+			}
+			else
+			{
+				block_->head = region.startingBlockHead;
+				block_->tail = region.startingBlockTail;
+			}
+
+			if (Dqn_BitIsSet(this->flags, DqnMemStack::Flag::BoundsGuard))
+			{
+				u8 *blockStart = this->block->head;
+				u8 *blockEnd   = this->block->tail;
+				DqnMemStackInternal_KillMetadataPtrsExistingIn(&this->metadata, blockStart, blockEnd);
+			}
+			break;
 		}
+		else
+		{
+			if (region.keepHeadChanges || region.keepTailChanges)
+			{
+				u8 *blockStart = nullptr;
+				u8 *blockEnd   = nullptr;
+				if (region.keepHeadChanges)
+				{
+					blockStart   = block_->tail;
+					blockEnd     = block_->memory + block_->size;
+					block_->tail = blockEnd;
+				}
+				else
+				{
+					blockStart   = block_->memory;
+					blockEnd     = block_->memory + block_->size;
+					block_->head = blockStart;
+				}
 
-		this->block->head = region.startingBlockHead;
-		this->block->tail = region.startingBlockTail;
+				if (Dqn_BitIsSet(this->flags, DqnMemStack::Flag::BoundsGuard))
+				{
+					DqnMemStackInternal_KillMetadataPtrsExistingIn(&this->metadata, blockStart, blockEnd);
+				}
+			}
+		}
 	}
-
-	if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
-	{
-		while(this->metadata.allocations.count != region.allocationCount)
-			this->metadata.allocations.Pop();
-	}
-
-
-	this->tempRegionCount--;
-	DQN_ASSERT(this->tempRegionCount >= 0);
-}
-
-void DqnMemStack::TempRegionKeepChanges(TempRegion region)
-{
-	DqnMemStack *stack = region.stack;
-	DQN_ASSERT(stack == this);
-
-	this->tempRegionCount--;
-	DQN_ASSERT(this->tempRegionCount >= 0);
 }
 
 DqnMemStack::TempRegionGuard_ DqnMemStack::TempRegionGuard()
@@ -3935,16 +4028,13 @@ DqnMemStack::TempRegionGuard_ DqnMemStack::TempRegionGuard()
 
 DqnMemStack::TempRegionGuard_::TempRegionGuard_(DqnMemStack *const stack)
 {
-	this->memRegion = stack->TempRegionBegin();
+	this->region = stack->TempRegionBegin();
 }
 
 DqnMemStack::TempRegionGuard_::~TempRegionGuard_()
 {
-	TempRegion region        = this->memRegion;
-	DqnMemStack *const stack = region.stack;
-
-	if (this->keepChanges) stack->TempRegionKeepChanges(region);
-	else                   stack->TempRegionEnd(region);
+	DqnMemStack *const stack = this->region.stack;
+	stack->TempRegionEnd(this->region);
 }
 
 // #DqnHash
@@ -5841,12 +5931,12 @@ void DqnString::Init(DqnMemAPI *const api)
 
 void DqnString::Init(DqnMemStack *const stack)
 {
-	this->Init(&stack->myAPI);
+	this->Init(&stack->myHeadAPI);
 }
 
 bool DqnString::InitSize(const i32 size, DqnMemStack *const stack)
 {
-	bool result = this->InitSize(size, &stack->myAPI);
+	bool result = this->InitSize(size, &stack->myHeadAPI);
 	return result;
 }
 
@@ -5894,13 +5984,13 @@ bool DqnString::InitFixedMem(char *const memory, i32 const sizeInBytes)
 
 bool DqnString::InitLiteral(char const *const cstr, DqnMemStack *const stack)
 {
-	bool result = this->InitLiteral(cstr, &stack->myAPI);
+	bool result = this->InitLiteral(cstr, &stack->myHeadAPI);
 	return result;
 }
 
 bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemStack *const stack)
 {
-	bool result = this->InitLiteral(cstr, lenInBytes, &stack->myAPI);
+	bool result = this->InitLiteral(cstr, lenInBytes, &stack->myHeadAPI);
 	return result;
 }
 
@@ -5935,7 +6025,7 @@ bool DqnString::InitLiteral(char const *const cstr, DqnMemAPI *const api)
 
 bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemStack *const stack)
 {
-	bool result = this->InitLiteral(cstr, &stack->myAPI);
+	bool result = this->InitLiteral(cstr, &stack->myHeadAPI);
 	return result;
 }
 

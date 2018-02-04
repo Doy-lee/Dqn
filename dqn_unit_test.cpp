@@ -1637,7 +1637,7 @@ void DqnArray_Test()
 			{
 				auto memGuard0 = stack.TempRegionGuard();
 				DqnArray<char> array = {};
-				DQN_ASSERT(array.InitSize(1, &stack.myAPI));
+				DQN_ASSERT(array.InitSize(1, &stack.myHeadAPI));
 				DqnArray_TestRealDataInternal(&array);
 			}
 
@@ -1646,7 +1646,7 @@ void DqnArray_Test()
 			{
 				auto memGuard0 = stack.TempRegionGuard();
 				DqnArray<char> array = {};
-				DQN_ASSERT(array.InitSize(128, &stack.myAPI));
+				DQN_ASSERT(array.InitSize(128, &stack.myHeadAPI));
 				stack.Push(1024);
 				DqnArray_TestRealDataInternal(&array);
 			}
@@ -2485,7 +2485,7 @@ FILE_SCOPE void DqnMemStack_Test()
 				DQN_ASSERT(result5);
 				DQN_ASSERT(stack.block != blockToReturnTo);
 				DQN_ASSERT(stack.tempRegionCount == 1);
-				memGuard1.keepChanges = true;
+				memGuard1.region.keepHeadChanges = true;
 			}
 
 			DQN_ASSERT(stack.block != blockToReturnTo);
@@ -2762,7 +2762,7 @@ FILE_SCOPE void DqnMemStack_Test()
 			{
 				DqnMemStack stack = {};
 				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
-				auto *api = &stack.myAPI;
+				auto *api = &stack.myHeadAPI;
 
 				auto *blockBefore = stack.block;
 				auto *headBefore  = stack.block->head;
@@ -2793,7 +2793,7 @@ FILE_SCOPE void DqnMemStack_Test()
 			{
 				DqnMemStack stack = {};
 				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
-				auto *api = &stack.myAPI;
+				auto *api = &stack.myHeadAPI;
 
 				auto *blockBefore = stack.block;
 				auto *tailBefore  = stack.block->tail;
@@ -2829,7 +2829,7 @@ FILE_SCOPE void DqnMemStack_Test()
 			{
 				DqnMemStack stack = {};
 				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
-				auto *api = &stack.myAPI;
+				auto *api = &stack.myHeadAPI;
 
 				auto *blockBefore = stack.block;
 				auto *headBefore  = stack.block->head;
@@ -2859,7 +2859,7 @@ FILE_SCOPE void DqnMemStack_Test()
 			{
 				DqnMemStack stack = {};
 				DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard));
-				auto *api = &stack.myAPI;
+				auto *api = &stack.myHeadAPI;
 
 				auto *blockBefore = stack.block;
 				auto *tailBefore  = stack.block->tail;
