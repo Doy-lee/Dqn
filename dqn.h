@@ -485,7 +485,9 @@ struct DqnMemStack
 	bool  FreeLastBlock ();
 
 	// Reverts the stack and its usage back to the first block
-	void  Reset();
+	void  Reset         ();
+
+	void  ResetTail     ();
 
 	// Reset the current memory block usage to 0.
 	void  ClearCurrBlock(bool zeroClear);
@@ -633,8 +635,8 @@ template <typename T>
 bool DqnArray<T>::Grow(isize multiplier)
 {
 	isize newMax = this->max * multiplier;
-	newMax       = (newMax == 0) ? 8 : newMax;
-	bool result = this->Resize(newMax);
+	newMax       = (newMax < 8) ? 8 : newMax;
+	bool result  = this->Resize(newMax);
 	return result;
 }
 
@@ -659,7 +661,7 @@ T *DqnArray<T>::Make()
 template <typename T>
 T *DqnArray<T>::Push(T const *item, isize num)
 {
-	if (!this->data || (this->count + num) >= this->max)
+	if (!this->data || (this->count + num) > this->max)
 	{
 		if (!this->Grow())
 		{
@@ -1512,7 +1514,14 @@ typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(char const *const key, i3
 			this->usedEntries[indexToEndAt] = hashIndex;
 		}
 
-		newEntry->key.InitSize(keyLen, this->memAPI);
+		// TODO(doyle): Is this a robust check? If we retrieve from the freeEntryList, the memAPI
+		// may already be initialised.
+		if (!newEntry->key.memAPI)
+		{
+			newEntry->key.InitSize(keyLen, this->memAPI);
+			DQN_ASSERT(newEntry->key.memAPI == this->memAPI);
+		}
+
 		newEntry->key.Append(key, keyLen);
 		newEntry->next           = this->entries[hashIndex];
 		this->entries[hashIndex] = newEntry;
@@ -3867,6 +3876,19 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 	return false;
 }
 
+void DqnMemStack::ResetTail()
+{
+	u8 *start = this->block->tail;
+	u8 *end   = this->block->memory + this->block->size;
+
+	if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
+	{
+		DqnMemStackInternal_KillMetadataPtrsExistingIn(&this->metadata, start, end);
+	}
+
+	this->block->tail = end;
+}
+
 void DqnMemStack::Reset()
 {
 	while(this->block && this->block->prevBlock)
@@ -5236,7 +5258,7 @@ DQN_FILE_SCOPE bool DqnStr_EndsWith(char const *src, i32 srcLen, char const *fin
 	if (srcLen < findLen)
 		return false;
 
-	char const *srcEnd       = src + (srcLen - 1);
+	char const *srcEnd       = src + (srcLen);
 	char const *checkSrcFrom = srcEnd - findLen;
 
 	bool result = (DqnStr_Cmp(checkSrcFrom, find, findLen, ignoreCase) == 0);
