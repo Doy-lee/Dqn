@@ -34,6 +34,7 @@
 // #DqnMemAPI    Custom memory API for Dqn Data Structures
 // #DqnArray     Dynamic Array using Templates
 // #DqnMemStack  Memory Allocator, Push, Pop Style
+// #DqnSlice     Slices
 // #DqnHash      Hashing using Murmur
 // #DqnMath      Simple Math Helpers (Lerp etc.)
 // #DqnV2        2D  Math Vectors
@@ -137,6 +138,8 @@ using f32 = float;
 #define DQN_GIGABYTE(val) (DQN_MEGABYTE(val) * 1024LL)
 #define DQN_MEGABYTE(val) (DQN_KILOBYTE(val) * 1024LL)
 #define DQN_KILOBYTE(val) ((val) * 1024LL)
+
+#define DQN_MINUTE(val) ((val) * 60LL)
 
 #define DQN_ALIGN_POW_N(val, align) ((((usize)val) + ((usize)align-1)) & (~(usize)(align-1)))
 #define DQN_ALIGN_POW_4(val)        DQN_ALIGN_POW_N(val, 4)
@@ -856,6 +859,15 @@ void DqnArray<T>::RemoveStable(isize *indexList, isize numIndexes)
 		DQN_ASSERT(this->count >= 0);
 	}
 }
+
+// #DqnSlice API
+// =================================================================================================
+template <typename T>
+struct DqnSlice
+{
+	T   *data;
+	i32  len;
+};
 
 // #DqnHash API
 // =================================================================================================
@@ -1796,6 +1808,13 @@ DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed);
 // #Dqn_ API
 // =================================================================================================
 
+// return: The number of splits in the array. If array is null this returns the required size of the array.
+i32 Dqn_SplitString(char const *src, i32 srcLen, char splitChar, DqnSlice<char> *array = nullptr, i32 size = 0);
+
+// Util function that uses Dqn_SplitString
+// return: The number of splits, splitting by "splitChar" would generate.
+i32 Dqn_GetNumSplits(char const *src, i32 srcLen, char splitChar);
+
 inline bool Dqn_BitIsSet(u32 const bits, u32 const flag)
 {
 	bool result = ((bits & flag) == flag);
@@ -2123,12 +2142,13 @@ struct DqnFile
 	// Static API
 	// ==============================================================================================
 	// Read entire file into the given buffer. To determine required bufSize size, use GetFileSize.
+	// NOTE: You want size + 1 and add the null-terminator yourself if you want a null terminated buffer.
 	// bytesRead: Pass in to get how many bytes of the buf was used. Basically the return value of Read
 	// return:    False if insufficient bufSize OR file access failure OR nullptr arguments.
 	static bool   ReadEntireFile(char    const *const path, u8 *const buf, usize const bufSize, usize *const bytesRead);
 	static bool   ReadEntireFile(wchar_t const *const path, u8 *const buf, usize const bufSize, usize *const bytesRead);
 
-	// Buffer should be freed when done with.
+	// Buffer is null-terminated and should be freed when done with.
 	// return: False if file access failure OR nullptr arguments.
 	static u8    *ReadEntireFile(char    const *const path, usize *const bufSize, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
 	static u8    *ReadEntireFile(wchar_t const *const path, usize *const bufSize, DqnMemAPI *const api = &DQN_DEFAULT_HEAP_ALLOCATOR);
@@ -3010,6 +3030,7 @@ DQN_FILE_SCOPE void *DqnMem_Set64(void *const dest, u8 const value, i64 const nu
 	usize  const numU8ToCopy = numBytesToCopy & (remainingMask);
 	__stosb(destU8, valueU8, numU8ToCopy);
 #else
+	(void)dest; (void)value; (void)numBytesToCopy;
 	DQN_ASSERT(DQN_INVALID_CODE_PATH)
 #endif
 	return dest;
@@ -5087,7 +5108,7 @@ DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *lineLength)
 
 // #DqnStr Implementation
 // =================================================================================================
-DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *const a, const char *const b, i32 numBytesToCompare, bool ignoreCase)
+DQN_FILE_SCOPE i32 DqnStr_Cmp(char const *a, char const *b, i32 numBytesToCompare, bool ignoreCase)
 {
 	if (!a && !b)               return -1;
 	if (!a)                     return -1;
@@ -5095,35 +5116,22 @@ DQN_FILE_SCOPE i32 DqnStr_Cmp(const char *const a, const char *const b, i32 numB
 	if (numBytesToCompare == 0) return -1;
 
 	i32 bytesCompared = 0;
-	char const *aPtr = a;
-	char const *bPtr = b;
-
 	if (ignoreCase)
 	{
-		while (DqnChar_ToLower((*aPtr)) == DqnChar_ToLower((*bPtr)))
+		while (a[0] && DqnChar_ToLower((*a++)) == DqnChar_ToLower((*b++)))
 		{
-			if (!(*aPtr)) return 0;
-			bytesCompared++;
-			aPtr++;
-			bPtr++;
-
-			if (bytesCompared == numBytesToCompare) return 0;
+			if (++bytesCompared == numBytesToCompare) return 0;
 		}
 	}
 	else
 	{
-		while ((*aPtr) == (*bPtr))
+		while (a[0] && (*a++) == (*b++))
 		{
-			if (!(*aPtr)) return 0;
-			bytesCompared++;
-			aPtr++;
-			bPtr++;
-
-			if (bytesCompared == numBytesToCompare) return 0;
+			if (++bytesCompared == numBytesToCompare) return 0;
 		}
 	}
 
-	return (((*aPtr) < (*bPtr)) ? -1 : 1);
+	return (*a - *b);
 }
 
 DQN_FILE_SCOPE char *DqnStr_GetPtrToLastSlash(char const *str, i32 strLen)
@@ -5318,7 +5326,12 @@ DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufS
 
 	if (value == 0)
 	{
-		if (validBuffer) buf[0] = '0';
+		if (validBuffer)
+		{
+			buf[0] = '0';
+			buf[1] = 0;
+		}
+
 		return 1;
 	}
 	
@@ -5381,6 +5394,7 @@ DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufS
 		}
 	}
 
+	buf[charIndex] = 0;
 	return charIndex;
 }
 
@@ -5768,7 +5782,7 @@ DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *const a, const wchar_t *const b)
 }
 
 DQN_FILE_SCOPE i32 DqnWStr_FindFirstOccurence(const wchar_t *const src, const i32 srcLen,
-                                                  const wchar_t *const find, const i32 findLen)
+                                              const wchar_t *const find, const i32 findLen)
 {
 	if (!src || !find)               return -1;
 	if (srcLen == 0 || findLen == 0) return -1;
@@ -6069,6 +6083,7 @@ bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI *const api)
 	return true;
 
 #else
+	(void)cstr; (void)api;
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return false;
 
@@ -6286,6 +6301,7 @@ i32 DqnString::ToWChar(wchar_t *const buf, i32 const bufSize) const
 	return result;
 
 #else
+	(void)buf; (void)bufSize;
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return -1;
 #endif
@@ -6308,6 +6324,7 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *const api) const
 	return result;
 
 #else
+	(void)api;
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 	return nullptr;
 
@@ -6425,6 +6442,56 @@ i32 DqnRndPCG::Range(i32 min, i32 max)
 
 // #Dqn
 // =================================================================================================
+i32 Dqn_GetNumSplits(char const *src, i32 srcLen, char splitChar)
+{
+	auto result = Dqn_SplitString(src, srcLen, splitChar, nullptr, 0);
+	return result;
+}
+
+i32 Dqn_SplitString(char const *src, i32 srcLen, char splitChar, DqnSlice<char> *array, i32 size)
+{
+	// TODO(doyle): Const correctness
+	i32 sliceLen   = 0;
+	i32 arrayIndex = 0;
+	for (auto i = 0; i < srcLen; i++)
+	{
+		char *c = (char *)(src + i);
+		if (*c == splitChar)
+		{
+			DqnSlice<char> slice = {c - sliceLen, sliceLen};
+			if (array)
+			{
+				if (arrayIndex < size)
+				{
+					array[arrayIndex] = slice;
+				}
+			}
+			arrayIndex++;
+			sliceLen = 0;
+		}
+		else
+		{
+			sliceLen++;
+		}
+	}
+
+	DqnSlice<char> lastSlice = {(char *)src + srcLen - sliceLen, sliceLen};
+	if (lastSlice.len > 0)
+	{
+		if (array)
+		{
+			if (arrayIndex < size)
+			{
+				array[arrayIndex] = lastSlice;
+			}
+		}
+
+		arrayIndex++;
+	}
+
+	return arrayIndex;
+}
+
 DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *const array, i64 const size, i64 const find,
                                Dqn_BSearchBound const bound)
 {
@@ -8613,7 +8680,7 @@ u8 *DqnFile::ReadEntireFile(wchar_t const *const path, usize *const bufSize, Dqn
 	usize bytesRead = 0;
 	if (DqnFile::ReadEntireFile(path, buf, requiredSize, &bytesRead))
 	{
-		*bufSize = requiredSize;
+		*bufSize          = requiredSize;
 		DQN_ASSERT(bytesRead == requiredSize);
 		return buf;
 	}
@@ -8669,8 +8736,7 @@ cleanup:
 	return result;
 }
 
-bool DqnFile::ReadEntireFile(const char *const path, u8 *const buf, usize const bufSize,
-                             usize *const bytesRead)
+bool DqnFile::ReadEntireFile(const char *const path, u8 *const buf, usize const bufSize, usize *const bytesRead)
 {
 	if (!path || !buf || !bytesRead) return false;
 
