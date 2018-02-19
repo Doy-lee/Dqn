@@ -24,6 +24,11 @@
 		<DisplayString>{{numEntries={numEntries} numFreeEntries={numFreeEntries} usedEntriesIndex={usedEntriesIndex}}}</DisplayString>
 	</Type>
 
+	<Type Name="DqnSlice&lt;*&gt;">
+		<DisplayString>{len={len} data={data,[len]}}</DisplayString>
+		<StringView>data,s</StringView>
+	</Type>
+
 	<Type Name="DqnString">
 		<DisplayString>{{len={len}/{max} {str,s}}}</DisplayString>
 		<StringView>str,s</StringView>
