@@ -27,7 +27,7 @@
 // TODO(doyle): Replace DQN_ASSERT with a non-halting assert that can connect to
 // some sort of testing framework to track successes and failures.
 
-#define LOG_HEADER() LogHeader( __func__)
+#define LOG_HEADER() LogHeader(__func__)
 FILE_SCOPE i32  globalIndent;
 FILE_SCOPE bool globalNewLine;
 
@@ -47,7 +47,7 @@ enum class Status
 	Error
 };
 
-void Log(Status status, char *fmt, va_list argList)
+void Log(Status status, char const *fmt, va_list argList)
 {
 	DQN_ASSERT(globalIndent >= 0);
 	LOCAL_PERSIST i32 lineLen = 0;
@@ -56,7 +56,7 @@ void Log(Status status, char *fmt, va_list argList)
 	i32 bufLen     = 0;
 	{
 		bufLen = Dqn_vsprintf(buf, fmt, argList);
-		DQN_ASSERT(bufLen < DQN_ARRAY_COUNT(buf));
+		DQN_ASSERT(bufLen < (i32)DQN_ARRAY_COUNT(buf));
 		lineLen += bufLen;
 	}
 
@@ -113,7 +113,7 @@ void Log(Status status, char *fmt, va_list argList)
 	}
 }
 
-void Log(Status status, char *fmt, ...)
+void Log(Status status, char const *fmt, ...)
 {
 	va_list argList;
 	va_start(argList, fmt);
@@ -121,7 +121,7 @@ void Log(Status status, char *fmt, ...)
 	va_end(argList);
 }
 
-void Log(char *fmt, ...)
+void Log(char const *fmt, ...)
 {
 	va_list argList;
 	va_start(argList, fmt);
@@ -129,7 +129,7 @@ void Log(char *fmt, ...)
 	va_end(argList);
 }
 
-void LogHeader(char *funcName)
+void LogHeader(char const *funcName)
 {
 	globalIndent--;
 	Log("\n[%s]", funcName);
@@ -707,17 +707,6 @@ void DqnString_Test()
 		str.Free();
 		Log(Status::Ok, "Check expand on append");
 	}
-
-	// Try init literal no alloc
-	if (1)
-	{
-		char *literal = "this is a literal string";
-		DqnString str = {};
-		DQN_ASSERT(str.InitLiteralNoAlloc(literal));
-		DQN_ASSERT(str.Append(", hello again") == false);
-		str.Free();
-		Log(Status::Ok, "Try init literal no alloc, can't expand");
-	}
 }
 
 void DqnTimer_Test()
@@ -726,13 +715,14 @@ void DqnTimer_Test()
 
 	if (1)
 	{
+
 #if defined(DQN_UNIX_PLATFORM)
-		f64 startInS     = DqnTimer_NowInS();
-		u32 sleepTimeInS = 1;
-		sleep(sleepTimeInS);
-		f64 endInS = DqnTimer_NowInS();
-		Log("start: %f, end: %f", startInS, endInS);
-		DQN_ASSERT((startInS + sleepTimeInS) <= endInS);
+		f64 startInMs     = DqnTimer_NowInMs();
+		u32 sleepTimeInMs = 1;
+		sleep(sleepTimeInMs);
+		f64 endInMs = DqnTimer_NowInMs();
+		Log("start: %f, end: %f", startInMs, endInMs);
+		DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
 
 #elif defined(DQN_WIN32_PLATFORM)
 		f64 startInMs     = DqnTimer_NowInMs();
@@ -1577,7 +1567,7 @@ void DqnArray_TestRealDataInternal(DqnArray<char> *array)
 	u8 *buf        = DqnFile::ReadEntireFile("tests/google-10000-english.txt", &bufSize);
 	DQN_ASSERT(buf);
 
-	for (auto i = 0; i < bufSize; i++)
+	for (usize i = 0; i < bufSize; i++)
 		array->Push(buf[i]);
 
 	DQN_ASSERT((size_t)array->count == bufSize);
@@ -1631,7 +1621,6 @@ void DqnArray_Test()
 		if (1)
 		{
 			DqnMemStack stack = {}; stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard);
-			DqnMemAPI memAPI  = DqnMemAPI::StackAllocator(&stack);
 
 			if (1)
 			{
@@ -1681,7 +1670,7 @@ void DqnFile_Test()
 				// should give us zero, but we fall back to manual byte checking
 				// which should give us the proper size.
 				size_t size = 0;
-				DQN_ASSERT(DqnFile_GetFileSize("/proc/cpuinfo", &size));
+				DQN_ASSERT(DqnFile::GetFileSize("/proc/cpuinfo", &size));
 				DQN_ASSERT(size > 0);
 			}
 
@@ -1866,8 +1855,7 @@ void DqnFile_Test()
 FILE_SCOPE u32 volatile globalDebugCounter;
 FILE_SCOPE DqnLock globalJobQueueLock;
 const u32 QUEUE_SIZE = 256;
-FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
-                                                      void *const userData)
+FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue, void *const userData)
 {
 	(void)userData;
 	DQN_ASSERT(queue->size == QUEUE_SIZE);
@@ -1875,15 +1863,11 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue,
 		DqnLockGuard guard = globalJobQueueLock.LockGuard();
 		globalDebugCounter++;
 
-#if 0
 		u32 number = globalDebugCounter;
 #if defined(DQN_WIN32_IMPLEMENTATION)
-		Log("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d\n",
-		       GetCurrentThreadId(), number);
+		Log("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d", GetCurrentThreadId(), number);
 #elif defined(DQN_UNIX_IMPLEMENTATION)
-		Log("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d\n",
-		       number);
-#endif
+		Log("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d", number);
 #endif
 	}
 
@@ -2314,16 +2298,18 @@ void DqnMemSet_Test()
 		for (auto testIndex = 0; testIndex < size; testIndex++)
 		{
 			DQN_ASSERT(((u8 *)buffers[0])[testIndex] == ((u8 *)buffers[1])[testIndex]);
+#if defined(DQN_WIN32_IMPLEMENTATION)
 			DQN_ASSERT(((u8 *)buffers[1])[testIndex] == ((u8 *)buffers[2])[testIndex]);
+#endif
 		}
 
-		for (auto bufferIndex = 0; bufferIndex < DQN_ARRAY_COUNT(buffers); bufferIndex++)
+		for (usize bufferIndex = 0; bufferIndex < DQN_ARRAY_COUNT(buffers); bufferIndex++)
 		{
 			free(buffers[bufferIndex]);
 		}
 	}
 
-	for (auto timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(timings); timingsIndex++)
+	for (usize timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(timings); timingsIndex++)
 	{
 		f64 totalTime = 0;
 		for (auto iterationIndex = 0; iterationIndex < NUM_ITERATIONS; iterationIndex++)
@@ -2897,15 +2883,14 @@ int main(void)
 {
 	globalIndent  = 1;
 	globalNewLine = true;
-
 	DqnString_Test();
+	DqnMemStack_Test();
 	DqnChar_Test();
 	DqnRnd_Test();
 	DqnMath_Test();
 	DqnVX_Test();
 	DqnRect_Test();
 	DqnArray_Test();
-	DqnMemStack_Test();
 	DqnQuickSort_Test();
 	DqnHashTable_Test();
 	Dqn_BSearch_Test();

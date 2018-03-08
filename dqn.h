@@ -30,11 +30,16 @@
 
 // #Portable Code
 // #DqnAssert    Assertions and Logging
+// #DqnSlice     Slices
+// #DqnChar      Char  Operations (IsDigit(), IsAlpha() etc)
+// #DqnStr       Str   Operations (Str_Len(), Str_Copy() etc)
+// #DqnWChar     WChar Operations (IsDigit(), IsAlpha() etc)
+// #DqnRnd       Random Number Generator (ints and floats)
+// #Dqn_*        Utility code, (qsort, quick file reading)
 // #DqnMem       Memory Allocation
 // #DqnMemAPI    Custom memory API for Dqn Data Structures
 // #DqnArray     Dynamic Array using Templates
 // #DqnMemStack  Memory Allocator, Push, Pop Style
-// #DqnSlice     Slices
 // #DqnHash      Hashing using Murmur
 // #DqnMath      Simple Math Helpers (Lerp etc.)
 // #DqnV2        2D  Math Vectors
@@ -42,13 +47,8 @@
 // #DqnV4        4D  Math Vectors
 // #DqnMat4      4x4 Math Matrix
 // #DqnRect      Rectangles
-// #DqnChar      Char  Operations (IsDigit(), IsAlpha() etc)
-// #DqnStr       Str   Operations (Str_Len(), Str_Copy() etc)
-// #DqnWChar     WChar Operations (IsDigit(), IsAlpha() etc)
 // #DqnString    String library
 // #DqnHashTable Hash Tables using Templates
-// #DqnRnd       Random Number Generator (ints and floats)
-// #Dqn_*        Utility code, (qsort, quick file reading)
 
 // #XPlatform (Win32 & Unix)
 // #DqnFile      File I/O (Read, Write, Delete)
@@ -74,7 +74,7 @@
 // - Win32
 //   - Get rid of reliance on MAX_PATH
 //
-// - Make lib compile and run on Linux with GCC using -03
+// - Mbuildake lib compile and run on Linux with GCC using -03
 // - Make DqnV* operations be static to class for consistency?
 
 // Preprocessor Checks
@@ -109,6 +109,7 @@
 #include <stdint.h> // For standard types
 #include <stddef.h> // For standard types
 #include <string.h> // memmove
+#include <stdarg.h> // va_list
 #include <float.h>
 #define LOCAL_PERSIST static
 #define FILE_SCOPE    static
@@ -185,23 +186,405 @@ enum struct IgnoreCase  { True = 1, False = 0};
 	{                                                                                              \
 		if (!(expr))                                                                               \
 		{                                                                                          \
-			DqnLogExpr(__FILE__, __func__, __LINE__, #expr, msg, ##__VA_ARGS__);                       \
+			DqnLogExpr(__FILE__, __func__, __LINE__, #expr, msg, ## __VA_ARGS__);                  \
 			(*((int *)0)) = 0;                                                                     \
 		}                                                                                          \
 	} while (0)
 
-#define DQN_LOGE(msg, ...) DqnLog(__FILE__, __func__, __LINE__, msg, ##__VA_ARGS__);
-#define DQN_LOGD(msg, ...) DqnLog(__FILE__, __func__, __LINE__, msg, ##__VA_ARGS__);
+#define DQN_LOGE(msg, ...) DqnLog(__FILE__, __func__, __LINE__, msg, ## __VA_ARGS__);
+#define DQN_LOGD(msg, ...) DqnLog(__FILE__, __func__, __LINE__, msg, ## __VA_ARGS__);
 
 // Use macro above.
-DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum, char const *const msg, ...);
-DQN_FILE_SCOPE void DqnLogExpr(char *file, char const *const functionName, i32 const lineNum, char const *const expr, char const *const msg, ...);
+DQN_FILE_SCOPE void DqnLog    (char const *file, char const *functionName, i32 const lineNum, char const *msg, ...);
+DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 const lineNum, char const *expr, char const *msg, ...);
 
 // Assert at compile time by making a type that is invalid depending on the expression result
 #define DQN_COMPILE_ASSERT(expr)                DQN_COMPILE_ASSERT_INTERNAL(expr, DQN_UNIQUE_NAME(DqnCompileAssertInternal_))
 #define DQN_COMPILE_ASSERT_INTERNAL(expr, name) typedef char name[((int)(expr)) * 2 - 1];
 
 DQN_COMPILE_ASSERT(sizeof(isize) == sizeof(usize));
+
+// #DqnSlice API
+// =================================================================================================
+template <typename T>
+struct DqnSlice
+{
+	T   *data;
+	i32  len;
+
+	DqnSlice() = default;
+	DqnSlice(T *str, i32 len) { data = str; len = len; }
+};
+#define DQN_SLICE_NAME(name) DqnSlice<char const>(name, DQN_CHAR_COUNT(name))
+
+template <typename T>
+bool DqnSlice_Cmp(DqnSlice<T> const a, DqnSlice<T> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False)
+{
+	char const *bytePtrA      = reinterpret_cast<char const *>(a.data);
+	char const *bytePtrB      = reinterpret_cast<char const *>(b.data);
+	bool result = (a.len == b.len && DqnStr_Cmp(bytePtrA, bytePtrB, a.len, ignore) == 0);
+	return result;
+}
+
+// #DqnChar API
+// =================================================================================================
+DQN_FILE_SCOPE char DqnChar_ToLower     (char c);
+DQN_FILE_SCOPE char DqnChar_ToUpper     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsDigit     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsAlpha     (char c);
+DQN_FILE_SCOPE bool DqnChar_IsAlphaNum  (char c);
+DQN_FILE_SCOPE bool DqnChar_IsEndOfLine (char c);
+DQN_FILE_SCOPE bool DqnChar_IsWhitespace(char c);
+
+DQN_FILE_SCOPE char *DqnChar_TrimWhitespaceAround(char const *src, i32 srcLen, i32 *newLen);
+DQN_FILE_SCOPE char *DqnChar_SkipWhitespace      (char const *ptr);
+
+// TODO(doyle): this is NOT UTF8 safe
+// ch:        Char to find
+// len:       The length of the string stored in ptr, (doesn't care if it includes null terminator)
+// lenToChar: The length to the char from end of the ptr, i.e. (ptr + len)
+// return:    The ptr to the last char, null if it could not find.
+DQN_FILE_SCOPE char *DqnChar_FindLastChar  (char *ptr, char const ch, i32 len, u32 *const lenToChar);
+
+// Finds up to the first [\r]\n and destroy the line, giving you a null terminated line at the newline.
+// returns: The value to advance the ptr by, this can be different from the line
+//          length if there are new lines or leading whitespaces in the next line
+DQN_FILE_SCOPE i32   DqnChar_FindNextLine(char *ptr, i32 *lineLength);
+DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *lineLength);
+
+// #DqnStr API
+// =================================================================================================
+// numBytesToCompare: If -1, cmp runs until \0 is encountered.
+// return:            0 if equal. 0 < if a is before b, > 0 if a is after b
+DQN_FILE_SCOPE        i32            DqnStr_Cmp                   (char const *a, char const *b, i32 numBytesToCompare = -1, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
+
+// strLen: Len of string, if -1, StrLen is used.
+// return: Pointer in str to the last slash, if none then the original string.
+DQN_FILE_SCOPE        char          *DqnStr_GetPtrToLastSlash     (char const *str, i32 strLen = -1);
+
+// return: String length not including the nullptr terminator. 0 if invalid args.
+DQN_FILE_SCOPE        i32            DqnStr_Len                   (char const *const a);
+DQN_FILE_SCOPE        i32            DqnStr_LenUTF8               (u32 const *const a, i32 *const lenInBytes = nullptr);
+
+// return: String length starting from a, up to and not including the first delimiter character.
+DQN_FILE_SCOPE        i32            DqnStr_LenDelimitWith        (char *const a, char const delimiter);
+
+// return: The dest argument, nullptr if args invalid (i.e. nullptr pointers or numChars < 0)
+DQN_FILE_SCOPE        char          *DqnStr_Copy                  (char *const dest, char const *const src, i32 const numChars);
+DQN_FILE_SCOPE        void           DqnStr_Reverse               (char *const buf, i32 const bufSize);
+
+// return: Number of bytes in codepoint, 0 if *a becomes invalid or end of stream.
+DQN_FILE_SCOPE        i32            DqnStr_ReadUTF8Codepoint     (u32 const *const a, u32 *outCodepoint);
+
+// return: The offset into the src to first char of the found string. Returns -1 if not found
+DQN_FILE_SCOPE        i32            DqnStr_FindFirstOccurence    (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
+DQN_FILE_SCOPE        bool           DqnStr_EndsWith              (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
+
+// return: Helper function that returns the pointer to the first occurence, nullptr if not found.
+DQN_FILE_SCOPE        char          *DqnStr_GetFirstOccurence     (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
+DQN_FILE_SCOPE        bool           DqnStr_HasSubstring          (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
+
+DQN_FILE_SCOPE        DqnSlice<char> DqnStr_RemoveLeadTrailChar   (char const *str, i32 strLen, char leadChar, char trailChar);
+DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailQuotes (DqnSlice<char> slice);
+DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailBraces (DqnSlice<char> slice);
+DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailQuotes (char const *str, i32 strLen);
+DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailBraces (char const *str, i32 strLen);
+
+
+#define DQN_32BIT_NUM_MAX_STR_SIZE 11
+#define DQN_64BIT_NUM_MAX_STR_SIZE 21
+// Return the len of the derived string. If buf is nullptr and or bufSize is 0 the function returns the
+// required string length for the integer
+// TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work atm.
+DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufSize);
+DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *const buf, i64 const bufSize);
+// WARNING: Not robust, precision errors and whatnot but good enough!
+DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize);
+
+// Both return the number of bytes read, return 0 if invalid codepoint or UTF8
+DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, u32 const character);
+DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, u32 const character);
+
+// #DqnWChar API
+// =================================================================================================
+// NOTE: See above for documentation
+DQN_FILE_SCOPE bool     DqnWChar_IsDigit          (wchar_t const c);
+DQN_FILE_SCOPE wchar_t  DqnWChar_ToLower          (wchar_t const c);
+
+DQN_FILE_SCOPE wchar_t *DqnWChar_SkipWhitespace   (wchar_t *ptr);
+DQN_FILE_SCOPE wchar_t *DqnWChar_FindLastChar     (wchar_t *ptr, const wchar_t ch, i32 len, u32 *const lenToChar);
+DQN_FILE_SCOPE i32      DqnWChar_GetNextLine      (const wchar_t *ptr, i32 *lineLength);
+
+DQN_FILE_SCOPE i32      DqnWStr_Cmp               (wchar_t const *const a, const wchar_t *const b);
+DQN_FILE_SCOPE i32      DqnWStr_FindFirstOccurence(wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
+DQN_FILE_SCOPE bool     DqnWStr_HasSubstring      (wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
+DQN_FILE_SCOPE i32      DqnWStr_Len               (wchar_t const *const a);
+DQN_FILE_SCOPE i32      DqnWStr_LenDelimitWith    (wchar_t const *const a, wchar_t const delimiter);
+DQN_FILE_SCOPE void     DqnWStr_Reverse           (wchar_t *const buf, u32 const bufSize);
+
+DQN_FILE_SCOPE i32      Dqn_WStrToI32             (wchar_t const *const buf, i32 const bufSize);
+DQN_FILE_SCOPE i32      Dqn_I32ToWStr             (i32 value, wchar_t *buf, i32 bufSize);
+
+// #DqnRnd API
+// =================================================================================================
+// NOTE: Uses PCG (Permuted Congruential Generator)
+struct DqnRndPCG
+{
+	u64 state[2];
+
+	void Init        ();          // Uses rdstc to create a seed
+	void InitWithSeed(u32 seed);
+
+	u32 Next ();                 // return: A random number  N between [0, 0xFFFFFFFF]
+	f32 Nextf();                 // return: A random float   N between [0.0, 1.0f]
+	i32 Range(i32 min, i32 max); // return: A random integer N between [min, max]
+};
+
+DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_();         // Uses rdtsc to create a seed
+DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed);
+
+
+// #Dqn_* API
+// =================================================================================================
+// return: The number of splits in the array. If array is null this returns the required size of the array.
+i32 Dqn_SplitString(char const *src, i32 srcLen, char splitChar, DqnSlice<char> *array = nullptr, i32 size = 0);
+
+// Util function that uses Dqn_SplitString
+// return: The number of splits, splitting by "splitChar" would generate.
+i32 Dqn_GetNumSplits(char const *src, i32 srcLen, char splitChar);
+
+DQN_FILE_SCOPE inline bool Dqn_BitIsSet (u32 const bits, u32 const flag);
+DQN_FILE_SCOPE inline u32  Dqn_BitSet   (u32 const bits, u32 const flag);
+DQN_FILE_SCOPE inline u32  Dqn_BitUnset (u32 const bits, u32 const flag);
+DQN_FILE_SCOPE inline u32  Dqn_BitToggle(u32 const bits, u32 const flag);
+
+template <typename T>
+using Dqn_QuickSortLessThanCallback = bool (*)(T const *, T const *, void *);
+
+DQN_FILE_SCOPE inline bool Dqn_QuickSortDqnStringSorter(struct DqnString const *a, struct DqnString const *b, void *);
+
+template <typename T>
+DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size,
+                                  Dqn_QuickSortLessThanCallback<T> IsLessThan, void *userContext = nullptr)
+{
+	if (!array || size <= 1 || !IsLessThan) return;
+
+#if 1
+	// Insertion Sort, under 24->32 is an optimal amount
+	const i32 QUICK_SORT_THRESHOLD = 24;
+	if (size < QUICK_SORT_THRESHOLD)
+	{
+		i32 itemToInsertIndex = 1;
+		while (itemToInsertIndex < size)
+		{
+			for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
+			{
+				if (!IsLessThan(&array[checkIndex], &array[itemToInsertIndex], userContext))
+				{
+					T itemToInsert = array[itemToInsertIndex];
+					for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
+						array[i] = array[i - 1];
+
+					array[checkIndex] = itemToInsert;
+					break;
+				}
+			}
+			itemToInsertIndex++;
+		}
+
+		return;
+	}
+#endif
+
+	DqnRndPCG state; state.Init();
+
+	auto lastIndex      = size - 1;
+	auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex);
+	auto partitionIndex = 0;
+	auto startIndex     = 0;
+
+	// Swap pivot with last index, so pivot is always at the end of the array.
+	// This makes logic much simpler.
+	DQN_SWAP(T, array[lastIndex], array[pivotIndex]);
+	pivotIndex = lastIndex;
+
+	// 4^, 8, 7, 5, 2, 3, 6
+	if (IsLessThan(&array[startIndex], &array[pivotIndex], userContext)) partitionIndex++;
+	startIndex++;
+
+	// 4, |8, 7, 5^, 2, 3, 6*
+	// 4, 5, |7, 8, 2^, 3, 6*
+	// 4, 5, 2, |8, 7, ^3, 6*
+	// 4, 5, 2, 3, |7, 8, ^6*
+	for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
+	{
+		if (IsLessThan(&array[checkIndex], &array[pivotIndex], userContext))
+		{
+			DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
+			partitionIndex++;
+		}
+	}
+
+	// Move pivot to right of partition
+	// 4, 5, 2, 3, |6, 8, ^7*
+	DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
+	Dqn_QuickSort(array, partitionIndex, IsLessThan, userContext);
+
+	// Skip the value at partion index since that is guaranteed to be sorted.
+	// 4, 5, 2, 3, (x), 8, 7
+	i32 oneAfterPartitionIndex = partitionIndex + 1;
+	Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex), IsLessThan, userContext);
+}
+
+template <typename T>
+DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size)
+{
+	if (!array || size <= 1) return;
+
+#if 1
+	// Insertion Sort, under 24->32 is an optimal amount
+	const i32 QUICK_SORT_THRESHOLD = 24;
+	if (size < QUICK_SORT_THRESHOLD)
+	{
+		i32 itemToInsertIndex = 1;
+		while (itemToInsertIndex < size)
+		{
+			for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
+			{
+				if (!(array[checkIndex] < array[itemToInsertIndex]))
+				{
+					T itemToInsert = array[itemToInsertIndex];
+					for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
+						array[i] = array[i - 1];
+
+					array[checkIndex] = itemToInsert;
+					break;
+				}
+			}
+			itemToInsertIndex++;
+		}
+
+		return;
+	}
+#endif
+
+	DqnRndPCG state; state.Init();
+
+	auto lastIndex      = size - 1;
+	auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex); // TODO(doyle): RNG 64bit
+	auto partitionIndex = 0;
+	auto startIndex     = 0;
+
+	// Swap pivot with last index, so pivot is always at the end of the array.
+	// This makes logic much simpler.
+	DQN_SWAP(T, array[lastIndex], array[pivotIndex]);
+	pivotIndex = lastIndex;
+
+	// 4^, 8, 7, 5, 2, 3, 6
+	if (array[startIndex] < array[pivotIndex]) partitionIndex++;
+	startIndex++;
+
+	// 4, |8, 7, 5^, 2, 3, 6*
+	// 4, 5, |7, 8, 2^, 3, 6*
+	// 4, 5, 2, |8, 7, ^3, 6*
+	// 4, 5, 2, 3, |7, 8, ^6*
+	for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
+	{
+		if (array[checkIndex] < array[pivotIndex])
+		{
+			DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
+			partitionIndex++;
+		}
+	}
+
+	// Move pivot to right of partition
+	// 4, 5, 2, 3, |6, 8, ^7*
+	DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
+	Dqn_QuickSort(array, partitionIndex);
+
+	// Skip the value at partion index since that is guaranteed to be sorted.
+	// 4, 5, 2, 3, (x), 8, 7
+	i32 oneAfterPartitionIndex = partitionIndex + 1;
+	Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex));
+}
+
+template <typename T>
+using Dqn_BSearchLessThanCallback = bool (*)(const T&, const T&);
+
+template <typename T>
+using Dqn_BSearchEqualsCallback   = bool (*)(const T&, const T&);
+
+enum Dqn_BSearchBound
+{
+	Dqn_BSearchBound_Normal, // Return the index of the first item that matches the find value
+	Dqn_BSearchBound_Lower,  // Return the index of the first item lower than the find value
+	Dqn_BSearchBound_Higher, // Return the index of the first item higher than the find value
+
+	Dqn_BSearchBound_NormalLower,  // Return the index of the matching item if not found the first item lower
+	Dqn_BSearchBound_NormalHigher, // Return the index of the matching item if not found the first item higher
+};
+
+// bound: The behaviour of the binary search,
+// return: -1 if element not found, otherwise index of the element.
+//         For higher and lower bounds return -1 if there is no element higher/lower than the
+//         find value (i.e. -1 if the 0th element is the find val for lower bound).
+template <typename T>
+DQN_FILE_SCOPE i64 Dqn_BSearch(T *const array, i64 const size, T const &find,
+                               Dqn_BSearchEqualsCallback<T> const Equals,
+                               Dqn_BSearchLessThanCallback<T> const IsLessThan,
+                               Dqn_BSearchBound const bound = Dqn_BSearchBound_Normal)
+{
+	if (size == 0 || !array) return -1;
+
+	i64 start = 0;
+	i64 end   = size - 1;
+	i64 mid   = (i64)((start + end) * 0.5f);
+
+	while (start <= end)
+	{
+		if (Equals(array[mid], find))
+		{
+			if (bound == Dqn_BSearchBound_Normal ||
+			    bound == Dqn_BSearchBound_NormalLower ||
+			    bound == Dqn_BSearchBound_NormalHigher)
+			{
+				return mid;
+			}
+			else if (bound == Dqn_BSearchBound_Lower)
+			{
+				// NOTE: We can always -1 because at worst case, 0 index will go to -1 which is
+				// correct behaviour.
+				return mid - 1;
+			}
+			else
+			{
+				if ((mid + 1) >= size) return -1;
+				return mid + 1;
+			}
+		}
+		else if (IsLessThan(array[mid], find)) start = mid + 1;
+		else                                   end   = mid - 1;
+		mid = (i64)((start + end) * 0.5f);
+	}
+
+	if (bound == Dqn_BSearchBound_Normal)
+	{
+		return -1;
+	}
+	if (bound == Dqn_BSearchBound_Lower || bound == Dqn_BSearchBound_NormalLower)
+	{
+		if (IsLessThan(find, array[mid])) return -1;
+		return mid;
+	}
+	else
+	{
+		if (IsLessThan(array[mid], find)) return -1;
+		return mid;
+	}
+}
+
+DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *const array, i64 const size, i64 const find,
+                               Dqn_BSearchBound const bound = Dqn_BSearchBound_Normal);
 
 // #DqnMem API
 // =================================================================================================
@@ -267,7 +650,7 @@ public:
 				isize oldSize;
 				void *oldMemPtr;
 			} realloc;
-		};
+		} e;
 	};
 
 	typedef u8 *Allocator(DqnMemAPI *, DqnMemAPI::Request);
@@ -296,6 +679,7 @@ public:
 
 FILE_SCOPE DqnMemAPI DQN_DEFAULT_HEAP_ALLOCATOR_ = DqnMemAPI::HeapAllocator();
 FILE_SCOPE DqnMemAPI *DQN_DEFAULT_HEAP_ALLOCATOR = &DQN_DEFAULT_HEAP_ALLOCATOR_;
+
 
 // #DqnArray API
 // =================================================================================================
@@ -352,7 +736,7 @@ struct DqnArray
 template <typename T>
 class DqnSmartArray : public DqnArray<T>
 {
-	~DqnSmartArray() { if (data && memAPI) memAPI->Free(data); }
+	~DqnSmartArray() { if (this->data && this->memAPI) this->memAPI->Free(this->data); }
 };
 
 // #DqnAllocatorMetadata
@@ -875,26 +1259,6 @@ void DqnArray<T>::RemoveStable(isize *indexList, isize numIndexes)
 	}
 }
 
-// #DqnSlice API
-// =================================================================================================
-#define DQN_SLICE_NAME(name) {name, DQN_CHAR_COUNT(name)}
-template <typename T>
-struct DqnSlice
-{
-	T   *data;
-	i32  len;
-
-};
-
-template <typename T>
-bool DqnSlice_Cmp(DqnSlice<T> const a, DqnSlice<T> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False)
-{
-	char const *bytePtrA      = reinterpret_cast<char const *>(a.data);
-	char const *bytePtrB      = reinterpret_cast<char const *>(b.data);
-	bool result = (a.len == b.len && DqnStr_Cmp(bytePtrA, bytePtrB, a.len, ignore) == 0);
-	return result;
-}
-
 // #DqnHash API
 // =================================================================================================
 DQN_FILE_SCOPE u32 DqnHash_Murmur32Seed(void const *data,  usize len, u32 seed);
@@ -1123,9 +1487,8 @@ DQN_FILE_SCOPE DqnV4   DqnMat4_MulV4       (DqnMat4 a, DqnV4 b);
 
 // #DqnRect API
 // =================================================================================================
-class DqnRect
+struct DqnRect
 {
-public:
 	DqnV2 min;
 	DqnV2 max;
 
@@ -1144,105 +1507,6 @@ DQN_FILE_SCOPE DqnRect DqnRect_(DqnV2 origin, DqnV2 size);
 DQN_FILE_SCOPE DqnRect DqnRect_(f32 x, f32 y, f32 w, f32 h);
 DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h);
 
-// #DqnChar API
-// =================================================================================================
-DQN_FILE_SCOPE char DqnChar_ToLower     (char c);
-DQN_FILE_SCOPE char DqnChar_ToUpper     (char c);
-DQN_FILE_SCOPE bool DqnChar_IsDigit     (char c);
-DQN_FILE_SCOPE bool DqnChar_IsAlpha     (char c);
-DQN_FILE_SCOPE bool DqnChar_IsAlphaNum  (char c);
-DQN_FILE_SCOPE bool DqnChar_IsEndOfLine (char c);
-DQN_FILE_SCOPE bool DqnChar_IsWhitespace(char c);
-
-DQN_FILE_SCOPE char *DqnChar_TrimWhitespaceAround(char const *src, i32 srcLen, i32 *newLen);
-DQN_FILE_SCOPE char *DqnChar_SkipWhitespace      (char const *ptr);
-
-// TODO(doyle): this is NOT UTF8 safe
-// ch:        Char to find
-// len:       The length of the string stored in ptr, (doesn't care if it includes null terminator)
-// lenToChar: The length to the char from end of the ptr, i.e. (ptr + len)
-// return:    The ptr to the last char, null if it could not find.
-DQN_FILE_SCOPE char *DqnChar_FindLastChar  (char *ptr, char const ch, i32 len, u32 *const lenToChar);
-
-// Finds up to the first [\r]\n and destroy the line, giving you a null terminated line at the newline.
-// returns: The value to advance the ptr by, this can be different from the line
-//          length if there are new lines or leading whitespaces in the next line
-DQN_FILE_SCOPE i32   DqnChar_FindNextLine(char *ptr, i32 *lineLength);
-DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *lineLength);
-
-// #DqnStr API
-// =================================================================================================
-// numBytesToCompare: If -1, cmp runs until \0 is encountered.
-// return:            0 if equal. 0 < if a is before b, > 0 if a is after b
-DQN_FILE_SCOPE        i32            DqnStr_Cmp                   (char const *a, char const *b, i32 numBytesToCompare = -1, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
-
-// strLen: Len of string, if -1, StrLen is used.
-// return: Pointer in str to the last slash, if none then the original string.
-DQN_FILE_SCOPE        char          *DqnStr_GetPtrToLastSlash     (char const *str, i32 strLen = -1);
-
-// return: String length not including the nullptr terminator. 0 if invalid args.
-DQN_FILE_SCOPE        i32            DqnStr_Len                   (char const *const a);
-DQN_FILE_SCOPE        i32            DqnStr_LenUTF8               (u32 const *const a, i32 *const lenInBytes = nullptr);
-
-// return: String length starting from a, up to and not including the first delimiter character.
-DQN_FILE_SCOPE        i32            DqnStr_LenDelimitWith        (char *const a, char const delimiter);
-
-// return: The dest argument, nullptr if args invalid (i.e. nullptr pointers or numChars < 0)
-DQN_FILE_SCOPE        char          *DqnStr_Copy                  (char *const dest, char const *const src, i32 const numChars);
-DQN_FILE_SCOPE        void           DqnStr_Reverse               (char *const buf, i32 const bufSize);
-
-// return: Number of bytes in codepoint, 0 if *a becomes invalid or end of stream.
-DQN_FILE_SCOPE        i32            DqnStr_ReadUTF8Codepoint     (u32 const *const a, u32 *outCodepoint);
-
-// return: The offset into the src to first char of the found string. Returns -1 if not found
-DQN_FILE_SCOPE        i32            DqnStr_FindFirstOccurence    (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
-DQN_FILE_SCOPE        bool           DqnStr_EndsWith              (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
-
-// return: Helper function that returns the pointer to the first occurence, nullptr if not found.
-DQN_FILE_SCOPE        char          *DqnStr_GetFirstOccurence     (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
-DQN_FILE_SCOPE        bool           DqnStr_HasSubstring          (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
-
-DQN_FILE_SCOPE        DqnSlice<char> DqnStr_RemoveLeadTrailChar   (char const *str, i32 strLen, char leadChar, char trailChar);
-DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailQuotes (DqnSlice<char> slice);
-DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailBraces (DqnSlice<char> slice);
-DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailQuotes (char const *str, i32 strLen);
-DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailBraces (char const *str, i32 strLen);
-
-
-#define DQN_32BIT_NUM_MAX_STR_SIZE 11
-#define DQN_64BIT_NUM_MAX_STR_SIZE 21
-// Return the len of the derived string. If buf is nullptr and or bufSize is 0 the function returns the
-// required string length for the integer
-// TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work atm.
-DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufSize);
-DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *const buf, i64 const bufSize);
-// WARNING: Not robust, precision errors and whatnot but good enough!
-DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize);
-
-// Both return the number of bytes read, return 0 if invalid codepoint or UTF8
-DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, u32 const character);
-DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, u32 const character);
-
-// #DqnWChar API
-// =================================================================================================
-// NOTE: See above for documentation
-DQN_FILE_SCOPE bool     DqnWChar_IsDigit          (wchar_t const c);
-DQN_FILE_SCOPE wchar_t  DqnWChar_ToLower          (wchar_t const c);
-
-DQN_FILE_SCOPE wchar_t *DqnWChar_SkipWhitespace   (wchar_t *ptr);
-DQN_FILE_SCOPE wchar_t *DqnWChar_FindLastChar     (wchar_t *ptr, const wchar_t ch, i32 len, u32 *const lenToChar);
-DQN_FILE_SCOPE i32      DqnWChar_GetNextLine      (const wchar_t *ptr, i32 *lineLength);
-
-DQN_FILE_SCOPE i32      DqnWStr_Cmp               (wchar_t const *const a, const wchar_t *const b);
-DQN_FILE_SCOPE i32      DqnWStr_FindFirstOccurence(wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
-DQN_FILE_SCOPE bool     DqnWStr_HasSubstring      (wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
-DQN_FILE_SCOPE i32      DqnWStr_Len               (wchar_t const *const a);
-DQN_FILE_SCOPE i32      DqnWStr_LenDelimitWith    (wchar_t const *const a, wchar_t const delimiter);
-DQN_FILE_SCOPE void     DqnWStr_Reverse           (wchar_t *const buf, u32 const bufSize);
-
-DQN_FILE_SCOPE i32      Dqn_WStrToI32             (wchar_t const *const buf, i32 const bufSize);
-DQN_FILE_SCOPE i32      Dqn_I32ToWStr             (i32 value, wchar_t *buf, i32 bufSize);
-
 // #DqnString Public API - String library
 // =================================================================================================
 // String allocates +1 extra byte for the null-terminator to be completely compatible with
@@ -1252,10 +1516,8 @@ DQN_FILE_SCOPE i32      Dqn_I32ToWStr             (i32 value, wchar_t *buf, i32 
 #define DQN_STRING_LITERAL(srcVariable, literal)                                                   \
 	DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, DQN_UNIQUE_NAME(dqnstring_))
 
-class DqnString
+struct DqnString
 {
-
-public:
 	DqnMemAPI *memAPI;
 	i32        len;              // Len of the string in bytes not including null-terminator
 	i32        max;              // The maximum capacity not including space for null-terminator.
@@ -1280,9 +1542,6 @@ public:
 
 	bool InitLiteral       (wchar_t const *const cstr, DqnMemStack *const stack);
 	bool InitLiteral       (wchar_t const *const cstr, DqnMemAPI   *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
-
-	// return: False if cstr is nullptr.
-	bool InitLiteralNoAlloc(char *const cstr, i32 cstrLen = -1);
 
 	// API
 	// =============================================================================================
@@ -1312,9 +1571,8 @@ public:
 	}
 };
 
-class DqnSmartString : public DqnString
+struct DqnSmartString : public DqnString
 {
-public:
 	~DqnSmartString() { this->Free(); }
 };
 
@@ -1418,7 +1676,7 @@ bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemStack *const stack)
 template <typename T>
 typename DqnHashTable<T>::Entry *DqnHashTableInternal_AllocateEntry(DqnHashTable<T> *table)
 {
-	auto *result = (DqnHashTable<T>::Entry *)table->memAPI->Alloc(sizeof(DqnHashTable<T>::Entry));
+	auto *result = (typename DqnHashTable<T>::Entry *)table->memAPI->Alloc(sizeof(typename DqnHashTable<T>::Entry));
 
 	if (result)
 	{
@@ -1441,7 +1699,7 @@ template <typename T>
 FILE_SCOPE typename DqnHashTable<T>::Entry *
 DqnHashTableInternal_GetFreeEntry(DqnHashTable<T> *table)
 {
-	DqnHashTable<T>::Entry *result = {};
+	typename DqnHashTable<T>::Entry *result = {};
 	if (table->freeList)
 	{
 		result          = table->freeList;
@@ -1500,10 +1758,11 @@ template <typename T>
 DQN_FILE_SCOPE inline typename DqnHashTable<T>::Entry *
 DqnHashTableInternal_Get(DqnHashTable<T> const *table, char const *const key, i32 keyLen, i64 hashIndex)
 {
-	DqnHashTable<T>::Entry *entry  = table->entries[hashIndex];
+	typename DqnHashTable<T>::Entry *entry  = table->entries[hashIndex];
 	if (entry)
 	{
-		DqnHashTable<T>::Entry *matchingEntry = DqnHashTableInternal_FindMatchingKey<T>(entry, key, (i64)keyLen);
+		typename DqnHashTable<T>::Entry *matchingEntry
+		    = DqnHashTableInternal_FindMatchingKey<T>(entry, key, (i64)keyLen);
 		if (matchingEntry)
 			return matchingEntry;
 	}
@@ -1820,59 +2079,6 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
 	return true;
 }
 
-// #DqnRnd API
-// =================================================================================================
-// NOTE: Uses PCG (Permuted Congruential Generator)
-class DqnRndPCG
-{
-public:
-	u64 state[2];
-
-	void Init        ();          // Uses rdstc to create a seed
-	void InitWithSeed(u32 seed);
-
-	u32 Next ();                 // return: A random number  N between [0, 0xFFFFFFFF]
-	f32 Nextf();                 // return: A random float   N between [0.0, 1.0f]
-	i32 Range(i32 min, i32 max); // return: A random integer N between [min, max]
-};
-
-DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_();         // Uses rdtsc to create a seed
-DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed);
-
-// #Dqn_ API
-// =================================================================================================
-
-// return: The number of splits in the array. If array is null this returns the required size of the array.
-i32 Dqn_SplitString(char const *src, i32 srcLen, char splitChar, DqnSlice<char> *array = nullptr, i32 size = 0);
-
-// Util function that uses Dqn_SplitString
-// return: The number of splits, splitting by "splitChar" would generate.
-i32 Dqn_GetNumSplits(char const *src, i32 srcLen, char splitChar);
-
-inline bool Dqn_BitIsSet(u32 const bits, u32 const flag)
-{
-	bool result = ((bits & flag) == flag);
-	return result;
-}
-
-inline u32 Dqn_BitSet(u32 const bits, u32 const flag)
-{
-	u32 result = (bits | flag);
-	return result;
-}
-
-inline u32 Dqn_BitUnset(u32 const bits, u32 const flag)
-{
-	u32 result = (bits & ~flag);
-	return result;
-}
-
-inline u32 Dqn_BitToggle(u32 const bits, u32 const flag)
-{
-	u32 result = (bits ^ flag);
-	return result;
-}
-
 struct DqnJson
 {
 	enum struct Type
@@ -1896,241 +2102,10 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnSlice<char> const buf, DqnSli
 DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnJson const input, DqnSlice<char> const findProperty);
 
 // newInput: (Optional) Returns the input advanced to the next array item, can be used again with
-//              function to get next array item.
-// return:      The array item.
+//           function to get next array item.
+// return:   The array item.
 DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson const input, DqnJson *newInput);
 
-template <typename T>
-using Dqn_QuickSortLessThanCallback = bool (*)(T const *, T const *, void *);
-
-DQN_FILE_SCOPE inline bool Dqn_QuickSortDqnStringSorter(DqnString const *a, DqnString const *b, void *)
-{
-	auto result = DqnStr_Cmp(a->str, b->str);
-	return result <= 0;
-}
-
-template <typename T>
-DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size,
-                                  Dqn_QuickSortLessThanCallback<T> IsLessThan, void *userContext = nullptr)
-{
-	if (!array || size <= 1 || !IsLessThan) return;
-
-#if 1
-	// Insertion Sort, under 24->32 is an optimal amount
-	const i32 QUICK_SORT_THRESHOLD = 24;
-	if (size < QUICK_SORT_THRESHOLD)
-	{
-		i32 itemToInsertIndex = 1;
-		while (itemToInsertIndex < size)
-		{
-			for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
-			{
-				if (!IsLessThan(&array[checkIndex], &array[itemToInsertIndex], userContext))
-				{
-					T itemToInsert = array[itemToInsertIndex];
-					for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
-						array[i] = array[i - 1];
-
-					array[checkIndex] = itemToInsert;
-					break;
-				}
-			}
-			itemToInsertIndex++;
-		}
-
-		return;
-	}
-#endif
-
-	DqnRndPCG state; state.Init();
-
-	auto lastIndex      = size - 1;
-	auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex);
-	auto partitionIndex = 0;
-	auto startIndex     = 0;
-
-	// Swap pivot with last index, so pivot is always at the end of the array.
-	// This makes logic much simpler.
-	DQN_SWAP(T, array[lastIndex], array[pivotIndex]);
-	pivotIndex = lastIndex;
-
-	// 4^, 8, 7, 5, 2, 3, 6
-	if (IsLessThan(&array[startIndex], &array[pivotIndex], userContext)) partitionIndex++;
-	startIndex++;
-
-	// 4, |8, 7, 5^, 2, 3, 6*
-	// 4, 5, |7, 8, 2^, 3, 6*
-	// 4, 5, 2, |8, 7, ^3, 6*
-	// 4, 5, 2, 3, |7, 8, ^6*
-	for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
-	{
-		if (IsLessThan(&array[checkIndex], &array[pivotIndex], userContext))
-		{
-			DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
-			partitionIndex++;
-		}
-	}
-
-	// Move pivot to right of partition
-	// 4, 5, 2, 3, |6, 8, ^7*
-	DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
-	Dqn_QuickSort(array, partitionIndex, IsLessThan, userContext);
-
-	// Skip the value at partion index since that is guaranteed to be sorted.
-	// 4, 5, 2, 3, (x), 8, 7
-	i32 oneAfterPartitionIndex = partitionIndex + 1;
-	Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex), IsLessThan, userContext);
-}
-
-template <typename T>
-DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size)
-{
-	if (!array || size <= 1) return;
-
-#if 1
-	// Insertion Sort, under 24->32 is an optimal amount
-	const i32 QUICK_SORT_THRESHOLD = 24;
-	if (size < QUICK_SORT_THRESHOLD)
-	{
-		i32 itemToInsertIndex = 1;
-		while (itemToInsertIndex < size)
-		{
-			for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
-			{
-				if (!(array[checkIndex] < array[itemToInsertIndex]))
-				{
-					T itemToInsert = array[itemToInsertIndex];
-					for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
-						array[i] = array[i - 1];
-
-					array[checkIndex] = itemToInsert;
-					break;
-				}
-			}
-			itemToInsertIndex++;
-		}
-
-		return;
-	}
-#endif
-
-	DqnRndPCG state; state.Init();
-
-	auto lastIndex      = size - 1;
-	auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex); // TODO(doyle): RNG 64bit
-	auto partitionIndex = 0;
-	auto startIndex     = 0;
-
-	// Swap pivot with last index, so pivot is always at the end of the array.
-	// This makes logic much simpler.
-	DQN_SWAP(T, array[lastIndex], array[pivotIndex]);
-	pivotIndex = lastIndex;
-
-	// 4^, 8, 7, 5, 2, 3, 6
-	if (array[startIndex] < array[pivotIndex]) partitionIndex++;
-	startIndex++;
-
-	// 4, |8, 7, 5^, 2, 3, 6*
-	// 4, 5, |7, 8, 2^, 3, 6*
-	// 4, 5, 2, |8, 7, ^3, 6*
-	// 4, 5, 2, 3, |7, 8, ^6*
-	for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
-	{
-		if (array[checkIndex] < array[pivotIndex])
-		{
-			DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
-			partitionIndex++;
-		}
-	}
-
-	// Move pivot to right of partition
-	// 4, 5, 2, 3, |6, 8, ^7*
-	DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
-	Dqn_QuickSort(array, partitionIndex);
-
-	// Skip the value at partion index since that is guaranteed to be sorted.
-	// 4, 5, 2, 3, (x), 8, 7
-	i32 oneAfterPartitionIndex = partitionIndex + 1;
-	Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex));
-}
-
-template <typename T>
-using Dqn_BSearchLessThanCallback = bool (*)(const T&, const T&);
-
-template <typename T>
-using Dqn_BSearchEqualsCallback   = bool (*)(const T&, const T&);
-
-enum Dqn_BSearchBound
-{
-	Dqn_BSearchBound_Normal, // Return the index of the first item that matches the find value
-	Dqn_BSearchBound_Lower,  // Return the index of the first item lower than the find value
-	Dqn_BSearchBound_Higher, // Return the index of the first item higher than the find value
-
-	Dqn_BSearchBound_NormalLower,  // Return the index of the matching item if not found the first item lower
-	Dqn_BSearchBound_NormalHigher, // Return the index of the matching item if not found the first item higher
-};
-
-// bound: The behaviour of the binary search,
-// return: -1 if element not found, otherwise index of the element.
-//         For higher and lower bounds return -1 if there is no element higher/lower than the
-//         find value (i.e. -1 if the 0th element is the find val for lower bound).
-template <typename T>
-DQN_FILE_SCOPE i64 Dqn_BSearch(T *const array, i64 const size, T const &find,
-                               Dqn_BSearchEqualsCallback<T> const Equals,
-                               Dqn_BSearchLessThanCallback<T> const IsLessThan,
-                               Dqn_BSearchBound const bound = Dqn_BSearchBound_Normal)
-{
-	if (size == 0 || !array) return -1;
-
-	i64 start = 0;
-	i64 end   = size - 1;
-	i64 mid   = (i64)((start + end) * 0.5f);
-
-	while (start <= end)
-	{
-		if (Equals(array[mid], find))
-		{
-			if (bound == Dqn_BSearchBound_Normal ||
-			    bound == Dqn_BSearchBound_NormalLower ||
-			    bound == Dqn_BSearchBound_NormalHigher)
-			{
-				return mid;
-			}
-			else if (bound == Dqn_BSearchBound_Lower)
-			{
-				// NOTE: We can always -1 because at worst case, 0 index will go to -1 which is
-				// correct behaviour.
-				return mid - 1;
-			}
-			else
-			{
-				if ((mid + 1) >= size) return -1;
-				return mid + 1;
-			}
-		}
-		else if (IsLessThan(array[mid], find)) start = mid + 1;
-		else                                   end   = mid - 1;
-		mid = (i64)((start + end) * 0.5f);
-	}
-
-	if (bound == Dqn_BSearchBound_Normal)
-	{
-		return -1;
-	}
-	if (bound == Dqn_BSearchBound_Lower || bound == Dqn_BSearchBound_NormalLower)
-	{
-		if (IsLessThan(find, array[mid])) return -1;
-		return mid;
-	}
-	else
-	{
-		if (IsLessThan(array[mid], find)) return -1;
-		return mid;
-	}
-}
-
-DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *const array, i64 const size, i64 const find,
-                               Dqn_BSearchBound const bound = Dqn_BSearchBound_Normal);
 #endif  /* DQN_H */
 
 // #XPlatform (Win32 & Unix) API
@@ -2186,8 +2161,8 @@ struct DqnFile
 		u64 lastAccessTimeInS;
 	};
 
-	u32     flags;
-	void   *handle;
+	u32    flags;
+	void  *handle;
 	usize  size;
 
 	// API
@@ -2967,8 +2942,8 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 
 // #DqnLog
 // =================================================================================================
-DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const lineNum,
-                           char const *const msg, ...)
+DQN_FILE_SCOPE void DqnLog(char const *file, char const *functionName, i32 const lineNum,
+                           char const *msg, ...)
 {
 	// TODO(doyle): Compress this
 	auto fileLen = DqnStr_Len(file);
@@ -3003,8 +2978,8 @@ DQN_FILE_SCOPE void DqnLog(char *file, char const *const functionName, i32 const
 	#endif
 }
 
-DQN_FILE_SCOPE void DqnLogExpr(char *file, char const *const functionName, i32 const lineNum,
-                           char const *const expr, char const *const msg, ...)
+DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 const lineNum,
+                               char const *expr, char const *msg, ...)
 {
 	auto fileLen = DqnStr_Len(file);
 	for (auto i = fileLen - 1; i >= 0; i--)
@@ -3119,14 +3094,14 @@ FILE_SCOPE void DqnMemAPIInternal_ValidateRequest(DqnMemAPI::Request request_)
 
 	if (request_.type == DqnMemAPI::Type::Alloc)
 	{
-		auto *request = &request_.alloc;
+		auto *request = &request_.e.alloc;
 		DQN_ASSERT(request->requestSize > 0);
 		return;
 	}
 
 	if (request_.type == DqnMemAPI::Type::Realloc)
 	{
-		auto *request = &request_.realloc;
+		auto *request = &request_.e.realloc;
 		DQN_ASSERT(request->oldSize > 0);
 		DQN_ASSERT(request->newSize > 0);
 		DQN_ASSERT((request->newSize - request->oldSize) != 0);
@@ -3139,7 +3114,7 @@ FILE_SCOPE void DqnMemAPIInternal_UpdateAPIStatistics(DqnMemAPI *api, DqnMemAPI:
 {
 	if (request_->type == DqnMemAPI::Type::Alloc)
 	{
-		auto *request = &request_->alloc;
+		auto *request = &request_->e.alloc;
 		api->bytesAllocated += request->requestSize;
 		api->lifetimeBytesAllocated += request->requestSize;
 		return;
@@ -3147,7 +3122,7 @@ FILE_SCOPE void DqnMemAPIInternal_UpdateAPIStatistics(DqnMemAPI *api, DqnMemAPI:
 
 	if (request_->type == DqnMemAPI::Type::Realloc)
 	{
-		auto *request = &request_->realloc;
+		auto *request = &request_->e.realloc;
 		api->lifetimeBytesAllocated += request->newSize;
 		api->lifetimeBytesFreed += request->oldSize;
 
@@ -3158,7 +3133,7 @@ FILE_SCOPE void DqnMemAPIInternal_UpdateAPIStatistics(DqnMemAPI *api, DqnMemAPI:
 
 	if (request_->type == DqnMemAPI::Type::Free)
 	{
-		auto *request = &request_->free;
+		auto *request = &request_->e.free;
 		api->bytesAllocated     -= request->sizeToFree;
 		api->lifetimeBytesFreed += request->sizeToFree;
 		return;
@@ -3175,7 +3150,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI
 
 	if (request_.type == DqnMemAPI::Type::Alloc)
 	{
-		auto const *request = &request_.alloc;
+		auto const *request = &request_.e.alloc;
 
 		if (request->zeroClear) result = (u8 *)DqnMem_Calloc(request->requestSize);
 		else                    result = (u8 *)DqnMem_Alloc(request->requestSize);
@@ -3184,7 +3159,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI
 	}
 	else if (request_.type == DqnMemAPI::Type::Realloc)
 	{
-		auto const *request = &request_.realloc;
+		auto const *request = &request_.e.realloc;
 		if (request->newSize == request->oldSize)
 		{
 			result = (u8 *)request->oldMemPtr;
@@ -3197,7 +3172,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI
 	}
 	else if (request_.type == DqnMemAPI::Type::Free)
 	{
-		auto *request = &request_.free;
+		auto *request = &request_.e.free;
 		DqnMem_Free(request->ptrToFree);
 		success = (request->ptrToFree != nullptr);
 	}
@@ -3282,7 +3257,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 
 	if (request_.type == DqnMemAPI::Type::Alloc)
 	{
-		auto *request = &request_.alloc;
+		auto *request = &request_.e.alloc;
 		if (pushToHead) result = (u8 *)stack->Push(request->requestSize);
 		else            result = (u8 *)stack->PushOnTail(request->requestSize);
 
@@ -3295,7 +3270,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 	else if (request_.type == DqnMemAPI::Type::Realloc)
 	{
 		// IMPORTANT: This is a _naive_ realloc scheme for stack allocation.
-		auto *request = &request_.realloc;
+		auto *request = &request_.e.realloc;
 		u8 *const ptr = (u8 *)request->oldMemPtr;
 		for (DqnMemStack::Block *block = stack->block; block; block = block->prevBlock)
 		{
@@ -3411,7 +3386,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 	}
 	else
 	{
-		auto *request = &request_.free;
+		auto *request = &request_.e.free;
 		DQN_ASSERT(request_.type == DqnMemAPI::Type::Free);
 
 		DqnMemStack::Block *const block = stack->block;
@@ -3432,12 +3407,12 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
 
 	// TODO(doyle): Stats. Irrelevant now?
 	(void)api;
-#if 0
 	if (success)
 	{
+#if 0
 		DqnMemAPIInternal_UpdateAPIStatistics(api, &request_);
-	}
 #endif
+	}
 
 	return result;
 }
@@ -3456,12 +3431,12 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallbackPushToTail(DqnMemAPI *api
 
 void *DqnMemAPI::Realloc(void *const oldPtr, isize const oldSize, isize const newSize)
 {
-	Request request           = {};
-	request.type              = Type::Realloc;
-	request.userContext       = this->userContext;
-	request.realloc.newSize   = newSize;
-	request.realloc.oldMemPtr = oldPtr;
-	request.realloc.oldSize   = oldSize;
+	Request request             = {};
+	request.type                = Type::Realloc;
+	request.userContext         = this->userContext;
+	request.e.realloc.newSize   = newSize;
+	request.e.realloc.oldMemPtr = oldPtr;
+	request.e.realloc.oldSize   = oldSize;
 
 	void *result = (void *)this->allocator(this, request);
 	return result;
@@ -3469,11 +3444,11 @@ void *DqnMemAPI::Realloc(void *const oldPtr, isize const oldSize, isize const ne
 
 void *DqnMemAPI::Alloc(isize const size, Dqn::ZeroClear clear)
 {
-	Request request           = {};
-	request.type              = Type::Alloc;
-	request.userContext       = this->userContext;
-	request.alloc.zeroClear   = (clear == Dqn::ZeroClear::True) ? true : false;
-	request.alloc.requestSize = size;
+	Request request             = {};
+	request.type                = Type::Alloc;
+	request.userContext         = this->userContext;
+	request.e.alloc.zeroClear   = (clear == Dqn::ZeroClear::True) ? true : false;
+	request.e.alloc.requestSize = size;
 
 	void *result = (void *)this->allocator(this, request);
 	return result;
@@ -3481,11 +3456,11 @@ void *DqnMemAPI::Alloc(isize const size, Dqn::ZeroClear clear)
 
 void DqnMemAPI::Free(void *const ptrToFree, isize const sizeToFree)
 {
-	Request request         = {};
-	request.type            = Type::Free;
-	request.userContext     = this->userContext;
-	request.free.ptrToFree  = ptrToFree;
-	request.free.sizeToFree = sizeToFree;
+	Request request           = {};
+	request.type              = Type::Free;
+	request.userContext       = this->userContext;
+	request.e.free.ptrToFree  = ptrToFree;
+	request.e.free.sizeToFree = sizeToFree;
 	this->allocator(this, request);
 }
 
@@ -3659,7 +3634,7 @@ bool DqnMemStack::Init(void *const mem, isize size, Dqn::ZeroClear clear, u32 fl
 		return false;
 	}
 
-	if (size < sizeof(DqnMemStack::Block))
+	if (size < static_cast<isize>(sizeof(DqnMemStack::Block)))
 	{
 		DQN_LOGE(
 		    "Memory size is too small to store the metadata, we received: %$d, the "
@@ -4141,7 +4116,7 @@ void DqnMemStack::TempRegionEnd(TempRegion region)
 
 DqnMemStack::TempRegionGuard_ DqnMemStack::TempRegionGuard()
 {
-	return DqnMemStack::TempRegionGuard_::TempRegionGuard_(this);
+	return TempRegionGuard_(this);
 }
 
 DqnMemStack::TempRegionGuard_::TempRegionGuard_(DqnMemStack *const stack)
@@ -4978,7 +4953,6 @@ DqnRect DqnRect::ClipRect(const DqnRect clip) const
 	DQN_ASSERT(clip.min <= clip.max);
 	DqnRect result = *this;
 
-	DqnV2 clipSize = clip.GetSize();
 	if (clip.min.x > this->min.x && clip.min.x < this->max.x)
 	{
 		if (clip.min.y > this->min.y && clip.min.y < this->max.y)
@@ -6055,6 +6029,149 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 	return charIndex;
 }
 
+// #DqnRnd
+// =================================================================================================
+// Public Domain library with thanks to Mattias Gustavsson
+// https://github.com/mattiasgustavsson/libs/blob/master/docs/rnd.md
+
+// Convert a randomized u32 value to a float value x in the range 0.0f <= x
+// < 1.0f. Contributed by Jonatan Hedborg
+
+// NOTE: This is to abide to strict aliasing rules.
+union DqnRndInternal_U32F32
+{
+	u32 unsigned32;
+	f32 float32;
+};
+
+FILE_SCOPE f32 DqnRndInternal_F32NormalizedFromU32(u32 value)
+{
+	u32 exponent = 127;
+	u32 mantissa = value >> 9;
+
+	union DqnRndInternal_U32F32 uf;
+	uf.unsigned32 = (exponent << 23 | mantissa);
+	return uf.float32 - 1.0f;
+}
+
+FILE_SCOPE u64 DqnRndInternal_Murmur3Avalanche64(u64 h)
+{
+	h ^= h >> 33;
+	h *= 0xff51afd7ed558ccd;
+	h ^= h >> 33;
+	h *= 0xc4ceb9fe1a85ec53;
+	h ^= h >> 33;
+	return h;
+}
+
+#if defined(DQN_UNIX_PLATFORM)
+	#include <x86intrin.h> // __rdtsc
+#endif
+
+FILE_SCOPE u32 DqnRndInternal_MakeSeed()
+{
+#if defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM)
+	i64 numClockCycles = __rdtsc();
+	return (u32)numClockCycles;
+#elif __ANDROID__
+	DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Android path not implemented yet");
+	return 0;
+#else
+	DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
+	return 0;
+#endif
+}
+
+DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_()
+{
+	DqnRndPCG result;
+	result.Init();
+	return result;
+}
+
+DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed)
+{
+	DqnRndPCG result;
+	result.InitWithSeed(seed);
+	return result;
+}
+
+void DqnRndPCG::InitWithSeed(u32 seed)
+{
+	u64 value     = (((u64)seed) << 1ULL) | 1ULL;
+	value         = DqnRndInternal_Murmur3Avalanche64(value);
+	this->state[0] = 0U;
+	this->state[1] = (value << 1ULL) | 1ULL;
+	this->Next();
+	this->state[0] += DqnRndInternal_Murmur3Avalanche64(value);
+	this->Next();
+}
+
+void DqnRndPCG::Init()
+{
+	u32 seed = DqnRndInternal_MakeSeed();
+	this->InitWithSeed(seed);
+}
+
+u32 DqnRndPCG::Next()
+{
+	u64 oldstate   = this->state[0];
+	this->state[0] = oldstate * 0x5851f42d4c957f2dULL + this->state[1];
+	u32 xorshifted = (u32)(((oldstate >> 18ULL) ^ oldstate) >> 27ULL);
+	u32 rot        = (u32)(oldstate >> 59ULL);
+	return (xorshifted >> rot) | (xorshifted << ((-(i32)rot) & 31));
+}
+
+f32 DqnRndPCG::Nextf()
+{
+	f32 result = DqnRndInternal_F32NormalizedFromU32(this->Next());
+	return result;
+}
+
+i32 DqnRndPCG::Range(i32 min, i32 max)
+{
+	i32 const range = (max - min) + 1;
+	if (range <= 0) return min;
+
+	i32 const value = (i32)(this->Nextf() * range);
+	i32 result      = min + value;
+	return result;
+}
+
+
+// #Dqn_*
+// =================================================================================================
+DQN_FILE_SCOPE inline bool Dqn_BitIsSet(u32 const bits, u32 const flag)
+{
+	bool result = ((bits & flag) == flag);
+	return result;
+}
+
+DQN_FILE_SCOPE inline u32 Dqn_BitSet(u32 const bits, u32 const flag)
+{
+	u32 result = (bits | flag);
+	return result;
+}
+
+DQN_FILE_SCOPE inline u32 Dqn_BitUnset(u32 const bits, u32 const flag)
+{
+	u32 result = (bits & ~flag);
+	return result;
+}
+
+DQN_FILE_SCOPE inline u32 Dqn_BitToggle(u32 const bits, u32 const flag)
+{
+	u32 result = (bits ^ flag);
+	return result;
+}
+
+
+DQN_FILE_SCOPE inline bool Dqn_QuickSortDqnStringSorter(struct DqnString const *a, struct DqnString const *b, void *)
+{
+	bool result =  DqnString::Cmp(a, b);
+	return result;
+}
+
 // #DqnString Impleemntation
 // =================================================================================================
 // TODO(doyle): SSO requires handling assign/copy op when copying strings, we need to reassign the
@@ -6212,26 +6329,6 @@ bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI *const api)
 	return false;
 
 #endif
-}
-
-bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
-{
-	if (!cstr) return false;
-
-	this->str = cstr;
-	if (cstrLen == -1)
-	{
-		i32 utf8LenInBytes = 0;
-		DqnStr_LenUTF8((u32 *)cstr, &utf8LenInBytes);
-		this->len = utf8LenInBytes;
-	}
-	else
-	{
-		this->len = cstrLen;
-	}
-
-	this->max = this->len;
-	return true;
 }
 
 bool DqnString::Expand(i32 newMax)
@@ -6455,115 +6552,6 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *const api) const
 #endif
 }
 
-// #DqnRnd
-// =================================================================================================
-// Public Domain library with thanks to Mattias Gustavsson
-// https://github.com/mattiasgustavsson/libs/blob/master/docs/rnd.md
-
-// Convert a randomized u32 value to a float value x in the range 0.0f <= x
-// < 1.0f. Contributed by Jonatan Hedborg
-
-// NOTE: This is to abide to strict aliasing rules.
-union DqnRndInternal_U32F32
-{
-	u32 unsigned32;
-	f32 float32;
-};
-
-FILE_SCOPE f32 DqnRndInternal_F32NormalizedFromU32(u32 value)
-{
-	u32 exponent = 127;
-	u32 mantissa = value >> 9;
-
-	union DqnRndInternal_U32F32 uf;
-	uf.unsigned32 = (exponent << 23 | mantissa);
-	return uf.float32 - 1.0f;
-}
-
-FILE_SCOPE u64 DqnRndInternal_Murmur3Avalanche64(u64 h)
-{
-	h ^= h >> 33;
-	h *= 0xff51afd7ed558ccd;
-	h ^= h >> 33;
-	h *= 0xc4ceb9fe1a85ec53;
-	h ^= h >> 33;
-	return h;
-}
-
-#if defined(DQN_UNIX_PLATFORM)
-	#include <x86intrin.h> // __rdtsc
-#endif
-
-FILE_SCOPE u32 DqnRndInternal_MakeSeed()
-{
-#if defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM)
-	i64 numClockCycles = __rdtsc();
-	return (u32)numClockCycles;
-#elif __ANDROID__
-	DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Android path not implemented yet");
-	return 0;
-#else
-	DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
-	return 0;
-#endif
-}
-
-DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_()
-{
-	DqnRndPCG result;
-	result.Init();
-	return result;
-}
-
-DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed)
-{
-	DqnRndPCG result;
-	result.InitWithSeed(seed);
-	return result;
-}
-
-void DqnRndPCG::InitWithSeed(u32 seed)
-{
-	u64 value     = (((u64)seed) << 1ULL) | 1ULL;
-	value         = DqnRndInternal_Murmur3Avalanche64(value);
-	this->state[0] = 0U;
-	this->state[1] = (value << 1ULL) | 1ULL;
-	this->Next();
-	this->state[0] += DqnRndInternal_Murmur3Avalanche64(value);
-	this->Next();
-}
-
-void DqnRndPCG::Init()
-{
-	u32 seed = DqnRndInternal_MakeSeed();
-	this->InitWithSeed(seed);
-}
-
-u32 DqnRndPCG::Next()
-{
-	u64 oldstate   = this->state[0];
-	this->state[0] = oldstate * 0x5851f42d4c957f2dULL + this->state[1];
-	u32 xorshifted = (u32)(((oldstate >> 18ULL) ^ oldstate) >> 27ULL);
-	u32 rot        = (u32)(oldstate >> 59ULL);
-	return (xorshifted >> rot) | (xorshifted << ((-(i32)rot) & 31));
-}
-
-f32 DqnRndPCG::Nextf()
-{
-	f32 result = DqnRndInternal_F32NormalizedFromU32(this->Next());
-	return result;
-}
-
-i32 DqnRndPCG::Range(i32 min, i32 max)
-{
-	i32 const range = (max - min) + 1;
-	if (range <= 0) return min;
-
-	i32 const value = (i32)(this->Nextf() * range);
-	i32 result      = min + value;
-	return result;
-}
-
 // #Dqn
 // =================================================================================================
 i32 Dqn_GetNumSplits(char const *src, i32 srcLen, char splitChar)
@@ -6666,7 +6654,6 @@ DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *const array, i64 const size, i64 const find,
 	}
 }
 
-// #Dqn_*
 DQN_FILE_SCOPE DqnJson DqnJson_Get(char const *buf, i32 bufLen, char const *findProperty, i32 findPropertyLen)
 {
 	DqnJson result = {};
@@ -6778,11 +6765,25 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnSlice<char> const buf, DqnSlice<char> cons
 	return result;
 }
 
+DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnSlice<char> const buf, DqnSlice<char const> findProperty)
+{
+	DqnJson result = DqnJson_Get(buf.data, buf.len, findProperty.data, findProperty.len);
+	return result;
+}
+
+
 DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnJson const input, DqnSlice<char> const findProperty)
 {
 	DqnJson result = DqnJson_Get(input.value.data, input.value.len, findProperty.data, findProperty.len);
 	return result;
 }
+
+DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnJson const input, DqnSlice<char const> findProperty)
+{
+	DqnJson result = DqnJson_Get(input.value.data, input.value.len, findProperty.data, findProperty.len);
+	return result;
+}
+
 
 DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson const input, DqnJson *newInput)
 {
@@ -6868,7 +6869,6 @@ PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
 
 #ifdef __GNUC__
 	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wmisleading-indentation"
 	#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif
 
@@ -8521,6 +8521,8 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 	#include <unistd.h>   // unlink()
 #endif
 
+#define DQN_FILE_INTERNAL_LIST_DIR(name) DQN_FILE_SCOPE char **name(char const *dir, i32 *numFiles, DqnMemAPI *api)
+
 // XPlatform > #DqnFile
 // =================================================================================================
 #ifdef DQN_WIN32_PLATFORM
@@ -8574,7 +8576,7 @@ FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *const path, DqnFile *co
 	return true;
 }
 
-DQN_FILE_SCOPE char **DqnFileInternal_PlatformListDir(char const *dir, i32 *numFiles, DqnMemAPI *const api)
+DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
 {
 	if (!dir) return nullptr;
 
@@ -8671,11 +8673,11 @@ DQN_FILE_SCOPE char **DqnFileInternal_PlatformListDir(char const *dir, i32 *numF
 #endif // DQN_WIN32_PLATFORM
 
 #ifdef DQN_UNIX_PLATFORM
-FILE_SCOPE bool DqnFileInternal_UnixGetFileSizeithStat(char const *const path, usize &size)
+FILE_SCOPE bool DqnFileInternal_UnixGetFileSizeWithStat(char const *const path, usize *size)
 {
 	struct stat fileStat = {0};
 	if (stat(path, &fileStat)) return false;
-	size = fileStat.st_size;
+	*size = fileStat.st_size;
 
 	return true;
 }
@@ -8696,12 +8698,12 @@ FILE_SCOPE usize DqnFileInternal_UnixGetFileSizeManual(FILE *const handle, bool 
 }
 
 FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *const path, DqnFile *const file,
-                                         u32 const permissionFlags, DqnFile::Action action)
+                                         u32 const flags, DqnFile::Action action)
 {
 	char operation  = 0;
 	bool updateFlag = false;
 
-	if (permissionFlags & DqnFile::PermissionFlag::FileWrite)
+	if (flags & DqnFile::PermissionFlag::FileWrite)
 	{
 		updateFlag = true;
 		switch (action)
@@ -8722,10 +8724,10 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *const path, DqnFile *const 
 			break;
 		}
 	}
-	else if ((permissionFlags & DqnFile::PermissionFlag::FileRead) ||
-	         (permissionFlags & DqnFile::PermissionFlag::Execute))
+	else if ((flags & DqnFile::PermissionFlag::FileRead) ||
+	         (flags & DqnFile::PermissionFlag::Execute))
 	{
-		if (permissionFlags & DqnFile::PermissionFlag::Execute)
+		if (flags & DqnFile::PermissionFlag::Execute)
 		{
 			// TODO(doyle): Logging, UNIX doesn't have execute param for file
 			// handles. Execution goes through system()
@@ -8750,15 +8752,15 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *const path, DqnFile *const 
 	FILE *handle = fopen(path, mode);
 	if (!handle) return false;
 
-	if (!DqnFileInternal_UnixGetFileSizeithStat(path, &file->size))
+	if (!DqnFileInternal_UnixGetFileSizeWithStat(path, &file->size))
 	{
 		// TODO(doyle): Logging
 		fclose(handle);
 		return false;
 	}
 
-	file->handle          = (void *)handle;
-	file->permissionFlags = permissionFlags;
+	file->handle = (void *)handle;
+	file->flags  = flags;
 
 	// NOTE: Can occur in some instances where files are generated on demand,
 	//       i.e. /proc/cpuinfo. But there can also be zero-byte files, we can't
@@ -8769,7 +8771,7 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *const path, DqnFile *const 
 	return true;
 }
 
-DQN_FILE_SCOPE char **DqnFileInternal_PlatformListDir(char const *const dir, i32 numFiles)
+DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
 {
 	if (!dir) return nullptr;
 
@@ -8799,7 +8801,7 @@ DQN_FILE_SCOPE char **DqnFileInternal_PlatformListDir(char const *const dir, i32
 		DIR *const dirHandle = opendir(dir);
 		if (!dirHandle) return nullptr;
 
-		char **list = (char **)api->Alloc(sizeof(*list) * currNumFiles, true);
+		char **list = (char **)api->Alloc(sizeof(*list) * currNumFiles, Dqn::ZeroClear::True);
 		if (!list)
 		{
 			DQN_LOGE("Memory allocation failed, required: %$_d", sizeof(*list) * currNumFiles);
@@ -8810,7 +8812,7 @@ DQN_FILE_SCOPE char **DqnFileInternal_PlatformListDir(char const *const dir, i32
 		struct dirent *dirFile = readdir(dirHandle);
 		for (auto i = 0; i < currNumFiles; i++)
 		{
-			list[i] = (char *)api->Alloc(sizeof(**list) * DQN_ARRAY_COUNT(dirFile->d_name), true);
+			list[i] = (char *)api->Alloc(sizeof(**list) * DQN_ARRAY_COUNT(dirFile->d_name), Dqn::ZeroClear::True);
 			if (!list[i])
 			{
 				for (auto j = 0; j < i; j++) api->Free(list[j]);
@@ -8872,13 +8874,14 @@ usize DqnFile::Write(u8 const *const buf, usize const numBytesToWrite, usize con
 {
 	// TODO(doyle): Implement when it's needed
 	DQN_ASSERTM(fileOffset == 0, "File writing into offset is not implemented.");
+	usize numBytesWritten = 0;
 
 #if defined(DQN_WIN32_PLATFORM)
 	DWORD bytesToWrite = (DWORD)numBytesToWrite;
 	DWORD bytesWritten;
-	BOOL result            = WriteFile(this->handle, (void *)buf, bytesToWrite, &bytesWritten, nullptr);
+	BOOL result = WriteFile(this->handle, (void *)buf, bytesToWrite, &bytesWritten, nullptr);
 
-	usize numBytesWritten = (usize)bytesWritten;
+	numBytesWritten = (usize)bytesWritten;
 	// TODO(doyle): Better logging system
 	if (result == 0)
 	{
@@ -8887,8 +8890,7 @@ usize DqnFile::Write(u8 const *const buf, usize const numBytesToWrite, usize con
 
 #elif defined(DQN_UNIX_PLATFORM)
 	const usize ITEMS_TO_WRITE = 1;
-	if (fwrite(buf, numBytesToWrite, ITEMS_TO_WRITE, (FILE *)this->handle) ==
-	    ITEMS_TO_WRITE)
+	if (fwrite(buf, numBytesToWrite, ITEMS_TO_WRITE, (FILE *)this->handle) == ITEMS_TO_WRITE)
 	{
 		rewind((FILE *)this->handle);
 		numBytesWritten = ITEMS_TO_WRITE * numBytesToWrite;
@@ -8939,13 +8941,22 @@ usize DqnFile::Read(u8 *const buf, usize const numBytesToRead)
 u8 *DqnFile::ReadEntireFile(wchar_t const *const path, usize *const bufSize, DqnMemAPI *const api)
 {
 	// TODO(doyle): Logging
-	if (!path || !bufSize) return false;
+	if (!path || !bufSize)
+	{
+		return nullptr;
+	}
 
 	usize requiredSize = 0;
-	if (!DqnFile::GetFileSize(path, &requiredSize) || requiredSize == 0) return nullptr;
+	if (!DqnFile::GetFileSize(path, &requiredSize) || requiredSize == 0)
+	{
+		return nullptr;
+	}
 
 	auto *buf = (u8 *)api->Alloc(requiredSize, Dqn::ZeroClear::False);
-	if (!buf) return nullptr;
+	if (!buf)
+	{
+		return nullptr;
+	}
 
 	usize bytesRead = 0;
 	if (DqnFile::ReadEntireFile(path, buf, requiredSize, &bytesRead))
@@ -9076,7 +9087,7 @@ bool DqnFile::GetFileSize(char const *const path, usize *const size)
 
 #elif defined(DQN_UNIX_PLATFORM)
 	// TODO(doyle): Error logging
-	if (!DqnFileInternal_UnixGetFileSizeithStat(path, size)) return false;
+	if (!DqnFileInternal_UnixGetFileSizeWithStat(path, size)) return false;
 
 	// NOTE: 0 size can occur in some instances where files are generated on demand,
 	//       i.e. /proc/cpuinfo
@@ -9084,7 +9095,7 @@ bool DqnFile::GetFileSize(char const *const path, usize *const size)
 	{
 		// If stat fails, then do a manual byte count
 		FILE *handle = fopen(path, "r");
-		size         = DqnFileInternal_UnixGetFileSizeManual(handle, false);
+		*size        = DqnFileInternal_UnixGetFileSizeManual(handle, false);
 		fclose(handle);
 	}
 
@@ -9123,7 +9134,7 @@ bool DqnFile::GetInfo(wchar_t const *const path, Info *const info)
 	}
 
 #elif defined(DQN_UNIX_PLATFORM)
-	// NOTE: Not supported on unix
+	// NOTE: Wide char not supported on unix
 	DQN_ASSERT(DQN_INVALID_CODE_PATH);
 
 #endif
@@ -9133,17 +9144,31 @@ bool DqnFile::GetInfo(wchar_t const *const path, Info *const info)
 
 bool DqnFile::GetInfo(char const *const path, Info *const info)
 {
-	if (!path || !info) return false;
-
 	// TODO(doyle): Logging
+	if (!path || !info)
+	{
+		return false;
+	}
+
 #if defined(DQN_WIN32_PLATFORM)
 	// TODO(doyle): MAX PATH is baad
-	wchar_t widePath[MAX_PATH] = {0};
+	wchar_t widePath[MAX_PATH] = {};
 	DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
 	return DqnFile::GetInfo(widePath, info);
 
 #elif defined(DQN_UNIX_PLATFORM)
-#error UNIX implementation not completed.
+	struct stat fileStat = {};
+	if (stat(path, &fileStat))
+	{
+		return false;
+	}
+
+	info->size              = fileStat.st_size;
+	info->createTimeInS     = 0;
+	info->lastWriteTimeInS  = fileStat.st_mtime;
+	info->lastAccessTimeInS = fileStat.st_atime;
+
+	return true;
 #endif
 }
 
@@ -9637,26 +9662,21 @@ DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *const src, const i32 value)
 
 // XPlatform > #DqnPlatform
 // =================================================================================================
+#define DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(name) \
+	FILE_SCOPE void name(u32 *const numCores, u32 *const numThreadsPerCore)
+
 #if defined(DQN_UNIX_PLATFORM)
-FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCores,
-                                                              u32 *const numThreadsPerCore)
+DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresAndThreads)
 {
 	if (!numThreadsPerCore && !numCores) return;
 
 	// TODO(doyle): Not exactly standard
-	DqnFile file = {};
-	DQN_ASSERT(
-	    DqnFile_Open("/proc/cpuinfo", &file, DqnFile::PermissionFlag::FileRead, DqnFile::Action::OpenOnly));
-	DQN_ASSERT(file.size > 0);
 
-	u8 *readBuffer = (u8 *)DqnMem_Calloc(file.size);
-	if (readBuffer)
+	usize fileSize = 0;
+	if (u8 *readBuffer = DqnFile::ReadEntireFile("/proc/cpuinfo", &fileSize))
 	{
-		usize bytesRead = DqnFile_Read(&file, readBuffer, file.size);
-		DQN_ASSERT(bytesRead == file.size);
-
-		const char *srcPtr = (char *)readBuffer;
-		u32 srcLen   = file.size;
+		char const *srcPtr = reinterpret_cast<char *>(readBuffer);
+		usize srcLen       = fileSize;
 
 #define DQN_ADVANCE_CHAR_PTR_AND_LEN_INTERNAL(ptr, len, offset)                                     \
 	ptr += offset;                                                                                 \
@@ -9666,9 +9686,9 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 		{
 			*numThreadsPerCore = 0;
 			// Find the offset to the processor field and move to it
-			const char processorStr[] = "processor";
-			i32 processorOffset       = DqnStr_FindFirstOccurence(srcPtr, srcLen, processorStr,
-			                                                          DQN_ARRAY_COUNT(processorStr));
+			DqnSlice<char const> processor = DQN_SLICE_NAME("processor");
+			i32 processorOffset            = DqnStr_FindFirstOccurence(srcPtr, srcLen, processor.data, processor.len);
+
 			DQN_ASSERT(processorOffset != -1);
 			DQN_ADVANCE_CHAR_PTR_AND_LEN_INTERNAL(srcPtr, srcLen, processorOffset);
 
@@ -9686,10 +9706,10 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 		{
 			*numCores   = 0;
 			// Find the offset to the cpu cores field and move to it
-			const char cpuCoresStr[] = "cpu cores";
-			i32 cpuCoresOffset       = DqnStr_FindFirstOccurence(srcPtr, srcLen, cpuCoresStr,
-			                                               DQN_ARRAY_COUNT(cpuCoresStr));
+			DqnSlice<char const> cpuCores = DQN_SLICE_NAME("cpu cores");
+			i32 cpuCoresOffset            = DqnStr_FindFirstOccurence(srcPtr, srcLen, cpuCores.data, cpuCores.len);
 			DQN_ASSERT(cpuCoresOffset != -1);
+
 			DQN_ADVANCE_CHAR_PTR_AND_LEN_INTERNAL(srcPtr, srcLen, cpuCoresOffset);
 
 			// Find the offset to the colon delimiter and advance to 1 after it
@@ -9700,8 +9720,7 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 			// Read num cores value, i.e. physical cores
 			*numCores = Dqn_StrToI64(srcPtr, srcLen);
 		}
-		DqnFile_Close(&file);
-		DqnMem_Free(readBuffer);
+		DQN_DEFAULT_HEAP_ALLOCATOR->Free(readBuffer);
 	}
 	else
 	{
@@ -9712,8 +9731,7 @@ FILE_SCOPE void DqnPlatformInternal_UnixGetNumCoresAndThreads(u32 *const numCore
 #endif // DQN_UNIX_PLATFORM
 
 #if defined(DQN_WIN32_PLATFORM)
-FILE_SCOPE void DqnPlatformInternal_Win32GetNumCoresAndThreads(u32 *const numCores,
-                                                               u32 *const numThreadsPerCore)
+DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresAndThreads)
 {
 	if (numThreadsPerCore)
 	{
@@ -9775,11 +9793,8 @@ FILE_SCOPE void DqnPlatformInternal_Win32GetNumCoresAndThreads(u32 *const numCor
 // =================================================================================================
 DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *const numCores, u32 *const numThreadsPerCore)
 {
-#if defined(DQN_WIN32_PLATFORM)
-	DqnPlatformInternal_Win32GetNumCoresAndThreads(numCores, numThreadsPerCore);
-
-#elif defined(DQN_UNIX_PLATFORM)
-	DqnPlatformInternal_UnixGetNumCoresAndThreads(numCores, numThreadsPerCore);
+#if (defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM))
+	DqnPlatformInternal_GetNumCoresAndThreads(numCores, numThreadsPerCore);
 
 #else
 	#error Unsupported platform
