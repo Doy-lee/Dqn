@@ -139,8 +139,9 @@ using f32 = float;
 #define DQN_MEGABYTE(val) (DQN_KILOBYTE(val) * 1024LL)
 #define DQN_KILOBYTE(val) ((val) * 1024LL)
 
-#define DQN_HOUR(val) ((DQN_MINUTE(val)) * 60)
-#define DQN_MINUTE(val) ((val) * 60)
+#define DQN_DAY_TO_S(val) ((DQN_HOUR_TO_S(val)) * 24)
+#define DQN_HOUR_TO_S(val) ((DQN_MINUTE_TO_S(val)) * 60)
+#define DQN_MINUTE_TO_S(val) ((val) * 60)
 
 #define DQN_ALIGN_POW_N(val, align) ((((usize)val) + ((usize)align-1)) & (~(usize)(align-1)))
 #define DQN_ALIGN_POW_4(val)        DQN_ALIGN_POW_N(val, 4)
@@ -213,19 +214,11 @@ struct DqnSlice
 	i32  len;
 
 	DqnSlice() = default;
-	DqnSlice(T *str, i32 len) { data = str; len = len; }
+	DqnSlice(T *str, i32 len) { this->data = str; this->len = len; }
 };
 #define DQN_SLICE_NAME(name) DqnSlice<char const>(name, DQN_CHAR_COUNT(name))
 
-template <typename T>
-bool DqnSlice_Cmp(DqnSlice<T> const a, DqnSlice<T> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False)
-{
-	char const *bytePtrA      = reinterpret_cast<char const *>(a.data);
-	char const *bytePtrB      = reinterpret_cast<char const *>(b.data);
-	bool result = (a.len == b.len && DqnStr_Cmp(bytePtrA, bytePtrB, a.len, ignore) == 0);
-	return result;
-}
-
+#define DQN_SLICE_CMP(a, b, ignoreCase)  (a.len == b.len && (DqnStr_Cmp(a.data, b.data, a.len, ignoreCase) == 0))
 // #DqnChar API
 // =================================================================================================
 DQN_FILE_SCOPE char DqnChar_ToLower     (char c);
@@ -1543,6 +1536,9 @@ struct DqnString
 	bool InitLiteral       (wchar_t const *const cstr, DqnMemStack *const stack);
 	bool InitLiteral       (wchar_t const *const cstr, DqnMemAPI   *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
 
+	// return: False if cstr is nullptr.
+	bool InitLiteralNoAlloc(char *const cstr, i32 cstrLen = -1);
+
 	// API
 	// =============================================================================================
 	// return: These functions return false if allocation failed. String is preserved.
@@ -1567,6 +1563,18 @@ struct DqnString
 	static bool Cmp(DqnString const *a, DqnString const *b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False)
 	{
 		bool result = (a->len == b->len) && (DqnStr_Cmp(a->str, b->str, a->len, ignore) == 0);
+		return result;
+	}
+
+	static bool Cmp(DqnString const *a, DqnSlice<char const> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False)
+	{
+		bool result = (a->len == b.len) && (DqnStr_Cmp(a->str, b.data, b.len, ignore) == 0);
+		return result;
+	}
+
+	static bool Cmp(DqnString const *a, DqnSlice<char> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False)
+	{
+		bool result = (a->len == b.len) && (DqnStr_Cmp(a->str, b.data, b.len, ignore) == 0);
 		return result;
 	}
 };
@@ -2098,8 +2106,11 @@ struct DqnJson
 // If array, it returns a slice from [..] not-inclusive, if object, it returns a slice from {..} not-inclusive
 // If just name value pair, it returns the literal with quotes or just the value if it is a primitive with quotes.
 DQN_FILE_SCOPE DqnJson DqnJson_Get             (char const *buf, i32 bufLen, char const *findProperty, i32 findPropertyLen);
-DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnSlice<char> const buf, DqnSlice<char> const findProperty);
-DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnJson const input, DqnSlice<char> const findProperty);
+DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnSlice<char>       const buf, DqnSlice<char>       const findProperty);
+DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnSlice<char>       const buf, DqnSlice<char const> const findProperty);
+DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnSlice<char const> const buf, DqnSlice<char const> const findProperty);
+DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnJson const input, DqnSlice<char const> const findProperty);
+DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnJson const input, DqnSlice<char>       const findProperty);
 
 // newInput: (Optional) Returns the input advanced to the next array item, can be used again with
 //           function to get next array item.
@@ -6331,6 +6342,26 @@ bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI *const api)
 #endif
 }
 
+bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
+{
+	if (!cstr) return false;
+
+	this->str = cstr;
+	if (cstrLen == -1)
+	{
+		i32 utf8LenInBytes = 0;
+		DqnStr_LenUTF8((u32 *)cstr, &utf8LenInBytes);
+		this->len = utf8LenInBytes;
+	}
+	else
+	{
+		this->len = cstrLen;
+	}
+
+	this->max = this->len;
+	return true;
+}
+
 bool DqnString::Expand(i32 newMax)
 {
 	if (newMax < this->max)
@@ -6765,12 +6796,17 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnSlice<char> const buf, DqnSlice<char> cons
 	return result;
 }
 
-DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnSlice<char> const buf, DqnSlice<char const> findProperty)
+DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnSlice<char const> const buf, DqnSlice<char const> const findProperty)
 {
 	DqnJson result = DqnJson_Get(buf.data, buf.len, findProperty.data, findProperty.len);
 	return result;
 }
 
+DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnSlice<char> const buf, DqnSlice<char const> const findProperty)
+{
+	DqnJson result = DqnJson_Get(buf.data, buf.len, findProperty.data, findProperty.len);
+	return result;
+}
 
 DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnJson const input, DqnSlice<char> const findProperty)
 {
@@ -6778,12 +6814,11 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnJson const input, DqnSlice<char> const fin
 	return result;
 }
 
-DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnJson const input, DqnSlice<char const> findProperty)
+DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnJson const input, DqnSlice<char const> const findProperty)
 {
 	DqnJson result = DqnJson_Get(input.value.data, input.value.len, findProperty.data, findProperty.len);
 	return result;
 }
-
 
 DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson const input, DqnJson *newInput)
 {
