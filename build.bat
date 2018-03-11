@@ -5,8 +5,29 @@
 set ProjectName=dqn_unit_test
 set CompileEntryPoint=..\dqn_unit_test.cpp
 
-REM Build tags file
-ctags -R
+REM Build tags file if you have ctags in path
+where /q ctags
+if %errorlevel%==0 (
+REM When parsing a C++ member function definition (e.g. "className::function"),
+REM ctags cannot determine whether the scope specifier is a class name or
+REM a namespace specifier and always lists it as a class name in the scope
+REM portion of the extension fields. Also, if a C++ function is defined outside
+REM of the class declaration (the usual case), the access specification (i.e.
+REM public, protected, or private) and implementation information (e.g. virtual,
+REM pure virtual) contained in the function declaration are not known when the
+REM tag is generated for the function definition. -c++-kinds=+p fixes that
+
+REM The --fields=+iaS option:
+REM    a   Access (or export) of class members
+REM    i   Inheritance information
+REM    S   Signature of routine (e.g. prototype or parameter list)
+REM
+REM The --extra=+q option:
+REM    By default, ctags only generates tags for separate identifiers found in
+REM    the source files. With --extras=+q option, then ctags will also generate
+REM    a second, class-qualified tag for each class member
+	ctags -R --c++-kinds=+p --fields=+iaS --extras=+q
+)
 
 REM Check if build tool is on path
 REM >nul, 2>nul will remove the output text from the where command

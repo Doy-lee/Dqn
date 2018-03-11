@@ -775,9 +775,9 @@ struct DqnAllocatorMetadata
 	isize *PtrToAllocAmount    (u8 const *ptr)            const;
 
 private:
-	u32            boundsGuardSize; // sizeof(GUARD_VALUE) OR 0 if BoundsGuard is disabled.
-	u32            allocHeadSize;   // Bounds Guard Size + Offset To Src Size + Alloc Amount Size
-	u32            allocTailSize;   // Bounds Guard Size
+	u32    boundsGuardSize; // sizeof(GUARD_VALUE) OR 0 if BoundsGuard is disabled.
+	u32    allocHeadSize;   // Bounds Guard Size + Offset To Src Size + Alloc Amount Size
+	u32    allocTailSize;   // Bounds Guard Size
 };
 
 // #DqnMemStack API
@@ -1099,7 +1099,7 @@ T *DqnArray<T>::Insert(T const item, isize index)
 	this->data[index] = item;
 	T *result         = this->data + index;
 
-	DQN_ASSERT(this->count < this->max);
+	DQN_ASSERT(this->count <= this->max);
 	return result;
 }
 
@@ -6395,7 +6395,7 @@ bool DqnString::Expand(i32 newMax)
 	usize allocSize = sizeof(*(this->str)) * (newMax + 1);
 	char *result     = nullptr;
 
-	if (this->str) result = (char *)this->memAPI->Realloc(this->str, this->max, allocSize);
+	if (this->str) result = (char *)this->memAPI->Realloc(this->str, (this->max + 1), allocSize);
 	else           result = (char *)this->memAPI->Alloc(allocSize, Dqn::ZeroClear::False);
 
 	if (result)
