@@ -127,6 +127,8 @@ using i32 = int32_t;
 using i16 = int16_t;
 using i8  = int8_t;
 
+using b32 = i32;
+
 using f64 = double;
 using f32 = float;
 
@@ -176,6 +178,342 @@ namespace Dqn
 enum struct ZeroClear   { True = 1, False = 0};
 enum struct IgnoreCase  { True = 1, False = 0};
 }; // namespace Dqn
+
+// #Win32 Prototypes
+// =================================================================================================
+#ifdef DQN_WIN32_PLATFORM
+#ifndef _WINDOWS_
+using WORD      = unsigned short;
+using DWORD     = unsigned long;
+using BOOL      = int;
+using LONG      = long;
+using LONGLONG  = long long;
+using HANDLE    = void *;
+using HMODULE   = HANDLE;
+using HWND      = HANDLE;
+using UINT      = unsigned int;
+using ULONG     = unsigned long;
+using ULONGLONG = unsigned long long;
+using DWORD64   = unsigned long long;
+using BYTE      = unsigned char;
+
+u32    const MB_OK                         = 0x00000000L;
+HANDLE const INVALID_HANDLE_VALUE          = ((HANDLE)(LONG *)-1);
+u32    const MAX_PATH                      = 260;
+u32    const INFINITE                      = 0xFFFFFFFF;
+u32    const CP_UTF8                       = 65001;
+u32    const FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200;
+u32    const FORMAT_MESSAGE_FROM_SYSTEM    = 0x00001000;
+
+struct RECT
+{
+    LONG left;
+    LONG top;
+    LONG right;
+    LONG bottom;
+};
+
+union LARGE_INTEGER
+{
+    struct { DWORD LowPart; LONG HighPart; };
+    struct { DWORD LowPart; LONG HighPart; } u;
+    LONGLONG QuadPart;
+};
+
+union ULARGE_INTEGER
+{
+  struct { DWORD LowPart; DWORD HighPart; };
+  struct { DWORD LowPart; DWORD HighPart; } u;
+  ULONGLONG QuadPart;
+};
+
+struct SECURITY_ATTRIBUTES
+{
+    DWORD length;
+    void *securityDescriptor;
+    BOOL inheritHandle;
+};
+
+struct PROCESS_INFORMATION
+{
+    void *hProcess;
+    void *hThread;
+    DWORD dwProcessId;
+    DWORD dwThreadId;
+};
+
+
+struct FILETIME
+{
+  DWORD dwLowDateTime;
+  DWORD dwHighDateTime;
+};
+
+struct WIN32_FILE_ATTRIBUTE_DATA
+{
+    DWORD dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
+    FILETIME ftLastWriteTime;
+    DWORD nFileSizeHigh;
+    DWORD nFileSizeLow;
+};
+
+enum GET_FILEEX_INFO_LEVELS
+{
+    GetFileExInfoStandard,
+    GetFileExMaxInfoLevel
+};
+
+struct WIN32_FIND_DATAW
+{
+  DWORD    dwFileAttributes;
+  FILETIME ftCreationTime;
+  FILETIME ftLastAccessTime;
+  FILETIME ftLastWriteTime;
+  DWORD    nFileSizeHigh;
+  DWORD    nFileSizeLow;
+  DWORD    dwReserved0;
+  DWORD    dwReserved1;
+  wchar_t  cFileName[MAX_PATH];
+  wchar_t  cAlternateFileName[14];
+};
+
+struct LIST_ENTRY {
+   struct LIST_ENTRY *Flink;
+   struct LIST_ENTRY *Blink;
+};
+
+struct RTL_CRITICAL_SECTION_DEBUG
+{
+    WORD Type;
+    WORD CreatorBackTraceIndex;
+    struct CRITICAL_SECTION *CriticalSection;
+    LIST_ENTRY ProcessLocksList;
+    DWORD EntryCount;
+    DWORD ContentionCount;
+    DWORD Flags;
+    WORD CreatorBackTraceIndexHigh;
+    WORD SpareWORD;
+};
+
+struct CRITICAL_SECTION
+{
+    RTL_CRITICAL_SECTION_DEBUG *DebugInfo;
+    LONG LockCount;
+    LONG RecursionCount;
+    HANDLE OwningThread;
+    HANDLE LockSemaphore;
+    ULONG *SpinCount;
+};
+
+struct OVERLAPPED {
+  ULONG *Internal;
+  ULONG *InternalHigh;
+  union {
+    struct {
+      DWORD Offset;
+      DWORD OffsetHigh;
+    };
+    void  *Pointer;
+  };
+  HANDLE    hEvent;
+};
+
+struct SYSTEM_INFO {
+  union
+  {
+    DWORD  dwOemId;
+    struct
+    {
+      WORD wProcessorArchitecture;
+      WORD wReserved;
+    };
+  };
+  DWORD  dwPageSize;
+  void  *lpMinimumApplicationAddress;
+  void  *lpMaximumApplicationAddress;
+  DWORD *dwActiveProcessorMask;
+  DWORD  dwNumberOfProcessors;
+  DWORD  dwProcessorType;
+  DWORD  dwAllocationGranularity;
+  WORD   wProcessorLevel;
+  WORD   wProcessorRevision;
+};
+
+enum LOGICAL_PROCESSOR_RELATIONSHIP
+{
+    RelationProcessorCore,
+    RelationNumaNode,
+    RelationCache,
+    RelationProcessorPackage,
+    RelationGroup,
+    RelationAll = 0xffff
+};
+
+typedef unsigned long *KAFFINITY;
+struct GROUP_AFFINITY {
+    KAFFINITY Mask;
+    WORD   Group;
+    WORD   Reserved[3];
+};
+
+struct PROCESSOR_RELATIONSHIP
+{
+    BYTE  Flags;
+    BYTE  EfficiencyClass;
+    BYTE  Reserved[20];
+    WORD  GroupCount;
+    GROUP_AFFINITY GroupMask[1];
+};
+
+struct NUMA_NODE_RELATIONSHIP {
+    DWORD NodeNumber;
+    BYTE  Reserved[20];
+    GROUP_AFFINITY GroupMask;
+};
+
+enum PROCESSOR_CACHE_TYPE
+{
+    CacheUnified,
+    CacheInstruction,
+    CacheData,
+    CacheTrace
+};
+
+struct CACHE_RELATIONSHIP
+{
+    BYTE Level;
+    BYTE Associativity;
+    WORD LineSize;
+    DWORD CacheSize;
+    PROCESSOR_CACHE_TYPE Type;
+    BYTE Reserved[20];
+    GROUP_AFFINITY GroupMask;
+};
+
+struct PROCESSOR_GROUP_INFO
+{
+    BYTE MaximumProcessorCount;
+    BYTE ActiveProcessorCount;
+    BYTE Reserved[38];
+    KAFFINITY ActiveProcessorMask;
+};
+
+struct GROUP_RELATIONSHIP
+{
+    WORD MaximumGroupCount;
+    WORD ActiveGroupCount;
+    BYTE Reserved[20];
+    PROCESSOR_GROUP_INFO GroupInfo[1];
+};
+
+struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX
+{
+    LOGICAL_PROCESSOR_RELATIONSHIP Relationship;
+    DWORD Size;
+    union
+    {
+        PROCESSOR_RELATIONSHIP Processor;
+        NUMA_NODE_RELATIONSHIP NumaNode;
+        CACHE_RELATIONSHIP Cache;
+        GROUP_RELATIONSHIP Group;
+    };
+};
+
+
+typedef DWORD (*LPTHREAD_START_ROUTINE)(void *lpThreadParameter);
+
+DWORD64 __rdtsc();
+
+void    DeleteCriticalSection           (CRITICAL_SECTION *lpCriticalSection);
+BOOL    DeleteFileA                     (char    const *lpFileName); // TODO(doyle): Wide versions only
+BOOL    DeleteFileW                     (wchar_t const *lpFileName);
+BOOL    CloseHandle                     (HANDLE hObject);
+BOOL    CopyFileA                       (char    const *lpExistingFileName, char const *lpNewFileName, BOOL bFailIfExists);
+BOOL    CopyFileW                       (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, BOOL bFailIfExists);
+BOOL    CloseHandle                     (HANDLE *hObject);
+HANDLE  CreateFileW                     (wchar_t const *lpFileName,
+                                         DWORD dwDesiredAccess,
+                                         DWORD dwShareMode,
+                                         SECURITY_ATTRIBUTES *lpSecurityAttributes,
+                                         DWORD dwCreationDisposition,
+                                         DWORD dwFlagsAndAttributes,
+                                         HANDLE hTemplateFile);
+HANDLE  CreateSemaphoreA                (SECURITY_ATTRIBUTES *lpSemaphoreAttributes,
+                                         long lInitialCount,
+                                         long lMaximumCount,
+                                         char const *lpName);
+HANDLE  CreateThread                    (SECURITY_ATTRIBUTES *lpThreadAttributes,
+                                         size_t dwStackSize,
+                                         LPTHREAD_START_ROUTINE lpStartAddress,
+                                         void *lpParameter,
+                                         DWORD dwCreationFlags,
+                                         DWORD *lpThreadId);
+void    EnterCriticalSection            (CRITICAL_SECTION *lpCriticalSection);
+BOOL    FindClose                       (HANDLE hFindFile);
+HANDLE  FindFirstFileW                  (wchar_t const *lpFileName, WIN32_FIND_DATAW *lpFindFileData);
+BOOL    FindNextFileW                   (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+DWORD   FormatMessageA                  (DWORD dwFlags,
+                                         void const *lpSource,
+                                         DWORD dwMessageId,
+                                         DWORD dwLanguageId,
+                                         char *lpBuffer,
+                                         DWORD nSize,
+                                         va_list *Arguments);
+BOOL    GetClientRect                   (HWND hWnd, RECT *lpRect);
+BOOL    GetExitCodeProcess              (HANDLE *hProcess, DWORD *lpExitCode);
+BOOL    GetFileSizeEx                   (HANDLE hFile, LARGE_INTEGER *lpFileSize);
+BOOL    GetFileAttributesExW            (wchar_t const *lpFileName,
+                                         GET_FILEEX_INFO_LEVELS fInfoLevelId,
+                                         void *lpFileInformation);
+DWORD   GetLastError                    (void);
+DWORD   GetModuleFileNameA              (HMODULE hModule, char *lpFilename, DWORD nSize);
+void    GetNativeSystemInfo             (SYSTEM_INFO *lpSystemInfo);
+BOOL    GetLogicalProcessorInformationEx(LOGICAL_PROCESSOR_RELATIONSHIP RelationshipType,
+                                         SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *Buffer,
+                                         DWORD *ReturnedLength);
+BOOL    InitializeCriticalSectionEx     (CRITICAL_SECTION *lpCriticalSection,
+                                         DWORD dwSpinCount,
+                                         DWORD Flags);
+long    InterlockedAdd                  (long volatile *Addend, long Value);
+long    InterlockedCompareExchange      (long volatile *Destination, long Exchange, long Comparand);
+void    LeaveCriticalSection            (CRITICAL_SECTION *lpCriticalSection);
+int     MessageBoxA                     (HWND hWnd, char const *lpText, char const *lpCaption, UINT uType);
+int     MultiByteToWideChar             (unsigned int CodePage,
+                                         DWORD dwFlags,
+                                         char const *lpMultiByteStr,
+                                         int cbMultiByte,
+                                         wchar_t *lpWideCharStr,
+                                         int cchWideChar);
+void    OutputDebugStringA              (char const *lpOutputString);
+BOOL    ReadFile                        (HANDLE hFile,
+                                         void *lpBuffer,
+                                         DWORD nNumberOfBytesToRead,
+                                         DWORD *lpNumberOfBytesRead,
+                                         OVERLAPPED *lpOverlapped);
+BOOL    ReleaseSemaphore                (HANDLE hSemaphore, long lReleaseCount, long *lpPreviousCount);
+BOOL    QueryPerformanceFrequency       (LARGE_INTEGER *lpFrequency);
+BOOL    QueryPerformanceCounter         (LARGE_INTEGER *lpPerformanceCount);
+DWORD   WaitForSingleObject             (HANDLE *hHandle, DWORD dwMilliseconds);
+DWORD   WaitForSingleObjectEx           (HANDLE hHandle, DWORD dwMilliseconds, BOOL bAlertable);
+int     WideCharToMultiByte             (unsigned int CodePage,
+                                         DWORD dwFlags,
+                                         wchar_t const *lpWideCharStr,
+                                         int cchWideChar,
+                                         char *lpMultiByteStr,
+                                         int cbMultiByte,
+                                         char const *lpDefaultChar,
+                                         BOOL *lpUsedDefaultChar);
+void    Sleep                           (DWORD dwMilliseconds);
+BOOL    WriteFile                       (HANDLE hFile,
+                                         void *const lpBuffer,
+                                         DWORD nNumberOfBytesToWrite,
+                                         DWORD *lpNumberOfBytesWritten,
+                                         OVERLAPPED *lpOverlapped);
+#endif // _WINDOWS_
+#endif // DQN_WIN32_PLATFORM
+
 
 // #DqnAssert API
 // =================================================================================================
@@ -2155,17 +2493,11 @@ DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson const input, DqnJson *ne
 #define DQN_PLATFORM_H
 
 #if defined(DQN_IS_WIN32)
-    #ifndef WIN32_LEAN_AND_MEAN
-        #define WIN32_LEAN_AND_MEAN 1
-    #endif
-
-    #include <Windows.h>
-
 #elif defined(DQN_IS_UNIX)
     #include <pthread.h>
     #include <semaphore.h>
-
 #endif
+
 // XPlatform > #DqnFile API
 // =================================================================================================
 struct DqnFile
@@ -2205,17 +2537,17 @@ struct DqnFile
     // Open a handle for file read and writing. Deleting files does not need a handle. Handles should be
     // closed before deleting files otherwise the OS may not be able to delete the file.
     // return: FALSE if invalid args or failed to get handle (i.e. insufficient permissions)
-    bool   Open(const char    *const path, u32 const flags_, Action const action);
-    bool   Open(const wchar_t *const path, u32 const flags_, Action const action);
+    bool   Open(char    const *path, u32 const flags_, Action const action);
+    bool   Open(wchar_t const *path, u32 const flags_, Action const action);
 
     // fileOffset: The byte offset to starting writing from.
     // return:     The number of bytes written. 0 if invalid args or it failed to write.
-    usize  Write(u8 const *const buf, usize const numBytesToWrite, usize const fileOffset);
+    usize  Write(u8 const *buf, usize const numBytesToWrite, usize const fileOffset);
 
     // IMPORTANT: You may want to allocate size+1 for null-terminating the file contents when
     // reading into a buffer.
     // return: The number of bytes read. 0 if invalid args or it failed to read.
-    usize  Read (u8 *const buf, usize const numBytesToRead);
+    usize  Read (u8 *buf, usize const numBytesToRead);
 
     // File close invalidates the handle after it is called.
     void   Close();
@@ -2226,29 +2558,29 @@ struct DqnFile
     // NOTE: You want size + 1 and add the null-terminator yourself if you want a null terminated buffer.
     // bytesRead: Pass in to get how many bytes of the buf was used. Basically the return value of Read
     // return:    False if insufficient bufSize OR file access failure OR nullptr arguments.
-    static bool   ReadEntireFile(char    const *const path, u8 *const buf, usize const bufSize, usize *const bytesRead);
-    static bool   ReadEntireFile(wchar_t const *const path, u8 *const buf, usize const bufSize, usize *const bytesRead);
+    static bool   ReadEntireFile(char    const *path, u8 *buf, usize const bufSize, usize *bytesRead);
+    static bool   ReadEntireFile(wchar_t const *path, u8 *buf, usize const bufSize, usize *bytesRead);
 
     // Buffer is null-terminated and should be freed when done with.
     // return: False if file access failure OR nullptr arguments.
-    static u8    *ReadEntireFile(char    const *const path, usize *const bufSize, DqnMemAPI *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
-    static u8    *ReadEntireFile(wchar_t const *const path, usize *const bufSize, DqnMemAPI *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
+    static u8    *ReadEntireFile(char    const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+    static u8    *ReadEntireFile(wchar_t const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 
     // return: False if file access failure OR nullptr arguments.
-    static bool   GetFileSize   (char    const *const path, usize *const size);
-    static bool   GetFileSize   (wchar_t const *const path, usize *const size);
+    static bool   GetFileSize   (char    const *path, usize *size);
+    static bool   GetFileSize   (wchar_t const *path, usize *size);
 
     // info:   Pass in to fill with file attributes.
     // return: False if file access failure OR nullptr arguments.
-    static bool   GetInfo       (char    const *const path, Info *const info);
-    static bool   GetInfo       (wchar_t const *const path, Info *const info);
+    static bool   GetInfo       (char    const *path, Info *info);
+    static bool   GetInfo       (wchar_t const *path, Info *info);
 
     // NOTE: You can't delete a file unless the handle has been closed to it on Win32.
     // return: False if file access failure OR nullptr arguments.
-    static bool   Delete        (char    const *const path);
-    static bool   Delete        (wchar_t const *const path);
-    static bool   Copy          (char    const *const src, char    const *const dest);
-    static bool   Copy          (wchar_t const *const src, wchar_t const *const dest);
+    static bool   Delete        (char    const *path);
+    static bool   Delete        (wchar_t const *path);
+    static bool   Copy          (char    const *src, char    const *dest);
+    static bool   Copy          (wchar_t const *src, wchar_t const *dest);
 
     // NOTE: Win32: Current directory is "*", Unix: "."
     // numFiles: Pass in a ref to a i32. The function fills it out with the number of entries.
@@ -2258,9 +2590,8 @@ struct DqnFile
     static void   ListDirFree   (char **fileList, i32 numFiles, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 };
 
-class DqnSmartFile : public DqnFile
+struct DqnSmartFile : public DqnFile
 {
-public:
     ~DqnSmartFile() { this->Close(); }
 };
 
@@ -2440,8 +2771,8 @@ DQN_FILE_SCOPE i32 DqnWin32_WCharToUTF8(const wchar_t *const in, char    *const 
 
 // "width" and "height" are optional and won't be used if not given by user.
 // width & height: Pass in a pointer for function to fill out.
-DQN_FILE_SCOPE void DqnWin32_GetClientDim     (const HWND window, LONG *const width, LONG *const height);
-DQN_FILE_SCOPE void DqnWin32_GetRectDim       (const RECT rect,   LONG *const width, LONG *const height);
+DQN_FILE_SCOPE void DqnWin32_GetClientDim     (HWND const window, LONG *width, LONG *height);
+DQN_FILE_SCOPE void DqnWin32_GetRectDim       (RECT const rect,   LONG *width, LONG *height);
 
 // Displays error in the format <errorPrefix>: <Win32 Error Message> in a Win32 Dialog Box.
 // errorPrefix: The message before the Win32 error, can be nullptr
@@ -3094,30 +3425,6 @@ DQN_FILE_SCOPE void *DqnMem_Set(void *const dest, u8 const value, i64 const numB
 
     return dest;
 }
-
-DQN_FILE_SCOPE void *DqnMem_Set64(void *const dest, u8 const value, i64 const numBytesToCopy)
-{
-#if defined(DQN_WIN32_PLATFORM)
-    u64 valueU64 = value;
-    valueU64 |= valueU64 << 8;
-    valueU64 |= valueU64 << 16;
-    valueU64 |= valueU64 << 32;
-
-    auto *const destU64      = (u64 *)dest;
-    i64   const numU64ToCopy = numBytesToCopy / sizeof(u64);
-    __stosq(destU64, valueU64, numU64ToCopy);
-
-    const u64 remainingMask   = sizeof(u64) - 1;
-    auto   *const destU8      = (u8 *)dest + (numBytesToCopy & ~remainingMask);
-    u8      const valueU8     = value;
-    usize  const numU8ToCopy = numBytesToCopy & (remainingMask);
-    __stosb(destU8, valueU8, numU8ToCopy);
-#else
-    (void)dest; (void)value; (void)numBytesToCopy;
-    DQN_ASSERT(DQN_INVALID_CODE_PATH)
-#endif
-    return dest;
-};
 
 // #DqnMemAPI
 // =================================================================================================
@@ -8592,21 +8899,35 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 // XPlatform > #DqnFile
 // =================================================================================================
 #ifdef DQN_WIN32_PLATFORM
-FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *const path, DqnFile *const file,
+
+FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *path, DqnFile *const file,
                                            u32 const flags, DqnFile::Action const action)
 {
     if (!file || !path) return false;
 
+    u32 const WIN32_GENERIC_READ    = 0x80000000L;
+    u32 const WIN32_GENERIC_WRITE   = 0x40000000L;
+    u32 const WIN32_GENERIC_EXECUTE = 0x20000000L;
+    u32 const WIN32_GENERIC_ALL     = 0x10000000L;
+
+    u32 const WIN32_CREATE_NEW        = 1;
+    u32 const WIN32_CREATE_ALWAYS     = 2;
+    u32 const WIN32_OPEN_EXISTING     = 3;
+    u32 const WIN32_OPEN_ALWAYS       = 4;
+    u32 const WIN32_TRUNCATE_EXISTING = 5;
+
+    u32 const WIN32_FILE_ATTRIBUTE_NORMAL = 0x00000080;
+
     DWORD win32Permission = 0;
     if (flags & DqnFile::PermissionFlag::All)
     {
-        win32Permission = GENERIC_ALL;
+        win32Permission = WIN32_GENERIC_ALL;
     }
     else
     {
-        if (flags & DqnFile::PermissionFlag::FileRead)  win32Permission |= GENERIC_READ;
-        if (flags & DqnFile::PermissionFlag::FileWrite) win32Permission |= GENERIC_WRITE;
-        if (flags & DqnFile::PermissionFlag::Execute)   win32Permission |= GENERIC_EXECUTE;
+        if (flags & DqnFile::PermissionFlag::FileRead)  win32Permission |= WIN32_GENERIC_READ;
+        if (flags & DqnFile::PermissionFlag::FileWrite) win32Permission |= WIN32_GENERIC_WRITE;
+        if (flags & DqnFile::PermissionFlag::Execute)   win32Permission |= WIN32_GENERIC_EXECUTE;
     }
 
     DWORD win32Action = 0;
@@ -8614,14 +8935,14 @@ FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *const path, DqnFile *co
     {
         // Allow fall through
         default: DQN_ASSERT(DQN_INVALID_CODE_PATH);
-        case DqnFile::Action::OpenOnly:         win32Action = OPEN_EXISTING; break;
-        case DqnFile::Action::ClearIfExist:     win32Action = TRUNCATE_EXISTING; break;
-        case DqnFile::Action::CreateIfNotExist: win32Action = CREATE_NEW; break;
-        case DqnFile::Action::ForceCreate:      win32Action = CREATE_ALWAYS; break;
+        case DqnFile::Action::OpenOnly:         win32Action = WIN32_OPEN_EXISTING; break;
+        case DqnFile::Action::ClearIfExist:     win32Action = WIN32_TRUNCATE_EXISTING; break;
+        case DqnFile::Action::CreateIfNotExist: win32Action = WIN32_CREATE_NEW; break;
+        case DqnFile::Action::ForceCreate:      win32Action = WIN32_CREATE_ALWAYS; break;
     }
 
     HANDLE handle = CreateFileW(path, win32Permission, 0, nullptr, win32Action,
-                                FILE_ATTRIBUTE_NORMAL, nullptr);
+                                WIN32_FILE_ATTRIBUTE_NORMAL, nullptr);
 
     if (handle == INVALID_HANDLE_VALUE)
     {
@@ -8667,7 +8988,9 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
             if (result == 0)
             {
                 DWORD error = GetLastError();
-                if (error != ERROR_NO_MORE_FILES)
+
+                u32 const WIN32_ERROR_NO_MORE_FILES = 18L;
+                if (error != WIN32_ERROR_NO_MORE_FILES)
                 {
                     DqnWin32_DisplayErrorCode(error, "FindNextFileW() failed");
                 }
@@ -8903,7 +9226,7 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
 }
 
 #endif // DQN_UNIX_PLATFORM
-bool DqnFile::Open(char const *const path, u32 const flags_, Action const action)
+bool DqnFile::Open(char const *path, u32 const flags_, Action const action)
 {
     if (!path) return false;
 
@@ -8923,7 +9246,7 @@ bool DqnFile::Open(char const *const path, u32 const flags_, Action const action
 #endif
 }
 
-bool DqnFile::Open(const wchar_t *const path, u32 const flags_, Action const action)
+bool DqnFile::Open(wchar_t const *path, u32 const flags_, Action const action)
 {
     if (!path) return false;
 
@@ -8936,7 +9259,7 @@ bool DqnFile::Open(const wchar_t *const path, u32 const flags_, Action const act
 #endif
 }
 
-usize DqnFile::Write(u8 const *const buf, usize const numBytesToWrite, usize const fileOffset)
+usize DqnFile::Write(u8 const *buf, usize const numBytesToWrite, usize const fileOffset)
 {
     // TODO(doyle): Implement when it's needed
     DQN_ASSERTM(fileOffset == 0, "File writing into offset is not implemented.");
@@ -9559,7 +9882,7 @@ FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *const queue, co
     if (!queue) return false;
 
 #if defined(DQN_WIN32_PLATFORM)
-    queue->semaphore = (void *)CreateSemaphore(nullptr, initSignalCount, maxSignalCount, nullptr);
+    queue->semaphore = (void *)CreateSemaphoreA(nullptr, initSignalCount, maxSignalCount, nullptr);
     DQN_ASSERT(queue->semaphore);
 
 #elif defined(DQN_UNIX_PLATFORM)
@@ -9870,7 +10193,6 @@ DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *const numCores, u32 *
 #endif // DQN_XPLATFORM_LAYER
 
 #ifdef DQN_WIN32_PLATFORM
-
 // #DqnWin32
 // =================================================================================================
 DQN_FILE_SCOPE i32 DqnWin32_UTF8ToWChar(const char *const in,
@@ -9902,7 +10224,7 @@ DQN_FILE_SCOPE i32 DqnWin32_WCharToUTF8(const wchar_t *const in,
     return result;
 }
 
-DQN_FILE_SCOPE void DqnWin32_GetClientDim(const HWND window, LONG *const width, LONG *const height)
+DQN_FILE_SCOPE void DqnWin32_GetClientDim(HWND const window, LONG *const width, LONG *const height)
 {
     RECT rect;
     GetClientRect(window, &rect);
@@ -9910,7 +10232,7 @@ DQN_FILE_SCOPE void DqnWin32_GetClientDim(const HWND window, LONG *const width, 
     if (height) *height = rect.bottom - rect.top;
 }
 
-DQN_FILE_SCOPE void DqnWin32_GetRectDim(const RECT rect, LONG *const width, LONG *const height)
+DQN_FILE_SCOPE void DqnWin32_GetRectDim(RECT const rect, LONG *const width, LONG *const height)
 {
     if (width)  *width  = rect.right - rect.left;
     if (height) *height = rect.bottom - rect.top;

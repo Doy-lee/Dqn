@@ -58,7 +58,7 @@ REM Include directories
 set IncludeFlags=
 
 REM Link libraries
-set LinkLibraries=user32.lib gdi32.lib msimg32.lib
+set LinkLibraries=user32.lib
 
 REM incrmenetal:no, turn incremental builds off
 REM opt:ref, try to remove functions from libs that are referenced at all
