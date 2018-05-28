@@ -1240,14 +1240,14 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 {
     if (1)
     {
-        DqnArray<DqnV2> array = {};
+        DqnArray<DqnV2> array(memAPI);
         if (1)
         {
-            DQN_ASSERT(array.InitSize(1, memAPI));
+            DQN_ASSERT(array.Reserve(1));
             DQN_ASSERT(array.max >= 1);
             DQN_ASSERT(array.count == 0);
 
-            // Test basic insert
+            // Test basic push
             if (1)
             {
                 DqnV2 va = DqnV2_(5, 10);
@@ -1258,7 +1258,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 
                 DQN_ASSERT(array.max >= 1);
                 DQN_ASSERT(array.count == 1);
-                Log(Status::Ok, "Test basic insert");
+                Log(Status::Ok, "Test basic push");
             }
 
             // Test array resizing and freeing
@@ -1320,12 +1320,63 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 
                 Log(Status::Ok, "Test resizing and free");
             }
+            array.Free();
+
+            // Test insert
+            if (1)
+            {
+                DqnV2 va = DqnV2_(5, 10);
+                array.Push(va);
+                array.Push(va);
+                array.Push(va);
+
+                DqnV2 vb = DqnV2_(1, 2);
+                array.Insert(vb, -1);
+                DQN_ASSERT(DqnV2_Equals(array.data[0], vb));
+
+                DqnV2 vc = DqnV2_(2, 1);
+                array.Insert(vc, array.count);
+                DQN_ASSERT(DqnV2_Equals(array.data[array.count-1], vc));
+
+                DqnV2 vd = DqnV2_(8, 9);
+                array.Insert(vd, 1);
+
+                DQN_ASSERT(DqnV2_Equals(array.data[0], vb));
+                DQN_ASSERT(DqnV2_Equals(array.data[1], vd));
+                DQN_ASSERT(DqnV2_Equals(array.data[2], va));
+                DQN_ASSERT(DqnV2_Equals(array.data[3], va));
+                DQN_ASSERT(DqnV2_Equals(array.data[4], va));
+                DQN_ASSERT(DqnV2_Equals(array.data[5], vc));
+
+                Log(Status::Ok, "Test insert");
+            }
+            array.Free();
+
+            // Test multi-insert
+            if (1)
+            {
+                DqnV2 va[] = {DqnV2_(5, 10), DqnV2_(6, 10), DqnV2_(7, 10)};
+                DqnV2 tmp = DqnV2_(1, 1);
+                array.Push(tmp);
+                array.Push(tmp);
+                array.Push(tmp);
+
+                array.Insert(va, DQN_ARRAY_COUNT(va), 1);
+                DQN_ASSERT(DqnV2_Equals(array.data[0], tmp));
+                DQN_ASSERT(DqnV2_Equals(array.data[1], va[0]));
+                DQN_ASSERT(DqnV2_Equals(array.data[2], va[1]));
+                DQN_ASSERT(DqnV2_Equals(array.data[3], va[2]));
+                DQN_ASSERT(DqnV2_Equals(array.data[4], tmp));
+                DQN_ASSERT(DqnV2_Equals(array.data[5], tmp));
+
+                Log(Status::Ok, "Test insert");
+            }
+            array.Free();
         }
-        array.Free();
 
         if (1)
         {
-            DQN_ASSERT(array.InitSize(1, memAPI));
+            DQN_ASSERT(array.Reserve(1));
             DQN_ASSERT(array.max >= 1);
             DQN_ASSERT(array.count == 0);
             Log(Status::Ok, "Empty array");
@@ -1339,7 +1390,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             DqnV2 c = DqnV2_(5, 6);
             DqnV2 d = DqnV2_(7, 8);
 
-            DQN_ASSERT(array.InitSize(16, memAPI));
+            DQN_ASSERT(array.Reserve(16));
             DQN_ASSERT(array.Remove(0) == false);
             DQN_ASSERT(array.max >= 16);
             DQN_ASSERT(array.count == 0);
@@ -1380,6 +1431,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             Log(Status::Ok, "Test removal");
         }
         array.Free();
+        array.memAPI = memAPI;
 
         if (1)
         {
@@ -1388,7 +1440,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             DqnV2 c = DqnV2_(5, 6);
             DqnV2 d = DqnV2_(7, 8);
 
-            DQN_ASSERT(array.InitSize(16, memAPI));
+            DQN_ASSERT(array.Reserve(16));
 
             DQN_ASSERT(array.Push(a));
             DQN_ASSERT(array.Push(b));
@@ -1428,8 +1480,9 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             i64 indexesToFree[] = {3, 2, 1, 0};
             i32 intList[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array;
-            array.InitSize(DQN_ARRAY_COUNT(intList), memAPI);
+            DqnArray<i32> array(memAPI);
+            array.Reserve(DQN_ARRAY_COUNT(intList));
+
             array.Push(intList, DQN_ARRAY_COUNT(intList));
             array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
             DQN_ASSERT(array.count == 0);
@@ -1442,8 +1495,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             i64 indexesToFree[] = {100, 200, 300, 400};
             i32 intList[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array;
-            array.InitSize(DQN_ARRAY_COUNT(intList), memAPI);
+            DqnArray<i32> array(memAPI);
+            array.Reserve(DQN_ARRAY_COUNT(intList));
             array.Push(intList, DQN_ARRAY_COUNT(intList));
             array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
             DQN_ASSERT(array.count == 4);
@@ -1460,8 +1513,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             i64 indexesToFree[] = {1};
             i32 intList[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array;
-            array.InitSize(DQN_ARRAY_COUNT(intList), memAPI);
+            DqnArray<i32> array(memAPI);
+            array.Reserve(DQN_ARRAY_COUNT(intList));
             array.Push(intList, DQN_ARRAY_COUNT(intList));
             array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
             DQN_ASSERT(array.count == 3);
@@ -1477,8 +1530,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             i64 indexesToFree[] = {100};
             i32 intList[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array;
-            array.InitSize(DQN_ARRAY_COUNT(intList), memAPI);
+            DqnArray<i32> array(memAPI);
+            array.Reserve(DQN_ARRAY_COUNT(intList));
             array.Push(intList, DQN_ARRAY_COUNT(intList));
             array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
             DQN_ASSERT(array.count == 4);
@@ -1495,8 +1548,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             i64 indexesToFree[] = {2};
             i32 intList[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array;
-            array.InitSize(DQN_ARRAY_COUNT(intList), memAPI);
+            DqnArray<i32> array(memAPI);
+            array.Reserve(DQN_ARRAY_COUNT(intList));
             array.Push(intList, DQN_ARRAY_COUNT(intList));
             array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
             DQN_ASSERT(array.count == 3);
@@ -1512,8 +1565,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             i64 indexesToFree[] = {2, 3};
             i32 intList[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array;
-            array.InitSize(DQN_ARRAY_COUNT(intList), memAPI);
+            DqnArray<i32> array(memAPI);
+            array.Reserve(DQN_ARRAY_COUNT(intList));
             array.Push(intList, DQN_ARRAY_COUNT(intList));
             array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
             DQN_ASSERT(array.count == 2);
@@ -1528,8 +1581,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             i64 indexesToFree[] = {30, 1, 3};
             i32 intList[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array;
-            array.InitSize(DQN_ARRAY_COUNT(intList), memAPI);
+            DqnArray<i32> array(memAPI);
+            array.Reserve(DQN_ARRAY_COUNT(intList));
             array.Push(intList, DQN_ARRAY_COUNT(intList));
             array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
 
@@ -1545,8 +1598,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             i64 indexesToFree[] = {0, 1, 2};
             i32 intList[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array;
-            array.InitSize(DQN_ARRAY_COUNT(intList), memAPI);
+            DqnArray<i32> array(memAPI);
+            array.Reserve(DQN_ARRAY_COUNT(intList));
             array.Push(intList, DQN_ARRAY_COUNT(intList));
             array.RemoveStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
 
@@ -1554,8 +1607,6 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             DQN_ASSERT(array.data[0] == 31);
             array.Free();
         }
-
-
         Log(Status::Ok, "Test stable removal with list of indexes");
     }
 }
@@ -1594,13 +1645,13 @@ void DqnArray_Test()
     {
         if (1)
         {
-            DqnArray<char> array1;
-            array1.InitSize(3);
+            DqnArray<char> array1 = {};
+            array1.Reserve(3);
             DQN_ASSERT(array1.count == 0);
             DQN_ASSERT(array1.max == 3);
             array1.Free();
 
-            array1.InitSize(0);
+            array1.Reserve(0);
             DQN_ASSERT(array1.count == 0);
             DQN_ASSERT(array1.max == 0);
 
@@ -1614,7 +1665,7 @@ void DqnArray_Test()
         if (1)
         {
             DqnArray<char> array = {};
-            DQN_ASSERT(array.InitSize(1));
+            DQN_ASSERT(array.Reserve(1));
             DqnArray_TestRealDataInternal(&array);
         }
 
@@ -1625,8 +1676,8 @@ void DqnArray_Test()
             if (1)
             {
                 auto memGuard0 = stack.TempRegionGuard();
-                DqnArray<char> array = {};
-                DQN_ASSERT(array.InitSize(1, &stack.myHeadAPI));
+                DqnArray<char> array(&stack.myHeadAPI);
+                DQN_ASSERT(array.Reserve(1));
                 DqnArray_TestRealDataInternal(&array);
             }
 
@@ -1634,8 +1685,8 @@ void DqnArray_Test()
             if (1)
             {
                 auto memGuard0 = stack.TempRegionGuard();
-                DqnArray<char> array = {};
-                DQN_ASSERT(array.InitSize(128, &stack.myHeadAPI));
+                DqnArray<char> array(&stack.myHeadAPI);
+                DQN_ASSERT(array.Reserve(128));
                 stack.Push(1024);
                 DqnArray_TestRealDataInternal(&array);
             }
@@ -2877,6 +2928,16 @@ int main(void)
     DqnTimer_Test();
     DqnJobQueue_Test();
 #endif
+
+    struct Item
+    {
+        f32 a, b, c, d;
+    };
+
+    Item storage[20] = {};
+    DqnArray<Item> array = {};
+    array.UseMemory(storage, DQN_ARRAY_COUNT(storage));
+
 
     // Log("\nPress 'Enter' Key to Exit\n");
     // getchar();

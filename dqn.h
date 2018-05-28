@@ -929,7 +929,6 @@ DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, const usize newSize);
 DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
 DQN_FILE_SCOPE void  DqnMem_Copy   (void *const dest, void const *const src, i64 const numBytesToCopy);
 DQN_FILE_SCOPE void *DqnMem_Set    (void *const dest, u8 const value,        i64 const numBytesToSet);
-DQN_FILE_SCOPE void *DqnMem_Set64  (void *const dest, u8 const value,        i64 const numBytesToSet);
 
 // #DqnMemAPI API
 // =================================================================================================
@@ -1019,25 +1018,25 @@ FILE_SCOPE DqnMemAPI *DQN_DEFAULT_HEAP_ALLOCATOR = &DQN_DEFAULT_HEAP_ALLOCATOR_;
 template <typename T>
 struct DqnArray
 {
-    DqnMemAPI *memAPI;
-    isize      count;
-    isize      max;
-    T         *data;
+    DqnMemAPI *memAPI; // R/Write: The allocation scheme used, if null, it gets set to DQN_DEFAULT_HEAP_ALLOCATOR
+    isize      count;  // Read: The number of item in the array
+    isize      max;    // Read: Maximum size of array
+    T         *data;   // Read: Item storage
+
+    DqnArray() = default; // Zero Is Initialisation
+    DqnArray(DqnMemAPI *memAPI_) { *this = {}; this->memAPI = memAPI_; }
 
     // API
     // =============================================================================================
-    void  Init        (T           *const data_, isize max_, isize count_ = 0);
-    void  Init        (DqnMemAPI   *const memAPI_ = DQN_DEFAULT_HEAP_ALLOCATOR);
-    void  Init        (DqnMemStack *const stack);
-    bool  InitSize    (isize size_, DqnMemAPI   *const memAPI_ = DQN_DEFAULT_HEAP_ALLOCATOR);
-    bool  InitSize    (isize size_, DqnMemStack *const stack);
+    void  UseMemory   (T *data_, isize max_, isize count_ = 0) { this->memAPI = nullptr; this->data = data_; this->max = max_; this->count = count_; }
 
     void  Free        ();
-    bool  Resize      (isize newMax);              // If (newMax < count), it will destroy the left over elements.
+    bool  Reserve     (isize newMax);              // If (newMax <= count) true is returned. False is returned only if out of memory.
     bool  Grow        (isize multiplier = 2);
-    T    *Make        ();                          // Get a ptr to the next free element in the array, increment count.
-    T    *Push        (T const *item, isize num);
-    T    *Push        (T const  item);
+    T    *Make        (isize num = 1);             // Increment array count by num and return a ptr to the start of an array of num elements.
+    T    *Push        (T const *item, isize num);  // return: Last element pushed (this->data + this->count - 1), or null if out of memory.
+    T    *Push        (T const  item);             // return: Last element pushed (this->data + this->count - 1), or null if out of memory.
+    T    *Insert      (T const *item, isize numItems, isize index);
     T    *Insert      (T const  item, isize index);
     void  Pop         ();
     T    *Peek        ();
@@ -1267,44 +1266,6 @@ inline void                           DqnMemStack_TempRegionEnd        (DqnMemSt
 inline DqnMemStack::TempRegionGuard_  DqnMemStack_TempRegionGuard      (DqnMemStack *me)                                                                                                      { return me->TempRegionGuard(); }
 inline void                           DqnMemStack_TempRegionKeepChanges(DqnMemStack *me, DqnMemStack::TempRegion region)                                                                      { me->TempRegionKeepChanges(region); }
 
-template <typename T>
-void DqnArray<T>::Init(DqnMemAPI *const memAPI_)
-{
-    memAPI = memAPI_;
-    count = max = 0;
-    data        = nullptr;
-}
-
-template <typename T>
-void DqnArray<T>::Init(T *data_, isize max_, isize count_)
-{
-    DQN_ASSERT(data_);
-    memAPI = nullptr;
-    count  = count_;
-    max    = max_;
-    data   = data_;
-}
-
-template <typename T>
-void DqnArray<T>::Init(DqnMemStack *const stack)
-{
-    this->Init(stack->myHeadAPI);
-}
-
-template <typename T>
-bool DqnArray<T>::InitSize(isize size_, DqnMemAPI *const memAPI_)
-{
-    this->Init(memAPI_);
-    bool result = this->Resize(size_);
-    return result;
-}
-
-template <typename T>
-bool DqnArray<T>::InitSize(isize size_, DqnMemStack *const stack)
-{
-    bool result = this->InitSize(size_, &stack->myHeadAPI);
-    return result;
-}
 
 // Implementation taken from Milton, developed by Serge at
 // https://github.com/serge-rgb/milton#license
@@ -1318,40 +1279,28 @@ void DqnArray<T>::Free()
             auto sizeToFree = this->max * sizeof(T);
             this->memAPI->Free(this->data, sizeToFree);
         }
-
-        this->data  = nullptr;
-        this->count = 0;
-        this->max   = 0;
     }
+
+    auto *memAPI_ = this->memAPI;
+    *this = {};
+    this->memAPI = memAPI_;
 }
 
 template <typename T>
-bool DqnArray<T>::Resize(isize newMax)
+bool DqnArray<T>::Reserve(isize newMax)
 {
-    if (!this->memAPI)
+    if (newMax <= this->count)
     {
-        DQN_LOGE("DqnArray has no memory api assigned. Resize to %d items failed.", newMax);
-        return false;
-    }
-
-    if (newMax == 0)
-    {
-        DQN_LOGD(
-            "DqnArray tried to resize to 0 items. Not allowed? TODO(doyle): Maybe just free the "
-            "array then?");
         return true;
     }
 
-
-    if (newMax < this->count)
+    if (!this->memAPI)
     {
-        DQN_LOGE(
-            "DqnArray has %d items but requested a resize to: %d and will destroy the remaining "
-            "items in the array!", this->count, newMax);
+        this->memAPI = DQN_DEFAULT_HEAP_ALLOCATOR;
     }
 
-    auto oldSize = this->max * sizeof(T);
-    auto newSize = newMax * sizeof(T);
+    usize oldSize = this->max * sizeof(T);
+    usize newSize = newMax * sizeof(T);
 
     T *result = nullptr;
     if (this->data)
@@ -1381,22 +1330,29 @@ bool DqnArray<T>::Grow(isize multiplier)
 {
     isize newMax = this->max * multiplier;
     newMax       = (newMax < 8) ? 8 : newMax;
-    bool result  = this->Resize(newMax);
+    bool result  = this->Reserve(newMax);
     return result;
 }
 
 template <typename T>
-T *DqnArray<T>::Make()
+inline bool DqnArray__TryMakeEnoughSpace(DqnArray<T> *array, isize numNewItems)
 {
-    bool accessible = true;
-    if (!this->data || this->count >= this->max)
+    bool result = true;
+    if (!array->data || (array->count + numNewItems) >= array->max)
     {
-        accessible = this->Grow();
+        result = array->Grow();
     }
 
-    if (accessible)
+    return result;
+}
+
+template <typename T>
+T *DqnArray<T>::Make(isize num)
+{
+    if (DqnArray__TryMakeEnoughSpace(this, num))
     {
-        T *result = this->data[this->count++];
+        T *result = &this->data[this->count];
+        this->count += num;
         return result;
     }
 
@@ -1406,13 +1362,10 @@ T *DqnArray<T>::Make()
 template <typename T>
 T *DqnArray<T>::Push(T const *item, isize num)
 {
-    if (!this->data || (this->count + num) > this->max)
+    if (!DqnArray__TryMakeEnoughSpace(this, num))
     {
-        if (!this->Grow())
-        {
-            DQN_LOGE("DqnArray could not push %d item(s) onto array because growing failed.", num);
-            return nullptr;
-        }
+        DQN_LOGE("DqnArray could not push %d item(s) onto array because growing failed.", num);
+        return nullptr;
     }
 
     for (auto i = 0; i < num; i++)
@@ -1431,32 +1384,40 @@ T *DqnArray<T>::Push(T const item)
 }
 
 template <typename T>
-T *DqnArray<T>::Insert(T const item, isize index)
+T *DqnArray<T>::Insert(T const *item, isize numItems, isize index)
 {
-    index = DQN_MAX(index, 0);
+    if (!DqnArray__TryMakeEnoughSpace(this, numItems))
+    {
+        DQN_LOGE("DqnArray could not push %d item(s) onto array because growing failed.", numItems);
+        return nullptr;
+    }
+
+    index = DQN_MIN(DQN_MAX(0, index), this->count);
     if (index >= this->count)
     {
-        T *result = this->Push(item);
+        T *result = this->Push(item, numItems);
         return result;
     }
 
-    if (!this->data || (this->count + 1) > this->max)
+    isize numItemsToShift = this->count - index;
+    for (isize i = 0; i < numItemsToShift; i++)
     {
-        if (!this->Grow())
-        {
-            DQN_LOGE("DqnArray could not insert at index %d because growing failed.", index);
-            return nullptr;
-        }
+        isize backwardsIndex       = this->count + numItems - 1 - i;
+        this->data[backwardsIndex] = this->data[this->count - 1 - i];
     }
 
-    this->count++;
-    for (auto i = this->count - 1; (i - 1) >= index; i--)
-        this->data[i] = this->data[i - 1];
-
-    this->data[index] = item;
-    T *result         = this->data + index;
+    this->count += numItems;
+    DqnMem_Copy(this->data + index, item, sizeof(*item) * numItems);
+    T *result = this->data + index;
 
     DQN_ASSERT(this->count <= this->max);
+    return result;
+}
+
+template <typename T>
+T *DqnArray<T>::Insert(T const item, isize index)
+{
+    T *result = this->Insert(&item, 1, index);
     return result;
 }
 
@@ -3832,7 +3793,8 @@ void DqnAllocatorMetadata::Init(bool boundsGuard)
     {
         this->boundsGuardSize        = sizeof(HEAD_GUARD_VALUE);
         LOCAL_PERSIST DqnMemAPI heap = DqnMemAPI::HeapAllocator();
-        DQN_ASSERT(this->allocations.InitSize(128, &heap));
+        this->allocations.memAPI     = &heap;
+        DQN_ASSERT(this->allocations.Reserve(128));
     }
     else
     {
