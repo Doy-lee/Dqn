@@ -445,41 +445,6 @@ void DqnStr_Test()
             Log("DqnStr_Len()");
         }
 
-        // strncpy
-        if (1)
-        {
-            if (1)
-            {
-                const char *const a = "str_a";
-                char b[10]          = {};
-                // Check copy into empty array
-                if (1)
-                {
-                    char *result = DqnStr_Copy(b, a, DqnStr_Len(a));
-                    DQN_ASSERT(DqnStr_Cmp(b, "str_a") == 0);
-                    DQN_ASSERT(DqnStr_Cmp(a, "str_a") == 0);
-                    DQN_ASSERT(DqnStr_Cmp(result, "str_a") == 0);
-                    DQN_ASSERT(DqnStr_Len(result) == 5);
-                    Log("DqnStr_Copy(): Check copy into empty array");
-                }
-
-                // Check copy into array offset, overlap with old results
-                if (1)
-                {
-                    char *newResult = DqnStr_Copy(&b[1], a, DqnStr_Len(a));
-                    DQN_ASSERT(DqnStr_Cmp(newResult, "str_a") == 0);
-                    DQN_ASSERT(DqnStr_Len(newResult) == 5);
-
-                    DQN_ASSERT(DqnStr_Cmp(a, "str_a") == 0);
-                    DQN_ASSERT(DqnStr_Len(a) == 5);
-
-                    DQN_ASSERT(DqnStr_Cmp(b, "sstr_a") == 0);
-                    DQN_ASSERT(DqnStr_Len(b) == 6);
-                    Log("DqnStr_Copy(): Check copy into array offset, overlap with old results");
-                }
-            }
-        }
-
         // StrReverse
         if (1)
         {
@@ -807,13 +772,13 @@ void DqnMath_Test()
         if (1)
         {
             hmm_vec3 hmmVec       = HMM_Vec3i(1, 2, 3);
-            DqnV3 dqnVec          = DqnV3_(1, 2, 3);
+            DqnV3 dqnVec          = DqnV3(1, 2, 3);
             DqnMat4 dqnTranslate  = DqnMat4_Translate3f(dqnVec.x, dqnVec.y, dqnVec.z);
             hmm_mat4 hmmTranslate = HMM_Translate(hmmVec);
             HandmadeMathVerifyMat4(dqnTranslate, hmmTranslate);
 
             hmm_vec3 hmmAxis      = HMM_Vec3(0.5f, 0.2f, 0.7f);
-            DqnV3 dqnAxis         = DqnV3_(0.5f, 0.2f, 0.7f);
+            DqnV3 dqnAxis         = DqnV3(0.5f, 0.2f, 0.7f);
             f32 rotationInDegrees = 80.0f;
 
             DqnMat4 dqnRotate = DqnMat4_Rotate(DQN_DEGREES_TO_RADIANS(rotationInDegrees), dqnAxis.x,
@@ -834,7 +799,7 @@ void DqnMath_Test()
             // Test Mat4 * MulV4
             if (1)
             {
-                DqnV4 dqnV4    = DqnV4_(1, 2, 3, 4);
+                DqnV4 dqnV4    = DqnV4(1, 2, 3, 4);
                 hmm_vec4 hmmV4 = HMM_Vec4(1, 2, 3, 4);
 
                 DqnV4 dqnResult    = DqnMat4_MulV4(dqnTSMatrix, dqnV4);
@@ -864,7 +829,7 @@ void DqnVX_Test()
             // Ctor with floats
             if (1)
             {
-                DqnV2 vec = DqnV2_(5.5f, 5.0f);
+                DqnV2 vec = DqnV2(5.5f, 5.0f);
                 DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f);
                 DQN_ASSERT(vec.w == 5.5f && vec.h == 5.0f);
             }
@@ -872,7 +837,7 @@ void DqnVX_Test()
             // Ctor with 2 integers
             if (1)
             {
-                DqnV2 vec = DqnV2_(3, 5);
+                DqnV2 vec = DqnV2(3, 5);
                 DQN_ASSERT(vec.x == 3 && vec.y == 5.0f);
                 DQN_ASSERT(vec.w == 3 && vec.h == 5.0f);
             }
@@ -882,25 +847,25 @@ void DqnVX_Test()
         // V2 Arithmetic
         if (1)
         {
-            DqnV2 vecA = DqnV2_(5, 10);
-            DqnV2 vecB = DqnV2_(2, 3);
+            DqnV2 vecA = DqnV2(5, 10);
+            DqnV2 vecB = DqnV2(2, 3);
             DQN_ASSERT(DqnV2_Equals(vecA, vecB) == false);
-            DQN_ASSERT(DqnV2_Equals(vecA, DqnV2_(5, 10)) == true);
-            DQN_ASSERT(DqnV2_Equals(vecB, DqnV2_(2, 3)) == true);
+            DQN_ASSERT(DqnV2_Equals(vecA, DqnV2(5, 10)) == true);
+            DQN_ASSERT(DqnV2_Equals(vecB, DqnV2(2, 3)) == true);
 
-            DqnV2 result = DqnV2_Add(vecA,  DqnV2_(5, 10));
-            DQN_ASSERT(DqnV2_Equals(result, DqnV2_(10, 20)) == true);
+            DqnV2 result = DqnV2_Add(vecA,  DqnV2(5, 10));
+            DQN_ASSERT(DqnV2_Equals(result, DqnV2(10, 20)) == true);
 
-            result = DqnV2_Sub(result, DqnV2_(5, 10));
-            DQN_ASSERT(DqnV2_Equals(result, DqnV2_(5, 10)) == true);
+            result = DqnV2_Sub(result, DqnV2(5, 10));
+            DQN_ASSERT(DqnV2_Equals(result, DqnV2(5, 10)) == true);
 
             result = DqnV2_Scalef(result, 5);
-            DQN_ASSERT(DqnV2_Equals(result, DqnV2_(25, 50)) == true);
+            DQN_ASSERT(DqnV2_Equals(result, DqnV2(25, 50)) == true);
 
-            result = DqnV2_Hadamard(result, DqnV2_(10.0f, 0.5f));
-            DQN_ASSERT(DqnV2_Equals(result, DqnV2_(250, 25)) == true);
+            result = DqnV2_Hadamard(result, DqnV2(10.0f, 0.5f));
+            DQN_ASSERT(DqnV2_Equals(result, DqnV2(250, 25)) == true);
 
-            f32 dotResult = DqnV2_Dot(DqnV2_(5, 10), DqnV2_(3, 4));
+            f32 dotResult = DqnV2_Dot(DqnV2(5, 10), DqnV2(3, 4));
             DQN_ASSERT(dotResult == 55);
             Log(Status::Ok, "DqnV2: Arithmetic");
         }
@@ -908,29 +873,29 @@ void DqnVX_Test()
         // Test operator overloading
         if (1)
         {
-            DqnV2 vecA = DqnV2_(5, 10);
-            DqnV2 vecB = DqnV2_(2, 3);
+            DqnV2 vecA = DqnV2(5, 10);
+            DqnV2 vecB = DqnV2(2, 3);
             DQN_ASSERT((vecA == vecB) == false);
-            DQN_ASSERT((vecA == DqnV2_(5, 10)) == true);
-            DQN_ASSERT((vecB == DqnV2_(2, 3)) == true);
+            DQN_ASSERT((vecA == DqnV2(5, 10)) == true);
+            DQN_ASSERT((vecB == DqnV2(2, 3)) == true);
 
-            DqnV2 result = vecA + DqnV2_(5, 10);
-            DQN_ASSERT((result == DqnV2_(10, 20)) == true);
+            DqnV2 result = vecA + DqnV2(5, 10);
+            DQN_ASSERT((result == DqnV2(10, 20)) == true);
 
-            result -= DqnV2_(5, 10);
-            DQN_ASSERT((result == DqnV2_(5, 10)) == true);
+            result -= DqnV2(5, 10);
+            DQN_ASSERT((result == DqnV2(5, 10)) == true);
 
             result *= 5;
-            DQN_ASSERT((result == DqnV2_(25, 50)) == true);
+            DQN_ASSERT((result == DqnV2(25, 50)) == true);
 
-            result = result * DqnV2_(10.0f, 0.5f);
-            DQN_ASSERT((result == DqnV2_(250, 25)) == true);
+            result = result * DqnV2(10.0f, 0.5f);
+            DQN_ASSERT((result == DqnV2(250, 25)) == true);
 
-            result += DqnV2_(1, 1);
-            DQN_ASSERT((result == DqnV2_(251, 26)) == true);
+            result += DqnV2(1, 1);
+            DQN_ASSERT((result == DqnV2(251, 26)) == true);
 
-            result = result - DqnV2_(1, 1);
-            DQN_ASSERT((result == DqnV2_(250, 25)) == true);
+            result = result - DqnV2(1, 1);
+            DQN_ASSERT((result == DqnV2(250, 25)) == true);
             Log(Status::Ok, "DqnV2: Operator Overloading");
         }
 
@@ -938,8 +903,8 @@ void DqnVX_Test()
         if (1)
         {
             const f32 EPSILON = 0.001f;
-            DqnV2 a           = DqnV2_(0, 0);
-            DqnV2 b           = DqnV2_(3, 4);
+            DqnV2 a           = DqnV2(0, 0);
+            DqnV2 b           = DqnV2(3, 4);
 
             f32 lengthSq = DqnV2_LengthSquared(a, b);
             DQN_ASSERT(lengthSq == 25);
@@ -955,7 +920,7 @@ void DqnVX_Test()
             DQN_ASSERTM(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x, normX);
             DQN_ASSERTM(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y, normY);
 
-            DqnV2 c = DqnV2_(3.5f, 8.0f);
+            DqnV2 c = DqnV2(3.5f, 8.0f);
             DQN_ASSERT(DqnV2_Overlaps(b, c) == true);
             DQN_ASSERT(DqnV2_Overlaps(b, a) == false);
 
@@ -968,8 +933,8 @@ void DqnVX_Test()
         // ConstrainToRatio
         if (1)
         {
-            DqnV2 ratio  = DqnV2_(16, 9);
-            DqnV2 dim    = DqnV2_(2000, 1080);
+            DqnV2 ratio  = DqnV2(16, 9);
+            DqnV2 dim    = DqnV2(2000, 1080);
             DqnV2 result = DqnV2_ConstrainToRatio(dim, ratio);
             DQN_ASSERT(result.w == 1920 && result.h == 1080);
             Log(Status::Ok, "DqnV2: ConstrainToRatio");
@@ -985,7 +950,7 @@ void DqnVX_Test()
             // Floats
             if (1)
             {
-                DqnV3 vec = DqnV3_(5.5f, 5.0f, 5.875f);
+                DqnV3 vec = DqnV3(5.5f, 5.0f, 5.875f);
                 DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f);
                 DQN_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f);
             }
@@ -993,7 +958,7 @@ void DqnVX_Test()
             // Integers
             if (1)
             {
-                DqnV3 vec = DqnV3_(3, 4, 5);
+                DqnV3 vec = DqnV3(3, 4, 5);
                 DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5);
                 DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5);
             }
@@ -1005,57 +970,57 @@ void DqnVX_Test()
             // Arithmetic
             if (1)
             {
-                DqnV3 vecA = DqnV3_(5, 10, 15);
-                DqnV3 vecB = DqnV3_(2, 3, 6);
+                DqnV3 vecA = DqnV3(5, 10, 15);
+                DqnV3 vecB = DqnV3(2, 3, 6);
                 DQN_ASSERT(DqnV3_Equals(vecA, vecB) == false);
-                DQN_ASSERT(DqnV3_Equals(vecA, DqnV3_(5, 10, 15)) == true);
-                DQN_ASSERT(DqnV3_Equals(vecB, DqnV3_(2, 3, 6)) == true);
+                DQN_ASSERT(DqnV3_Equals(vecA, DqnV3(5, 10, 15)) == true);
+                DQN_ASSERT(DqnV3_Equals(vecB, DqnV3(2, 3, 6)) == true);
 
-                DqnV3 result = DqnV3_Add(vecA, DqnV3_(5, 10, 15));
-                DQN_ASSERT(DqnV3_Equals(result, DqnV3_(10, 20, 30)) == true);
+                DqnV3 result = DqnV3_Add(vecA, DqnV3(5, 10, 15));
+                DQN_ASSERT(DqnV3_Equals(result, DqnV3(10, 20, 30)) == true);
 
-                result = DqnV3_Sub(result, DqnV3_(5, 10, 15));
-                DQN_ASSERT(DqnV3_Equals(result, DqnV3_(5, 10, 15)) == true);
+                result = DqnV3_Sub(result, DqnV3(5, 10, 15));
+                DQN_ASSERT(DqnV3_Equals(result, DqnV3(5, 10, 15)) == true);
 
                 result = DqnV3_Scalef(result, 5);
-                DQN_ASSERT(DqnV3_Equals(result, DqnV3_(25, 50, 75)) == true);
+                DQN_ASSERT(DqnV3_Equals(result, DqnV3(25, 50, 75)) == true);
 
-                result = DqnV3_Hadamard(result, DqnV3_(10.0f, 0.5f, 10.0f));
-                DQN_ASSERT(DqnV3_Equals(result, DqnV3_(250, 25, 750)) == true);
+                result = DqnV3_Hadamard(result, DqnV3(10.0f, 0.5f, 10.0f));
+                DQN_ASSERT(DqnV3_Equals(result, DqnV3(250, 25, 750)) == true);
 
-                f32 dotResult = DqnV3_Dot(DqnV3_(5, 10, 2), DqnV3_(3, 4, 6));
+                f32 dotResult = DqnV3_Dot(DqnV3(5, 10, 2), DqnV3(3, 4, 6));
                 DQN_ASSERT(dotResult == 67);
 
                 DqnV3 cross = DqnV3_Cross(vecA, vecB);
-                DQN_ASSERT(DqnV3_Equals(cross, DqnV3_(15, 0, -5)) == true);
+                DQN_ASSERT(DqnV3_Equals(cross, DqnV3(15, 0, -5)) == true);
             }
 
             // Operator overloading
             if (1)
             {
-                DqnV3 vecA = DqnV3_(5, 10, 15);
-                DqnV3 vecB = DqnV3_(2, 3, 6);
+                DqnV3 vecA = DqnV3(5, 10, 15);
+                DqnV3 vecB = DqnV3(2, 3, 6);
                 DQN_ASSERT((vecA == vecB) == false);
-                DQN_ASSERT((vecA == DqnV3_(5, 10, 15)) == true);
-                DQN_ASSERT((vecB == DqnV3_(2, 3, 6)) == true);
+                DQN_ASSERT((vecA == DqnV3(5, 10, 15)) == true);
+                DQN_ASSERT((vecB == DqnV3(2, 3, 6)) == true);
 
-                DqnV3 result = vecA + DqnV3_(5, 10, 15);
-                DQN_ASSERT((result == DqnV3_(10, 20, 30)) == true);
+                DqnV3 result = vecA + DqnV3(5, 10, 15);
+                DQN_ASSERT((result == DqnV3(10, 20, 30)) == true);
 
-                result -= DqnV3_(5, 10, 15);
-                DQN_ASSERT((result == DqnV3_(5, 10, 15)) == true);
+                result -= DqnV3(5, 10, 15);
+                DQN_ASSERT((result == DqnV3(5, 10, 15)) == true);
 
                 result = result * 5;
-                DQN_ASSERT((result == DqnV3_(25, 50, 75)) == true);
+                DQN_ASSERT((result == DqnV3(25, 50, 75)) == true);
 
-                result *= DqnV3_(10.0f, 0.5f, 10.0f);
-                DQN_ASSERT((result == DqnV3_(250, 25, 750)) == true);
+                result *= DqnV3(10.0f, 0.5f, 10.0f);
+                DQN_ASSERT((result == DqnV3(250, 25, 750)) == true);
 
-                result = result - DqnV3_(1, 1, 1);
-                DQN_ASSERT((result == DqnV3_(249, 24, 749)) == true);
+                result = result - DqnV3(1, 1, 1);
+                DQN_ASSERT((result == DqnV3(249, 24, 749)) == true);
 
-                result += DqnV3_(1, 1, 1);
-                DQN_ASSERT((result == DqnV3_(250, 25, 750)) == true);
+                result += DqnV3(1, 1, 1);
+                DQN_ASSERT((result == DqnV3(250, 25, 750)) == true);
             }
             Log(Status::Ok, "DqnV3: Arithmetic");
         }
@@ -1071,7 +1036,7 @@ void DqnVX_Test()
             // Floats
             if (1)
             {
-                DqnV4 vec = DqnV4_(5.5f, 5.0f, 5.875f, 5.928f);
+                DqnV4 vec = DqnV4(5.5f, 5.0f, 5.875f, 5.928f);
                 DQN_ASSERT(vec.x == 5.5f && vec.y == 5.0f && vec.z == 5.875f && vec.w == 5.928f);
                 DQN_ASSERT(vec.r == 5.5f && vec.g == 5.0f && vec.b == 5.875f && vec.a == 5.928f);
             }
@@ -1079,7 +1044,7 @@ void DqnVX_Test()
             // Integers
             if (1)
             {
-                DqnV4 vec = DqnV4_(3, 4, 5, 6);
+                DqnV4 vec = DqnV4(3, 4, 5, 6);
                 DQN_ASSERT(vec.x == 3 && vec.y == 4 && vec.z == 5 && vec.w == 6);
                 DQN_ASSERT(vec.r == 3 && vec.g == 4 && vec.b == 5 && vec.a == 6);
             }
@@ -1090,54 +1055,54 @@ void DqnVX_Test()
         {
             // Arithmetic
             {
-                DqnV4 vecA = DqnV4_(5, 10, 15, 20);
-                DqnV4 vecB = DqnV4_(2, 3, 6, 8);
+                DqnV4 vecA = DqnV4(5, 10, 15, 20);
+                DqnV4 vecB = DqnV4(2, 3, 6, 8);
                 DQN_ASSERT(DqnV4_Equals(vecA, vecB) == false);
-                DQN_ASSERT(DqnV4_Equals(vecA, DqnV4_(5, 10, 15, 20)) == true);
-                DQN_ASSERT(DqnV4_Equals(vecB, DqnV4_(2, 3, 6, 8)) == true);
+                DQN_ASSERT(DqnV4_Equals(vecA, DqnV4(5, 10, 15, 20)) == true);
+                DQN_ASSERT(DqnV4_Equals(vecB, DqnV4(2, 3, 6, 8)) == true);
 
-                DqnV4 result = DqnV4_Add(vecA, DqnV4_(5, 10, 15, 20));
-                DQN_ASSERT(DqnV4_Equals(result, DqnV4_(10, 20, 30, 40)) == true);
+                DqnV4 result = DqnV4_Add(vecA, DqnV4(5, 10, 15, 20));
+                DQN_ASSERT(DqnV4_Equals(result, DqnV4(10, 20, 30, 40)) == true);
 
-                result = DqnV4_Sub(result, DqnV4_(5, 10, 15, 20));
-                DQN_ASSERT(DqnV4_Equals(result, DqnV4_(5, 10, 15, 20)) == true);
+                result = DqnV4_Sub(result, DqnV4(5, 10, 15, 20));
+                DQN_ASSERT(DqnV4_Equals(result, DqnV4(5, 10, 15, 20)) == true);
 
                 result = DqnV4_Scalef(result, 5);
-                DQN_ASSERT(DqnV4_Equals(result, DqnV4_(25, 50, 75, 100)) == true);
+                DQN_ASSERT(DqnV4_Equals(result, DqnV4(25, 50, 75, 100)) == true);
 
-                result = DqnV4_Hadamard(result, DqnV4_(10.0f, 0.5f, 10.0f, 0.25f));
-                DQN_ASSERT(DqnV4_Equals(result, DqnV4_(250, 25, 750, 25)) == true);
+                result = DqnV4_Hadamard(result, DqnV4(10.0f, 0.5f, 10.0f, 0.25f));
+                DQN_ASSERT(DqnV4_Equals(result, DqnV4(250, 25, 750, 25)) == true);
 
-                f32 dotResult = DqnV4_Dot(DqnV4_(5, 10, 2, 8), DqnV4_(3, 4, 6, 5));
+                f32 dotResult = DqnV4_Dot(DqnV4(5, 10, 2, 8), DqnV4(3, 4, 6, 5));
                 DQN_ASSERT(dotResult == 107);
             }
 
             // Operator Overloading
             if (1)
             {
-                DqnV4 vecA = DqnV4_(5, 10, 15, 20);
-                DqnV4 vecB = DqnV4_(2, 3, 6, 8);
+                DqnV4 vecA = DqnV4(5, 10, 15, 20);
+                DqnV4 vecB = DqnV4(2, 3, 6, 8);
                 DQN_ASSERT((vecA == vecB) == false);
-                DQN_ASSERT((vecA == DqnV4_(5, 10, 15, 20)) == true);
-                DQN_ASSERT((vecB == DqnV4_(2, 3, 6, 8)) == true);
+                DQN_ASSERT((vecA == DqnV4(5, 10, 15, 20)) == true);
+                DQN_ASSERT((vecB == DqnV4(2, 3, 6, 8)) == true);
 
-                DqnV4 result = vecA + DqnV4_(5, 10, 15, 20);
-                DQN_ASSERT((result == DqnV4_(10, 20, 30, 40)) == true);
+                DqnV4 result = vecA + DqnV4(5, 10, 15, 20);
+                DQN_ASSERT((result == DqnV4(10, 20, 30, 40)) == true);
 
-                result = result - DqnV4_(5, 10, 15, 20);
-                DQN_ASSERT((result == DqnV4_(5, 10, 15, 20)) == true);
+                result = result - DqnV4(5, 10, 15, 20);
+                DQN_ASSERT((result == DqnV4(5, 10, 15, 20)) == true);
 
                 result = result * 5;
-                DQN_ASSERT((result == DqnV4_(25, 50, 75, 100)) == true);
+                DQN_ASSERT((result == DqnV4(25, 50, 75, 100)) == true);
 
-                result *= DqnV4_(10.0f, 0.5f, 10.0f, 0.25f);
-                DQN_ASSERT((result == DqnV4_(250, 25, 750, 25)) == true);
+                result *= DqnV4(10.0f, 0.5f, 10.0f, 0.25f);
+                DQN_ASSERT((result == DqnV4(250, 25, 750, 25)) == true);
 
-                result += DqnV4_(1, 1, 1, 1);
-                DQN_ASSERT((result == DqnV4_(251, 26, 751, 26)) == true);
+                result += DqnV4(1, 1, 1, 1);
+                DQN_ASSERT((result == DqnV4(251, 26, 751, 26)) == true);
 
-                result -= DqnV4_(1, 1, 1, 1);
-                DQN_ASSERT((result == DqnV4_(250, 25, 750, 25)) == true);
+                result -= DqnV4(1, 1, 1, 1);
+                DQN_ASSERT((result == DqnV4(250, 25, 750, 25)) == true);
             }
             Log(Status::Ok, "DqnV4: Arithmetic");
         }
@@ -1153,8 +1118,8 @@ void DqnRect_Test()
         // Test rect init functions
         if (1)
         {
-            DqnRect rect4f = DqnRect_(1.1f, 2.2f, 3.3f, 4.4f);
-            DqnRect rect4i = DqnRect_(1, 2, 3, 4);
+            DqnRect rect4f = DqnRect(1.1f, 2.2f, 3.3f, 4.4f);
+            DqnRect rect4i = DqnRect(1, 2, 3, 4);
 
             DQN_ASSERT(rect4i.min.x == 1 && rect4i.min.y == 2);
             DQN_ASSERT(rect4i.max.x == 4 && rect4i.max.y == 6);
@@ -1165,9 +1130,9 @@ void DqnRect_Test()
             DQN_ASSERT(rect4f.min.x == 1.1f && rect4f.min.y == 2.2f);
             DQN_ASSERT(DQN_ABS(diffMaxX) < EPSILON && DQN_ABS(diffMaxY) < EPSILON);
 
-            DqnRect rect = DqnRect_(-10, -10, 20, 20);
-            DQN_ASSERT(DqnV2_Equals(rect.min, DqnV2_(-10, -10)));
-            DQN_ASSERT(DqnV2_Equals(rect.max, DqnV2_(10, 10)));
+            DqnRect rect = DqnRect(-10, -10, 20, 20);
+            DQN_ASSERT(DqnV2_Equals(rect.min, DqnV2(-10, -10)));
+            DQN_ASSERT(DqnV2_Equals(rect.max, DqnV2(10, 10)));
             Log(Status::Ok, "Ctor");
         }
 
@@ -1177,7 +1142,7 @@ void DqnRect_Test()
             // Test float rect
             if (1)
             {
-                DqnRect rect = DqnRect_(DqnV2_(-10, -10), DqnV2_(20, 20));
+                DqnRect rect = DqnRect(DqnV2(-10, -10), DqnV2(20, 20));
 
                 f32 width, height;
                 rect.GetSize(&width, &height);
@@ -1185,19 +1150,19 @@ void DqnRect_Test()
                 DQN_ASSERT(height == 20);
 
                 DqnV2 dim = rect.GetSize();
-                DQN_ASSERT(DqnV2_Equals(dim, DqnV2_(20, 20)));
+                DQN_ASSERT(DqnV2_Equals(dim, DqnV2(20, 20)));
                 Log(Status::Ok, "GetSize");
             }
         }
 
         // Test rect get centre
-        DqnRect rect     = DqnRect_(DqnV2_(-10, -10), DqnV2_(20, 20));
+        DqnRect rect     = DqnRect(DqnV2(-10, -10), DqnV2(20, 20));
         DqnV2 rectCenter = rect.GetCenter();
-        DQN_ASSERT(DqnV2_Equals(rectCenter, DqnV2_(0, 0)));
+        DQN_ASSERT(DqnV2_Equals(rectCenter, DqnV2(0, 0)));
         Log(Status::Ok, "GetCentre");
 
         // Test clipping rect get centre
-        DqnRect clipRect   = DqnRect_(DqnV2_(-15, -15), DqnV2_(10, 10) + DqnV2_(15));
+        DqnRect clipRect   = DqnRect(DqnV2(-15, -15), DqnV2(10, 10) + DqnV2(15));
         DqnRect clipResult = rect.ClipRect(clipRect);
         DQN_ASSERT(clipResult.min.x == -10 && clipResult.min.y == -10);
         DQN_ASSERT(clipResult.max.x == 10 && clipResult.max.y == 10);
@@ -1206,9 +1171,9 @@ void DqnRect_Test()
         // Test shifting rect
         if (1)
         {
-            DqnRect shiftedRect = rect.Move(DqnV2_(10, 0));
-            DQN_ASSERT(DqnV2_Equals(shiftedRect.min, DqnV2_(0, -10)));
-            DQN_ASSERT(DqnV2_Equals(shiftedRect.max, DqnV2_(20, 10)));
+            DqnRect shiftedRect = rect.Move(DqnV2(10, 0));
+            DQN_ASSERT(DqnV2_Equals(shiftedRect.min, DqnV2(0, -10)));
+            DQN_ASSERT(DqnV2_Equals(shiftedRect.max, DqnV2(20, 10)));
 
             // Ensure dimensions have remained the same
             if (1)
@@ -1219,14 +1184,14 @@ void DqnRect_Test()
                 DQN_ASSERT(height == 20);
 
                 DqnV2 dim = shiftedRect.GetSize();
-                DQN_ASSERT(DqnV2_Equals(dim, DqnV2_(20, 20)));
+                DQN_ASSERT(DqnV2_Equals(dim, DqnV2(20, 20)));
             }
 
             // Test rect contains p
             if (1)
             {
-                DqnV2 inP  = DqnV2_(5, 5);
-                DqnV2 outP = DqnV2_(100, 100);
+                DqnV2 inP  = DqnV2(5, 5);
+                DqnV2 outP = DqnV2(100, 100);
                 DQN_ASSERT(shiftedRect.ContainsP(inP));
                 DQN_ASSERT(!shiftedRect.ContainsP(outP));
             }
@@ -1250,7 +1215,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             // Test basic push
             if (1)
             {
-                DqnV2 va = DqnV2_(5, 10);
+                DqnV2 va = DqnV2(5, 10);
                 DQN_ASSERT(array.Push(va));
 
                 DqnV2 vb = array.data[0];
@@ -1264,7 +1229,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             // Test array resizing and freeing
             if (1)
             {
-                DqnV2 va = DqnV2_(10, 15);
+                DqnV2 va = DqnV2(10, 15);
                 DQN_ASSERT(array.Push(va));
 
                 DqnV2 vb = array.data[0];
@@ -1312,7 +1277,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
                 DQN_ASSERT(array.max >= 11);
                 DQN_ASSERT(array.count == 11);
 
-                DqnV2 vc = DqnV2_(90, 100);
+                DqnV2 vc = DqnV2(90, 100);
                 DQN_ASSERT(array.Push(vc));
                 DQN_ASSERT(array.max >= 12);
                 DQN_ASSERT(array.count == 12);
@@ -1325,20 +1290,20 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             // Test insert
             if (1)
             {
-                DqnV2 va = DqnV2_(5, 10);
+                DqnV2 va = DqnV2(5, 10);
                 array.Push(va);
                 array.Push(va);
                 array.Push(va);
 
-                DqnV2 vb = DqnV2_(1, 2);
+                DqnV2 vb = DqnV2(1, 2);
                 array.Insert(vb, -1);
                 DQN_ASSERT(DqnV2_Equals(array.data[0], vb));
 
-                DqnV2 vc = DqnV2_(2, 1);
+                DqnV2 vc = DqnV2(2, 1);
                 array.Insert(vc, array.count);
                 DQN_ASSERT(DqnV2_Equals(array.data[array.count-1], vc));
 
-                DqnV2 vd = DqnV2_(8, 9);
+                DqnV2 vd = DqnV2(8, 9);
                 array.Insert(vd, 1);
 
                 DQN_ASSERT(DqnV2_Equals(array.data[0], vb));
@@ -1355,8 +1320,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             // Test multi-insert
             if (1)
             {
-                DqnV2 va[] = {DqnV2_(5, 10), DqnV2_(6, 10), DqnV2_(7, 10)};
-                DqnV2 tmp = DqnV2_(1, 1);
+                DqnV2 va[] = {DqnV2(5, 10), DqnV2(6, 10), DqnV2(7, 10)};
+                DqnV2 tmp = DqnV2(1, 1);
                 array.Push(tmp);
                 array.Push(tmp);
                 array.Push(tmp);
@@ -1385,10 +1350,10 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 
         if (1)
         {
-            DqnV2 a = DqnV2_(1, 2);
-            DqnV2 b = DqnV2_(3, 4);
-            DqnV2 c = DqnV2_(5, 6);
-            DqnV2 d = DqnV2_(7, 8);
+            DqnV2 a = DqnV2(1, 2);
+            DqnV2 b = DqnV2(3, 4);
+            DqnV2 c = DqnV2(5, 6);
+            DqnV2 d = DqnV2(7, 8);
 
             DQN_ASSERT(array.Reserve(16));
             DQN_ASSERT(array.Remove(0) == false);
@@ -1435,10 +1400,10 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 
         if (1)
         {
-            DqnV2 a = DqnV2_(1, 2);
-            DqnV2 b = DqnV2_(3, 4);
-            DqnV2 c = DqnV2_(5, 6);
-            DqnV2 d = DqnV2_(7, 8);
+            DqnV2 a = DqnV2(1, 2);
+            DqnV2 b = DqnV2(3, 4);
+            DqnV2 c = DqnV2(5, 6);
+            DqnV2 d = DqnV2(7, 8);
 
             DQN_ASSERT(array.Reserve(16));
 

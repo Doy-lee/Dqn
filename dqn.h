@@ -577,7 +577,7 @@ DQN_FILE_SCOPE char *DqnChar_SkipWhitespace      (char const *ptr);
 // len:       The length of the string stored in ptr, (doesn't care if it includes null terminator)
 // lenToChar: The length to the char from end of the ptr, i.e. (ptr + len)
 // return:    The ptr to the last char, null if it could not find.
-DQN_FILE_SCOPE char *DqnChar_FindLastChar  (char *ptr, char const ch, i32 len, u32 *const lenToChar);
+DQN_FILE_SCOPE char *DqnChar_FindLastChar  (char *ptr, char ch, i32 len, u32 *lenToChar);
 
 // Finds up to the first [\r]\n and destroy the line, giving you a null terminated line at the newline.
 // returns: The value to advance the ptr by, this can be different from the line
@@ -596,18 +596,17 @@ DQN_FILE_SCOPE        i32            DqnStr_Cmp                   (char const *a
 DQN_FILE_SCOPE        char          *DqnStr_GetPtrToLastSlash     (char const *str, i32 strLen = -1);
 
 // return: String length not including the nullptr terminator. 0 if invalid args.
-DQN_FILE_SCOPE        i32            DqnStr_Len                   (char const *const a);
-DQN_FILE_SCOPE        i32            DqnStr_LenUTF8               (u32 const *const a, i32 *const lenInBytes = nullptr);
+DQN_FILE_SCOPE        i32            DqnStr_Len                   (char const *a);
+DQN_FILE_SCOPE        i32            DqnStr_LenUTF8               (u32 const *a, i32 *lenInBytes = nullptr);
 
 // return: String length starting from a, up to and not including the first delimiter character.
-DQN_FILE_SCOPE        i32            DqnStr_LenDelimitWith        (char *const a, char const delimiter);
+DQN_FILE_SCOPE        i32            DqnStr_LenDelimitWith        (char const *a, char delimiter);
 
 // return: The dest argument, nullptr if args invalid (i.e. nullptr pointers or numChars < 0)
-DQN_FILE_SCOPE        char          *DqnStr_Copy                  (char *const dest, char const *const src, i32 const numChars);
-DQN_FILE_SCOPE        void           DqnStr_Reverse               (char *const buf, i32 const bufSize);
+DQN_FILE_SCOPE        void           DqnStr_Reverse               (char *buf, isize bufSize);
 
 // return: Number of bytes in codepoint, 0 if *a becomes invalid or end of stream.
-DQN_FILE_SCOPE        i32            DqnStr_ReadUTF8Codepoint     (u32 const *const a, u32 *outCodepoint);
+DQN_FILE_SCOPE        i32            DqnStr_ReadUTF8Codepoint     (u32 const *a, u32 *outCodepoint);
 
 // return: The offset into the src to first char of the found string. Returns -1 if not found
 DQN_FILE_SCOPE        i32            DqnStr_FindFirstOccurence    (char const *src, i32 srcLen, char const *find, i32 findLen, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::False);
@@ -629,33 +628,33 @@ DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailBraces (char const *s
 // Return the len of the derived string. If buf is nullptr and or bufSize is 0 the function returns the
 // required string length for the integer
 // TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work atm.
-DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufSize);
-DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *const buf, i64 const bufSize);
+DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *buf, i32 bufSize);
+DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *buf, i64 bufSize);
 // WARNING: Not robust, precision errors and whatnot but good enough!
-DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize);
+DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *buf, i64 bufSize);
 
 // Both return the number of bytes read, return 0 if invalid codepoint or UTF8
-DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, u32 const character);
-DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, u32 const character);
+DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character);
+DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *dest, u32 character);
 
 // #DqnWChar API
 // =================================================================================================
 // NOTE: See above for documentation
-DQN_FILE_SCOPE bool     DqnWChar_IsDigit          (wchar_t const c);
-DQN_FILE_SCOPE wchar_t  DqnWChar_ToLower          (wchar_t const c);
+DQN_FILE_SCOPE bool     DqnWChar_IsDigit          (wchar_t c);
+DQN_FILE_SCOPE wchar_t  DqnWChar_ToLower          (wchar_t c);
 
 DQN_FILE_SCOPE wchar_t *DqnWChar_SkipWhitespace   (wchar_t *ptr);
-DQN_FILE_SCOPE wchar_t *DqnWChar_FindLastChar     (wchar_t *ptr, const wchar_t ch, i32 len, u32 *const lenToChar);
-DQN_FILE_SCOPE i32      DqnWChar_GetNextLine      (const wchar_t *ptr, i32 *lineLength);
+DQN_FILE_SCOPE wchar_t *DqnWChar_FindLastChar     (wchar_t *ptr, wchar_t ch, i32 len, u32 *lenToChar);
+DQN_FILE_SCOPE i32      DqnWChar_GetNextLine      (wchar_t *ptr, i32 *lineLength);
 
-DQN_FILE_SCOPE i32      DqnWStr_Cmp               (wchar_t const *const a, const wchar_t *const b);
-DQN_FILE_SCOPE i32      DqnWStr_FindFirstOccurence(wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
-DQN_FILE_SCOPE bool     DqnWStr_HasSubstring      (wchar_t const *const src, i32 const srcLen, wchar_t const *const find, i32 const findLen);
-DQN_FILE_SCOPE i32      DqnWStr_Len               (wchar_t const *const a);
-DQN_FILE_SCOPE i32      DqnWStr_LenDelimitWith    (wchar_t const *const a, wchar_t const delimiter);
-DQN_FILE_SCOPE void     DqnWStr_Reverse           (wchar_t *const buf, u32 const bufSize);
+DQN_FILE_SCOPE i32      DqnWStr_Cmp               (wchar_t const *a, wchar_t const *b);
+DQN_FILE_SCOPE i32      DqnWStr_FindFirstOccurence(wchar_t const *src, i32 srcLen, wchar_t const *find, i32 findLen);
+DQN_FILE_SCOPE bool     DqnWStr_HasSubstring      (wchar_t const *src, i32 srcLen, wchar_t const *find, i32 findLen);
+DQN_FILE_SCOPE i32      DqnWStr_Len               (wchar_t const *a);
+DQN_FILE_SCOPE i32      DqnWStr_LenDelimitWith    (wchar_t const *a, wchar_t delimiter);
+DQN_FILE_SCOPE void     DqnWStr_Reverse           (wchar_t *buf, i32 bufSize);
 
-DQN_FILE_SCOPE i32      Dqn_WStrToI32             (wchar_t const *const buf, i32 const bufSize);
+DQN_FILE_SCOPE i32      Dqn_WStrToI32             (wchar_t const *buf, i32 bufSize);
 DQN_FILE_SCOPE i32      Dqn_I32ToWStr             (i32 value, wchar_t *buf, i32 bufSize);
 
 // #DqnRnd API
@@ -686,10 +685,10 @@ i32 Dqn_SplitString(char const *src, i32 srcLen, char splitChar, DqnSlice<char> 
 // return: The number of splits, splitting by "splitChar" would generate.
 i32 Dqn_GetNumSplits(char const *src, i32 srcLen, char splitChar);
 
-DQN_FILE_SCOPE inline bool Dqn_BitIsSet (u32 const bits, u32 const flag);
-DQN_FILE_SCOPE inline u32  Dqn_BitSet   (u32 const bits, u32 const flag);
-DQN_FILE_SCOPE inline u32  Dqn_BitUnset (u32 const bits, u32 const flag);
-DQN_FILE_SCOPE inline u32  Dqn_BitToggle(u32 const bits, u32 const flag);
+DQN_FILE_SCOPE inline bool Dqn_BitIsSet (u32 bits, u32 flag);
+DQN_FILE_SCOPE inline u32  Dqn_BitSet   (u32 bits, u32 flag);
+DQN_FILE_SCOPE inline u32  Dqn_BitUnset (u32 bits, u32 flag);
+DQN_FILE_SCOPE inline u32  Dqn_BitToggle(u32 bits, u32 flag);
 
 template <typename T>
 using Dqn_QuickSortLessThanCallback = bool (*)(T const *, T const *, void *);
@@ -862,10 +861,10 @@ enum Dqn_BSearchBound
 //         For higher and lower bounds return -1 if there is no element higher/lower than the
 //         find value (i.e. -1 if the 0th element is the find val for lower bound).
 template <typename T>
-DQN_FILE_SCOPE i64 Dqn_BSearch(T *const array, i64 const size, T const &find,
-                               Dqn_BSearchEqualsCallback<T> const Equals,
-                               Dqn_BSearchLessThanCallback<T> const IsLessThan,
-                               Dqn_BSearchBound const bound = Dqn_BSearchBound_Normal)
+DQN_FILE_SCOPE i64 Dqn_BSearch(T *array, i64 size, T const &find,
+                               Dqn_BSearchEqualsCallback<T> Equals,
+                               Dqn_BSearchLessThanCallback<T> IsLessThan,
+                               Dqn_BSearchBound bound = Dqn_BSearchBound_Normal)
 {
     if (size == 0 || !array) return -1;
 
@@ -916,19 +915,18 @@ DQN_FILE_SCOPE i64 Dqn_BSearch(T *const array, i64 const size, T const &find,
     }
 }
 
-DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *const array, i64 const size, i64 const find,
-                               Dqn_BSearchBound const bound = Dqn_BSearchBound_Normal);
+DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *array, i64 size, i64 find, Dqn_BSearchBound bound = Dqn_BSearchBound_Normal);
 
 // #DqnMem API
 // =================================================================================================
 // TODO(doyle): Use platform allocation, fallback to malloc if platform not defined
-DQN_FILE_SCOPE void *DqnMem_Alloc  (const usize size);
-DQN_FILE_SCOPE void *DqnMem_Calloc (const usize size);
-DQN_FILE_SCOPE void  DqnMem_Clear  (void *const memory, const u8 clearValue, const usize size);
-DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, const usize newSize);
+DQN_FILE_SCOPE void *DqnMem_Alloc  (usize size);
+DQN_FILE_SCOPE void *DqnMem_Calloc (usize size);
+DQN_FILE_SCOPE void  DqnMem_Clear  (void *memory, u8 clearValue, usize size);
+DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, usize newSize);
 DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
-DQN_FILE_SCOPE void  DqnMem_Copy   (void *const dest, void const *const src, i64 const numBytesToCopy);
-DQN_FILE_SCOPE void *DqnMem_Set    (void *const dest, u8 const value,        i64 const numBytesToSet);
+DQN_FILE_SCOPE void  DqnMem_Copy   (void *dest, void const *src, usize numBytesToCopy);
+DQN_FILE_SCOPE void *DqnMem_Set    (void *dest, u8 value,        usize numBytesToSet);
 
 // #DqnMemAPI API
 // =================================================================================================
@@ -949,7 +947,7 @@ DQN_FILE_SCOPE void *DqnMem_Set    (void *const dest, u8 const value,        i64
 class DqnMemAPI
 {
 public:
-    enum class Type
+    enum struct Type
     {
         Uninitialised,
         Alloc,
@@ -1001,11 +999,11 @@ public:
         Head,
         Tail,
     };
-    static DqnMemAPI StackAllocator(struct DqnMemStack *const stack, StackPushType type = StackPushType::Head);
+    static DqnMemAPI StackAllocator(struct DqnMemStack *stack, StackPushType type = StackPushType::Head);
 
-    void *Realloc(void  *const oldPtr,    isize oldSize, isize newSize);
-    void *Alloc  (isize  const size,      Dqn::ZeroClear clear = Dqn::ZeroClear::True);
-    void  Free   (void  *const ptrToFree, isize sizeToFree = 0); // TODO(doyle): sizeToFree opt is iffy
+    void *Realloc(void  *oldPtr,    isize oldSize, isize newSize);
+    void *Alloc  (isize  size,      Dqn::ZeroClear clear = Dqn::ZeroClear::True);
+    void  Free   (void  *ptrToFree, isize sizeToFree = 0); // TODO(doyle): sizeToFree opt is iffy
     bool  IsValid() const { return (this->allocator != nullptr); }
 };
 
@@ -1087,8 +1085,8 @@ class DqnSmartArray : public DqnArray<T>
 // Offset To Src:          Number of bytes to subtract from the "Aligned Ptr For Client" to return to the "Ptr From ALlocator"
 struct DqnAllocatorMetadata
 {
-    static u32 const HEAD_GUARD_VALUE        = 0xCAFEBABE;
-    static u32 const TAIL_GUARD_VALUE        = 0xDEADBEEF;
+    static u32 const HEAD_GUARD_VALUE   = 0xCAFEBABE;
+    static u32 const TAIL_GUARD_VALUE   = 0xDEADBEEF;
     static u32 const OFFSET_TO_SRC_SIZE = sizeof(u8);
     static u32 const ALIGNMENT_SIZE     = sizeof(u8);
     static u32 const ALLOC_AMOUNT_SIZE  = sizeof(usize);
@@ -1182,10 +1180,10 @@ struct DqnMemStack
     // Uses fixed buffer, allocations will be sourced from the buffer and fail after buffer is full.
     // mem:       Memory to use for the memory stack
     // return:    FALSE if args are invalid, or insufficient memSize.
-    bool Init(void *const mem, isize size, Dqn::ZeroClear clear, u32 flags_ = 0);
+    bool Init(void *mem, isize size, Dqn::ZeroClear clear, u32 flags_ = 0);
 
     // Memory Stack capable of expanding when full, but only if NonExpandable flag is not set.
-    bool Init(isize size, Dqn::ZeroClear clear, u32 flags_ = 0, DqnMemAPI *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
+    bool Init(isize size, Dqn::ZeroClear clear, u32 flags_ = 0, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 
     // Allocation API
     // =============================================================================================
@@ -1197,8 +1195,8 @@ struct DqnMemStack
     void *PushOnTail    (isize size, u8 alignment = 4);
 
     // Frees the given ptr. It MUST be the last allocated item in the stack, asserts otherwise.
-    void  Pop           (void *const ptr, Dqn::ZeroClear clear = Dqn::ZeroClear::False);
-    void  PopOnTail     (void *const ptr, Dqn::ZeroClear zeroClear = Dqn::ZeroClear::False);
+    void  Pop           (void *ptr, Dqn::ZeroClear clear = Dqn::ZeroClear::False);
+    void  PopOnTail     (void *ptr, Dqn::ZeroClear zeroClear = Dqn::ZeroClear::False);
 
     // Frees all blocks belonging to this stack.
     void  Free          ();
@@ -1235,7 +1233,7 @@ struct DqnMemStack
 
     struct TempRegionGuard_
     {
-         TempRegionGuard_(DqnMemStack *const stack);
+         TempRegionGuard_(DqnMemStack *stack);
         ~TempRegionGuard_();
         TempRegion region;
     };
@@ -1249,22 +1247,22 @@ struct DqnMemStack
     void             TempRegionKeepChanges(TempRegion region);
 };
 
-inline bool                           DqnMemStack_Init                 (DqnMemStack *me, isize size, Dqn::ZeroClear clear, u32 flags_ = 0, DqnMemAPI *const api = DQN_DEFAULT_HEAP_ALLOCATOR) { return me->Init(size, clear, flags_, api); }
-inline void                          *DqnMemStack_Push                 (DqnMemStack *me, isize size, u8 alignment = 4)                                                                        { return me->Push(size, alignment); }
-inline void                          *DqnMemStack_PushOnTail           (DqnMemStack *me, isize size, u8 alignment = 4)                                                                        { return me->PushOnTail(size, alignment); }
-inline void                           DqnMemStack_Pop                  (DqnMemStack *me, void *const ptr, Dqn::ZeroClear clear = Dqn::ZeroClear::False)                                       { me->Pop(ptr, clear); }
-inline void                           DqnMemStack_PopOnTail            (DqnMemStack *me, void *const ptr, Dqn::ZeroClear clear = Dqn::ZeroClear::False)                                       { me->PopOnTail(ptr, clear); }
-inline void                           DqnMemStack_Free                 (DqnMemStack *me)                                                                                                      { me->Free(); }
-inline bool                           DqnMemStack_FreeMemBlock         (DqnMemStack *me, DqnMemStack::Block *memBlock)                                                                        { return me->FreeMemBlock(memBlock); }
-inline bool                           DqnMemStack_FreeLastBlock        (DqnMemStack *me)                                                                                                      { return me->FreeLastBlock(); }
-inline void                           DqnMemStack_Reset                (DqnMemStack *me)                                                                                                      { me->Reset(); }
-inline void                           DqnMemStack_ResetTail            (DqnMemStack *me)                                                                                                      { me->ResetTail(); }
-inline void                           DqnMemStack_ClearCurrBlock       (DqnMemStack *me, Dqn::ZeroClear clear)                                                                                { me->ClearCurrBlock(clear); }
-inline DqnMemStack::Info              DqnMemStack_GetInfo              (DqnMemStack *me)                                                                                                      { return me->GetInfo(); }
-inline DqnMemStack::TempRegion        DqnMemStack_TempRegionBegin      (DqnMemStack *me)                                                                                                      { return me->TempRegionBegin(); }
-inline void                           DqnMemStack_TempRegionEnd        (DqnMemStack *me, DqnMemStack::TempRegion region)                                                                      { me->TempRegionEnd(region); }
-inline DqnMemStack::TempRegionGuard_  DqnMemStack_TempRegionGuard      (DqnMemStack *me)                                                                                                      { return me->TempRegionGuard(); }
-inline void                           DqnMemStack_TempRegionKeepChanges(DqnMemStack *me, DqnMemStack::TempRegion region)                                                                      { me->TempRegionKeepChanges(region); }
+inline bool                           DqnMemStack_Init                 (DqnMemStack *me, isize size, Dqn::ZeroClear clear, u32 flags_ = 0, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR) { return me->Init(size, clear, flags_, api); }
+inline void                          *DqnMemStack_Push                 (DqnMemStack *me, isize size, u8 alignment = 4)                                                                  { return me->Push(size, alignment); }
+inline void                          *DqnMemStack_PushOnTail           (DqnMemStack *me, isize size, u8 alignment = 4)                                                                  { return me->PushOnTail(size, alignment); }
+inline void                           DqnMemStack_Pop                  (DqnMemStack *me, void *ptr, Dqn::ZeroClear clear = Dqn::ZeroClear::False)                                       { me->Pop(ptr, clear); }
+inline void                           DqnMemStack_PopOnTail            (DqnMemStack *me, void *ptr, Dqn::ZeroClear clear = Dqn::ZeroClear::False)                                       { me->PopOnTail(ptr, clear); }
+inline void                           DqnMemStack_Free                 (DqnMemStack *me)                                                                                                { me->Free(); }
+inline bool                           DqnMemStack_FreeMemBlock         (DqnMemStack *me, DqnMemStack::Block *memBlock)                                                                  { return me->FreeMemBlock(memBlock); }
+inline bool                           DqnMemStack_FreeLastBlock        (DqnMemStack *me)                                                                                                { return me->FreeLastBlock(); }
+inline void                           DqnMemStack_Reset                (DqnMemStack *me)                                                                                                { me->Reset(); }
+inline void                           DqnMemStack_ResetTail            (DqnMemStack *me)                                                                                                { me->ResetTail(); }
+inline void                           DqnMemStack_ClearCurrBlock       (DqnMemStack *me, Dqn::ZeroClear clear)                                                                          { me->ClearCurrBlock(clear); }
+inline DqnMemStack::Info              DqnMemStack_GetInfo              (DqnMemStack *me)                                                                                                { return me->GetInfo(); }
+inline DqnMemStack::TempRegion        DqnMemStack_TempRegionBegin      (DqnMemStack *me)                                                                                                { return me->TempRegionBegin(); }
+inline void                           DqnMemStack_TempRegionEnd        (DqnMemStack *me, DqnMemStack::TempRegion region)                                                                { me->TempRegionEnd(region); }
+inline DqnMemStack::TempRegionGuard_  DqnMemStack_TempRegionGuard      (DqnMemStack *me)                                                                                                { return me->TempRegionGuard(); }
+inline void                           DqnMemStack_TempRegionKeepChanges(DqnMemStack *me, DqnMemStack::TempRegion region)                                                                { me->TempRegionKeepChanges(region); }
 
 
 // Implementation taken from Milton, developed by Serge at
@@ -1600,6 +1598,10 @@ union DqnV2i
     struct { i32 min, max; };
     i32 e[2];
 
+    DqnV2i() = default;
+    DqnV2i(i32 x_, i32 y_): x(x_), y(y_) {}
+    DqnV2i(f32 x_, f32 y_): x((i32)x_), y((i32)y_) {}
+
     bool operator==(DqnV2i const &b) const { return (this->x == b.x) && (this->y == b.y); }
     bool operator!=(DqnV2i const &b) const { return !(*this == b); }
     bool operator>=(DqnV2i const &b) const { return (this->x >= b.x) && (this->y >= b.y); }
@@ -1615,6 +1617,12 @@ union DqnV2
     struct { f32 min, max; };
     f32 e[2];
 
+    DqnV2() = default;
+    DqnV2(f32 xy)        : x(xy),       y(xy)       {}
+    DqnV2(f32 x_, f32 y_): x(x_),       y(y_)       {}
+    DqnV2(i32 x_, i32 y_): x((f32)x_),  y((f32)y_)  {}
+    DqnV2(DqnV2i a)      : x((f32)a.x), y((f32)a.y) {}
+
     bool operator==(DqnV2 const &b) const { return (this->x == b.x) && (this->y == b.y); }
     bool operator!=(DqnV2 const &b) const { return !(*this == b); }
     bool operator>=(DqnV2 const &b) const { return (this->x >= b.x) && (this->y >= b.y); }
@@ -1622,11 +1630,6 @@ union DqnV2
     bool operator< (DqnV2 const &b) const { return (this->x <  b.x) && (this->y <  b.y); }
     bool operator> (DqnV2 const &b) const { return (this->x >  b.x) && (this->y >  b.y); }
 };
-
-DQN_FILE_SCOPE DqnV2 DqnV2_(f32 xy);
-DQN_FILE_SCOPE DqnV2 DqnV2_(f32 x, f32 y);
-DQN_FILE_SCOPE DqnV2 DqnV2_(i32 x, i32 y);
-DQN_FILE_SCOPE DqnV2 DqnV2_(DqnV2i a);
 
 DQN_FILE_SCOPE DqnV2 DqnV2_Add     (DqnV2 a, DqnV2 b);
 DQN_FILE_SCOPE DqnV2 DqnV2_Sub     (DqnV2 a, DqnV2 b);
@@ -1657,10 +1660,6 @@ DQN_FILE_SCOPE inline DqnV2 &operator-=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_S
 DQN_FILE_SCOPE inline DqnV2 &operator+=(DqnV2 &a, DqnV2 b) { return (a = DqnV2_Add     (a, b)); }
 
 // DqnV2i
-DQN_FILE_SCOPE DqnV2i DqnV2i_(i32 x_, i32 y_);
-DQN_FILE_SCOPE DqnV2i DqnV2i_(f32 x_, f32 y_);
-DQN_FILE_SCOPE DqnV2i DqnV2i_(DqnV2 a);
-
 DQN_FILE_SCOPE DqnV2i DqnV2i_Add     (DqnV2i a, DqnV2i b);
 DQN_FILE_SCOPE DqnV2i DqnV2i_Sub     (DqnV2i a, DqnV2i b);
 DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei  (DqnV2i a, i32 b);
@@ -1682,13 +1681,15 @@ DQN_FILE_SCOPE inline DqnV2i &operator+=(DqnV2i &a, DqnV2i b) { return (a = DqnV
 // =================================================================================================
 union DqnV3
 {
-    DqnV3() = default;
-    DqnV3(f32 xyz) { this->x = xyz; this->y = xyz; this->z = xyz; }
-
     struct { f32 x, y, z; };
-    DqnV2 xy;
     struct { f32 r, g, b; };
+    DqnV2 xy;
     f32 e[3];
+
+    DqnV3() = default;
+    DqnV3(f32 xyz)               : x(xyz),     y(xyz),     z(xyz)     {}
+    DqnV3(f32 x_, f32 y_, f32 z_): x(x_),      y(y_),      z(z_)      {}
+    DqnV3(i32 x_, i32 y_, i32 z_): x((f32)x_), y((f32)y_), z((f32)z_) {}
 };
 
 union DqnV3i
@@ -1696,13 +1697,13 @@ union DqnV3i
     struct { i32 x, y, z; };
     struct { i32 r, g, b; };
     i32 e[3];
+
+    DqnV3i() = default;
+    DqnV3i(i32 x_, i32 y_, i32 z_): x(x_),      y(y_),      z(z_)      {}
+    DqnV3i(f32 x_, f32 y_, f32 z_): x((i32)x_), y((i32)y_), z((i32)z_) {}
 };
 
 // DqnV3
-DQN_FILE_SCOPE DqnV3 DqnV3_(f32 xyz);
-DQN_FILE_SCOPE DqnV3 DqnV3_(f32 x, f32 y, f32 z);
-DQN_FILE_SCOPE DqnV3 DqnV3_(i32 x, i32 y, i32 z);
-
 DQN_FILE_SCOPE DqnV3 DqnV3_Add     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Sub     (DqnV3 a, DqnV3 b);
 DQN_FILE_SCOPE DqnV3 DqnV3_Scalei  (DqnV3 a, i32 b);
@@ -1718,7 +1719,7 @@ DQN_FILE_SCOPE f32   DqnV3_LengthSquared(DqnV3 a, DqnV3 b);
 
 DQN_FILE_SCOPE inline DqnV3  operator- (DqnV3  a, DqnV3 b) { return      DqnV3_Sub     (a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, DqnV3 b) { return      DqnV3_Add     (a, b);           }
-DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3_(b));   }
+DQN_FILE_SCOPE inline DqnV3  operator+ (DqnV3  a, f32   b) { return      DqnV3_Add     (a, DqnV3(b));    }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, DqnV3 b) { return      DqnV3_Hadamard(a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, f32   b) { return      DqnV3_Scalef  (a, b);           }
 DQN_FILE_SCOPE inline DqnV3  operator* (DqnV3  a, i32   b) { return      DqnV3_Scalei  (a, b);           }
@@ -1729,9 +1730,6 @@ DQN_FILE_SCOPE inline DqnV3 &operator*=(DqnV3 &a, i32   b) { return (a = DqnV3_S
 DQN_FILE_SCOPE inline DqnV3 &operator-=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Sub     (a, b));          }
 DQN_FILE_SCOPE inline DqnV3 &operator+=(DqnV3 &a, DqnV3 b) { return (a = DqnV3_Add     (a, b));          }
 DQN_FILE_SCOPE inline bool   operator==(DqnV3  a, DqnV3 b) { return      DqnV3_Equals  (a, b);           }
-
-DQN_FILE_SCOPE DqnV3i DqnV3i_(i32 x, i32 y, i32 z);
-DQN_FILE_SCOPE DqnV3i DqnV3i_(f32 x, f32 y, f32 z);
 
 // #DqnV4 API
 // =================================================================================================
@@ -1746,13 +1744,14 @@ union DqnV4
 
     f32    e[4];
     DqnV2 v2[2];
-};
 
-DQN_FILE_SCOPE DqnV4 DqnV4_();
-DQN_FILE_SCOPE DqnV4 DqnV4_(f32 xyzw);
-DQN_FILE_SCOPE DqnV4 DqnV4_(f32 x, f32 y, f32 z, f32 w);
-DQN_FILE_SCOPE DqnV4 DqnV4_(i32 x, i32 y, i32 z, i32 w);
-DQN_FILE_SCOPE DqnV4 DqnV4_(DqnV3 a, f32 w);
+    DqnV4() = default;
+    DqnV4(f32 xyzw)                      : x(xyzw),    y(xyzw),    z(xyzw),    w(xyzw)    {}
+    DqnV4(f32 x_, f32 y_, f32 z_, f32 w_): x(x_),      y(y_),      z(z_),      w(w_)      {}
+    DqnV4(i32 x_, i32 y_, i32 z_, i32 w_): x((f32)x_), y((f32)y_), z((f32)z_), w((f32)w_) {}
+    DqnV4(DqnV3 a, f32 w_)               : x(a.x),     y(a.y),     z(a.z),     w(w_)      {}
+
+};
 
 DQN_FILE_SCOPE DqnV4 DqnV4_Add     (DqnV4 a, DqnV4 b);
 DQN_FILE_SCOPE DqnV4 DqnV4_Sub     (DqnV4 a, DqnV4 b);
@@ -1764,7 +1763,7 @@ DQN_FILE_SCOPE bool  DqnV4_Equals  (DqnV4 a, DqnV4 b);
 
 DQN_FILE_SCOPE inline DqnV4  operator- (DqnV4  a, DqnV4 b) { return      DqnV4_Sub     (a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, DqnV4 b) { return      DqnV4_Add     (a, b);            }
-DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4_(b));    }
+DQN_FILE_SCOPE inline DqnV4  operator+ (DqnV4  a, f32   b) { return      DqnV4_Add     (a, DqnV4(b));     }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, DqnV4 b) { return      DqnV4_Hadamard(a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, f32   b) { return      DqnV4_Scalef  (a, b);            }
 DQN_FILE_SCOPE inline DqnV4  operator* (DqnV4  a, i32   b) { return      DqnV4_Scalei  (a, b);            }
@@ -1806,20 +1805,21 @@ struct DqnRect
     DqnV2 min;
     DqnV2 max;
 
+    DqnRect() = default;
+    DqnRect(DqnV2 origin, DqnV2 size)   { this->min = origin;      this->max = origin + size; }
+    DqnRect(f32 x, f32 y, f32 w, f32 h) { this->min = DqnV2(x, y); this->max = DqnV2(x + w, y + h); }
+    DqnRect(i32 x, i32 y, i32 w, i32 h) { this->min = DqnV2(x, y); this->max = DqnV2(x + w, y + h); }
+
     f32   GetWidth ()                                    const { return max.w - min.w; }
     f32   GetHeight()                                    const { return max.h - min.h; }
     DqnV2 GetSize  ()                                    const { return max - min;     }
     void  GetSize  (f32 *const width, f32 *const height) const;
     DqnV2 GetCenter()                                    const;
 
-    DqnRect ClipRect (DqnRect const clip) const;
-    DqnRect Move     (DqnV2   const shift)  const;
-    bool    ContainsP(DqnV2   const p)      const;
+    DqnRect ClipRect (DqnRect const clip)  const;
+    DqnRect Move     (DqnV2   const shift) const;
+    bool    ContainsP(DqnV2   const p)     const;
 };
-
-DQN_FILE_SCOPE DqnRect DqnRect_(DqnV2 origin, DqnV2 size);
-DQN_FILE_SCOPE DqnRect DqnRect_(f32 x, f32 y, f32 w, f32 h);
-DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h);
 
 // #DqnString Public API - String library
 // =================================================================================================
@@ -3267,7 +3267,7 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 
 // #DqnLog
 // =================================================================================================
-DQN_FILE_SCOPE void DqnLog(char const *file, char const *functionName, i32 const lineNum,
+DQN_FILE_SCOPE void DqnLog(char const *file, char const *functionName, i32 lineNum,
                            char const *msg, ...)
 {
     // TODO(doyle): Compress this
@@ -3303,7 +3303,7 @@ DQN_FILE_SCOPE void DqnLog(char const *file, char const *functionName, i32 const
     #endif
 }
 
-DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 const lineNum,
+DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 lineNum,
                                char const *expr, char const *msg, ...)
 {
     auto fileLen = DqnStr_Len(file);
@@ -3342,24 +3342,27 @@ DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 c
 // =================================================================================================
 // NOTE: All memory allocations in dqn.h go through these functions. So they can
 // be rerouted fairly easily especially for platform specific mallocs.
-DQN_FILE_SCOPE void *DqnMem_Alloc(const usize size)
+DQN_FILE_SCOPE void *DqnMem_Alloc(usize size)
 {
     void *result = malloc(size);
     return result;
 }
 
-DQN_FILE_SCOPE void *DqnMem_Calloc(const usize size)
+DQN_FILE_SCOPE void *DqnMem_Calloc(usize size)
 {
     void *result = calloc(1, size);
     return result;
 }
 
-DQN_FILE_SCOPE void DqnMem_Clear(void *const memory, const u8 clearValue, const usize size)
+DQN_FILE_SCOPE void DqnMem_Clear(void *memory, u8 clearValue, usize size)
 {
-    if (memory) memset(memory, clearValue, size);
+    if (memory)
+    {
+        DqnMem_Set(memory, clearValue, size);
+    }
 }
 
-DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, const usize newSize)
+DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, usize newSize)
 {
     void *result = realloc(memory, newSize);
     return result;
@@ -3370,18 +3373,18 @@ DQN_FILE_SCOPE void DqnMem_Free(void *memory)
     if (memory) free(memory);
 }
 
-DQN_FILE_SCOPE void DqnMem_Copy(void *const dest, void const *const src, i64 const numBytesToCopy)
+DQN_FILE_SCOPE void DqnMem_Copy(void *dest, void const *src, usize numBytesToCopy)
 {
     auto *to   = (u8 *)dest;
     auto *from = (u8 *)src;
-    for (auto i = 0; i < numBytesToCopy; i++)
+    for (usize i = 0; i < numBytesToCopy; i++)
         to[i]   = from[i];
 }
 
-DQN_FILE_SCOPE void *DqnMem_Set(void *const dest, u8 const value, i64 const numBytesToSet)
+DQN_FILE_SCOPE void *DqnMem_Set(void *dest, u8 value, usize numBytesToSet)
 {
     auto volatile *ptr = (u8 *)dest; // NOTE: Volatile so memset is not optimised out.
-    for (auto i = 0; i < numBytesToSet; i++)
+    for (usize i = 0; i < numBytesToSet; i++)
         ptr[i]  = value;
 
     return dest;
@@ -3730,7 +3733,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallbackPushToTail(DqnMemAPI *api
     return result;
 }
 
-void *DqnMemAPI::Realloc(void *const oldPtr, isize const oldSize, isize const newSize)
+void *DqnMemAPI::Realloc(void *const oldPtr, isize oldSize, isize newSize)
 {
     Request request             = {};
     request.type                = Type::Realloc;
@@ -3743,7 +3746,7 @@ void *DqnMemAPI::Realloc(void *const oldPtr, isize const oldSize, isize const ne
     return result;
 }
 
-void *DqnMemAPI::Alloc(isize const size, Dqn::ZeroClear clear)
+void *DqnMemAPI::Alloc(isize size, Dqn::ZeroClear clear)
 {
     Request request             = {};
     request.type                = Type::Alloc;
@@ -3755,7 +3758,7 @@ void *DqnMemAPI::Alloc(isize const size, Dqn::ZeroClear clear)
     return result;
 }
 
-void DqnMemAPI::Free(void *const ptrToFree, isize const sizeToFree)
+void DqnMemAPI::Free(void *const ptrToFree, isize sizeToFree)
 {
     Request request           = {};
     request.type              = Type::Free;
@@ -3773,7 +3776,7 @@ DqnMemAPI DqnMemAPI::HeapAllocator()
     return result;
 }
 
-DqnMemAPI DqnMemAPI::StackAllocator(struct DqnMemStack *const stack, StackPushType type)
+DqnMemAPI DqnMemAPI::StackAllocator(struct DqnMemStack *stack, StackPushType type)
 {
     DQN_ASSERT(stack);
     DqnMemAPI result   = {0};
@@ -3904,7 +3907,7 @@ u32 *DqnAllocatorMetadata::PtrToTailBoundsGuard(u8 const *ptr) const
 // #DqnMemStack
 // =================================================================================================
 DQN_FILE_SCOPE DqnMemStack::Block *
-DqnMemStackInternal_AllocateBlock(isize size, Dqn::ZeroClear clear, DqnMemAPI *const api)
+DqnMemStackInternal_AllocateBlock(isize size, Dqn::ZeroClear clear, DqnMemAPI *api)
 {
     DQN_ASSERT(size > 0);
     if (!api || !api->IsValid())
@@ -3928,7 +3931,7 @@ DqnMemStackInternal_AllocateBlock(isize size, Dqn::ZeroClear clear, DqnMemAPI *c
     return result;
 }
 
-bool DqnMemStack::Init(void *const mem, isize size, Dqn::ZeroClear clear, u32 flags_)
+bool DqnMemStack::Init(void *mem, isize size, Dqn::ZeroClear clear, u32 flags_)
 {
     if (!mem)
     {
@@ -3967,7 +3970,7 @@ bool DqnMemStack::Init(void *const mem, isize size, Dqn::ZeroClear clear, u32 fl
     return true;
 }
 
-bool DqnMemStack::Init(isize size, Dqn::ZeroClear clear, u32 flags_, DqnMemAPI *const api)
+bool DqnMemStack::Init(isize size, Dqn::ZeroClear clear, u32 flags_, DqnMemAPI *api)
 {
     if (!this || size < 0) return false;
 
@@ -4144,7 +4147,7 @@ FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingInBlock(DqnAllocator
     DqnMemStackInternal_KillMetadataPtrsExistingIn(metadata, blockStart, blockEnd);
 }
 
-FILE_SCOPE void DqnMemStackInternal_Pop(DqnMemStack *stack, void *const ptr, Dqn::ZeroClear clear, bool popHead)
+FILE_SCOPE void DqnMemStackInternal_Pop(DqnMemStack *stack, void *ptr, Dqn::ZeroClear clear, bool popHead)
 {
     if (!ptr) return;
     DQN_ASSERT(stack->block);
@@ -4193,12 +4196,12 @@ FILE_SCOPE void DqnMemStackInternal_Pop(DqnMemStack *stack, void *const ptr, Dqn
     }
 }
 
-void DqnMemStack::Pop(void *const ptr, Dqn::ZeroClear clear)
+void DqnMemStack::Pop(void *ptr, Dqn::ZeroClear clear)
 {
     DqnMemStackInternal_Pop(this, ptr, clear, true);
 }
 
-void DqnMemStack::PopOnTail(void *const ptr, Dqn::ZeroClear clear)
+void DqnMemStack::PopOnTail(void *ptr, Dqn::ZeroClear clear)
 {
     DqnMemStackInternal_Pop(this, ptr, clear, false);
 }
@@ -4421,7 +4424,7 @@ DqnMemStack::TempRegionGuard_ DqnMemStack::TempRegionGuard()
     return TempRegionGuard_(this);
 }
 
-DqnMemStack::TempRegionGuard_::TempRegionGuard_(DqnMemStack *const stack)
+DqnMemStack::TempRegionGuard_::TempRegionGuard_(DqnMemStack *stack)
 {
     this->region = stack->TempRegionBegin();
 }
@@ -4540,30 +4543,6 @@ DQN_FILE_SCOPE f32 DqnMath_Clampf(f32 val, f32 min, f32 max)
 
 // #DqnV2
 // =================================================================================================
-DQN_FILE_SCOPE DqnV2 DqnV2_(f32 xy)
-{
-    DqnV2 result = {xy, xy};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV2 DqnV2_(f32 x, f32 y)
-{
-    DqnV2 result = {x, y};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV2 DqnV2_(i32 x, i32 y)
-{
-    DqnV2 result = {(f32)x, (f32)y};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV2 DqnV2_(DqnV2i a)
-{
-    DqnV2 result = {(f32)a.x, (f32)a.y};
-    return result;
-}
-
 DQN_FILE_SCOPE DqnV2 DqnV2_Add(DqnV2 a, DqnV2 b)
 {
     DqnV2 result = {};
@@ -4633,7 +4612,7 @@ DQN_FILE_SCOPE bool DqnV2_Equals(DqnV2 a, DqnV2 b)
     return result;
 }
 
-DQN_FILE_SCOPE f32 DqnV2_LengthSquared(const DqnV2 a, const DqnV2 b)
+DQN_FILE_SCOPE f32 DqnV2_LengthSquared(DqnV2 a, DqnV2 b)
 {
     f32 x_     = b.x - a.x;
     f32 y_     = b.y - a.y;
@@ -4641,7 +4620,7 @@ DQN_FILE_SCOPE f32 DqnV2_LengthSquared(const DqnV2 a, const DqnV2 b)
     return result;
 }
 
-DQN_FILE_SCOPE f32 DqnV2_Length(const DqnV2 a, const DqnV2 b)
+DQN_FILE_SCOPE f32 DqnV2_Length(DqnV2 a, DqnV2 b)
 {
     f32 lengthSq = DqnV2_LengthSquared(a, b);
     if (lengthSq == 0) return 0;
@@ -4650,10 +4629,10 @@ DQN_FILE_SCOPE f32 DqnV2_Length(const DqnV2 a, const DqnV2 b)
     return result;
 }
 
-DQN_FILE_SCOPE DqnV2 DqnV2_Normalise(const DqnV2 a)
+DQN_FILE_SCOPE DqnV2 DqnV2_Normalise(DqnV2 a)
 {
-    f32 magnitude = DqnV2_Length(DqnV2_(0, 0), a);
-    if (magnitude == 0) return DqnV2_(0.0f);
+    f32 magnitude = DqnV2_Length(DqnV2(0, 0), a);
+    if (magnitude == 0) return DqnV2(0.0f);
 
     DqnV2 result = a * (1.0f / magnitude);
     return result;
@@ -4681,9 +4660,9 @@ DQN_FILE_SCOPE bool DqnV2_Overlaps(DqnV2 a, DqnV2 b)
     return result;
 }
 
-DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(const DqnV2 a)
+DQN_FILE_SCOPE DqnV2 DqnV2_Perpendicular(DqnV2 a)
 {
-    DqnV2 result = DqnV2_(a.y, -a.x);
+    DqnV2 result = DqnV2(a.y, -a.x);
     return result;
 }
 
@@ -4712,27 +4691,9 @@ DQN_FILE_SCOPE DqnV2 DqnV2_ConstrainToRatio(DqnV2 dim, DqnV2 ratio)
 
 // #DqnV2i
 // =================================================================================================
-DQN_FILE_SCOPE DqnV2i DqnV2i_(i32 x, i32 y)
-{
-    DqnV2i result = {x, y};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV2i DqnV2i_(f32 x, f32 y)
-{
-    DqnV2i result = {(i32)x, (i32)y};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV2i DqnV2i_(DqnV2 a)
-{
-    DqnV2i result = {(i32)a.x, (i32)a.y};
-    return result;
-}
-
 DQN_FILE_SCOPE DqnV2i DqnV2i_Add(DqnV2i a, DqnV2i b)
 {
-    DqnV2i result = {0};
+    DqnV2i result = {};
     for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
         result.e[i] = a.e[i] + b.e[i];
 
@@ -4741,7 +4702,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_Add(DqnV2i a, DqnV2i b)
 
 DQN_FILE_SCOPE DqnV2i DqnV2i_Sub(DqnV2i a, DqnV2i b)
 {
-    DqnV2i result = {0};
+    DqnV2i result = {};
     for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
         result.e[i] = a.e[i] - b.e[i];
 
@@ -4750,7 +4711,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_Sub(DqnV2i a, DqnV2i b)
 
 DQN_FILE_SCOPE DqnV2i DqnV2i_Scalef(DqnV2i a, f32 b)
 {
-    DqnV2i result = {0};
+    DqnV2i result = {};
     for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
         result.e[i] = (i32)(a.e[i] * b);
 
@@ -4759,7 +4720,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_Scalef(DqnV2i a, f32 b)
 
 DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei(DqnV2i a, i32 b)
 {
-    DqnV2i result = {0};
+    DqnV2i result = {};
     for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
         result.e[i] = a.e[i] * b;
 
@@ -4768,7 +4729,7 @@ DQN_FILE_SCOPE DqnV2i DqnV2i_Scalei(DqnV2i a, i32 b)
 
 DQN_FILE_SCOPE DqnV2i DqnV2i_Hadamard(DqnV2i a, DqnV2i b)
 {
-    DqnV2i result = {0};
+    DqnV2i result = {};
     for (u32 i = 0; i < DQN_ARRAY_COUNT(a.e); i++)
         result.e[i] = a.e[i] * b.e[i];
 
@@ -4801,33 +4762,6 @@ DQN_FILE_SCOPE bool DqnV2i_Equals(DqnV2i a, DqnV2i b)
 
 // #DqnV3
 // =================================================================================================
-DQN_FILE_SCOPE DqnV3 DqnV3_(f32 xyz)
-{
-    DqnV3 result;
-    result.x = xyz;
-    result.y = xyz;
-    result.z = xyz;
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV3 DqnV3_(f32 x, f32 y, f32 z)
-{
-    DqnV3 result;
-    result.x = x;
-    result.y = y;
-    result.z = z;
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV3 DqnV3_(i32 x, i32 y, i32 z)
-{
-    DqnV3 result;
-    result.x = (f32)x;
-    result.y = (f32)y;
-    result.z = (f32)z;
-    return result;
-}
-
 DQN_FILE_SCOPE DqnV3 DqnV3_Add(DqnV3 a, DqnV3 b)
 {
     DqnV3 result = {0};
@@ -4940,46 +4874,8 @@ DQN_FILE_SCOPE f32 DqnV3_Length(DqnV3 a, DqnV3 b)
     return result;
 }
 
-// #DqnV3i
-// =================================================================================================
-DQN_FILE_SCOPE DqnV3i DqnV3i_(i32 x, i32 y, i32 z)
-{
-    DqnV3i result = {x, y, z};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV3i DqnV3i_(f32 x, f32 y, f32 z)
-{
-    DqnV3i result = {(i32)x, (i32)y, (i32)z};
-    return result;
-}
-
 // #DqnV4
 // =================================================================================================
-DQN_FILE_SCOPE DqnV4 DqnV4_(f32 xyzw)
-{
-    DqnV4 result = {xyzw, xyzw, xyzw, xyzw};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV4 DqnV4_(f32 x, f32 y, f32 z, f32 w)
-{
-    DqnV4 result = {x, y, z, w};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV4 DqnV4_(i32 x, i32 y, i32 z, i32 w)
-{
-    DqnV4 result = {(f32)x, (f32)y, (f32)z, (f32)w};
-    return result;
-}
-
-DQN_FILE_SCOPE DqnV4 DqnV4_(DqnV3 a, f32 w)
-{
-    DqnV4 result = {a.x, a.y, a.z, w};
-    return result;
-}
-
 DQN_FILE_SCOPE DqnV4 DqnV4_Add(DqnV4 a, DqnV4 b)
 {
     DqnV4 result = {0};
@@ -5146,7 +5042,7 @@ DQN_FILE_SCOPE DqnMat4 DqnMat4_Rotate(f32 radians, f32 x, f32 y, f32 z)
     f32 cosVal         = cosf(radians);
     f32 oneMinusCosVal = 1 - cosVal;
 
-    DqnV3 axis = DqnV3_Normalise(DqnV3_(x, y, z));
+    DqnV3 axis = DqnV3_Normalise(DqnV3(x, y, z));
 
     result.e[0][0] = (axis.x * axis.x * oneMinusCosVal) + cosVal;
     result.e[0][1] = (axis.x * axis.y * oneMinusCosVal) + (axis.z * sinVal);
@@ -5212,37 +5108,7 @@ DQN_FILE_SCOPE DqnV4 DqnMat4_MulV4(DqnMat4 a, DqnV4 b)
 
 // #DqnRect Implementation
 // =================================================================================================
-DQN_FILE_SCOPE DqnRect DqnRect_(DqnV2 origin, DqnV2 size)
-{
-    DqnRect result;
-    result.min = origin;
-    result.max = result.min + size;
-
-    DQN_ASSERT(result.min <= result.max);
-    return result;
-}
-
-DQN_FILE_SCOPE DqnRect DqnRect_(f32 x, f32 y, f32 w, f32 h)
-{
-    DqnRect result;
-    result.min = DqnV2_(x, y);
-    result.max = DqnV2_(x + w, y + h);
-
-    DQN_ASSERT(result.min <= result.max);
-    return result;
-}
-
-DQN_FILE_SCOPE DqnRect DqnRect_(i32 x, i32 y, i32 w, i32 h)
-{
-    DqnRect result;
-    result.min = DqnV2_(x, y);
-    result.max = DqnV2_(x + w, y + h);
-
-    DQN_ASSERT(result.min <= result.max);
-    return result;
-}
-
-void DqnRect::GetSize(f32 *const width, f32 *const height) const
+void DqnRect::GetSize(f32 *width, f32 *height) const
 {
     DQN_ASSERT(this->min <= this->max);
     if (width) *width   = this->max.x - this->min.x;
@@ -5254,11 +5120,11 @@ DqnV2 DqnRect::GetCenter() const
     DQN_ASSERT(this->min <= this->max);
     f32 sumX     = this->min.x + this->max.x;
     f32 sumY     = this->min.y + this->max.y;
-    DqnV2 result = DqnV2_(sumX, sumY) * 0.5f;
+    DqnV2 result = DqnV2(sumX, sumY) * 0.5f;
     return result;
 }
 
-DqnRect DqnRect::ClipRect(const DqnRect clip) const
+DqnRect DqnRect::ClipRect(DqnRect clip) const
 {
     DQN_ASSERT(this->min <= this->max);
     DQN_ASSERT(clip.min <= clip.max);
@@ -5291,7 +5157,7 @@ DqnRect DqnRect::ClipRect(const DqnRect clip) const
     return result;
 }
 
-DqnRect DqnRect::Move(const DqnV2 shift) const
+DqnRect DqnRect::Move(DqnV2 shift) const
 {
     DQN_ASSERT(this->min <= this->max);
 
@@ -5301,7 +5167,7 @@ DqnRect DqnRect::Move(const DqnV2 shift) const
     return result;
 }
 
-bool DqnRect::ContainsP(const DqnV2 p) const
+bool DqnRect::ContainsP(DqnV2 p) const
 {
     DQN_ASSERT(this->min <= this->max);
 
@@ -5408,7 +5274,7 @@ DQN_FILE_SCOPE char *DqnChar_SkipWhitespace(char const *ptr)
     return (char *)ptr;
 }
 
-DQN_FILE_SCOPE char *DqnChar_FindLastChar(char *ptr, const char ch, i32 len, u32 *const lenToChar)
+DQN_FILE_SCOPE char *DqnChar_FindLastChar(char *ptr, char ch, i32 len, u32 *lenToChar)
 {
     for (i32 i = len - 1; i >= 0; i--)
     {
@@ -5515,14 +5381,14 @@ DQN_FILE_SCOPE char *DqnStr_GetPtrToLastSlash(char const *str, i32 strLen)
     return (char *)result;
 }
 
-DQN_FILE_SCOPE i32 DqnStr_Len(const char *const a)
+DQN_FILE_SCOPE i32 DqnStr_Len(char const *a)
 {
     i32 result = 0;
     while (a && a[result]) result++;
     return result;
 }
 
-DQN_FILE_SCOPE i32 DqnStr_LenUTF8(const u32 *const a, i32 *const lenInBytes)
+DQN_FILE_SCOPE i32 DqnStr_LenUTF8(u32 const *a, i32 *lenInBytes)
 {
     i32 utf8Len        = 0;
     i32 utf8LenInBytes = 0;
@@ -5542,26 +5408,14 @@ DQN_FILE_SCOPE i32 DqnStr_LenUTF8(const u32 *const a, i32 *const lenInBytes)
     return utf8Len;
 }
 
-DQN_FILE_SCOPE i32 DqnStr_LenDelimitWith(const char *a, const char delimiter)
+DQN_FILE_SCOPE i32 DqnStr_LenDelimitWith(char const *a, char delimiter)
 {
     i32 result = 0;
     while (a && a[result] && a[result] != delimiter) result++;
     return result;
 }
 
-DQN_FILE_SCOPE char *DqnStr_Copy(char *const dest, const char *const src, const i32 numChars)
-{
-    if (!dest) return nullptr;
-    if (!src)  return nullptr;
-    if (numChars < 0) return nullptr;
-
-    for (i32 i  = 0; i < numChars; i++)
-        dest[i] = src[i];
-
-    return dest;
-}
-
-DQN_FILE_SCOPE i32 DqnStr_ReadUTF8Codepoint(const u32 *const a, u32 *outCodepoint)
+DQN_FILE_SCOPE i32 DqnStr_ReadUTF8Codepoint(u32 const *a, u32 *outCodepoint)
 {
     u8 *byte = (u8 *)a;
     if (a && byte[0])
@@ -5610,12 +5464,12 @@ DQN_FILE_SCOPE i32 DqnStr_ReadUTF8Codepoint(const u32 *const a, u32 *outCodepoin
     return 0;
 }
 
-DQN_FILE_SCOPE void DqnStr_Reverse(char *const buf, i32 bufSize)
+DQN_FILE_SCOPE void DqnStr_Reverse(char *buf, isize bufSize)
 {
     if (!buf) return;
-    i32 mid = bufSize / 2;
+    isize mid = bufSize / 2;
 
-    for (i32 i = 0; i < mid; i++)
+    for (isize i = 0; i < mid; i++)
     {
         char tmp               = buf[i];
         buf[i]                 = buf[(bufSize - 1) - i];
@@ -5684,7 +5538,7 @@ DQN_FILE_SCOPE bool DqnStr_HasSubstring(char const *src, i32 srcLen,
     return true;
 }
 
-DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufSize)
+DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 value, char *buf, i32 bufSize)
 {
     bool validBuffer = true;
     if (!buf || bufSize == 0) validBuffer = false;
@@ -5763,7 +5617,7 @@ DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *const buf, i32 const bufS
     return charIndex;
 }
 
-DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *const buf, i64 const bufSize)
+DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *buf, i64 bufSize)
 {
     if (!buf || bufSize == 0) return 0;
 
@@ -5803,7 +5657,7 @@ DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *const buf, i64 const bufSize)
     return result;
 }
 
-DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize)
+DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *buf, i64 bufSize)
 {
     if (!buf || bufSize == 0) return 0;
 
@@ -5915,7 +5769,7 @@ DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *const buf, i64 const bufSize)
     The UCS code values 0xd800–0xdfff (UTF-16 surrogates) as well as 0xfffe and
     0xffff (UCS noncharacters) should not appear in conforming UTF-8 streams.
 */
-DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, const u32 character)
+DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *dest, u32 character)
 {
     if (!dest) return 0;
 
@@ -5984,7 +5838,7 @@ DQN_FILE_SCOPE u32 Dqn_UCSToUTF8(u32 *const dest, const u32 character)
     return 0;
 }
 
-DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *const dest, const u32 character)
+DQN_FILE_SCOPE u32 Dqn_UTF8ToUCS(u32 *dest, u32 character)
 {
     if (!dest) return 0;
 
@@ -6105,13 +5959,13 @@ DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailQuotes(DqnSlice<char>
 
 // #DqnWChar
 // =================================================================================================
-DQN_FILE_SCOPE bool DqnWChar_IsDigit(const wchar_t c)
+DQN_FILE_SCOPE bool DqnWChar_IsDigit(wchar_t c)
 {
     if (c >= L'0' && c <= L'9') return true;
     return false;
 }
 
-DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(const wchar_t c)
+DQN_FILE_SCOPE wchar_t DqnWChar_ToLower(wchar_t c)
 {
     if (c >= L'A' && c <= L'Z')
     {
@@ -6128,7 +5982,7 @@ DQN_FILE_SCOPE wchar_t *DqnWChar_SkipWhitespace(wchar_t *ptr)
     return ptr;
 }
 
-DQN_FILE_SCOPE wchar_t *DqnWChar_FindLastChar(wchar_t *ptr, const wchar_t ch, i32 len, u32 *const lenToChar)
+DQN_FILE_SCOPE wchar_t *DqnWChar_FindLastChar(wchar_t *ptr, wchar_t ch, i32 len, u32 *lenToChar)
 {
     for (i32 i = len - 1; i >= 0; i--)
     {
@@ -6171,7 +6025,7 @@ DQN_FILE_SCOPE i32 DqnWChar_GetNextLine(wchar_t *ptr, i32 *lineLength)
 
 // #DqnWStr
 // =================================================================================================
-DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *const a, const wchar_t *const b)
+DQN_FILE_SCOPE i32 DqnWStr_Cmp(wchar_t const *a, wchar_t const *b)
 {
     if (!a && !b) return -1;
     if (!a) return -1;
@@ -6190,8 +6044,8 @@ DQN_FILE_SCOPE i32 DqnWStr_Cmp(const wchar_t *const a, const wchar_t *const b)
     return (((*aPtr) < (*bPtr)) ? -1 : 1);
 }
 
-DQN_FILE_SCOPE i32 DqnWStr_FindFirstOccurence(const wchar_t *const src, const i32 srcLen,
-                                              const wchar_t *const find, const i32 findLen)
+DQN_FILE_SCOPE i32 DqnWStr_FindFirstOccurence(wchar_t const *src, i32 srcLen,
+                                              wchar_t const *find, i32 findLen)
 {
     if (!src || !find)               return -1;
     if (srcLen == 0 || findLen == 0) return -1;
@@ -6230,8 +6084,8 @@ DQN_FILE_SCOPE i32 DqnWStr_FindFirstOccurence(const wchar_t *const src, const i3
     return -1;
 }
 
-DQN_FILE_SCOPE bool DqnWStr_HasSubstring(const wchar_t *const src, const i32 srcLen,
-                                         const wchar_t *const find, const i32 findLen)
+DQN_FILE_SCOPE bool DqnWStr_HasSubstring(wchar_t const *src, i32 srcLen,
+                                         wchar_t const *find, i32 findLen)
 {
     if (DqnWStr_FindFirstOccurence(src, srcLen, find, findLen) == -1)
         return false;
@@ -6239,21 +6093,21 @@ DQN_FILE_SCOPE bool DqnWStr_HasSubstring(const wchar_t *const src, const i32 src
     return true;
 }
 
-DQN_FILE_SCOPE i32 DqnWStr_Len(const wchar_t *const a)
+DQN_FILE_SCOPE i32 DqnWStr_Len(wchar_t const *a)
 {
     i32 result = 0;
     while (a && a[result]) result++;
     return result;
 }
 
-DQN_FILE_SCOPE i32 DqnWStr_LenDelimitWith(const wchar_t *a, const wchar_t delimiter)
+DQN_FILE_SCOPE i32 DqnWStr_LenDelimitWith(wchar_t const *a, wchar_t delimiter)
 {
     i32 result = 0;
     while (a && a[result] && a[result] != delimiter) result++;
     return result;
 }
 
-DQN_FILE_SCOPE void DqnWStr_Reverse(wchar_t *const buf, const u32 bufSize)
+DQN_FILE_SCOPE void DqnWStr_Reverse(wchar_t *buf, i32 bufSize)
 {
     if (!buf) return;
     i32 mid = bufSize / 2;
@@ -6266,7 +6120,7 @@ DQN_FILE_SCOPE void DqnWStr_Reverse(wchar_t *const buf, const u32 bufSize)
     }
 }
 
-DQN_FILE_SCOPE i32 Dqn_WStrToI32(const wchar_t *const buf, const i32 bufSize)
+DQN_FILE_SCOPE i32 Dqn_WStrToI32(wchar_t const *buf, i32 bufSize)
 {
     if (!buf || bufSize == 0) return 0;
 
@@ -6310,7 +6164,7 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
         buf[0] = L'0';
         return 0;
     }
-    
+
     // NOTE(doyle): Max 32bit integer (+-)2147483647
     i32 charIndex = 0;
     bool negative           = false;
@@ -6452,25 +6306,25 @@ i32 DqnRndPCG::Range(i32 min, i32 max)
 
 // #Dqn_*
 // =================================================================================================
-DQN_FILE_SCOPE inline bool Dqn_BitIsSet(u32 const bits, u32 const flag)
+DQN_FILE_SCOPE inline bool Dqn_BitIsSet(u32 bits, u32 flag)
 {
     bool result = ((bits & flag) == flag);
     return result;
 }
 
-DQN_FILE_SCOPE inline u32 Dqn_BitSet(u32 const bits, u32 const flag)
+DQN_FILE_SCOPE inline u32 Dqn_BitSet(u32 bits, u32 flag)
 {
     u32 result = (bits | flag);
     return result;
 }
 
-DQN_FILE_SCOPE inline u32 Dqn_BitUnset(u32 const bits, u32 const flag)
+DQN_FILE_SCOPE inline u32 Dqn_BitUnset(u32 bits, u32 flag)
 {
     u32 result = (bits & ~flag);
     return result;
 }
 
-DQN_FILE_SCOPE inline u32 Dqn_BitToggle(u32 const bits, u32 const flag)
+DQN_FILE_SCOPE inline u32 Dqn_BitToggle(u32 bits, u32 flag)
 {
     u32 result = (bits ^ flag);
     return result;
@@ -6490,21 +6344,7 @@ DQN_FILE_SCOPE inline bool Dqn_QuickSortDqnStringSorter(struct DqnString const *
 //              strings. So disabled for now.
 // #define DQN_STRING_ENABLE_SSO
 
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI *const api)
-{
-    DqnString result;
-    result.Init(api);
-    return result;
-}
-
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack)
-{
-    DqnString result;
-    result.Init(stack);
-    return result;
-}
-
-void DqnString::Init(DqnMemAPI *const api)
+void DqnString::Init(DqnMemAPI *api)
 {
     DQN_ASSERT(api);
 
@@ -6517,12 +6357,12 @@ void DqnString::Init(DqnMemAPI *const api)
     this->max    = 0;
 }
 
-void DqnString::Init(DqnMemStack *const stack)
+void DqnString::Init(DqnMemStack *stack)
 {
     this->Init(&stack->myHeadAPI);
 }
 
-bool DqnString::InitSize(const i32 size, DqnMemStack *const stack)
+bool DqnString::InitSize(i32 size, DqnMemStack *const stack)
 {
     bool result = this->InitSize(size, &stack->myHeadAPI);
     return result;
@@ -6558,7 +6398,7 @@ bool DqnString::InitSize(i32 size, DqnMemAPI *const api)
     return true;
 }
 
-bool DqnString::InitFixedMem(char *const memory, i32 const sizeInBytes)
+bool DqnString::InitFixedMem(char *const memory, i32 sizeInBytes)
 {
     if (!memory || sizeInBytes == 0) return false;
 
@@ -6570,19 +6410,19 @@ bool DqnString::InitFixedMem(char *const memory, i32 const sizeInBytes)
     return true;
 }
 
-bool DqnString::InitLiteral(char const *const cstr, DqnMemStack *const stack)
+bool DqnString::InitLiteral(char const *cstr, DqnMemStack *stack)
 {
     bool result = this->InitLiteral(cstr, &stack->myHeadAPI);
     return result;
 }
 
-bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemStack *const stack)
+bool DqnString::InitLiteral(char const *cstr, i32 lenInBytes, DqnMemStack *stack)
 {
     bool result = this->InitLiteral(cstr, lenInBytes, &stack->myHeadAPI);
     return result;
 }
 
-bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMemAPI *const api)
+bool DqnString::InitLiteral(char const *cstr, i32 lenInBytes, DqnMemAPI *api)
 {
     if (!this->InitSize(lenInBytes, api))
     {
@@ -6601,7 +6441,7 @@ bool DqnString::InitLiteral(char const *const cstr, i32 const lenInBytes, DqnMem
     return true;
 }
 
-bool DqnString::InitLiteral(char const *const cstr, DqnMemAPI *const api)
+bool DqnString::InitLiteral(char const *cstr, DqnMemAPI *api)
 {
     i32 utf8LenInBytes = 0;
     DqnStr_LenUTF8((u32 *)cstr, &utf8LenInBytes);
@@ -6611,13 +6451,13 @@ bool DqnString::InitLiteral(char const *const cstr, DqnMemAPI *const api)
     return result;
 }
 
-bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemStack *const stack)
+bool DqnString::InitLiteral(wchar_t const *cstr, DqnMemStack *stack)
 {
     bool result = this->InitLiteral(cstr, &stack->myHeadAPI);
     return result;
 }
 
-bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI *const api)
+bool DqnString::InitLiteral(wchar_t const *cstr, DqnMemAPI *api)
 {
 #if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
     i32 reqLenInclNullTerminator = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
@@ -6642,7 +6482,7 @@ bool DqnString::InitLiteral(wchar_t const *const cstr, DqnMemAPI *const api)
 #endif
 }
 
-bool DqnString::InitLiteralNoAlloc(char *const cstr, i32 cstrLen)
+bool DqnString::InitLiteralNoAlloc(char *cstr, i32 cstrLen)
 {
     if (!cstr) return false;
 
@@ -6721,8 +6561,8 @@ bool DqnString::Expand(i32 newMax)
     return false;
 }
 
-DQN_FILE_SCOPE bool DqnStringInternal_Append(DqnString *const str, char const *const cstr,
-                                             i32 const bytesToCopy)
+DQN_FILE_SCOPE bool DqnStringInternal_Append(DqnString *str, char const *cstr,
+                                             i32 bytesToCopy)
 {
     if (bytesToCopy <= 0)
     {
@@ -6784,7 +6624,7 @@ bool DqnString::VSprintf(char const *fmt, va_list argList)
     return true;
 }
 
-bool DqnString::Append(char const *const cstr, i32 bytesToCopy)
+bool DqnString::Append(char const *cstr, i32 bytesToCopy)
 {
     i32 cstrLen = 0;
     if (bytesToCopy == -1)
@@ -6846,7 +6686,7 @@ void DqnString::Free()
     }
 }
 
-i32 DqnString::ToWChar(wchar_t *const buf, i32 const bufSize) const
+i32 DqnString::ToWChar(wchar_t *buf, i32 bufSize) const
 {
 #if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
     i32 result = DqnWin32_UTF8ToWChar(this->str, buf, bufSize);
@@ -6859,7 +6699,7 @@ i32 DqnString::ToWChar(wchar_t *const buf, i32 const bufSize) const
 #endif
 }
 
-wchar_t *DqnString::ToWChar(DqnMemAPI *const api) const
+wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
 {
     // TODO(doyle): Should the "in" string allow specifyign len? probably
     // Otherwise a c-string and a literal initiated string might have different lengths
@@ -6935,8 +6775,8 @@ i32 Dqn_SplitString(char const *src, i32 srcLen, char splitChar, DqnSlice<char> 
     return arrayIndex;
 }
 
-DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *const array, i64 const size, i64 const find,
-                               Dqn_BSearchBound const bound)
+DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *array, i64 size, i64 find,
+                               Dqn_BSearchBound bound)
 {
     if (size == 0 || !array) return -1;
 
@@ -8862,8 +8702,8 @@ void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
 // =================================================================================================
 #ifdef DQN_WIN32_PLATFORM
 
-FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *path, DqnFile *const file,
-                                           u32 const flags, DqnFile::Action const action)
+FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *path, DqnFile *file,
+                                           u32 flags, DqnFile::Action action)
 {
     if (!file || !path) return false;
 
@@ -9024,7 +8864,7 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
 #endif // DQN_WIN32_PLATFORM
 
 #ifdef DQN_UNIX_PLATFORM
-FILE_SCOPE bool DqnFileInternal_UnixGetFileSizeWithStat(char const *const path, usize *size)
+FILE_SCOPE bool DqnFileInternal_UnixGetFileSizeWithStat(char const *path, usize *size)
 {
     struct stat fileStat = {0};
     if (stat(path, &fileStat)) return false;
@@ -9033,7 +8873,7 @@ FILE_SCOPE bool DqnFileInternal_UnixGetFileSizeWithStat(char const *const path, 
     return true;
 }
 
-FILE_SCOPE usize DqnFileInternal_UnixGetFileSizeManual(FILE *const handle, bool const rewindHandle)
+FILE_SCOPE usize DqnFileInternal_UnixGetFileSizeManual(FILE *handle, bool rewindHandle)
 {
     u64 fileSizeInBytes = 0;
 
@@ -9048,8 +8888,8 @@ FILE_SCOPE usize DqnFileInternal_UnixGetFileSizeManual(FILE *const handle, bool 
     return fileSizeInBytes;
 }
 
-FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *const path, DqnFile *const file,
-                                         u32 const flags, DqnFile::Action action)
+FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *path, DqnFile *file,
+                                         u32 flags, DqnFile::Action action)
 {
     char operation  = 0;
     bool updateFlag = false;
@@ -9188,7 +9028,7 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
 }
 
 #endif // DQN_UNIX_PLATFORM
-bool DqnFile::Open(char const *path, u32 const flags_, Action const action)
+bool DqnFile::Open(char const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
@@ -9208,7 +9048,7 @@ bool DqnFile::Open(char const *path, u32 const flags_, Action const action)
 #endif
 }
 
-bool DqnFile::Open(wchar_t const *path, u32 const flags_, Action const action)
+bool DqnFile::Open(wchar_t const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
@@ -9221,7 +9061,7 @@ bool DqnFile::Open(wchar_t const *path, u32 const flags_, Action const action)
 #endif
 }
 
-usize DqnFile::Write(u8 const *buf, usize const numBytesToWrite, usize const fileOffset)
+usize DqnFile::Write(u8 const *buf, usize numBytesToWrite, usize fileOffset)
 {
     // TODO(doyle): Implement when it's needed
     DQN_ASSERTM(fileOffset == 0, "File writing into offset is not implemented.");
@@ -9251,7 +9091,7 @@ usize DqnFile::Write(u8 const *buf, usize const numBytesToWrite, usize const fil
     return numBytesWritten;
 }
 
-usize DqnFile::Read(u8 *const buf, usize const numBytesToRead)
+usize DqnFile::Read(u8 *buf, usize numBytesToRead)
 {
     usize numBytesRead = 0;
     if (this->handle)
@@ -9289,7 +9129,7 @@ usize DqnFile::Read(u8 *const buf, usize const numBytesToRead)
     return numBytesRead;
 }
 
-u8 *DqnFile::ReadEntireFile(wchar_t const *const path, usize *const bufSize, DqnMemAPI *const api)
+u8 *DqnFile::ReadEntireFile(wchar_t const *path, usize *bufSize, DqnMemAPI *api)
 {
     // TODO(doyle): Logging
     if (!path || !bufSize)
@@ -9321,7 +9161,7 @@ u8 *DqnFile::ReadEntireFile(wchar_t const *const path, usize *const bufSize, Dqn
     return nullptr;
 }
 
-u8 *DqnFile::ReadEntireFile(char const *const path, usize *const bufSize, DqnMemAPI *const api)
+u8 *DqnFile::ReadEntireFile(char const *path, usize *bufSize, DqnMemAPI *api)
 {
     // TODO(doyle): Logging
 
@@ -9343,8 +9183,8 @@ u8 *DqnFile::ReadEntireFile(char const *const path, usize *const bufSize, DqnMem
     return nullptr;
 }
 
-bool DqnFile::ReadEntireFile(wchar_t const *const path, u8 *const buf, usize const bufSize,
-                             usize *const bytesRead)
+bool DqnFile::ReadEntireFile(wchar_t const *path, u8 *buf, usize bufSize,
+                             usize *bytesRead)
 {
     if (!path || !buf || !bytesRead) return false;
 
@@ -9368,7 +9208,7 @@ cleanup:
     return result;
 }
 
-bool DqnFile::ReadEntireFile(const char *const path, u8 *const buf, usize const bufSize, usize *const bytesRead)
+bool DqnFile::ReadEntireFile(const char *path, u8 *buf, usize bufSize, usize *bytesRead)
 {
     if (!path || !buf || !bytesRead) return false;
 
@@ -9411,7 +9251,7 @@ void DqnFile::Close()
 #if defined(DQN_WIN32_PLATFORM)
     DQN_COMPILE_ASSERT(sizeof(DWORD)  == sizeof(u32));
 #endif
-bool DqnFile::GetFileSize(wchar_t const *const path, usize *const size)
+bool DqnFile::GetFileSize(wchar_t const *path, usize *size)
 {
     if (!size || !path) return false;
 
@@ -9425,7 +9265,7 @@ bool DqnFile::GetFileSize(wchar_t const *const path, usize *const size)
     return false;
 }
 
-bool DqnFile::GetFileSize(char const *const path, usize *const size)
+bool DqnFile::GetFileSize(char const *path, usize *size)
 {
     if (!path || !size) return false;
 
@@ -9454,7 +9294,7 @@ bool DqnFile::GetFileSize(char const *const path, usize *const size)
 #endif
 }
 
-bool DqnFile::GetInfo(wchar_t const *const path, Info *const info)
+bool DqnFile::GetInfo(wchar_t const *path, Info *info)
 {
     if (!path || !info) return false;
 
@@ -9493,7 +9333,7 @@ bool DqnFile::GetInfo(wchar_t const *const path, Info *const info)
     return false;
 }
 
-bool DqnFile::GetInfo(char const *const path, Info *const info)
+bool DqnFile::GetInfo(char const *path, Info *info)
 {
     // TODO(doyle): Logging
     if (!path || !info)
@@ -9524,7 +9364,7 @@ bool DqnFile::GetInfo(char const *const path, Info *const info)
 }
 
 
-bool DqnFile::Delete(char const *const path)
+bool DqnFile::Delete(char const *path)
 {
     if (!path) return false;
 
@@ -9541,7 +9381,7 @@ bool DqnFile::Delete(char const *const path)
 #endif
 }
 
-bool DqnFile::Delete(wchar_t const *const path)
+bool DqnFile::Delete(wchar_t const *path)
 {
     if (!path) return false;
 
@@ -9556,7 +9396,7 @@ bool DqnFile::Delete(wchar_t const *const path)
 #endif
 }
 
-bool DqnFile::Copy(char const *const src, char const *const dest)
+bool DqnFile::Copy(char const *src, char const *dest)
 {
     if (!src || !dest) return false;
 
@@ -9576,7 +9416,7 @@ bool DqnFile::Copy(char const *const src, char const *const dest)
 #endif
 }
 
-bool DqnFile::Copy(wchar_t const *const src, wchar_t const *const dest)
+bool DqnFile::Copy(wchar_t const *src, wchar_t const *dest)
 {
     if (!src || !dest) return false;
 
@@ -9663,7 +9503,7 @@ DQN_FILE_SCOPE f64 DqnTimer_NowInS() { return DqnTimer_NowInMs() / 1000.0f; }
 
 // XPlatform > #DqnLock
 // =================================================================================================
-bool DqnLock_Init(DqnLock *const lock)
+bool DqnLock_Init(DqnLock *lock)
 {
     if (!lock) return false;
 
@@ -9686,7 +9526,7 @@ bool DqnLock_Init(DqnLock *const lock)
     return false;
 }
 
-void DqnLock_Acquire(DqnLock *const lock)
+void DqnLock_Acquire(DqnLock *lock)
 {
     if (!lock) return;
 
@@ -9704,7 +9544,7 @@ void DqnLock_Acquire(DqnLock *const lock)
 #endif
 }
 
-void DqnLock_Release(DqnLock *const lock)
+void DqnLock_Release(DqnLock *lock)
 {
     if (!lock) return;
 
@@ -9722,7 +9562,7 @@ void DqnLock_Release(DqnLock *const lock)
 #endif
 }
 
-void DqnLock_Delete(DqnLock *const lock)
+void DqnLock_Delete(DqnLock *lock)
 {
     if (!lock) return;
 
@@ -9749,7 +9589,7 @@ DqnLockGuard DqnLock::LockGuard()
     return DqnLockGuard(this, nullptr);
 }
 
-DqnLockGuard::DqnLockGuard(DqnLock *const lock_, bool *const succeeded)
+DqnLockGuard::DqnLockGuard(DqnLock *lock_, bool *succeeded)
 {
     if (lock_)
     {
@@ -9774,9 +9614,9 @@ DqnLockGuard::~DqnLockGuard()
 typedef void *DqnThreadCallbackInternal(void *threadParam);
 usize DQN_JOB_QUEUE_INTERNAL_THREAD_DEFAULT_STACK_SIZE = 0;
 
-FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(const usize stackSize,
-                                                DqnThreadCallbackInternal *const threadCallback,
-                                                void *const threadParam, const u32 numThreads)
+FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(usize stackSize,
+                                                DqnThreadCallbackInternal *threadCallback,
+                                                void *threadParam, u32 numThreads)
 {
     u32 numThreadsCreated = 0;
 
@@ -9839,7 +9679,7 @@ FILE_SCOPE void *DqnJobQueueInternal_ThreadCallback(void *threadParam)
     }
 }
 
-FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *const queue, const u32 initSignalCount, const u32 maxSignalCount)
+FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *queue, u32 initSignalCount, u32 maxSignalCount)
 {
     if (!queue) return false;
 
@@ -9865,7 +9705,7 @@ FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *const queue, co
     return true;
 }
 
-FILE_SCOPE bool DqnJobQueueInternal_ReleaseSemaphore(DqnJobQueue *const queue)
+FILE_SCOPE bool DqnJobQueueInternal_ReleaseSemaphore(DqnJobQueue *queue)
 {
     DQN_ASSERT(queue);
 
@@ -9885,8 +9725,7 @@ FILE_SCOPE bool DqnJobQueueInternal_ReleaseSemaphore(DqnJobQueue *const queue)
     return true;
 }
 
-DQN_FILE_SCOPE bool DqnJobQueue_Init(DqnJobQueue *const queue, DqnJob *const jobList,
-                                     const u32 jobListSize, const u32 numThreads)
+DQN_FILE_SCOPE bool DqnJobQueue_Init(DqnJobQueue *queue, DqnJob *jobList, u32 jobListSize, u32 numThreads)
 {
     if (!queue || !jobList || jobListSize == 0 || numThreads == 0) return false;
     queue->jobList = jobList;
@@ -9903,7 +9742,7 @@ DQN_FILE_SCOPE bool DqnJobQueue_Init(DqnJobQueue *const queue, DqnJob *const job
     return true;
 }
 
-DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob job)
+DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *queue, const DqnJob job)
 {
     i32 newJobInsertIndex = (queue->jobInsertIndex + 1) % queue->size;
     if (newJobInsertIndex == queue->jobToExecuteIndex) return false;
@@ -9917,13 +9756,13 @@ DQN_FILE_SCOPE bool DqnJobQueue_AddJob(DqnJobQueue *const queue, const DqnJob jo
     return true;
 }
 
-DQN_FILE_SCOPE void DqnJobQueue_BlockAndCompleteAllJobs(DqnJobQueue *const queue)
+DQN_FILE_SCOPE void DqnJobQueue_BlockAndCompleteAllJobs(DqnJobQueue *queue)
 {
     while (DqnJobQueue_TryExecuteNextJob(queue) || !DqnJobQueue_AllJobsComplete(queue))
         ;
 }
 
-DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue)
+DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *queue)
 {
     if (!queue) return false;
 
@@ -9951,7 +9790,7 @@ DQN_FILE_SCOPE bool DqnJobQueue_TryExecuteNextJob(DqnJobQueue *const queue)
     return false;
 }
 
-DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete(DqnJobQueue *const queue)
+DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete(DqnJobQueue *queue)
 {
     if (!queue) return false;
 
@@ -9959,7 +9798,7 @@ DQN_FILE_SCOPE bool DqnJobQueue_AllJobsComplete(DqnJobQueue *const queue)
     return result;
 }
 
-bool DqnJobQueue::Init(DqnJob *const jobList_, const u32 jobListSize, const u32 numThreads)
+bool DqnJobQueue::Init(DqnJob *jobList_, u32 jobListSize, u32 numThreads)
 {
     bool result = DqnJobQueue_Init(this, jobList_, jobListSize, numThreads);
     return result;
@@ -9977,8 +9816,7 @@ bool DqnJobQueue::AllJobsComplete  ()                 { return DqnJobQueue_AllJo
     DQN_COMPILE_ASSERT(sizeof(LONG) == sizeof(i32));
 #endif
 
-DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *const dest, const i32 swapVal,
-                                           const i32 compareVal)
+DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *dest, i32 swapVal, i32 compareVal)
 {
     i32 result = 0;
 #if defined(DQN_WIN32_PLATFORM)
@@ -9994,7 +9832,7 @@ DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *const dest, const i32 s
     return result;
 }
 
-DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *const src, const i32 value)
+DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
 {
     i32 result = 0;
 #if defined(DQN_WIN32_PLATFORM)
@@ -10142,7 +9980,7 @@ DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresA
 
 // XPlatform > #DqnPlatform
 // =================================================================================================
-DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *const numCores, u32 *const numThreadsPerCore)
+DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *numCores, u32 *numThreadsPerCore)
 {
 #if (defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM))
     DqnPlatformInternal_GetNumCoresAndThreads(numCores, numThreadsPerCore);
@@ -10157,8 +9995,7 @@ DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *const numCores, u32 *
 #ifdef DQN_WIN32_PLATFORM
 // #DqnWin32
 // =================================================================================================
-DQN_FILE_SCOPE i32 DqnWin32_UTF8ToWChar(const char *const in,
-                                         wchar_t *const out, const i32 outLen)
+DQN_FILE_SCOPE i32 DqnWin32_UTF8ToWChar(char const *in, wchar_t *out, i32 outLen)
 {
     i32 result = MultiByteToWideChar(CP_UTF8, 0, in, -1, out, outLen);
 
@@ -10171,8 +10008,7 @@ DQN_FILE_SCOPE i32 DqnWin32_UTF8ToWChar(const char *const in,
     return result;
 }
 
-DQN_FILE_SCOPE i32 DqnWin32_WCharToUTF8(const wchar_t *const in,
-                                        char *const out, const i32 outLen)
+DQN_FILE_SCOPE i32 DqnWin32_WCharToUTF8(wchar_t const *in, char *out, i32 outLen)
 {
     i32 result =
         WideCharToMultiByte(CP_UTF8, 0, in, -1, out, outLen, nullptr, nullptr);
@@ -10186,7 +10022,7 @@ DQN_FILE_SCOPE i32 DqnWin32_WCharToUTF8(const wchar_t *const in,
     return result;
 }
 
-DQN_FILE_SCOPE void DqnWin32_GetClientDim(HWND const window, LONG *const width, LONG *const height)
+DQN_FILE_SCOPE void DqnWin32_GetClientDim(HWND window, LONG *width, LONG *height)
 {
     RECT rect;
     GetClientRect(window, &rect);
@@ -10194,13 +10030,13 @@ DQN_FILE_SCOPE void DqnWin32_GetClientDim(HWND const window, LONG *const width, 
     if (height) *height = rect.bottom - rect.top;
 }
 
-DQN_FILE_SCOPE void DqnWin32_GetRectDim(RECT const rect, LONG *const width, LONG *const height)
+DQN_FILE_SCOPE void DqnWin32_GetRectDim(RECT const rect, LONG *width, LONG *height)
 {
     if (width)  *width  = rect.right - rect.left;
     if (height) *height = rect.bottom - rect.top;
 }
 
-DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix)
+DQN_FILE_SCOPE void DqnWin32_DisplayLastError(char const *errorPrefix)
 {
     DWORD error         = GetLastError();
     char errorMsg[1024] = {0};
@@ -10220,7 +10056,7 @@ DQN_FILE_SCOPE void DqnWin32_DisplayLastError(const char *const errorPrefix)
 }
 
 const i32 DQN_WIN32_INTERNAL_ERROR_MSG_SIZE = 2048;
-DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *const errorPrefix)
+DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(DWORD error, char const *errorPrefix)
 {
     char errorMsg[DQN_WIN32_INTERNAL_ERROR_MSG_SIZE] = {0};
     FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -10231,7 +10067,7 @@ DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(const DWORD error, const char *con
     DQN_WIN32_ERROR_BOX(formattedError, nullptr);
 }
 
-DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
+DQN_FILE_SCOPE void DqnWin32_OutputDebugString(char const *formatStr, ...)
 {
     char str[DQN_WIN32_INTERNAL_ERROR_MSG_SIZE] = {0};
 
@@ -10246,7 +10082,7 @@ DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
     OutputDebugStringA(str);
 }
 
-DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen)
+DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *buf, u32 bufLen)
 {
     if (!buf || bufLen == 0) return -1;
     u32 copiedLen = GetModuleFileNameA(nullptr, buf, bufLen);
