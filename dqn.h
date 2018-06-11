@@ -766,22 +766,17 @@ DQN_FILE_SCOPE i32      Dqn_I32ToWStr             (i32 value, wchar_t *buf, i32 
 
 // #DqnRnd API
 // =================================================================================================
-// NOTE: Uses PCG (Permuted Congruential Generator)
-struct DqnRndPCG
+struct DqnRndPCG // PCG (Permuted Congruential Generator)
 {
     u64 state[2];
 
-    void Init        ();          // Uses rdstc to create a seed
-    void InitWithSeed(u32 seed);
+    DqnRndPCG();
+    DqnRndPCG(u32 seed);
 
     u32 Next ();                 // return: A random number  N between [0, 0xFFFFFFFF]
     f32 Nextf();                 // return: A random float   N between [0.0, 1.0f]
     i32 Range(i32 min, i32 max); // return: A random integer N between [min, max]
 };
-
-DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_();         // Uses rdtsc to create a seed
-DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed);
-
 
 // #Dqn_* API
 // =================================================================================================
@@ -835,8 +830,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size,
     }
 #endif
 
-    DqnRndPCG state; state.Init();
-
+    auto state          = DqnRndPCG();
     auto lastIndex      = size - 1;
     auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex);
     auto partitionIndex = 0;
@@ -907,8 +901,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size)
     }
 #endif
 
-    DqnRndPCG state; state.Init();
-
+    auto state          = DqnRndPCG();
     auto lastIndex      = size - 1;
     auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex); // TODO(doyle): RNG 64bit
     auto partitionIndex = 0;
@@ -5925,23 +5918,23 @@ DQN_FILE_SCOPE i32 Dqn_I32ToWstr(i32 value, wchar_t *buf, i32 bufSize)
 // < 1.0f. Contributed by Jonatan Hedborg
 
 // NOTE: This is to abide to strict aliasing rules.
-union DqnRndInternal_U32F32
+union DqnRnd__U32F32
 {
     u32 unsigned32;
     f32 float32;
 };
 
-FILE_SCOPE f32 DqnRndInternal_F32NormalizedFromU32(u32 value)
+FILE_SCOPE f32 DqnRnd__F32NormalizedFromU32(u32 value)
 {
     u32 exponent = 127;
     u32 mantissa = value >> 9;
 
-    union DqnRndInternal_U32F32 uf;
+    union DqnRnd__U32F32 uf;
     uf.unsigned32 = (exponent << 23 | mantissa);
     return uf.float32 - 1.0f;
 }
 
-FILE_SCOPE u64 DqnRndInternal_Murmur3Avalanche64(u64 h)
+FILE_SCOPE u64 DqnRnd__Murmur3Avalanche64(u64 h)
 {
     h ^= h >> 33;
     h *= 0xff51afd7ed558ccd;
@@ -5955,7 +5948,7 @@ FILE_SCOPE u64 DqnRndInternal_Murmur3Avalanche64(u64 h)
     #include <x86intrin.h> // __rdtsc
 #endif
 
-FILE_SCOPE u32 DqnRndInternal_MakeSeed()
+FILE_SCOPE u32 DqnRnd__MakeSeed()
 {
 #if defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM)
     i64 numClockCycles = __rdtsc();
@@ -5969,35 +5962,21 @@ FILE_SCOPE u32 DqnRndInternal_MakeSeed()
 #endif
 }
 
-DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_()
+DqnRndPCG::DqnRndPCG()
 {
-    DqnRndPCG result;
-    result.Init();
-    return result;
+    u32 seed = DqnRnd__MakeSeed();
+    *this    = DqnRndPCG(seed);
 }
 
-DQN_FILE_SCOPE DqnRndPCG DqnRndPCG_(u32 seed)
+DqnRndPCG::DqnRndPCG(u32 seed)
 {
-    DqnRndPCG result;
-    result.InitWithSeed(seed);
-    return result;
-}
-
-void DqnRndPCG::InitWithSeed(u32 seed)
-{
-    u64 value     = (((u64)seed) << 1ULL) | 1ULL;
-    value         = DqnRndInternal_Murmur3Avalanche64(value);
+    u64 value      = (((u64)seed) << 1ULL) | 1ULL;
+    value          = DqnRnd__Murmur3Avalanche64(value);
     this->state[0] = 0U;
     this->state[1] = (value << 1ULL) | 1ULL;
     this->Next();
-    this->state[0] += DqnRndInternal_Murmur3Avalanche64(value);
+    this->state[0] += DqnRnd__Murmur3Avalanche64(value);
     this->Next();
-}
-
-void DqnRndPCG::Init()
-{
-    u32 seed = DqnRndInternal_MakeSeed();
-    this->InitWithSeed(seed);
 }
 
 u32 DqnRndPCG::Next()
@@ -6011,7 +5990,7 @@ u32 DqnRndPCG::Next()
 
 f32 DqnRndPCG::Nextf()
 {
-    f32 result = DqnRndInternal_F32NormalizedFromU32(this->Next());
+    f32 result = DqnRnd__F32NormalizedFromU32(this->Next());
     return result;
 }
 

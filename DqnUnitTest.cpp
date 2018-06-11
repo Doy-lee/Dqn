@@ -709,7 +709,7 @@ void DqnRnd_Test()
 {
     LOG_HEADER();
 
-    DqnRndPCG pcg; pcg.Init();
+    auto pcg = DqnRndPCG();
     for (i32 i = 0; i < 1000000; i++)
     {
         i32 min    = -100;
@@ -1932,7 +1932,7 @@ FILE_SCOPE void DqnJobQueue_Test()
 void DqnQuickSort_Test()
 {
     LOG_HEADER();
-    DqnRndPCG state; state.Init();
+    auto state = DqnRndPCG();
     if (1)
     {
         DqnMemStack stack = {};
@@ -2247,7 +2247,7 @@ void Dqn_BSearch_Test()
 void DqnMemSet_Test()
 {
     LOG_HEADER();
-    DqnRndPCG rnd = DqnRndPCG_();
+    auto rnd = DqnRndPCG();
 
     const int NUM_TIMINGS = 5;
     f64 timings[2][NUM_TIMINGS] = {};
