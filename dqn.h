@@ -2011,10 +2011,19 @@ struct DqnSmartString : public DqnString
     ~DqnSmartString() { this->Free(); }
 };
 
+DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI   *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
+DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
+
+// NOTE: First level of indirection needs to turn the combined dqnstring_(guid) into a name. Otherwise
+//       each use of literalVarName will increment __COUNTER__
+#define DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, literalVarName)                          \
+    {};                                                                                            \
+    char literalVarName[] = literal;                                                               \
+    srcVariable.InitLiteralNoAlloc(literalVarName, DQN_CHAR_COUNT(literalVarName))
 
 // #DqnFixedString Public API - Fixed sized strings at compile time
 // =================================================================================================
-int DqnFixedString__Append(char *dest, int destSize, char const *src, int len = -1);
+FILE_SCOPE int DqnFixedString__Append(char *dest, int destSize, char const *src, int len = -1);
 
 template <unsigned int MAX>
 struct DqnFixedString
@@ -2033,10 +2042,10 @@ struct DqnFixedString
     DqnFixedString &operator+=(DqnSlice<char> const &other)       { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
     DqnFixedString &operator+=(DqnFixedString const &other)       { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other.str, other.len); return *this; }
 
-    DqnFixedString  operator+ (char const *other);
-    DqnFixedString  operator+ (DqnSlice<char const> const &other);
-    DqnFixedString  operator+ (DqnSlice<char> const &other);
-    DqnFixedString  operator+ (DqnFixedString const &other);
+    DqnFixedString  operator+ (char const *other)                 { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other); return result; }
+    DqnFixedString  operator+ (DqnSlice<char const> const &other) { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
+    DqnFixedString  operator+ (DqnSlice<char> const &other)       { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
+    DqnFixedString  operator+ (DqnFixedString const &other)       { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.str, other.len); return result; }
 
     // Xprintf functions always modifies buffer and null-terminates even with insufficient buffer size.
     // Asserts on failure if DQN_ASSERT is defined.
@@ -2049,33 +2058,6 @@ struct DqnFixedString
 
     void Clear         (Dqn::ZeroClear clear = Dqn::ZeroClear::False) { if (clear == Dqn::ZeroClear::True) DqnMem_Set(str, 0, MAX); this = {}; }
 };
-
-template <unsigned int MAX>
-DqnFixedString<MAX> DqnFixedString<MAX>::operator+(char const *other)
-{
-    DqnFixedString result = {};
-    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, this->str, this->len);
-    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other);
-    return result;
-}
-
-template <unsigned int MAX>
-DqnFixedString<MAX> DqnFixedString<MAX>::operator+(DqnSlice<char const> const &other)
-{
-    DqnFixedString result = {};
-    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, this->str, this->len);
-    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len);
-    return result;
-}
-
-template <unsigned int MAX>
-DqnFixedString<MAX> DqnFixedString<MAX>::operator+(DqnFixedString const &other)
-{
-    DqnFixedString result = {};
-    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, this->str, this->len);
-    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.str, other.len);
-    return result;
-}
 
 template <unsigned int MAX>
 FILE_SCOPE bool
@@ -2136,17 +2118,6 @@ bool DqnFixedString<MAX>::SprintfAppend(char const *fmt, ...)
     va_end(argList);
     return result;
 }
-
-
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI   *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
-
-// NOTE: First level of indirection needs to turn the combined dqnstring_(guid) into a name. Otherwise
-//       each use of literalVarName will increment __COUNTER__
-#define DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, literalVarName)                          \
-    {};                                                                                            \
-    char literalVarName[] = literal;                                                               \
-    srcVariable.InitLiteralNoAlloc(literalVarName, DQN_CHAR_COUNT(literalVarName))
 
 // TODO(doyle): Load factor
 // #DqnHashTable API
@@ -6465,7 +6436,7 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
 // #DqnFixedString Implementation
 // =================================================================================================
 // return: The number of bytes written to dest
-int DqnFixedString__Append(char *dest, int destSize, char const *src, int len)
+FILE_SCOPE int DqnFixedString__Append(char *dest, int destSize, char const *src, int len)
 {
     if (len <= -1)
     {
