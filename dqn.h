@@ -29,26 +29,28 @@
 // The first match is the public API, the next matche(s) are the implementation
 
 // #Portable Code
-// #DqnAssert    Assertions and Logging
-// #DqnSlice     Slices
-// #DqnChar      Char  Operations (IsDigit(), IsAlpha() etc)
-// #DqnStr       Str   Operations (Str_Len(), Str_Copy() etc)
-// #DqnWChar     WChar Operations (IsDigit(), IsAlpha() etc)
-// #DqnRnd       Random Number Generator (ints and floats)
-// #Dqn_*        Utility code, (qsort, quick file reading)
-// #DqnMem       Memory Allocation
-// #DqnMemAPI    Custom memory API for Dqn Data Structures
-// #DqnArray     Dynamic Array using Templates
-// #DqnMemStack  Memory Allocator, Push, Pop Style
-// #DqnHash      Hashing using Murmur
-// #DqnMath      Simple Math Helpers (Lerp etc.)
-// #DqnV2        2D  Math Vectors
-// #DqnV3        3D  Math Vectors
-// #DqnV4        4D  Math Vectors
-// #DqnMat4      4x4 Math Matrix
-// #DqnRect      Rectangles
-// #DqnString    String library
-// #DqnHashTable Hash Tables using Templates
+// #DqnSprintf     Cross-platform Sprintf Implementation (Public Domain lib stb_sprintf)
+// #DqnAssert      Assertions and Logging
+// #DqnSlice       Slices
+// #DqnChar        Char  Operations (IsDigit(), IsAlpha() etc)
+// #DqnStr         Str   Operations (Str_Len(), Str_Copy() etc)
+// #DqnWChar       WChar Operations (IsDigit(), IsAlpha() etc)
+// #DqnRnd         Random Number Generator (ints and floats)
+// #Dqn_*          Utility code, (qsort, quick file reading)
+// #DqnMem         Memory Allocation
+// #DqnMemAPI      Custom memory API for Dqn Data Structures
+// #DqnArray       Dynamic Array using Templates
+// #DqnMemStack    Memory Allocator, Push, Pop Style
+// #DqnHash        Hashing using Murmur
+// #DqnMath        Simple Math Helpers (Lerp etc.)
+// #DqnV2          2D  Math Vectors
+// #DqnV3          3D  Math Vectors
+// #DqnV4          4D  Math Vectors
+// #DqnMat4        4x4 Math Matrix
+// #DqnRect        Rectangles
+// #DqnString      String library
+// #DqnFixedString Fixed sized strings at compile time.
+// #DqnHashTable   Hash Tables using Templates
 
 // #XPlatform (Win32 & Unix)
 // #DqnFile      File I/O (Read, Write, Delete)
@@ -60,10 +62,6 @@
 
 // #Platform
 //   - #DqnWin32     Common Win32 API Helpers
-
-// #External Code
-// #DqnIni       Simple INI Config File API (Public Domain lib by Mattias Gustavsson)
-// #DqnSprintf   Cross-platform Sprintf Implementation (Public Domain lib stb_sprintf)
 
 // TODO
 // - DqnMemStack
@@ -514,6 +512,114 @@ BOOL    WriteFile                       (HANDLE hFile,
 #endif // _WINDOWS_
 #endif // DQN_WIN32_PLATFORM
 
+// #External Code
+// =================================================================================================
+#ifndef STB_SPRINTF_H_INCLUDE
+#define STB_SPRINTF_H_INCLUDE
+#define STB_SPRINTF_DECORATE(name) Dqn_##name
+
+////////////////////////////////////////////////////////////////////////////////
+// #DqnSprintf Public API - Cross-platform Sprintf Implementation
+////////////////////////////////////////////////////////////////////////////////
+/*
+Public Domain library originally written by Jeff Roberts at RAD Game Tools
+- 2015/10/20.  Hereby placed in public domain.
+STB_Sprintf renamed to Dqn_Sprintf
+
+FLOATS/DOUBLES:
+===============
+This code uses a internal float->ascii conversion method that uses doubles with
+error correction (double-doubles, for ~105 bits of precision).  This conversion
+is round-trip perfect - that is, an atof of the values output here will give you
+the bit-exact double back.
+
+One difference is that our insignificant digits will be different than with MSVC
+or GCC (but they don't match each other either).  We also don't attempt to find
+the minimum length matching float (pre-MSVC15 doesn't either).
+
+If you don't need float or doubles at all, define STB_SPRINTF_NOFLOAT and you'll
+save 4K of code space.
+
+64-BIT INTS:
+============
+This library also supports 64-bit integers and you can use MSVC style or GCC
+style indicators (%I64d or %lld).  It supports the C99 specifiers for usize and
+ptr_diff_t (%jd %zd) as well.
+
+EXTRAS:
+=======
+Like some GCCs, for integers and floats, you can use a ' (single quote)
+specifier and commas will be inserted on the thousands: "%'d" on 12345 would
+print 12,345.
+
+For integers and floats, you can use a "$" specifier and the number will be
+converted to float and then divided to get kilo, mega, giga or tera and then
+printed, so "%$d" 1000 is "1.0 k", "%$.2d" 2536000 is "2.53 M", etc. For byte
+values, use two $:s, like "%$$d" to turn 2536000 to "2.42 Mi". If you prefer
+JEDEC suffixes to SI ones, use three $:s: "%$$$d" -> "2.42 M". To remove the
+space between the number and the suffix, add "_" specifier: "%_$d" -> "2.53M".
+
+In addition to octal and hexadecimal conversions, you can print integers in
+binary: "%b" for 256 would print 100.
+*/
+
+#if defined(__has_feature)
+    #if __has_feature(address_sanitizer)
+        #define STBI__ASAN __attribute__((no_sanitize("address")))
+    #endif
+#endif
+
+#ifndef STBI__ASAN
+    #define STBI__ASAN
+#endif
+
+#ifdef STB_SPRINTF_STATIC
+    #define STBSP__PUBLICDEC static
+    #define STBSP__PUBLICDEF static STBI__ASAN
+#else
+    #ifdef __cplusplus
+        #define STBSP__PUBLICDEC extern "C"
+        #define STBSP__PUBLICDEF extern "C" STBI__ASAN
+    #else
+        #define STBSP__PUBLICDEC extern
+        #define STBSP__PUBLICDEF STBI__ASAN
+    #endif
+#endif
+
+#include <stdarg.h>  // for va_list()
+
+#ifndef STB_SPRINTF_MIN
+    #define STB_SPRINTF_MIN 512 // how many characters per callback
+#endif
+
+#ifndef STB_SPRINTF_DECORATE
+    #define STB_SPRINTF_DECORATE(name) stbsp_##name  // define this before including if you want to change the names
+#endif
+
+// Convert a va_list arg list into a buffer. vsnprintf always returns a zero-terminated string (unlike regular snprintf).
+// return: The number of characters copied into the buffer
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf) (char *buf, char const *fmt, va_list va);
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsnprintf)(char *buf, int count, char const *fmt, va_list va);
+
+// Write format string to buffer. It always writes the whole string and appends a null.
+// return: The number of characters copied into the buffer not including the null terminator.
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf) (char *buf, char const *fmt, ...);
+
+// snprintf() always returns a zero-terminated string (unlike regular snprintf).
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char const *fmt, ...);
+
+// Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
+// Your callback can then copy the chars out, print them or whatever.
+// This function is actually the workhorse for everything else.
+// The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
+// You return the next buffer to use or 0 to stop converting
+typedef char *STBSP_SPRINTFCB(char *buf, void *user, int len);
+STBSP__PUBLICDEF int  STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB* callback, void *user, char *buf, char const *fmt, va_list va);
+
+// Set the comma and period characters to use.
+STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
+
+#endif // STB_SPRINTF_H_INCLUDE
 
 // #DqnAssert API
 // =================================================================================================
@@ -1905,6 +2011,133 @@ struct DqnSmartString : public DqnString
     ~DqnSmartString() { this->Free(); }
 };
 
+
+// #DqnFixedString Public API - Fixed sized strings at compile time
+// =================================================================================================
+int DqnFixedString__Append(char *dest, int destSize, char const *src, int len = -1);
+
+template <unsigned int MAX>
+struct DqnFixedString
+{
+    int  len;
+    char str[MAX];
+
+    DqnFixedString(): len(0)                          { this->str[0] = 0; }
+    DqnFixedString(char const *str, int len = -1)     {                     this->len = DqnFixedString__Append(this->str, MAX, str, len);              }
+    DqnFixedString(DqnSlice<char const> const &other) {                     this->len = DqnFixedString__Append(this->str, MAX, other.data, other.len); }
+    DqnFixedString(DqnSlice<char> const &other)       {                     this->len = DqnFixedString__Append(this->str, MAX, other.data, other.len); }
+    DqnFixedString(DqnFixedString const &other)       { if (this != &other) this->len = DqnFixedString__Append(this->str, MAX, other.str, other.len);  }
+
+    DqnFixedString &operator+=(char const *other)                 { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other); return *this; }
+    DqnFixedString &operator+=(DqnSlice<char const> const &other) { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
+    DqnFixedString &operator+=(DqnSlice<char> const &other)       { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
+    DqnFixedString &operator+=(DqnFixedString const &other)       { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other.str, other.len); return *this; }
+
+    DqnFixedString  operator+ (char const *other);
+    DqnFixedString  operator+ (DqnSlice<char const> const &other);
+    DqnFixedString  operator+ (DqnSlice<char> const &other);
+    DqnFixedString  operator+ (DqnFixedString const &other);
+
+    // Xprintf functions always modifies buffer and null-terminates even with insufficient buffer size.
+    // Asserts on failure if DQN_ASSERT is defined.
+    // return: True if there was sufficient space.
+    bool Sprintf       (char const *fmt, ...);
+    bool SprintfAppend (char const *fmt, ...);
+
+    bool VSprintf      (char const *fmt, va_list argList);
+    bool VSprintfAppend(char const *fmt, va_list argList);
+
+    void Clear         (Dqn::ZeroClear clear = Dqn::ZeroClear::False) { if (clear == Dqn::ZeroClear::True) DqnMem_Set(str, 0, MAX); this = {}; }
+};
+
+template <unsigned int MAX>
+DqnFixedString<MAX> DqnFixedString<MAX>::operator+(char const *other)
+{
+    DqnFixedString result = {};
+    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, this->str, this->len);
+    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other);
+    return result;
+}
+
+template <unsigned int MAX>
+DqnFixedString<MAX> DqnFixedString<MAX>::operator+(DqnSlice<char const> const &other)
+{
+    DqnFixedString result = {};
+    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, this->str, this->len);
+    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len);
+    return result;
+}
+
+template <unsigned int MAX>
+DqnFixedString<MAX> DqnFixedString<MAX>::operator+(DqnFixedString const &other)
+{
+    DqnFixedString result = {};
+    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, this->str, this->len);
+    result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.str, other.len);
+    return result;
+}
+
+template <unsigned int MAX>
+FILE_SCOPE bool
+DqnFixedString__VSprintf(DqnFixedString<MAX> *me, char const *fmt, va_list argList, int bufOffset)
+{
+    LOCAL_PERSIST char tmp[STB_SPRINTF_MIN];
+    auto SprintfCallback = [](char *buf, void *user, int len) -> char *
+    {
+        // TODO(doyle): Do the mem copy here into the string
+        (void)len; (void)user;
+        return buf;
+    };
+
+    char *bufStart           = me->str + bufOffset;
+    i32 const reqLen         = Dqn_vsprintfcb(SprintfCallback, nullptr, tmp, fmt, argList) + 1 /*NULL*/;
+    i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
+
+    i32 numToCopy            = DQN_MIN(remainingSpace, reqLen);
+    i32 numCopiedNotInclNull = Dqn_vsnprintf(bufStart, numToCopy, fmt, argList);
+    me->len                  = (bufOffset == 0) ? numCopiedNotInclNull : me->len + numCopiedNotInclNull;
+
+    bool result = (numToCopy == (numCopiedNotInclNull + 1));
+    return result;
+}
+
+template <unsigned int MAX>
+bool DqnFixedString<MAX>::VSprintf(char const *fmt, va_list argList)
+{
+    int bufOffset = 0;
+    bool result = DqnFixedString__VSprintf(this, fmt, argList, bufOffset);
+    return result;
+}
+
+template <unsigned int MAX>
+bool DqnFixedString<MAX>::Sprintf(char const *fmt, ...)
+{
+    va_list argList;
+    va_start(argList, fmt);
+    bool result = this->VSprintf(fmt, argList);
+    va_end(argList);
+    return result;
+}
+
+template <unsigned int MAX>
+bool DqnFixedString<MAX>::VSprintfAppend(char const *fmt, va_list argList)
+{
+    int bufOffset = this->len;
+    bool result = DqnFixedString__VSprintf(this, fmt, argList, bufOffset);
+    return result;
+}
+
+template <unsigned int MAX>
+bool DqnFixedString<MAX>::SprintfAppend(char const *fmt, ...)
+{
+    va_list argList;
+    va_start(argList, fmt);
+    bool result = this->VSprintfAppend(fmt, argList);
+    va_end(argList);
+    return result;
+}
+
+
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI   *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
 DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
 
@@ -2756,500 +2989,6 @@ DQN_FILE_SCOPE i32  DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen);
 #endif // DQN_PLATFORM_H
 #endif // DQN_PLATFORM_HEADER
 
-
-// #External Code
-// =================================================================================================
-#ifndef DQN_INI_H
-#define DQN_INI_H
-// #DqnIni API v1.1
-// =================================================================================================
-/*
-TODO(doyle): Make my own for fun?
-Public Domain library with thanks to Mattias Gustavsson
-https://github.com/mattiasgustavsson/libs/blob/master/docs/ini.md
-
-Examples
-Loading an ini file and retrieving values
-
-#define DQN_INI_IMPLEMENTATION
-#include "ini.h"
-#include <stdio.h>
-#include <stdlib.h>
-
-int main()
-{
-    FILE *fp = fopen("test.ini", "r");
-    fseek(fp, 0, SEEK_END);
-    int size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    char *data = (char *)malloc(size + 1);
-    fread(data, 1, size, fp);
-    data[size] = '\0';
-    fclose(fp);
-
-    DqnIni *ini = DqnIni_Load(data);
-    free(data);
-    int second_index   = DqnIni_FindProperty(ini, DQN_INI_GLOBAL_SECTION, "SecondSetting");
-    char const *second = DqnIni_PropertyValue(ini, DQN_INI_GLOBAL_SECTION, second_index);
-    int section        = DqnIni_FindSection(ini, "MySection");
-    int third_index    = DqnIni_FindProperty(ini, section, "ThirdSetting");
-    char const *third  = DqnIni_PropertyValue(ini, section, third_index);
-    DqnIni_Destroy(ini);
-
-    return 0;
-}
-
-Creating a new ini file
-#define DQN_INI_IMPLEMENTATION
-#include "ini.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-
-int main()
-{
-    DqnIni *ini = DqnIni_Create();
-    DqnIni_PropertyAdd(ini, DQN_INI_GLOBAL_SECTION, "FirstSetting", "Test");
-    DqnIni_PropertyAdd(ini, DQN_INI_GLOBAL_SECTION, "SecondSetting", "2");
-    int section = DqnIni_SectionAdd(ini, "MySection");
-    DqnIni_PropertyAdd(ini, section, "ThirdSetting", "Three");
-
-    int size   = DqnIni_Save(ini, nullptr, 0); // Find the size needed
-    char *data = (char *)malloc(size);
-    size       = DqnIni_Save(ini, data, size); // Actually save the file
-    DqnIni_Destroy(ini);
-
-    FILE *fp = fopen("test.ini", "w");
-    fwrite(data, 1, size, fp);
-    fclose(fp);
-    free(data);
-
-    return 0;
-}
-*/
-
-#define DQN_INI_GLOBAL_SECTION (0)
-#define DQN_INI_NOT_FOUND (-1)
-
-typedef struct DqnIni DqnIni;
-
-DqnIni *DqnIni_Create(void *memctx);
-DqnIni *DqnIni_Load  (char const *data, void *memctx);
-
-int  DqnIni_Save   (DqnIni const *ini, char *data, int size);
-void DqnIni_Destroy(DqnIni *ini);
-
-int         DqnIni_SectionCount(DqnIni const *ini);
-char const *DqnIni_SectionName (DqnIni const *ini, int section);
-
-int         DqnIni_PropertyCount(DqnIni const *ini, int section);
-char const *DqnIni_PropertyName (DqnIni const *ini, int section, int property);
-char const *DqnIni_PropertyValue(DqnIni const *ini, int section, int property);
-
-int DqnIni_FindSection (DqnIni const *ini, char const *name, int name_length);
-int DqnIni_FindProperty(DqnIni const *ini, int section, char const *name, int name_length);
-
-int  DqnIni_SectionAdd    (DqnIni *ini, char const *name, int length);
-void DqnIni_PropertyAdd   (DqnIni *ini, int section, char const *name, int name_length, char const *value, int value_length);
-void DqnIni_SectionRemove (DqnIni *ini, int section);
-void DqnIni_PropertyRemove(DqnIni *ini, int section, int property);
-
-void DqnIni_SectionNameSet  (DqnIni *ini, int section, char const *name, int length);
-void DqnIni_PropertyNameSet (DqnIni *ini, int section, int property, char const *name, int length);
-void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property, char const *value, int length);
-
-/**
-Customization
--------------
-### Custom memory allocators
-
-To store the internal data structures, ini.h needs to do dynamic allocation by
-calling `malloc`. Programs might want to keep track of allocations done, or use
-custom defined pools to allocate memory from. ini.h allows for specifying custom
-memory allocation functions for `malloc` and `free`.  This is done with the
-following code:
-
-    #define DQN_INI_IMPLEMENTATION
-    #define DQN_INI_MALLOC( ctx, size ) ( my_custom_malloc( ctx, size ) )
-    #define DQN_INI_FREE( ctx, ptr ) ( my_custom_free( ctx, ptr ) )
-    #include "ini.h"
-
-where `my_custom_malloc` and `my_custom_free` are your own memory
-allocation/deallocation functions. The `ctx` parameter is an optional parameter
-of type `void*`. When `DqnIni_Create` or `DqnIni_Load` is called, you can pass
-in a `memctx` parameter, which can be a pointer to anything you like, and which
-will be passed through as the `ctx` parameter to every
-`DQN_INI_MALLOC`/`DQN_INI_FREE` call. For example, if you are doing memory
-tracking, you can pass a pointer to your tracking data as `memctx`, and in your
-custom allocation/deallocation function, you can cast the `ctx` param back to
-the right type, and access the tracking data.
-
-If no custom allocator is defined, ini.h will default to `malloc` and `free`
-from the C runtime library.
-
-### Custom C runtime function
-The library makes use of three additional functions from the C runtime library,
-and for full flexibility, it allows you to substitute them for your own.  Here's
-an example:
-
-    #define DQN_INI_IMPLEMENTATION
-    #define DQN_INI_MEMCPY( dst, src, cnt ) ( my_memcpy_func( dst, src, cnt ) )
-    #define DQN_INI_STRLEN( s ) ( my_strlen_func( s ) )
-    #define DQN_INI_STRICMP( s1, s2 ) ( my_stricmp_func( s1, s2 ) )
-    #include "ini.h"
-
-If no custom function is defined, ini.h will default to the C runtime library equivalent.
-
-
-DqnIni_Create
-----------
-
-    DqnIni* DqnIni_Create( void* memctx )
-
-Instantiates a new, empty ini structure, which can be manipulated with other API
-calls, to fill it with data. To save it out to an ini-file string, use
-`DqnIni_Save`. When no longer needed, it can be destroyed by calling
-`DqnIni_Destroy`.  `memctx` is a pointer to user defined data which will be
-passed through to the custom DQN_INI_MALLOC/DQN_INI_FREE calls. It can be nullptr
-if no user defined data is needed.
-
-
-DqnIni_Load
---------
-
-    DqnIni* DqnIni_Load( char const* data, void* memctx )
-
-Parse the zero-terminated string `data` containing an ini-file, and create a new
-DqnIni instance containing the data.  The instance can be manipulated with
-other API calls to enumerate sections/properties and retrieve values. When no
-longer needed, it can be destroyed by calling `DqnIni_Destroy`. `memctx` is
-a pointer to user defined data which will be passed through to the custom
-DQN_INI_MALLOC/DQN_INI_FREE calls. It can be nullptr if no user defined data is
-needed.
-
-
-DqnIni_Save
---------
-
-    int DqnIni_Save( DqnIni const* ini, char* data, int size )
-
-Saves an ini structure as a zero-terminated ini-file string, into the specified
-buffer. Returns the number of bytes written, including the zero terminator. If
-`data` is nullptr, nothing is written, but `DqnIni_Save` still returns the number
-of bytes it would have written. If the size of `data`, as specified in the
-`size` parameter, is smaller than that required, only part of the ini-file
-string will be written. `DqnIni_Save` still returns the number of bytes it
-would have written had the buffer been large enough.
-
-DqnIni_Destroy
------------
-
-    void DqnIni_Destroy( DqnIni* ini )
-
-Destroy an `DqnIni` instance created by calling `DqnIni_Load` or
-`DqnIni_Create`, releasing the memory allocated by it. No further API calls are
-valid on an `DqnIni` instance after calling `DqnIni_Destroy` on it.
-
-
-DqnIni_SectionCount
------------------
-
-    int DqnIni_SectionCount( DqnIni const* ini )
-
-Returns the number of sections in an ini file. There's at least one section in
-an ini file (the global section), but there can be many more, each specified in
-the file by the section name wrapped in square brackets [ ].
-
-
-DqnIni_SectionName
-----------------
-
-    char const* DqnIni_SectionName( DqnIni const* ini, int section )
-
-Returns the name of the section with the specified index. `section` must be
-non-negative and less than the value returned by `DqnIni_SectionCount`, or
-`DqnIni_SectionName` will return nullptr. The defined constant
-`DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.
-
-
-DqnIni_PropertyCount
-------------------
-
-    int DqnIni_PropertyCount( DqnIni const* ini, int section )
-
-Returns the number of properties belonging to the section with the specified
-index. `section` must be non-negative and less than the value returned by
-`DqnIni_SectionCount`, or `DqnIni_SectionName` will return 0. The defined
-constant `DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.
-Properties are declared in the ini-file on he format `name=value`.
-
-
-DqnIni_PropertyName
------------------
-
-    char const* DqnIni_PropertyName( DqnIni const* ini, int section, int property )
-
-Returns the name of the property with the specified index `property` in the
-section with the specified index `section`.  `section` must be non-negative and
-less than the value returned by `DqnIni_SectionCount`, and `property` must be
-non-negative and less than the value returned by `DqnIni_PropertyCount`, or
-`DqnIni_PropertyName` will return nullptr. The defined constant
-`DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.
-
-
-DqnIni_PropertyValue
-------------------
-
-    char const* DqnIni_PropertyValue( DqnIni const* ini, int section, int property )
-
-Returns the value of the property with the specified index `property` in the
-section with the specified index `section`.  `section` must be non-negative and
-less than the value returned by `DqnIni_SectionCount`, and `property` must be
-non-negative and less than the value returned by `DqnIni_PropertyCount`, or
-`DqnIni_PropertyValue` will return nullptr. The defined constant
-`DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.
-
-
-DqnIni_FindSection
-----------------
-
-    int DqnIni_FindSection( DqnIni const* ini, char const* name, int name_length )
-
-Finds the section with the specified name, and returns its index. `name_length`
-specifies the number of characters in `name`, which does not have to be
-zero-terminated. If `name_length` is zero, the length is determined
-automatically, but in this case `name` has to be zero-terminated. If no section
-with the specified name could be found, the value `DQN_INI_NOT_FOUND` is
-returned.
-
-
-DqnIni_FindProperty
------------------
-
-    int DqnIni_FindProperty( DqnIni const* ini, int section, char const* name, int name_length )
-
-Finds the property with the specified name, within the section with the
-specified index, and returns the index of the property. `name_length` specifies
-the number of characters in `name`, which does not have to be zero-terminated.
-If `name_length` is zero, the length is determined automatically, but in this
-case `name` has to be zero-terminated. If no property with the specified name
-could be found within the specified section, the value `DQN_INI_NOT_FOUND` is
-returned.  `section` must be non-negative and less than the value returned by
-`DqnIni_SectionCount`, or `DqnIni_FindProperty` will return
-`DQN_INI_NOT_FOUND`. The defined constant `DQN_INI_GLOBAL_SECTION` can be used
-to indicate the global section.
-
-
-DqnIni_SectionAdd
----------------
-
-    int DqnIni_SectionAdd( DqnIni* ini, char const* name, int length )
-
-Adds a section with the specified name, and returns the index it was added at.
-There is no check done to see if a section with the specified name already
-exists - multiple sections of the same name are allowed. `length` specifies the
-number of characters in `name`, which does not have to be zero-terminated. If
-`length` is zero, the length is determined automatically, but in this case
-`name` has to be zero-terminated.
-
-
-DqnIni_PropertyAdd
-----------------
-    
-    void DqnIni_PropertyAdd( DqnIni* ini, int section, char const* name, int name_length, char const* value, int value_length )
-
-Adds a property with the specified name and value to the specified section, and returns the index it was added at. There is no check done to see if a property
-with the specified name already exists - multiple properties of the same name
-are allowed. `name_length` and `value_length` specifies the number of characters
-in `name` and `value`, which does not have to be zero-terminated. If
-`name_length` or `value_length` is zero, the length is determined automatically,
-but in this case `name`/`value` has to be zero-terminated. `section` must be
-non-negative and less than the value returned by `DqnIni_SectionCount`, or the
-property will not be added. The defined constant `DQN_INI_GLOBAL_SECTION` can be
-used to indicate the global section.
-
-
-DqnIni_SectionRemove
-------------------
-
-    void DqnIni_SectionRemove( DqnIni* ini, int section )
-
-Removes the section with the specified index, and all properties within it.
-`section` must be non-negative and less than the value returned by
-`DqnIni_SectionCount`. The defined constant `DQN_INI_GLOBAL_SECTION` can be
-used to indicate the global section. Note that removing a section will shuffle
-section indices, so that section indices you may have stored will no longer
-indicate the same section as it did before the remove. Use the find functions to
-update your indices.
-
-
-DqnIni_PropertyRemove
--------------------
-
-    void DqnIni_PropertyRemove( DqnIni* ini, int section, int property )
-
-Removes the property with the specified index from the specified section.
-`section` must be non-negative and less than the value returned by
-`DqnIni_SectionCount`, and `property` must be non-negative and less than the
-value returned by `DqnIni_PropertyCount`. The defined constant
-`DQN_INI_GLOBAL_SECTION` can be used to indicate the global section. Note that
-removing a property will shuffle property indices within the specified section,
-so that property indices you may have stored will no longer indicate the same
-property as it did before the remove. Use the find functions to update your
-indices.
-
-
-DqnIni_SectionNameSet
---------------------
-
-    void DqnIni_SectionNameSet( DqnIni* ini, int section, char const* name, int length )
-
-Change the name of the section with the specified index. `section` must be
-non-negative and less than the value returned by `DqnIni_SectionCount`. The
-defined constant `DQN_INI_GLOBAL_SECTION` can be used to indicate the global
-section. `length` specifies the number of characters in `name`, which does not
-have to be zero-terminated. If `length` is zero, the length is determined
-automatically, but in this case `name` has to be zero-terminated.
-
-
-DqnIni_PropertyNameSet
----------------------
-
-    void DqnIni_PropertyNameSet( DqnIni* ini, int section, int property, char const* name, int length )
-
-Change the name of the property with the specified index in the specified
-section. `section` must be non-negative and less than the value returned by
-`DqnIni_SectionCount`, and `property` must be non-negative and less than the
-value returned by `DqnIni_PropertyCount`. The defined constant
-`DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.  `length`
-specifies the number of characters in `name`, which does not have to be
-zero-terminated. If `length` is zero, the length is determined automatically,
-    but in this case `name` has to be zero-terminated.
-
-
-DqnIni_PropertyValueSet
-----------------------
-
-    void DqnIni_PropertyValueSet( DqnIni* ini, int section, int property, char const* value, int length  )
-
-Change the value of the property with the specified index in the specified
-section. `section` must be non-negative and less than the value returned by
-`DqnIni_SectionCount`, and `property` must be non-negative and less than the
-value returned by `DqnIni_PropertyCount`. The defined constant
-`DQN_INI_GLOBAL_SECTION` can be used to indicate the global section.  `length`
-specifies the number of characters in `value`, which does not have to be
-zero-terminated. If `length` is zero, the length is determined automatically,
-    but in this case `value` has to be zero-terminated.
-
-**/
-#endif // DQN_INI_H
-
-#ifndef STB_SPRINTF_H_INCLUDE
-#define STB_SPRINTF_H_INCLUDE
-#define STB_SPRINTF_DECORATE(name) Dqn_##name
-
-////////////////////////////////////////////////////////////////////////////////
-// #DqnSprintf Public API - Cross-platform Sprintf Implementation
-////////////////////////////////////////////////////////////////////////////////
-/*
-Public Domain library originally written by Jeff Roberts at RAD Game Tools
-- 2015/10/20.  Hereby placed in public domain.
-STB_Sprintf renamed to Dqn_Sprintf
-
-FLOATS/DOUBLES:
-===============
-This code uses a internal float->ascii conversion method that uses doubles with
-error correction (double-doubles, for ~105 bits of precision).  This conversion
-is round-trip perfect - that is, an atof of the values output here will give you
-the bit-exact double back.
-
-One difference is that our insignificant digits will be different than with MSVC
-or GCC (but they don't match each other either).  We also don't attempt to find
-the minimum length matching float (pre-MSVC15 doesn't either).
-
-If you don't need float or doubles at all, define STB_SPRINTF_NOFLOAT and you'll
-save 4K of code space.
-
-64-BIT INTS:
-============
-This library also supports 64-bit integers and you can use MSVC style or GCC
-style indicators (%I64d or %lld).  It supports the C99 specifiers for usize and
-ptr_diff_t (%jd %zd) as well.
-
-EXTRAS:
-=======
-Like some GCCs, for integers and floats, you can use a ' (single quote)
-specifier and commas will be inserted on the thousands: "%'d" on 12345 would
-print 12,345.
-
-For integers and floats, you can use a "$" specifier and the number will be
-converted to float and then divided to get kilo, mega, giga or tera and then
-printed, so "%$d" 1000 is "1.0 k", "%$.2d" 2536000 is "2.53 M", etc. For byte
-values, use two $:s, like "%$$d" to turn 2536000 to "2.42 Mi". If you prefer
-JEDEC suffixes to SI ones, use three $:s: "%$$$d" -> "2.42 M". To remove the
-space between the number and the suffix, add "_" specifier: "%_$d" -> "2.53M".
-
-In addition to octal and hexadecimal conversions, you can print integers in
-binary: "%b" for 256 would print 100.
-*/
-
-#if defined(__has_feature)
-    #if __has_feature(address_sanitizer)
-        #define STBI__ASAN __attribute__((no_sanitize("address")))
-    #endif
-#endif
-
-#ifndef STBI__ASAN
-    #define STBI__ASAN
-#endif
-
-#ifdef STB_SPRINTF_STATIC
-    #define STBSP__PUBLICDEC static
-    #define STBSP__PUBLICDEF static STBI__ASAN
-#else
-    #ifdef __cplusplus
-        #define STBSP__PUBLICDEC extern "C"
-        #define STBSP__PUBLICDEF extern "C" STBI__ASAN
-    #else
-        #define STBSP__PUBLICDEC extern
-        #define STBSP__PUBLICDEF STBI__ASAN
-    #endif
-#endif
-
-#include <stdarg.h>  // for va_list()
-
-#ifndef STB_SPRINTF_MIN
-    #define STB_SPRINTF_MIN 512 // how many characters per callback
-#endif
-
-#ifndef STB_SPRINTF_DECORATE
-    #define STB_SPRINTF_DECORATE(name) stbsp_##name  // define this before including if you want to change the names
-#endif
-
-// Convert a va_list arg list into a buffer. vsnprintf always returns a zero-terminated string (unlike regular snprintf).
-// return: The number of characters copied into the buffer
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf) (char *buf, char const *fmt, va_list va);
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsnprintf)(char *buf, int count, char const *fmt, va_list va);
-
-// Write format string to buffer. It always writes the whole string and appends a null.
-// return: The number of characters copied into the buffer not including the null terminator.
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf) (char *buf, char const *fmt, ...);
-
-// snprintf() always returns a zero-terminated string (unlike regular snprintf).
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char const *fmt, ...);
-
-// Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
-// Your callback can then copy the chars out, print them or whatever.
-// This function is actually the workhorse for everything else.
-// The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
-// You return the next buffer to use or 0 to stop converting
-typedef char *STBSP_SPRINTFCB(char *buf, void *user, int len);
-STBSP__PUBLICDEF int  STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB* callback, void *user, char *buf, char const *fmt, va_list va);
-
-// Set the comma and period characters to use.
-STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
-
-#endif // STB_SPRINTF_H_INCLUDE
 
 #ifdef DQN_IMPLEMENTATION
 // DQN_IMPLEMENTATION
@@ -6723,6 +6462,24 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
 #endif
 }
 
+// #DqnFixedString Implementation
+// =================================================================================================
+// return: The number of bytes written to dest
+int DqnFixedString__Append(char *dest, int destSize, char const *src, int len)
+{
+    if (len <= -1)
+    {
+        len = DqnStr_Len(src);
+    }
+
+    i32 bytesToCopy = DQN_MIN(len, destSize - 1);
+    DQN_ASSERT(len <= destSize && bytesToCopy >= 0);
+
+    DqnMem_Copy(dest, src, bytesToCopy);
+    dest[bytesToCopy] = 0;
+    return bytesToCopy;
+}
+
 // #Dqn
 // =================================================================================================
 i32 Dqn_GetNumSplits(char const *src, i32 srcLen, char splitChar)
@@ -8030,653 +7787,6 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 
 #ifdef __GNUC__
     #pragma GCC diagnostic pop
-#endif
-
-// #DqnIni
-// =================================================================================================
-#ifdef __GNUC__
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wsign-compare"
-#endif
-
-#define INITIAL_CAPACITY (256)
-
-#define _CRT_NONSTDC_NO_DEPRECATE
-#define _CRT_SECURE_NO_WARNINGS
-#include <stddef.h>
-
-#ifndef DQN_INI_MALLOC
-    #define _CRT_NONSTDC_NO_DEPRECATE
-    #define _CRT_SECURE_NO_WARNINGS
-    #include <stdlib.h>
-    #define DQN_INI_MALLOC(ctx, size) (malloc(size))
-    #define DQN_INI_FREE(ctx, ptr) (free(ptr))
-#endif
-
-#ifndef DQN_INI_MEMCPY
-    #define _CRT_NONSTDC_NO_DEPRECATE
-    #define _CRT_SECURE_NO_WARNINGS
-    #include <string.h>
-    #define DQN_INI_MEMCPY(dst, src, cnt) (memcpy(dst, src, cnt))
-#endif
-
-#ifndef DQN_INI_STRLEN
-    #define _CRT_NONSTDC_NO_DEPRECATE
-    #define _CRT_SECURE_NO_WARNINGS
-    #include <string.h>
-    #define DQN_INI_STRLEN(s) (strlen(s))
-#endif
-
-#ifndef DQN_INI_STRICMP
-    #ifdef _WIN32
-        #define _CRT_NONSTDC_NO_DEPRECATE
-        #define _CRT_SECURE_NO_WARNINGS
-        #include <string.h>
-        #define DQN_INI_STRICMP(s1, s2) ( _stricmp(s1, s2))
-    #else
-        #include <string.h>
-        #define DQN_INI_STRICMP(s1, s2) (strcasecmp(s1, s2))
-    #endif
-#endif
-
-struct dqn_ini_internal_section_t
-{
-    char name[32];
-    char *name_large;
-};
-
-struct dqn_ini_internal_property_t
-{
-    int section;
-    char name[32];
-    char *name_large;
-    char value[64];
-    char *value_large;
-};
-
-struct DqnIni
-{
-    struct dqn_ini_internal_section_t *sections;
-    int section_capacity;
-    int section_count;
-
-    struct dqn_ini_internal_property_t *properties;
-    int property_capacity;
-    int property_count;
-
-    void *memctx;
-};
-
-static int DqnIni_InternalPropertyIndex(DqnIni const *ini, int section,
-                                           int property)
-{
-    int i;
-    int p;
-
-    if (ini && section >= 0 && section < ini->section_count)
-    {
-        p = 0;
-        for (i = 0; i < ini->property_count; ++i)
-        {
-            if (ini->properties[i].section == section)
-            {
-                if (p == property) return i;
-                ++p;
-            }
-        }
-    }
-
-    return DQN_INI_NOT_FOUND;
-}
-
-DqnIni *DqnIni_Create(void *memctx)
-{
-    DqnIni *ini;
-
-    ini           = (DqnIni *)DQN_INI_MALLOC(memctx, sizeof(DqnIni));
-    ini->memctx   = memctx;
-    ini->sections = (struct dqn_ini_internal_section_t *)DQN_INI_MALLOC(
-        ini->memctx, INITIAL_CAPACITY * sizeof(ini->sections[0]));
-    ini->section_capacity       = INITIAL_CAPACITY;
-    ini->section_count          = 1; /* global section */
-    ini->sections[0].name[0]    = '\0';
-    ini->sections[0].name_large = 0;
-    ini->properties = (struct dqn_ini_internal_property_t *)DQN_INI_MALLOC(
-        ini->memctx, INITIAL_CAPACITY * sizeof(ini->properties[0]));
-    ini->property_capacity = INITIAL_CAPACITY;
-    ini->property_count    = 0;
-    return ini;
-}
-
-DqnIni *DqnIni_Load(char const *data, void *memctx)
-{
-    DqnIni *ini;
-    char const *ptr;
-    int s;
-    char const *start;
-    char const *start2;
-    int l;
-
-    ini = DqnIni_Create(memctx);
-
-    ptr = data;
-    if (ptr)
-    {
-        s = 0;
-        while (*ptr)
-        {
-            /* trim leading whitespace */
-            while (*ptr && *ptr <= ' ')
-                ++ptr;
-
-            /* done? */
-            if (!*ptr) break;
-
-            /* comment */
-            else if (*ptr == ';')
-            {
-                while (*ptr && *ptr != '\n')
-                    ++ptr;
-            }
-            /* section */
-            else if (*ptr == '[')
-            {
-                ++ptr;
-                start = ptr;
-                while (*ptr && *ptr != ']' && *ptr != '\n')
-                    ++ptr;
-
-                if (*ptr == ']')
-                {
-                    s = DqnIni_SectionAdd(ini, start, (int)(ptr - start));
-                    ++ptr;
-                }
-            }
-            /* property */
-            else
-            {
-                start = ptr;
-                while (*ptr && *ptr != '=' && *ptr != '\n')
-                    ++ptr;
-
-                if (*ptr == '=')
-                {
-                    l = (int)(ptr - start);
-                    ++ptr;
-                    while (*ptr && *ptr <= ' ' && *ptr != '\n')
-                        ptr++;
-                    start2 = ptr;
-                    while (*ptr && *ptr != '\n')
-                        ++ptr;
-                    while (*(--ptr) <= ' ')
-                        (void)ptr;
-                    ptr++;
-                    DqnIni_PropertyAdd(ini, s, start, l, start2,
-                                         (int)(ptr - start2));
-                }
-            }
-        }
-    }
-
-    return ini;
-}
-
-int DqnIni_Save(DqnIni const *ini, char *data, int size)
-{
-    int s;
-    int p;
-    int i;
-    int l;
-    char *n;
-    int pos;
-
-    if (ini)
-    {
-        pos = 0;
-        for (s = 0; s < ini->section_count; ++s)
-        {
-            n = ini->sections[s].name_large ? ini->sections[s].name_large
-                                            : ini->sections[s].name;
-            l = (int)DQN_INI_STRLEN(n);
-            if (l > 0)
-            {
-                if (data && pos < size) data[pos] = '[';
-                ++pos;
-                for (i = 0; i < l; ++i)
-                {
-                    if (data && pos < size) data[pos] = n[i];
-                    ++pos;
-                }
-                if (data && pos < size) data[pos] = ']';
-                ++pos;
-                if (data && pos < size) data[pos] = '\n';
-                ++pos;
-            }
-
-            for (p = 0; p < ini->property_count; ++p)
-            {
-                if (ini->properties[p].section == s)
-                {
-                    n = ini->properties[p].name_large
-                            ? ini->properties[p].name_large
-                            : ini->properties[p].name;
-                    l = (int)DQN_INI_STRLEN(n);
-                    for (i = 0; i < l; ++i)
-                    {
-                        if (data && pos < size) data[pos] = n[i];
-                        ++pos;
-                    }
-                    if (data && pos < size) data[pos] = '=';
-                    ++pos;
-                    n = ini->properties[p].value_large
-                            ? ini->properties[p].value_large
-                            : ini->properties[p].value;
-                    l = (int)DQN_INI_STRLEN(n);
-                    for (i = 0; i < l; ++i)
-                    {
-                        if (data && pos < size) data[pos] = n[i];
-                        ++pos;
-                    }
-                    if (data && pos < size) data[pos] = '\n';
-                    ++pos;
-                }
-            }
-
-            if (pos > 0)
-            {
-                if (data && pos < size) data[pos] = '\n';
-                ++pos;
-            }
-        }
-
-        if (data && pos < size) data[pos] = '\0';
-        ++pos;
-
-        return pos;
-    }
-
-    return 0;
-}
-
-void DqnIni_Destroy(DqnIni *ini)
-{
-    int i;
-
-    if (ini)
-    {
-        for (i = 0; i < ini->property_count; ++i)
-        {
-            if (ini->properties[i].value_large)
-                DQN_INI_FREE(ini->memctx, ini->properties[i].value_large);
-            if (ini->properties[i].name_large)
-                DQN_INI_FREE(ini->memctx, ini->properties[i].name_large);
-        }
-        for (i = 0; i < ini->section_count; ++i)
-            if (ini->sections[i].name_large)
-                DQN_INI_FREE(ini->memctx, ini->sections[i].name_large);
-        DQN_INI_FREE(ini->memctx, ini->properties);
-        DQN_INI_FREE(ini->memctx, ini->sections);
-        DQN_INI_FREE(ini->memctx, ini);
-    }
-}
-
-int DqnIni_SectionCount(DqnIni const *ini)
-{
-    if (ini) return ini->section_count;
-    return 0;
-}
-
-char const *DqnIni_SectionName(DqnIni const *ini, int section)
-{
-    if (ini && section >= 0 && section < ini->section_count)
-        return ini->sections[section].name_large
-                   ? ini->sections[section].name_large
-                   : ini->sections[section].name;
-
-    return nullptr;
-}
-
-int DqnIni_PropertyCount(DqnIni const *ini, int section)
-{
-    int i;
-    int count;
-
-    if (ini)
-    {
-        count = 0;
-        for (i = 0; i < ini->property_count; ++i)
-        {
-            if (ini->properties[i].section == section) ++count;
-        }
-        return count;
-    }
-
-    return 0;
-}
-
-char const *DqnIni_PropertyName(DqnIni const *ini, int section, int property)
-{
-    int p;
-
-    if (ini && section >= 0 && section < ini->section_count)
-    {
-        p = DqnIni_InternalPropertyIndex(ini, section, property);
-        if (p != DQN_INI_NOT_FOUND)
-            return ini->properties[p].name_large ? ini->properties[p].name_large
-                                                 : ini->properties[p].name;
-    }
-
-    return nullptr;
-}
-
-char const *DqnIni_PropertyValue(DqnIni const *ini, int section, int property)
-{
-    int p;
-
-    if (ini && section >= 0 && section < ini->section_count)
-    {
-        p = DqnIni_InternalPropertyIndex(ini, section, property);
-        if (p != DQN_INI_NOT_FOUND)
-            return ini->properties[p].value_large
-                       ? ini->properties[p].value_large
-                       : ini->properties[p].value;
-    }
-
-    return nullptr;
-}
-
-int DqnIni_FindSection(DqnIni const *ini, char const *name, int name_length)
-{
-    int i;
-
-    if (ini && name)
-    {
-        if (name_length <= 0) name_length = (int)DQN_INI_STRLEN(name);
-        for (i = 0; i < ini->section_count; ++i)
-        {
-            char const *const other = ini->sections[i].name_large
-                                          ? ini->sections[i].name_large
-                                          : ini->sections[i].name;
-            if ((int)DQN_INI_STRLEN(other) == name_length &&
-                DQN_INI_STRICMP(name, other) == 0)
-                return i;
-        }
-    }
-
-    return DQN_INI_NOT_FOUND;
-}
-
-int DqnIni_FindProperty(DqnIni const *ini, int section, char const *name,
-                          int name_length)
-{
-    int i;
-    int c;
-
-    if (ini && name && section >= 0 && section < ini->section_count)
-    {
-        if (name_length <= 0) name_length = (int)DQN_INI_STRLEN(name);
-        c                                 = 0;
-        for (i = 0; i < ini->property_capacity; ++i)
-        {
-            if (ini->properties[i].section == section)
-            {
-                char const *const other = ini->properties[i].name_large
-                                              ? ini->properties[i].name_large
-                                              : ini->properties[i].name;
-                if ((int)DQN_INI_STRLEN(other) == name_length &&
-                    DQN_INI_STRICMP(name, other) == 0)
-                    return c;
-                ++c;
-            }
-        }
-    }
-
-    return DQN_INI_NOT_FOUND;
-}
-
-int DqnIni_SectionAdd(DqnIni *ini, char const *name, int length)
-{
-    struct dqn_ini_internal_section_t *new_sections;
-
-    if (ini && name)
-    {
-        if (length <= 0) length = (int)DQN_INI_STRLEN(name);
-        if (ini->section_count >= ini->section_capacity)
-        {
-            ini->section_capacity *= 2;
-            new_sections = (struct dqn_ini_internal_section_t *)DQN_INI_MALLOC(
-                ini->memctx, ini->section_capacity * sizeof(ini->sections[0]));
-            DQN_INI_MEMCPY(new_sections, ini->sections,
-                           ini->section_count * sizeof(ini->sections[0]));
-            DQN_INI_FREE(ini->memctx, ini->sections);
-            ini->sections = new_sections;
-        }
-
-        ini->sections[ini->section_count].name_large = 0;
-        if (length + 1 >= sizeof(ini->sections[0].name))
-        {
-            ini->sections[ini->section_count].name_large =
-                (char *)DQN_INI_MALLOC(ini->memctx, (usize)length + 1);
-            DQN_INI_MEMCPY(ini->sections[ini->section_count].name_large, name,
-                           (usize)length);
-            ini->sections[ini->section_count].name_large[length] = '\0';
-        }
-        else
-        {
-            DQN_INI_MEMCPY(ini->sections[ini->section_count].name, name,
-                           (usize)length);
-            ini->sections[ini->section_count].name[length] = '\0';
-        }
-
-        return ini->section_count++;
-    }
-    return DQN_INI_NOT_FOUND;
-}
-
-void DqnIni_PropertyAdd(DqnIni *ini, int section, char const *name,
-                          int name_length, char const *value, int value_length)
-{
-    struct dqn_ini_internal_property_t *new_properties;
-
-    if (ini && name && section >= 0 && section < ini->section_count)
-    {
-        if (name_length <= 0) name_length   = (int)DQN_INI_STRLEN(name);
-        if (value_length <= 0) value_length = (int)DQN_INI_STRLEN(value);
-
-        if (ini->property_count >= ini->property_capacity)
-        {
-
-            ini->property_capacity *= 2;
-            new_properties =
-                (struct dqn_ini_internal_property_t *)DQN_INI_MALLOC(
-                    ini->memctx,
-                    ini->property_capacity * sizeof(ini->properties[0]));
-            DQN_INI_MEMCPY(new_properties, ini->properties,
-                           ini->property_count * sizeof(ini->properties[0]));
-            DQN_INI_FREE(ini->memctx, ini->properties);
-            ini->properties = new_properties;
-        }
-
-        ini->properties[ini->property_count].section     = section;
-        ini->properties[ini->property_count].name_large  = 0;
-        ini->properties[ini->property_count].value_large = 0;
-
-        if (name_length + 1 >= sizeof(ini->properties[0].name))
-        {
-            ini->properties[ini->property_count].name_large =
-                (char *)DQN_INI_MALLOC(ini->memctx, (usize)name_length + 1);
-            DQN_INI_MEMCPY(ini->properties[ini->property_count].name_large,
-                           name, (usize)name_length);
-            ini->properties[ini->property_count].name_large[name_length] = '\0';
-        }
-        else
-        {
-            DQN_INI_MEMCPY(ini->properties[ini->property_count].name, name,
-                           (usize)name_length);
-            ini->properties[ini->property_count].name[name_length] = '\0';
-        }
-
-        if (value_length + 1 >= sizeof(ini->properties[0].value))
-        {
-            ini->properties[ini->property_count].value_large =
-                (char *)DQN_INI_MALLOC(ini->memctx, (usize)value_length + 1);
-            DQN_INI_MEMCPY(ini->properties[ini->property_count].value_large,
-                           value, (usize)value_length);
-            ini->properties[ini->property_count].value_large[value_length] =
-                '\0';
-        }
-        else
-        {
-            DQN_INI_MEMCPY(ini->properties[ini->property_count].value, value,
-                           (usize)value_length);
-            ini->properties[ini->property_count].value[value_length] = '\0';
-        }
-
-        ++ini->property_count;
-    }
-}
-
-void DqnIni_SectionRemove(DqnIni *ini, int section)
-{
-    int p;
-
-    if (ini && section >= 0 && section < ini->section_count)
-    {
-        if (ini->sections[section].name_large)
-            DQN_INI_FREE(ini->memctx, ini->sections[section].name_large);
-        for (p = ini->property_count - 1; p >= 0; --p)
-        {
-            if (ini->properties[p].section == section)
-            {
-                if (ini->properties[p].value_large)
-                    DQN_INI_FREE(ini->memctx, ini->properties[p].value_large);
-                if (ini->properties[p].name_large)
-                    DQN_INI_FREE(ini->memctx, ini->properties[p].name_large);
-                ini->properties[p] = ini->properties[--ini->property_count];
-            }
-        }
-
-        ini->sections[section] = ini->sections[--ini->section_count];
-
-        for (p = 0; p < ini->property_count; ++p)
-        {
-            if (ini->properties[p].section == ini->section_count)
-                ini->properties[p].section = section;
-        }
-    }
-}
-
-void DqnIni_PropertyRemove(DqnIni *ini, int section, int property)
-{
-    int p;
-
-    if (ini && section >= 0 && section < ini->section_count)
-    {
-        p = DqnIni_InternalPropertyIndex(ini, section, property);
-        if (p != DQN_INI_NOT_FOUND)
-        {
-            if (ini->properties[p].value_large)
-                DQN_INI_FREE(ini->memctx, ini->properties[p].value_large);
-            if (ini->properties[p].name_large)
-                DQN_INI_FREE(ini->memctx, ini->properties[p].name_large);
-            ini->properties[p] = ini->properties[--ini->property_count];
-            return;
-        }
-    }
-}
-
-void DqnIni_SectionNameSet(DqnIni *ini, int section, char const *name,
-                              int length)
-{
-    if (ini && name && section >= 0 && section < ini->section_count)
-    {
-        if (length <= 0) length = (int)DQN_INI_STRLEN(name);
-        if (ini->sections[section].name_large)
-            DQN_INI_FREE(ini->memctx, ini->sections[section].name_large);
-        ini->sections[section].name_large = 0;
-
-        if (length + 1 >= sizeof(ini->sections[0].name))
-        {
-            ini->sections[section].name_large =
-                (char *)DQN_INI_MALLOC(ini->memctx, (usize)length + 1);
-            DQN_INI_MEMCPY(ini->sections[section].name_large, name,
-                           (usize)length);
-            ini->sections[section].name_large[length] = '\0';
-        }
-        else
-        {
-            DQN_INI_MEMCPY(ini->sections[section].name, name, (usize)length);
-            ini->sections[section].name[length] = '\0';
-        }
-    }
-}
-
-void DqnIni_PropertyNameSet(DqnIni *ini, int section, int property,
-                               char const *name, int length)
-{
-    int p;
-
-    if (ini && name && section >= 0 && section < ini->section_count)
-    {
-        if (length <= 0) length = (int)DQN_INI_STRLEN(name);
-        p = DqnIni_InternalPropertyIndex(ini, section, property);
-        if (p != DQN_INI_NOT_FOUND)
-        {
-            if (ini->properties[p].name_large)
-                DQN_INI_FREE(ini->memctx, ini->properties[p].name_large);
-            ini->properties[ini->property_count].name_large = 0;
-
-            if (length + 1 >= sizeof(ini->properties[0].name))
-            {
-                ini->properties[p].name_large =
-                    (char *)DQN_INI_MALLOC(ini->memctx, (usize)length + 1);
-                DQN_INI_MEMCPY(ini->properties[p].name_large, name,
-                               (usize)length);
-                ini->properties[p].name_large[length] = '\0';
-            }
-            else
-            {
-                DQN_INI_MEMCPY(ini->properties[p].name, name, (usize)length);
-                ini->properties[p].name[length] = '\0';
-            }
-        }
-    }
-}
-
-void DqnIni_PropertyValueSet(DqnIni *ini, int section, int property,
-                                char const *value, int length)
-{
-    int p;
-
-    if (ini && value && section >= 0 && section < ini->section_count)
-    {
-        if (length <= 0) length = (int)DQN_INI_STRLEN(value);
-        p = DqnIni_InternalPropertyIndex(ini, section, property);
-        if (p != DQN_INI_NOT_FOUND)
-        {
-            if (ini->properties[p].value_large)
-                DQN_INI_FREE(ini->memctx, ini->properties[p].value_large);
-            ini->properties[ini->property_count].value_large = 0;
-
-            if (length + 1 >= sizeof(ini->properties[0].value))
-            {
-                ini->properties[p].value_large =
-                    (char *)DQN_INI_MALLOC(ini->memctx, (usize)length + 1);
-                DQN_INI_MEMCPY(ini->properties[p].name_large, value,
-                               (usize)length);
-                ini->properties[p].value_large[length] = '\0';
-            }
-            else
-            {
-                DQN_INI_MEMCPY(ini->properties[p].value, value, (usize)length);
-                ini->properties[p].name[length] = '\0';
-            }
-        }
-    }
-}
-
-#ifdef __GNUC__
-        #pragma GCC diagnostic pop // -Wsign-compare for DQN_INI
 #endif
 #endif // DQN_IMPLEMENTATION
 

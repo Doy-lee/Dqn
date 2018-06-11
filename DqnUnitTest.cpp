@@ -46,7 +46,6 @@ enum class Status
     Ok,
     Error
 };
-
 void Log(Status status, char const *fmt, va_list argList)
 {
     DQN_ASSERT(globalIndent >= 0);
@@ -135,6 +134,8 @@ void LogHeader(char const *funcName)
     Log("\n[%s]", funcName);
     globalIndent++;
 }
+
+#include "DqnFixedString.cpp"
 
 void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 {
@@ -1879,11 +1880,11 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue, 
         DqnLockGuard guard = globalJobQueueLock.LockGuard();
         globalDebugCounter++;
 
-        u32 number = globalDebugCounter;
+        // u32 number = globalDebugCounter;
 #if defined(DQN_WIN32_IMPLEMENTATION)
-        Log("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d", GetCurrentThreadId(), number);
+        // Log("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d", GetCurrentThreadId(), number);
 #elif defined(DQN_UNIX_IMPLEMENTATION)
-        Log("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d", number);
+        // Log("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d", number);
 #endif
     }
 
@@ -1944,7 +1945,7 @@ void DqnQuickSort_Test()
         u32 *stdArray    = (u32 *)stack.Push(sizeInBytes);
         DQN_ASSERT(dqnCPPArray && stdArray);
 
-        f64 dqnCPPTimings[5]                           = {};
+        f64 dqnCPPTimings[2]                           = {};
         f64 stdTimings[DQN_ARRAY_COUNT(dqnCPPTimings)] = {};
 
         f64 dqnCPPAverage = 0;
@@ -2871,6 +2872,8 @@ FILE_SCOPE void DqnMemStack_Test()
     }
 }
 
+void DqnFixedString_Test();
+
 int main(void)
 {
     globalIndent  = 1;
@@ -2887,22 +2890,13 @@ int main(void)
     DqnHashTable_Test();
     Dqn_BSearch_Test();
     DqnMemSet_Test();
+    DqnFixedString_Test();
 
 #ifdef DQN_XPLATFORM_LAYER
     DqnFile_Test();
     DqnTimer_Test();
     DqnJobQueue_Test();
 #endif
-
-    struct Item
-    {
-        f32 a, b, c, d;
-    };
-
-    Item storage[20] = {};
-    DqnArray<Item> array = {};
-    array.UseMemory(storage, DQN_ARRAY_COUNT(storage));
-
 
     // Log("\nPress 'Enter' Key to Exit\n");
     // getchar();
