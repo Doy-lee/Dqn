@@ -175,6 +175,7 @@ namespace Dqn
 {
 enum struct ZeroClear   { True = 1, False = 0};
 enum struct IgnoreCase  { True = 1, False = 0};
+FILE_SCOPE const bool IS_DEBUG = true;
 }; // namespace Dqn
 
 // #Win32 Prototypes
@@ -2049,72 +2050,83 @@ struct DqnFixedString
 
     // Xprintf functions always modifies buffer and null-terminates even with insufficient buffer size.
     // Asserts on failure if DQN_ASSERT is defined.
-    // return: True if there was sufficient space.
-    bool Sprintf       (char const *fmt, ...);
-    bool SprintfAppend (char const *fmt, ...);
+    // return: The number of characters copied to the buffer
+    int Sprintf       (char const *fmt, ...);
+    int SprintfAppend (char const *fmt, ...);
 
-    bool VSprintf      (char const *fmt, va_list argList);
-    bool VSprintfAppend(char const *fmt, va_list argList);
+    int VSprintf      (char const *fmt, va_list argList);
+    int VSprintfAppend(char const *fmt, va_list argList);
 
-    void Clear         (Dqn::ZeroClear clear = Dqn::ZeroClear::False) { if (clear == Dqn::ZeroClear::True) DqnMem_Set(str, 0, MAX); this = {}; }
+    void Clear        (Dqn::ZeroClear clear = Dqn::ZeroClear::False) { if (clear == Dqn::ZeroClear::True) DqnMem_Set(str, 0, MAX); this = {}; }
 };
 
 template <unsigned int MAX>
-FILE_SCOPE bool
+FILE_SCOPE int
 DqnFixedString__VSprintf(DqnFixedString<MAX> *me, char const *fmt, va_list argList, int bufOffset)
 {
-    LOCAL_PERSIST char tmp[STB_SPRINTF_MIN];
-    auto SprintfCallback = [](char *buf, void *user, int len) -> char *
+    int result = 0;
+    if (Dqn::IS_DEBUG)
     {
-        // TODO(doyle): Do the mem copy here into the string
-        (void)len; (void)user;
-        return buf;
-    };
+        LOCAL_PERSIST char tmp[STB_SPRINTF_MIN];
+        auto SprintfCallback = [](char *buf, void *user, int len) -> char *
+        {
+            (void)len; (void)user;
+            return buf;
+        };
 
-    char *bufStart           = me->str + bufOffset;
-    i32 const reqLen         = Dqn_vsprintfcb(SprintfCallback, nullptr, tmp, fmt, argList) + 1 /*NULL*/;
-    i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
+        char *bufStart           = me->str + bufOffset;
+        i32 const reqLen         = Dqn_vsprintfcb(SprintfCallback, nullptr, tmp, fmt, argList) + 1 /*NULL*/;
+        i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
 
-    i32 numToCopy            = DQN_MIN(remainingSpace, reqLen);
-    i32 numCopiedNotInclNull = Dqn_vsnprintf(bufStart, numToCopy, fmt, argList);
-    me->len                  = (bufOffset == 0) ? numCopiedNotInclNull : me->len + numCopiedNotInclNull;
+        i32 numToCopy            = DQN_MIN(remainingSpace, reqLen);
+        i32 numCopiedNotInclNull = Dqn_vsnprintf(bufStart, numToCopy, fmt, argList);
+        me->len                  = (bufOffset == 0) ? numCopiedNotInclNull : me->len + numCopiedNotInclNull;
 
-    bool result = (numToCopy == (numCopiedNotInclNull + 1));
+        DQN_ASSERT(numToCopy == (numCopiedNotInclNull + 1));
+        result = numCopiedNotInclNull;
+    }
+    else
+    {
+        char *bufStart           = me->str + bufOffset;
+        i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
+        result = Dqn_vsnprintf(bufStart, remainingSpace, fmt, argList);
+    }
+
     return result;
 }
 
 template <unsigned int MAX>
-bool DqnFixedString<MAX>::VSprintf(char const *fmt, va_list argList)
+int DqnFixedString<MAX>::VSprintf(char const *fmt, va_list argList)
 {
     int bufOffset = 0;
-    bool result = DqnFixedString__VSprintf(this, fmt, argList, bufOffset);
+    int result    = DqnFixedString__VSprintf(this, fmt, argList, bufOffset);
     return result;
 }
 
 template <unsigned int MAX>
-bool DqnFixedString<MAX>::Sprintf(char const *fmt, ...)
+int DqnFixedString<MAX>::Sprintf(char const *fmt, ...)
 {
     va_list argList;
     va_start(argList, fmt);
-    bool result = this->VSprintf(fmt, argList);
+    int result = this->VSprintf(fmt, argList);
     va_end(argList);
     return result;
 }
 
 template <unsigned int MAX>
-bool DqnFixedString<MAX>::VSprintfAppend(char const *fmt, va_list argList)
+int DqnFixedString<MAX>::VSprintfAppend(char const *fmt, va_list argList)
 {
     int bufOffset = this->len;
-    bool result = DqnFixedString__VSprintf(this, fmt, argList, bufOffset);
+    int result = DqnFixedString__VSprintf(this, fmt, argList, bufOffset);
     return result;
 }
 
 template <unsigned int MAX>
-bool DqnFixedString<MAX>::SprintfAppend(char const *fmt, ...)
+int DqnFixedString<MAX>::SprintfAppend(char const *fmt, ...)
 {
     va_list argList;
     va_start(argList, fmt);
-    bool result = this->VSprintfAppend(fmt, argList);
+    int result = this->VSprintfAppend(fmt, argList);
     va_end(argList);
     return result;
 }
