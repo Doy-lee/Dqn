@@ -80,17 +80,17 @@
 // This needs to be above the portable layer so  that, if the user requests a platform
 // implementation, platform specific implementations in the portable layer will get activated.
 #if (defined(_WIN32) || defined(_WIN64))
-    #define DQN_IS_WIN32 1
+    #define DQN__IS_WIN32 1
 #elif defined(__linux__)
-    #define DQN_IS_UNIX 1
+    #define DQN__IS_UNIX 1
 #endif
 
-#if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
-    #define DQN_XPLATFORM_LAYER 1
-    #define DQN_WIN32_PLATFORM 1
-#elif defined(DQN_IS_UNIX) && defined(DQN_UNIX_IMPLEMENTATION)
-    #define DQN_XPLATFORM_LAYER 1
-    #define DQN_UNIX_PLATFORM 1
+#if defined(DQN__IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+    #define DQN__XPLATFORM_LAYER 1
+    #define DQN__WIN32_PLATFORM 1
+#elif defined(DQN__IS_UNIX) && defined(DQN_UNIX_IMPLEMENTATION)
+    #define DQN__XPLATFORM_LAYER 1
+    #define DQN__UNIX_PLATFORM 1
 #endif
 
 // #Portable Code
@@ -180,7 +180,7 @@ FILE_SCOPE const bool IS_DEBUG = true;
 
 // #Win32 Prototypes
 // =================================================================================================
-#ifdef DQN_WIN32_PLATFORM
+#ifdef DQN__WIN32_PLATFORM
 #ifndef _WINDOWS_
 using WORD      = unsigned short;
 using DWORD     = unsigned long;
@@ -203,6 +203,11 @@ u32    const INFINITE                      = 0xFFFFFFFF;
 u32    const CP_UTF8                       = 65001;
 u32    const FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200;
 u32    const FORMAT_MESSAGE_FROM_SYSTEM    = 0x00001000;
+u32    const MEM_COMMIT                    = 0x00001000;
+u32    const MEM_RESERVE                   = 0x00002000;
+u32    const PAGE_READWRITE                = 0x04;
+u32    const MEM_DECOMMIT                  = 0x4000;
+u32    const MEM_RELEASE                   = 0x8000;
 
 struct RECT
 {
@@ -510,8 +515,15 @@ BOOL    WriteFile                       (HANDLE hFile,
                                          DWORD nNumberOfBytesToWrite,
                                          DWORD *lpNumberOfBytesWritten,
                                          OVERLAPPED *lpOverlapped);
+void   *VirtualAlloc                    (void *lpAddress,
+                                         size_t dwSize,
+                                         DWORD  flAllocationType,
+                                         DWORD  flProtect);
+BOOL    VirtualFree                     (void *lpAddress,
+                                         size_t dwSize,
+                                         DWORD  dwFreeType);
 #endif // _WINDOWS_
-#endif // DQN_WIN32_PLATFORM
+#endif // DQN__WIN32_PLATFORM
 
 // #External Code
 // =================================================================================================
@@ -2662,8 +2674,7 @@ DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson const input, DqnJson *ne
 #ifndef DQN_PLATFORM_H
 #define DQN_PLATFORM_H
 
-#if defined(DQN_IS_WIN32)
-#elif defined(DQN_IS_UNIX)
+#if defined(DQN__IS_UNIX)
     #include <pthread.h>
     #include <semaphore.h>
 #endif
@@ -2774,15 +2785,14 @@ DQN_FILE_SCOPE f64  DqnTimer_NowInS ();
 // =================================================================================================
 typedef struct DqnLock
 {
-#if defined(DQN_IS_WIN32)
+#if defined(DQN__WIN32_PLATFORM)
     CRITICAL_SECTION win32Handle;
 
-#elif defined(DQN_IS_UNIX)
+#elif defined(DQN__UNIX_PLATFORM)
     pthread_mutex_t unixHandle;
 
 #else
     #error Unknown platform
-
 #endif
 
     // Win32 only, when trying to acquire a locked lock, it is the number of spins permitted
@@ -2853,10 +2863,10 @@ struct DqnJobQueue
     i32   volatile jobToExecuteIndex;
     i32   volatile numJobsToComplete;
 
-#if defined(DQN_IS_WIN32)
+#if defined(DQN__IS_WIN32)
     void *semaphore;
 
-#elif defined(DQN_IS_UNIX)
+#elif defined(DQN__IS_UNIX)
     sem_t semaphore;
 
 #else
@@ -2925,12 +2935,12 @@ DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *const numCores, u32 *
 // #Platform Specific API
 // =================================================================================================
 // Functions here are only available for the #defined sections (i.e. all functions in
-// DQN_WIN32_PLATFORM only have a valid implementation in Win32.
+// DQN__WIN32_PLATFORM only have a valid implementation in Win32.
 
-#if defined(DQN_IS_WIN32)
+#if defined(DQN__IS_WIN32)
 // Platform > #DqnWin32 API
 // =================================================================================================
-#define DQN_WIN32_ERROR_BOX(text, title) MessageBoxA(nullptr, text, title, MB_OK);
+#define DQN__WIN32_ERROR_BOX(text, title) MessageBoxA(nullptr, text, title, MB_OK);
 
 // The function automatically null-terminates the output string.
 // out:    A pointer to the buffer to receive the characters.
@@ -2961,7 +2971,7 @@ DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
 // return: The offset to the last backslash. -1 if bufLen was not large enough or buf is null. (i.e.
 //         buf + offsetToLastSlash + 1, gives C:/Path/)
 DQN_FILE_SCOPE i32  DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen);
-#endif // DQN_IS_WIN32
+#endif // DQN__IS_WIN32
 #endif // DQN_PLATFORM_H
 #endif // DQN_PLATFORM_HEADER
 
@@ -3013,7 +3023,7 @@ DQN_FILE_SCOPE void DqnLog(char const *file, char const *functionName, i32 lineN
     char const *const formatStr = "%s:%s,%d: DqnLog: %s\n";
     fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
 
-    #if defined(DQN_WIN32_PLATFORM)
+    #if defined(DQN__WIN32_PLATFORM)
         DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, userMsg);
     #endif
 }
@@ -3048,7 +3058,7 @@ DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 l
     char const *const formatStr = ":%s:%s,%d(%s): DqnLog: %s\n";
     fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
 
-    #if defined(DQN_WIN32_PLATFORM)
+    #if defined(DQN__WIN32_PLATFORM)
         DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, expr, userMsg);
     #endif
 }
@@ -5944,13 +5954,13 @@ FILE_SCOPE u64 DqnRnd__Murmur3Avalanche64(u64 h)
     return h;
 }
 
-#if defined(DQN_UNIX_PLATFORM)
+#if defined(DQN__UNIX_PLATFORM)
     #include <x86intrin.h> // __rdtsc
 #endif
 
 FILE_SCOPE u32 DqnRnd__MakeSeed()
 {
-#if defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM) || defined(DQN__UNIX_PLATFORM)
     i64 numClockCycles = __rdtsc();
     return (u32)numClockCycles;
 #elif __ANDROID__
@@ -6160,7 +6170,7 @@ bool DqnString::InitLiteral(wchar_t const *cstr, DqnMemStack *stack)
 
 bool DqnString::InitLiteral(wchar_t const *cstr, DqnMemAPI *api)
 {
-#if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+#if defined(DQN__IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
     i32 reqLenInclNullTerminator = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
     if (!this->InitSize(reqLenInclNullTerminator - 1, api))
     {
@@ -6389,7 +6399,7 @@ void DqnString::Free()
 
 i32 DqnString::ToWChar(wchar_t *buf, i32 bufSize) const
 {
-#if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+#if defined(DQN__IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
     i32 result = DqnWin32_UTF8ToWChar(this->str, buf, bufSize);
     return result;
 
@@ -6405,7 +6415,7 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
     // TODO(doyle): Should the "in" string allow specifyign len? probably
     // Otherwise a c-string and a literal initiated string might have different lengths
     // to wchar will produce an unintuitive output
-#if defined(DQN_IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+#if defined(DQN__IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
     i32 requiredLenInclNull = DqnWin32_UTF8ToWChar(this->str, nullptr, 0);
 
     i32 allocSize = sizeof(wchar_t) * requiredLenInclNull;
@@ -7752,13 +7762,13 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 #endif
 #endif // DQN_IMPLEMENTATION
 
-#if defined(DQN_XPLATFORM_LAYER)
+#if defined(DQN__XPLATFORM_LAYER)
 // #XPlatform (Win32 & Unix)
 // =================================================================================================
 // Functions in the Cross Platform are guaranteed to be supported in both Unix
 // and Win32
 
-#ifdef DQN_UNIX_PLATFORM
+#ifdef DQN__UNIX_PLATFORM
     #include <stdio.h>    // Basic File I/O // TODO(doyle): Syscall versions
 
     #include <dirent.h>   // readdir()/opendir()/closedir()
@@ -7772,7 +7782,7 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 
 // XPlatform > #DqnFile
 // =================================================================================================
-#ifdef DQN_WIN32_PLATFORM
+#ifdef DQN__WIN32_PLATFORM
 
 FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *path, DqnFile *file,
                                            u32 flags, DqnFile::Action action)
@@ -7851,7 +7861,7 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
         HANDLE findHandle = FindFirstFileW(wideDir, &findData);
         if (findHandle == INVALID_HANDLE_VALUE)
         {
-            DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", nullptr);
+            DQN__WIN32_ERROR_BOX("FindFirstFile() failed.", nullptr);
             return nullptr;
         }
 
@@ -7890,7 +7900,7 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
         HANDLE findHandle = FindFirstFileW(wideDir, &initFind);
         if (findHandle == INVALID_HANDLE_VALUE)
         {
-            DQN_WIN32_ERROR_BOX("FindFirstFile() failed.", nullptr);
+            DQN__WIN32_ERROR_BOX("FindFirstFile() failed.", nullptr);
             *numFiles = 0;
             return nullptr;
         }
@@ -7933,9 +7943,9 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
     }
 }
 
-#endif // DQN_WIN32_PLATFORM
+#endif // DQN__WIN32_PLATFORM
 
-#ifdef DQN_UNIX_PLATFORM
+#ifdef DQN__UNIX_PLATFORM
 FILE_SCOPE bool DqnFileInternal_UnixGetFileSizeWithStat(char const *path, usize *size)
 {
     struct stat fileStat = {0};
@@ -8099,18 +8109,18 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
     }
 }
 
-#endif // DQN_UNIX_PLATFORM
+#endif // DQN__UNIX_PLATFORM
 bool DqnFile::Open(char const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {0};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
     return DqnFileInternal_Win32Open(widePath, this, flags_, action);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     return DqnFileInternal_UnixOpen(path, this, flags_, action);
 
 #else
@@ -8124,7 +8134,7 @@ bool DqnFile::Open(wchar_t const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     return DqnFileInternal_Win32Open(path, this, flags_, action);
 
 #else
@@ -8139,7 +8149,7 @@ usize DqnFile::Write(u8 const *buf, usize numBytesToWrite, usize fileOffset)
     DQN_ASSERTM(fileOffset == 0, "File writing into offset is not implemented.");
     usize numBytesWritten = 0;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     DWORD bytesToWrite = (DWORD)numBytesToWrite;
     DWORD bytesWritten;
     BOOL result = WriteFile(this->handle, (void *)buf, bytesToWrite, &bytesWritten, nullptr);
@@ -8148,10 +8158,10 @@ usize DqnFile::Write(u8 const *buf, usize numBytesToWrite, usize fileOffset)
     // TODO(doyle): Better logging system
     if (result == 0)
     {
-        DQN_WIN32_ERROR_BOX("ReadFile() failed.", nullptr);
+        DQN__WIN32_ERROR_BOX("ReadFile() failed.", nullptr);
     }
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     const usize ITEMS_TO_WRITE = 1;
     if (fwrite(buf, numBytesToWrite, ITEMS_TO_WRITE, (FILE *)this->handle) == ITEMS_TO_WRITE)
     {
@@ -8168,7 +8178,7 @@ usize DqnFile::Read(u8 *buf, usize numBytesToRead)
     usize numBytesRead = 0;
     if (this->handle)
     {
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
         DWORD bytesToRead = (DWORD)numBytesToRead;
         DWORD bytesRead    = 0;
         HANDLE win32Handle = this->handle;
@@ -8179,10 +8189,10 @@ usize DqnFile::Read(u8 *buf, usize numBytesToRead)
         // TODO(doyle): 0 also means it is completing async, but still valid
         if (result == 0)
         {
-            DQN_WIN32_ERROR_BOX("ReadFile() failed.", nullptr);
+            DQN__WIN32_ERROR_BOX("ReadFile() failed.", nullptr);
         }
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
         // TODO(doyle): Syscall version
         const usize ITEMS_TO_READ = 1;
         if (fread(buf, numBytesToRead, ITEMS_TO_READ, (FILE *)this->handle) == ITEMS_TO_READ)
@@ -8308,9 +8318,9 @@ void DqnFile::Close()
 {
     if (this->handle)
     {
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
         CloseHandle(this->handle);
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
         fclose((FILE *)this->handle);
 #endif
         this->handle = nullptr;
@@ -8320,7 +8330,7 @@ void DqnFile::Close()
     this->flags = 0;
 }
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     DQN_COMPILE_ASSERT(sizeof(DWORD)  == sizeof(u32));
 #endif
 bool DqnFile::GetFileSize(wchar_t const *path, usize *size)
@@ -8342,13 +8352,13 @@ bool DqnFile::GetFileSize(char const *path, usize *size)
     if (!path || !size) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {0};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
     return DqnFile::GetFileSize(widePath, size);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     // TODO(doyle): Error logging
     if (!DqnFileInternal_UnixGetFileSizeWithStat(path, size)) return false;
 
@@ -8370,7 +8380,7 @@ bool DqnFile::GetInfo(wchar_t const *path, Info *info)
 {
     if (!path || !info) return false;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     auto FileTimeToSeconds = [](FILETIME const *time) -> i64 {
         ULARGE_INTEGER timeLargeInt = {};
         timeLargeInt.LowPart        = time->dwLowDateTime;
@@ -8396,7 +8406,7 @@ bool DqnFile::GetInfo(wchar_t const *path, Info *info)
         return true;
     }
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     // NOTE: Wide char not supported on unix
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
 
@@ -8413,13 +8423,13 @@ bool DqnFile::GetInfo(char const *path, Info *info)
         return false;
     }
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
     return DqnFile::GetInfo(widePath, info);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     struct stat fileStat = {};
     if (stat(path, &fileStat))
     {
@@ -8441,10 +8451,10 @@ bool DqnFile::Delete(char const *path)
     if (!path) return false;
 
 // TODO(doyle): Logging
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     return DeleteFileA(path);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     i32 result = unlink(path);
 
     if (result == 0) return true;
@@ -8458,10 +8468,10 @@ bool DqnFile::Delete(wchar_t const *path)
     if (!path) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     return DeleteFileW(path);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
 
@@ -8473,7 +8483,7 @@ bool DqnFile::Copy(char const *src, char const *dest)
     if (!src || !dest) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     BOOL result = (CopyFileA(src, dest, /*FailIfExist*/false) != 0);
     if (result == 0)
     {
@@ -8481,7 +8491,7 @@ bool DqnFile::Copy(char const *src, char const *dest)
     }
     return (result != 0);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
 
@@ -8493,10 +8503,10 @@ bool DqnFile::Copy(wchar_t const *src, wchar_t const *dest)
     if (!src || !dest) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     return (CopyFileW(src, dest, /*FailIfExist*/false) != 0);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
 
@@ -8525,7 +8535,7 @@ void DqnFile::ListDirFree(char **fileList, i32 numFiles, DqnMemAPI *api)
 
 // XPlatform > #DqnTimer
 // =================================================================================================
-#if defined (DQN_WIN32_PLATFORM)
+#if defined (DQN__WIN32_PLATFORM)
 FILE_SCOPE f64 DqnTimerInternal_Win32QueryPerfCounterTimeInMs()
 {
     LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {0};
@@ -8549,10 +8559,10 @@ FILE_SCOPE f64 DqnTimerInternal_Win32QueryPerfCounterTimeInMs()
 DQN_FILE_SCOPE f64 DqnTimer_NowInMs()
 {
     f64 result = 0;
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     result = DQN_MAX(DqnTimerInternal_Win32QueryPerfCounterTimeInMs(), 0);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     struct timespec timeSpec = {0};
     if (clock_gettime(CLOCK_MONOTONIC, &timeSpec))
     {
@@ -8579,11 +8589,11 @@ bool DqnLock_Init(DqnLock *lock)
 {
     if (!lock) return false;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     if (InitializeCriticalSectionEx(&lock->win32Handle, lock->win32SpinCount, 0))
         return true;
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     // NOTE: Static initialise, pre-empt a lock so that it gets initialised as per documentation
     lock->unixHandle = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
     DqnLock_Acquire(lock);
@@ -8602,10 +8612,10 @@ void DqnLock_Acquire(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     EnterCriticalSection(&lock->win32Handle);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     // TODO(doyle): Better error handling
     i32 error = pthread_mutex_lock(&lock->unixHandle);
     DQN_ASSERT(error == 0);
@@ -8620,10 +8630,10 @@ void DqnLock_Release(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     LeaveCriticalSection(&lock->win32Handle);
 
-#elif defined (DQN_UNIX_PLATFORM)
+#elif defined (DQN__UNIX_PLATFORM)
     // TODO(doyle): better error handling
     i32 error = pthread_mutex_unlock(&lock->unixHandle);
     DQN_ASSERT(error == 0);
@@ -8638,10 +8648,10 @@ void DqnLock_Delete(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     DeleteCriticalSection(&lock->win32Handle);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     i32 error = pthread_mutex_destroy(&lock->unixHandle);
     DQN_ASSERT(error == 0);
 
@@ -8692,7 +8702,7 @@ FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(usize stackSize,
 {
     u32 numThreadsCreated = 0;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     DQN_ASSERT(stackSize == 0 || !threadCallback);
     for (u32 i = 0; i < numThreads; i++)
     {
@@ -8702,7 +8712,7 @@ FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(usize stackSize,
         numThreadsCreated++;
     }
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     // TODO(doyle): Better error handling
     pthread_attr_t attribute = {};
     DQN_ASSERT(pthread_attr_init(&attribute) == 0);
@@ -8737,10 +8747,10 @@ FILE_SCOPE void *DqnJobQueueInternal_ThreadCallback(void *threadParam)
     {
         if (!DqnJobQueue_TryExecuteNextJob(queue))
         {
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
             WaitForSingleObjectEx(queue->semaphore, INFINITE, false);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
             sem_wait(&queue->semaphore);
 
 #else
@@ -8755,11 +8765,11 @@ FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *queue, u32 init
 {
     if (!queue) return false;
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     queue->semaphore = (void *)CreateSemaphoreA(nullptr, initSignalCount, maxSignalCount, nullptr);
     DQN_ASSERT(queue->semaphore);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     // TODO(doyle): Use max count for unix
     // TODO(doyle): Error handling
     const u32 UNIX_DONT_SHARE_BETWEEN_PROCESSES = 0;
@@ -8781,11 +8791,11 @@ FILE_SCOPE bool DqnJobQueueInternal_ReleaseSemaphore(DqnJobQueue *queue)
 {
     DQN_ASSERT(queue);
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     DQN_ASSERT(queue->semaphore);
     ReleaseSemaphore(queue->semaphore, 1, nullptr);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     // TODO(doyle): Error handling
     DQN_ASSERT(sem_post(&queue->semaphore) == 0);
 
@@ -8884,17 +8894,17 @@ bool DqnJobQueue::AllJobsComplete  ()                 { return DqnJobQueue_AllJo
 // XPlatform > #DqnAtomic
 // =================================================================================================
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     DQN_COMPILE_ASSERT(sizeof(LONG) == sizeof(i32));
 #endif
 
 DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *dest, i32 swapVal, i32 compareVal)
 {
     i32 result = 0;
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     result = (i32)InterlockedCompareExchange((LONG volatile *)dest, (LONG)swapVal, (LONG)compareVal);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     result = __sync_val_compare_and_swap(dest, compareVal, swapVal);
 
 #else
@@ -8907,10 +8917,10 @@ DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *dest, i32 swapVal, i32 
 DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
 {
     i32 result = 0;
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
     result = (i32)InterlockedAdd((LONG volatile *)src, value);
 
-#elif defined(DQN_UNIX_PLATFORM)
+#elif defined(DQN__UNIX_PLATFORM)
     result = __sync_add_and_fetch(src, value);
 
 #else
@@ -8926,7 +8936,7 @@ DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
 #define DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(name) \
     FILE_SCOPE void name(u32 *const numCores, u32 *const numThreadsPerCore)
 
-#if defined(DQN_UNIX_PLATFORM)
+#if defined(DQN__UNIX_PLATFORM)
 DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresAndThreads)
 {
     if (!numThreadsPerCore && !numCores) return;
@@ -8989,9 +8999,9 @@ DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresA
         DQN_ASSERT(DQN_INVALID_CODE_PATH);
     }
 }
-#endif // DQN_UNIX_PLATFORM
+#endif // DQN__UNIX_PLATFORM
 
-#if defined(DQN_WIN32_PLATFORM)
+#if defined(DQN__WIN32_PLATFORM)
 DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresAndThreads)
 {
     if (numThreadsPerCore)
@@ -9048,13 +9058,13 @@ DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresA
         DqnMem_Free(rawProcInfoArray);
     }
 }
-#endif // DQN_WIN32_PLATFORM
+#endif // DQN__WIN32_PLATFORM
 
 // XPlatform > #DqnPlatform
 // =================================================================================================
 DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *numCores, u32 *numThreadsPerCore)
 {
-#if (defined(DQN_WIN32_PLATFORM) || defined(DQN_UNIX_PLATFORM))
+#if (defined(DQN__WIN32_PLATFORM) || defined(DQN__UNIX_PLATFORM))
     DqnPlatformInternal_GetNumCoresAndThreads(numCores, numThreadsPerCore);
 
 #else
@@ -9062,9 +9072,9 @@ DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *numCores, u32 *numThr
 
 #endif
 }
-#endif // DQN_XPLATFORM_LAYER
+#endif // DQN__XPLATFORM_LAYER
 
-#ifdef DQN_WIN32_PLATFORM
+#ifdef DQN__WIN32_PLATFORM
 // #DqnWin32
 // =================================================================================================
 DQN_FILE_SCOPE i32 DqnWin32_UTF8ToWChar(char const *in, wchar_t *out, i32 outLen)
@@ -9073,7 +9083,7 @@ DQN_FILE_SCOPE i32 DqnWin32_UTF8ToWChar(char const *in, wchar_t *out, i32 outLen
 
     if (result == 0xFFFD || 0)
     {
-        DQN_WIN32_ERROR_BOX("WideCharToMultiByte() failed.", nullptr);
+        DQN__WIN32_ERROR_BOX("WideCharToMultiByte() failed.", nullptr);
         return -1;
     }
 
@@ -9087,7 +9097,7 @@ DQN_FILE_SCOPE i32 DqnWin32_WCharToUTF8(wchar_t const *in, char *out, i32 outLen
 
     if (result == 0xFFFD || 0)
     {
-        DQN_WIN32_ERROR_BOX("WideCharToMultiByte() failed.", nullptr);
+        DQN__WIN32_ERROR_BOX("WideCharToMultiByte() failed.", nullptr);
         return -1;
     }
 
@@ -9119,29 +9129,29 @@ DQN_FILE_SCOPE void DqnWin32_DisplayLastError(char const *errorPrefix)
     {
         char formattedError[2048] = {0};
         Dqn_sprintf(formattedError, "%s: %s", errorPrefix, errorMsg);
-        DQN_WIN32_ERROR_BOX(formattedError, nullptr);
+        DQN__WIN32_ERROR_BOX(formattedError, nullptr);
     }
     else
     {
-        DQN_WIN32_ERROR_BOX(errorMsg, nullptr);
+        DQN__WIN32_ERROR_BOX(errorMsg, nullptr);
     }
 }
 
-const i32 DQN_WIN32_INTERNAL_ERROR_MSG_SIZE = 2048;
+const i32 DQN__WIN32_INTERNAL_ERROR_MSG_SIZE = 2048;
 DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(DWORD error, char const *errorPrefix)
 {
-    char errorMsg[DQN_WIN32_INTERNAL_ERROR_MSG_SIZE] = {0};
+    char errorMsg[DQN__WIN32_INTERNAL_ERROR_MSG_SIZE] = {0};
     FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                    nullptr, error, 0, errorMsg, DQN_ARRAY_COUNT(errorMsg), nullptr);
 
     char formattedError[2048] = {0};
     Dqn_sprintf(formattedError, "%s: %s", errorPrefix, errorMsg);
-    DQN_WIN32_ERROR_BOX(formattedError, nullptr);
+    DQN__WIN32_ERROR_BOX(formattedError, nullptr);
 }
 
 DQN_FILE_SCOPE void DqnWin32_OutputDebugString(char const *formatStr, ...)
 {
-    char str[DQN_WIN32_INTERNAL_ERROR_MSG_SIZE] = {0};
+    char str[DQN__WIN32_INTERNAL_ERROR_MSG_SIZE] = {0};
 
     va_list argList;
     va_start(argList, formatStr);
@@ -9175,4 +9185,4 @@ DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *buf, u32 bufLen)
     return lastSlashIndex;
 }
 
-#endif // DQN_WIN32_PLATFORM
+#endif // DQN__WIN32_PLATFORM

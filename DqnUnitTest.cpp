@@ -675,36 +675,6 @@ void DqnString_Test()
     }
 }
 
-void DqnTimer_Test()
-{
-    LOG_HEADER();
-
-    if (1)
-    {
-
-#if defined(DQN_UNIX_PLATFORM)
-        f64 startInMs     = DqnTimer_NowInMs();
-        u32 sleepTimeInMs = 1;
-        sleep(sleepTimeInMs);
-        f64 endInMs = DqnTimer_NowInMs();
-        Log("start: %f, end: %f", startInMs, endInMs);
-        DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
-
-#elif defined(DQN_WIN32_PLATFORM)
-        f64 startInMs     = DqnTimer_NowInMs();
-        u32 sleepTimeInMs = 1000;
-        Sleep(sleepTimeInMs);
-        f64 endInMs = DqnTimer_NowInMs();
-
-        DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
-#endif
-        Log(Status::Ok, "Timer advanced in time over 1 second");
-        globalIndent++;
-        Log("Start: %f, End: %f", startInMs, endInMs);
-        globalIndent--;
-    }
-}
-
 void DqnRnd_Test()
 {
     LOG_HEADER();
@@ -1579,7 +1549,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 
 void DqnArray_TestRealDataInternal(DqnArray<char> *array)
 {
-#ifdef DQN_XPLATFORM_LAYER
+    (void)array;
+#ifdef DQN_PLATFORM_HEADER
     size_t bufSize = 0;
     u8 *buf        = DqnFile::ReadEntireFile("tests/google-10000-english.txt", &bufSize);
     DQN_ASSERT(buf);
@@ -1661,7 +1632,7 @@ void DqnArray_Test()
     }
 }
 
-#ifdef DQN_XPLATFORM_LAYER
+#ifdef DQN_PLATFORM_HEADER
 void DqnFile_Test()
 {
     LOG_HEADER();
@@ -1867,7 +1838,35 @@ void DqnFile_Test()
     }
 
 }
+
+void DqnTimer_Test()
+{
+    LOG_HEADER();
+
+    if (1)
+    {
+
+        f64 startInMs = DqnTimer_NowInMs();
+#if defined(DQN_UNIX_PLATFORM)
+        u32 sleepTimeInMs = 1;
+        sleep(sleepTimeInMs);
+        Log("start: %f, end: %f", startInMs, endInMs);
+        DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
+
+#elif defined(DQN_WIN32_PLATFORM)
+        u32 sleepTimeInMs = 1000;
+        Sleep(sleepTimeInMs);
+
+        DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
 #endif
+        f64 endInMs = DqnTimer_NowInMs();
+        Log(Status::Ok, "Timer advanced in time over 1 second");
+        globalIndent++;
+        Log("Start: %f, End: %f", startInMs, endInMs);
+        globalIndent--;
+    }
+}
+
 
 FILE_SCOPE u32 volatile globalDebugCounter;
 FILE_SCOPE DqnLock globalJobQueueLock;
@@ -1927,6 +1926,11 @@ FILE_SCOPE void DqnJobQueue_Test()
 
     Log("Final incremented value: %d\n", globalDebugCounter);
 }
+
+#else
+f64 DqnTimer_NowInMs() { return 0; }
+f64 DqnTimer_NowInS()  { return 0; }
+#endif // DQN_PLATFORM_HEADER
 
 #include <algorithm>
 void DqnQuickSort_Test()
@@ -2872,8 +2876,6 @@ FILE_SCOPE void DqnMemStack_Test()
     }
 }
 
-void DqnFixedString_Test();
-
 int main(void)
 {
     globalIndent  = 1;
@@ -2892,7 +2894,7 @@ int main(void)
     DqnMemSet_Test();
     DqnFixedString_Test();
 
-#ifdef DQN_XPLATFORM_LAYER
+#ifdef DQN_PLATFORM_HEADER
     DqnFile_Test();
     DqnTimer_Test();
     DqnJobQueue_Test();
