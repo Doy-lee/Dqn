@@ -675,7 +675,7 @@ struct DqnSlice
     DqnSlice() = default;
     DqnSlice(T *str, i32 len) { this->data = str; this->len = len; }
 };
-#define DQN_SLICE_NAME(name) DqnSlice<char const>(name, DQN_CHAR_COUNT(name))
+#define DQN_SLICE(literal) DqnSlice<char const>(literal, DQN_CHAR_COUNT(literal))
 
 #define DQN_SLICE_CMP(a, b, ignoreCase)  (a.len == b.len && (DqnStr_Cmp(a.data, b.data, a.len, ignoreCase) == 0))
 // #DqnChar API
@@ -747,8 +747,11 @@ DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailBraces (char const *s
 // Return the len of the derived string. If buf is nullptr and or bufSize is 0 the function returns the
 // required string length for the integer
 // TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work atm.
-DQN_FILE_SCOPE i32 Dqn_I64ToStr(i64 const value, char *buf, i32 bufSize);
-DQN_FILE_SCOPE i64 Dqn_StrToI64(char const *buf, i64 bufSize);
+DQN_FILE_SCOPE        i32 Dqn_I64ToStr(i64 const value, char *buf, i32 bufSize);
+DQN_FILE_SCOPE        i64 Dqn_StrToI64(char const *buf, i64 bufSize);
+DQN_FILE_SCOPE inline i64 Dqn_StrToI64(DqnSlice<char const> buf) { return Dqn_StrToI64(buf.data, buf.len); }
+DQN_FILE_SCOPE inline i64 Dqn_StrToI64(DqnSlice<char> buf)       { return Dqn_StrToI64(buf.data, buf.len); }
+
 // WARNING: Not robust, precision errors and whatnot but good enough!
 DQN_FILE_SCOPE f32 Dqn_StrToF32(char const *buf, i64 bufSize);
 
@@ -2038,7 +2041,8 @@ struct DqnFixedString
     char str[MAX];
 
     DqnFixedString(): len(0)                          { this->str[0] = 0; }
-    DqnFixedString(char const *str, int len = -1)     {                     this->len = DqnFixedString__Append(this->str, MAX, str, len);              }
+    DqnFixedString(char const *str)                   {                     this->len = DqnFixedString__Append(this->str, MAX, str, -1);               }
+    DqnFixedString(char const *str, int len)          {                     this->len = DqnFixedString__Append(this->str, MAX, str, len);              }
     DqnFixedString(DqnSlice<char const> const &other) {                     this->len = DqnFixedString__Append(this->str, MAX, other.data, other.len); }
     DqnFixedString(DqnSlice<char> const &other)       {                     this->len = DqnFixedString__Append(this->str, MAX, other.data, other.len); }
     DqnFixedString(DqnFixedString const &other)       { if (this != &other) this->len = DqnFixedString__Append(this->str, MAX, other.str, other.len);  }
@@ -2641,7 +2645,8 @@ struct DqnJson
     DqnSlice<char> value;
     i32            numEntries;
 
-    operator bool() const { return (value.data != nullptr); }
+    operator bool () const { return (value.data != nullptr); }
+    i64      ToI64() const { return Dqn_StrToI64(value.data, value.len); }
 };
 
 // Zero allocation json finder. Returns the data of the value.
@@ -2654,10 +2659,8 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnSlice<char const> const buf, 
 DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnJson const input, DqnSlice<char const> const findProperty);
 DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnJson const input, DqnSlice<char>       const findProperty);
 
-// newInput: (Optional) Returns the input advanced to the next array item, can be used again with
-//           function to get next array item.
 // return:   The array item.
-DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson const input, DqnJson *newInput);
+DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson *iterator);
 
 #endif  /* DQN_H */
 
@@ -6439,17 +6442,31 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
 // return: The number of bytes written to dest
 FILE_SCOPE int DqnFixedString__Append(char *dest, int destSize, char const *src, int len)
 {
+    i32 realLen = 0;
     if (len <= -1)
     {
-        len = DqnStr_Len(src);
+        char *ptr = dest;
+        char *end = ptr + destSize;
+
+        while (*src && ptr != end)
+            *ptr++ = *src++;
+
+        if (ptr == end)
+        {
+            DQN_ASSERT(!src[0]);
+        }
+
+        realLen = ptr - dest;
+    }
+    else
+    {
+        realLen = DQN_MIN(len, destSize - 1);
+        DqnMem_Copy(dest, src, realLen);
     }
 
-    i32 bytesToCopy = DQN_MIN(len, destSize - 1);
-    DQN_ASSERT(len <= destSize && bytesToCopy >= 0);
-
-    DqnMem_Copy(dest, src, bytesToCopy);
-    dest[bytesToCopy] = 0;
-    return bytesToCopy;
+    DQN_ASSERT(realLen <= destSize && realLen >= 0);
+    dest[realLen] = 0;
+    return realLen;
 }
 
 // #Dqn
@@ -6689,30 +6706,28 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnJson const input, DqnSlice<char const> con
     return result;
 }
 
-DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson const input, DqnJson *newInput)
+DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson *iterator)
 {
     DqnJson result = {};
-    if (input.type != DqnJson::Type::Array || input.numEntries <= 0)
+    if (iterator->type != DqnJson::Type::Array || iterator->numEntries <= 0)
         return result;
 
-    result = DqnJson_Get(input.value, DQN_SLICE_NAME("{"));
-    if (result && newInput)
+    result = DqnJson_Get(iterator->value, DQN_SLICE("{"));
+    if (result)
     {
-        *newInput            = input;
-        char const *end      = input.value.data + input.value.len;
-        newInput->value.data = result.value.data + result.value.len;
-        newInput->numEntries--;
+        char const *end      = iterator->value.data + iterator->value.len;
+        iterator->value.data = result.value.data + result.value.len;
+        iterator->numEntries--;
 
-        while (newInput->value.data[0] && *newInput->value.data++ != '}')
+        while (iterator->value.data[0] && *iterator->value.data++ != '}')
             ;
 
-        newInput->value.data = DqnChar_SkipWhitespace(newInput->value.data);
-        if (newInput->value.data[0] && newInput->value.data[0] == ',')
-            newInput->value.data++;
+        iterator->value.data = DqnChar_SkipWhitespace(iterator->value.data);
+        if (iterator->value.data[0] && iterator->value.data[0] == ',')
+            iterator->value.data++;
 
-        newInput->value.data = DqnChar_SkipWhitespace(newInput->value.data);
-
-        newInput->value.len  = (newInput->value.data) ? static_cast<i32>(end - newInput->value.data) : 0;
+        iterator->value.data = DqnChar_SkipWhitespace(iterator->value.data);
+        iterator->value.len  = (iterator->value.data) ? static_cast<i32>(end - iterator->value.data) : 0;
     }
 
     return result;
@@ -8957,7 +8972,7 @@ DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresA
         {
             *numThreadsPerCore = 0;
             // Find the offset to the processor field and move to it
-            DqnSlice<char const> processor = DQN_SLICE_NAME("processor");
+            DqnSlice<char const> processor = DQN_SLICE("processor");
             i32 processorOffset            = DqnStr_FindFirstOccurence(srcPtr, srcLen, processor.data, processor.len);
 
             DQN_ASSERT(processorOffset != -1);
@@ -8977,7 +8992,7 @@ DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresA
         {
             *numCores   = 0;
             // Find the offset to the cpu cores field and move to it
-            DqnSlice<char const> cpuCores = DQN_SLICE_NAME("cpu cores");
+            DqnSlice<char const> cpuCores = DQN_SLICE("cpu cores");
             i32 cpuCoresOffset            = DqnStr_FindFirstOccurence(srcPtr, srcLen, cpuCores.data, cpuCores.len);
             DQN_ASSERT(cpuCoresOffset != -1);
 
