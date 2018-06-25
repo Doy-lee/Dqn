@@ -58,7 +58,7 @@
 // #DqnLock      Mutex Synchronisation
 // #DqnJobQueue  Multithreaded Job Queue
 // #DqnAtomic    Interlocks/Atomic Operations
-// #DqnPlatform  Common Platform API helpers
+// #DqnOS        Common Platform API helpers
 
 // #Platform
 //   - #DqnWin32     Common Win32 API Helpers
@@ -2929,11 +2929,11 @@ DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *const dest, const i32 s
 // return: The new value at src
 DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *const src, const i32 value);
 
-// XPlatform > #DqnPlatform API
+// XPlatform > #DqnOS API
 // =================================================================================================
 // Uses a single call to DqnMem_Calloc() and DqnMem_Free(). Not completely platform "independent" for Unix.
 // numCores: numThreadsPerCore: Can be nullptr, the function will just skip it.
-DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *const numCores, u32 *const numThreadsPerCore);
+DQN_FILE_SCOPE void DqnOS_GetThreadsAndCores(u32 *const numCores, u32 *const numThreadsPerCore);
 
 // #Platform Specific API
 // =================================================================================================
@@ -7793,14 +7793,14 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
     #include <unistd.h>   // unlink()
 #endif
 
-#define DQN_FILE_INTERNAL_LIST_DIR(name) DQN_FILE_SCOPE char **name(char const *dir, i32 *numFiles, DqnMemAPI *api)
+#define DQN_FILE__LIST_DIR(name) DQN_FILE_SCOPE char **name(char const *dir, i32 *numFiles, DqnMemAPI *api)
 
 // XPlatform > #DqnFile
 // =================================================================================================
 #ifdef DQN__WIN32_PLATFORM
 
-FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *path, DqnFile *file,
-                                           u32 flags, DqnFile::Action action)
+FILE_SCOPE bool
+DqnFile__Win32Open(wchar_t const *path, DqnFile *file, u32 flags, DqnFile::Action action)
 {
     if (!file || !path) return false;
 
@@ -7862,7 +7862,7 @@ FILE_SCOPE bool DqnFileInternal_Win32Open(wchar_t const *path, DqnFile *file,
     return true;
 }
 
-DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
+DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
 {
     if (!dir) return nullptr;
 
@@ -7957,36 +7957,45 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
         return list;
     }
 }
-
 #endif // DQN__WIN32_PLATFORM
 
 #ifdef DQN__UNIX_PLATFORM
-FILE_SCOPE bool DqnFileInternal_UnixGetFileSizeWithStat(char const *path, usize *size)
+FILE_SCOPE bool DqnFile__UnixGetFileSizeWithStat(FILE *file, char const *path, usize *size)
 {
-    struct stat fileStat = {0};
-    if (stat(path, &fileStat)) return false;
+    if (!file)
+    {
+        return false;
+    }
+
+    struct stat fileStat = {};
+    if (stat(path, &fileStat))
+    {
+        // TODO(doyle): Logging
+        return false;
+    }
+
     *size = fileStat.st_size;
+
+    // NOTE: Can occur in some instances where files are generated on demand, i.e. /proc/cpuinfo.
+    // But there can also be zero-byte files, we can't be sure. So manual check by counting bytes
+    if (*size == 0)
+    {
+        u64 fileSizeInBytes = 0;
+
+        char c = fgetc(file);
+        while (c != EOF)
+        {
+            fileSizeInBytes++;
+            c = fgetc(file);
+        }
+        rewind(file);
+    }
 
     return true;
 }
 
-FILE_SCOPE usize DqnFileInternal_UnixGetFileSizeManual(FILE *handle, bool rewindHandle)
-{
-    u64 fileSizeInBytes = 0;
-
-    DQN_ASSERT(handle);
-    char c = fgetc(handle);
-    while (c != EOF)
-    {
-        fileSizeInBytes++;
-        c = fgetc(handle);
-    }
-    if (rewindHandle) rewind(handle);
-    return fileSizeInBytes;
-}
-
-FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *path, DqnFile *file,
-                                         u32 flags, DqnFile::Action action)
+FILE_SCOPE bool
+DqnFile__UnixOpen(char const *path, DqnFile *file, u32 flags, DqnFile::Action action)
 {
     char operation  = 0;
     bool updateFlag = false;
@@ -8024,8 +8033,7 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *path, DqnFile *file,
     }
     DQN_ASSERT(operation != 0);
 
-    // TODO(doyle): What about not reading as a binary file and appending to end
-    // of file.
+    // TODO(doyle): What about not reading as a binary file and appending to end of file.
     u32 modeIndex     = 0;
     char mode[4]      = {};
     mode[modeIndex++] = operation;
@@ -8037,29 +8045,19 @@ FILE_SCOPE bool DqnFileInternal_UnixOpen(char const *path, DqnFile *file,
 
     // TODO(doyle): Use open syscall
     // TODO(doyle): Query errno
-    FILE *handle = fopen(path, mode);
-    if (!handle) return false;
-
-    if (!DqnFileInternal_UnixGetFileSizeWithStat(path, &file->size))
+    file->handle = reinterpret_cast<void *>(fopen(path, mode));
+    if (!DqnFile__UnixGetFileSize(reinterpret_cast<FILE *>(file->handle), path, &file->size))
     {
         // TODO(doyle): Logging
         fclose(handle);
         return false;
     }
 
-    file->handle = (void *)handle;
-    file->flags  = flags;
-
-    // NOTE: Can occur in some instances where files are generated on demand,
-    //       i.e. /proc/cpuinfo. But there can also be zero-byte files, we can't
-    //       be sure. So manual check by counting bytes
-    if (file->size == 0)
-        file->size = DqnFileInternal_UnixGetFileSizeManual((FILE *)file->handle, true);
-
+    file->flags = flags;
     return true;
 }
 
-DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
+DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
 {
     if (!dir) return nullptr;
 
@@ -8123,20 +8121,20 @@ DQN_FILE_INTERNAL_LIST_DIR(DqnFileInternal_PlatformListDir)
         return list;
     }
 }
-
 #endif // DQN__UNIX_PLATFORM
+
 bool DqnFile::Open(char const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
 #if defined(DQN__WIN32_PLATFORM)
     // TODO(doyle): MAX PATH is baad
-    wchar_t widePath[MAX_PATH] = {0};
+    wchar_t widePath[MAX_PATH] = {};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
-    return DqnFileInternal_Win32Open(widePath, this, flags_, action);
+    return DqnFile__Win32Open(widePath, this, flags_, action);
 
 #elif defined(DQN__UNIX_PLATFORM)
-    return DqnFileInternal_UnixOpen(path, this, flags_, action);
+    return DqnFile__UnixOpen(path, this, flags_, action);
 
 #else
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
@@ -8150,7 +8148,7 @@ bool DqnFile::Open(wchar_t const *path, u32 flags_, Action action)
     if (!path) return false;
 
 #if defined(DQN__WIN32_PLATFORM)
-    return DqnFileInternal_Win32Open(path, this, flags_, action);
+    return DqnFile__Win32Open(path, this, flags_, action);
 
 #else
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
@@ -8375,7 +8373,7 @@ bool DqnFile::GetFileSize(char const *path, usize *size)
 
 #elif defined(DQN__UNIX_PLATFORM)
     // TODO(doyle): Error logging
-    if (!DqnFileInternal_UnixGetFileSizeWithStat(path, size)) return false;
+    if (!DqnFile__UnixGetFileSizeWithStat(path, size)) return false;
 
     // NOTE: 0 size can occur in some instances where files are generated on demand,
     //       i.e. /proc/cpuinfo
@@ -8383,7 +8381,7 @@ bool DqnFile::GetFileSize(char const *path, usize *size)
     {
         // If stat fails, then do a manual byte count
         FILE *handle = fopen(path, "r");
-        *size        = DqnFileInternal_UnixGetFileSizeManual(handle, false);
+        *size        = DqnFile__UnixGetFileSizeManual(handle, false);
         fclose(handle);
     }
 
@@ -8530,7 +8528,7 @@ bool DqnFile::Copy(wchar_t const *src, wchar_t const *dest)
 
 char **DqnFile::ListDir(char const *dir, i32 *numFiles, DqnMemAPI *api)
 {
-    char **result = DqnFileInternal_PlatformListDir(dir, numFiles, api);
+    char **result = DqnFile__PlatformListDir(dir, numFiles, api);
     return result;
 }
 
@@ -8946,13 +8944,13 @@ DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
     return result;
 }
 
-// XPlatform > #DqnPlatform
+// XPlatform > #DqnOS
 // =================================================================================================
-#define DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(name) \
-    FILE_SCOPE void name(u32 *const numCores, u32 *const numThreadsPerCore)
+#define DQN_OS_GET_THREADS_AND_CORES(name) \
+    DQN_FILE_SCOPE void name(u32 *const numCores, u32 *const numThreadsPerCore)
 
 #if defined(DQN__UNIX_PLATFORM)
-DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresAndThreads)
+DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
 {
     if (!numThreadsPerCore && !numCores) return;
 
@@ -9017,7 +9015,7 @@ DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresA
 #endif // DQN__UNIX_PLATFORM
 
 #if defined(DQN__WIN32_PLATFORM)
-DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresAndThreads)
+DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
 {
     if (numThreadsPerCore)
     {
@@ -9074,19 +9072,6 @@ DQN_PLATFORM_INTERNAL_GET_NUM_CORES_AND_THREADS(DqnPlatformInternal_GetNumCoresA
     }
 }
 #endif // DQN__WIN32_PLATFORM
-
-// XPlatform > #DqnPlatform
-// =================================================================================================
-DQN_FILE_SCOPE void DqnPlatform_GetNumThreadsAndCores(u32 *numCores, u32 *numThreadsPerCore)
-{
-#if (defined(DQN__WIN32_PLATFORM) || defined(DQN__UNIX_PLATFORM))
-    DqnPlatformInternal_GetNumCoresAndThreads(numCores, numThreadsPerCore);
-
-#else
-    #error Unsupported platform
-
-#endif
-}
 #endif // DQN__XPLATFORM_LAYER
 
 #ifdef DQN__WIN32_PLATFORM
@@ -9199,5 +9184,4 @@ DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *buf, u32 bufLen)
 
     return lastSlashIndex;
 }
-
 #endif // DQN__WIN32_PLATFORM

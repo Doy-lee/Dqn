@@ -1898,7 +1898,7 @@ FILE_SCOPE void DqnJobQueue_Test()
     DQN_ASSERT(memStack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
     u32 numThreads, numCores;
-    DqnPlatform_GetNumThreadsAndCores(&numCores, &numThreads);
+    DqnOS_GetThreadsAndCores(&numCores, &numThreads);
     DQN_ASSERT(numThreads > 0 && numCores > 0);
 
     u32 totalThreads = (numCores - 1) * numThreads;
