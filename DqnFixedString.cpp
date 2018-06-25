@@ -2,7 +2,7 @@ void DqnFixedString_Test()
 {
     LOG_HEADER();
     {
-        DqnFixedString<512> str  = DQN_SLICE_NAME("hello world");
+        DqnFixedString<512> str  = DQN_SLICE("hello world");
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello world") == 0);
 
         Log(Status::Ok, "Copy constructor DqnSlice<char>");
@@ -10,11 +10,11 @@ void DqnFixedString_Test()
 
     {
         DqnFixedString<512> zero = {};
-        DqnFixedString<512> str  = DQN_SLICE_NAME("hello world");
+        DqnFixedString<512> str  = DQN_SLICE("hello world");
         str = zero;
         DQN_ASSERT(str.len == 0 && str.str[0] == 0);
 
-        DqnSlice<char const> helloSlice = DQN_SLICE_NAME("hello");
+        DqnSlice<char const> helloSlice = DQN_SLICE("hello");
         str = helloSlice;
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello") == 0);
 
@@ -22,7 +22,7 @@ void DqnFixedString_Test()
     }
 
     {
-        DqnFixedString<512> str = DQN_SLICE_NAME("hello world");
+        DqnFixedString<512> str = DQN_SLICE("hello world");
         DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor") == 0);
 
@@ -31,14 +31,14 @@ void DqnFixedString_Test()
 
     {
         {
-            DqnFixedString<512> str = DQN_SLICE_NAME("hello world");
+            DqnFixedString<512> str = DQN_SLICE("hello world");
             DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
-            str += DQN_SLICE_NAME(".end");
+            str += DQN_SLICE(".end");
             DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor.end") == 0);
         }
 
         {
-            DqnFixedString<512> str = DQN_SLICE_NAME("hello world");
+            DqnFixedString<512> str = DQN_SLICE("hello world");
             DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
             DQN_ASSERT(str.SprintfAppend(" %d, %d", 100, 200));
             DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor 100, 200") == 0);
@@ -58,9 +58,9 @@ void DqnFixedString_Test()
     }
 
     {
-        DqnFixedString<512> str = DQN_SLICE_NAME("hello world");
+        DqnFixedString<512> str = DQN_SLICE("hello world");
         DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
-        str = str + " end" + DQN_SLICE_NAME(" of");
+        str = str + " end" + DQN_SLICE(" of");
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor end of") == 0);
 
         Log(Status::Ok, "Operator +");

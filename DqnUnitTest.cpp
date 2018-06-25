@@ -1608,7 +1608,7 @@ void DqnArray_Test()
 
         if (1)
         {
-            DqnMemStack stack = {}; stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard);
+            DqnMemStack stack = {}; stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
 
             if (1)
             {
@@ -1759,7 +1759,7 @@ void DqnFile_Test()
         }
 
         DqnMemStack memStack = {};
-        DQN_ASSERT(memStack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+        DQN_ASSERT(memStack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
         // Read data back in
         for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
         {
@@ -1895,7 +1895,7 @@ FILE_SCOPE void DqnJobQueue_Test()
     globalDebugCounter = 0;
 
     DqnMemStack memStack = {};
-    DQN_ASSERT(memStack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+    DQN_ASSERT(memStack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
     u32 numThreads, numCores;
     DqnPlatform_GetNumThreadsAndCores(&numCores, &numThreads);
@@ -1940,7 +1940,7 @@ void DqnQuickSort_Test()
     if (1)
     {
         DqnMemStack stack = {};
-        DQN_ASSERT(stack.Init(DQN_KILOBYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+        DQN_ASSERT(stack.Init(DQN_KILOBYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
         // Create array of ints
         u32 numInts      = 1000000;
@@ -2336,7 +2336,7 @@ FILE_SCOPE void DqnMemStack_Test()
     if (1)
     {
         DqnMemStack stack = {};
-        DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+        DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
         i32 const ALIGN64 = 64;
         i32 const ALIGN16 = 16;
@@ -2374,7 +2374,7 @@ FILE_SCOPE void DqnMemStack_Test()
     if (1)
     {
         DqnMemStack stack = {};
-        DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::NonExpandable));
+        DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::NonExpandable));
         auto *result1 = stack.Push(DQN_MEGABYTE(2));
         DQN_ASSERT(result1 == nullptr);
         DQN_ASSERT(stack.block->prevBlock == nullptr);
@@ -2387,7 +2387,7 @@ FILE_SCOPE void DqnMemStack_Test()
     if (1)
     {
         DqnMemStack stack = {};
-        DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True));
+        DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes));
         DQN_ASSERT(stack.metadata.GetBoundsGuardSize() == 0);
 
         auto *oldBlock = stack.block;
@@ -2413,7 +2413,7 @@ FILE_SCOPE void DqnMemStack_Test()
         if (1)
         {
             DqnMemStack stack = {};
-            DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+            DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
             DqnMemStack::Block *blockToReturnTo = stack.block;
             auto headBefore                     = blockToReturnTo->head;
@@ -2447,7 +2447,7 @@ FILE_SCOPE void DqnMemStack_Test()
         if (1)
         {
             DqnMemStack stack = {};
-            DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+            DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
             DqnMemStack::Block *blockToReturnTo = stack.block;
             auto headBefore                     = blockToReturnTo->head;
@@ -2482,7 +2482,7 @@ FILE_SCOPE void DqnMemStack_Test()
         if (1)
         {
             DqnMemStack stack = {};
-            DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+            DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
             auto *pop1 = stack.Push(222);
             auto *pop2 = stack.PushOnTail(333);
@@ -2533,7 +2533,7 @@ FILE_SCOPE void DqnMemStack_Test()
         {
             u8 memBuf[sizeof(DqnMemStack::Block) - 1] = {};
             DqnMemStack stack                         = {};
-            auto result = stack.Init(&(memBuf[0]), DQN_ARRAY_COUNT(memBuf), Dqn::ZeroClear::False);
+            auto result = stack.Init(&(memBuf[0]), DQN_ARRAY_COUNT(memBuf), Dqn::ZeroClear::No);
 
             DQN_ASSERT(result == false);
             DQN_ASSERT(stack.block == nullptr);
@@ -2546,7 +2546,7 @@ FILE_SCOPE void DqnMemStack_Test()
             i32 const bufSize  = sizeof(DqnMemStack::Block) * 5;
             u8 memBuf[bufSize] = {};
             DqnMemStack stack  = {};
-            auto result        = stack.Init(&(memBuf[0]), bufSize, Dqn::ZeroClear::False);
+            auto result        = stack.Init(&(memBuf[0]), bufSize, Dqn::ZeroClear::No);
 
             DQN_ASSERT(result == true);
             DQN_ASSERT(stack.block);
@@ -2578,7 +2578,7 @@ FILE_SCOPE void DqnMemStack_Test()
         usize size           = 32;
         usize additionalSize = DqnMemStack::MINIMUM_BLOCK_SIZE;
         DqnMemAPI heap = DqnMemAPI::HeapAllocator();
-        DQN_ASSERT(stack.Init(size, Dqn::ZeroClear::True, 0, &heap));
+        DQN_ASSERT(stack.Init(size, Dqn::ZeroClear::Yes, 0, &heap));
         auto *block1 = stack.block;
 
         size += additionalSize;
@@ -2628,7 +2628,7 @@ FILE_SCOPE void DqnMemStack_Test()
     if (1)
     {
         DqnMemStack stack = {};
-        DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+        DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
         auto *result = stack.Push(64);
 
         // TODO(doyle): check head and tail are adjacent to the bounds of the allocation
@@ -2647,7 +2647,7 @@ FILE_SCOPE void DqnMemStack_Test()
         if (1)
         {
             DqnMemStack stack = {};
-            DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+            DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
             auto *result1    = stack.Push(100);
             auto *result2    = stack.PushOnTail(100);
@@ -2675,7 +2675,7 @@ FILE_SCOPE void DqnMemStack_Test()
             if (1)
             {
                 DqnMemStack stack = {};
-                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
 
                 auto *result1 = stack.Push(100);
                 DQN_ASSERT(stack.block->prevBlock == nullptr);
@@ -2706,7 +2706,7 @@ FILE_SCOPE void DqnMemStack_Test()
             if (1)
             {
                 DqnMemStack stack = {};
-                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::NonExpandable));
+                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::NonExpandable));
 
                 auto *result1 = stack.Push(100);
                 DQN_ASSERT(stack.block->prevBlock == nullptr);
@@ -2744,7 +2744,7 @@ FILE_SCOPE void DqnMemStack_Test()
             if (1)
             {
                 DqnMemStack stack = {};
-                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
                 auto *api = &stack.myHeadAPI;
 
                 auto *blockBefore = stack.block;
@@ -2775,7 +2775,7 @@ FILE_SCOPE void DqnMemStack_Test()
             if (1)
             {
                 DqnMemStack stack = {};
-                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
                 auto *api = &stack.myHeadAPI;
 
                 auto *blockBefore = stack.block;
@@ -2811,7 +2811,7 @@ FILE_SCOPE void DqnMemStack_Test()
             if (1)
             {
                 DqnMemStack stack = {};
-                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
                 auto *api = &stack.myHeadAPI;
 
                 auto *blockBefore = stack.block;
@@ -2841,7 +2841,7 @@ FILE_SCOPE void DqnMemStack_Test()
             if (1)
             {
                 DqnMemStack stack = {};
-                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::True, DqnMemStack::Flag::BoundsGuard));
+                DQN_ASSERT(stack.Init(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard));
                 auto *api = &stack.myHeadAPI;
 
                 auto *blockBefore = stack.block;
