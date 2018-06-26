@@ -170,6 +170,11 @@ using f32 = float;
 // Produce a unique name with prefix and counter. i.e. where prefix is "data" then it gives "data1"
 #define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE2(prefix, __COUNTER__)
 
+#define DQN_DEFER_BLOCK(startFunc, ...) startFunc; for (isize i__ = 0; i__ < 1; i__++, __VA_ARGS__)
+#define DQN_DEFER(endFunc) for (isize i__ = 0; i__ < 1; i__++, endFunc)
+
+#define DQN_FOR_EACH(i, lim) for (isize (i) = 0; (i) < (isize)(lim); ++(i))
+
 // #Dqn Namespace
 namespace Dqn
 {
@@ -1179,7 +1184,7 @@ struct DqnArray
 };
 
 template <typename T>
-class DqnSmartArray : public DqnArray<T>
+struct DqnSmartArray : public DqnArray<T>
 {
     ~DqnSmartArray() { if (this->data && this->memAPI) this->memAPI->Free(this->data); }
 };
@@ -1402,7 +1407,7 @@ void DqnArray<T>::Free()
 template <typename T>
 bool DqnArray<T>::Reserve(isize newMax)
 {
-    if (newMax <= this->count)
+    if (newMax <= this->max)
     {
         return true;
     }
@@ -1450,12 +1455,13 @@ bool DqnArray<T>::Grow(isize multiplier)
 template <typename T>
 inline bool DqnArray__TryMakeEnoughSpace(DqnArray<T> *array, isize numNewItems)
 {
-    bool result = true;
-    if (!array->data || (array->count + numNewItems) >= array->max)
+    i32 numToReserve = numNewItems;
+    if ((array->count + numNewItems) >= array->max)
     {
-        result = array->Grow();
+        numToReserve = array->count + numNewItems;
     }
 
+    bool result = array->Reserve(numNewItems);
     return result;
 }
 
