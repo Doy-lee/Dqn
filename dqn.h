@@ -1130,7 +1130,95 @@ public:
 FILE_SCOPE DqnMemAPI DQN_DEFAULT_HEAP_ALLOCATOR_ = DqnMemAPI::HeapAllocator();
 FILE_SCOPE DqnMemAPI *DQN_DEFAULT_HEAP_ALLOCATOR = &DQN_DEFAULT_HEAP_ALLOCATOR_;
 
+template<typename T>
+struct DqnArray
+{
+    DqnMemAPI                  *memAPI = DQN_DEFAULT_HEAP_ALLOCATOR;
+    isize                       count;
+    isize                       max;
+    T                          *data;
 
+     DqnArray        () = default;
+     DqnArray        (DqnMemAPI *memAPI_)                         { *this = {}; this->memAPI = memAPI_; }
+    ~DqnArray        ()                                           { if (this->data && this->memAPI) this->memAPI->Free(data); }
+
+    void  UseMemory  (T *data_, isize max_, isize count_ = 0)     { this->memAPI = nullptr; this->data = data_; this->max = max_; this->count = count_; }
+    void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::Yes) { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
+    void  Free       ()                                           { if (data) { memAPI->Free(data); } *this = {}; }
+    T    *Front      ()                                           { DQN_ASSERT(count > 0); return data + 0; }
+    T    *Back       ()                                           { DQN_ASSERT(count > 0); return data + (count - 1); }
+    bool  Resize     (isize newCount)                             { if (newCount > max) Reserve(GrowCapacity_(newCount)); count = newCount; }
+    bool  Resize     (isize newCount, T const *v)                 { if (newCount > max) Reserve(GrowCapacity_(newCount)); if (newCount > count) for (isize n = count; n < newCount; n++) data[n] = *v; count = newCount; }
+    bool  Reserve    (isize newMax);
+    T    *Push       (T const &v)                                 { return Insert(count, &v, 1); }
+    T    *Push       (T const *v, isize numItems = 1)             { return Insert(count,  v, numItems); }
+    void  Pop        ()                                           { if (count > 0) count--; }
+    void  Erase      (isize index)                                { DQN_ASSERT(index >= 0 && index < count); data[index] = data[--count]; }
+    void  EraseStable(isize index);
+    T    *Insert     (isize index, T const *v)                    { return Insert(index,  v, 1); }
+    T    *Insert     (isize index, T const &v)                    { return Insert(index, &v, 1); }
+    T    *Insert     (isize index, T const *v, isize numItems);
+    bool  Contains   (T const *v) const                           { T const *ptr = data;  T const *end = data + count; while (ptr < end) if (*ptr++ == *v) return true; return false; }
+
+    T    &operator[] (isize i) const                              { DQN_ASSERT(i < count && i > 0); return this->data[i]; }
+    T    *begin      ()                                           { return data; }
+    T    *end        ()                                           { return data + count; }
+
+private:
+    isize GrowCapacity_(isize size) const                         { isize newMax = max ? (max * 2) : 8; return newMax > size ? newMax : size; }
+};
+
+template<typename T> T *DqnArray<T>::Insert(isize index, T const *v, isize numItems)
+{
+    index = DQN_MIN(DQN_MAX(index, 0), count);
+    isize const off = (data + index) - data;
+    isize const newCount = count + numItems;
+
+    if (newCount >= max && !Reserve(GrowCapacity_(newCount)))
+    {
+        return nullptr;
+    }
+
+    count    = newCount;
+    T *start = data + off;
+    if (off < count)
+        memmove(start + numItems, start, ((usize)count - (usize)off) * sizeof(T));
+
+    for (isize i = 0; i < numItems; i++)
+        data[off + i] = v[i];
+
+    return data + off;
+}
+
+template <typename T> void DqnArray<T>::EraseStable(isize index)
+{
+    DQN_ASSERT(index >= 0 && index < count);
+    isize const off = (data + index) - data;
+    memmove(data + off, data + off + 1, ((usize)count - (usize)off - 1) * sizeof(T));
+    count--;
+}
+
+template <typename T> bool DqnArray<T>::Reserve(isize newMax)
+{
+    if (newMax <= max) return true;
+
+    if (data)
+    {
+        T *newData = (T *)memAPI->Realloc(data, max * sizeof(T), newMax * sizeof(T));
+        if (newData)
+        {
+            data = newData;
+            max  = newMax;
+        }
+        return newData;
+    }
+
+    data = (T *)memAPI->Alloc(newMax * sizeof(T));
+    max  = newMax;
+    return data;
+}
+
+#if 0
 // #DqnArray API
 // =================================================================================================
 template <typename T>
@@ -1161,10 +1249,10 @@ struct DqnArray
     T    *Get         (isize index);
     void  Clear       (Dqn::ZeroClear clear = Dqn::ZeroClear::No);
     bool  Remove      (isize index);
-    bool  RemoveStable(isize index);
+    bool  EraseStable(isize index);
 
      // indexList: Array of indexes to remove. This list gets sorted.
-    void  RemoveStable(isize *indexList, isize numIndexes);
+    void  EraseStable(isize *indexList, isize numIndexes);
 
     // C++ Iterator
     // =============================================================================================
@@ -1188,6 +1276,7 @@ struct DqnSmartArray : public DqnArray<T>
 {
     ~DqnSmartArray() { if (this->data && this->memAPI) this->memAPI->Free(this->data); }
 };
+#endif
 
 // #DqnAllocatorMetadata
 // =================================================================================================
@@ -1387,6 +1476,7 @@ inline void                           DqnMemStack_TempRegionKeepChanges(DqnMemSt
 
 // Implementation taken from Milton, developed by Serge at
 // https://github.com/serge-rgb/milton#license
+#if 0
 template <typename T>
 void DqnArray<T>::Free()
 {
@@ -1455,7 +1545,7 @@ bool DqnArray<T>::Grow(isize multiplier)
 template <typename T>
 inline bool DqnArray__TryMakeEnoughSpace(DqnArray<T> *array, isize numNewItems)
 {
-    i32 numToReserve = numNewItems;
+    isize numToReserve = numNewItems;
     if ((array->count + numNewItems) >= array->max)
     {
         numToReserve = array->count + numNewItems;
@@ -1593,7 +1683,7 @@ bool DqnArray<T>::Remove(isize index)
 }
 
 template <typename T>
-bool DqnArray<T>::RemoveStable(isize index)
+bool DqnArray<T>::EraseStable(isize index)
 {
     if (index >= this->count || index < 0)
         return false;
@@ -1620,7 +1710,7 @@ bool DqnArray<T>::RemoveStable(isize index)
 }
 
 template <typename T>
-void DqnArray<T>::RemoveStable(isize *indexList, isize numIndexes)
+void DqnArray<T>::EraseStable(isize *indexList, isize numIndexes)
 {
     if (numIndexes == 0 || !indexList) return;
 
@@ -1651,7 +1741,7 @@ void DqnArray<T>::RemoveStable(isize *indexList, isize numIndexes)
 
     if (realCount == 1)
     {
-        this->RemoveStable(indexList[0]);
+        this->EraseStable(indexList[0]);
     }
     else
     {
@@ -1688,6 +1778,7 @@ void DqnArray<T>::RemoveStable(isize *indexList, isize numIndexes)
         DQN_ASSERT(this->count >= 0);
     }
 }
+#endif
 
 // #DqnHash API
 // =================================================================================================
@@ -3560,7 +3651,7 @@ void DqnAllocatorMetadata::RemoveAllocation(u8 *ptr)
     }
 
     DQN_ASSERT(deleteIndex != -1);
-    this->allocations.RemoveStable(deleteIndex);
+    this->allocations.EraseStable(deleteIndex);
 }
 
 void DqnAllocatorMetadata::CheckAllocations() const
@@ -3867,7 +3958,7 @@ FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingIn(DqnAllocatorMetad
         u8 *ptr = metadata->allocations.data[index];
         if (ptr >= start && ptr < end)
         {
-            metadata->allocations.RemoveStable(index);
+            metadata->allocations.EraseStable(index);
             index--;
         }
     }
