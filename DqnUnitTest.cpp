@@ -136,7 +136,6 @@ void LogHeader(char const *funcName)
 }
 
 #include "DqnFixedString.cpp"
-#include "DqnOS.cpp"
 
 void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 {
@@ -1180,7 +1179,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         DqnArray<DqnV2> array(memAPI);
         if (1)
         {
-            DQN_ASSERT(array.Reserve(1));
+            array.Reserve(1);
             DQN_ASSERT(array.max >= 1);
             DQN_ASSERT(array.count == 0);
 
@@ -1313,7 +1312,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 
         if (1)
         {
-            DQN_ASSERT(array.Reserve(1));
+            array.Reserve(1);
             DQN_ASSERT(array.max >= 1);
             DQN_ASSERT(array.count == 0);
             Log(Status::Ok, "Empty array");
@@ -1327,7 +1326,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             DqnV2 c = DqnV2(5, 6);
             DqnV2 d = DqnV2(7, 8);
 
-            DQN_ASSERT(array.Reserve(16));
+            array.Reserve(16);
             DQN_ASSERT(array.max >= 16);
             DQN_ASSERT(array.count == 0);
 
@@ -1376,7 +1375,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             DqnV2 c = DqnV2(5, 6);
             DqnV2 d = DqnV2(7, 8);
 
-            DQN_ASSERT(array.Reserve(16));
+            array.Reserve(16);
 
             DQN_ASSERT(array.Push(a));
             DQN_ASSERT(array.Push(b));
@@ -1605,7 +1604,7 @@ void DqnArray_Test()
         if (1)
         {
             DqnArray<char> array = {};
-            DQN_ASSERT(array.Reserve(1));
+            array.Reserve(1);
             DqnArray_TestRealDataInternal(&array);
         }
 
@@ -1617,7 +1616,7 @@ void DqnArray_Test()
             {
                 auto memGuard0 = stack.TempRegionGuard();
                 DqnArray<char> array(&stack.myHeadAPI);
-                DQN_ASSERT(array.Reserve(1));
+                array.Reserve(1);
                 DqnArray_TestRealDataInternal(&array);
             }
 
@@ -1626,7 +1625,7 @@ void DqnArray_Test()
             {
                 auto memGuard0 = stack.TempRegionGuard();
                 DqnArray<char> array(&stack.myHeadAPI);
-                DQN_ASSERT(array.Reserve(128));
+                array.Reserve(128);
                 stack.Push(1024);
                 DqnArray_TestRealDataInternal(&array);
             }
@@ -2898,7 +2897,7 @@ int main(void)
     DqnFixedString_Test();
 
 #ifdef DQN_PLATFORM_HEADER
-    DqnOS_Test();
+    // DqnOS_Test();
     DqnFile_Test();
     DqnTimer_Test();
     DqnJobQueue_Test();

@@ -24,7 +24,7 @@ void DqnFixedString_Test()
     {
         DqnFixedString<512> str = DQN_SLICE("hello world");
         DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
-        DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor") == 0);
+        DQN_ASSERTM(DqnStr_Cmp(str.str, "hello sailor") == 0, "Result: %s", str.str);
 
         Log(Status::Ok, "Sprintf");
     }
