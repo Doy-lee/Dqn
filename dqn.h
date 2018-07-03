@@ -1170,8 +1170,7 @@ private:
 
 template<typename T> T *DqnArray<T>::Insert(isize index, T const *v, isize numItems)
 {
-    index = DQN_MIN(DQN_MAX(index, 0), count);
-    isize const off = (data + index) - data;
+    index                = DQN_MIN(DQN_MAX(index, 0), count);
     isize const newCount = count + numItems;
 
     if (newCount >= max && !Reserve(GrowCapacity_(newCount)))
@@ -1179,15 +1178,16 @@ template<typename T> T *DqnArray<T>::Insert(isize index, T const *v, isize numIt
         return nullptr;
     }
 
-    count    = newCount;
-    T *start = data + off;
-    if (off < count)
-        memmove(start + numItems, start, ((usize)count - (usize)off) * sizeof(T));
+    T *src  = data + index;
+    T *dest = src + numItems;
+    if (src < dest)
+        memmove(dest, src, ((data + count) - src) * sizeof(T));
 
     for (isize i = 0; i < numItems; i++)
-        data[off + i] = v[i];
+        src[i] = v[i];
 
-    return data + off;
+    count = newCount;
+    return src;
 }
 
 template <typename T> void DqnArray<T>::EraseStable(isize index)
@@ -2163,7 +2163,7 @@ struct DqnFixedString
     int VSprintf      (char const *fmt, va_list argList);
     int VSprintfAppend(char const *fmt, va_list argList);
 
-    void Clear        (Dqn::ZeroClear clear = Dqn::ZeroClear::No) { if (clear == Dqn::ZeroClear::Yes) DqnMem_Set(str, 0, MAX); this = {}; }
+    void Clear        (Dqn::ZeroClear clear = Dqn::ZeroClear::No) { if (clear == Dqn::ZeroClear::Yes) DqnMem_Set(str, 0, MAX); *this = {}; }
 };
 
 template <unsigned int MAX>
@@ -8802,7 +8802,6 @@ DqnLockGuard::~DqnLockGuard()
 
 // XPlatform > #DqnJobQueue
 // =================================================================================================
-
 typedef void *DqnThreadCallbackInternal(void *threadParam);
 usize DQN_JOB_QUEUE_INTERNAL_THREAD_DEFAULT_STACK_SIZE = 0;
 
