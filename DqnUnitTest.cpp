@@ -3,13 +3,7 @@
 #include <ws2tcpip.h>
 #include <Windows.h>
 
-#if (defined(_WIN32) || defined(_WIN64))
-    #define DQN_WIN32_IMPLEMENTATION
-    #include "Windows.h"
-#endif
-
 #if defined(__linux__)
-    #define DQN_UNIX_IMPLEMENTATION
     #define HANDMADE_MATH_NO_SSE
 #endif
 
@@ -19,6 +13,7 @@
 #endif
 
 #define DQN_PLATFORM_HEADER
+#define DQN_PLATFORM_IMPLEMENTATION
 #define DQN_IMPLEMENTATION
 #include "dqn.h"
 
@@ -1829,9 +1824,9 @@ void DqnFile_Test()
     if (1)
     {
         i32 numFiles;
-#if defined(DQN_UNIX_IMPLEMENTATION)
+#if defined(DQN___IS_UNIX)
         char **filelist = DqnFile::ListDir(".", &numFiles);
-#elif defined(DQN_WIN32_IMPLEMENTATION)
+#else
         char **filelist = DqnFile::ListDir("*", &numFiles);
 #endif
 
@@ -1855,19 +1850,18 @@ void DqnTimer_Test()
     {
 
         f64 startInMs = DqnTimer_NowInMs();
-#if defined(DQN_UNIX_PLATFORM)
+#if defined(DQN__IS_UNIX)
         u32 sleepTimeInMs = 1;
         sleep(sleepTimeInMs);
         Log("start: %f, end: %f", startInMs, endInMs);
-        DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
 
-#elif defined(DQN_WIN32_PLATFORM)
+#else
         u32 sleepTimeInMs = 1000;
         Sleep(sleepTimeInMs);
-
-        DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
 #endif
         f64 endInMs = DqnTimer_NowInMs();
+        DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
+
         Log(Status::Ok, "Timer advanced in time over 1 second");
         globalIndent++;
         Log("Start: %f, End: %f", startInMs, endInMs);
@@ -1888,9 +1882,9 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue, 
         globalDebugCounter++;
 
         // u32 number = globalDebugCounter;
-#if defined(DQN_WIN32_IMPLEMENTATION)
+#if defined(DQN__IS_WIN32)
         // Log("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d", GetCurrentThreadId(), number);
-#elif defined(DQN_UNIX_IMPLEMENTATION)
+#else
         // Log("JobQueueDebugCallbackIncrementCounter(): Thread unix: Incrementing Number: %d", number);
 #endif
     }

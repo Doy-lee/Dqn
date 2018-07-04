@@ -1,18 +1,11 @@
 // Dqn.h Usage
 // =================================================================================================
 /*
-    #define DQN_IMPLEMENTATION       // Enable the implementation
-
     // Define this wherever you want access to DQN code that uses the platform.
-    #define DQN_PLATFORM_HEADER      // Enable function prototypes for xplatform/platform code
-
-    // NOTE: For platform code, it's one or the other or you will get compilation problems.
-    // Define this in ONE and only ONE file to enable the implementation of platform code.
-    // On Win32 you must link against user32.lib and kernel32.lib
-    #define DQN_WIN32_IMPLEMENTATION // Enable Win32 Code, but only if _WIN32 or _WIN64 is already defined. Also requires DQN_IMPLEMENTATION.
-    #define DQN_UNIX_IMPLEMENTATION  // Enable Unix Code, but only if __linux__ is already defined. Also requires DQN_IMPLEMENTATION.
-
-    #define DQN_MAKE_STATIC          // Make all functions be static
+    #define DQN_PLATFORM_HEADER         // Enable function prototypes for xplatform/platform code
+    #define DQN_IMPLEMENTATION          // Enable the implementation
+    #define DQN_PLATFORM_IMPLEMENTATION // Enable platform specific implementation on Win32 you must link against user32.lib and kernel32.lib
+    #define DQN_MAKE_STATIC             // Make all functions be static
     #include "dqn.h"
  */
 
@@ -81,16 +74,18 @@
 // implementation, platform specific implementations in the portable layer will get activated.
 #if (defined(_WIN32) || defined(_WIN64))
     #define DQN__IS_WIN32 1
-#elif defined(__linux__)
+#else
     #define DQN__IS_UNIX 1
 #endif
 
-#if defined(DQN__IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+#if defined(DQN_PLATFORM_IMPLEMENTATION)
     #define DQN__XPLATFORM_LAYER 1
-    #define DQN__WIN32_PLATFORM 1
-#elif defined(DQN__IS_UNIX) && defined(DQN_UNIX_IMPLEMENTATION)
-    #define DQN__XPLATFORM_LAYER 1
-    #define DQN__UNIX_PLATFORM 1
+
+    // #if defined(DQN__IS_WIN32)
+    //     #define DQN__WIN32_PLATFORM 1
+    // #else
+    //     #define DQN__UNIX_PLATFORM 1
+    // #endif
 #endif
 
 // #Portable Code
@@ -169,11 +164,23 @@ using f32 = float;
 
 // Produce a unique name with prefix and counter. i.e. where prefix is "data" then it gives "data1"
 #define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE2(prefix, __COUNTER__)
-
-#define DQN_DEFER_BLOCK(startFunc, ...) startFunc; for (isize i__ = 0; i__ < 1; i__++, __VA_ARGS__)
-#define DQN_DEFER(endFunc) for (isize i__ = 0; i__ < 1; i__++, endFunc)
-
 #define DQN_FOR_EACH(i, lim) for (isize (i) = 0; (i) < (isize)(lim); ++(i))
+
+template <typename Proc>
+struct DqnDefer__
+{
+     DqnDefer__(Proc p) : proc(p) { }
+    ~DqnDefer__() { proc(); }
+    Proc proc;
+};
+
+template <typename Proc>
+DqnDefer__<Proc> DqnDeferFunc__(Proc p)
+{
+    return DqnDefer__<Proc>(p);
+}
+
+#define DQN_DEFER(code) auto DQN_UNIQUE_NAME(dqnDeferLambda__) = DqnDeferFunc__([&]()->void {code;})
 
 // #Dqn Namespace
 namespace Dqn
@@ -182,353 +189,6 @@ enum struct ZeroClear   { No = 0, Yes = 1};
 enum struct IgnoreCase  { No = 0, Yes = 1};
 FILE_SCOPE const bool IS_DEBUG = true;
 }; // namespace Dqn
-
-// #Win32 Prototypes
-// =================================================================================================
-#ifdef DQN__WIN32_PLATFORM
-#ifndef _WINDOWS_
-using WORD      = unsigned short;
-using DWORD     = unsigned long;
-using BOOL      = int;
-using LONG      = long;
-using LONGLONG  = long long;
-using HANDLE    = void *;
-using HMODULE   = HANDLE;
-using HWND      = HANDLE;
-using UINT      = unsigned int;
-using ULONG     = unsigned long;
-using ULONGLONG = unsigned long long;
-using DWORD64   = unsigned long long;
-using BYTE      = unsigned char;
-
-u32    const MB_OK                         = 0x00000000L;
-HANDLE const INVALID_HANDLE_VALUE          = ((HANDLE)(LONG *)-1);
-u32    const MAX_PATH                      = 260;
-u32    const INFINITE                      = 0xFFFFFFFF;
-u32    const CP_UTF8                       = 65001;
-u32    const FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200;
-u32    const FORMAT_MESSAGE_FROM_SYSTEM    = 0x00001000;
-u32    const MEM_COMMIT                    = 0x00001000;
-u32    const MEM_RESERVE                   = 0x00002000;
-u32    const PAGE_READWRITE                = 0x04;
-u32    const MEM_DECOMMIT                  = 0x4000;
-u32    const MEM_RELEASE                   = 0x8000;
-
-struct RECT
-{
-    LONG left;
-    LONG top;
-    LONG right;
-    LONG bottom;
-};
-
-union LARGE_INTEGER
-{
-    struct { DWORD LowPart; LONG HighPart; };
-    struct { DWORD LowPart; LONG HighPart; } u;
-    LONGLONG QuadPart;
-};
-
-union ULARGE_INTEGER
-{
-  struct { DWORD LowPart; DWORD HighPart; };
-  struct { DWORD LowPart; DWORD HighPart; } u;
-  ULONGLONG QuadPart;
-};
-
-struct SECURITY_ATTRIBUTES
-{
-    DWORD length;
-    void *securityDescriptor;
-    BOOL inheritHandle;
-};
-
-struct PROCESS_INFORMATION
-{
-    void *hProcess;
-    void *hThread;
-    DWORD dwProcessId;
-    DWORD dwThreadId;
-};
-
-
-struct FILETIME
-{
-  DWORD dwLowDateTime;
-  DWORD dwHighDateTime;
-};
-
-struct WIN32_FILE_ATTRIBUTE_DATA
-{
-    DWORD dwFileAttributes;
-    FILETIME ftCreationTime;
-    FILETIME ftLastAccessTime;
-    FILETIME ftLastWriteTime;
-    DWORD nFileSizeHigh;
-    DWORD nFileSizeLow;
-};
-
-enum GET_FILEEX_INFO_LEVELS
-{
-    GetFileExInfoStandard,
-    GetFileExMaxInfoLevel
-};
-
-struct WIN32_FIND_DATAW
-{
-  DWORD    dwFileAttributes;
-  FILETIME ftCreationTime;
-  FILETIME ftLastAccessTime;
-  FILETIME ftLastWriteTime;
-  DWORD    nFileSizeHigh;
-  DWORD    nFileSizeLow;
-  DWORD    dwReserved0;
-  DWORD    dwReserved1;
-  wchar_t  cFileName[MAX_PATH];
-  wchar_t  cAlternateFileName[14];
-};
-
-struct LIST_ENTRY {
-   struct LIST_ENTRY *Flink;
-   struct LIST_ENTRY *Blink;
-};
-
-struct RTL_CRITICAL_SECTION_DEBUG
-{
-    WORD Type;
-    WORD CreatorBackTraceIndex;
-    struct CRITICAL_SECTION *CriticalSection;
-    LIST_ENTRY ProcessLocksList;
-    DWORD EntryCount;
-    DWORD ContentionCount;
-    DWORD Flags;
-    WORD CreatorBackTraceIndexHigh;
-    WORD SpareWORD;
-};
-
-struct CRITICAL_SECTION
-{
-    RTL_CRITICAL_SECTION_DEBUG *DebugInfo;
-    LONG LockCount;
-    LONG RecursionCount;
-    HANDLE OwningThread;
-    HANDLE LockSemaphore;
-    ULONG *SpinCount;
-};
-
-struct OVERLAPPED {
-  ULONG *Internal;
-  ULONG *InternalHigh;
-  union {
-    struct {
-      DWORD Offset;
-      DWORD OffsetHigh;
-    };
-    void  *Pointer;
-  };
-  HANDLE    hEvent;
-};
-
-struct SYSTEM_INFO {
-  union
-  {
-    DWORD  dwOemId;
-    struct
-    {
-      WORD wProcessorArchitecture;
-      WORD wReserved;
-    };
-  };
-  DWORD  dwPageSize;
-  void  *lpMinimumApplicationAddress;
-  void  *lpMaximumApplicationAddress;
-  DWORD *dwActiveProcessorMask;
-  DWORD  dwNumberOfProcessors;
-  DWORD  dwProcessorType;
-  DWORD  dwAllocationGranularity;
-  WORD   wProcessorLevel;
-  WORD   wProcessorRevision;
-};
-
-enum LOGICAL_PROCESSOR_RELATIONSHIP
-{
-    RelationProcessorCore,
-    RelationNumaNode,
-    RelationCache,
-    RelationProcessorPackage,
-    RelationGroup,
-    RelationAll = 0xffff
-};
-
-typedef unsigned long *KAFFINITY;
-struct GROUP_AFFINITY {
-    KAFFINITY Mask;
-    WORD   Group;
-    WORD   Reserved[3];
-};
-
-struct PROCESSOR_RELATIONSHIP
-{
-    BYTE  Flags;
-    BYTE  EfficiencyClass;
-    BYTE  Reserved[20];
-    WORD  GroupCount;
-    GROUP_AFFINITY GroupMask[1];
-};
-
-struct NUMA_NODE_RELATIONSHIP {
-    DWORD NodeNumber;
-    BYTE  Reserved[20];
-    GROUP_AFFINITY GroupMask;
-};
-
-enum PROCESSOR_CACHE_TYPE
-{
-    CacheUnified,
-    CacheInstruction,
-    CacheData,
-    CacheTrace
-};
-
-struct CACHE_RELATIONSHIP
-{
-    BYTE Level;
-    BYTE Associativity;
-    WORD LineSize;
-    DWORD CacheSize;
-    PROCESSOR_CACHE_TYPE Type;
-    BYTE Reserved[20];
-    GROUP_AFFINITY GroupMask;
-};
-
-struct PROCESSOR_GROUP_INFO
-{
-    BYTE MaximumProcessorCount;
-    BYTE ActiveProcessorCount;
-    BYTE Reserved[38];
-    KAFFINITY ActiveProcessorMask;
-};
-
-struct GROUP_RELATIONSHIP
-{
-    WORD MaximumGroupCount;
-    WORD ActiveGroupCount;
-    BYTE Reserved[20];
-    PROCESSOR_GROUP_INFO GroupInfo[1];
-};
-
-struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX
-{
-    LOGICAL_PROCESSOR_RELATIONSHIP Relationship;
-    DWORD Size;
-    union
-    {
-        PROCESSOR_RELATIONSHIP Processor;
-        NUMA_NODE_RELATIONSHIP NumaNode;
-        CACHE_RELATIONSHIP Cache;
-        GROUP_RELATIONSHIP Group;
-    };
-};
-
-
-typedef DWORD (*LPTHREAD_START_ROUTINE)(void *lpThreadParameter);
-
-DWORD64 __rdtsc();
-
-void    DeleteCriticalSection           (CRITICAL_SECTION *lpCriticalSection);
-BOOL    DeleteFileA                     (char    const *lpFileName); // TODO(doyle): Wide versions only
-BOOL    DeleteFileW                     (wchar_t const *lpFileName);
-BOOL    CloseHandle                     (HANDLE hObject);
-BOOL    CopyFileA                       (char    const *lpExistingFileName, char const *lpNewFileName, BOOL bFailIfExists);
-BOOL    CopyFileW                       (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, BOOL bFailIfExists);
-BOOL    CloseHandle                     (HANDLE *hObject);
-HANDLE  CreateFileW                     (wchar_t const *lpFileName,
-                                         DWORD dwDesiredAccess,
-                                         DWORD dwShareMode,
-                                         SECURITY_ATTRIBUTES *lpSecurityAttributes,
-                                         DWORD dwCreationDisposition,
-                                         DWORD dwFlagsAndAttributes,
-                                         HANDLE hTemplateFile);
-HANDLE  CreateSemaphoreA                (SECURITY_ATTRIBUTES *lpSemaphoreAttributes,
-                                         long lInitialCount,
-                                         long lMaximumCount,
-                                         char const *lpName);
-HANDLE  CreateThread                    (SECURITY_ATTRIBUTES *lpThreadAttributes,
-                                         size_t dwStackSize,
-                                         LPTHREAD_START_ROUTINE lpStartAddress,
-                                         void *lpParameter,
-                                         DWORD dwCreationFlags,
-                                         DWORD *lpThreadId);
-void    EnterCriticalSection            (CRITICAL_SECTION *lpCriticalSection);
-BOOL    FindClose                       (HANDLE hFindFile);
-HANDLE  FindFirstFileW                  (wchar_t const *lpFileName, WIN32_FIND_DATAW *lpFindFileData);
-BOOL    FindNextFileW                   (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
-DWORD   FormatMessageA                  (DWORD dwFlags,
-                                         void const *lpSource,
-                                         DWORD dwMessageId,
-                                         DWORD dwLanguageId,
-                                         char *lpBuffer,
-                                         DWORD nSize,
-                                         va_list *Arguments);
-BOOL    GetClientRect                   (HWND hWnd, RECT *lpRect);
-BOOL    GetExitCodeProcess              (HANDLE *hProcess, DWORD *lpExitCode);
-BOOL    GetFileSizeEx                   (HANDLE hFile, LARGE_INTEGER *lpFileSize);
-BOOL    GetFileAttributesExW            (wchar_t const *lpFileName,
-                                         GET_FILEEX_INFO_LEVELS fInfoLevelId,
-                                         void *lpFileInformation);
-DWORD   GetLastError                    (void);
-DWORD   GetModuleFileNameA              (HMODULE hModule, char *lpFilename, DWORD nSize);
-void    GetNativeSystemInfo             (SYSTEM_INFO *lpSystemInfo);
-BOOL    GetLogicalProcessorInformationEx(LOGICAL_PROCESSOR_RELATIONSHIP RelationshipType,
-                                         SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *Buffer,
-                                         DWORD *ReturnedLength);
-BOOL    InitializeCriticalSectionEx     (CRITICAL_SECTION *lpCriticalSection,
-                                         DWORD dwSpinCount,
-                                         DWORD Flags);
-long    InterlockedAdd                  (long volatile *Addend, long Value);
-long    InterlockedCompareExchange      (long volatile *Destination, long Exchange, long Comparand);
-void    LeaveCriticalSection            (CRITICAL_SECTION *lpCriticalSection);
-int     MessageBoxA                     (HWND hWnd, char const *lpText, char const *lpCaption, UINT uType);
-int     MultiByteToWideChar             (unsigned int CodePage,
-                                         DWORD dwFlags,
-                                         char const *lpMultiByteStr,
-                                         int cbMultiByte,
-                                         wchar_t *lpWideCharStr,
-                                         int cchWideChar);
-void    OutputDebugStringA              (char const *lpOutputString);
-BOOL    ReadFile                        (HANDLE hFile,
-                                         void *lpBuffer,
-                                         DWORD nNumberOfBytesToRead,
-                                         DWORD *lpNumberOfBytesRead,
-                                         OVERLAPPED *lpOverlapped);
-BOOL    ReleaseSemaphore                (HANDLE hSemaphore, long lReleaseCount, long *lpPreviousCount);
-BOOL    QueryPerformanceFrequency       (LARGE_INTEGER *lpFrequency);
-BOOL    QueryPerformanceCounter         (LARGE_INTEGER *lpPerformanceCount);
-DWORD   WaitForSingleObject             (HANDLE *hHandle, DWORD dwMilliseconds);
-DWORD   WaitForSingleObjectEx           (HANDLE hHandle, DWORD dwMilliseconds, BOOL bAlertable);
-int     WideCharToMultiByte             (unsigned int CodePage,
-                                         DWORD dwFlags,
-                                         wchar_t const *lpWideCharStr,
-                                         int cchWideChar,
-                                         char *lpMultiByteStr,
-                                         int cbMultiByte,
-                                         char const *lpDefaultChar,
-                                         BOOL *lpUsedDefaultChar);
-void    Sleep                           (DWORD dwMilliseconds);
-BOOL    WriteFile                       (HANDLE hFile,
-                                         void *const lpBuffer,
-                                         DWORD nNumberOfBytesToWrite,
-                                         DWORD *lpNumberOfBytesWritten,
-                                         OVERLAPPED *lpOverlapped);
-void   *VirtualAlloc                    (void *lpAddress,
-                                         size_t dwSize,
-                                         DWORD  flAllocationType,
-                                         DWORD  flProtect);
-BOOL    VirtualFree                     (void *lpAddress,
-                                         size_t dwSize,
-                                         DWORD  dwFreeType);
-#endif // _WINDOWS_
-#endif // DQN__WIN32_PLATFORM
 
 // #External Code
 // =================================================================================================
@@ -539,104 +199,176 @@ BOOL    VirtualFree                     (void *lpAddress,
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnSprintf Public API - Cross-platform Sprintf Implementation
 ////////////////////////////////////////////////////////////////////////////////
-/*
-Public Domain library originally written by Jeff Roberts at RAD Game Tools
-- 2015/10/20.  Hereby placed in public domain.
-STB_Sprintf renamed to Dqn_Sprintf
+// stb_sprintf - v1.05 - public domain snprintf() implementation
+// originally by Jeff Roberts / RAD Game Tools, 2015/10/20
+// http://github.com/nothings/stb
+//
+// allowed types:  sc uidBboXx p AaGgEef n
+// lengths      :  h ll j z t I64 I32 I
+//
+// Contributors:
+//    Fabian "ryg" Giesen (reformatting)
+//
+// Contributors (bugfixes):
+//    github:d26435
+//    github:trex78
+//    Jari Komppa (SI suffixes)
+//    Rohit Nirmal
+//    Marcin Wojdyr
+//    Leonard Ritter
+//
+// LICENSE:
+//
+//   See end of file for license information.
 
+/*
+Single file sprintf replacement.
+Originally written by Jeff Roberts at RAD Game Tools - 2015/10/20.
+Hereby placed in public domain.
+This is a full sprintf replacement that supports everything that
+the C runtime sprintfs support, including float/double, 64-bit integers,
+hex floats, field parameters (%*.*d stuff), length reads backs, etc.
+Why would you need this if sprintf already exists?  Well, first off,
+it's *much* faster (see below). It's also much smaller than the CRT
+versions code-space-wise. We've also added some simple improvements
+that are super handy (commas in thousands, callbacks at buffer full,
+for example). Finally, the format strings for MSVC and GCC differ
+for 64-bit integers (among other small things), so this lets you use
+the same format strings in cross platform code.
+It uses the standard single file trick of being both the header file
+and the source itself. If you just include it normally, you just get
+the header file function definitions. To get the code, you include
+it from a C or C++ file and define STB_SPRINTF_IMPLEMENTATION first.
+It only uses va_args macros from the C runtime to do it's work. It
+does cast doubles to S64s and shifts and divides U64s, which does
+drag in CRT code on most platforms.
+It compiles to roughly 8K with float support, and 4K without.
+As a comparison, when using MSVC static libs, calling sprintf drags
+in 16K.
+API:
+====
+int stbsp_sprintf( char * buf, char const * fmt, ... )
+int stbsp_snprintf( char * buf, int count, char const * fmt, ... )
+  Convert an arg list into a buffer.  stbsp_snprintf always returns
+  a zero-terminated string (unlike regular snprintf).
+int stbsp_vsprintf( char * buf, char const * fmt, va_list va )
+int stbsp_vsnprintf( char * buf, int count, char const * fmt, va_list va )
+  Convert a va_list arg list into a buffer.  stbsp_vsnprintf always returns
+  a zero-terminated string (unlike regular snprintf).
+int stbsp_vsprintfcb( STBSP_SPRINTFCB * callback, void * user, char * buf, char const * fmt, va_list va )
+    typedef char * STBSP_SPRINTFCB( char const * buf, void * user, int len );
+  Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
+  Your callback can then copy the chars out, print them or whatever.
+  This function is actually the workhorse for everything else.
+  The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
+    // you return the next buffer to use or 0 to stop converting
+void stbsp_set_separators( char comma, char period )
+  Set the comma and period characters to use.
 FLOATS/DOUBLES:
 ===============
-This code uses a internal float->ascii conversion method that uses doubles with
-error correction (double-doubles, for ~105 bits of precision).  This conversion
-is round-trip perfect - that is, an atof of the values output here will give you
-the bit-exact double back.
-
-One difference is that our insignificant digits will be different than with MSVC
-or GCC (but they don't match each other either).  We also don't attempt to find
-the minimum length matching float (pre-MSVC15 doesn't either).
-
-If you don't need float or doubles at all, define STB_SPRINTF_NOFLOAT and you'll
-save 4K of code space.
-
+This code uses a internal float->ascii conversion method that uses
+doubles with error correction (double-doubles, for ~105 bits of
+precision).  This conversion is round-trip perfect - that is, an atof
+of the values output here will give you the bit-exact double back.
+One difference is that our insignificant digits will be different than
+with MSVC or GCC (but they don't match each other either).  We also
+don't attempt to find the minimum length matching float (pre-MSVC15
+doesn't either).
+If you don't need float or doubles at all, define STB_SPRINTF_NOFLOAT
+and you'll save 4K of code space.
 64-BIT INTS:
 ============
-This library also supports 64-bit integers and you can use MSVC style or GCC
-style indicators (%I64d or %lld).  It supports the C99 specifiers for usize and
-ptr_diff_t (%jd %zd) as well.
-
+This library also supports 64-bit integers and you can use MSVC style or
+GCC style indicators (%I64d or %lld).  It supports the C99 specifiers
+for size_t and ptr_diff_t (%jd %zd) as well.
 EXTRAS:
 =======
 Like some GCCs, for integers and floats, you can use a ' (single quote)
-specifier and commas will be inserted on the thousands: "%'d" on 12345 would
-print 12,345.
-
-For integers and floats, you can use a "$" specifier and the number will be
-converted to float and then divided to get kilo, mega, giga or tera and then
-printed, so "%$d" 1000 is "1.0 k", "%$.2d" 2536000 is "2.53 M", etc. For byte
-values, use two $:s, like "%$$d" to turn 2536000 to "2.42 Mi". If you prefer
-JEDEC suffixes to SI ones, use three $:s: "%$$$d" -> "2.42 M". To remove the
-space between the number and the suffix, add "_" specifier: "%_$d" -> "2.53M".
-
-In addition to octal and hexadecimal conversions, you can print integers in
-binary: "%b" for 256 would print 100.
+specifier and commas will be inserted on the thousands: "%'d" on 12345
+would print 12,345.
+For integers and floats, you can use a "$" specifier and the number
+will be converted to float and then divided to get kilo, mega, giga or
+tera and then printed, so "%$d" 1000 is "1.0 k", "%$.2d" 2536000 is
+"2.53 M", etc. For byte values, use two $:s, like "%$$d" to turn
+2536000 to "2.42 Mi". If you prefer JEDEC suffixes to SI ones, use three
+$:s: "%$$$d" -> "2.42 M". To remove the space between the number and the
+suffix, add "_" specifier: "%_$d" -> "2.53M".
+In addition to octal and hexadecimal conversions, you can print
+integers in binary: "%b" for 256 would print 100.
+PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
+===================================================================
+"%d" across all 32-bit ints (4.8x/4.0x faster than 32-/64-bit MSVC)
+"%24d" across all 32-bit ints (4.5x/4.2x faster)
+"%x" across all 32-bit ints (4.5x/3.8x faster)
+"%08x" across all 32-bit ints (4.3x/3.8x faster)
+"%f" across e-10 to e+10 floats (7.3x/6.0x faster)
+"%e" across e-10 to e+10 floats (8.1x/6.0x faster)
+"%g" across e-10 to e+10 floats (10.0x/7.1x faster)
+"%f" for values near e-300 (7.9x/6.5x faster)
+"%f" for values near e+300 (10.0x/9.1x faster)
+"%e" for values near e-300 (10.1x/7.0x faster)
+"%e" for values near e+300 (9.2x/6.0x faster)
+"%.320f" for values near e-300 (12.6x/11.2x faster)
+"%a" for random values (8.6x/4.3x faster)
+"%I64d" for 64-bits with 32-bit values (4.8x/3.4x faster)
+"%I64d" for 64-bits > 32-bit values (4.9x/5.5x faster)
+"%s%s%s" for 64 char strings (7.1x/7.3x faster)
+"...512 char string..." ( 35.0x/32.5x faster!)
 */
 
 #if defined(__has_feature)
-    #if __has_feature(address_sanitizer)
-        #define STBI__ASAN __attribute__((no_sanitize("address")))
-    #endif
+   #if __has_feature(address_sanitizer)
+      #define STBI__ASAN __attribute__((no_sanitize("address")))
+   #endif
 #endif
-
 #ifndef STBI__ASAN
-    #define STBI__ASAN
+#define STBI__ASAN
 #endif
 
 #ifdef STB_SPRINTF_STATIC
-    #define STBSP__PUBLICDEC static
-    #define STBSP__PUBLICDEF static STBI__ASAN
+#define STBSP__PUBLICDEC static
+#define STBSP__PUBLICDEF static STBI__ASAN
 #else
-    #ifdef __cplusplus
-        #define STBSP__PUBLICDEC extern "C"
-        #define STBSP__PUBLICDEF extern "C" STBI__ASAN
-    #else
-        #define STBSP__PUBLICDEC extern
-        #define STBSP__PUBLICDEF STBI__ASAN
-    #endif
+#ifdef __cplusplus
+#define STBSP__PUBLICDEC extern "C"
+#define STBSP__PUBLICDEF extern "C" STBI__ASAN
+#else
+#define STBSP__PUBLICDEC extern
+#define STBSP__PUBLICDEF STBI__ASAN
+#endif
 #endif
 
-#include <stdarg.h>  // for va_list()
+#include <stdarg.h> // for va_list()
 
 #ifndef STB_SPRINTF_MIN
-    #define STB_SPRINTF_MIN 512 // how many characters per callback
+#define STB_SPRINTF_MIN 512 // how many characters per callback
 #endif
+typedef char *STBSP_SPRINTFCB(char *buf, void *user, int len);
 
 #ifndef STB_SPRINTF_DECORATE
-    #define STB_SPRINTF_DECORATE(name) stbsp_##name  // define this before including if you want to change the names
+#define STB_SPRINTF_DECORATE(name) stbsp_##name // define this before including if you want to change the names
 #endif
 
 // Convert a va_list arg list into a buffer. vsnprintf always returns a zero-terminated string (unlike regular snprintf).
 // return: The number of characters copied into the buffer
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf) (char *buf, char const *fmt, va_list va);
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf)(char *buf, char const *fmt, va_list va);
 STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsnprintf)(char *buf, int count, char const *fmt, va_list va);
 
 // Write format string to buffer. It always writes the whole string and appends a null.
 // return: The number of characters copied into the buffer not including the null terminator.
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf) (char *buf, char const *fmt, ...);
-
-// snprintf() always returns a zero-terminated string (unlike regular snprintf).
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf)(char *buf, char const *fmt, ...);
 STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char const *fmt, ...);
 
+// snprintf() always returns a zero-terminated string (unlike regular snprintf).
 // Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
 // Your callback can then copy the chars out, print them or whatever.
 // This function is actually the workhorse for everything else.
 // The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
 // You return the next buffer to use or 0 to stop converting
-typedef char *STBSP_SPRINTFCB(char *buf, void *user, int len);
-STBSP__PUBLICDEF int  STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB* callback, void *user, char *buf, char const *fmt, va_list va);
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va);
 
 // Set the comma and period characters to use.
 STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
-
 #endif // STB_SPRINTF_H_INCLUDE
 
 // #DqnAssert API
@@ -1147,9 +879,9 @@ struct DqnArray
     void  Free       ()                                           { if (data) { memAPI->Free(data); } *this = {}; }
     T    *Front      ()                                           { DQN_ASSERT(count > 0); return data + 0; }
     T    *Back       ()                                           { DQN_ASSERT(count > 0); return data + (count - 1); }
-    void  Resize     (isize newCount)                             { if (newCount > max) Reserve(GrowCapacity_(newCount)); count = newCount; }
-    void  Resize     (isize newCount, T const *v)                 { if (newCount > max) Reserve(GrowCapacity_(newCount)); if (newCount > count) for (isize n = count; n < newCount; n++) data[n] = *v; count = newCount; }
-    void  Reserve    (isize newMax);
+    bool  Resize     (isize newCount)                             { if (newCount > max) Reserve(GrowCapacity_(newCount)); count = newCount; }
+    bool  Resize     (isize newCount, T const *v)                 { if (newCount > max) Reserve(GrowCapacity_(newCount)); if (newCount > count) for (isize n = count; n < newCount; n++) data[n] = *v; count = newCount; }
+    bool  Reserve    (isize newMax);
     T    *Push       (T const &v)                                 { return Insert(count, &v, 1); }
     T    *Push       (T const *v, isize numItems = 1)             { return Insert(count,  v, numItems); }
     void  Pop        ()                                           { if (count > 0) count--; }
@@ -1173,18 +905,22 @@ template<typename T> T *DqnArray<T>::Insert(isize index, T const *v, isize numIt
     index                = DQN_MIN(DQN_MAX(index, 0), count);
     isize const newCount = count + numItems;
 
-    if (newCount >= max) Reserve(GrowCapacity_(newCount));
+    if (newCount >= max && !Reserve(GrowCapacity_(newCount)))
+    {
+        return nullptr;
+    }
 
-    T *src  = data + index;
-    T *dest = src + numItems;
-    if (src < dest)
-        memmove(dest, src, ((data + count) - src) * sizeof(T));
+    T *start     = data + index;
+    T const *end = data + count;
+    count        = newCount;
+
+    if (start < end)
+        memmove(start + numItems, start, numItems * sizeof(T));
 
     for (isize i = 0; i < numItems; i++)
-        src[i] = v[i];
+        start[i] = v[i];
 
-    count = newCount;
-    return src;
+    return start;
 }
 
 template <typename T> void DqnArray<T>::EraseStable(isize index)
@@ -1195,27 +931,24 @@ template <typename T> void DqnArray<T>::EraseStable(isize index)
     count--;
 }
 
-template <typename T> void DqnArray<T>::Reserve(isize newMax)
+template <typename T> bool DqnArray<T>::Reserve(isize newMax)
 {
-    // TODO(doyle): Super hard asserts
-    if (newMax <= max) return;
+    if (newMax <= max) return true;
+
     if (data)
     {
         T *newData = (T *)memAPI->Realloc(data, max * sizeof(T), newMax * sizeof(T));
-        DQN_ASSERT(newData);
         if (newData)
         {
             data = newData;
             max  = newMax;
         }
-    }
-    else
-    {
-      data = (T *)memAPI->Alloc(newMax * sizeof(T));
-      max  = newMax;
-      DQN_ASSERT(data);
+        return newData;
     }
 
+    data = (T *)memAPI->Alloc(newMax * sizeof(T));
+    max  = newMax;
+    return data;
 }
 
 #if 0
@@ -2170,34 +1903,9 @@ template <unsigned int MAX>
 FILE_SCOPE int
 DqnFixedString__VSprintf(DqnFixedString<MAX> *me, char const *fmt, va_list argList, int bufOffset)
 {
-    int result = 0;
-    if (Dqn::IS_DEBUG)
-    {
-        LOCAL_PERSIST char tmp[STB_SPRINTF_MIN];
-        auto SprintfCallback = [](char *buf, void *user, int len) -> char *
-        {
-            (void)len; (void)user;
-            return buf;
-        };
-
-        char *bufStart           = me->str + bufOffset;
-        i32 const reqLen         = Dqn_vsprintfcb(SprintfCallback, nullptr, tmp, fmt, argList) + 1 /*NULL*/;
-        i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
-
-        i32 numToCopy            = DQN_MIN(remainingSpace, reqLen);
-        i32 numCopiedNotInclNull = Dqn_vsnprintf(bufStart, numToCopy, fmt, argList);
-        me->len                  = (bufOffset == 0) ? numCopiedNotInclNull : me->len + numCopiedNotInclNull;
-
-        DQN_ASSERT(numToCopy == (numCopiedNotInclNull + 1));
-        result = numCopiedNotInclNull;
-    }
-    else
-    {
-        char *bufStart           = me->str + bufOffset;
-        i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
-        result = Dqn_vsnprintf(bufStart, remainingSpace, fmt, argList);
-    }
-
+    char *bufStart           = me->str + bufOffset;
+    i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
+    int result = Dqn_vsnprintf(bufStart, remainingSpace, fmt, argList);
     return result;
 }
 
@@ -2293,12 +2001,12 @@ struct DqnHashTable
 template <typename T>
 bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemAPI *const api)
 {
-    usize arrayOfPtrsSize = sizeof(*this->entries) * numTableEntries;
-    auto *arrayOfPtrs      = (u8 *)api->Alloc(arrayOfPtrsSize);
+    isize arrayOfPtrsSize = (isize)(sizeof(*this->entries) * numTableEntries);
+    auto *arrayOfPtrs   = (u8 *)api->Alloc((isize)arrayOfPtrsSize);
     if (!arrayOfPtrs) return false;
 
-    usize usedEntriesSize = sizeof(*this->usedEntries) * numTableEntries;
-    auto *usedEntriesPtr   = (u8 *)api->Alloc(usedEntriesSize);
+    isize usedEntriesSize  = (isize)(sizeof(*this->usedEntries) * numTableEntries);
+    auto *usedEntriesPtr = (u8 *)api->Alloc(usedEntriesSize);
     if (!usedEntriesPtr)
     {
         api->Free((void *)arrayOfPtrs, arrayOfPtrsSize);
@@ -2589,7 +2297,7 @@ void DqnHashTable<T>::Free()
 
     // Free usedEntries list
     {
-        usize sizeToFree = sizeof(*this->usedEntries) * this->numEntries;
+        isize sizeToFree = (isize)(sizeof(*this->usedEntries) * this->numEntries);
         this->memAPI->Free(this->usedEntries, sizeToFree);
     }
 
@@ -2608,7 +2316,7 @@ void DqnHashTable<T>::Free()
 
     // Free the array of ptrs
     {
-        usize sizeToFree = ENTRY_SIZE * this->numEntries;
+        isize sizeToFree = (isize)(ENTRY_SIZE * this->numEntries);
         this->memAPI->Free(this->entries, sizeToFree);
     }
 
@@ -2656,10 +2364,10 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
     if (newNumEntries == this->numEntries) return true;
 
     Entry **newEntries    = {};
-    usize newEntriesSize = sizeof(*this->entries) * newNumEntries;
+    isize newEntriesSize = (isize)(sizeof(*this->entries) * newNumEntries);
 
     i64 *newUsedEntries       = {};
-    usize newUsedEntriesSize = sizeof(*this->usedEntries) * newNumEntries;
+    isize newUsedEntriesSize = (isize)(sizeof(*this->usedEntries) * newNumEntries);
     i64 newUsedEntriesIndex   = 0;
 
     // NOTE: If you change allocation order, be sure to change the free order.
@@ -2713,13 +2421,13 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
 
     // Free the old entry list
     {
-        usize freeSize = sizeof(*this->entries) * this->numEntries;
+        usize freeSize = (isize)(sizeof(*this->entries) * this->numEntries);
         this->memAPI->Free(this->entries, freeSize);
     }
 
     // Free the old used entry list
     {
-        usize freeSize = sizeof(*this->usedEntries) * this->numEntries;
+        usize freeSize = (isize)(sizeof(*this->usedEntries) * this->numEntries);
         this->memAPI->Free(this->usedEntries, freeSize);
     }
 
@@ -2885,14 +2593,10 @@ DQN_FILE_SCOPE f64  DqnTimer_NowInS ();
 // =================================================================================================
 typedef struct DqnLock
 {
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     CRITICAL_SECTION win32Handle;
-
-#elif defined(DQN__UNIX_PLATFORM)
-    pthread_mutex_t unixHandle;
-
 #else
-    #error Unknown platform
+    pthread_mutex_t  unixHandle;
 #endif
 
     // Win32 only, when trying to acquire a locked lock, it is the number of spins permitted
@@ -2965,13 +2669,8 @@ struct DqnJobQueue
 
 #if defined(DQN__IS_WIN32)
     void *semaphore;
-
-#elif defined(DQN__IS_UNIX)
-    sem_t semaphore;
-
 #else
-    #error Unknown platform
-
+    sem_t semaphore;
 #endif
 
     // NOTE: Modified by main thread ONLY
@@ -3035,7 +2734,7 @@ DQN_FILE_SCOPE void DqnOS_GetThreadsAndCores(u32 *const numCores, u32 *const num
 // #Platform Specific API
 // =================================================================================================
 // Functions here are only available for the #defined sections (i.e. all functions in
-// DQN__WIN32_PLATFORM only have a valid implementation in Win32.
+// DQN__IS_WIN32 only have a valid implementation in Win32.
 
 #if defined(DQN__IS_WIN32)
 // Platform > #DqnWin32 API
@@ -3123,7 +2822,7 @@ DQN_FILE_SCOPE void DqnLog(char const *file, char const *functionName, i32 lineN
     char const *const formatStr = "%s:%s,%d: DqnLog: %s\n";
     fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
 
-    #if defined(DQN__WIN32_PLATFORM)
+    #if defined(DQN__IS_WIN32)
         DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, userMsg);
     #endif
 }
@@ -3158,7 +2857,7 @@ DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 l
     char const *const formatStr = ":%s:%s,%d(%s): DqnLog: %s\n";
     fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
 
-    #if defined(DQN__WIN32_PLATFORM)
+    #if defined(DQN__IS_WIN32)
         DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, expr, userMsg);
     #endif
 }
@@ -3622,7 +3321,7 @@ void DqnAllocatorMetadata::Init(bool boundsGuard)
         this->boundsGuardSize        = sizeof(HEAD_GUARD_VALUE);
         LOCAL_PERSIST DqnMemAPI heap = DqnMemAPI::HeapAllocator();
         this->allocations.memAPI     = &heap;
-        this->allocations.Reserve(128);
+        DQN_ASSERT(this->allocations.Reserve(128));
     }
     else
     {
@@ -6054,20 +5753,17 @@ FILE_SCOPE u64 DqnRnd__Murmur3Avalanche64(u64 h)
     return h;
 }
 
-#if defined(DQN__UNIX_PLATFORM)
+#if defined(DQN__IS_UNIX)
     #include <x86intrin.h> // __rdtsc
 #endif
 
 FILE_SCOPE u32 DqnRnd__MakeSeed()
 {
-#if defined(DQN__WIN32_PLATFORM) || defined(DQN__UNIX_PLATFORM)
+#if defined(DQN_PLATFORM_IMPLEMENTATION) && (defined(DQN__IS_WIN32) || defined(DQN__IS_UNIX))
     i64 numClockCycles = __rdtsc();
     return (u32)numClockCycles;
-#elif __ANDROID__
-    DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Android path not implemented yet");
-    return 0;
 #else
-    DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Non Win32 path not implemented yet");
+    DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return 0;
 #endif
 }
@@ -6270,7 +5966,7 @@ bool DqnString::InitLiteral(wchar_t const *cstr, DqnMemStack *stack)
 
 bool DqnString::InitLiteral(wchar_t const *cstr, DqnMemAPI *api)
 {
-#if defined(DQN__IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+#if defined(DQN__IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
     i32 reqLenInclNullTerminator = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
     if (!this->InitSize(reqLenInclNullTerminator - 1, api))
     {
@@ -6499,7 +6195,7 @@ void DqnString::Free()
 
 i32 DqnString::ToWChar(wchar_t *buf, i32 bufSize) const
 {
-#if defined(DQN__IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+#if defined(DQN__IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
     i32 result = DqnWin32_UTF8ToWChar(this->str, buf, bufSize);
     return result;
 
@@ -6515,7 +6211,7 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
     // TODO(doyle): Should the "in" string allow specifyign len? probably
     // Otherwise a c-string and a literal initiated string might have different lengths
     // to wchar will produce an unintuitive output
-#if defined(DQN__IS_WIN32) && defined(DQN_WIN32_IMPLEMENTATION)
+#if defined(DQN__IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
     i32 requiredLenInclNull = DqnWin32_UTF8ToWChar(this->str, nullptr, 0);
 
     i32 allocSize = sizeof(wchar_t) * requiredLenInclNull;
@@ -6831,64 +6527,13 @@ DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson *iterator)
 }
 
 
-// #DqnSprintf - STB_Sprintf
-// =================================================================================================
-/*
-Single file sprintf replacement.
-
-Originally written by Jeff Roberts at RAD Game Tools - 2015/10/20.  Hereby
-placed in public domain.
-
-This is a full sprintf replacement that supports everything that the C runtime
-sprintfs support, including float/double, 64-bit integers, hex floats, field
-parameters (%*.*d stuff), length reads backs, etc.
-
-Why would you need this if sprintf already exists?  Well, first off, it's *much*
-faster (see below). It's also much smaller than the CRT versions
-code-space-wise. We've also added some simple improvements that are super handy
-(commas in thousands, callbacks at buffer full, for example). Finally, the
-format strings for MSVC and GCC differ for 64-bit integers (among other small
-things), so this lets you use the same format strings in cross platform code.
-
-It uses the standard single file trick of being both the header file and the
-source itself. If you just include it normally, you just get the header file
-function definitions. To get the code, you include it from a C or C++ file and
-define STB_SPRINTF_IMPLEMENTATION first.
-
-It only uses va_args macros from the C runtime to do it's work. It does cast
-doubles to S64s and shifts and divides U64s, which does drag in CRT code on most
-platforms.
-
-It compiles to roughly 8K with float support, and 4K without.  As a comparison,
-when using MSVC static libs, calling sprintf drags in 16K.
-
-PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
-===================================================================
-"%d" across all 32-bit ints (4.8x/4.0x faster than 32-/64-bit MSVC)
-"%24d" across all 32-bit ints (4.5x/4.2x faster)
-"%x" across all 32-bit ints (4.5x/3.8x faster)
-"%08x" across all 32-bit ints (4.3x/3.8x faster)
-"%f" across e-10 to e+10 floats (7.3x/6.0x faster)
-"%e" across e-10 to e+10 floats (8.1x/6.0x faster)
-"%g" across e-10 to e+10 floats (10.0x/7.1x faster)
-"%f" for values near e-300 (7.9x/6.5x faster)
-"%f" for values near e+300 (10.0x/9.1x faster)
-"%e" for values near e-300 (10.1x/7.0x faster)
-"%e" for values near e+300 (9.2x/6.0x faster)
-"%.320f" for values near e-300 (12.6x/11.2x faster)
-"%a" for random values (8.6x/4.3x faster)
-"%I64d" for 64-bits with 32-bit values (4.8x/3.4x faster)
-"%I64d" for 64-bits > 32-bit values (4.9x/5.5x faster)
-"%s%s%s" for 64 char strings (7.1x/7.3x faster)
-"...512 char string..." ( 35.0x/32.5x faster!)
-*/
-
 #ifdef __GNUC__
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif
-
-#include <stdlib.h>  // for va_arg()
+// #DqnSprintf - STB_Sprintf
+// =================================================================================================
+#include <stdlib.h> // for va_arg()
 
 #define stbsp__uint32 unsigned int
 #define stbsp__int32 signed int
@@ -6902,7 +6547,7 @@ PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
 #endif
 #define stbsp__uint16 unsigned short
 
-#ifndef stbsp__uintptr 
+#ifndef stbsp__uintptr
 #if defined(__ppc64__) || defined(__aarch64__) || defined(_M_X64) || defined(__x86_64__) || defined(__x86_64)
 #define stbsp__uintptr stbsp__uint64
 #else
@@ -6910,13 +6555,13 @@ PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
 #endif
 #endif
 
-#ifndef STB_SPRINTF_MSVC_MODE  // used for MSVC2013 and earlier (MSVC2015 matches GCC)
-#if defined(_MSC_VER) && (_MSC_VER<1900)
+#ifndef STB_SPRINTF_MSVC_MODE // used for MSVC2013 and earlier (MSVC2015 matches GCC)
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
 #define STB_SPRINTF_MSVC_MODE
 #endif
 #endif
 
-#ifdef STB_SPRINTF_NOUNALIGNED  // define this before inclusion to force stbsp_sprintf to always use aligned accesses
+#ifdef STB_SPRINTF_NOUNALIGNED // define this before inclusion to force stbsp_sprintf to always use aligned accesses
 #define STBSP__UNALIGNED(code)
 #else
 #define STBSP__UNALIGNED(code) code
@@ -6924,19 +6569,21 @@ PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
 
 #ifndef STB_SPRINTF_NOFLOAT
 // internal float utility functions
-static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * len, char *out, stbsp__int32 * decimal_pos, double value, stbsp__uint32 frac_digits );
-static stbsp__int32 stbsp__real_to_parts( stbsp__int64 * bits, stbsp__int32 * expo, double value );
+static stbsp__int32 stbsp__real_to_str(char const **start, stbsp__uint32 *len, char *out, stbsp__int32 *decimal_pos, double value, stbsp__uint32 frac_digits);
+static stbsp__int32 stbsp__real_to_parts(stbsp__int64 *bits, stbsp__int32 *expo, double value);
 #define STBSP__SPECIAL 0x7000
 #endif
 
-static char stbsp__period='.';
-static char stbsp__comma=',';
-static char stbsp__digitpair[201]="00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899";
+static char stbsp__period = '.';
+static char stbsp__comma = ',';
+static char stbsp__digitpair[201] =
+   "0001020304050607080910111213141516171819202122232425262728293031323334353637383940414243444546474849505152535455565758596061626364656667686970717273747576"
+   "7778798081828384858687888990919293949596979899";
 
-STBSP__PUBLICDEF void STB_SPRINTF_DECORATE( set_separators )( char pcomma, char pperiod )
+STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char pcomma, char pperiod)
 {
-  stbsp__period=pperiod;
-  stbsp__comma=pcomma;
+   stbsp__period = pperiod;
+   stbsp__comma = pcomma;
 }
 
 #define STBSP__LEFTJUST 1
@@ -6955,582 +6602,1037 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE( set_separators )( char pcomma, char 
 
 static void stbsp__lead_sign(stbsp__uint32 fl, char *sign)
 {
-  sign[0] = 0;
-  if (fl&STBSP__NEGATIVE) {
-    sign[0]=1;
-    sign[1]='-';
-  } else if (fl&STBSP__LEADINGSPACE) {
-    sign[0]=1;
-    sign[1]=' ';
-  } else if (fl&STBSP__LEADINGPLUS) {
-    sign[0]=1;
-    sign[1]='+';
-  }
+   sign[0] = 0;
+   if (fl & STBSP__NEGATIVE) {
+      sign[0] = 1;
+      sign[1] = '-';
+   } else if (fl & STBSP__LEADINGSPACE) {
+      sign[0] = 1;
+      sign[1] = ' ';
+   } else if (fl & STBSP__LEADINGPLUS) {
+      sign[0] = 1;
+      sign[1] = '+';
+   }
 }
-  
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE( vsprintfcb )( STBSP_SPRINTFCB * callback, void * user, char * buf, char const * fmt, va_list va )
+
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va)
 {
-  static char hex[]="0123456789abcdefxp";
-  static char hexu[]="0123456789ABCDEFXP";
-  char * bf;
-  char const * f;
-  int tlen = 0;
+   static char hex[] = "0123456789abcdefxp";
+   static char hexu[] = "0123456789ABCDEFXP";
+   char *bf;
+   char const *f;
+   int tlen = 0;
 
-  bf = buf;
-  f = fmt;
-  for(;;)
-  {
-    stbsp__int32 fw,pr,tz; stbsp__uint32 fl;
+   bf = buf;
+   f = fmt;
+   for (;;) {
+      stbsp__int32 fw, pr, tz;
+      stbsp__uint32 fl;
 
-    // macros for the callback buffer stuff
-    #define stbsp__chk_cb_bufL(bytes) { int len = (int)(bf-buf); if ((len+(bytes))>=STB_SPRINTF_MIN) { tlen+=len; if (0==(bf=buf=callback(buf,user,len))) goto done; } }
-    #define stbsp__chk_cb_buf(bytes) { if ( callback ) { stbsp__chk_cb_bufL(bytes); } }
-    #define stbsp__flush_cb() { stbsp__chk_cb_bufL(STB_SPRINTF_MIN-1); } //flush if there is even one byte in the buffer
-    #define stbsp__cb_buf_clamp(cl,v) cl = v; if ( callback ) { int lg = STB_SPRINTF_MIN-(int)(bf-buf); if (cl>lg) cl=lg; }
+      // macros for the callback buffer stuff
+      #define stbsp__chk_cb_bufL(bytes)                        \
+         {                                                     \
+            int len = (int)(bf - buf);                         \
+            if ((len + (bytes)) >= STB_SPRINTF_MIN) {          \
+               tlen += len;                                    \
+               if (0 == (bf = buf = callback(buf, user, len))) \
+                  goto done;                                   \
+            }                                                  \
+         }
+      #define stbsp__chk_cb_buf(bytes)    \
+         {                                \
+            if (callback) {               \
+               stbsp__chk_cb_bufL(bytes); \
+            }                             \
+         }
+      #define stbsp__flush_cb()                      \
+         {                                           \
+            stbsp__chk_cb_bufL(STB_SPRINTF_MIN - 1); \
+         } // flush if there is even one byte in the buffer
+      #define stbsp__cb_buf_clamp(cl, v)                \
+         cl = v;                                        \
+         if (callback) {                                \
+            int lg = STB_SPRINTF_MIN - (int)(bf - buf); \
+            if (cl > lg)                                \
+               cl = lg;                                 \
+         }
 
-    // fast copy everything up to the next % (or end of string)
-    for(;;)
-    { 
-      while (((stbsp__uintptr)f)&3)
-      {
-       schk1: if (f[0]=='%') goto scandd;
-       schk2: if (f[0]==0) goto endfmt;
-        stbsp__chk_cb_buf(1); *bf++=f[0]; ++f;
-      } 
-      for(;;)
-      { 
-        // Check if the next 4 bytes contain %(0x25) or end of string.
-        // Using the 'hasless' trick:
-        // https://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
-        stbsp__uint32 v,c;
-        v=*(stbsp__uint32*)f; c=(~v)&0x80808080;
-        if (((v^0x25252525)-0x01010101)&c) goto schk1;
-        if ((v-0x01010101)&c) goto schk2; 
-        if (callback) if ((STB_SPRINTF_MIN-(int)(bf-buf))<4) goto schk1;
-        *(stbsp__uint32*)bf=v; bf+=4; f+=4;
+      // fast copy everything up to the next % (or end of string)
+      for (;;) {
+         while (((stbsp__uintptr)f) & 3) {
+         schk1:
+            if (f[0] == '%')
+               goto scandd;
+         schk2:
+            if (f[0] == 0)
+               goto endfmt;
+            stbsp__chk_cb_buf(1);
+            *bf++ = f[0];
+            ++f;
+         }
+         for (;;) {
+            // Check if the next 4 bytes contain %(0x25) or end of string.
+            // Using the 'hasless' trick:
+            // https://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
+            stbsp__uint32 v, c;
+            v = *(stbsp__uint32 *)f;
+            c = (~v) & 0x80808080;
+            if (((v ^ 0x25252525) - 0x01010101) & c)
+               goto schk1;
+            if ((v - 0x01010101) & c)
+               goto schk2;
+            if (callback)
+               if ((STB_SPRINTF_MIN - (int)(bf - buf)) < 4)
+                  goto schk1;
+            *(stbsp__uint32 *)bf = v;
+            bf += 4;
+            f += 4;
+         }
       }
-    } scandd:
+   scandd:
 
-    ++f;
+      ++f;
 
-    // ok, we have a percent, read the modifiers first
-    fw = 0; pr = -1; fl = 0; tz = 0;
-    
-    // flags
-    for(;;)
-    {
-      switch(f[0])
-      {
-        // if we have left justify
-        case '-': fl|=STBSP__LEFTJUST; ++f; continue;
-        // if we have leading plus
-        case '+': fl|=STBSP__LEADINGPLUS; ++f; continue; 
-        // if we have leading space
-        case ' ': fl|=STBSP__LEADINGSPACE; ++f; continue; 
-        // if we have leading 0x
-        case '#': fl|=STBSP__LEADING_0X; ++f; continue; 
-        // if we have thousand commas
-        case '\'': fl|=STBSP__TRIPLET_COMMA; ++f; continue; 
-        // if we have kilo marker (none->kilo->kibi->jedec)
-        case '$': 
-            if (fl&STBSP__METRIC_SUFFIX)
-            {
-                if (fl&STBSP__METRIC_1024)
-                {
-                    fl|=STBSP__METRIC_JEDEC;
-                }
-                else
-                {
-                    fl|=STBSP__METRIC_1024;
-                }
+      // ok, we have a percent, read the modifiers first
+      fw = 0;
+      pr = -1;
+      fl = 0;
+      tz = 0;
+
+      // flags
+      for (;;) {
+         switch (f[0]) {
+         // if we have left justify
+         case '-':
+            fl |= STBSP__LEFTJUST;
+            ++f;
+            continue;
+         // if we have leading plus
+         case '+':
+            fl |= STBSP__LEADINGPLUS;
+            ++f;
+            continue;
+         // if we have leading space
+         case ' ':
+            fl |= STBSP__LEADINGSPACE;
+            ++f;
+            continue;
+         // if we have leading 0x
+         case '#':
+            fl |= STBSP__LEADING_0X;
+            ++f;
+            continue;
+         // if we have thousand commas
+         case '\'':
+            fl |= STBSP__TRIPLET_COMMA;
+            ++f;
+            continue;
+         // if we have kilo marker (none->kilo->kibi->jedec)
+         case '$':
+            if (fl & STBSP__METRIC_SUFFIX) {
+               if (fl & STBSP__METRIC_1024) {
+                  fl |= STBSP__METRIC_JEDEC;
+               } else {
+                  fl |= STBSP__METRIC_1024;
+               }
+            } else {
+               fl |= STBSP__METRIC_SUFFIX;
             }
-            else
-            {
-                fl|=STBSP__METRIC_SUFFIX; 
-            }
-            ++f; continue; 
-        // if we don't want space between metric suffix and number
-        case '_': fl|=STBSP__METRIC_NOSPACE; ++f; continue;
-        // if we have leading zero
-        case '0': fl|=STBSP__LEADINGZERO; ++f; goto flags_done; 
-        default: goto flags_done;
+            ++f;
+            continue;
+         // if we don't want space between metric suffix and number
+         case '_':
+            fl |= STBSP__METRIC_NOSPACE;
+            ++f;
+            continue;
+         // if we have leading zero
+         case '0':
+            fl |= STBSP__LEADINGZERO;
+            ++f;
+            goto flags_done;
+         default: goto flags_done;
+         }
       }
-    }
-    flags_done:
-   
-    // get the field width
-    if ( f[0] == '*' ) {fw = va_arg(va,stbsp__uint32); ++f;} else { while (( f[0] >= '0' ) && ( f[0] <= '9' )) { fw = fw * 10 + f[0] - '0'; f++; } }
-    // get the precision
-    if ( f[0]=='.' ) { ++f; if ( f[0] == '*' ) {pr = va_arg(va,stbsp__uint32); ++f;} else { pr = 0; while (( f[0] >= '0' ) && ( f[0] <= '9' )) { pr = pr * 10 + f[0] - '0'; f++; } } } 
-    
-    // handle integer size overrides
-    switch(f[0])
-    {
+   flags_done:
+
+      // get the field width
+      if (f[0] == '*') {
+         fw = va_arg(va, stbsp__uint32);
+         ++f;
+      } else {
+         while ((f[0] >= '0') && (f[0] <= '9')) {
+            fw = fw * 10 + f[0] - '0';
+            f++;
+         }
+      }
+      // get the precision
+      if (f[0] == '.') {
+         ++f;
+         if (f[0] == '*') {
+            pr = va_arg(va, stbsp__uint32);
+            ++f;
+         } else {
+            pr = 0;
+            while ((f[0] >= '0') && (f[0] <= '9')) {
+               pr = pr * 10 + f[0] - '0';
+               f++;
+            }
+         }
+      }
+
+      // handle integer size overrides
+      switch (f[0]) {
       // are we halfwidth?
-      case 'h': fl|=STBSP__HALFWIDTH; ++f; break;
+      case 'h':
+         fl |= STBSP__HALFWIDTH;
+         ++f;
+         break;
       // are we 64-bit (unix style)
-      case 'l': ++f; if ( f[0]=='l') { fl|=STBSP__INTMAX; ++f; } break;
+      case 'l':
+         ++f;
+         if (f[0] == 'l') {
+            fl |= STBSP__INTMAX;
+            ++f;
+         }
+         break;
       // are we 64-bit on intmax? (c99)
-      case 'j': fl|=STBSP__INTMAX; ++f; break; 
-      // are we 64-bit on usize or ptrdiff_t? (c99)
-      case 'z': case 't': fl|=((sizeof(char*)==8)?STBSP__INTMAX:0); ++f; break; 
+      case 'j':
+         fl |= STBSP__INTMAX;
+         ++f;
+         break;
+      // are we 64-bit on size_t or ptrdiff_t? (c99)
+      case 'z':
+      case 't':
+         fl |= ((sizeof(char *) == 8) ? STBSP__INTMAX : 0);
+         ++f;
+         break;
       // are we 64-bit (msft style)
-      case 'I': if ( ( f[1]=='6') && ( f[2]=='4') ) { fl|=STBSP__INTMAX; f+=3; }
-                else if ( ( f[1]=='3') && ( f[2]=='2') ) { f+=3; }
-                else { fl|=((sizeof(void*)==8)?STBSP__INTMAX:0); ++f; } break;
+      case 'I':
+         if ((f[1] == '6') && (f[2] == '4')) {
+            fl |= STBSP__INTMAX;
+            f += 3;
+         } else if ((f[1] == '3') && (f[2] == '2')) {
+            f += 3;
+         } else {
+            fl |= ((sizeof(void *) == 8) ? STBSP__INTMAX : 0);
+            ++f;
+         }
+         break;
       default: break;
-    }
+      }
 
-    // handle each replacement
-    switch( f[0] )
-    {
-      #define STBSP__NUMSZ   512 // big enough for e308 (with commas) or e-307 
-      char num[STBSP__NUMSZ]; 
-      char lead[8]; 
-      char tail[8]; 
-      char *s;
-      char const *h;
-      stbsp__uint32 l,n,cs;
-      stbsp__uint64 n64;
-      #ifndef STB_SPRINTF_NOFLOAT      
-      double fv; 
-      #endif
-      stbsp__int32 dp; char const * sn;
+      // handle each replacement
+      switch (f[0]) {
+         #define STBSP__NUMSZ 512 // big enough for e308 (with commas) or e-307
+         char num[STBSP__NUMSZ];
+         char lead[8];
+         char tail[8];
+         char *s;
+         char const *h;
+         stbsp__uint32 l, n, cs;
+         stbsp__uint64 n64;
+#ifndef STB_SPRINTF_NOFLOAT
+         double fv;
+#endif
+         stbsp__int32 dp;
+         char const *sn;
 
       case 's':
-        // get the string
-        s = va_arg(va,char*); if (s==0) s = (char*)"null";
-        // get the length
-        sn = s;
-        for(;;)
-        { 
-          if ((((stbsp__uintptr)sn)&3)==0) break;
+         // get the string
+         s = va_arg(va, char *);
+         if (s == 0)
+            s = (char *)"null";
+         // get the length
+         sn = s;
+         for (;;) {
+            if ((((stbsp__uintptr)sn) & 3) == 0)
+               break;
          lchk:
-          if (sn[0]==0) goto ld;
-          ++sn;
-        }
-        n = 0xffffffff;
-        if (pr>=0) { n=(stbsp__uint32)(sn-s); if (n>=(stbsp__uint32)pr) goto ld; n=((stbsp__uint32)(pr-n))>>2; }
-        while(n) 
-        { 
-          stbsp__uint32 v=*(stbsp__uint32*)sn;
-          if ((v-0x01010101)&(~v)&0x80808080UL) goto lchk; 
-          sn+=4; 
-          --n;
-        }
-        goto lchk;
-       ld:
+            if (sn[0] == 0)
+               goto ld;
+            ++sn;
+         }
+         n = 0xffffffff;
+         if (pr >= 0) {
+            n = (stbsp__uint32)(sn - s);
+            if (n >= (stbsp__uint32)pr)
+               goto ld;
+            n = ((stbsp__uint32)(pr - n)) >> 2;
+         }
+         while (n) {
+            stbsp__uint32 v = *(stbsp__uint32 *)sn;
+            if ((v - 0x01010101) & (~v) & 0x80808080UL)
+               goto lchk;
+            sn += 4;
+            --n;
+         }
+         goto lchk;
+      ld:
 
-        l = (stbsp__uint32) ( sn - s );
-        // clamp to precision
-        if ( l > (stbsp__uint32)pr ) l = pr;
-        lead[0]=0; tail[0]=0; pr = 0; dp = 0; cs = 0;
-        // copy the string in
-        goto scopy;
+         l = (stbsp__uint32)(sn - s);
+         // clamp to precision
+         if (l > (stbsp__uint32)pr)
+            l = pr;
+         lead[0] = 0;
+         tail[0] = 0;
+         pr = 0;
+         dp = 0;
+         cs = 0;
+         // copy the string in
+         goto scopy;
 
       case 'c': // char
-        // get the character
-        s = num + STBSP__NUMSZ -1; *s = (char)va_arg(va,int);
-        l = 1;
-        lead[0]=0; tail[0]=0; pr = 0; dp = 0; cs = 0;
-        goto scopy;
+         // get the character
+         s = num + STBSP__NUMSZ - 1;
+         *s = (char)va_arg(va, int);
+         l = 1;
+         lead[0] = 0;
+         tail[0] = 0;
+         pr = 0;
+         dp = 0;
+         cs = 0;
+         goto scopy;
 
       case 'n': // weird write-bytes specifier
-        { int * d = va_arg(va,int*);
-        *d = tlen + (int)( bf - buf ); }
-        break;
+      {
+         int *d = va_arg(va, int *);
+         *d = tlen + (int)(bf - buf);
+      } break;
 
 #ifdef STB_SPRINTF_NOFLOAT
-      case 'A': // float
-      case 'a': // hex float
-      case 'G': // float
-      case 'g': // float
-      case 'E': // float
-      case 'e': // float
-      case 'f': // float
-        va_arg(va,double); // eat it
-        s = (char*)"No float";
-        l = 8;
-        lead[0]=0; tail[0]=0; pr = 0; dp = 0; cs = 0;
-        goto scopy;
+      case 'A':              // float
+      case 'a':              // hex float
+      case 'G':              // float
+      case 'g':              // float
+      case 'E':              // float
+      case 'e':              // float
+      case 'f':              // float
+         va_arg(va, double); // eat it
+         s = (char *)"No float";
+         l = 8;
+         lead[0] = 0;
+         tail[0] = 0;
+         pr = 0;
+         dp = 0;
+         cs = 0;
+         goto scopy;
 #else
-      case 'A': // float
-        h=hexu;  
-        goto hexfloat;
-
+      case 'A': // hex float
       case 'a': // hex float
-        h=hex;
-       hexfloat: 
-        fv = va_arg(va,double);
-        if (pr==-1) pr=6; // default is 6
-        // read the double into a string
-        if ( stbsp__real_to_parts( (stbsp__int64*)&n64, &dp, fv ) )
-          fl |= STBSP__NEGATIVE;
-  
-        s = num+64;
+         h = (f[0] == 'A') ? hexu : hex;
+         fv = va_arg(va, double);
+         if (pr == -1)
+            pr = 6; // default is 6
+         // read the double into a string
+         if (stbsp__real_to_parts((stbsp__int64 *)&n64, &dp, fv))
+            fl |= STBSP__NEGATIVE;
 
-        stbsp__lead_sign(fl, lead);
+         s = num + 64;
 
-        if (dp==-1023) dp=(n64)?-1022:0; else n64|=(((stbsp__uint64)1)<<52);
-        n64<<=(64-56);
-        if (pr<15) n64+=((((stbsp__uint64)8)<<56)>>(pr*4));
-        // add leading chars
-        
-        #ifdef STB_SPRINTF_MSVC_MODE
-        *s++='0';*s++='x';
-        #else
-        lead[1+lead[0]]='0'; lead[2+lead[0]]='x'; lead[0]+=2;
-        #endif
-        *s++=h[(n64>>60)&15]; n64<<=4;
-        if ( pr ) *s++=stbsp__period;
-        sn = s;
+         stbsp__lead_sign(fl, lead);
 
-        // print the bits
-        n = pr; if (n>13) n = 13; if (pr>(stbsp__int32)n) tz=pr-n; pr = 0;
-        while(n--) { *s++=h[(n64>>60)&15]; n64<<=4; }
+         if (dp == -1023)
+            dp = (n64) ? -1022 : 0;
+         else
+            n64 |= (((stbsp__uint64)1) << 52);
+         n64 <<= (64 - 56);
+         if (pr < 15)
+            n64 += ((((stbsp__uint64)8) << 56) >> (pr * 4));
+// add leading chars
 
-        // print the expo
-        tail[1]=h[17];
-        if (dp<0) { tail[2]='-'; dp=-dp;} else tail[2]='+';
-        n = (dp>=1000)?6:((dp>=100)?5:((dp>=10)?4:3));
-        tail[0]=(char)n;
-        for(;;) { tail[n]='0'+dp%10; if (n<=3) break; --n; dp/=10; }
+#ifdef STB_SPRINTF_MSVC_MODE
+         *s++ = '0';
+         *s++ = 'x';
+#else
+         lead[1 + lead[0]] = '0';
+         lead[2 + lead[0]] = 'x';
+         lead[0] += 2;
+#endif
+         *s++ = h[(n64 >> 60) & 15];
+         n64 <<= 4;
+         if (pr)
+            *s++ = stbsp__period;
+         sn = s;
 
-        dp = (int)(s-sn);
-        l = (int)(s-(num+64));
-        s = num+64;
-        cs = 1 + (3<<24);
-        goto scopy;
+         // print the bits
+         n = pr;
+         if (n > 13)
+            n = 13;
+         if (pr > (stbsp__int32)n)
+            tz = pr - n;
+         pr = 0;
+         while (n--) {
+            *s++ = h[(n64 >> 60) & 15];
+            n64 <<= 4;
+         }
+
+         // print the expo
+         tail[1] = h[17];
+         if (dp < 0) {
+            tail[2] = '-';
+            dp = -dp;
+         } else
+            tail[2] = '+';
+         n = (dp >= 1000) ? 6 : ((dp >= 100) ? 5 : ((dp >= 10) ? 4 : 3));
+         tail[0] = (char)n;
+         for (;;) {
+            tail[n] = '0' + dp % 10;
+            if (n <= 3)
+               break;
+            --n;
+            dp /= 10;
+         }
+
+         dp = (int)(s - sn);
+         l = (int)(s - (num + 64));
+         s = num + 64;
+         cs = 1 + (3 << 24);
+         goto scopy;
 
       case 'G': // float
-        h=hexu;
-        goto dosmallfloat;
-
       case 'g': // float
-        h=hex;
-       dosmallfloat:   
-        fv = va_arg(va,double);
-        if (pr==-1) pr=6; else if (pr==0) pr = 1; // default is 6
-        // read the double into a string
-        if ( stbsp__real_to_str( &sn, &l, num, &dp, fv, (pr-1)|0x80000000 ) )
-          fl |= STBSP__NEGATIVE;
+         h = (f[0] == 'G') ? hexu : hex;
+         fv = va_arg(va, double);
+         if (pr == -1)
+            pr = 6;
+         else if (pr == 0)
+            pr = 1; // default is 6
+         // read the double into a string
+         if (stbsp__real_to_str(&sn, &l, num, &dp, fv, (pr - 1) | 0x80000000))
+            fl |= STBSP__NEGATIVE;
 
-        // clamp the precision and delete extra zeros after clamp
-        n = pr;
-        if ( l > (stbsp__uint32)pr ) l = pr; while ((l>1)&&(pr)&&(sn[l-1]=='0')) { --pr; --l; }
+         // clamp the precision and delete extra zeros after clamp
+         n = pr;
+         if (l > (stbsp__uint32)pr)
+            l = pr;
+         while ((l > 1) && (pr) && (sn[l - 1] == '0')) {
+            --pr;
+            --l;
+         }
 
-        // should we use %e
-        if ((dp<=-4)||(dp>(stbsp__int32)n))
-        {
-          if ( pr > (stbsp__int32)l ) pr = l-1; else if ( pr ) --pr; // when using %e, there is one digit before the decimal
-          goto doexpfromg;
-        }
-        // this is the insane action to get the pr to match %g sematics for %f
-        if(dp>0) { pr=(dp<(stbsp__int32)l)?l-dp:0; } else { pr = -dp+((pr>(stbsp__int32)l)?l:pr); }
-        goto dofloatfromg;
+         // should we use %e
+         if ((dp <= -4) || (dp > (stbsp__int32)n)) {
+            if (pr > (stbsp__int32)l)
+               pr = l - 1;
+            else if (pr)
+               --pr; // when using %e, there is one digit before the decimal
+            goto doexpfromg;
+         }
+         // this is the insane action to get the pr to match %g sematics for %f
+         if (dp > 0) {
+            pr = (dp < (stbsp__int32)l) ? l - dp : 0;
+         } else {
+            pr = -dp + ((pr > (stbsp__int32)l) ? l : pr);
+         }
+         goto dofloatfromg;
 
       case 'E': // float
-        h=hexu;  
-        goto doexp;
-
       case 'e': // float
-        h=hex;
-       doexp:   
-        fv = va_arg(va,double);
-        if (pr==-1) pr=6; // default is 6
-        // read the double into a string
-        if ( stbsp__real_to_str( &sn, &l, num, &dp, fv, pr|0x80000000 ) )
-          fl |= STBSP__NEGATIVE;
-       doexpfromg: 
-        tail[0]=0; 
-        stbsp__lead_sign(fl, lead);
-        if ( dp == STBSP__SPECIAL ) { s=(char*)sn; cs=0; pr=0; goto scopy; }
-        s=num+64; 
-        // handle leading chars
-        *s++=sn[0];
+         h = (f[0] == 'E') ? hexu : hex;
+         fv = va_arg(va, double);
+         if (pr == -1)
+            pr = 6; // default is 6
+         // read the double into a string
+         if (stbsp__real_to_str(&sn, &l, num, &dp, fv, pr | 0x80000000))
+            fl |= STBSP__NEGATIVE;
+      doexpfromg:
+         tail[0] = 0;
+         stbsp__lead_sign(fl, lead);
+         if (dp == STBSP__SPECIAL) {
+            s = (char *)sn;
+            cs = 0;
+            pr = 0;
+            goto scopy;
+         }
+         s = num + 64;
+         // handle leading chars
+         *s++ = sn[0];
 
-        if (pr) *s++=stbsp__period;
+         if (pr)
+            *s++ = stbsp__period;
 
-        // handle after decimal
-        if ((l-1)>(stbsp__uint32)pr) l=pr+1;
-        for(n=1;n<l;n++) *s++=sn[n];
-        // trailing zeros
-        tz = pr-(l-1); pr=0;
-        // dump expo
-        tail[1]=h[0xe];
-        dp -= 1;
-        if (dp<0) { tail[2]='-'; dp=-dp;} else tail[2]='+';
-        #ifdef STB_SPRINTF_MSVC_MODE
-        n = 5;
-        #else
-        n = (dp>=100)?5:4;
-        #endif
-        tail[0]=(char)n;
-        for(;;) { tail[n]='0'+dp%10; if (n<=3) break; --n; dp/=10; }
-        cs = 1 + (3<<24); // how many tens
-        goto flt_lead;   
+         // handle after decimal
+         if ((l - 1) > (stbsp__uint32)pr)
+            l = pr + 1;
+         for (n = 1; n < l; n++)
+            *s++ = sn[n];
+         // trailing zeros
+         tz = pr - (l - 1);
+         pr = 0;
+         // dump expo
+         tail[1] = h[0xe];
+         dp -= 1;
+         if (dp < 0) {
+            tail[2] = '-';
+            dp = -dp;
+         } else
+            tail[2] = '+';
+#ifdef STB_SPRINTF_MSVC_MODE
+         n = 5;
+#else
+         n = (dp >= 100) ? 5 : 4;
+#endif
+         tail[0] = (char)n;
+         for (;;) {
+            tail[n] = '0' + dp % 10;
+            if (n <= 3)
+               break;
+            --n;
+            dp /= 10;
+         }
+         cs = 1 + (3 << 24); // how many tens
+         goto flt_lead;
 
       case 'f': // float
-        fv = va_arg(va,double);
-       doafloat: 
-        // do kilos
-        if (fl&STBSP__METRIC_SUFFIX) 
-        {
+         fv = va_arg(va, double);
+      doafloat:
+         // do kilos
+         if (fl & STBSP__METRIC_SUFFIX) {
             double divisor;
-            divisor=1000.0f;
-            if (fl&STBSP__METRIC_1024) divisor = 1024.0;
-            while(fl<0x4000000) { if ((fv<divisor) && (fv>-divisor)) break; fv/=divisor; fl+=0x1000000; }
-        }
-        if (pr==-1) pr=6; // default is 6
-        // read the double into a string
-        if ( stbsp__real_to_str( &sn, &l, num, &dp, fv, pr ) )
-          fl |= STBSP__NEGATIVE;
-        dofloatfromg:
-        tail[0]=0;
-        stbsp__lead_sign(fl, lead);
-        if ( dp == STBSP__SPECIAL ) { s=(char*)sn; cs=0; pr=0; goto scopy; }
-        s=num+64; 
-
-        // handle the three decimal varieties
-        if (dp<=0) 
-        { 
-          stbsp__int32 i;
-          // handle 0.000*000xxxx
-          *s++='0'; if (pr) *s++=stbsp__period; 
-          n=-dp; if((stbsp__int32)n>pr) n=pr; i=n; while(i) { if ((((stbsp__uintptr)s)&3)==0) break; *s++='0'; --i; } while(i>=4) { *(stbsp__uint32*)s=0x30303030; s+=4; i-=4; } while(i) { *s++='0'; --i; }
-          if ((stbsp__int32)(l+n)>pr) l=pr-n; i=l; while(i) { *s++=*sn++; --i; }
-          tz = pr-(n+l);
-          cs = 1 + (3<<24); // how many tens did we write (for commas below)
-        }
-        else
-        {
-          cs = (fl&STBSP__TRIPLET_COMMA)?((600-(stbsp__uint32)dp)%3):0;
-          if ((stbsp__uint32)dp>=l)
-          {
-            // handle xxxx000*000.0
-            n=0; for(;;) { if ((fl&STBSP__TRIPLET_COMMA) && (++cs==4)) { cs = 0; *s++=stbsp__comma; } else { *s++=sn[n]; ++n; if (n>=l) break; } }
-            if (n<(stbsp__uint32)dp)
-            {
-              n = dp - n;
-              if ((fl&STBSP__TRIPLET_COMMA)==0) { while(n) { if ((((stbsp__uintptr)s)&3)==0) break; *s++='0'; --n; }  while(n>=4) { *(stbsp__uint32*)s=0x30303030; s+=4; n-=4; } }
-              while(n) { if ((fl&STBSP__TRIPLET_COMMA) && (++cs==4)) { cs = 0; *s++=stbsp__comma; } else { *s++='0'; --n; } }
+            divisor = 1000.0f;
+            if (fl & STBSP__METRIC_1024)
+               divisor = 1024.0;
+            while (fl < 0x4000000) {
+               if ((fv < divisor) && (fv > -divisor))
+                  break;
+               fv /= divisor;
+               fl += 0x1000000;
             }
-            cs = (int)(s-(num+64)) + (3<<24); // cs is how many tens
-            if (pr) { *s++=stbsp__period; tz=pr;}
-          }
-          else
-          {
-            // handle xxxxx.xxxx000*000
-            n=0; for(;;) { if ((fl&STBSP__TRIPLET_COMMA) && (++cs==4)) { cs = 0; *s++=stbsp__comma; } else { *s++=sn[n]; ++n; if (n>=(stbsp__uint32)dp) break; } }
-            cs = (int)(s-(num+64)) + (3<<24); // cs is how many tens
-            if (pr) *s++=stbsp__period;
-            if ((l-dp)>(stbsp__uint32)pr) l=pr+dp;
-            while(n<l) { *s++=sn[n]; ++n; }
-            tz = pr-(l-dp);
-          }
-        }
-        pr = 0;
-        
-        // handle k,m,g,t
-        if (fl&STBSP__METRIC_SUFFIX) 
-        { 
-            char idx;
-            idx=1;
-            if (fl&STBSP__METRIC_NOSPACE)
-                idx=0;
-            tail[0]=idx; 
-            tail[1]=' '; 
-            { 
-                if (fl>>24) 
-                {   // SI kilo is 'k', JEDEC and SI kibits are 'K'.
-                    if (fl&STBSP__METRIC_1024)
-                        tail[idx+1]="_KMGT"[fl>>24]; 
-                    else
-                        tail[idx+1]="_kMGT"[fl>>24]; 
-                    idx++;
-                    // If printing kibits and not in jedec, add the 'i'.
-                    if (fl&STBSP__METRIC_1024&&!(fl&STBSP__METRIC_JEDEC))
-                    {
-                        tail[idx+1]='i';
-                        idx++;
-                    }
-                    tail[0]=idx;
-                } 
-            } 
-        };
+         }
+         if (pr == -1)
+            pr = 6; // default is 6
+         // read the double into a string
+         if (stbsp__real_to_str(&sn, &l, num, &dp, fv, pr))
+            fl |= STBSP__NEGATIVE;
+      dofloatfromg:
+         tail[0] = 0;
+         stbsp__lead_sign(fl, lead);
+         if (dp == STBSP__SPECIAL) {
+            s = (char *)sn;
+            cs = 0;
+            pr = 0;
+            goto scopy;
+         }
+         s = num + 64;
 
-        flt_lead:
-        // get the length that we copied
-        l = (stbsp__uint32) ( s-(num+64) );
-        s=num+64; 
-        goto scopy;
+         // handle the three decimal varieties
+         if (dp <= 0) {
+            stbsp__int32 i;
+            // handle 0.000*000xxxx
+            *s++ = '0';
+            if (pr)
+               *s++ = stbsp__period;
+            n = -dp;
+            if ((stbsp__int32)n > pr)
+               n = pr;
+            i = n;
+            while (i) {
+               if ((((stbsp__uintptr)s) & 3) == 0)
+                  break;
+               *s++ = '0';
+               --i;
+            }
+            while (i >= 4) {
+               *(stbsp__uint32 *)s = 0x30303030;
+               s += 4;
+               i -= 4;
+            }
+            while (i) {
+               *s++ = '0';
+               --i;
+            }
+            if ((stbsp__int32)(l + n) > pr)
+               l = pr - n;
+            i = l;
+            while (i) {
+               *s++ = *sn++;
+               --i;
+            }
+            tz = pr - (n + l);
+            cs = 1 + (3 << 24); // how many tens did we write (for commas below)
+         } else {
+            cs = (fl & STBSP__TRIPLET_COMMA) ? ((600 - (stbsp__uint32)dp) % 3) : 0;
+            if ((stbsp__uint32)dp >= l) {
+               // handle xxxx000*000.0
+               n = 0;
+               for (;;) {
+                  if ((fl & STBSP__TRIPLET_COMMA) && (++cs == 4)) {
+                     cs = 0;
+                     *s++ = stbsp__comma;
+                  } else {
+                     *s++ = sn[n];
+                     ++n;
+                     if (n >= l)
+                        break;
+                  }
+               }
+               if (n < (stbsp__uint32)dp) {
+                  n = dp - n;
+                  if ((fl & STBSP__TRIPLET_COMMA) == 0) {
+                     while (n) {
+                        if ((((stbsp__uintptr)s) & 3) == 0)
+                           break;
+                        *s++ = '0';
+                        --n;
+                     }
+                     while (n >= 4) {
+                        *(stbsp__uint32 *)s = 0x30303030;
+                        s += 4;
+                        n -= 4;
+                     }
+                  }
+                  while (n) {
+                     if ((fl & STBSP__TRIPLET_COMMA) && (++cs == 4)) {
+                        cs = 0;
+                        *s++ = stbsp__comma;
+                     } else {
+                        *s++ = '0';
+                        --n;
+                     }
+                  }
+               }
+               cs = (int)(s - (num + 64)) + (3 << 24); // cs is how many tens
+               if (pr) {
+                  *s++ = stbsp__period;
+                  tz = pr;
+               }
+            } else {
+               // handle xxxxx.xxxx000*000
+               n = 0;
+               for (;;) {
+                  if ((fl & STBSP__TRIPLET_COMMA) && (++cs == 4)) {
+                     cs = 0;
+                     *s++ = stbsp__comma;
+                  } else {
+                     *s++ = sn[n];
+                     ++n;
+                     if (n >= (stbsp__uint32)dp)
+                        break;
+                  }
+               }
+               cs = (int)(s - (num + 64)) + (3 << 24); // cs is how many tens
+               if (pr)
+                  *s++ = stbsp__period;
+               if ((l - dp) > (stbsp__uint32)pr)
+                  l = pr + dp;
+               while (n < l) {
+                  *s++ = sn[n];
+                  ++n;
+               }
+               tz = pr - (l - dp);
+            }
+         }
+         pr = 0;
+
+         // handle k,m,g,t
+         if (fl & STBSP__METRIC_SUFFIX) {
+            char idx;
+            idx = 1;
+            if (fl & STBSP__METRIC_NOSPACE)
+               idx = 0;
+            tail[0] = idx;
+            tail[1] = ' ';
+            {
+               if (fl >> 24) { // SI kilo is 'k', JEDEC and SI kibits are 'K'.
+                  if (fl & STBSP__METRIC_1024)
+                     tail[idx + 1] = "_KMGT"[fl >> 24];
+                  else
+                     tail[idx + 1] = "_kMGT"[fl >> 24];
+                  idx++;
+                  // If printing kibits and not in jedec, add the 'i'.
+                  if (fl & STBSP__METRIC_1024 && !(fl & STBSP__METRIC_JEDEC)) {
+                     tail[idx + 1] = 'i';
+                     idx++;
+                  }
+                  tail[0] = idx;
+               }
+            }
+         };
+
+      flt_lead:
+         // get the length that we copied
+         l = (stbsp__uint32)(s - (num + 64));
+         s = num + 64;
+         goto scopy;
 #endif
 
       case 'B': // upper binary
-        h = hexu;
-        goto binary;
-
       case 'b': // lower binary
-        h = hex;
-        binary:
-        lead[0]=0;
-        if (fl&STBSP__LEADING_0X) { lead[0]=2;lead[1]='0';lead[2]=h[0xb]; }
-        l=(8<<4)|(1<<8);
-        goto radixnum;
+         h = (f[0] == 'B') ? hexu : hex;
+         lead[0] = 0;
+         if (fl & STBSP__LEADING_0X) {
+            lead[0] = 2;
+            lead[1] = '0';
+            lead[2] = h[0xb];
+         }
+         l = (8 << 4) | (1 << 8);
+         goto radixnum;
 
       case 'o': // octal
-        h = hexu;
-        lead[0]=0;
-        if (fl&STBSP__LEADING_0X) { lead[0]=1;lead[1]='0'; }
-        l=(3<<4)|(3<<8);
-        goto radixnum;
+         h = hexu;
+         lead[0] = 0;
+         if (fl & STBSP__LEADING_0X) {
+            lead[0] = 1;
+            lead[1] = '0';
+         }
+         l = (3 << 4) | (3 << 8);
+         goto radixnum;
 
       case 'p': // pointer
-        fl |= (sizeof(void*)==8)?STBSP__INTMAX:0;
-        pr = sizeof(void*)*2;
-        fl &= ~STBSP__LEADINGZERO; // 'p' only prints the pointer with zeros
-        // drop through to X
-      
-      case 'X': // upper binary
-        h = hexu;
-        goto dohexb;
+         fl |= (sizeof(void *) == 8) ? STBSP__INTMAX : 0;
+         pr = sizeof(void *) * 2;
+         fl &= ~STBSP__LEADINGZERO; // 'p' only prints the pointer with zeros
+                                    // fall through - to X
 
-      case 'x': // lower binary
-        h = hex; dohexb:
-        l=(4<<4)|(4<<8);
-        lead[0]=0;
-        if (fl&STBSP__LEADING_0X) { lead[0]=2;lead[1]='0';lead[2]=h[16]; }
-       radixnum: 
-        // get the number
-        if ( fl&STBSP__INTMAX )
-          n64 = va_arg(va,stbsp__uint64);
-        else
-          n64 = va_arg(va,stbsp__uint32);
+      case 'X': // upper hex
+      case 'x': // lower hex
+         h = (f[0] == 'X') ? hexu : hex;
+         l = (4 << 4) | (4 << 8);
+         lead[0] = 0;
+         if (fl & STBSP__LEADING_0X) {
+            lead[0] = 2;
+            lead[1] = '0';
+            lead[2] = h[16];
+         }
+      radixnum:
+         // get the number
+         if (fl & STBSP__INTMAX)
+            n64 = va_arg(va, stbsp__uint64);
+         else
+            n64 = va_arg(va, stbsp__uint32);
 
-        s = num + STBSP__NUMSZ; dp = 0;
-        // clear tail, and clear leading if value is zero
-        tail[0]=0; if (n64==0) { lead[0]=0; if (pr==0) { l=0; cs = ( ((l>>4)&15)) << 24; goto scopy; } }
-        // convert to string
-        for(;;) { *--s = h[n64&((1<<(l>>8))-1)]; n64>>=(l>>8); if ( ! ( (n64) || ((stbsp__int32) ( (num+STBSP__NUMSZ) - s ) < pr ) ) ) break; if ( fl&STBSP__TRIPLET_COMMA) { ++l; if ((l&15)==((l>>4)&15)) { l&=~15; *--s=stbsp__comma; } } };
-        // get the tens and the comma pos
-        cs = (stbsp__uint32) ( (num+STBSP__NUMSZ) - s ) + ( ( ((l>>4)&15)) << 24 );
-        // get the length that we copied
-        l = (stbsp__uint32) ( (num+STBSP__NUMSZ) - s );
-        // copy it
-        goto scopy;
+         s = num + STBSP__NUMSZ;
+         dp = 0;
+         // clear tail, and clear leading if value is zero
+         tail[0] = 0;
+         if (n64 == 0) {
+            lead[0] = 0;
+            if (pr == 0) {
+               l = 0;
+               cs = (((l >> 4) & 15)) << 24;
+               goto scopy;
+            }
+         }
+         // convert to string
+         for (;;) {
+            *--s = h[n64 & ((1 << (l >> 8)) - 1)];
+            n64 >>= (l >> 8);
+            if (!((n64) || ((stbsp__int32)((num + STBSP__NUMSZ) - s) < pr)))
+               break;
+            if (fl & STBSP__TRIPLET_COMMA) {
+               ++l;
+               if ((l & 15) == ((l >> 4) & 15)) {
+                  l &= ~15;
+                  *--s = stbsp__comma;
+               }
+            }
+         };
+         // get the tens and the comma pos
+         cs = (stbsp__uint32)((num + STBSP__NUMSZ) - s) + ((((l >> 4) & 15)) << 24);
+         // get the length that we copied
+         l = (stbsp__uint32)((num + STBSP__NUMSZ) - s);
+         // copy it
+         goto scopy;
 
       case 'u': // unsigned
       case 'i':
       case 'd': // integer
-        // get the integer and abs it
-        if ( fl&STBSP__INTMAX )
-        {
-          stbsp__int64 i64 = va_arg(va,stbsp__int64); n64 = (stbsp__uint64)i64; if ((f[0]!='u') && (i64<0)) { n64=(stbsp__uint64)-i64; fl|=STBSP__NEGATIVE; }
-        }
-        else
-        {
-          stbsp__int32 i = va_arg(va,stbsp__int32); n64 = (stbsp__uint32)i; if ((f[0]!='u') && (i<0)) { n64=(stbsp__uint32)-i; fl|=STBSP__NEGATIVE; }
-        }
+         // get the integer and abs it
+         if (fl & STBSP__INTMAX) {
+            stbsp__int64 i64 = va_arg(va, stbsp__int64);
+            n64 = (stbsp__uint64)i64;
+            if ((f[0] != 'u') && (i64 < 0)) {
+               n64 = (stbsp__uint64)-i64;
+               fl |= STBSP__NEGATIVE;
+            }
+         } else {
+            stbsp__int32 i = va_arg(va, stbsp__int32);
+            n64 = (stbsp__uint32)i;
+            if ((f[0] != 'u') && (i < 0)) {
+               n64 = (stbsp__uint32)-i;
+               fl |= STBSP__NEGATIVE;
+            }
+         }
 
-        #ifndef STB_SPRINTF_NOFLOAT
-        if (fl&STBSP__METRIC_SUFFIX) { if (n64<1024) pr=0; else if (pr==-1) pr=1; fv=(double)(stbsp__int64)n64; goto doafloat; } 
-        #endif
+#ifndef STB_SPRINTF_NOFLOAT
+         if (fl & STBSP__METRIC_SUFFIX) {
+            if (n64 < 1024)
+               pr = 0;
+            else if (pr == -1)
+               pr = 1;
+            fv = (double)(stbsp__int64)n64;
+            goto doafloat;
+         }
+#endif
 
-        // convert to string
-        s = num+STBSP__NUMSZ; l=0; 
-        
-        for(;;)
-        {
-          // do in 32-bit chunks (avoid lots of 64-bit divides even with constant denominators)
-          char * o=s-8;
-          if (n64>=100000000) { n = (stbsp__uint32)( n64 % 100000000);  n64 /= 100000000; } else {n = (stbsp__uint32)n64; n64 = 0; }
-          if((fl&STBSP__TRIPLET_COMMA)==0) { while(n) { s-=2; *(stbsp__uint16*)s=*(stbsp__uint16*)&stbsp__digitpair[(n%100)*2]; n/=100; } }
-          while (n) { if ( ( fl&STBSP__TRIPLET_COMMA) && (l++==3) ) { l=0; *--s=stbsp__comma; --o; } else { *--s=(char)(n%10)+'0'; n/=10; } }
-          if (n64==0) { if ((s[0]=='0') && (s!=(num+STBSP__NUMSZ))) ++s; break; }
-          while (s!=o) if ( ( fl&STBSP__TRIPLET_COMMA) && (l++==3) ) { l=0; *--s=stbsp__comma; --o; } else { *--s='0'; }
-        }
+         // convert to string
+         s = num + STBSP__NUMSZ;
+         l = 0;
 
-        tail[0]=0;
-        stbsp__lead_sign(fl, lead);
+         for (;;) {
+            // do in 32-bit chunks (avoid lots of 64-bit divides even with constant denominators)
+            char *o = s - 8;
+            if (n64 >= 100000000) {
+               n = (stbsp__uint32)(n64 % 100000000);
+               n64 /= 100000000;
+            } else {
+               n = (stbsp__uint32)n64;
+               n64 = 0;
+            }
+            if ((fl & STBSP__TRIPLET_COMMA) == 0) {
+               do {
+                  s -= 2;
+                  *(stbsp__uint16 *)s = *(stbsp__uint16 *)&stbsp__digitpair[(n % 100) * 2];
+                  n /= 100;
+               } while (n);
+            }
+            while (n) {
+               if ((fl & STBSP__TRIPLET_COMMA) && (l++ == 3)) {
+                  l = 0;
+                  *--s = stbsp__comma;
+                  --o;
+               } else {
+                  *--s = (char)(n % 10) + '0';
+                  n /= 10;
+               }
+            }
+            if (n64 == 0) {
+               if ((s[0] == '0') && (s != (num + STBSP__NUMSZ)))
+                  ++s;
+               break;
+            }
+            while (s != o)
+               if ((fl & STBSP__TRIPLET_COMMA) && (l++ == 3)) {
+                  l = 0;
+                  *--s = stbsp__comma;
+                  --o;
+               } else {
+                  *--s = '0';
+               }
+         }
 
-        // get the length that we copied
-        l = (stbsp__uint32) ( (num+STBSP__NUMSZ) - s ); if ( l == 0 ) { *--s='0'; l = 1; }
-        cs = l + (3<<24);
-        if (pr<0) pr = 0;
+         tail[0] = 0;
+         stbsp__lead_sign(fl, lead);
 
-       scopy: 
-        // get fw=leading/trailing space, pr=leading zeros
-        if (pr<(stbsp__int32)l) pr = l;
-        n = pr + lead[0] + tail[0] + tz;
-        if (fw<(stbsp__int32)n) fw = n;
-        fw -= n;
-        pr -= l;
+         // get the length that we copied
+         l = (stbsp__uint32)((num + STBSP__NUMSZ) - s);
+         if (l == 0) {
+            *--s = '0';
+            l = 1;
+         }
+         cs = l + (3 << 24);
+         if (pr < 0)
+            pr = 0;
 
-        // handle right justify and leading zeros
-        if ( (fl&STBSP__LEFTJUST)==0 )
-        {
-          if (fl&STBSP__LEADINGZERO) // if leading zeros, everything is in pr
-          { 
-            pr = (fw>pr)?fw:pr;
-            fw = 0;
-          }
-          else
-          {
-            fl &= ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
-          }
-        }
+      scopy:
+         // get fw=leading/trailing space, pr=leading zeros
+         if (pr < (stbsp__int32)l)
+            pr = l;
+         n = pr + lead[0] + tail[0] + tz;
+         if (fw < (stbsp__int32)n)
+            fw = n;
+         fw -= n;
+         pr -= l;
 
-        // copy the spaces and/or zeros
-        if (fw+pr)
-        {
-          stbsp__int32 i; stbsp__uint32 c; 
+         // handle right justify and leading zeros
+         if ((fl & STBSP__LEFTJUST) == 0) {
+            if (fl & STBSP__LEADINGZERO) // if leading zeros, everything is in pr
+            {
+               pr = (fw > pr) ? fw : pr;
+               fw = 0;
+            } else {
+               fl &= ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
+            }
+         }
 
-          // copy leading spaces (or when doing %8.4d stuff)
-          if ( (fl&STBSP__LEFTJUST)==0 ) while(fw>0) { stbsp__cb_buf_clamp(i,fw); fw -= i; while(i) { if ((((stbsp__uintptr)bf)&3)==0) break; *bf++=' '; --i; } while(i>=4) { *(stbsp__uint32*)bf=0x20202020; bf+=4; i-=4; } while (i) {*bf++=' '; --i;} stbsp__chk_cb_buf(1); }
-        
-          // copy leader
-          sn=lead+1; while(lead[0]) { stbsp__cb_buf_clamp(i,lead[0]); lead[0] -= (char)i; while (i) {*bf++=*sn++; --i;} stbsp__chk_cb_buf(1); }
-          
-          // copy leading zeros
-          c = cs >> 24; cs &= 0xffffff;
-          cs = (fl&STBSP__TRIPLET_COMMA)?((stbsp__uint32)(c-((pr+cs)%(c+1)))):0;
-          while(pr>0) { stbsp__cb_buf_clamp(i,pr); pr -= i; if((fl&STBSP__TRIPLET_COMMA)==0) { while(i) { if ((((stbsp__uintptr)bf)&3)==0) break; *bf++='0'; --i; } while(i>=4) { *(stbsp__uint32*)bf=0x30303030; bf+=4; i-=4; } } while (i) { if((fl&STBSP__TRIPLET_COMMA) && (cs++==c)) { cs = 0; *bf++=stbsp__comma; } else *bf++='0'; --i; } stbsp__chk_cb_buf(1); }
-        }
+         // copy the spaces and/or zeros
+         if (fw + pr) {
+            stbsp__int32 i;
+            stbsp__uint32 c;
 
-        // copy leader if there is still one
-        sn=lead+1; while(lead[0]) { stbsp__int32 i; stbsp__cb_buf_clamp(i,lead[0]); lead[0] -= (char)i; while (i) {*bf++=*sn++; --i;} stbsp__chk_cb_buf(1); }
+            // copy leading spaces (or when doing %8.4d stuff)
+            if ((fl & STBSP__LEFTJUST) == 0)
+               while (fw > 0) {
+                  stbsp__cb_buf_clamp(i, fw);
+                  fw -= i;
+                  while (i) {
+                     if ((((stbsp__uintptr)bf) & 3) == 0)
+                        break;
+                     *bf++ = ' ';
+                     --i;
+                  }
+                  while (i >= 4) {
+                     *(stbsp__uint32 *)bf = 0x20202020;
+                     bf += 4;
+                     i -= 4;
+                  }
+                  while (i) {
+                     *bf++ = ' ';
+                     --i;
+                  }
+                  stbsp__chk_cb_buf(1);
+               }
 
-        // copy the string
-        n = l; while (n) { stbsp__int32 i; stbsp__cb_buf_clamp(i,n); n-=i; STBSP__UNALIGNED( while(i>=4) { *(stbsp__uint32*)bf=*(stbsp__uint32*)s; bf+=4; s+=4; i-=4; } ) while (i) {*bf++=*s++; --i;} stbsp__chk_cb_buf(1); }
+            // copy leader
+            sn = lead + 1;
+            while (lead[0]) {
+               stbsp__cb_buf_clamp(i, lead[0]);
+               lead[0] -= (char)i;
+               while (i) {
+                  *bf++ = *sn++;
+                  --i;
+               }
+               stbsp__chk_cb_buf(1);
+            }
 
-        // copy trailing zeros
-        while(tz) { stbsp__int32 i; stbsp__cb_buf_clamp(i,tz); tz -= i; while(i) { if ((((stbsp__uintptr)bf)&3)==0) break; *bf++='0'; --i; } while(i>=4) { *(stbsp__uint32*)bf=0x30303030; bf+=4; i-=4; } while (i) {*bf++='0'; --i;} stbsp__chk_cb_buf(1); }
+            // copy leading zeros
+            c = cs >> 24;
+            cs &= 0xffffff;
+            cs = (fl & STBSP__TRIPLET_COMMA) ? ((stbsp__uint32)(c - ((pr + cs) % (c + 1)))) : 0;
+            while (pr > 0) {
+               stbsp__cb_buf_clamp(i, pr);
+               pr -= i;
+               if ((fl & STBSP__TRIPLET_COMMA) == 0) {
+                  while (i) {
+                     if ((((stbsp__uintptr)bf) & 3) == 0)
+                        break;
+                     *bf++ = '0';
+                     --i;
+                  }
+                  while (i >= 4) {
+                     *(stbsp__uint32 *)bf = 0x30303030;
+                     bf += 4;
+                     i -= 4;
+                  }
+               }
+               while (i) {
+                  if ((fl & STBSP__TRIPLET_COMMA) && (cs++ == c)) {
+                     cs = 0;
+                     *bf++ = stbsp__comma;
+                  } else
+                     *bf++ = '0';
+                  --i;
+               }
+               stbsp__chk_cb_buf(1);
+            }
+         }
 
-        // copy tail if there is one
-        sn=tail+1; while(tail[0]) { stbsp__int32 i; stbsp__cb_buf_clamp(i,tail[0]); tail[0] -= (char)i; while (i) {*bf++=*sn++; --i;} stbsp__chk_cb_buf(1); }
+         // copy leader if there is still one
+         sn = lead + 1;
+         while (lead[0]) {
+            stbsp__int32 i;
+            stbsp__cb_buf_clamp(i, lead[0]);
+            lead[0] -= (char)i;
+            while (i) {
+               *bf++ = *sn++;
+               --i;
+            }
+            stbsp__chk_cb_buf(1);
+         }
 
-        // handle the left justify
-        if (fl&STBSP__LEFTJUST) if (fw>0) { while (fw) { stbsp__int32 i; stbsp__cb_buf_clamp(i,fw); fw-=i; while(i) { if ((((stbsp__uintptr)bf)&3)==0) break; *bf++=' '; --i; } while(i>=4) { *(stbsp__uint32*)bf=0x20202020; bf+=4; i-=4; } while (i--) *bf++=' '; stbsp__chk_cb_buf(1); } }
-        break;
+         // copy the string
+         n = l;
+         while (n) {
+            stbsp__int32 i;
+            stbsp__cb_buf_clamp(i, n);
+            n -= i;
+            STBSP__UNALIGNED(while (i >= 4) {
+               *(stbsp__uint32 *)bf = *(stbsp__uint32 *)s;
+               bf += 4;
+               s += 4;
+               i -= 4;
+            })
+            while (i) {
+               *bf++ = *s++;
+               --i;
+            }
+            stbsp__chk_cb_buf(1);
+         }
+
+         // copy trailing zeros
+         while (tz) {
+            stbsp__int32 i;
+            stbsp__cb_buf_clamp(i, tz);
+            tz -= i;
+            while (i) {
+               if ((((stbsp__uintptr)bf) & 3) == 0)
+                  break;
+               *bf++ = '0';
+               --i;
+            }
+            while (i >= 4) {
+               *(stbsp__uint32 *)bf = 0x30303030;
+               bf += 4;
+               i -= 4;
+            }
+            while (i) {
+               *bf++ = '0';
+               --i;
+            }
+            stbsp__chk_cb_buf(1);
+         }
+
+         // copy tail if there is one
+         sn = tail + 1;
+         while (tail[0]) {
+            stbsp__int32 i;
+            stbsp__cb_buf_clamp(i, tail[0]);
+            tail[0] -= (char)i;
+            while (i) {
+               *bf++ = *sn++;
+               --i;
+            }
+            stbsp__chk_cb_buf(1);
+         }
+
+         // handle the left justify
+         if (fl & STBSP__LEFTJUST)
+            if (fw > 0) {
+               while (fw) {
+                  stbsp__int32 i;
+                  stbsp__cb_buf_clamp(i, fw);
+                  fw -= i;
+                  while (i) {
+                     if ((((stbsp__uintptr)bf) & 3) == 0)
+                        break;
+                     *bf++ = ' ';
+                     --i;
+                  }
+                  while (i >= 4) {
+                     *(stbsp__uint32 *)bf = 0x20202020;
+                     bf += 4;
+                     i -= 4;
+                  }
+                  while (i--)
+                     *bf++ = ' ';
+                  stbsp__chk_cb_buf(1);
+               }
+            }
+         break;
 
       default: // unknown, just copy code
-        s = num + STBSP__NUMSZ -1; *s = f[0];
-        l = 1;
-        fw=pr=fl=0;
-        lead[0]=0; tail[0]=0; pr = 0; dp = 0; cs = 0;
-        goto scopy;
-    }
-    ++f;
-  }
- endfmt:
+         s = num + STBSP__NUMSZ - 1;
+         *s = f[0];
+         l = 1;
+         fw = fl = 0;
+         lead[0] = 0;
+         tail[0] = 0;
+         pr = 0;
+         dp = 0;
+         cs = 0;
+         goto scopy;
+      }
+      ++f;
+   }
+endfmt:
 
-  if (!callback) 
-    *bf = 0;
-  else
-    stbsp__flush_cb();
- 
- done:
-  return tlen + (int)(bf-buf);
+   if (!callback)
+      *bf = 0;
+   else
+      stbsp__flush_cb();
+
+done:
+   return tlen + (int)(bf - buf);
 }
 
 // cleanup
@@ -7552,82 +7654,103 @@ STBSP__PUBLICDEF int STB_SPRINTF_DECORATE( vsprintfcb )( STBSP_SPRINTFCB * callb
 // ============================================================================
 //   wrapper functions
 
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE( sprintf )( char * buf, char const * fmt, ... )
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf)(char *buf, char const *fmt, ...)
 {
-  int result;
-  va_list va;
-  va_start( va, fmt );
-  result = STB_SPRINTF_DECORATE( vsprintfcb )( 0, 0, buf, fmt, va );
-  va_end(va);
-  return result;
+   int result;
+   va_list va;
+   va_start(va, fmt);
+   result = STB_SPRINTF_DECORATE(vsprintfcb)(0, 0, buf, fmt, va);
+   va_end(va);
+   return result;
 }
 
-typedef struct stbsp__context
-{
-  char * buf;
-  int count;
-  char tmp[ STB_SPRINTF_MIN ];
+typedef struct stbsp__context {
+   char *buf;
+   int count;
+   char tmp[STB_SPRINTF_MIN];
 } stbsp__context;
 
-static char * stbsp__clamp_callback( char * buf, void * user, int len )
+static char *stbsp__clamp_callback(char *buf, void *user, int len)
 {
-  stbsp__context * c = (stbsp__context*)user;
+   stbsp__context *c = (stbsp__context *)user;
 
-  if ( len > c->count ) len = c->count;
+   if (len > c->count)
+      len = c->count;
 
-  if (len)
-  {
-    if ( buf != c->buf )
-    {
-      char * s, * d, * se;
-      d = c->buf; s = buf; se = buf+len;
-      do{ *d++ = *s++; } while (s<se);
-    }
-    c->buf += len;
-    c->count -= len;
-  }
-  
-  if ( c->count <= 0 ) return 0;
-  return ( c->count >= STB_SPRINTF_MIN ) ? c->buf : c->tmp; // go direct into buffer if you can
+   if (len) {
+      if (buf != c->buf) {
+         char *s, *d, *se;
+         d = c->buf;
+         s = buf;
+         se = buf + len;
+         do {
+            *d++ = *s++;
+         } while (s < se);
+      }
+      c->buf += len;
+      c->count -= len;
+   }
+
+   if (c->count <= 0)
+      return 0;
+   return (c->count >= STB_SPRINTF_MIN) ? c->buf : c->tmp; // go direct into buffer if you can
+}
+
+static char * stbsp__count_clamp_callback( char * buf, void * user, int len )
+{
+    (void)buf;
+   stbsp__context * c = (stbsp__context*)user;
+   c->count += len;
+   return c->tmp; // go direct into buffer if you can
 }
 
 STBSP__PUBLICDEF int STB_SPRINTF_DECORATE( vsnprintf )( char * buf, int count, char const * fmt, va_list va )
 {
-  stbsp__context c;
-  int l;
+   stbsp__context c;
+   int l;
 
-  if ( count == 0 )
-    return 0;
+   if ( (count == 0) && !buf )
+   {
+      c.count = 0;
 
-  c.buf = buf;
-  c.count = count;
+      STB_SPRINTF_DECORATE( vsprintfcb )( stbsp__count_clamp_callback, &c, c.tmp, fmt, va );
+      l = c.count;
+   }
+   else
+   {
+      if ( count == 0 )
+         return 0;
 
-  STB_SPRINTF_DECORATE( vsprintfcb )( stbsp__clamp_callback, &c, stbsp__clamp_callback(0,&c,0), fmt, va );
-  
-  // zero-terminate
-  l = (int)( c.buf - buf );
-  if ( l >= count ) // should never be greater, only equal (or less) than count
-    l = count - 1;
-  buf[l] = 0;
+      c.buf = buf;
+      c.count = count;
 
-  return l;
+      STB_SPRINTF_DECORATE( vsprintfcb )( stbsp__clamp_callback, &c, stbsp__clamp_callback(0,&c,0), fmt, va );
+
+      // zero-terminate
+      l = (int)( c.buf - buf );
+      if ( l >= count ) // should never be greater, only equal (or less) than count
+         l = count - 1;
+      buf[l] = 0;
+   }
+
+   return l;
 }
 
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE( snprintf )( char * buf, int count, char const * fmt, ... )
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char const *fmt, ...)
 {
-  int result;
-  va_list va;
-  va_start( va, fmt );
+   int result;
+   va_list va;
+   va_start(va, fmt);
 
-  result = STB_SPRINTF_DECORATE( vsnprintf )( buf, count, fmt, va );
-  va_end(va);
+   result = STB_SPRINTF_DECORATE(vsnprintf)(buf, count, fmt, va);
+   va_end(va);
 
-  return result;
+   return result;
 }
 
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE( vsprintf )( char * buf, char const * fmt, va_list va )
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf)(char *buf, char const *fmt, va_list va)
 {
-  return STB_SPRINTF_DECORATE( vsprintfcb )( 0, 0, buf, fmt, va );
+   return STB_SPRINTF_DECORATE(vsprintfcb)(0, 0, buf, fmt, va);
 }
 
 // =======================================================================
@@ -7636,220 +7759,368 @@ STBSP__PUBLICDEF int STB_SPRINTF_DECORATE( vsprintf )( char * buf, char const * 
 #ifndef STB_SPRINTF_NOFLOAT
 
 // copies d to bits w/ strict aliasing (this compiles to nothing on /Ox)
-#define STBSP__COPYFP(dest,src) { int cn; for(cn=0;cn<8;cn++) ((char*)&dest)[cn]=((char*)&src)[cn]; }
- 
+#define STBSP__COPYFP(dest, src)                   \
+   {                                               \
+      int cn;                                      \
+      for (cn = 0; cn < 8; cn++)                   \
+         ((char *)&dest)[cn] = ((char *)&src)[cn]; \
+   }
+
 // get float info
-static stbsp__int32 stbsp__real_to_parts( stbsp__int64 * bits, stbsp__int32 * expo, double value )
+static stbsp__int32 stbsp__real_to_parts(stbsp__int64 *bits, stbsp__int32 *expo, double value)
 {
-  double d;
-  stbsp__int64 b = 0;
+   double d;
+   stbsp__int64 b = 0;
 
-  // load value and round at the frac_digits
-  d = value;
+   // load value and round at the frac_digits
+   d = value;
 
-  STBSP__COPYFP( b, d );
+   STBSP__COPYFP(b, d);
 
-  *bits = b & ((((stbsp__uint64)1)<<52)-1);
-  *expo = (stbsp__int32) (((b >> 52) & 2047)-1023);
-    
-  return (stbsp__int32)(b >> 63);
+   *bits = b & ((((stbsp__uint64)1) << 52) - 1);
+   *expo = (stbsp__int32)(((b >> 52) & 2047) - 1023);
+
+   return (stbsp__int32)(b >> 63);
 }
 
-static double const stbsp__bot[23]={1e+000,1e+001,1e+002,1e+003,1e+004,1e+005,1e+006,1e+007,1e+008,1e+009,1e+010,1e+011,1e+012,1e+013,1e+014,1e+015,1e+016,1e+017,1e+018,1e+019,1e+020,1e+021,1e+022};
-static double const stbsp__negbot[22]={1e-001,1e-002,1e-003,1e-004,1e-005,1e-006,1e-007,1e-008,1e-009,1e-010,1e-011,1e-012,1e-013,1e-014,1e-015,1e-016,1e-017,1e-018,1e-019,1e-020,1e-021,1e-022};
-static double const stbsp__negboterr[22]={-5.551115123125783e-018,-2.0816681711721684e-019,-2.0816681711721686e-020,-4.7921736023859299e-021,-8.1803053914031305e-022,4.5251888174113741e-023,4.5251888174113739e-024,-2.0922560830128471e-025,-6.2281591457779853e-026,-3.6432197315497743e-027,6.0503030718060191e-028,2.0113352370744385e-029,-3.0373745563400371e-030,1.1806906454401013e-032,-7.7705399876661076e-032,2.0902213275965398e-033,-7.1542424054621921e-034,-7.1542424054621926e-035,2.4754073164739869e-036,5.4846728545790429e-037,9.2462547772103625e-038,-4.8596774326570872e-039};
-static double const stbsp__top[13]={1e+023,1e+046,1e+069,1e+092,1e+115,1e+138,1e+161,1e+184,1e+207,1e+230,1e+253,1e+276,1e+299};
-static double const stbsp__negtop[13]={1e-023,1e-046,1e-069,1e-092,1e-115,1e-138,1e-161,1e-184,1e-207,1e-230,1e-253,1e-276,1e-299};
-static double const stbsp__toperr[13]={8388608,6.8601809640529717e+028,-7.253143638152921e+052,-4.3377296974619174e+075,-1.5559416129466825e+098,-3.2841562489204913e+121,-3.7745893248228135e+144,-1.7356668416969134e+167,-3.8893577551088374e+190,-9.9566444326005119e+213,6.3641293062232429e+236,-5.2069140800249813e+259,-5.2504760255204387e+282};
-static double const stbsp__negtoperr[13]={3.9565301985100693e-040,-2.299904345391321e-063,3.6506201437945798e-086,1.1875228833981544e-109,-5.0644902316928607e-132,-6.7156837247865426e-155,-2.812077463003139e-178,-5.7778912386589953e-201,7.4997100559334532e-224,-4.6439668915134491e-247,-6.3691100762962136e-270,-9.436808465446358e-293,8.0970921678014997e-317};
+static double const stbsp__bot[23] = {
+   1e+000, 1e+001, 1e+002, 1e+003, 1e+004, 1e+005, 1e+006, 1e+007, 1e+008, 1e+009, 1e+010, 1e+011,
+   1e+012, 1e+013, 1e+014, 1e+015, 1e+016, 1e+017, 1e+018, 1e+019, 1e+020, 1e+021, 1e+022
+};
+static double const stbsp__negbot[22] = {
+   1e-001, 1e-002, 1e-003, 1e-004, 1e-005, 1e-006, 1e-007, 1e-008, 1e-009, 1e-010, 1e-011,
+   1e-012, 1e-013, 1e-014, 1e-015, 1e-016, 1e-017, 1e-018, 1e-019, 1e-020, 1e-021, 1e-022
+};
+static double const stbsp__negboterr[22] = {
+   -5.551115123125783e-018,  -2.0816681711721684e-019, -2.0816681711721686e-020, -4.7921736023859299e-021, -8.1803053914031305e-022, 4.5251888174113741e-023,
+   4.5251888174113739e-024,  -2.0922560830128471e-025, -6.2281591457779853e-026, -3.6432197315497743e-027, 6.0503030718060191e-028,  2.0113352370744385e-029,
+   -3.0373745563400371e-030, 1.1806906454401013e-032,  -7.7705399876661076e-032, 2.0902213275965398e-033,  -7.1542424054621921e-034, -7.1542424054621926e-035,
+   2.4754073164739869e-036,  5.4846728545790429e-037,  9.2462547772103625e-038,  -4.8596774326570872e-039
+};
+static double const stbsp__top[13] = {
+   1e+023, 1e+046, 1e+069, 1e+092, 1e+115, 1e+138, 1e+161, 1e+184, 1e+207, 1e+230, 1e+253, 1e+276, 1e+299
+};
+static double const stbsp__negtop[13] = {
+   1e-023, 1e-046, 1e-069, 1e-092, 1e-115, 1e-138, 1e-161, 1e-184, 1e-207, 1e-230, 1e-253, 1e-276, 1e-299
+};
+static double const stbsp__toperr[13] = {
+   8388608,
+   6.8601809640529717e+028,
+   -7.253143638152921e+052,
+   -4.3377296974619174e+075,
+   -1.5559416129466825e+098,
+   -3.2841562489204913e+121,
+   -3.7745893248228135e+144,
+   -1.7356668416969134e+167,
+   -3.8893577551088374e+190,
+   -9.9566444326005119e+213,
+   6.3641293062232429e+236,
+   -5.2069140800249813e+259,
+   -5.2504760255204387e+282
+};
+static double const stbsp__negtoperr[13] = {
+   3.9565301985100693e-040,  -2.299904345391321e-063,  3.6506201437945798e-086,  1.1875228833981544e-109,
+   -5.0644902316928607e-132, -6.7156837247865426e-155, -2.812077463003139e-178,  -5.7778912386589953e-201,
+   7.4997100559334532e-224,  -4.6439668915134491e-247, -6.3691100762962136e-270, -9.436808465446358e-293,
+   8.0970921678014997e-317
+};
 
-#if defined(_MSC_VER) && (_MSC_VER<=1200)                                                                                                                                                                                       
-static stbsp__uint64 const stbsp__powten[20]={1,10,100,1000, 10000,100000,1000000,10000000, 100000000,1000000000,10000000000,100000000000,  1000000000000,10000000000000,100000000000000,1000000000000000,  10000000000000000,100000000000000000,1000000000000000000,10000000000000000000U };
+#if defined(_MSC_VER) && (_MSC_VER <= 1200)
+static stbsp__uint64 const stbsp__powten[20] = {
+   1,
+   10,
+   100,
+   1000,
+   10000,
+   100000,
+   1000000,
+   10000000,
+   100000000,
+   1000000000,
+   10000000000,
+   100000000000,
+   1000000000000,
+   10000000000000,
+   100000000000000,
+   1000000000000000,
+   10000000000000000,
+   100000000000000000,
+   1000000000000000000,
+   10000000000000000000U
+};
 #define stbsp__tento19th ((stbsp__uint64)1000000000000000000)
 #else
-static stbsp__uint64 const stbsp__powten[20]={1,10,100,1000, 10000,100000,1000000,10000000, 100000000,1000000000,10000000000ULL,100000000000ULL,  1000000000000ULL,10000000000000ULL,100000000000000ULL,1000000000000000ULL,  10000000000000000ULL,100000000000000000ULL,1000000000000000000ULL,10000000000000000000ULL };
+static stbsp__uint64 const stbsp__powten[20] = {
+   1,
+   10,
+   100,
+   1000,
+   10000,
+   100000,
+   1000000,
+   10000000,
+   100000000,
+   1000000000,
+   10000000000ULL,
+   100000000000ULL,
+   1000000000000ULL,
+   10000000000000ULL,
+   100000000000000ULL,
+   1000000000000000ULL,
+   10000000000000000ULL,
+   100000000000000000ULL,
+   1000000000000000000ULL,
+   10000000000000000000ULL
+};
 #define stbsp__tento19th (1000000000000000000ULL)
 #endif
 
-#define stbsp__ddmulthi(oh,ol,xh,yh) \
-{ \
-  double ahi=0,alo,bhi=0,blo; \
-  stbsp__int64 bt; \
-  oh = xh * yh; \
-  STBSP__COPYFP(bt,xh); bt&=((~(stbsp__uint64)0)<<27); STBSP__COPYFP(ahi,bt); alo = xh-ahi; \
-  STBSP__COPYFP(bt,yh); bt&=((~(stbsp__uint64)0)<<27); STBSP__COPYFP(bhi,bt); blo = yh-bhi; \
-  ol = ((ahi*bhi-oh)+ahi*blo+alo*bhi)+alo*blo; \
-}
+#define stbsp__ddmulthi(oh, ol, xh, yh)                            \
+   {                                                               \
+      double ahi = 0, alo, bhi = 0, blo;                           \
+      stbsp__int64 bt;                                             \
+      oh = xh * yh;                                                \
+      STBSP__COPYFP(bt, xh);                                       \
+      bt &= ((~(stbsp__uint64)0) << 27);                           \
+      STBSP__COPYFP(ahi, bt);                                      \
+      alo = xh - ahi;                                              \
+      STBSP__COPYFP(bt, yh);                                       \
+      bt &= ((~(stbsp__uint64)0) << 27);                           \
+      STBSP__COPYFP(bhi, bt);                                      \
+      blo = yh - bhi;                                              \
+      ol = ((ahi * bhi - oh) + ahi * blo + alo * bhi) + alo * blo; \
+   }
 
-#define stbsp__ddtoS64(ob,xh,xl) \
-{ \
-  double ahi=0,alo,vh,t;\
-  ob = (stbsp__int64)ph;\
-  vh=(double)ob;\
-  ahi = ( xh - vh );\
-  t = ( ahi - xh );\
-  alo = (xh-(ahi-t))-(vh+t);\
-  ob += (stbsp__int64)(ahi+alo+xl);\
-}
+#define stbsp__ddtoS64(ob, xh, xl)          \
+   {                                        \
+      double ahi = 0, alo, vh, t;           \
+      ob = (stbsp__int64)ph;                \
+      vh = (double)ob;                      \
+      ahi = (xh - vh);                      \
+      t = (ahi - xh);                       \
+      alo = (xh - (ahi - t)) - (vh + t);    \
+      ob += (stbsp__int64)(ahi + alo + xl); \
+   }
 
+#define stbsp__ddrenorm(oh, ol) \
+   {                            \
+      double s;                 \
+      s = oh + ol;              \
+      ol = ol - (s - oh);       \
+      oh = s;                   \
+   }
 
-#define stbsp__ddrenorm(oh,ol) { double s; s=oh+ol; ol=ol-(s-oh); oh=s; }
+#define stbsp__ddmultlo(oh, ol, xh, xl, yh, yl) ol = ol + (xh * yl + xl * yh);
 
-#define stbsp__ddmultlo(oh,ol,xh,xl,yh,yl) \
-  ol = ol + ( xh*yl + xl*yh ); \
+#define stbsp__ddmultlos(oh, ol, xh, yl) ol = ol + (xh * yl);
 
-#define stbsp__ddmultlos(oh,ol,xh,yl) \
-  ol = ol + ( xh*yl ); \
-
-static void stbsp__raise_to_power10( double *ohi, double *olo, double d, stbsp__int32 power )  // power can be -323 to +350
+static void stbsp__raise_to_power10(double *ohi, double *olo, double d, stbsp__int32 power) // power can be -323 to +350
 {
-  double ph, pl;
-  if ((power>=0) && (power<=22))
-  {
-    stbsp__ddmulthi(ph,pl,d,stbsp__bot[power]);
-  }
-  else
-  {
-    stbsp__int32 e,et,eb;
-    double p2h,p2l;
+   double ph, pl;
+   if ((power >= 0) && (power <= 22)) {
+      stbsp__ddmulthi(ph, pl, d, stbsp__bot[power]);
+   } else {
+      stbsp__int32 e, et, eb;
+      double p2h, p2l;
 
-    e=power; if (power<0) e=-e; 
-    et = (e*0x2c9)>>14;/* %23 */ if (et>13) et=13; eb = e-(et*23);
+      e = power;
+      if (power < 0)
+         e = -e;
+      et = (e * 0x2c9) >> 14; /* %23 */
+      if (et > 13)
+         et = 13;
+      eb = e - (et * 23);
 
-    ph = d; pl = 0.0;
-    if (power<0)
-    {
-      if (eb) { --eb; stbsp__ddmulthi(ph,pl,d,stbsp__negbot[eb]); stbsp__ddmultlos(ph,pl,d,stbsp__negboterr[eb]); }
-      if (et)
-      { 
-        stbsp__ddrenorm(ph,pl);
-        --et; stbsp__ddmulthi(p2h,p2l,ph,stbsp__negtop[et]); stbsp__ddmultlo(p2h,p2l,ph,pl,stbsp__negtop[et],stbsp__negtoperr[et]); ph=p2h;pl=p2l;
+      ph = d;
+      pl = 0.0;
+      if (power < 0) {
+         if (eb) {
+            --eb;
+            stbsp__ddmulthi(ph, pl, d, stbsp__negbot[eb]);
+            stbsp__ddmultlos(ph, pl, d, stbsp__negboterr[eb]);
+         }
+         if (et) {
+            stbsp__ddrenorm(ph, pl);
+            --et;
+            stbsp__ddmulthi(p2h, p2l, ph, stbsp__negtop[et]);
+            stbsp__ddmultlo(p2h, p2l, ph, pl, stbsp__negtop[et], stbsp__negtoperr[et]);
+            ph = p2h;
+            pl = p2l;
+         }
+      } else {
+         if (eb) {
+            e = eb;
+            if (eb > 22)
+               eb = 22;
+            e -= eb;
+            stbsp__ddmulthi(ph, pl, d, stbsp__bot[eb]);
+            if (e) {
+               stbsp__ddrenorm(ph, pl);
+               stbsp__ddmulthi(p2h, p2l, ph, stbsp__bot[e]);
+               stbsp__ddmultlos(p2h, p2l, stbsp__bot[e], pl);
+               ph = p2h;
+               pl = p2l;
+            }
+         }
+         if (et) {
+            stbsp__ddrenorm(ph, pl);
+            --et;
+            stbsp__ddmulthi(p2h, p2l, ph, stbsp__top[et]);
+            stbsp__ddmultlo(p2h, p2l, ph, pl, stbsp__top[et], stbsp__toperr[et]);
+            ph = p2h;
+            pl = p2l;
+         }
       }
-    }
-    else
-    {
-      if (eb) 
-      { 
-        e = eb; if (eb>22) eb=22; e -= eb;
-        stbsp__ddmulthi(ph,pl,d,stbsp__bot[eb]); 
-        if ( e ) { stbsp__ddrenorm(ph,pl); stbsp__ddmulthi(p2h,p2l,ph,stbsp__bot[e]); stbsp__ddmultlos(p2h,p2l,stbsp__bot[e],pl); ph=p2h;pl=p2l; }
-      }
-      if (et)
-      {
-        stbsp__ddrenorm(ph,pl);
-        --et; stbsp__ddmulthi(p2h,p2l,ph,stbsp__top[et]); stbsp__ddmultlo(p2h,p2l,ph,pl,stbsp__top[et],stbsp__toperr[et]); ph=p2h;pl=p2l;
-      }
-    }
-  }
-  stbsp__ddrenorm(ph,pl);
-  *ohi = ph; *olo = pl;
+   }
+   stbsp__ddrenorm(ph, pl);
+   *ohi = ph;
+   *olo = pl;
 }
 
 // given a float value, returns the significant bits in bits, and the position of the
 //   decimal point in decimal_pos.  +/-INF and NAN are specified by special values
 //   returned in the decimal_pos parameter.
 // frac_digits is absolute normally, but if you want from first significant digits (got %g and %e), or in 0x80000000
-static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * len, char *out, stbsp__int32 * decimal_pos, double value, stbsp__uint32 frac_digits )
+static stbsp__int32 stbsp__real_to_str(char const **start, stbsp__uint32 *len, char *out, stbsp__int32 *decimal_pos, double value, stbsp__uint32 frac_digits)
 {
-  double d;
-  stbsp__int64 bits = 0;
-  stbsp__int32 expo, e, ng, tens;
+   double d;
+   stbsp__int64 bits = 0;
+   stbsp__int32 expo, e, ng, tens;
 
-  d = value;
-  STBSP__COPYFP(bits,d);
-  expo = (stbsp__int32) ((bits >> 52) & 2047);
-  ng = (stbsp__int32)(bits >> 63);
-  if (ng) d=-d;
+   d = value;
+   STBSP__COPYFP(bits, d);
+   expo = (stbsp__int32)((bits >> 52) & 2047);
+   ng = (stbsp__int32)(bits >> 63);
+   if (ng)
+      d = -d;
 
-  if ( expo == 2047 ) // is nan or inf?
-  {
-    *start = (bits&((((stbsp__uint64)1)<<52)-1)) ? "NaN" : "Inf";
-    *decimal_pos =  STBSP__SPECIAL;
-    *len = 3;
-    return ng;
-  } 
-
-  if ( expo == 0 ) // is zero or denormal
-  {
-    if ((bits<<1)==0) // do zero
-    {
-      *decimal_pos = 1; 
-      *start = out;
-      out[0] = '0'; *len = 1;
+   if (expo == 2047) // is nan or inf?
+   {
+      *start = (bits & ((((stbsp__uint64)1) << 52) - 1)) ? "NaN" : "Inf";
+      *decimal_pos = STBSP__SPECIAL;
+      *len = 3;
       return ng;
-    }
-    // find the right expo for denormals
-    {
-      stbsp__int64 v = ((stbsp__uint64)1)<<51;
-      while ((bits&v)==0) { --expo; v >>= 1; }
-    }
-  }
+   }
 
-  // find the decimal exponent as well as the decimal bits of the value
-  {
-    double ph,pl;
+   if (expo == 0) // is zero or denormal
+   {
+      if ((bits << 1) == 0) // do zero
+      {
+         *decimal_pos = 1;
+         *start = out;
+         out[0] = '0';
+         *len = 1;
+         return ng;
+      }
+      // find the right expo for denormals
+      {
+         stbsp__int64 v = ((stbsp__uint64)1) << 51;
+         while ((bits & v) == 0) {
+            --expo;
+            v >>= 1;
+         }
+      }
+   }
 
-    // log10 estimate - very specifically tweaked to hit or undershoot by no more than 1 of log10 of all expos 1..2046
-    tens=expo-1023; tens = (tens<0)?((tens*617)/2048):(((tens*1233)/4096)+1);
+   // find the decimal exponent as well as the decimal bits of the value
+   {
+      double ph, pl;
 
-    // move the significant bits into position and stick them into an int 
-    stbsp__raise_to_power10( &ph, &pl, d, 18-tens );
+      // log10 estimate - very specifically tweaked to hit or undershoot by no more than 1 of log10 of all expos 1..2046
+      tens = expo - 1023;
+      tens = (tens < 0) ? ((tens * 617) / 2048) : (((tens * 1233) / 4096) + 1);
 
-    // get full as much precision from double-double as possible
-    stbsp__ddtoS64( bits, ph,pl );
+      // move the significant bits into position and stick them into an int
+      stbsp__raise_to_power10(&ph, &pl, d, 18 - tens);
 
-    // check if we undershot
-    if ( ((stbsp__uint64)bits) >= stbsp__tento19th ) ++tens; 
-  }
+      // get full as much precision from double-double as possible
+      stbsp__ddtoS64(bits, ph, pl);
 
-  // now do the rounding in integer land
-  frac_digits = ( frac_digits & 0x80000000 ) ? ( (frac_digits&0x7ffffff) + 1 ) : ( tens + frac_digits );
-  if ( ( frac_digits < 24 ) )
-  {
-    stbsp__uint32 dg = 1; if ((stbsp__uint64)bits >= stbsp__powten[9] ) dg=10; while( (stbsp__uint64)bits >= stbsp__powten[dg] ) { ++dg; if (dg==20) goto noround; }
-    if ( frac_digits < dg )
-    {
-      stbsp__uint64 r;
-      // add 0.5 at the right position and round
-      e = dg - frac_digits;
-      if ( (stbsp__uint32)e >= 24 ) goto noround;
-      r = stbsp__powten[e];
-      bits = bits + (r/2);
-      if ( (stbsp__uint64)bits >= stbsp__powten[dg] ) ++tens;
-      bits /= r;
-    } 
-    noround:;
-  }
+      // check if we undershot
+      if (((stbsp__uint64)bits) >= stbsp__tento19th)
+         ++tens;
+   }
 
-  // kill long trailing runs of zeros
-  if ( bits )
-  {
-    stbsp__uint32 n;
-    for(;;) { if ( bits<=0xffffffff ) break; if (bits%1000) goto donez; bits/=1000; }
-    n = (stbsp__uint32)bits;
-    while ((n%1000)==0) n/=1000;
-    bits=n;
-    donez:;
-  }
+   // now do the rounding in integer land
+   frac_digits = (frac_digits & 0x80000000) ? ((frac_digits & 0x7ffffff) + 1) : (tens + frac_digits);
+   if ((frac_digits < 24)) {
+      stbsp__uint32 dg = 1;
+      if ((stbsp__uint64)bits >= stbsp__powten[9])
+         dg = 10;
+      while ((stbsp__uint64)bits >= stbsp__powten[dg]) {
+         ++dg;
+         if (dg == 20)
+            goto noround;
+      }
+      if (frac_digits < dg) {
+         stbsp__uint64 r;
+         // add 0.5 at the right position and round
+         e = dg - frac_digits;
+         if ((stbsp__uint32)e >= 24)
+            goto noround;
+         r = stbsp__powten[e];
+         bits = bits + (r / 2);
+         if ((stbsp__uint64)bits >= stbsp__powten[dg])
+            ++tens;
+         bits /= r;
+      }
+   noround:;
+   }
 
-  // convert to string
-  out += 64;
-  e = 0; 
-  for(;;)
-  {
-    stbsp__uint32 n;
-    char * o = out-8;
-    // do the conversion in chunks of U32s (avoid most 64-bit divides, worth it, constant denomiators be damned)
-    if (bits>=100000000) { n = (stbsp__uint32)( bits % 100000000);  bits /= 100000000; } else {n = (stbsp__uint32)bits; bits = 0; }
-    while(n) { out-=2; *(stbsp__uint16*)out=*(stbsp__uint16*)&stbsp__digitpair[(n%100)*2]; n/=100; e+=2; }
-    if (bits==0) { if ((e) && (out[0]=='0')) { ++out; --e; } break; }
-    while( out!=o ) { *--out ='0'; ++e; }
-  }
-  
-  *decimal_pos = tens;
-  *start = out;
-  *len = e;
-  return ng;
+   // kill long trailing runs of zeros
+   if (bits) {
+      stbsp__uint32 n;
+      for (;;) {
+         if (bits <= 0xffffffff)
+            break;
+         if (bits % 1000)
+            goto donez;
+         bits /= 1000;
+      }
+      n = (stbsp__uint32)bits;
+      while ((n % 1000) == 0)
+         n /= 1000;
+      bits = n;
+   donez:;
+   }
+
+   // convert to string
+   out += 64;
+   e = 0;
+   for (;;) {
+      stbsp__uint32 n;
+      char *o = out - 8;
+      // do the conversion in chunks of U32s (avoid most 64-bit divides, worth it, constant denomiators be damned)
+      if (bits >= 100000000) {
+         n = (stbsp__uint32)(bits % 100000000);
+         bits /= 100000000;
+      } else {
+         n = (stbsp__uint32)bits;
+         bits = 0;
+      }
+      while (n) {
+         out -= 2;
+         *(stbsp__uint16 *)out = *(stbsp__uint16 *)&stbsp__digitpair[(n % 100) * 2];
+         n /= 100;
+         e += 2;
+      }
+      if (bits == 0) {
+         if ((e) && (out[0] == '0')) {
+            ++out;
+            --e;
+         }
+         break;
+      }
+      while (out != o) {
+         *--out = '0';
+         ++e;
+      }
+   }
+
+   *decimal_pos = tens;
+   *start = out;
+   *len = e;
+   return ng;
 }
 
 #undef stbsp__ddmulthi
@@ -7868,7 +8139,6 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 #undef stbsp__uint64
 #undef stbsp__int64
 #undef STBSP__UNALIGNED
-
 #ifdef __GNUC__
     #pragma GCC diagnostic pop
 #endif
@@ -7880,7 +8150,7 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 // Functions in the Cross Platform are guaranteed to be supported in both Unix
 // and Win32
 
-#ifdef DQN__UNIX_PLATFORM
+#ifdef DQN__IS_UNIX
     #include <stdio.h>    // Basic File I/O // TODO(doyle): Syscall versions
 
     #include <dirent.h>   // readdir()/opendir()/closedir()
@@ -7894,7 +8164,7 @@ static stbsp__int32 stbsp__real_to_str( char const * * start, stbsp__uint32 * le
 
 // XPlatform > #DqnFile
 // =================================================================================================
-#ifdef DQN__WIN32_PLATFORM
+#ifdef DQN__IS_WIN32
 
 FILE_SCOPE bool
 DqnFile__Win32Open(wchar_t const *path, DqnFile *file, u32 flags, DqnFile::Action action)
@@ -8054,11 +8324,16 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
         return list;
     }
 }
-#endif // DQN__WIN32_PLATFORM
+#endif // DQN__IS_WIN32
 
-#ifdef DQN__UNIX_PLATFORM
-FILE_SCOPE bool DqnFile__UnixGetFileSize(char const *path, usize *size)
+#ifdef DQN__IS_UNIX
+FILE_SCOPE bool DqnFile__UnixGetFileSizeWithStat(FILE *file, char const *path, usize *size)
 {
+    if (!file)
+    {
+        return false;
+    }
+
     struct stat fileStat = {};
     if (stat(path, &fileStat))
     {
@@ -8072,12 +8347,6 @@ FILE_SCOPE bool DqnFile__UnixGetFileSize(char const *path, usize *size)
     // But there can also be zero-byte files, we can't be sure. So manual check by counting bytes
     if (*size == 0)
     {
-        FILE *file = fopen(path, "r");
-        if (!file)
-        {
-          return false;
-        }
-
         u64 fileSizeInBytes = 0;
 
         char c = fgetc(file);
@@ -8143,15 +8412,16 @@ DqnFile__UnixOpen(char const *path, DqnFile *file, u32 flags, DqnFile::Action ac
 
     // TODO(doyle): Use open syscall
     // TODO(doyle): Query errno
-    if (!DqnFile__UnixGetFileSize(path, &file->size))
+    file->handle = reinterpret_cast<void *>(fopen(path, mode));
+    if (!DqnFile__UnixGetFileSize(reinterpret_cast<FILE *>(file->handle), path, &file->size))
     {
         // TODO(doyle): Logging
+        fclose(handle);
         return false;
     }
 
-    file->handle = reinterpret_cast<void *>(fopen(path, mode));
     file->flags = flags;
-    return file->handle;
+    return true;
 }
 
 DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
@@ -8210,7 +8480,7 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
         *numFiles      = currNumFiles;
         while (dirFile)
         {
-            DqnMem_Copy(list[listIndex++], dirFile->d_name, DQN_ARRAY_COUNT(dirFile->d_name));
+            DqnStr_Copy(list[listIndex++], dirFile->d_name, DQN_ARRAY_COUNT(dirFile->d_name));
             dirFile = readdir(dirHandle);
         }
         closedir(dirHandle);
@@ -8218,25 +8488,19 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
         return list;
     }
 }
-#endif // DQN__UNIX_PLATFORM
+#endif // DQN__IS_UNIX
 
 bool DqnFile::Open(char const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
     return DqnFile__Win32Open(widePath, this, flags_, action);
-
-#elif defined(DQN__UNIX_PLATFORM)
-    return DqnFile__UnixOpen(path, this, flags_, action);
-
 #else
-    DQN_ASSERT(DQN_INVALID_CODE_PATH);
-    return false;
-
+    return DqnFile__UnixOpen(path, this, flags_, action);
 #endif
 }
 
@@ -8244,7 +8508,7 @@ bool DqnFile::Open(wchar_t const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     return DqnFile__Win32Open(path, this, flags_, action);
 
 #else
@@ -8259,7 +8523,7 @@ usize DqnFile::Write(u8 const *buf, usize numBytesToWrite, usize fileOffset)
     DQN_ASSERTM(fileOffset == 0, "File writing into offset is not implemented.");
     usize numBytesWritten = 0;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     DWORD bytesToWrite = (DWORD)numBytesToWrite;
     DWORD bytesWritten;
     BOOL result = WriteFile(this->handle, (void *)buf, bytesToWrite, &bytesWritten, nullptr);
@@ -8271,7 +8535,7 @@ usize DqnFile::Write(u8 const *buf, usize numBytesToWrite, usize fileOffset)
         DQN__WIN32_ERROR_BOX("ReadFile() failed.", nullptr);
     }
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     const usize ITEMS_TO_WRITE = 1;
     if (fwrite(buf, numBytesToWrite, ITEMS_TO_WRITE, (FILE *)this->handle) == ITEMS_TO_WRITE)
     {
@@ -8288,7 +8552,7 @@ usize DqnFile::Read(u8 *buf, usize numBytesToRead)
     usize numBytesRead = 0;
     if (this->handle)
     {
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
         DWORD bytesToRead = (DWORD)numBytesToRead;
         DWORD bytesRead    = 0;
         HANDLE win32Handle = this->handle;
@@ -8302,7 +8566,7 @@ usize DqnFile::Read(u8 *buf, usize numBytesToRead)
             DQN__WIN32_ERROR_BOX("ReadFile() failed.", nullptr);
         }
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
         // TODO(doyle): Syscall version
         const usize ITEMS_TO_READ = 1;
         if (fread(buf, numBytesToRead, ITEMS_TO_READ, (FILE *)this->handle) == ITEMS_TO_READ)
@@ -8314,8 +8578,6 @@ usize DqnFile::Read(u8 *buf, usize numBytesToRead)
         {
             // TODO(doyle): Logging, failed read
         }
-#else
-    DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Non Win32/Unix path not implemented");
 #endif
     }
     return numBytesRead;
@@ -8428,9 +8690,9 @@ void DqnFile::Close()
 {
     if (this->handle)
     {
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
         CloseHandle(this->handle);
-#elif defined(DQN__UNIX_PLATFORM)
+#else
         fclose((FILE *)this->handle);
 #endif
         this->handle = nullptr;
@@ -8440,7 +8702,7 @@ void DqnFile::Close()
     this->flags = 0;
 }
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     DQN_COMPILE_ASSERT(sizeof(DWORD)  == sizeof(u32));
 #endif
 bool DqnFile::GetFileSize(wchar_t const *path, usize *size)
@@ -8462,15 +8724,26 @@ bool DqnFile::GetFileSize(char const *path, usize *size)
     if (!path || !size) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {0};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
     return DqnFile::GetFileSize(widePath, size);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     // TODO(doyle): Error logging
-    if (!DqnFile__UnixGetFileSize(path, size)) return false;
+    if (!DqnFile__UnixGetFileSizeWithStat(path, size)) return false;
+
+    // NOTE: 0 size can occur in some instances where files are generated on demand,
+    //       i.e. /proc/cpuinfo
+    if (*size == 0)
+    {
+        // If stat fails, then do a manual byte count
+        FILE *handle = fopen(path, "r");
+        *size        = DqnFile__UnixGetFileSizeManual(handle, false);
+        fclose(handle);
+    }
+
     return true;
 #endif
 }
@@ -8479,7 +8752,7 @@ bool DqnFile::GetInfo(wchar_t const *path, Info *info)
 {
     if (!path || !info) return false;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     auto FileTimeToSeconds = [](FILETIME const *time) -> i64 {
         ULARGE_INTEGER timeLargeInt = {};
         timeLargeInt.LowPart        = time->dwLowDateTime;
@@ -8505,7 +8778,7 @@ bool DqnFile::GetInfo(wchar_t const *path, Info *info)
         return true;
     }
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     // NOTE: Wide char not supported on unix
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
 
@@ -8522,13 +8795,13 @@ bool DqnFile::GetInfo(char const *path, Info *info)
         return false;
     }
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
     return DqnFile::GetInfo(widePath, info);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     struct stat fileStat = {};
     if (stat(path, &fileStat))
     {
@@ -8550,10 +8823,10 @@ bool DqnFile::Delete(char const *path)
     if (!path) return false;
 
 // TODO(doyle): Logging
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     return DeleteFileA(path);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     i32 result = unlink(path);
 
     if (result == 0) return true;
@@ -8567,10 +8840,10 @@ bool DqnFile::Delete(wchar_t const *path)
     if (!path) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     return DeleteFileW(path);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
 
@@ -8582,7 +8855,7 @@ bool DqnFile::Copy(char const *src, char const *dest)
     if (!src || !dest) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     BOOL result = (CopyFileA(src, dest, /*FailIfExist*/false) != 0);
     if (result == 0)
     {
@@ -8590,7 +8863,7 @@ bool DqnFile::Copy(char const *src, char const *dest)
     }
     return (result != 0);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
 
@@ -8602,10 +8875,10 @@ bool DqnFile::Copy(wchar_t const *src, wchar_t const *dest)
     if (!src || !dest) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     return (CopyFileW(src, dest, /*FailIfExist*/false) != 0);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
 
@@ -8634,7 +8907,7 @@ void DqnFile::ListDirFree(char **fileList, i32 numFiles, DqnMemAPI *api)
 
 // XPlatform > #DqnTimer
 // =================================================================================================
-#if defined (DQN__WIN32_PLATFORM)
+#if defined (DQN__IS_WIN32)
 FILE_SCOPE f64 DqnTimerInternal_Win32QueryPerfCounterTimeInMs()
 {
     LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {0};
@@ -8658,10 +8931,10 @@ FILE_SCOPE f64 DqnTimerInternal_Win32QueryPerfCounterTimeInMs()
 DQN_FILE_SCOPE f64 DqnTimer_NowInMs()
 {
     f64 result = 0;
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     result = DQN_MAX(DqnTimerInternal_Win32QueryPerfCounterTimeInMs(), 0);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     struct timespec timeSpec = {0};
     if (clock_gettime(CLOCK_MONOTONIC, &timeSpec))
     {
@@ -8672,9 +8945,6 @@ DQN_FILE_SCOPE f64 DqnTimer_NowInMs()
     {
         result = (f64)((timeSpec.tv_sec * 1000.0f) + (timeSpec.tv_nsec / 1000000.0f));
     }
-
-#else
-    DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Non Unix/Win32 path not implemented yet");
 
 #endif
     return result;
@@ -8688,20 +8958,15 @@ bool DqnLock_Init(DqnLock *lock)
 {
     if (!lock) return false;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     if (InitializeCriticalSectionEx(&lock->win32Handle, lock->win32SpinCount, 0))
         return true;
-
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     // NOTE: Static initialise, pre-empt a lock so that it gets initialised as per documentation
     lock->unixHandle = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
     DqnLock_Acquire(lock);
     DqnLock_Release(lock);
     return true;
-
-#else
-    #error Unsupported platform
-
 #endif
 
     return false;
@@ -8711,17 +8976,13 @@ void DqnLock_Acquire(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     EnterCriticalSection(&lock->win32Handle);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     // TODO(doyle): Better error handling
     i32 error = pthread_mutex_lock(&lock->unixHandle);
     DQN_ASSERT(error == 0);
-
-#else
-    #error Unsupported platform
-
 #endif
 }
 
@@ -8729,17 +8990,13 @@ void DqnLock_Release(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     LeaveCriticalSection(&lock->win32Handle);
 
-#elif defined (DQN__UNIX_PLATFORM)
+#else
     // TODO(doyle): better error handling
     i32 error = pthread_mutex_unlock(&lock->unixHandle);
     DQN_ASSERT(error == 0);
-
-#else
-    #error Unsupported platform
-
 #endif
 }
 
@@ -8747,16 +9004,11 @@ void DqnLock_Delete(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     DeleteCriticalSection(&lock->win32Handle);
-
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     i32 error = pthread_mutex_destroy(&lock->unixHandle);
     DQN_ASSERT(error == 0);
-
-#else
-    #error Unsupported platform
-
 #endif
 }
 
@@ -8800,7 +9052,7 @@ FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(usize stackSize,
 {
     u32 numThreadsCreated = 0;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     DQN_ASSERT(stackSize == 0 || !threadCallback);
     for (u32 i = 0; i < numThreads; i++)
     {
@@ -8810,7 +9062,7 @@ FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(usize stackSize,
         numThreadsCreated++;
     }
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     // TODO(doyle): Better error handling
     pthread_attr_t attribute = {};
     DQN_ASSERT(pthread_attr_init(&attribute) == 0);
@@ -8827,10 +9079,6 @@ FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(usize stackSize,
     }
 
     DQN_ASSERT(pthread_attr_destroy(&attribute) == 0);
-
-#else
-    #error Unsupported platform
-
 #endif
 
     DQN_ASSERT(numThreadsCreated == numThreads);
@@ -8845,15 +9093,10 @@ FILE_SCOPE void *DqnJobQueueInternal_ThreadCallback(void *threadParam)
     {
         if (!DqnJobQueue_TryExecuteNextJob(queue))
         {
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
             WaitForSingleObjectEx(queue->semaphore, INFINITE, false);
-
-#elif defined(DQN__UNIX_PLATFORM)
-            sem_wait(&queue->semaphore);
-
 #else
-    #error Unsupported platform
-
+            sem_wait(&queue->semaphore);
 #endif
         }
     }
@@ -8863,11 +9106,11 @@ FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *queue, u32 init
 {
     if (!queue) return false;
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     queue->semaphore = (void *)CreateSemaphoreA(nullptr, initSignalCount, maxSignalCount, nullptr);
     DQN_ASSERT(queue->semaphore);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     // TODO(doyle): Use max count for unix
     // TODO(doyle): Error handling
     const u32 UNIX_DONT_SHARE_BETWEEN_PROCESSES = 0;
@@ -8876,10 +9119,6 @@ FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *queue, u32 init
 
     for (u32 i = 0; i < initSignalCount; i++)
         DQN_ASSERT(sem_post(&queue->semaphore) == 0);
-
-#else
-    #error Unknown platform
-
 #endif
 
     return true;
@@ -8889,19 +9128,15 @@ FILE_SCOPE bool DqnJobQueueInternal_ReleaseSemaphore(DqnJobQueue *queue)
 {
     DQN_ASSERT(queue);
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     DQN_ASSERT(queue->semaphore);
     ReleaseSemaphore(queue->semaphore, 1, nullptr);
 
-#elif defined(DQN__UNIX_PLATFORM)
+#else
     // TODO(doyle): Error handling
     DQN_ASSERT(sem_post(&queue->semaphore) == 0);
-
-#else
-    #error Unknown platform
-
 #endif
-    
+
     return true;
 }
 
@@ -8992,22 +9227,18 @@ bool DqnJobQueue::AllJobsComplete  ()                 { return DqnJobQueue_AllJo
 // XPlatform > #DqnAtomic
 // =================================================================================================
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     DQN_COMPILE_ASSERT(sizeof(LONG) == sizeof(i32));
 #endif
 
 DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *dest, i32 swapVal, i32 compareVal)
 {
     i32 result = 0;
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     result = (i32)InterlockedCompareExchange((LONG volatile *)dest, (LONG)swapVal, (LONG)compareVal);
 
-#elif defined(DQN__UNIX_PLATFORM)
-    result = __sync_val_compare_and_swap(dest, compareVal, swapVal);
-
 #else
-    #error Unsupported platform
-
+    result = __sync_val_compare_and_swap(dest, compareVal, swapVal);
 #endif
     return result;
 }
@@ -9015,15 +9246,11 @@ DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *dest, i32 swapVal, i32 
 DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
 {
     i32 result = 0;
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
     result = (i32)InterlockedAdd((LONG volatile *)src, value);
 
-#elif defined(DQN__UNIX_PLATFORM)
-    result = __sync_add_and_fetch(src, value);
-
 #else
-    #error Unsupported platform
-
+    result = __sync_add_and_fetch(src, value);
 #endif
 
     return result;
@@ -9034,7 +9261,7 @@ DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
 #define DQN_OS_GET_THREADS_AND_CORES(name) \
     DQN_FILE_SCOPE void name(u32 *const numCores, u32 *const numThreadsPerCore)
 
-#if defined(DQN__UNIX_PLATFORM)
+#if defined(DQN__IS_UNIX)
 DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
 {
     if (!numThreadsPerCore && !numCores) return;
@@ -9097,9 +9324,9 @@ DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
         DQN_ASSERT(DQN_INVALID_CODE_PATH);
     }
 }
-#endif // DQN__UNIX_PLATFORM
+#endif // DQN__IS_UNIX
 
-#if defined(DQN__WIN32_PLATFORM)
+#if defined(DQN__IS_WIN32)
 DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
 {
     if (numThreadsPerCore)
@@ -9156,10 +9383,9 @@ DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
         DqnMem_Free(rawProcInfoArray);
     }
 }
-#endif // DQN__WIN32_PLATFORM
-#endif // DQN__XPLATFORM_LAYER
+#endif // DQN__IS_WIN32
 
-#ifdef DQN__WIN32_PLATFORM
+#ifdef DQN__IS_WIN32
 // #DqnWin32
 // =================================================================================================
 DQN_FILE_SCOPE i32 DqnWin32_UTF8ToWChar(char const *in, wchar_t *out, i32 outLen)
@@ -9269,4 +9495,5 @@ DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *buf, u32 bufLen)
 
     return lastSlashIndex;
 }
-#endif // DQN__WIN32_PLATFORM
+#endif // DQN__IS_WIN32
+#endif // DQN__XPLATFORM_LAYER
