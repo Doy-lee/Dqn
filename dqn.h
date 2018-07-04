@@ -32,6 +32,7 @@
 // #Dqn_*          Utility code, (qsort, quick file reading)
 // #DqnMem         Memory Allocation
 // #DqnMemAPI      Custom memory API for Dqn Data Structures
+// #DqnPool        Pool objects
 // #DqnArray       Dynamic Array using Templates
 // #DqnMemStack    Memory Allocator, Push, Pop Style
 // #DqnHash        Hashing using Murmur
@@ -80,12 +81,6 @@
 
 #if defined(DQN_PLATFORM_IMPLEMENTATION)
     #define DQN__XPLATFORM_LAYER 1
-
-    // #if defined(DQN__IS_WIN32)
-    //     #define DQN__WIN32_PLATFORM 1
-    // #else
-    //     #define DQN__UNIX_PLATFORM 1
-    // #endif
 #endif
 
 // #Portable Code
@@ -859,9 +854,32 @@ public:
     bool  IsValid() const { return (this->allocator != nullptr); }
 };
 
+// #DqnPool API
+// =================================================================================================
+template <typename T, i16 SIZE>
+struct DqnPool
+{
+    struct Entry : public T
+    {
+        u16 nextIndex;
+    };
+
+    const static isize SENTINEL_INDEX = SIZE;
+
+    Entry  pool[SIZE];
+    i16    freeIndex;
+    i16    numFree;
+
+         DqnPool() : freeIndex(0) , numFree(SIZE) { DQN_FOR_EACH(i, SIZE - 1) { Entry *entry = pool + i; entry->nextIndex = i + 1; } Entry *last = pool + (SIZE - 1); last->nextIndex = SENTINEL_INDEX; }
+    T   *GetNext()        { if (freeIndex == SENTINEL_INDEX) return nullptr; Entry *result = pool + freeIndex; freeIndex = result->nextIndex; numFree--; return result; }
+    void Return (T *item) { auto *entry = reinterpret_cast<Entry *>(item); entry->nextIndex = freeIndex; freeIndex = pool - entry; numFree++; }
+};
+
 FILE_SCOPE DqnMemAPI DQN_DEFAULT_HEAP_ALLOCATOR_ = DqnMemAPI::HeapAllocator();
 FILE_SCOPE DqnMemAPI *DQN_DEFAULT_HEAP_ALLOCATOR = &DQN_DEFAULT_HEAP_ALLOCATOR_;
 
+// #DqnArray API
+// =================================================================================================
 template<typename T>
 struct DqnArray
 {
@@ -950,66 +968,6 @@ template <typename T> bool DqnArray<T>::Reserve(isize newMax)
     max  = newMax;
     return data;
 }
-
-#if 0
-// #DqnArray API
-// =================================================================================================
-template <typename T>
-struct DqnArray
-{
-    DqnMemAPI *memAPI; // R/Write: The allocation scheme used, if null, it gets set to DQN_DEFAULT_HEAP_ALLOCATOR
-    isize      count;  // Read: The number of item in the array
-    isize      max;    // Read: Maximum size of array
-    T         *data;   // Read: Item storage
-
-    DqnArray() = default; // Zero Is Initialisation
-    DqnArray(DqnMemAPI *memAPI_) { *this = {}; this->memAPI = memAPI_; }
-
-    // API
-    // =============================================================================================
-    void  UseMemory   (T *data_, isize max_, isize count_ = 0) { this->memAPI = nullptr; this->data = data_; this->max = max_; this->count = count_; }
-
-    void  Free        ();
-    bool  Reserve     (isize newMax);              // If (newMax <= count) true is returned. False is returned only if out of memory.
-    bool  Grow        (isize multiplier = 2);
-    T    *Make        (isize num = 1);             // Increment array count by num and return a ptr to the start of an array of num elements.
-    T    *Push        (T const *item, isize num);  // return: Last element pushed (this->data + this->count - 1), or null if out of memory.
-    T    *Push        (T const  item);             // return: Last element pushed (this->data + this->count - 1), or null if out of memory.
-    T    *Insert      (T const *item, isize numItems, isize index);
-    T    *Insert      (T const  item, isize index);
-    void  Pop         ();
-    T    *Peek        ();
-    T    *Get         (isize index);
-    void  Clear       (Dqn::ZeroClear clear = Dqn::ZeroClear::No);
-    bool  Remove      (isize index);
-    bool  EraseStable(isize index);
-
-     // indexList: Array of indexes to remove. This list gets sorted.
-    void  EraseStable(isize *indexList, isize numIndexes);
-
-    // C++ Iterator
-    // =============================================================================================
-    class Iterator
-    {
-        T *data;
-    public:
-        Iterator(T *data_) : data(data_) {}
-        bool      operator!=(Iterator const &other) const { return this->data != other.data; }
-        T        &operator* ()                      const { return *data; }
-        Iterator  operator++()                            { data++; return *this; }
-    };
-
-    T &operator[] (isize index) const { return this->data[index]; }
-    Iterator begin()            const { return Iterator(this->data); }
-    Iterator end  ()            const { return Iterator(this->data + this->count); }
-};
-
-template <typename T>
-struct DqnSmartArray : public DqnArray<T>
-{
-    ~DqnSmartArray() { if (this->data && this->memAPI) this->memAPI->Free(this->data); }
-};
-#endif
 
 // #DqnAllocatorMetadata
 // =================================================================================================
