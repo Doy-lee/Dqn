@@ -910,17 +910,17 @@ template<typename T> T *DqnArray<T>::Insert(isize index, T const *v, isize numIt
         return nullptr;
     }
 
-    T *start     = data + index;
-    T const *end = data + count;
-    count        = newCount;
+    T *src  = data + index;
+    T *dest = src + numItems;
+    count   = newCount;
 
-    if (start < end)
-        memmove(start + numItems, start, numItems * sizeof(T));
+    if (src < dest)
+        memmove(dest, src, ((data + count) - src) * sizeof(T));
 
     for (isize i = 0; i < numItems; i++)
-        start[i] = v[i];
+        src[i] = v[i];
 
-    return start;
+    return src;
 }
 
 template <typename T> void DqnArray<T>::EraseStable(isize index)
@@ -1905,7 +1905,8 @@ DqnFixedString__VSprintf(DqnFixedString<MAX> *me, char const *fmt, va_list argLi
 {
     char *bufStart           = me->str + bufOffset;
     i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
-    int result = Dqn_vsnprintf(bufStart, remainingSpace, fmt, argList);
+    int result               = Dqn_vsnprintf(bufStart, remainingSpace, fmt, argList);
+    me->len                  = result;
     return result;
 }
 
@@ -2001,11 +2002,11 @@ struct DqnHashTable
 template <typename T>
 bool DqnHashTable<T>::Init(i64 const numTableEntries, DqnMemAPI *const api)
 {
-    isize arrayOfPtrsSize = (isize)(sizeof(*this->entries) * numTableEntries);
+    usize arrayOfPtrsSize = sizeof(*this->entries) * numTableEntries;
     auto *arrayOfPtrs   = (u8 *)api->Alloc((isize)arrayOfPtrsSize);
     if (!arrayOfPtrs) return false;
 
-    isize usedEntriesSize  = (isize)(sizeof(*this->usedEntries) * numTableEntries);
+    usize usedEntriesSize  = sizeof(*this->usedEntries) * numTableEntries;
     auto *usedEntriesPtr = (u8 *)api->Alloc(usedEntriesSize);
     if (!usedEntriesPtr)
     {
@@ -2297,7 +2298,7 @@ void DqnHashTable<T>::Free()
 
     // Free usedEntries list
     {
-        isize sizeToFree = (isize)(sizeof(*this->usedEntries) * this->numEntries);
+        usize sizeToFree = sizeof(*this->usedEntries) * this->numEntries;
         this->memAPI->Free(this->usedEntries, sizeToFree);
     }
 
@@ -2316,7 +2317,7 @@ void DqnHashTable<T>::Free()
 
     // Free the array of ptrs
     {
-        isize sizeToFree = (isize)(ENTRY_SIZE * this->numEntries);
+        usize sizeToFree = ENTRY_SIZE * this->numEntries;
         this->memAPI->Free(this->entries, sizeToFree);
     }
 
@@ -2364,10 +2365,10 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
     if (newNumEntries == this->numEntries) return true;
 
     Entry **newEntries    = {};
-    isize newEntriesSize = (isize)(sizeof(*this->entries) * newNumEntries);
+    usize newEntriesSize = sizeof(*this->entries) * newNumEntries;
 
     i64 *newUsedEntries       = {};
-    isize newUsedEntriesSize = (isize)(sizeof(*this->usedEntries) * newNumEntries);
+    usize newUsedEntriesSize = sizeof(*this->usedEntries) * newNumEntries;
     i64 newUsedEntriesIndex   = 0;
 
     // NOTE: If you change allocation order, be sure to change the free order.
@@ -2421,13 +2422,13 @@ bool DqnHashTable<T>::ChangeNumEntries(i64 newNumEntries)
 
     // Free the old entry list
     {
-        usize freeSize = (isize)(sizeof(*this->entries) * this->numEntries);
+        usize freeSize = sizeof(*this->entries) * this->numEntries;
         this->memAPI->Free(this->entries, freeSize);
     }
 
     // Free the old used entry list
     {
-        usize freeSize = (isize)(sizeof(*this->usedEntries) * this->numEntries);
+        usize freeSize = sizeof(*this->usedEntries) * this->numEntries;
         this->memAPI->Free(this->usedEntries, freeSize);
     }
 

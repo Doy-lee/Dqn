@@ -1648,7 +1648,7 @@ void DqnFile_Test()
         {
             const char *const FILE_TO_OPEN = ".clang-format";
             u32 expectedSize               = 0;
-#if defined(DQN_UNIX_IMPLEMENTATION)
+#if defined(DQN__IS_UNIX)
             {
                 struct stat fileStat = {0};
                 DQN_ASSERT(stat(FILE_TO_OPEN, &fileStat) == 0);
@@ -1665,7 +1665,7 @@ void DqnFile_Test()
                 DQN_ASSERT(size > 0);
             }
 
-#elif defined(DQN_WIN32_IMPLEMENTATION)
+#else
             {
                 HANDLE handle = CreateFile(FILE_TO_OPEN, GENERIC_READ, 0, NULL, OPEN_EXISTING,
                                            FILE_ATTRIBUTE_NORMAL, NULL);
