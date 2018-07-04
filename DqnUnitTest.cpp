@@ -1,3 +1,8 @@
+#define WIN32_MEAN_AND_LEAN
+#include <Winsock2.h>
+#include <ws2tcpip.h>
+#include <Windows.h>
+
 #if (defined(_WIN32) || defined(_WIN64))
     #define DQN_WIN32_IMPLEMENTATION
     #include "Windows.h"
@@ -136,6 +141,7 @@ void LogHeader(char const *funcName)
 }
 
 #include "DqnFixedString.cpp"
+#include "DqnOS.cpp"
 
 void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 {
@@ -2897,7 +2903,7 @@ int main(void)
     DqnFixedString_Test();
 
 #ifdef DQN_PLATFORM_HEADER
-    // DqnOS_Test();
+    DqnOS_Test();
     DqnFile_Test();
     DqnTimer_Test();
     DqnJobQueue_Test();
