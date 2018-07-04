@@ -15,7 +15,6 @@ void DqnOS_Test()
     // }
 #if defined(DQN__IS_WIN32)
     // CreateProcessW();
-    defer(printf("hello world\n"));
 
     WSAData wsaData;
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
