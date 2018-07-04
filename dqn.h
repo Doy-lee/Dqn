@@ -870,9 +870,33 @@ struct DqnPool
     i16    freeIndex;
     i16    numFree;
 
-         DqnPool() : freeIndex(0) , numFree(SIZE) { DQN_FOR_EACH(i, SIZE - 1) { Entry *entry = pool + i; entry->nextIndex = i + 1; } Entry *last = pool + (SIZE - 1); last->nextIndex = SENTINEL_INDEX; }
-    T   *GetNext()        { if (freeIndex == SENTINEL_INDEX) return nullptr; Entry *result = pool + freeIndex; freeIndex = result->nextIndex; numFree--; return result; }
-    void Return (T *item) { auto *entry = reinterpret_cast<Entry *>(item); entry->nextIndex = freeIndex; freeIndex = pool - entry; numFree++; }
+    DqnPool() : freeIndex(0) , numFree(SIZE)
+    {
+        DQN_FOR_EACH(i, SIZE - 1)
+        {
+            Entry *entry     = pool + i;
+            entry->nextIndex = i + 1;
+        }
+        Entry *last     = pool + (SIZE - 1);
+        last->nextIndex = SENTINEL_INDEX;
+    }
+
+    T *GetNext()
+    {
+        if (freeIndex == SENTINEL_INDEX) return nullptr;
+        Entry *result = pool + freeIndex;
+        freeIndex     = result->nextIndex;
+        numFree--;
+        return result;
+    }
+
+    void Return(T *item)
+    {
+        auto *entry      = reinterpret_cast<Entry *>(item);
+        entry->nextIndex = freeIndex;
+        freeIndex        = entry - pool;
+        numFree++;
+    }
 };
 
 FILE_SCOPE DqnMemAPI DQN_DEFAULT_HEAP_ALLOCATOR_ = DqnMemAPI::HeapAllocator();
