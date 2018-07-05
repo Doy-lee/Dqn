@@ -921,9 +921,9 @@ struct DqnArray
     void  Free       ()                                           { if (data) { memAPI->Free(data); } *this = {}; }
     T    *Front      ()                                           { DQN_ASSERT(count > 0); return data + 0; }
     T    *Back       ()                                           { DQN_ASSERT(count > 0); return data + (count - 1); }
-    bool  Resize     (isize newCount)                             { if (newCount > max) Reserve(GrowCapacity_(newCount)); count = newCount; }
-    bool  Resize     (isize newCount, T const *v)                 { if (newCount > max) Reserve(GrowCapacity_(newCount)); if (newCount > count) for (isize n = count; n < newCount; n++) data[n] = *v; count = newCount; }
-    bool  Reserve    (isize newMax);
+    void  Resize     (isize newCount)                             { if (newCount > max) Reserve(GrowCapacity_(newCount)); count = newCount; }
+    void  Resize     (isize newCount, T const *v)                 { if (newCount > max) Reserve(GrowCapacity_(newCount)); if (newCount > count) for (isize n = count; n < newCount; n++) data[n] = *v; count = newCount; }
+    void  Reserve    (isize newMax);
     T    *Push       (T const &v)                                 { return Insert(count, &v, 1); }
     T    *Push       (T const *v, isize numItems = 1)             { return Insert(count,  v, numItems); }
     void  Pop        ()                                           { if (count > 0) count--; }
@@ -947,18 +947,16 @@ template<typename T> T *DqnArray<T>::Insert(isize index, T const *v, isize numIt
     index                = DQN_MIN(DQN_MAX(index, 0), count);
     isize const newCount = count + numItems;
 
-    if (newCount >= max && !Reserve(GrowCapacity_(newCount)))
-    {
-        return nullptr;
-    }
+    if (newCount >= max)
+      Reserve(GrowCapacity_(newCount));
 
     T *src  = data + index;
     T *dest = src + numItems;
-    count   = newCount;
 
     if (src < dest)
         memmove(dest, src, ((data + count) - src) * sizeof(T));
 
+    count = newCount;
     for (isize i = 0; i < numItems; i++)
         src[i] = v[i];
 
@@ -973,24 +971,23 @@ template <typename T> void DqnArray<T>::EraseStable(isize index)
     count--;
 }
 
-template <typename T> bool DqnArray<T>::Reserve(isize newMax)
+template <typename T> void DqnArray<T>::Reserve(isize newMax)
 {
-    if (newMax <= max) return true;
+    if (newMax <= max) return;
 
     if (data)
     {
         T *newData = (T *)memAPI->Realloc(data, max * sizeof(T), newMax * sizeof(T));
-        if (newData)
-        {
-            data = newData;
-            max  = newMax;
-        }
-        return newData;
+        data = newData;
+        max  = newMax;
+    }
+    else
+    {
+      data = (T *)memAPI->Alloc(newMax * sizeof(T));
+      max  = newMax;
     }
 
-    data = (T *)memAPI->Alloc(newMax * sizeof(T));
-    max  = newMax;
-    return data;
+    DQN_ASSERT(data);
 }
 
 // #DqnAllocatorMetadata
@@ -3304,7 +3301,7 @@ void DqnAllocatorMetadata::Init(bool boundsGuard)
         this->boundsGuardSize        = sizeof(HEAD_GUARD_VALUE);
         LOCAL_PERSIST DqnMemAPI heap = DqnMemAPI::HeapAllocator();
         this->allocations.memAPI     = &heap;
-        DQN_ASSERT(this->allocations.Reserve(128));
+        this->allocations.Reserve(128);
     }
     else
     {
@@ -8310,13 +8307,8 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
 #endif // DQN__IS_WIN32
 
 #ifdef DQN__IS_UNIX
-FILE_SCOPE bool DqnFile__UnixGetFileSizeWithStat(FILE *file, char const *path, usize *size)
+FILE_SCOPE bool DqnFile__UnixGetFileSize(char const *path, usize *size)
 {
-    if (!file)
-    {
-        return false;
-    }
-
     struct stat fileStat = {};
     if (stat(path, &fileStat))
     {
@@ -8330,6 +8322,8 @@ FILE_SCOPE bool DqnFile__UnixGetFileSizeWithStat(FILE *file, char const *path, u
     // But there can also be zero-byte files, we can't be sure. So manual check by counting bytes
     if (*size == 0)
     {
+        FILE *file = fopen(path, "r");
+        DQN_DEFER(fclose(file));
         u64 fileSizeInBytes = 0;
 
         char c = fgetc(file);
@@ -8338,7 +8332,6 @@ FILE_SCOPE bool DqnFile__UnixGetFileSizeWithStat(FILE *file, char const *path, u
             fileSizeInBytes++;
             c = fgetc(file);
         }
-        rewind(file);
     }
 
     return true;
@@ -8395,11 +8388,8 @@ DqnFile__UnixOpen(char const *path, DqnFile *file, u32 flags, DqnFile::Action ac
 
     // TODO(doyle): Use open syscall
     // TODO(doyle): Query errno
-    file->handle = reinterpret_cast<void *>(fopen(path, mode));
-    if (!DqnFile__UnixGetFileSize(reinterpret_cast<FILE *>(file->handle), path, &file->size))
+    if (!DqnFile__UnixGetFileSize(path, &file->size))
     {
-        // TODO(doyle): Logging
-        fclose(handle);
         return false;
     }
 
@@ -8463,7 +8453,7 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
         *numFiles      = currNumFiles;
         while (dirFile)
         {
-            DqnStr_Copy(list[listIndex++], dirFile->d_name, DQN_ARRAY_COUNT(dirFile->d_name));
+            DqnMem_Copy(list[listIndex++], dirFile->d_name, DQN_ARRAY_COUNT(dirFile->d_name));
             dirFile = readdir(dirHandle);
         }
         closedir(dirHandle);
@@ -8715,19 +8705,8 @@ bool DqnFile::GetFileSize(char const *path, usize *size)
 
 #else
     // TODO(doyle): Error logging
-    if (!DqnFile__UnixGetFileSizeWithStat(path, size)) return false;
-
-    // NOTE: 0 size can occur in some instances where files are generated on demand,
-    //       i.e. /proc/cpuinfo
-    if (*size == 0)
-    {
-        // If stat fails, then do a manual byte count
-        FILE *handle = fopen(path, "r");
-        *size        = DqnFile__UnixGetFileSizeManual(handle, false);
-        fclose(handle);
-    }
-
-    return true;
+    bool result = DqnFile__UnixGetFileSize(path, size);
+    return result;
 #endif
 }
 
