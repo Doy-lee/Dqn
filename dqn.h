@@ -6347,8 +6347,9 @@ DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *array, i64 size, i64 find,
 DQN_FILE_SCOPE DqnJson DqnJson_Get(char const *buf, i32 bufLen, char const *findProperty, i32 findPropertyLen)
 {
     DqnJson result = {};
-    char *locate   = DqnStr_GetFirstOccurence(buf, bufLen, findProperty, findPropertyLen);
 
+TryNext:
+    char *locate   = DqnStr_GetFirstOccurence(buf, bufLen, findProperty, findPropertyLen);
     if (!locate) return result;
 
     // NOTE: if find property is '{' we are looking for an object in array or the global scope etc
@@ -6362,7 +6363,11 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(char const *buf, i32 bufLen, char const *find
         if (!(findProperty[0] == '"' && findProperty[findPropertyLen - 1] == '"'))
         {
             if (locate[-1] != '"' || locate[findPropertyLen] != '"')
-                return result;
+            {
+                bufLen -= ((locate - buf) + findPropertyLen);
+                buf     = locate + findPropertyLen;
+                goto TryNext;
+            }
         }
 
         if (!(locate[findPropertyLen + 1] && locate[findPropertyLen + 1] == ':'))
