@@ -1856,10 +1856,10 @@ struct DqnFixedString
     DqnFixedString(DqnSlice<char> const &other)       {                     this->len = DqnFixedString__Append(this->str, MAX, other.data, other.len); }
     DqnFixedString(DqnFixedString const &other)       { if (this != &other) this->len = DqnFixedString__Append(this->str, MAX, other.str, other.len);  }
 
-    DqnFixedString &operator+=(char const *other)                 { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other); return *this; }
-    DqnFixedString &operator+=(DqnSlice<char const> const &other) { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
-    DqnFixedString &operator+=(DqnSlice<char> const &other)       { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
-    DqnFixedString &operator+=(DqnFixedString const &other)       { this->len = DqnFixedString__Append(this->str + this->len, MAX - this->len, other.str, other.len); return *this; }
+    DqnFixedString &operator+=(char const *other)                 { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other); return *this; }
+    DqnFixedString &operator+=(DqnSlice<char const> const &other) { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
+    DqnFixedString &operator+=(DqnSlice<char> const &other)       { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
+    DqnFixedString &operator+=(DqnFixedString const &other)       { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other.str, other.len); return *this; }
 
     DqnFixedString  operator+ (char const *other)                 { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other); return result; }
     DqnFixedString  operator+ (DqnSlice<char const> const &other) { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
@@ -1885,7 +1885,7 @@ DqnFixedString__VSprintf(DqnFixedString<MAX> *me, char const *fmt, va_list argLi
     char *bufStart           = me->str + bufOffset;
     i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
     int result               = Dqn_vsnprintf(bufStart, remainingSpace, fmt, argList);
-    me->len                  = result;
+    me->len                  = bufOffset + result;
     return result;
 }
 
@@ -6215,7 +6215,6 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
 // return: The number of bytes written to dest
 FILE_SCOPE int DqnFixedString__Append(char *dest, int destSize, char const *src, int len)
 {
-    i32 realLen = 0;
     if (len <= -1)
     {
         char *ptr = dest;
@@ -6229,17 +6228,16 @@ FILE_SCOPE int DqnFixedString__Append(char *dest, int destSize, char const *src,
             DQN_ASSERT(!src[0]);
         }
 
-        realLen = static_cast<i32>(ptr - dest);
+        len = static_cast<i32>(ptr - dest);
     }
     else
     {
-        realLen = DQN_MIN(len, destSize - 1);
-        DqnMem_Copy(dest, src, realLen);
+        DqnMem_Copy(dest, src, len);
     }
 
-    DQN_ASSERT(realLen <= destSize && realLen >= 0);
-    dest[realLen] = 0;
-    return realLen;
+    DQN_ASSERT(len < destSize && len >= 0);
+    dest[len] = 0;
+    return len;
 }
 
 // #Dqn
@@ -6364,7 +6362,7 @@ TryNext:
         {
             if (locate[-1] != '"' || locate[findPropertyLen] != '"')
             {
-                bufLen -= ((locate - buf) + findPropertyLen);
+                bufLen -= static_cast<i32>(((locate - buf) + findPropertyLen));
                 buf     = locate + findPropertyLen;
                 goto TryNext;
             }

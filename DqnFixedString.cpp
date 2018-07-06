@@ -34,7 +34,7 @@ void DqnFixedString_Test()
             DqnFixedString<512> str = DQN_SLICE("hello world");
             DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
             str += DQN_SLICE(".end");
-            DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor.end") == 0);
+            DQN_ASSERTM(DqnStr_Cmp(str.str, "hello sailor.end") == 0, "Result: %s", str.str);
         }
 
         {
@@ -64,5 +64,14 @@ void DqnFixedString_Test()
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor end of") == 0);
 
         Log(Status::Ok, "Operator +");
+    }
+
+    {
+        DqnFixedString<512> str = "localhost";
+        str.SprintfAppend(":%d", 16832);
+        str += "/json_rpc";
+        DQN_ASSERT(str.len == 24 && DqnStr_Cmp("localhost:16832/json_rpc", str.str) == 0);
+
+        Log(Status::Ok, "Copy constructor, sprintf, operator +=");
     }
 }
