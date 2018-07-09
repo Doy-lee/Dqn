@@ -47,6 +47,7 @@
 // #DqnHashTable   Hash Tables using Templates
 
 // #XPlatform (Win32 & Unix)
+// #DqnVArray    Array backed by virtual memory
 // #DqnFile      File I/O (Read, Write, Delete)
 // #DqnTimer     High Resolution Timer
 // #DqnLock      Mutex Synchronisation
@@ -74,9 +75,9 @@
 // This needs to be above the portable layer so  that, if the user requests a platform
 // implementation, platform specific implementations in the portable layer will get activated.
 #if (defined(_WIN32) || defined(_WIN64))
-    #define DQN__IS_WIN32 1
+    #define DQN_IS_WIN32 1
 #else
-    #define DQN__IS_UNIX 1
+    #define DQN_IS_UNIX 1
 #endif
 
 #if defined(DQN_PLATFORM_IMPLEMENTATION)
@@ -187,6 +188,348 @@ FILE_SCOPE const bool IS_DEBUG = true;
 
 // #External Code
 // =================================================================================================
+#if defined(DQN_PLATFORM_HEADER) && defined(DQN_IS_WIN32) && !defined(_WINDOWS_)
+using WORD      = unsigned short;
+using DWORD     = unsigned long;
+using BOOL      = int;
+using LONG      = long;
+using LONGLONG  = long long;
+using HANDLE    = void *;
+using HMODULE   = HANDLE;
+using HWND      = HANDLE;
+using UINT      = unsigned int;
+using ULONG     = unsigned long;
+using ULONGLONG = unsigned long long;
+using DWORD64   = unsigned long long;
+using BYTE      = unsigned char;
+
+u32    const MB_OK                         = 0x00000000L;
+HANDLE const INVALID_HANDLE_VALUE          = ((HANDLE)(LONG *)-1);
+u32    const MAX_PATH                      = 260;
+u32    const INFINITE                      = 0xFFFFFFFF;
+u32    const CP_UTF8                       = 65001;
+u32    const FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200;
+u32    const FORMAT_MESSAGE_FROM_SYSTEM    = 0x00001000;
+u32    const MEM_COMMIT                    = 0x00001000;
+u32    const MEM_RESERVE                   = 0x00002000;
+u32    const PAGE_READWRITE                = 0x04;
+u32    const MEM_DECOMMIT                  = 0x4000;
+u32    const MEM_RELEASE                   = 0x8000;
+
+struct RECT
+{
+    LONG left;
+    LONG top;
+    LONG right;
+    LONG bottom;
+};
+
+union LARGE_INTEGER
+{
+    struct { DWORD LowPart; LONG HighPart; };
+    struct { DWORD LowPart; LONG HighPart; } u;
+    LONGLONG QuadPart;
+};
+
+union ULARGE_INTEGER
+{
+  struct { DWORD LowPart; DWORD HighPart; };
+  struct { DWORD LowPart; DWORD HighPart; } u;
+  ULONGLONG QuadPart;
+};
+
+struct SECURITY_ATTRIBUTES
+{
+    DWORD length;
+    void *securityDescriptor;
+    BOOL inheritHandle;
+};
+
+struct PROCESS_INFORMATION
+{
+    void *hProcess;
+    void *hThread;
+    DWORD dwProcessId;
+    DWORD dwThreadId;
+};
+
+
+struct FILETIME
+{
+  DWORD dwLowDateTime;
+  DWORD dwHighDateTime;
+};
+
+struct WIN32_FILE_ATTRIBUTE_DATA
+{
+    DWORD dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
+    FILETIME ftLastWriteTime;
+    DWORD nFileSizeHigh;
+    DWORD nFileSizeLow;
+};
+
+enum GET_FILEEX_INFO_LEVELS
+{
+    GetFileExInfoStandard,
+    GetFileExMaxInfoLevel
+};
+
+struct WIN32_FIND_DATAW
+{
+  DWORD    dwFileAttributes;
+  FILETIME ftCreationTime;
+  FILETIME ftLastAccessTime;
+  FILETIME ftLastWriteTime;
+  DWORD    nFileSizeHigh;
+  DWORD    nFileSizeLow;
+  DWORD    dwReserved0;
+  DWORD    dwReserved1;
+  wchar_t  cFileName[MAX_PATH];
+  wchar_t  cAlternateFileName[14];
+};
+
+struct LIST_ENTRY {
+   struct LIST_ENTRY *Flink;
+   struct LIST_ENTRY *Blink;
+};
+
+struct RTL_CRITICAL_SECTION_DEBUG
+{
+    WORD Type;
+    WORD CreatorBackTraceIndex;
+    struct CRITICAL_SECTION *CriticalSection;
+    LIST_ENTRY ProcessLocksList;
+    DWORD EntryCount;
+    DWORD ContentionCount;
+    DWORD Flags;
+    WORD CreatorBackTraceIndexHigh;
+    WORD SpareWORD;
+};
+
+struct CRITICAL_SECTION
+{
+    RTL_CRITICAL_SECTION_DEBUG *DebugInfo;
+    LONG LockCount;
+    LONG RecursionCount;
+    HANDLE OwningThread;
+    HANDLE LockSemaphore;
+    ULONG *SpinCount;
+};
+
+struct OVERLAPPED {
+  ULONG *Internal;
+  ULONG *InternalHigh;
+  union {
+    struct {
+      DWORD Offset;
+      DWORD OffsetHigh;
+    };
+    void  *Pointer;
+  };
+  HANDLE    hEvent;
+};
+
+struct SYSTEM_INFO {
+  union
+  {
+    DWORD  dwOemId;
+    struct
+    {
+      WORD wProcessorArchitecture;
+      WORD wReserved;
+    };
+  };
+  DWORD  dwPageSize;
+  void  *lpMinimumApplicationAddress;
+  void  *lpMaximumApplicationAddress;
+  DWORD *dwActiveProcessorMask;
+  DWORD  dwNumberOfProcessors;
+  DWORD  dwProcessorType;
+  DWORD  dwAllocationGranularity;
+  WORD   wProcessorLevel;
+  WORD   wProcessorRevision;
+};
+
+enum LOGICAL_PROCESSOR_RELATIONSHIP
+{
+    RelationProcessorCore,
+    RelationNumaNode,
+    RelationCache,
+    RelationProcessorPackage,
+    RelationGroup,
+    RelationAll = 0xffff
+};
+
+typedef unsigned long *KAFFINITY;
+struct GROUP_AFFINITY {
+    KAFFINITY Mask;
+    WORD   Group;
+    WORD   Reserved[3];
+};
+
+struct PROCESSOR_RELATIONSHIP
+{
+    BYTE  Flags;
+    BYTE  EfficiencyClass;
+    BYTE  Reserved[20];
+    WORD  GroupCount;
+    GROUP_AFFINITY GroupMask[1];
+};
+
+struct NUMA_NODE_RELATIONSHIP {
+    DWORD NodeNumber;
+    BYTE  Reserved[20];
+    GROUP_AFFINITY GroupMask;
+};
+
+enum PROCESSOR_CACHE_TYPE
+{
+    CacheUnified,
+    CacheInstruction,
+    CacheData,
+    CacheTrace
+};
+
+struct CACHE_RELATIONSHIP
+{
+    BYTE Level;
+    BYTE Associativity;
+    WORD LineSize;
+    DWORD CacheSize;
+    PROCESSOR_CACHE_TYPE Type;
+    BYTE Reserved[20];
+    GROUP_AFFINITY GroupMask;
+};
+
+struct PROCESSOR_GROUP_INFO
+{
+    BYTE MaximumProcessorCount;
+    BYTE ActiveProcessorCount;
+    BYTE Reserved[38];
+    KAFFINITY ActiveProcessorMask;
+};
+
+struct GROUP_RELATIONSHIP
+{
+    WORD MaximumGroupCount;
+    WORD ActiveGroupCount;
+    BYTE Reserved[20];
+    PROCESSOR_GROUP_INFO GroupInfo[1];
+};
+
+struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX
+{
+    LOGICAL_PROCESSOR_RELATIONSHIP Relationship;
+    DWORD Size;
+    union
+    {
+        PROCESSOR_RELATIONSHIP Processor;
+        NUMA_NODE_RELATIONSHIP NumaNode;
+        CACHE_RELATIONSHIP Cache;
+        GROUP_RELATIONSHIP Group;
+    };
+};
+
+
+typedef DWORD (*LPTHREAD_START_ROUTINE)(void *lpThreadParameter);
+
+DWORD64 __rdtsc();
+
+void    DeleteCriticalSection           (CRITICAL_SECTION *lpCriticalSection);
+BOOL    DeleteFileA                     (char    const *lpFileName); // TODO(doyle): Wide versions only
+BOOL    DeleteFileW                     (wchar_t const *lpFileName);
+BOOL    CloseHandle                     (HANDLE hObject);
+BOOL    CopyFileA                       (char    const *lpExistingFileName, char const *lpNewFileName, BOOL bFailIfExists);
+BOOL    CopyFileW                       (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, BOOL bFailIfExists);
+BOOL    CloseHandle                     (HANDLE *hObject);
+HANDLE  CreateFileW                     (wchar_t const *lpFileName,
+                                         DWORD dwDesiredAccess,
+                                         DWORD dwShareMode,
+                                         SECURITY_ATTRIBUTES *lpSecurityAttributes,
+                                         DWORD dwCreationDisposition,
+                                         DWORD dwFlagsAndAttributes,
+                                         HANDLE hTemplateFile);
+HANDLE  CreateSemaphoreA                (SECURITY_ATTRIBUTES *lpSemaphoreAttributes,
+                                         long lInitialCount,
+                                         long lMaximumCount,
+                                         char const *lpName);
+HANDLE  CreateThread                    (SECURITY_ATTRIBUTES *lpThreadAttributes,
+                                         size_t dwStackSize,
+                                         LPTHREAD_START_ROUTINE lpStartAddress,
+                                         void *lpParameter,
+                                         DWORD dwCreationFlags,
+                                         DWORD *lpThreadId);
+void    EnterCriticalSection            (CRITICAL_SECTION *lpCriticalSection);
+BOOL    FindClose                       (HANDLE hFindFile);
+HANDLE  FindFirstFileW                  (wchar_t const *lpFileName, WIN32_FIND_DATAW *lpFindFileData);
+BOOL    FindNextFileW                   (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+DWORD   FormatMessageA                  (DWORD dwFlags,
+                                         void const *lpSource,
+                                         DWORD dwMessageId,
+                                         DWORD dwLanguageId,
+                                         char *lpBuffer,
+                                         DWORD nSize,
+                                         va_list *Arguments);
+BOOL    GetClientRect                   (HWND hWnd, RECT *lpRect);
+BOOL    GetExitCodeProcess              (HANDLE *hProcess, DWORD *lpExitCode);
+BOOL    GetFileSizeEx                   (HANDLE hFile, LARGE_INTEGER *lpFileSize);
+BOOL    GetFileAttributesExW            (wchar_t const *lpFileName,
+                                         GET_FILEEX_INFO_LEVELS fInfoLevelId,
+                                         void *lpFileInformation);
+DWORD   GetLastError                    (void);
+DWORD   GetModuleFileNameA              (HMODULE hModule, char *lpFilename, DWORD nSize);
+void    GetNativeSystemInfo             (SYSTEM_INFO *lpSystemInfo);
+BOOL    GetLogicalProcessorInformationEx(LOGICAL_PROCESSOR_RELATIONSHIP RelationshipType,
+                                         SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *Buffer,
+                                         DWORD *ReturnedLength);
+BOOL    InitializeCriticalSectionEx     (CRITICAL_SECTION *lpCriticalSection,
+                                         DWORD dwSpinCount,
+                                         DWORD Flags);
+long    InterlockedAdd                  (long volatile *Addend, long Value);
+long    InterlockedCompareExchange      (long volatile *Destination, long Exchange, long Comparand);
+void    LeaveCriticalSection            (CRITICAL_SECTION *lpCriticalSection);
+int     MessageBoxA                     (HWND hWnd, char const *lpText, char const *lpCaption, UINT uType);
+int     MultiByteToWideChar             (unsigned int CodePage,
+                                         DWORD dwFlags,
+                                         char const *lpMultiByteStr,
+                                         int cbMultiByte,
+                                         wchar_t *lpWideCharStr,
+                                         int cchWideChar);
+void    OutputDebugStringA              (char const *lpOutputString);
+BOOL    ReadFile                        (HANDLE hFile,
+                                         void *lpBuffer,
+                                         DWORD nNumberOfBytesToRead,
+                                         DWORD *lpNumberOfBytesRead,
+                                         OVERLAPPED *lpOverlapped);
+BOOL    ReleaseSemaphore                (HANDLE hSemaphore, long lReleaseCount, long *lpPreviousCount);
+BOOL    QueryPerformanceFrequency       (LARGE_INTEGER *lpFrequency);
+BOOL    QueryPerformanceCounter         (LARGE_INTEGER *lpPerformanceCount);
+DWORD   WaitForSingleObject             (HANDLE *hHandle, DWORD dwMilliseconds);
+DWORD   WaitForSingleObjectEx           (HANDLE hHandle, DWORD dwMilliseconds, BOOL bAlertable);
+int     WideCharToMultiByte             (unsigned int CodePage,
+                                         DWORD dwFlags,
+                                         wchar_t const *lpWideCharStr,
+                                         int cchWideChar,
+                                         char *lpMultiByteStr,
+                                         int cbMultiByte,
+                                         char const *lpDefaultChar,
+                                         BOOL *lpUsedDefaultChar);
+void    Sleep                           (DWORD dwMilliseconds);
+BOOL    WriteFile                       (HANDLE hFile,
+                                         void *const lpBuffer,
+                                         DWORD nNumberOfBytesToWrite,
+                                         DWORD *lpNumberOfBytesWritten,
+                                         OVERLAPPED *lpOverlapped);
+void   *VirtualAlloc                    (void *lpAddress,
+                                         size_t dwSize,
+                                         DWORD  flAllocationType,
+                                         DWORD  flProtect);
+BOOL    VirtualFree                     (void *lpAddress,
+                                         size_t dwSize,
+                                         DWORD  dwFreeType);
+#endif // defined(DQN_PLATFORM_HEADER) && defined(DQN_IS_WIN32) && !defined(_WINDOWS_)
 #ifndef STB_SPRINTF_H_INCLUDE
 #define STB_SPRINTF_H_INCLUDE
 #define STB_SPRINTF_DECORATE(name) Dqn_##name
@@ -857,7 +1200,7 @@ public:
 // #DqnPool API
 // =================================================================================================
 template <typename T, i16 SIZE>
-struct DqnPool
+struct DqnFixedPool
 {
     struct Entry : public T
     {
@@ -870,7 +1213,7 @@ struct DqnPool
     i16    freeIndex;
     i16    numFree;
 
-    DqnPool() : freeIndex(0) , numFree(SIZE)
+    DqnFixedPool() : freeIndex(0) , numFree(SIZE)
     {
         DQN_FOR_EACH(i, SIZE - 1)
         {
@@ -884,6 +1227,54 @@ struct DqnPool
     T *GetNext()
     {
         if (freeIndex == SENTINEL_INDEX) return nullptr;
+        Entry *result = pool + freeIndex;
+        freeIndex     = result->nextIndex;
+        numFree--;
+        return result;
+    }
+
+    void Return(T *item)
+    {
+        auto *entry      = reinterpret_cast<Entry *>(item);
+        entry->nextIndex = freeIndex;
+        freeIndex        = entry - pool;
+        numFree++;
+    }
+};
+
+// #DqnPool API
+// =================================================================================================
+template <typename T>
+struct DqnPool
+{
+    struct Entry : public T
+    {
+        u16 nextIndex;
+    };
+
+    Entry  *pool;
+    i16     freeIndex;
+    i16     numFree;
+    i32     size;
+
+    void UseMemory(Entry *pool_, isize size)
+    {
+        pool      = pool_;
+        freeIndex = 0;
+        numFree   = size;
+
+        DQN_FOR_EACH(i, size - 1)
+        {
+            Entry *entry     = pool + i;
+            entry->nextIndex = i + 1;
+        }
+        Entry *last     = pool + (size - 1);
+        last->nextIndex = size;
+    }
+
+    T *GetNext()
+    {
+        if (freeIndex == size) return nullptr;
         Entry *result = pool + freeIndex;
         freeIndex     = result->nextIndex;
         numFree--;
@@ -924,6 +1315,7 @@ struct DqnArray
     void  Resize     (isize newCount)                             { if (newCount > max) Reserve(GrowCapacity_(newCount)); count = newCount; }
     void  Resize     (isize newCount, T const *v)                 { if (newCount > max) Reserve(GrowCapacity_(newCount)); if (newCount > count) for (isize n = count; n < newCount; n++) data[n] = *v; count = newCount; }
     void  Reserve    (isize newMax);
+    T    *Make       (isize num = 1)                              { count += num; if (count > max) Reserve(GrowCapacity_(count)); return &data[count - num]; }
     T    *Push       (T const &v)                                 { return Insert(count, &v, 1); }
     T    *Push       (T const *v, isize numItems = 1)             { return Insert(count,  v, numItems); }
     void  Pop        ()                                           { if (count > 0) count--; }
@@ -2462,10 +2854,77 @@ DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson *iterator);
 #ifndef DQN_PLATFORM_H
 #define DQN_PLATFORM_H
 
-#if defined(DQN__IS_UNIX)
+#if defined(DQN_IS_UNIX)
     #include <pthread.h>
     #include <semaphore.h>
 #endif
+
+// XPlatform > #DqnOS API
+// =================================================================================================
+DQN_FILE_SCOPE void *DqnOS_VAlloc(isize size, void *baseAddress = nullptr);
+DQN_FILE_SCOPE void  DqnOS_VFree (void *address, isize size);
+
+// Uses a single call to DqnMem_Calloc() and DqnMem_Free(). Not completely platform "independent" for Unix.
+// numCores: numThreadsPerCore: Can be nullptr, the function will just skip it.
+DQN_FILE_SCOPE void DqnOS_GetThreadsAndCores(u32 *const numCores, u32 *const numThreadsPerCore);
+
+// #XPlatform > #DqnVArray Array backed by virtual memory
+// =================================================================================================
+template<typename T>
+struct DqnVArray
+{
+    isize  count;   // Read
+    isize  max;     // Read
+    T     *data;    // Read
+
+     DqnVArray       ()                                           { count = 0; max = DQN_MEGABYTE(1) / sizeof(T); data = (T *)DqnOS_VAlloc(max * sizeof(T)); DQN_ASSERT(data); }
+    ~DqnVArray       ()                                           { if (data)   DqnOS_VFree(data, sizeof(T) * max); }
+    void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::Yes) { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
+    void  Free       ()                                           { if (data) { DqnOS_VFree(data, sizeof(T) * max); } *this = {}; }
+    T    *Front      ()                                           { DQN_ASSERT(count > 0); return data + 0; }
+    T    *Back       ()                                           { DQN_ASSERT(count > 0); return data + (count - 1); }
+    T    *Make       (isize num = 1)                              { count += num; DQN_ASSERT(count < max); return &data[count - num]; }
+    T    *Push       (T const &v)                                 { return Insert(count, &v, 1); }
+    T    *Push       (T const *v, isize numItems = 1)             { return Insert(count,  v, numItems); }
+    void  Pop        ()                                           { if (count > 0) count--; }
+    void  Erase      (isize index)                                { DQN_ASSERT(index >= 0 && index < count); data[index] = data[--count]; }
+    void  EraseStable(isize index);
+    T    *Insert     (isize index, T const *v)                    { return Insert(index,  v, 1); }
+    T    *Insert     (isize index, T const &v)                    { return Insert(index, &v, 1); }
+    T    *Insert     (isize index, T const *v, isize numItems);
+    bool  Contains   (T const *v) const                           { T const *ptr = data;  T const *end = data + count; while (ptr < end) if (*ptr++ == *v) return true; return false; }
+
+    T    &operator[] (isize i) const                              { DQN_ASSERT(i < count && i > 0); return this->data[i]; }
+    T    *begin      ()                                           { return data; }
+    T    *end        ()                                           { return data + count; }
+};
+
+template<typename T> T *DqnVArray<T>::Insert(isize index, T const *v, isize numItems)
+{
+    index                = DQN_MIN(DQN_MAX(index, 0), count);
+    isize const newCount = count + numItems;
+    DQN_ASSERT(newCount < max);
+
+    T *src  = data + index;
+    T *dest = src + numItems;
+
+    if (src < dest)
+        memmove(dest, src, ((data + count) - src) * sizeof(T));
+
+    count = newCount;
+    for (isize i = 0; i < numItems; i++)
+        src[i] = v[i];
+
+    return src;
+}
+
+template <typename T> void DqnVArray<T>::EraseStable(isize index)
+{
+    DQN_ASSERT(index >= 0 && index < count);
+    isize const off = (data + index) - data;
+    memmove(data + off, data + off + 1, ((usize)count - (usize)off - 1) * sizeof(T));
+    count--;
+}
 
 // XPlatform > #DqnFile API
 // =================================================================================================
@@ -2573,7 +3032,7 @@ DQN_FILE_SCOPE f64  DqnTimer_NowInS ();
 // =================================================================================================
 typedef struct DqnLock
 {
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     CRITICAL_SECTION win32Handle;
 #else
     pthread_mutex_t  unixHandle;
@@ -2647,7 +3106,7 @@ struct DqnJobQueue
     i32   volatile jobToExecuteIndex;
     i32   volatile numJobsToComplete;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     void *semaphore;
 #else
     sem_t semaphore;
@@ -2705,18 +3164,12 @@ DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *const dest, const i32 s
 // return: The new value at src
 DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *const src, const i32 value);
 
-// XPlatform > #DqnOS API
-// =================================================================================================
-// Uses a single call to DqnMem_Calloc() and DqnMem_Free(). Not completely platform "independent" for Unix.
-// numCores: numThreadsPerCore: Can be nullptr, the function will just skip it.
-DQN_FILE_SCOPE void DqnOS_GetThreadsAndCores(u32 *const numCores, u32 *const numThreadsPerCore);
-
 // #Platform Specific API
 // =================================================================================================
 // Functions here are only available for the #defined sections (i.e. all functions in
-// DQN__IS_WIN32 only have a valid implementation in Win32.
+// DQN_IS_WIN32 only have a valid implementation in Win32.
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
 // Platform > #DqnWin32 API
 // =================================================================================================
 #define DQN__WIN32_ERROR_BOX(text, title) MessageBoxA(nullptr, text, title, MB_OK);
@@ -2750,7 +3203,7 @@ DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const formatStr, ...)
 // return: The offset to the last backslash. -1 if bufLen was not large enough or buf is null. (i.e.
 //         buf + offsetToLastSlash + 1, gives C:/Path/)
 DQN_FILE_SCOPE i32  DqnWin32_GetEXEDirectory(char *const buf, const u32 bufLen);
-#endif // DQN__IS_WIN32
+#endif // DQN_IS_WIN32
 #endif // DQN_PLATFORM_H
 #endif // DQN_PLATFORM_HEADER
 
@@ -2802,7 +3255,7 @@ DQN_FILE_SCOPE void DqnLog(char const *file, char const *functionName, i32 lineN
     char const *const formatStr = "%s:%s,%d: DqnLog: %s\n";
     fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
 
-    #if defined(DQN__IS_WIN32)
+    #if defined(DQN_IS_WIN32)
         DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, userMsg);
     #endif
 }
@@ -2837,7 +3290,7 @@ DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 l
     char const *const formatStr = ":%s:%s,%d(%s): DqnLog: %s\n";
     fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
 
-    #if defined(DQN__IS_WIN32)
+    #if defined(DQN_IS_WIN32)
         DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, expr, userMsg);
     #endif
 }
@@ -5733,13 +6186,13 @@ FILE_SCOPE u64 DqnRnd__Murmur3Avalanche64(u64 h)
     return h;
 }
 
-#if defined(DQN__IS_UNIX)
+#if defined(DQN_IS_UNIX)
     #include <x86intrin.h> // __rdtsc
 #endif
 
 FILE_SCOPE u32 DqnRnd__MakeSeed()
 {
-#if defined(DQN_PLATFORM_IMPLEMENTATION) && (defined(DQN__IS_WIN32) || defined(DQN__IS_UNIX))
+#if defined(DQN_PLATFORM_IMPLEMENTATION) && (defined(DQN_IS_WIN32) || defined(DQN_IS_UNIX))
     i64 numClockCycles = __rdtsc();
     return (u32)numClockCycles;
 #else
@@ -5946,7 +6399,7 @@ bool DqnString::InitLiteral(wchar_t const *cstr, DqnMemStack *stack)
 
 bool DqnString::InitLiteral(wchar_t const *cstr, DqnMemAPI *api)
 {
-#if defined(DQN__IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
+#if defined(DQN_IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
     i32 reqLenInclNullTerminator = DqnWin32_WCharToUTF8(cstr, nullptr, 0);
     if (!this->InitSize(reqLenInclNullTerminator - 1, api))
     {
@@ -6175,7 +6628,7 @@ void DqnString::Free()
 
 i32 DqnString::ToWChar(wchar_t *buf, i32 bufSize) const
 {
-#if defined(DQN__IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
+#if defined(DQN_IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
     i32 result = DqnWin32_UTF8ToWChar(this->str, buf, bufSize);
     return result;
 
@@ -6191,7 +6644,7 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
     // TODO(doyle): Should the "in" string allow specifyign len? probably
     // Otherwise a c-string and a literal initiated string might have different lengths
     // to wchar will produce an unintuitive output
-#if defined(DQN__IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
+#if defined(DQN_IS_WIN32) && defined(DQN_PLATFORM_IMPLEMENTATION)
     i32 requiredLenInclNull = DqnWin32_UTF8ToWChar(this->str, nullptr, 0);
 
     i32 allocSize = sizeof(wchar_t) * requiredLenInclNull;
@@ -8133,7 +8586,7 @@ static stbsp__int32 stbsp__real_to_str(char const **start, stbsp__uint32 *len, c
 // Functions in the Cross Platform are guaranteed to be supported in both Unix
 // and Win32
 
-#ifdef DQN__IS_UNIX
+#ifdef DQN_IS_UNIX
     #include <stdio.h>    // Basic File I/O // TODO(doyle): Syscall versions
 
     #include <dirent.h>   // readdir()/opendir()/closedir()
@@ -8147,7 +8600,7 @@ static stbsp__int32 stbsp__real_to_str(char const **start, stbsp__uint32 *len, c
 
 // XPlatform > #DqnFile
 // =================================================================================================
-#ifdef DQN__IS_WIN32
+#ifdef DQN_IS_WIN32
 
 FILE_SCOPE bool
 DqnFile__Win32Open(wchar_t const *path, DqnFile *file, u32 flags, DqnFile::Action action)
@@ -8307,9 +8760,9 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
         return list;
     }
 }
-#endif // DQN__IS_WIN32
+#endif // DQN_IS_WIN32
 
-#ifdef DQN__IS_UNIX
+#ifdef DQN_IS_UNIX
 FILE_SCOPE bool DqnFile__UnixGetFileSize(char const *path, usize *size)
 {
     struct stat fileStat = {};
@@ -8464,13 +8917,13 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
         return list;
     }
 }
-#endif // DQN__IS_UNIX
+#endif // DQN_IS_UNIX
 
 bool DqnFile::Open(char const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
@@ -8484,7 +8937,7 @@ bool DqnFile::Open(wchar_t const *path, u32 flags_, Action action)
 {
     if (!path) return false;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     return DqnFile__Win32Open(path, this, flags_, action);
 
 #else
@@ -8499,7 +8952,7 @@ usize DqnFile::Write(u8 const *buf, usize numBytesToWrite, usize fileOffset)
     DQN_ASSERTM(fileOffset == 0, "File writing into offset is not implemented.");
     usize numBytesWritten = 0;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     DWORD bytesToWrite = (DWORD)numBytesToWrite;
     DWORD bytesWritten;
     BOOL result = WriteFile(this->handle, (void *)buf, bytesToWrite, &bytesWritten, nullptr);
@@ -8528,7 +8981,7 @@ usize DqnFile::Read(u8 *buf, usize numBytesToRead)
     usize numBytesRead = 0;
     if (this->handle)
     {
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
         DWORD bytesToRead = (DWORD)numBytesToRead;
         DWORD bytesRead    = 0;
         HANDLE win32Handle = this->handle;
@@ -8666,7 +9119,7 @@ void DqnFile::Close()
 {
     if (this->handle)
     {
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
         CloseHandle(this->handle);
 #else
         fclose((FILE *)this->handle);
@@ -8678,7 +9131,7 @@ void DqnFile::Close()
     this->flags = 0;
 }
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     DQN_COMPILE_ASSERT(sizeof(DWORD)  == sizeof(u32));
 #endif
 bool DqnFile::GetFileSize(wchar_t const *path, usize *size)
@@ -8700,7 +9153,7 @@ bool DqnFile::GetFileSize(char const *path, usize *size)
     if (!path || !size) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {0};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
@@ -8717,7 +9170,7 @@ bool DqnFile::GetInfo(wchar_t const *path, Info *info)
 {
     if (!path || !info) return false;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     auto FileTimeToSeconds = [](FILETIME const *time) -> i64 {
         ULARGE_INTEGER timeLargeInt = {};
         timeLargeInt.LowPart        = time->dwLowDateTime;
@@ -8760,7 +9213,7 @@ bool DqnFile::GetInfo(char const *path, Info *info)
         return false;
     }
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
@@ -8788,7 +9241,7 @@ bool DqnFile::Delete(char const *path)
     if (!path) return false;
 
 // TODO(doyle): Logging
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     return DeleteFileA(path);
 
 #else
@@ -8805,7 +9258,7 @@ bool DqnFile::Delete(wchar_t const *path)
     if (!path) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     return DeleteFileW(path);
 
 #else
@@ -8820,7 +9273,7 @@ bool DqnFile::Copy(char const *src, char const *dest)
     if (!src || !dest) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     BOOL result = (CopyFileA(src, dest, /*FailIfExist*/false) != 0);
     if (result == 0)
     {
@@ -8840,7 +9293,7 @@ bool DqnFile::Copy(wchar_t const *src, wchar_t const *dest)
     if (!src || !dest) return false;
 
     // TODO(doyle): Logging
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     return (CopyFileW(src, dest, /*FailIfExist*/false) != 0);
 
 #else
@@ -8872,7 +9325,7 @@ void DqnFile::ListDirFree(char **fileList, i32 numFiles, DqnMemAPI *api)
 
 // XPlatform > #DqnTimer
 // =================================================================================================
-#if defined (DQN__IS_WIN32)
+#if defined (DQN_IS_WIN32)
 FILE_SCOPE f64 DqnTimerInternal_Win32QueryPerfCounterTimeInMs()
 {
     LOCAL_PERSIST LARGE_INTEGER queryPerformanceFrequency = {0};
@@ -8896,7 +9349,7 @@ FILE_SCOPE f64 DqnTimerInternal_Win32QueryPerfCounterTimeInMs()
 DQN_FILE_SCOPE f64 DqnTimer_NowInMs()
 {
     f64 result = 0;
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     result = DQN_MAX(DqnTimerInternal_Win32QueryPerfCounterTimeInMs(), 0);
 
 #else
@@ -8923,7 +9376,7 @@ bool DqnLock_Init(DqnLock *lock)
 {
     if (!lock) return false;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     if (InitializeCriticalSectionEx(&lock->win32Handle, lock->win32SpinCount, 0))
         return true;
 #else
@@ -8941,7 +9394,7 @@ void DqnLock_Acquire(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     EnterCriticalSection(&lock->win32Handle);
 
 #else
@@ -8955,7 +9408,7 @@ void DqnLock_Release(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     LeaveCriticalSection(&lock->win32Handle);
 
 #else
@@ -8969,7 +9422,7 @@ void DqnLock_Delete(DqnLock *lock)
 {
     if (!lock) return;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     DeleteCriticalSection(&lock->win32Handle);
 #else
     i32 error = pthread_mutex_destroy(&lock->unixHandle);
@@ -9017,7 +9470,7 @@ FILE_SCOPE u32 DqnJobQueueInternal_ThreadCreate(usize stackSize,
 {
     u32 numThreadsCreated = 0;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     DQN_ASSERT(stackSize == 0 || !threadCallback);
     for (u32 i = 0; i < numThreads; i++)
     {
@@ -9058,7 +9511,7 @@ FILE_SCOPE void *DqnJobQueueInternal_ThreadCallback(void *threadParam)
     {
         if (!DqnJobQueue_TryExecuteNextJob(queue))
         {
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
             WaitForSingleObjectEx(queue->semaphore, INFINITE, false);
 #else
             sem_wait(&queue->semaphore);
@@ -9071,7 +9524,7 @@ FILE_SCOPE bool DqnJobQueueInternal_CreateSemaphore(DqnJobQueue *queue, u32 init
 {
     if (!queue) return false;
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     queue->semaphore = (void *)CreateSemaphoreA(nullptr, initSignalCount, maxSignalCount, nullptr);
     DQN_ASSERT(queue->semaphore);
 
@@ -9093,7 +9546,7 @@ FILE_SCOPE bool DqnJobQueueInternal_ReleaseSemaphore(DqnJobQueue *queue)
 {
     DQN_ASSERT(queue);
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     DQN_ASSERT(queue->semaphore);
     ReleaseSemaphore(queue->semaphore, 1, nullptr);
 
@@ -9192,14 +9645,14 @@ bool DqnJobQueue::AllJobsComplete  ()                 { return DqnJobQueue_AllJo
 // XPlatform > #DqnAtomic
 // =================================================================================================
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     DQN_COMPILE_ASSERT(sizeof(LONG) == sizeof(i32));
 #endif
 
 DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *dest, i32 swapVal, i32 compareVal)
 {
     i32 result = 0;
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     result = (i32)InterlockedCompareExchange((LONG volatile *)dest, (LONG)swapVal, (LONG)compareVal);
 
 #else
@@ -9211,7 +9664,7 @@ DQN_FILE_SCOPE i32 DqnAtomic_CompareSwap32(i32 volatile *dest, i32 swapVal, i32 
 DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
 {
     i32 result = 0;
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
     result = (i32)InterlockedAdd((LONG volatile *)src, value);
 
 #else
@@ -9223,10 +9676,41 @@ DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
 
 // XPlatform > #DqnOS
 // =================================================================================================
+#if defined(DQN_IS_UNIX)
+include <sys/mman.h>
+#endif
+
+void *DqnOS_VAlloc(isize size, void *baseAddress)
+{
+    void *result = nullptr;
+#if defined (DQN_IS_WIN32)
+    result = VirtualAlloc(baseAddress, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    DQN_ASSERT(result);
+#else
+    result = mmap(
+        baseAddress, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1 /*fd*/, 0 /*offset into fd*/);
+    DQN_ASSERT(result != MAP_FAILED);
+#endif
+
+    return result;
+}
+
+void DqnOS_VFree(void *address, isize size)
+{
+#if defined (DQN_IS_WIN32)
+    BOOL result = VirtualFree(address, 0 /*size*/, MEM_RELEASE);
+    (void)size;
+    DQN_ASSERT(result);
+#else
+    int result = munmap(address, size);
+    DQN_ASSERT(result != 0);
+#endif
+}
+
 #define DQN_OS_GET_THREADS_AND_CORES(name) \
     DQN_FILE_SCOPE void name(u32 *const numCores, u32 *const numThreadsPerCore)
 
-#if defined(DQN__IS_UNIX)
+#if defined(DQN_IS_UNIX)
 DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
 {
     if (!numThreadsPerCore && !numCores) return;
@@ -9289,9 +9773,9 @@ DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
         DQN_ASSERT(DQN_INVALID_CODE_PATH);
     }
 }
-#endif // DQN__IS_UNIX
+#endif // DQN_IS_UNIX
 
-#if defined(DQN__IS_WIN32)
+#if defined(DQN_IS_WIN32)
 DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
 {
     if (numThreadsPerCore)
@@ -9348,9 +9832,9 @@ DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
         DqnMem_Free(rawProcInfoArray);
     }
 }
-#endif // DQN__IS_WIN32
+#endif // DQN_IS_WIN32
 
-#ifdef DQN__IS_WIN32
+#ifdef DQN_IS_WIN32
 // #DqnWin32
 // =================================================================================================
 DQN_FILE_SCOPE i32 DqnWin32_UTF8ToWChar(char const *in, wchar_t *out, i32 outLen)
@@ -9460,5 +9944,5 @@ DQN_FILE_SCOPE i32 DqnWin32_GetEXEDirectory(char *buf, u32 bufLen)
 
     return lastSlashIndex;
 }
-#endif // DQN__IS_WIN32
+#endif // DQN_IS_WIN32
 #endif // DQN__XPLATFORM_LAYER
