@@ -1,10 +1,3 @@
-#if defined(DQN_IS_WIN32)
-#define WIN32_MEAN_AND_LEAN
-#include <Winsock2.h>
-#include <ws2tcpip.h>
-#include <Windows.h>
-#endif
-
 #if defined(__linux__)
     #define HANDMADE_MATH_NO_SSE
 #endif
@@ -12,6 +5,13 @@
 #if defined(__GNUC__)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wfree-nonheap-object"
+#endif
+
+#if defined(_WIN32)
+#define WIN32_MEAN_AND_LEAN
+#include <Winsock2.h>
+#include <ws2tcpip.h>
+#include <Windows.h>
 #endif
 
 #define DQN_PLATFORM_HEADER
@@ -1557,7 +1557,7 @@ void DqnArray_TestRealDataInternal(DqnArray<char> *array)
     (void)array;
 #ifdef DQN_PLATFORM_HEADER
     size_t bufSize = 0;
-    u8 *buf        = DqnFile::ReadEntireFile("tests/google-10000-english.txt", &bufSize);
+    u8 *buf        = DqnFile_ReadAll("tests/google-10000-english.txt", &bufSize);
     DQN_ASSERT(buf);
 
     for (usize i = 0; i < bufSize; i++)
@@ -1663,7 +1663,7 @@ void DqnFile_Test()
                 // should give us zero, but we fall back to manual byte checking
                 // which should give us the proper size.
                 size_t size = 0;
-                DQN_ASSERT(DqnFile::GetFileSize("/proc/cpuinfo", &size));
+                DQN_ASSERT(DqnFile_Size("/proc/cpuinfo", &size));
                 DQN_ASSERT(size > 0);
             }
 
@@ -1688,13 +1688,13 @@ void DqnFile_Test()
             if (1)
             {
                 size_t size = 0;
-                DQN_ASSERT(DqnFile::GetFileSize(FILE_TO_OPEN, &size));
+                DQN_ASSERT(DqnFile_Size(FILE_TO_OPEN, &size));
                 DQN_ASSERT(size == expectedSize);
             }
 
             DqnFile file = {};
             DQN_ASSERT(file.Open(".clang-format",
-                                    (DqnFile::PermissionFlag::FileWrite | DqnFile::PermissionFlag::FileRead),
+                                    (DqnFile::Permission::FileWrite | DqnFile::Permission::FileRead),
                                     DqnFile::Action::OpenOnly));
 
             DQN_ASSERTM(file.size == expectedSize,
@@ -1712,7 +1712,7 @@ void DqnFile_Test()
             {
                 DqnSmartFile raiiFile = {};
                 if (raiiFile.Open(FILE_TO_OPEN,
-                                  DqnFile::PermissionFlag::FileWrite | DqnFile::PermissionFlag::FileRead,
+                                  DqnFile::Permission::FileWrite | DqnFile::Permission::FileRead,
                                   DqnFile::Action::OpenOnly))
                 {
                     i32 breakHereToTestRaii = 0;
@@ -1727,8 +1727,8 @@ void DqnFile_Test()
         if (1)
         {
             DqnFile file = {};
-            DQN_ASSERT(!file.Open("asdljasdnel;kajdf", (DqnFile::PermissionFlag::FileWrite |
-                                                        DqnFile::PermissionFlag::FileRead),
+            DQN_ASSERT(!file.Open("asdljasdnel;kajdf", (DqnFile::Permission::FileWrite |
+                                                        DqnFile::Permission::FileRead),
                                   DqnFile::Action::OpenOnly));
             DQN_ASSERT(file.size == 0);
             DQN_ASSERT(file.flags == 0);
@@ -1747,7 +1747,7 @@ void DqnFile_Test()
         // Write data out to some files
         for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
         {
-            u32 permissions = DqnFile::PermissionFlag::FileRead | DqnFile::PermissionFlag::FileWrite;
+            u32 permissions = DqnFile::Permission::FileRead | DqnFile::Permission::FileWrite;
             DqnFile *file = files + i;
             if (!file->Open(fileNames[i], permissions, DqnFile::Action::ClearIfExist))
             {
@@ -1770,7 +1770,7 @@ void DqnFile_Test()
         {
             // Manual read the file contents
             {
-                u32 permissions = DqnFile::PermissionFlag::FileRead;
+                u32 permissions = DqnFile::Permission::FileRead;
                 DqnFile *file = files + i;
                 bool result = file->Open(fileNames[i], permissions, DqnFile::Action::OpenOnly);
                 DQN_ASSERT(result);
@@ -1792,13 +1792,13 @@ void DqnFile_Test()
             // Read using the ReadEntireFile api which doesn't need a file handle as an argument
             {
                 size_t reqSize = 0;
-                DQN_ASSERT(DqnFile::GetFileSize(fileNames[i], &reqSize));
+                DQN_ASSERT(DqnFile_Size(fileNames[i], &reqSize));
 
                 u8 *buffer = (u8 *)memStack.Push(reqSize);
                 DQN_ASSERT(buffer);
 
                 size_t bytesRead = 0;
-                DQN_ASSERT(DqnFile::ReadEntireFile(fileNames[i], buffer, reqSize, &bytesRead));
+                DQN_ASSERT(DqnFile_ReadAll(fileNames[i], buffer, reqSize, &bytesRead));
                 DQN_ASSERT(bytesRead == reqSize);
 
                 // Verify the data is the same as we wrote out
@@ -1806,14 +1806,14 @@ void DqnFile_Test()
                 memStack.Pop(buffer);
             }
 
-            DQN_ASSERT(DqnFile::Delete(fileNames[i]));
+            DQN_ASSERT(DqnFile_Delete(fileNames[i]));
         }
 
         // Then check delete actually worked, files should not exist.
         for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
         {
             DqnFile dummy   = {};
-            u32 permissions = DqnFile::PermissionFlag::FileRead;
+            u32 permissions = DqnFile::Permission::FileRead;
             bool fileExists = dummy.Open(fileNames[i], permissions, DqnFile::Action::OpenOnly);
             DQN_ASSERT(!fileExists);
         }
@@ -1827,9 +1827,9 @@ void DqnFile_Test()
     {
         i32 numFiles;
 #if defined(DQN___IS_UNIX)
-        char **filelist = DqnFile::ListDir(".", &numFiles);
+        char **filelist = DqnFile_ListDir(".", &numFiles);
 #else
-        char **filelist = DqnFile::ListDir("*", &numFiles);
+        char **filelist = DqnFile_ListDir("*", &numFiles);
 #endif
 
         Log("Test directory listing");
@@ -1837,7 +1837,7 @@ void DqnFile_Test()
         for (auto i = 0; i < numFiles; i++)
             Log("%02d: %s", i, filelist[i]);
 
-        DqnFile::ListDirFree(filelist, numFiles);
+        DqnFile_ListDirFree(filelist, numFiles);
         globalIndent--;
         Log(Status::Ok, "List directory files");
     }

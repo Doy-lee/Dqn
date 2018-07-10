@@ -215,6 +215,16 @@ u32    const MEM_RESERVE                   = 0x00002000;
 u32    const PAGE_READWRITE                = 0x04;
 u32    const MEM_DECOMMIT                  = 0x4000;
 u32    const MEM_RELEASE                   = 0x8000;
+u32    const GENERIC_READ                  = 0x80000000L;
+u32    const GENERIC_WRITE                 = 0x40000000L;
+u32    const GENERIC_EXECUTE               = 0x20000000L;
+u32    const GENERIC_ALL                   = 0x10000000L;
+u32    const CREATE_NEW                    = 1;
+u32    const CREATE_ALWAYS                 = 2;
+u32    const OPEN_EXISTING                 = 3;
+u32    const OPEN_ALWAYS                   = 4;
+u32    const TRUNCATE_EXISTING             = 5;
+u32    const FILE_ATTRIBUTE_NORMAL         = 0x00000080;
 
 struct RECT
 {
@@ -2930,7 +2940,7 @@ template <typename T> void DqnVArray<T>::EraseStable(isize index)
 // =================================================================================================
 struct DqnFile
 {
-    enum PermissionFlag
+    enum Permission
     {
         FileRead  = (1 << 0),
         FileWrite = (1 << 1),
@@ -2938,20 +2948,12 @@ struct DqnFile
         All       = (1 << 3)
     };
 
-    enum class Action
+    enum struct Action
     {
         OpenOnly,         // Only open file if it exists. Fails and returns false if file did not exist or could not open.
         CreateIfNotExist, // Try and create file. Return true if it was able to create. If it already exists, this fails.
         ClearIfExist,     // Clear the file contents to zero if it exists. Fails and returns false if file does not exist.
         ForceCreate,      // Always create, even if it exists
-    };
-
-    struct Info
-    {
-        usize size;
-        u64 createTimeInS;
-        u64 lastWriteTimeInS;
-        u64 lastAccessTimeInS;
     };
 
     u32    flags;
@@ -2972,51 +2974,56 @@ struct DqnFile
     // return:     The number of bytes written. 0 if invalid args or it failed to write.
     usize  Write(u8 const *buf, usize const numBytesToWrite, usize const fileOffset);
 
-    // IMPORTANT: You may want to allocate size+1 for null-terminating the file contents when
-    // reading into a buffer.
+    // IMPORTANT: You may want to allocate size+1 for null-terminating the file contents when reading into a buffer.
     // return: The number of bytes read. 0 if invalid args or it failed to read.
     usize  Read (u8 *buf, usize const numBytesToRead);
 
     // File close invalidates the handle after it is called.
     void   Close();
-
-    // Static API
-    // ==============================================================================================
-    // Read entire file into the given buffer. To determine required bufSize size, use GetFileSize.
-    // NOTE: You want size + 1 and add the null-terminator yourself if you want a null terminated buffer.
-    // bytesRead: Pass in to get how many bytes of the buf was used. Basically the return value of Read
-    // return:    False if insufficient bufSize OR file access failure OR nullptr arguments.
-    static bool   ReadEntireFile(char    const *path, u8 *buf, usize const bufSize, usize *bytesRead);
-    static bool   ReadEntireFile(wchar_t const *path, u8 *buf, usize const bufSize, usize *bytesRead);
-
-    // Buffer is null-terminated and should be freed when done with.
-    // return: False if file access failure OR nullptr arguments.
-    static u8    *ReadEntireFile(char    const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
-    static u8    *ReadEntireFile(wchar_t const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
-
-    // return: False if file access failure OR nullptr arguments.
-    static bool   GetFileSize   (char    const *path, usize *size);
-    static bool   GetFileSize   (wchar_t const *path, usize *size);
-
-    // info:   Pass in to fill with file attributes.
-    // return: False if file access failure OR nullptr arguments.
-    static bool   GetInfo       (char    const *path, Info *info);
-    static bool   GetInfo       (wchar_t const *path, Info *info);
-
-    // NOTE: You can't delete a file unless the handle has been closed to it on Win32.
-    // return: False if file access failure OR nullptr arguments.
-    static bool   Delete        (char    const *path);
-    static bool   Delete        (wchar_t const *path);
-    static bool   Copy          (char    const *src, char    const *dest);
-    static bool   Copy          (wchar_t const *src, wchar_t const *dest);
-
-    // NOTE: Win32: Current directory is "*", Unix: "."
-    // numFiles: Pass in a ref to a i32. The function fills it out with the number of entries.
-    // return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
-    //           allocated with malloc and must be freed using free() or the helper function ListDirFree()
-    static char **ListDir       (char const *dir, i32 *numFiles, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
-    static void   ListDirFree   (char **fileList, i32 numFiles, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 };
+
+struct DqnFileInfo
+{
+    usize size;
+    u64   createTimeInS;
+    u64   lastWriteTimeInS;
+    u64   lastAccessTimeInS;
+};
+
+// Read entire file into the given buffer. To determine required bufSize size, use GetFileSize.
+// NOTE: You want size + 1 and add the null-terminator yourself if you want a null terminated buffer.
+// bytesRead: Pass in to get how many bytes of the buf was used. Basically the return value of Read
+// return:    False if insufficient bufSize OR file access failure OR nullptr arguments.
+DQN_FILE_SCOPE bool   DqnFile_ReadAll(char    const *path, u8 *buf, usize const bufSize, usize *bytesRead);
+DQN_FILE_SCOPE bool   DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize const bufSize, usize *bytesRead);
+
+// Buffer is null-terminated and should be freed when done with.
+// return: False if file access failure OR nullptr arguments.
+DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+
+// return: False if file access failure
+DQN_FILE_SCOPE bool   DqnFile_Size(char    const *path, usize *size);
+DQN_FILE_SCOPE bool   DqnFile_Size(wchar_t const *path, usize *size);
+
+// info:   Pass in to fill with file attributes.
+// return: False if file access failure
+DQN_FILE_SCOPE bool   DqnFile_GetInfo(char    const *path, DqnFileInfo *info);
+DQN_FILE_SCOPE bool   DqnFile_GetInfo(wchar_t const *path, DqnFileInfo *info);
+
+// NOTE: You can't delete a file unless the handle has been closed to it on Win32.
+// return: False if file access failure
+DQN_FILE_SCOPE bool   DqnFile_Delete (char    const *path);
+DQN_FILE_SCOPE bool   DqnFile_Delete (wchar_t const *path);
+DQN_FILE_SCOPE bool   DqnFile_Copy   (char    const *src, char    const *dest);
+DQN_FILE_SCOPE bool   DqnFile_Copy   (wchar_t const *src, wchar_t const *dest);
+
+// NOTE: Win32: Current directory is "*", Unix: "."
+// numFiles: Pass in a ref to a i32. The function fills it out with the number of entries.
+// return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
+//           allocated with malloc and must be freed using free() or the helper function ListDirFree()
+DQN_FILE_SCOPE char **DqnFile_ListDir       (char const *dir, i32 *numFiles, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+DQN_FILE_SCOPE void   DqnFile_ListDirFree   (char **fileList, i32 numFiles,  DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 
 struct DqnSmartFile : public DqnFile
 {
@@ -8621,15 +8628,15 @@ DqnFile__Win32Open(wchar_t const *path, DqnFile *file, u32 flags, DqnFile::Actio
     u32 const WIN32_FILE_ATTRIBUTE_NORMAL = 0x00000080;
 
     DWORD win32Permission = 0;
-    if (flags & DqnFile::PermissionFlag::All)
+    if (flags & DqnFile::Permission::All)
     {
         win32Permission = WIN32_GENERIC_ALL;
     }
     else
     {
-        if (flags & DqnFile::PermissionFlag::FileRead)  win32Permission |= WIN32_GENERIC_READ;
-        if (flags & DqnFile::PermissionFlag::FileWrite) win32Permission |= WIN32_GENERIC_WRITE;
-        if (flags & DqnFile::PermissionFlag::Execute)   win32Permission |= WIN32_GENERIC_EXECUTE;
+        if (flags & DqnFile::Permission::FileRead)  win32Permission |= WIN32_GENERIC_READ;
+        if (flags & DqnFile::Permission::FileWrite) win32Permission |= WIN32_GENERIC_WRITE;
+        if (flags & DqnFile::Permission::Execute)   win32Permission |= WIN32_GENERIC_EXECUTE;
     }
 
     DWORD win32Action = 0;
@@ -8790,7 +8797,7 @@ DqnFile__UnixOpen(char const *path, DqnFile *file, u32 flags, DqnFile::Action ac
     char operation  = 0;
     bool updateFlag = false;
 
-    if (flags & DqnFile::PermissionFlag::FileWrite)
+    if (flags & DqnFile::Permission::FileWrite)
     {
         updateFlag = true;
         switch (action)
@@ -8811,10 +8818,10 @@ DqnFile__UnixOpen(char const *path, DqnFile *file, u32 flags, DqnFile::Action ac
             break;
         }
     }
-    else if ((flags & DqnFile::PermissionFlag::FileRead) ||
-             (flags & DqnFile::PermissionFlag::Execute))
+    else if ((flags & DqnFile::Permission::FileRead) ||
+             (flags & DqnFile::Permission::Execute))
     {
-        if (flags & DqnFile::PermissionFlag::Execute)
+        if (flags & DqnFile::Permission::Execute)
         {
             // TODO(doyle): Logging, UNIX doesn't have execute param for file
             // handles. Execution goes through system()
@@ -9004,16 +9011,11 @@ usize DqnFile::Read(u8 *buf, usize numBytesToRead)
     return numBytesRead;
 }
 
-u8 *DqnFile::ReadEntireFile(wchar_t const *path, usize *bufSize, DqnMemAPI *api)
+u8 *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemAPI *api)
 {
     // TODO(doyle): Logging
-    if (!path || !bufSize)
-    {
-        return nullptr;
-    }
-
     usize requiredSize = 0;
-    if (!DqnFile::GetFileSize(path, &requiredSize) || requiredSize == 0)
+    if (!DqnFile_Size(path, &requiredSize) || requiredSize == 0)
     {
         return nullptr;
     }
@@ -9025,10 +9027,10 @@ u8 *DqnFile::ReadEntireFile(wchar_t const *path, usize *bufSize, DqnMemAPI *api)
     }
 
     usize bytesRead = 0;
-    if (DqnFile::ReadEntireFile(path, buf, requiredSize, &bytesRead))
+    if (DqnFile_ReadAll(path, buf, requiredSize, &bytesRead))
     {
         *bufSize          = requiredSize;
-        DQN_ASSERT(bytesRead == requiredSize);
+        DQN_ASSERTM(bytesRead == requiredSize, "%zu != %zu", bytesRead, requiredSize);
         return buf;
     }
 
@@ -9036,18 +9038,23 @@ u8 *DqnFile::ReadEntireFile(wchar_t const *path, usize *bufSize, DqnMemAPI *api)
     return nullptr;
 }
 
-u8 *DqnFile::ReadEntireFile(char const *path, usize *bufSize, DqnMemAPI *api)
+u8 *DqnFile_ReadAll(char const *path, usize *bufSize, DqnMemAPI *api)
 {
     // TODO(doyle): Logging
-
     usize requiredSize = 0;
-    if (!DqnFile::GetFileSize(path, &requiredSize) || requiredSize == 0) return nullptr;
+    if (!DqnFile_Size(path, &requiredSize) || requiredSize == 0)
+    {
+        return nullptr;
+    }
 
     auto *buf = (u8 *)api->Alloc(requiredSize, Dqn::ZeroClear::No);
-    if (!buf) return nullptr;
+    if (!buf)
+    {
+        return nullptr;
+    }
 
     usize bytesRead = 0;
-    if (DqnFile::ReadEntireFile(path, buf, requiredSize, &bytesRead))
+    if (DqnFile_ReadAll(path, buf, requiredSize, &bytesRead))
     {
         *bufSize = requiredSize;
         DQN_ASSERTM(bytesRead == requiredSize, "%zu != %zu", bytesRead, requiredSize);
@@ -9058,52 +9065,37 @@ u8 *DqnFile::ReadEntireFile(char const *path, usize *bufSize, DqnMemAPI *api)
     return nullptr;
 }
 
-bool DqnFile::ReadEntireFile(wchar_t const *path, u8 *buf, usize bufSize,
-                             usize *bytesRead)
+bool DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize bufSize, usize *bytesRead)
 {
-    if (!path || !buf || !bytesRead) return false;
-
     DqnFile file = {};
-    bool result = file.Open(path, DqnFile::PermissionFlag::FileRead, DqnFile::Action::OpenOnly);
+    bool result = file.Open(path, DqnFile::Permission::FileRead, DqnFile::Action::OpenOnly);
+    DQN_DEFER(file.Close());
 
     // TODO(doyle): Logging
-    if (!result) goto cleanup;
-
-    if (file.size > bufSize)
+    if (file.size > bufSize || !result)
     {
-        result = false;
-        goto cleanup;
+        DQN_LOGE("Insufficient buffer size given: %zu, required: %zu\n", bufSize, file.size);
+        return false;
     }
 
     *bytesRead = file.Read(buf, file.size);
     DQN_ASSERT(*bytesRead == file.size);
-
-cleanup:
-    file.Close();
     return result;
 }
 
-bool DqnFile::ReadEntireFile(const char *path, u8 *buf, usize bufSize, usize *bytesRead)
+bool DqnFile_ReadAll(const char *path, u8 *buf, usize bufSize, usize *bytesRead)
 {
-    if (!path || !buf || !bytesRead) return false;
-
     DqnFile file = {};
-    bool result  = file.Open(path, DqnFile::PermissionFlag::FileRead, DqnFile::Action::OpenOnly);
+    bool result  = file.Open(path, DqnFile::Permission::FileRead, DqnFile::Action::OpenOnly);
+    DQN_DEFER(file.Close());
 
-    // TODO(doyle): Logging
-    if (!result) goto cleanup;
-
-    if (file.size > bufSize)
+    if (!result || file.size > bufSize)
     {
-        result = false;
-        goto cleanup;
+        return false;
     }
 
     *bytesRead = file.Read(buf, file.size);
     DQN_ASSERTM(*bytesRead == file.size, "%zu != %zu", *bytesRead, file.size);
-
-cleanup:
-    file.Close();
     return result;
 }
 
@@ -9126,12 +9118,11 @@ void DqnFile::Close()
 #if defined(DQN_IS_WIN32)
     DQN_COMPILE_ASSERT(sizeof(DWORD)  == sizeof(u32));
 #endif
-bool DqnFile::GetFileSize(wchar_t const *path, usize *size)
-{
-    if (!size || !path) return false;
 
-    Info info = {};
-    if (GetInfo(path, &info))
+bool DqnFile_Size(wchar_t const *path, usize *size)
+{
+    DqnFileInfo info = {};
+    if (DqnFile_GetInfo(path, &info))
     {
         *size = info.size;
         return true;
@@ -9140,16 +9131,14 @@ bool DqnFile::GetFileSize(wchar_t const *path, usize *size)
     return false;
 }
 
-bool DqnFile::GetFileSize(char const *path, usize *size)
+bool DqnFile_Size(char const *path, usize *size)
 {
-    if (!path || !size) return false;
-
     // TODO(doyle): Logging
 #if defined(DQN_IS_WIN32)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {0};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
-    return DqnFile::GetFileSize(widePath, size);
+    return DqnFile_Size(widePath, size);
 
 #else
     // TODO(doyle): Error logging
@@ -9158,10 +9147,8 @@ bool DqnFile::GetFileSize(char const *path, usize *size)
 #endif
 }
 
-bool DqnFile::GetInfo(wchar_t const *path, Info *info)
+bool DqnFile_GetInfo(wchar_t const *path, DqnFileInfo *info)
 {
-    if (!path || !info) return false;
-
 #if defined(DQN_IS_WIN32)
     auto FileTimeToSeconds = [](FILETIME const *time) -> i64 {
         ULARGE_INTEGER timeLargeInt = {};
@@ -9197,19 +9184,13 @@ bool DqnFile::GetInfo(wchar_t const *path, Info *info)
     return false;
 }
 
-bool DqnFile::GetInfo(char const *path, Info *info)
+bool DqnFile_GetInfo(char const *path, DqnFileInfo *info)
 {
-    // TODO(doyle): Logging
-    if (!path || !info)
-    {
-        return false;
-    }
-
 #if defined(DQN_IS_WIN32)
     // TODO(doyle): MAX PATH is baad
     wchar_t widePath[MAX_PATH] = {};
     DqnWin32_UTF8ToWChar(path, widePath, DQN_ARRAY_COUNT(widePath));
-    return DqnFile::GetInfo(widePath, info);
+    return DqnFile_GetInfo(widePath, info);
 
 #else
     struct stat fileStat = {};
@@ -9228,66 +9209,52 @@ bool DqnFile::GetInfo(char const *path, Info *info)
 }
 
 
-bool DqnFile::Delete(char const *path)
+bool DqnFile_Delete(char const *path)
 {
-    if (!path) return false;
-
-// TODO(doyle): Logging
 #if defined(DQN_IS_WIN32)
-    return DeleteFileA(path);
-
+    bool result = DeleteFileA(path);
 #else
-    i32 result = unlink(path);
-
-    if (result == 0) return true;
-    return false;
-
+    bool result = (unlink(path) == 0);
 #endif
+    return result;
 }
 
-bool DqnFile::Delete(wchar_t const *path)
+bool DqnFile_Delete(wchar_t const *path)
 {
-    if (!path) return false;
-
-    // TODO(doyle): Logging
 #if defined(DQN_IS_WIN32)
-    return DeleteFileW(path);
-
+    bool result = DeleteFileW(path);
+    return result;
 #else
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
-
 #endif
 }
 
-bool DqnFile::Copy(char const *src, char const *dest)
+bool DqnFile_Copy(char const *src, char const *dest)
 {
-    if (!src || !dest) return false;
-
     // TODO(doyle): Logging
 #if defined(DQN_IS_WIN32)
     BOOL result = (CopyFileA(src, dest, /*FailIfExist*/false) != 0);
     if (result == 0)
-    {
         DqnWin32_DisplayLastError("CopyFile failed: ");
-    }
+
     return (result != 0);
 
 #else
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
-
 #endif
 }
 
-bool DqnFile::Copy(wchar_t const *src, wchar_t const *dest)
+bool DqnFile_Copy(wchar_t const *src, wchar_t const *dest)
 {
-    if (!src || !dest) return false;
-
     // TODO(doyle): Logging
 #if defined(DQN_IS_WIN32)
-    return (CopyFileW(src, dest, /*FailIfExist*/false) != 0);
+    BOOL result = (CopyFileW(src, dest, /*FailIfExist*/false) != 0);
+    if (result == 0)
+        DqnWin32_DisplayLastError("CopyFile failed: ");
 
+    return result;
 #else
     DQN_ASSERT(DQN_INVALID_CODE_PATH);
     return false;
@@ -9295,13 +9262,13 @@ bool DqnFile::Copy(wchar_t const *src, wchar_t const *dest)
 #endif
 }
 
-char **DqnFile::ListDir(char const *dir, i32 *numFiles, DqnMemAPI *api)
+char **DqnFile_ListDir(char const *dir, i32 *numFiles, DqnMemAPI *api)
 {
     char **result = DqnFile__PlatformListDir(dir, numFiles, api);
     return result;
 }
 
-void DqnFile::ListDirFree(char **fileList, i32 numFiles, DqnMemAPI *api)
+void DqnFile_ListDirFree(char **fileList, i32 numFiles, DqnMemAPI *api)
 {
     if (fileList)
     {
