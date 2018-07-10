@@ -1,7 +1,9 @@
+#if defined(DQN_IS_WIN32)
 #define WIN32_MEAN_AND_LEAN
 #include <Winsock2.h>
 #include <ws2tcpip.h>
 #include <Windows.h>
+#endif
 
 #if defined(__linux__)
     #define HANDMADE_MATH_NO_SSE

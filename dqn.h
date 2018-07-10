@@ -8766,28 +8766,19 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
 FILE_SCOPE bool DqnFile__UnixGetFileSize(char const *path, usize *size)
 {
     struct stat fileStat = {};
-    if (stat(path, &fileStat))
-    {
-        // TODO(doyle): Logging
-        return false;
-    }
-
+    stat(path, &fileStat);
     *size = fileStat.st_size;
+
+    if (*size != 0)
+      return true;
 
     // NOTE: Can occur in some instances where files are generated on demand, i.e. /proc/cpuinfo.
     // But there can also be zero-byte files, we can't be sure. So manual check by counting bytes
-    if (*size == 0)
+    if (FILE *file = fopen(path, "rb"))
     {
-        FILE *file = fopen(path, "r");
         DQN_DEFER(fclose(file));
-        u64 fileSizeInBytes = 0;
-
-        char c = fgetc(file);
-        while (c != EOF)
-        {
-            fileSizeInBytes++;
-            c = fgetc(file);
-        }
+        while (fgetc(file) != EOF)
+            *size++;
     }
 
     return true;
@@ -8849,6 +8840,7 @@ DqnFile__UnixOpen(char const *path, DqnFile *file, u32 flags, DqnFile::Action ac
         return false;
     }
 
+    file->handle = fopen(path, mode);
     file->flags = flags;
     return true;
 }
@@ -9058,7 +9050,7 @@ u8 *DqnFile::ReadEntireFile(char const *path, usize *bufSize, DqnMemAPI *api)
     if (DqnFile::ReadEntireFile(path, buf, requiredSize, &bytesRead))
     {
         *bufSize = requiredSize;
-        DQN_ASSERT(bytesRead == requiredSize);
+        DQN_ASSERTM(bytesRead == requiredSize, "%zu != %zu", bytesRead, requiredSize);
         return buf;
     }
 
@@ -9108,7 +9100,7 @@ bool DqnFile::ReadEntireFile(const char *path, u8 *buf, usize bufSize, usize *by
     }
 
     *bytesRead = file.Read(buf, file.size);
-    DQN_ASSERT(*bytesRead == file.size);
+    DQN_ASSERTM(*bytesRead == file.size, "%zu != %zu", *bytesRead, file.size);
 
 cleanup:
     file.Close();
@@ -9677,7 +9669,7 @@ DQN_FILE_SCOPE i32 DqnAtomic_Add32(i32 volatile *src, i32 value)
 // XPlatform > #DqnOS
 // =================================================================================================
 #if defined(DQN_IS_UNIX)
-include <sys/mman.h>
+#include <sys/mman.h>
 #endif
 
 void *DqnOS_VAlloc(isize size, void *baseAddress)
