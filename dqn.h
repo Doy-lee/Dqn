@@ -2825,15 +2825,17 @@ struct DqnJson
     enum struct Type
     {
         Object,
-        Array,
+        ArrayOfObjects,
+        ArrayOfPrimitives,
     };
 
     Type           type;
     DqnSlice<char> value;
     i32            numEntries;
 
-    operator bool () const { return (value.data != nullptr); }
-    i64      ToI64() const { return Dqn_StrToI64(value.data, value.len); }
+    operator bool ()   const { return (value.data != nullptr); }
+    bool     IsArray() const { return (type == Type::ArrayOfObjects || type == Type::ArrayOfPrimitives); }
+    i64      ToI64()   const { return Dqn_StrToI64(value.data, value.len); }
 };
 
 // Zero allocation json finder. Returns the data of the value.
@@ -6802,17 +6804,69 @@ DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *array, i64 size, i64 find,
     }
 }
 
+// TODO(doyle): This should maybe be a tokenizer ...
 DQN_FILE_SCOPE DqnJson DqnJson_Get(char const *buf, i32 bufLen, char const *findProperty, i32 findPropertyLen)
 {
     DqnJson result = {};
+    char const *tmp = DqnChar_SkipWhitespace(buf);
+    bufLen          = static_cast<int>((buf + bufLen) - tmp);
+    buf             = tmp;
+
+    if (buf[0] == '{' || buf[1] == '[')
+    {
+        buf++;
+        bufLen--;
+    }
 
 TryNext:
-    char *locate   = DqnStr_GetFirstOccurence(buf, bufLen, findProperty, findPropertyLen);
+    char const *locate = nullptr;
+    for (i32 indexIntoBuf = 0; indexIntoBuf < bufLen; ++indexIntoBuf)
+    {
+        i32 remainingLenInSrcStr = bufLen - indexIntoBuf;
+        if (remainingLenInSrcStr < findPropertyLen) break;
+
+        char const *bufSubStr = buf + indexIntoBuf;
+        if (bufSubStr[0] == '{' || bufSubStr[0] == '[')
+        {
+            int bracketCount     = 0;
+            int braceCount       = 0;
+            int *searchCharCount = nullptr;
+            if (bufSubStr[0] == '[')
+            {
+                bracketCount++;
+                searchCharCount = &bracketCount;
+            }
+            else
+            {
+                braceCount++;
+                searchCharCount = &braceCount;
+            }
+
+            for (++indexIntoBuf; (*searchCharCount) != 0; ++indexIntoBuf)
+            {
+                bufSubStr = buf + indexIntoBuf;
+                if (!bufSubStr[0])
+                    return result;
+
+                if      (bufSubStr[0] == '{') ++braceCount;
+                else if (bufSubStr[0] == '}') --braceCount;
+                else if (bufSubStr[0] == '[') ++bracketCount;
+                else if (bufSubStr[0] == ']') --bracketCount;
+                else                         continue;
+            }
+        }
+
+        if (DqnStr_Cmp(bufSubStr, findProperty, findPropertyLen, Dqn::IgnoreCase::No) == 0)
+        {
+            locate = buf + indexIntoBuf;
+            break;
+        }
+    }
     if (!locate) return result;
 
     // NOTE: if find property is '{' we are looking for an object in array or the global scope etc
     // which doesn't have a specific property name
-    char *startOfValue = locate;
+    char const *startOfValue = locate;
     char const *bufPtr = startOfValue;
     if (findProperty[0] != '{' && findProperty[0] != '[')
     {
@@ -6844,11 +6898,19 @@ TryNext:
         startOfValue++;
 
         i32 *searchCharCount = nullptr;
-        if (bufPtr[0] == '[')
+        if (*bufPtr++ == '[')
         {
             bracketCount++;
-            result.type     = DqnJson::Type::Array;
             searchCharCount = &bracketCount;
+
+            while(bufPtr[0] != '{' && bufPtr[0] != '[' && bufPtr[0] != '"' && !DqnChar_IsAlphaNum(bufPtr[0]) && !bufPtr[0])
+                bufPtr++;
+
+            if (!bufPtr[0])
+                return result;
+
+            const b32 arrayOfPrimitives = (DqnChar_IsAlphaNum(bufPtr[0]) || bufPtr[0] == '"');
+            result.type = (arrayOfPrimitives) ? DqnJson::Type::ArrayOfPrimitives : DqnJson::Type::ArrayOfObjects;
         }
         else
         {
@@ -6857,24 +6919,43 @@ TryNext:
             searchCharCount = &braceCount;
         }
 
-        result.numEntries = 0;
-        for (bufPtr++; (*searchCharCount) != 0; bufPtr++)
+        if (result.type == DqnJson::Type::ArrayOfPrimitives)
         {
-            bool countsChanged = true;
-            if (!bufPtr[0])
-                return result;
-
-            if      (bufPtr[0] == '{') braceCount++;
-            else if (bufPtr[0] == '}') braceCount--;
-            else if (bufPtr[0] == '[') bracketCount++;
-            else if (bufPtr[0] == ']') bracketCount--;
-            else                       countsChanged = false;
-
-            if (countsChanged)
+            for (result.numEntries = 1;;)
             {
-                if (result.type == DqnJson::Type::Array)
+                while(bufPtr[0] && (bufPtr[0] != ',' && bufPtr[0] != ']'))
+                    bufPtr++;
+
+                if (bufPtr[0] == ',')
                 {
-                    if (braceCount == 0  && bracketCount == 1)
+                    result.numEntries++;
+                    bufPtr++;
+                    continue;
+                }
+
+                if (!bufPtr[0])
+                    return result;
+
+                if (bufPtr[0] == ']')
+                    break;
+            }
+        }
+        else
+        {
+            for (; (*searchCharCount) != 0; ++bufPtr)
+            {
+                if (!bufPtr[0])
+                    return result;
+
+                if      (bufPtr[0] == '{') ++braceCount;
+                else if (bufPtr[0] == '}') --braceCount;
+                else if (bufPtr[0] == '[') ++bracketCount;
+                else if (bufPtr[0] == ']') --bracketCount;
+                else                         continue;
+
+                if (result.type == DqnJson::Type::ArrayOfObjects)
+                {
+                    if (braceCount == 0 && bracketCount == 1)
                     {
                         result.numEntries++;
                     }
@@ -6887,9 +6968,10 @@ TryNext:
                     }
                 }
             }
+            // Don't include the open and closing braces/brackets.
+            bufPtr--;
         }
-        // Don't include the open and closing braces/brackets.
-        bufPtr--;
+
     }
     else if (bufPtr[0] == '"' || DqnChar_IsAlphaNum(bufPtr[0]))
     {
@@ -6906,7 +6988,7 @@ TryNext:
         return result;
     }
 
-    result.value.data = startOfValue;
+    result.value.data = (char *)startOfValue;
     result.value.len  = static_cast<i32>(bufPtr - result.value.data);
     result.value.data = DqnChar_TrimWhitespaceAround(result.value.data, result.value.len, &result.value.len);
     return result;
@@ -6945,25 +7027,49 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(DqnJson const input, DqnSlice<char const> con
 DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson *iterator)
 {
     DqnJson result = {};
-    if (iterator->type != DqnJson::Type::Array || iterator->numEntries <= 0)
+    if (!iterator->IsArray() || iterator->numEntries <= 0)
         return result;
 
-    result = DqnJson_Get(iterator->value, DQN_SLICE("{"));
-    if (result)
+    if (iterator->type == DqnJson::Type::ArrayOfObjects)
     {
-        char const *end      = iterator->value.data + iterator->value.len;
-        iterator->value.data = result.value.data + result.value.len;
-        iterator->numEntries--;
+        if (result = DqnJson_Get(iterator->value, DQN_SLICE("{")))
+        {
+            char const *end      = iterator->value.data + iterator->value.len;
+            iterator->value.data = result.value.data + result.value.len;
+            --iterator->numEntries;
 
-        while (iterator->value.data[0] && *iterator->value.data++ != '}')
-            ;
+            while (iterator->value.data[0] && *iterator->value.data++ != '}')
+                ;
 
-        iterator->value.data = DqnChar_SkipWhitespace(iterator->value.data);
-        if (iterator->value.data[0] && iterator->value.data[0] == ',')
-            iterator->value.data++;
+            iterator->value.data = DqnChar_SkipWhitespace(iterator->value.data);
+            if (iterator->value.data[0] && iterator->value.data[0] == ',')
+                iterator->value.data++;
 
-        iterator->value.data = DqnChar_SkipWhitespace(iterator->value.data);
-        iterator->value.len  = (iterator->value.data) ? static_cast<i32>(end - iterator->value.data) : 0;
+            iterator->value.data = DqnChar_SkipWhitespace(iterator->value.data);
+            iterator->value.len  = (iterator->value.data) ? static_cast<i32>(end - iterator->value.data) : 0;
+        }
+    }
+    else
+    {
+        char const *end   = iterator->value.data + iterator->value.len;
+        result.value.data = iterator->value.data;
+        --iterator->numEntries;
+
+        if (iterator->numEntries == 0)
+        {
+            while (iterator->value.data[0] && iterator->value.data[0] != ']')
+                ++iterator->value.data;
+        }
+        else
+        {
+            while (iterator->value.data[0] && iterator->value.data[0] != ',')
+                ++iterator->value.data;
+        }
+
+
+        result.value.len     = static_cast<i32>(iterator->value.data - result.value.data);
+        iterator->value.data = DqnChar_SkipWhitespace(++iterator->value.data);
+        iterator->value.len = (iterator->value.data) ? static_cast<i32>(end - iterator->value.data) : 0;
     }
 
     return result;
