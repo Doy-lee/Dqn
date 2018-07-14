@@ -140,6 +140,7 @@ void LogHeader(char const *funcName)
 #include "DqnFixedString.cpp"
 #include "DqnOS.cpp"
 #include "DqnJson.cpp"
+#include "DqnVHashTable.cpp"
 
 void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
 {
@@ -2901,6 +2902,7 @@ int main(void)
     DqnJson_Test();
 
 #ifdef DQN_PLATFORM_HEADER
+    DqnVHashTable_Test();
     DqnOS_Test();
     DqnFile_Test();
     DqnTimer_Test();

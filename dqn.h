@@ -47,13 +47,14 @@
 // #DqnHashTable   Hash Tables using Templates
 
 // #XPlatform (Win32 & Unix)
-// #DqnVArray    Array backed by virtual memory
-// #DqnFile      File I/O (Read, Write, Delete)
-// #DqnTimer     High Resolution Timer
-// #DqnLock      Mutex Synchronisation
-// #DqnJobQueue  Multithreaded Job Queue
-// #DqnAtomic    Interlocks/Atomic Operations
-// #DqnOS        Common Platform API helpers
+// #DqnVArray     Array backed by virtual memory
+// #DqnVHashTable Hash Table using templates backed by virtual memory
+// #DqnFile       File I/O (Read, Write, Delete)
+// #DqnTimer      High Resolution Timer
+// #DqnLock       Mutex Synchronisation
+// #DqnJobQueue   Multithreaded Job Queue
+// #DqnAtomic     Interlocks/Atomic Operations
+// #DqnOS         Common Platform API helpers
 
 // #Platform
 //   - #DqnWin32     Common Win32 API Helpers
@@ -1127,6 +1128,7 @@ DQN_FILE_SCOPE void *DqnMem_Realloc(void *memory, usize newSize);
 DQN_FILE_SCOPE void  DqnMem_Free   (void *memory);
 DQN_FILE_SCOPE void  DqnMem_Copy   (void *dest, void const *src, usize numBytesToCopy);
 DQN_FILE_SCOPE void *DqnMem_Set    (void *dest, u8 value,        usize numBytesToSet);
+DQN_FILE_SCOPE int   DqnMem_Cmp(void const *src, void const *dest, usize numBytes);
 
 // #DqnMemAPI API
 // =================================================================================================
@@ -2327,6 +2329,25 @@ int DqnFixedString<MAX>::SprintfAppend(char const *fmt, ...)
     return result;
 }
 
+template <typename Key> using DqnVHashTableHashingProc = isize(*)(isize count, Key const &data);
+template <typename Key> using DqnVHashTableEqualsProc  = bool (*)(Key const &a, Key const &b);
+
+#define DQN_VHASH_TABLE_HASHING_PROC(name) template <typename Key> inline isize name(isize count, Key const &key)
+DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash)
+{
+    const u64 SEED = 0x9747B28CAB3F8A7B;
+    u64 index64    = DqnHash_Murmur64Seed(&key, sizeof(key), SEED);
+    isize result   = index64 % count;
+    return result;
+}
+
+#define DQN_VHASH_TABLE_EQUALS_PROC(name) template <typename Key> inline bool name(Key const &a, Key const &b)
+DQN_VHASH_TABLE_EQUALS_PROC(DqnVHashTableDefaultEquals)
+{
+    bool result = (DqnMem_Cmp(&a, &b, sizeof(a)) == 0);
+    return result;
+}
+
 // TODO(doyle): Load factor
 // #DqnHashTable API
 // =================================================================================================
@@ -2938,6 +2959,119 @@ template <typename T> void DqnVArray<T>::EraseStable(isize index)
     count--;
 }
 
+// #XPlatform > #DqnVHashTable API
+// =================================================================================================
+#define DQN_VHASH_TABLE_TEMPLATE                                                                   \
+    template <typename Key,                                                                        \
+              typename Item,                                                                       \
+              DqnVHashTableHashingProc<Key> Hash  = DqnVHashTableDefaultHash<Key>,                 \
+              DqnVHashTableEqualsProc<Key> Equals = DqnVHashTableDefaultEquals<Key>>
+
+#define DQN_VHASH_TABLE_DECL DqnVHashTable<Key, Item, Hash, Equals>
+
+DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
+{
+    struct Entry
+    {
+        Key  key;
+        Item item;
+    };
+
+    struct Bucket
+    {
+        Entry entries[4];
+        isize entryIndex;
+    };
+
+    Bucket    *buckets;
+    isize      numBuckets;
+    isize      bucketsUsed;
+
+     DqnVHashTable() = default;
+     DqnVHashTable(isize size) { LazyInitialise(size); }
+    ~DqnVHashTable()           { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * numBuckets); }
+
+    void       Erase(Key const &key);
+    Item      *Set  (Key const &key, Item const &item);
+    Item      *Get  (Key const &key);
+
+    Item *operator[](Key const &key) { return Get(key); }
+
+private:
+    void LazyInitialise(isize size) { *this = {}; numBuckets = size; buckets = static_cast<Bucket *>(DqnOS_VAlloc(numBuckets * sizeof(*buckets))); DQN_ASSERT(buckets); }
+};
+
+DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Set(Key const &key, Item const &item)
+{
+    if (!buckets) LazyInitialise(1024);
+
+    isize index       = Hash(this->numBuckets, key);
+    Bucket *bucket    = this->buckets + index;
+    Entry *entry      = nullptr;
+
+    for (isize i = 0; i < bucket->entryIndex && !entry; i++)
+    {
+        Entry *check = bucket->entries + i;
+        entry        = Equals(check->key, key) ? check : nullptr;
+    }
+
+    if (!entry)
+    {
+        DQN_ASSERT(bucket->entryIndex < DQN_ARRAY_COUNT(bucket->entries));
+        this->bucketsUsed = (bucket->entryIndex == 0) ? this->bucketsUsed + 1 : this->bucketsUsed;
+        entry             = bucket->entries + bucket->entryIndex++;
+    }
+
+    entry->key  = key;
+    entry->item = item;
+    return &entry->item;
+}
+
+DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Get(Key const &key)
+{
+    Item *result = nullptr;
+    if (!buckets)
+    {
+        return result;
+    }
+
+    isize index    = Hash(this->numBuckets, key);
+    Bucket *bucket = this->buckets + index;
+
+    for (isize i = 0; i < bucket->entryIndex && !result; i++)
+    {
+        Entry *entry = bucket->entries + i;
+        result       = Equals(entry->key, key) ? &entry->item : nullptr;
+    }
+
+    return result;
+}
+
+DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
+{
+    if (!buckets)
+    {
+        return;
+    }
+
+    isize index    = Hash(this->numBuckets, key);
+    Bucket *bucket = this->buckets + index;
+
+    for (isize i = 0; i < bucket->entryIndex; ++i)
+    {
+        Entry *check  = bucket->entries + i;
+        if (Equals(check->key, key))
+        {
+            for (isize j = i; j < (bucket->entryIndex - 1); ++j)
+                bucket->entries[j] = bucket->entries[j + 1];
+
+            --bucket->entryIndex;
+            DQN_ASSERT(bucket->entryIndex >= 0);
+            return;
+        }
+    }
+}
+
 // XPlatform > #DqnFile API
 // =================================================================================================
 struct DqnFile
@@ -3354,6 +3488,22 @@ DQN_FILE_SCOPE void *DqnMem_Set(void *dest, u8 value, usize numBytesToSet)
         ptr[i]  = value;
 
     return dest;
+}
+
+DQN_FILE_SCOPE int DqnMem_Cmp(void const *src, void const *dest, usize numBytes)
+{
+    auto const *srcPtr  = static_cast<char const *>(src);
+    auto const *destPtr = static_cast<char const *>(dest);
+
+    usize i;
+    for (i = 0; i < numBytes; ++i)
+    {
+        if (srcPtr[i] != destPtr[i])
+            break;
+    }
+
+    i = DQN_MIN(i, (numBytes - 1));
+    return (srcPtr[i] - destPtr[i]);
 }
 
 // #DqnMemAPI
