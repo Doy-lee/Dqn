@@ -726,6 +726,10 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 // because there will be a trailing ',' at the end. Pasting it swallows it. MSVC
 // implicitly swallows the trailing comma.
 
+// Always assert are enabled in release mode.
+#define DQN_ALWAYS_ASSERT(expr) DQN_ASSERTM(expr, "");
+#define DQN_ALWAYS_ASSERTM(expr, msg, ...) DQN_ASSERTM(expr, msg, __VA_ARGS__)
+
 #define DQN_ASSERT(expr) DQN_ASSERTM(expr, "");
 #define DQN_ASSERTM(expr, msg, ...)                                                                \
     do                                                                                             \
@@ -3017,10 +3021,17 @@ DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Set(Key const &key, Item co
 
     if (!entry)
     {
-        DQN_ASSERT(bucket->entryIndex < DQN_ARRAY_COUNT(bucket->entries));
+        DQN_ALWAYS_ASSERTM(bucket->entryIndex < DQN_ARRAY_COUNT(bucket->entries), "More than %zu collisions in hash table, increase the size of the table or buckets", DQN_ARRAY_COUNT(bucket->entries));
         this->bucketsUsed = (bucket->entryIndex == 0) ? this->bucketsUsed + 1 : this->bucketsUsed;
         entry             = bucket->entries + bucket->entryIndex++;
     }
+
+    // TODO(doyle): A maybe case. We're using virtual memory, so you should
+    // just initialise a larger size. It's essentially free ... maybe one
+    // day we care about resizing the table but at the cost of a lot more code
+    // complexity.
+    isize const threshold = static_cast<isize>(0.75f * this->numBuckets);
+    DQN_ALWAYS_ASSERTM(this->bucketsUsed < threshold, "%zu >= %zu", this->bucketsUsed, threshold);
 
     entry->key  = key;
     entry->item = item;
@@ -3065,7 +3076,10 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
             for (isize j = i; j < (bucket->entryIndex - 1); ++j)
                 bucket->entries[j] = bucket->entries[j + 1];
 
-            --bucket->entryIndex;
+            if (--bucket->entryIndex == 0)
+                --this->bucketsUsed;
+
+            DQN_ASSERT(this->bucketsUsed >= 0);
             DQN_ASSERT(bucket->entryIndex >= 0);
             return;
         }
