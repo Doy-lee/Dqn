@@ -206,27 +206,27 @@ void Dqn_Test()
     // i64 to str
     if (1)
     {
-        char a[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+        char a[DQN_I64_MAX_STR_SIZE] = {};
         Dqn_I64ToStr(+100, a, DQN_ARRAY_COUNT(a));
         DQN_ASSERT(DqnStr_Cmp(a, "100") == 0);
 
-        char b[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+        char b[DQN_I64_MAX_STR_SIZE] = {};
         Dqn_I64ToStr(-100, b, DQN_ARRAY_COUNT(b));
         DQN_ASSERT(DqnStr_Cmp(b, "-100") == 0);
 
-        char c[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+        char c[DQN_I64_MAX_STR_SIZE] = {};
         Dqn_I64ToStr(0, c, DQN_ARRAY_COUNT(c));
         DQN_ASSERT(DqnStr_Cmp(c, "0") == 0);
 
 #if 0
-            char d[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+            char d[DQN_I64_MAX_STR_SIZE] = {};
             Dqn_I64ToStr(LARGEST_NUM, d, DQN_ARRAY_COUNT(d));
             DQN_ASSERT(DqnStr_Cmp(d, "18446744073709551615") == 0);
 #endif
 
         if (sizeof(size_t) == sizeof(u64))
         {
-            char e[DQN_64BIT_NUM_MAX_STR_SIZE] = {};
+            char e[DQN_I64_MAX_STR_SIZE] = {};
             Dqn_I64ToStr(SMALLEST_NUM, e, DQN_ARRAY_COUNT(e));
             DQN_ASSERTM(DqnStr_Cmp(e, "-9223372036854775808") == 0, "e: %s", e);
         }

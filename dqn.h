@@ -122,9 +122,9 @@ using b32 = i32;
 using f64 = double;
 using f32 = float;
 
-#define DQN_F32_MIN   -FLT_MAX;
-#define DQN_I64_MAX  INT64_MAX;
-#define DQN_U64_MAX UINT64_MAX;
+#define DQN_F32_MIN   -FLT_MAX
+#define DQN_I64_MAX  INT64_MAX
+#define DQN_U64_MAX UINT64_MAX
 
 #define DQN_TERABYTE(val) (DQN_GIGABYTE(val) * 1024LL)
 
@@ -150,6 +150,7 @@ using f32 = float;
 #define DQN_DEGREES_TO_RADIANS(x) ((x * (DQN_PI / 180.0f)))
 #define DQN_RADIANS_TO_DEGREES(x) ((x * (180.0f / DQN_PI)))
 
+#define DQN_CLAMP(value, min, max) DQN_MIN(DQN_MAX(value, min), max)
 #define DQN_MAX(a, b) ((a) < (b) ? (b) : (a))
 #define DQN_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define DQN_SWAP(type, a, b) do { type tmp = a; a = b; b = tmp; } while(0)
@@ -832,8 +833,8 @@ DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailQuotes (char const *s
 DQN_FILE_SCOPE inline DqnSlice<char> DqnStr_RemoveLeadTrailBraces (char const *str, i32 strLen);
 
 
-#define DQN_32BIT_NUM_MAX_STR_SIZE 11
-#define DQN_64BIT_NUM_MAX_STR_SIZE 21
+#define DQN_I32_MAX_STR_SIZE 11
+#define DQN_I64_MAX_STR_SIZE 21
 // Return the len of the derived string. If buf is nullptr and or bufSize is 0 the function returns the
 // required string length for the integer
 // TODO NOTE(doyle): Parsing stops when a non-digit is encountered, so numbers with ',' don't work atm.
@@ -1324,7 +1325,7 @@ struct DqnArray
     ~DqnArray        ()                                           { if (this->data && this->memAPI) this->memAPI->Free(data); }
 
     void  UseMemory  (T *data_, isize max_, isize count_ = 0)     { this->memAPI = nullptr; this->data = data_; this->max = max_; this->count = count_; }
-    void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::Yes) { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
+    void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::No)  { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
     void  Free       ()                                           { if (data) { memAPI->Free(data); } *this = {}; }
     T    *Front      ()                                           { DQN_ASSERT(count > 0); return data + 0; }
     T    *Back       ()                                           { DQN_ASSERT(count > 0); return data + (count - 1); }
@@ -2333,25 +2334,6 @@ int DqnFixedString<MAX>::SprintfAppend(char const *fmt, ...)
     return result;
 }
 
-template <typename Key> using DqnVHashTableHashingProc = isize(*)(isize count, Key const &data);
-template <typename Key> using DqnVHashTableEqualsProc  = bool (*)(Key const &a, Key const &b);
-
-#define DQN_VHASH_TABLE_HASHING_PROC(name) template <typename Key> inline isize name(isize count, Key const &key)
-DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash)
-{
-    const u64 SEED = 0x9747B28CAB3F8A7B;
-    u64 index64    = DqnHash_Murmur64Seed(&key, sizeof(key), SEED);
-    isize result   = index64 % count;
-    return result;
-}
-
-#define DQN_VHASH_TABLE_EQUALS_PROC(name) template <typename Key> inline bool name(Key const &a, Key const &b)
-DQN_VHASH_TABLE_EQUALS_PROC(DqnVHashTableDefaultEquals)
-{
-    bool result = (DqnMem_Cmp(&a, &b, sizeof(a)) == 0);
-    return result;
-}
-
 // TODO(doyle): Load factor
 // #DqnHashTable API
 // =================================================================================================
@@ -2914,22 +2896,25 @@ struct DqnVArray
     isize  max;     // Read
     T     *data;    // Read
 
-     DqnVArray       ()                                           { count = 0; max = DQN_MEGABYTE(1) / sizeof(T); data = (T *)DqnOS_VAlloc(max * sizeof(T)); DQN_ASSERT(data); }
-    ~DqnVArray       ()                                           { if (data)   DqnOS_VFree(data, sizeof(T) * max); }
-    void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::Yes) { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
+          DqnVArray  () = default;
+          DqnVArray  (isize size)                                 { LazyInit(size); }
+    void  LazyInit   (isize size)                                 { if (data) return; count = 0; max = size; data = (T *)DqnOS_VAlloc(max * sizeof(T)); DQN_ALWAYS_ASSERT(data); }
+         ~DqnVArray  ()                                           { if (data) DqnOS_VFree(data, sizeof(T) * max); }
+
+    void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::No)  { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
     void  Free       ()                                           { if (data) { DqnOS_VFree(data, sizeof(T) * max); } *this = {}; }
-    T    *Front      ()                                           { DQN_ASSERT(count > 0); return data + 0; }
-    T    *Back       ()                                           { DQN_ASSERT(count > 0); return data + (count - 1); }
-    T    *Make       (isize num = 1)                              { count += num; DQN_ASSERT(count < max); return &data[count - num]; }
+    T    *Front      ()                                           { return (count > 0) (data + 0)           : nullptr; }
+    T    *Back       ()                                           { return (count > 0) (data + (count - 1)) : nullptr; }
+    T    *Make       (isize num = 1)                              { LazyInit(1024); count += num; DQN_ASSERT(count < max); return &data[count - num]; }
     T    *Push       (T const &v)                                 { return Insert(count, &v, 1); }
     T    *Push       (T const *v, isize numItems = 1)             { return Insert(count,  v, numItems); }
     void  Pop        ()                                           { if (count > 0) count--; }
-    void  Erase      (isize index)                                { DQN_ASSERT(index >= 0 && index < count); data[index] = data[--count]; }
+    void  Erase      (isize index)                                { if (!data) return; DQN_ASSERT(index >= 0 && index < count); data[index] = data[--count]; }
     void  EraseStable(isize index);
     T    *Insert     (isize index, T const *v)                    { return Insert(index,  v, 1); }
     T    *Insert     (isize index, T const &v)                    { return Insert(index, &v, 1); }
     T    *Insert     (isize index, T const *v, isize numItems);
-    bool  Contains   (T const *v) const                           { T const *ptr = data;  T const *end = data + count; while (ptr < end) if (*ptr++ == *v) return true; return false; }
+    bool  Contains   (T const *v) const                           { T const *ptr = data;  T const *end = data + count; while (ptr < end) { if (*ptr++ == *v) return true; } return false; }
 
     T    &operator[] (isize i) const                              { DQN_ASSERT(i < count && i > 0); return this->data[i]; }
     T    *begin      ()                                           { return data; }
@@ -2938,7 +2923,9 @@ struct DqnVArray
 
 template<typename T> T *DqnVArray<T>::Insert(isize index, T const *v, isize numItems)
 {
-    index                = DQN_MIN(DQN_MAX(index, 0), count);
+    LazyInit(1024);
+
+    index                = DQN_CLAMP(index, 0, count);
     isize const newCount = count + numItems;
     DQN_ASSERT(newCount < max);
 
@@ -2957,6 +2944,7 @@ template<typename T> T *DqnVArray<T>::Insert(isize index, T const *v, isize numI
 
 template <typename T> void DqnVArray<T>::EraseStable(isize index)
 {
+    if (!data) return;
     DQN_ASSERT(index >= 0 && index < count);
     isize const off = (data + index) - data;
     memmove(data + off, data + off + 1, ((usize)count - (usize)off - 1) * sizeof(T));
@@ -2965,6 +2953,25 @@ template <typename T> void DqnVArray<T>::EraseStable(isize index)
 
 // #XPlatform > #DqnVHashTable API
 // =================================================================================================
+template <typename Key> using DqnVHashTableHashingProc = isize(*)(isize count, Key const &data);
+template <typename Key> using DqnVHashTableEqualsProc  = bool (*)(Key const &a, Key const &b);
+
+#define DQN_VHASH_TABLE_HASHING_PROC(name) template <typename Key> inline isize name(isize count, Key const &key)
+DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash)
+{
+    const u64 SEED = 0x9747B28CAB3F8A7B;
+    u64 index64    = DqnHash_Murmur64Seed(&key, sizeof(key), SEED);
+    isize result   = index64 % count;
+    return result;
+}
+
+#define DQN_VHASH_TABLE_EQUALS_PROC(name) template <typename Key> inline bool name(Key const &a, Key const &b)
+DQN_VHASH_TABLE_EQUALS_PROC(DqnVHashTableDefaultEquals)
+{
+    bool result = (DqnMem_Cmp(&a, &b, sizeof(a)) == 0);
+    return result;
+}
+
 #define DQN_VHASH_TABLE_TEMPLATE                                                                   \
     template <typename Key,                                                                        \
               typename Item,                                                                       \
@@ -2992,22 +2999,21 @@ DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
     isize      bucketsUsed;
 
      DqnVHashTable() = default;
-     DqnVHashTable(isize size) { LazyInitialise(size); }
+     DqnVHashTable(isize size) { LazyInit(size); }
     ~DqnVHashTable()           { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * numBuckets); }
 
-    void       Erase(Key const &key);
-    Item      *Set  (Key const &key, Item const &item);
-    Item      *Get  (Key const &key);
+    void       LazyInit(isize size) { *this = {}; numBuckets = size; buckets = static_cast<Bucket *>(DqnOS_VAlloc(numBuckets * sizeof(*buckets))); DQN_ASSERT(buckets); }
+    void       Erase   (Key const &key);
+    Item      *Set     (Key const &key, Item const &item);
+    Item      *Get     (Key const &key);
 
     Item *operator[](Key const &key) { return Get(key); }
 
-private:
-    void LazyInitialise(isize size) { *this = {}; numBuckets = size; buckets = static_cast<Bucket *>(DqnOS_VAlloc(numBuckets * sizeof(*buckets))); DQN_ASSERT(buckets); }
 };
 
 DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Set(Key const &key, Item const &item)
 {
-    if (!buckets) LazyInitialise(1024);
+    if (!buckets) LazyInit(1024);
 
     isize index       = Hash(this->numBuckets, key);
     Bucket *bucket    = this->buckets + index;
@@ -6972,6 +6978,8 @@ DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *array, i64 size, i64 find,
 DQN_FILE_SCOPE DqnJson DqnJson_Get(char const *buf, i32 bufLen, char const *findProperty, i32 findPropertyLen)
 {
     DqnJson result = {};
+    if (!buf || bufLen == 0 || !findProperty || findPropertyLen == 0) return result;
+
     char const *tmp = DqnChar_SkipWhitespace(buf);
     bufLen          = static_cast<int>((buf + bufLen) - tmp);
     buf             = tmp;
