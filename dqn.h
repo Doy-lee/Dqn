@@ -914,7 +914,7 @@ DQN_QUICK_SORT_LESS_THAN_PROC(DqnQuickSort_StringLessThan)
 }
 
 template <typename T, DqnQuickSort_LessThanProc<T> IsLessThan = DqnQuickSort_DefaultLessThan<T>>
-DQN_FILE_SCOPE void DqnQuickSort(T *array, isize size, void *userContext = nullptr)
+DQN_FILE_SCOPE void DqnQuickSort(T *array, isize size, void *userContext)
 {
     if (!array || size <= 1) return;
 
@@ -930,11 +930,11 @@ DQN_FILE_SCOPE void DqnQuickSort(T *array, isize size, void *userContext = nullp
             {
                 if (!IsLessThan(array[checkIndex], array[itemToInsertIndex], userContext))
                 {
-                    T itemToInsert = array[itemToInsertIndex];
+                    T *itemToInsert = array + itemToInsertIndex;
                     for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
                         array[i] = array[i - 1];
 
-                    array[checkIndex] = itemToInsert;
+                    array[checkIndex] = *itemToInsert;
                     break;
                 }
             }
@@ -983,6 +983,78 @@ DQN_FILE_SCOPE void DqnQuickSort(T *array, isize size, void *userContext = nullp
     i32 oneAfterPartitionIndex = partitionIndex + 1;
     DqnQuickSort<T, IsLessThan>(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex), userContext);
 }
+
+template <typename T>
+DQN_FILE_SCOPE void DqnQuickSort(T *array, isize size)
+{
+    if (!array || size <= 1) return;
+
+#if 1
+    // Insertion Sort, under 24->32 is an optimal amount
+    const i32 QUICK_SORT_THRESHOLD = 24;
+    if (size < QUICK_SORT_THRESHOLD)
+    {
+        i32 itemToInsertIndex = 1;
+        while (itemToInsertIndex < size)
+        {
+            for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
+            {
+                if (!(array[checkIndex] < array[itemToInsertIndex]))
+                {
+                    T itemToInsert = array[itemToInsertIndex];
+                    for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
+                        array[i] = array[i - 1];
+
+                    array[checkIndex] = itemToInsert;
+                    break;
+                }
+            }
+            itemToInsertIndex++;
+        }
+
+        return;
+    }
+#endif
+
+    auto state          = DqnRndPCG();
+    auto lastIndex      = size - 1;
+    auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex);
+    auto partitionIndex = 0;
+    auto startIndex     = 0;
+
+    // Swap pivot with last index, so pivot is always at the end of the array.
+    // This makes logic much simpler.
+    DQN_SWAP(T, array[lastIndex], array[pivotIndex]);
+    pivotIndex = lastIndex;
+
+    // 4^, 8, 7, 5, 2, 3, 6
+    if (array[startIndex] < array[pivotIndex]) partitionIndex++;
+    startIndex++;
+
+    // 4, |8, 7, 5^, 2, 3, 6*
+    // 4, 5, |7, 8, 2^, 3, 6*
+    // 4, 5, 2, |8, 7, ^3, 6*
+    // 4, 5, 2, 3, |7, 8, ^6*
+    for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
+    {
+        if (array[checkIndex] < array[pivotIndex])
+        {
+            DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
+            partitionIndex++;
+        }
+    }
+
+    // Move pivot to right of partition
+    // 4, 5, 2, 3, |6, 8, ^7*
+    DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
+    DqnQuickSort(array, partitionIndex);
+
+    // Skip the value at partion index since that is guaranteed to be sorted.
+    // 4, 5, 2, 3, (x), 8, 7
+    i32 oneAfterPartitionIndex = partitionIndex + 1;
+    DqnQuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex));
+}
+
 
 template <typename T> using DqnBSearch_LessThanProc = bool (*)(const T&, const T&);
 template <typename T> using DqnBSearch_EqualsProc   = bool (*)(const T&, const T&);
