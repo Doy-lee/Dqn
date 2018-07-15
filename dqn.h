@@ -930,11 +930,11 @@ DQN_FILE_SCOPE void DqnQuickSort(T *array, isize size, void *userContext)
             {
                 if (!IsLessThan(array[checkIndex], array[itemToInsertIndex], userContext))
                 {
-                    T *itemToInsert = array + itemToInsertIndex;
+                    T itemToInsert = array[itemToInsertIndex];
                     for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
                         array[i] = array[i - 1];
 
-                    array[checkIndex] = *itemToInsert;
+                    array[checkIndex] = itemToInsert;
                     break;
                 }
             }
