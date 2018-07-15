@@ -898,16 +898,25 @@ DQN_FILE_SCOPE inline u32  Dqn_BitSet   (u32 bits, u32 flag);
 DQN_FILE_SCOPE inline u32  Dqn_BitUnset (u32 bits, u32 flag);
 DQN_FILE_SCOPE inline u32  Dqn_BitToggle(u32 bits, u32 flag);
 
-template <typename T>
-using Dqn_QuickSortLessThanCallback = bool (*)(T const *, T const *, void *);
-
-DQN_FILE_SCOPE inline bool Dqn_QuickSortDqnStringSorter(struct DqnString const *a, struct DqnString const *b, void *);
-
-template <typename T>
-DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size,
-                                  Dqn_QuickSortLessThanCallback<T> IsLessThan, void *userContext = nullptr)
+template <typename T> using DqnQuickSort_LessThanProc =                  bool (*) (T const &a, T const &b, void *userContext);
+#define DQN_QUICK_SORT_LESS_THAN_PROC(name) template <typename T> inline bool name(T const &a, T const &b, void *userContext)
+DQN_QUICK_SORT_LESS_THAN_PROC(DqnQuickSort_DefaultLessThan)
 {
-    if (!array || size <= 1 || !IsLessThan) return;
+    (void)userContext;
+    bool result = a < b;
+    return result;
+}
+
+DQN_QUICK_SORT_LESS_THAN_PROC(DqnQuickSort_StringLessThan)
+{
+    bool result =  DqnString::Cmp(a, b);
+    return result;
+}
+
+template <typename T, DqnQuickSort_LessThanProc<T> IsLessThan = DqnQuickSort_DefaultLessThan<T>>
+DQN_FILE_SCOPE void DqnQuickSort(T *array, isize size, void *userContext = nullptr)
+{
+    if (!array || size <= 1) return;
 
 #if 1
     // Insertion Sort, under 24->32 is an optimal amount
@@ -919,7 +928,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size,
         {
             for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
             {
-                if (!IsLessThan(&array[checkIndex], &array[itemToInsertIndex], userContext))
+                if (!IsLessThan(array[checkIndex], array[itemToInsertIndex], userContext))
                 {
                     T itemToInsert = array[itemToInsertIndex];
                     for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
@@ -948,7 +957,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size,
     pivotIndex = lastIndex;
 
     // 4^, 8, 7, 5, 2, 3, 6
-    if (IsLessThan(&array[startIndex], &array[pivotIndex], userContext)) partitionIndex++;
+    if (IsLessThan(array[startIndex], array[pivotIndex], userContext)) partitionIndex++;
     startIndex++;
 
     // 4, |8, 7, 5^, 2, 3, 6*
@@ -957,7 +966,7 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size,
     // 4, 5, 2, 3, |7, 8, ^6*
     for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
     {
-        if (IsLessThan(&array[checkIndex], &array[pivotIndex], userContext))
+        if (IsLessThan(array[checkIndex], array[pivotIndex], userContext))
         {
             DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
             partitionIndex++;
@@ -967,128 +976,61 @@ DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size,
     // Move pivot to right of partition
     // 4, 5, 2, 3, |6, 8, ^7*
     DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
-    Dqn_QuickSort(array, partitionIndex, IsLessThan, userContext);
+    DqnQuickSort<T, IsLessThan>(array, partitionIndex, userContext);
 
     // Skip the value at partion index since that is guaranteed to be sorted.
     // 4, 5, 2, 3, (x), 8, 7
     i32 oneAfterPartitionIndex = partitionIndex + 1;
-    Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex), IsLessThan, userContext);
+    DqnQuickSort<T, IsLessThan>(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex), userContext);
 }
 
-template <typename T>
-DQN_FILE_SCOPE void Dqn_QuickSort(T *array, i64 size)
+template <typename T> using DqnBSearch_LessThanProc = bool (*)(const T&, const T&);
+template <typename T> using DqnBSearch_EqualsProc   = bool (*)(const T&, const T&);
+#define DQN_BSEARCH_LESS_THAN_PROC(name) template <typename T> inline bool name(T const &a, T const &b)
+#define DQN_BSEARCH_EQUALS_PROC(name)    template <typename T> inline bool name(T const &a, T const &b)
+DQN_BSEARCH_LESS_THAN_PROC(DqnBSearch_DefaultLessThan) { return a < b;  }
+DQN_BSEARCH_EQUALS_PROC   (DqnBSearch_DefaultEquals)   { return a == b; }
+
+enum struct DqnBSearchType
 {
-    if (!array || size <= 1) return;
+    Match,    // Return the index of the first item that matches the find value
+    MinusOne, // Return the index of the first item lower than the find value
+    PlusOne,  // Return the index of the first item higher than the find value
 
-#if 1
-    // Insertion Sort, under 24->32 is an optimal amount
-    const i32 QUICK_SORT_THRESHOLD = 24;
-    if (size < QUICK_SORT_THRESHOLD)
-    {
-        i32 itemToInsertIndex = 1;
-        while (itemToInsertIndex < size)
-        {
-            for (i32 checkIndex = 0; checkIndex < itemToInsertIndex; checkIndex++)
-            {
-                if (!(array[checkIndex] < array[itemToInsertIndex]))
-                {
-                    T itemToInsert = array[itemToInsertIndex];
-                    for (i32 i   = itemToInsertIndex; i > checkIndex; i--)
-                        array[i] = array[i - 1];
-
-                    array[checkIndex] = itemToInsert;
-                    break;
-                }
-            }
-            itemToInsertIndex++;
-        }
-
-        return;
-    }
-#endif
-
-    auto state          = DqnRndPCG();
-    auto lastIndex      = size - 1;
-    auto pivotIndex     = (i64)state.Range(0, (i32)lastIndex); // TODO(doyle): RNG 64bit
-    auto partitionIndex = 0;
-    auto startIndex     = 0;
-
-    // Swap pivot with last index, so pivot is always at the end of the array.
-    // This makes logic much simpler.
-    DQN_SWAP(T, array[lastIndex], array[pivotIndex]);
-    pivotIndex = lastIndex;
-
-    // 4^, 8, 7, 5, 2, 3, 6
-    if (array[startIndex] < array[pivotIndex]) partitionIndex++;
-    startIndex++;
-
-    // 4, |8, 7, 5^, 2, 3, 6*
-    // 4, 5, |7, 8, 2^, 3, 6*
-    // 4, 5, 2, |8, 7, ^3, 6*
-    // 4, 5, 2, 3, |7, 8, ^6*
-    for (auto checkIndex = startIndex; checkIndex < lastIndex; checkIndex++)
-    {
-        if (array[checkIndex] < array[pivotIndex])
-        {
-            DQN_SWAP(T, array[partitionIndex], array[checkIndex]);
-            partitionIndex++;
-        }
-    }
-
-    // Move pivot to right of partition
-    // 4, 5, 2, 3, |6, 8, ^7*
-    DQN_SWAP(T, array[partitionIndex], array[pivotIndex]);
-    Dqn_QuickSort(array, partitionIndex);
-
-    // Skip the value at partion index since that is guaranteed to be sorted.
-    // 4, 5, 2, 3, (x), 8, 7
-    i32 oneAfterPartitionIndex = partitionIndex + 1;
-    Dqn_QuickSort(array + oneAfterPartitionIndex, (size - oneAfterPartitionIndex));
-}
-
-template <typename T>
-using Dqn_BSearchLessThanCallback = bool (*)(const T&, const T&);
-
-template <typename T>
-using Dqn_BSearchEqualsCallback   = bool (*)(const T&, const T&);
-
-enum Dqn_BSearchBound
-{
-    Dqn_BSearchBound_Normal, // Return the index of the first item that matches the find value
-    Dqn_BSearchBound_Lower,  // Return the index of the first item lower than the find value
-    Dqn_BSearchBound_Higher, // Return the index of the first item higher than the find value
-
-    Dqn_BSearchBound_NormalLower,  // Return the index of the matching item if not found the first item lower
-    Dqn_BSearchBound_NormalHigher, // Return the index of the matching item if not found the first item higher
+    MatchOrMinusOne, // Return the index of the matching item if not found the first item lower
+    MatchOrPlusOne,  // Return the index of the matching item if not found the first item higher
 };
 
-// bound: The behaviour of the binary search,
+// type:   The matching behaviour of the binary search,
 // return: -1 if element not found, otherwise index of the element.
 //         For higher and lower bounds return -1 if there is no element higher/lower than the
 //         find value (i.e. -1 if the 0th element is the find val for lower bound).
-template <typename T>
-DQN_FILE_SCOPE i64 Dqn_BSearch(T *array, i64 size, T const &find,
-                               Dqn_BSearchEqualsCallback<T> Equals,
-                               Dqn_BSearchLessThanCallback<T> IsLessThan,
-                               Dqn_BSearchBound bound = Dqn_BSearchBound_Normal)
+template <typename T,
+          DqnBSearch_LessThanProc<T> IsLessThan = DqnBSearch_DefaultLessThan<T>,
+          DqnBSearch_EqualsProc<T> Equals       = DqnBSearch_DefaultEquals<T>>
+DQN_FILE_SCOPE i64
+DqnBSearch(T const *array, isize size, T const &find, DqnBSearchType type = DqnBSearchType::Match)
 {
-    if (size == 0 || !array) return -1;
+    if (size == 0 || !array)
+    {
+        return -1;
+    }
 
-    i64 start = 0;
-    i64 end   = size - 1;
-    i64 mid   = (i64)((start + end) * 0.5f);
+    isize start = 0;
+    isize end   = size - 1;
+    isize mid   = static_cast<isize>((start + end) * 0.5f);
 
     while (start <= end)
     {
         if (Equals(array[mid], find))
         {
-            if (bound == Dqn_BSearchBound_Normal ||
-                bound == Dqn_BSearchBound_NormalLower ||
-                bound == Dqn_BSearchBound_NormalHigher)
+            if (type == DqnBSearchType::Match ||
+                type == DqnBSearchType::MatchOrMinusOne ||
+                type == DqnBSearchType::MatchOrPlusOne)
             {
                 return mid;
             }
-            else if (bound == Dqn_BSearchBound_Lower)
+            else if (type == DqnBSearchType::MinusOne)
             {
                 // NOTE: We can always -1 because at worst case, 0 index will go to -1 which is
                 // correct behaviour.
@@ -1096,32 +1038,29 @@ DQN_FILE_SCOPE i64 Dqn_BSearch(T *array, i64 size, T const &find,
             }
             else
             {
-                if ((mid + 1) >= size) return -1;
-                return mid + 1;
+                return ((mid + 1) >= size) ? -1 : mid + 1;
             }
         }
         else if (IsLessThan(array[mid], find)) start = mid + 1;
         else                                   end   = mid - 1;
-        mid = (i64)((start + end) * 0.5f);
+        mid = static_cast<isize>((start + end) * 0.5f);
     }
 
-    if (bound == Dqn_BSearchBound_Normal)
+    if (type == DqnBSearchType::Match)
     {
         return -1;
     }
-    if (bound == Dqn_BSearchBound_Lower || bound == Dqn_BSearchBound_NormalLower)
+    if (type == DqnBSearchType::MinusOne || type == DqnBSearchType::MatchOrMinusOne)
     {
-        if (IsLessThan(find, array[mid])) return -1;
-        return mid;
+        return (IsLessThan(find, array[mid])) ? -1 : mid;
     }
     else
     {
-        if (IsLessThan(array[mid], find)) return -1;
-        return mid;
+        return (IsLessThan(find, array[mid])) ? mid : -1;
     }
 }
 
-DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *array, i64 size, i64 find, Dqn_BSearchBound bound = Dqn_BSearchBound_Normal);
+DQN_FILE_SCOPE inline i64 DqnBSearch(i64 const *array, i64 size, i64 find, DqnBSearchType type = DqnBSearchType::Match) { return DqnBSearch<i64>(array, size, find, type); }
 
 // #DqnMem API
 // =================================================================================================
@@ -1325,7 +1264,7 @@ struct DqnArray
     ~DqnArray        ()                                           { if (this->data && this->memAPI) this->memAPI->Free(data); }
 
     void  UseMemory  (T *data_, isize max_, isize count_ = 0)     { this->memAPI = nullptr; this->data = data_; this->max = max_; this->count = count_; }
-    void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::No)  { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
+    void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::No)  { if (!data) return; count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); }
     void  Free       ()                                           { if (data) { memAPI->Free(data); } *this = {}; }
     T    *Front      ()                                           { DQN_ASSERT(count > 0); return data + 0; }
     T    *Back       ()                                           { DQN_ASSERT(count > 0); return data + (count - 1); }
@@ -1577,24 +1516,6 @@ struct DqnMemStack
     void             TempRegionKeepChanges(TempRegion region);
 };
 
-inline bool                           DqnMemStack_Init                 (DqnMemStack *me, isize size, Dqn::ZeroClear clear, u32 flags_ = 0, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR) { return me->Init(size, clear, flags_, api); }
-inline void                          *DqnMemStack_Push                 (DqnMemStack *me, isize size, u8 alignment = 4)                                                                  { return me->Push(size, alignment); }
-inline void                          *DqnMemStack_PushOnTail           (DqnMemStack *me, isize size, u8 alignment = 4)                                                                  { return me->PushOnTail(size, alignment); }
-inline void                           DqnMemStack_Pop                  (DqnMemStack *me, void *ptr, Dqn::ZeroClear clear = Dqn::ZeroClear::No)                                       { me->Pop(ptr, clear); }
-inline void                           DqnMemStack_PopOnTail            (DqnMemStack *me, void *ptr, Dqn::ZeroClear clear = Dqn::ZeroClear::No)                                       { me->PopOnTail(ptr, clear); }
-inline void                           DqnMemStack_Free                 (DqnMemStack *me)                                                                                                { me->Free(); }
-inline bool                           DqnMemStack_FreeMemBlock         (DqnMemStack *me, DqnMemStack::Block *memBlock)                                                                  { return me->FreeMemBlock(memBlock); }
-inline bool                           DqnMemStack_FreeLastBlock        (DqnMemStack *me)                                                                                                { return me->FreeLastBlock(); }
-inline void                           DqnMemStack_Reset                (DqnMemStack *me)                                                                                                { me->Reset(); }
-inline void                           DqnMemStack_ResetTail            (DqnMemStack *me)                                                                                                { me->ResetTail(); }
-inline void                           DqnMemStack_ClearCurrBlock       (DqnMemStack *me, Dqn::ZeroClear clear)                                                                          { me->ClearCurrBlock(clear); }
-inline DqnMemStack::Info              DqnMemStack_GetInfo              (DqnMemStack *me)                                                                                                { return me->GetInfo(); }
-inline DqnMemStack::TempRegion        DqnMemStack_TempRegionBegin      (DqnMemStack *me)                                                                                                { return me->TempRegionBegin(); }
-inline void                           DqnMemStack_TempRegionEnd        (DqnMemStack *me, DqnMemStack::TempRegion region)                                                                { me->TempRegionEnd(region); }
-inline DqnMemStack::TempRegionGuard_  DqnMemStack_TempRegionGuard      (DqnMemStack *me)                                                                                                { return me->TempRegionGuard(); }
-inline void                           DqnMemStack_TempRegionKeepChanges(DqnMemStack *me, DqnMemStack::TempRegion region)                                                                { me->TempRegionKeepChanges(region); }
-
-
 // Implementation taken from Milton, developed by Serge at
 // https://github.com/serge-rgb/milton#license
 #if 0
@@ -1836,14 +1757,14 @@ void DqnArray<T>::EraseStable(isize *indexList, isize numIndexes)
     if (numIndexes == 0 || !indexList) return;
 
     // NOTE: Sort the index list and ensure we only remove indexes up to the size of our array
-    Dqn_QuickSort<isize>(indexList, numIndexes);
+    DqnQuickSort<isize>(indexList, numIndexes);
 
     auto arrayHighestIndex = this->count - 1;
     auto realCount         = numIndexes;
     if (indexList[numIndexes - 1] > arrayHighestIndex)
     {
         auto realNumIndexes =
-            Dqn_BSearch(indexList, numIndexes, arrayHighestIndex, Dqn_BSearchBound_Lower);
+            DqnBSearch(indexList, numIndexes, arrayHighestIndex, DqnBSearchType::MinusOne);
         // NOTE: If -1, then there's no index in the indexlist that is within the range of our array
         // i.e. no index we can remove without out of array bounds access
         if (realNumIndexes == -1)
@@ -2555,8 +2476,8 @@ typename DqnHashTable<T>::Entry *DqnHashTable<T>::Make(char const *const key, i3
         // If entry for hashIndex not used yet, mark it down as a used slot.
         if (!this->entries[hashIndex])
         {
-            i64 index = Dqn_BSearch(this->usedEntries, this->usedEntriesIndex, hashIndex,
-                                    Dqn_BSearchBound_Lower);
+            i64 index = DqnBSearch(this->usedEntries, this->usedEntriesIndex, hashIndex,
+                                    DqnBSearchType::MinusOne);
             i64 indexToEndAt              = index;
             if (index == -1) indexToEndAt = 0;
 
@@ -2615,8 +2536,8 @@ void DqnHashTable<T>::Remove(char const *const key, i32 keyLen)
             if (entryToFree == entry)
             {
                 // Unique entry, so remove this index from the used list as well.
-                i64 indexToRemove = Dqn_BSearch(this->usedEntries, this->usedEntriesIndex,
-                                                hashIndex, Dqn_BSearchBound_Lower);
+                i64 indexToRemove = DqnBSearch(this->usedEntries, this->usedEntriesIndex,
+                                                hashIndex, DqnBSearchType::MinusOne);
 
                 for (i64 i = indexToRemove; i < this->usedEntriesIndex - 1; i++)
                     this->usedEntries[i] = this->usedEntries[i + 1];
@@ -2899,13 +2820,13 @@ struct DqnVArray
           DqnVArray  () = default;
           DqnVArray  (isize size)                                 { LazyInit(size); }
     void  LazyInit   (isize size)                                 { if (data) return; count = 0; max = size; data = (T *)DqnOS_VAlloc(max * sizeof(T)); DQN_ALWAYS_ASSERT(data); }
-         ~DqnVArray  ()                                           { if (data) DqnOS_VFree(data, sizeof(T) * max); }
+         // ~DqnVArray  ()                                           { if (data) DqnOS_VFree(data, sizeof(T) * max); }
 
     void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::No)  { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
     void  Free       ()                                           { if (data) { DqnOS_VFree(data, sizeof(T) * max); } *this = {}; }
     T    *Front      ()                                           { return (count > 0) (data + 0)           : nullptr; }
     T    *Back       ()                                           { return (count > 0) (data + (count - 1)) : nullptr; }
-    T    *Make       (isize num = 1)                              { LazyInit(1024); count += num; DQN_ASSERT(count < max); return &data[count - num]; }
+    T    *Make       (isize num = 1)                              { LazyInit(1024); count += num; DQN_ASSERT(count <= max); return &data[count - num]; }
     T    *Push       (T const &v)                                 { return Insert(count, &v, 1); }
     T    *Push       (T const *v, isize numItems = 1)             { return Insert(count,  v, numItems); }
     void  Pop        ()                                           { if (count > 0) count--; }
@@ -2927,7 +2848,7 @@ template<typename T> T *DqnVArray<T>::Insert(isize index, T const *v, isize numI
 
     index                = DQN_CLAMP(index, 0, count);
     isize const newCount = count + numItems;
-    DQN_ASSERT(newCount < max);
+    DQN_ASSERT(newCount <= max);
 
     T *src  = data + index;
     T *dest = src + numItems;
@@ -3193,7 +3114,7 @@ DQN_FILE_SCOPE f64  DqnTimer_NowInS ();
 
 // XPlatform > #DqnLock API
 // =================================================================================================
-typedef struct DqnLock
+struct DqnLock
 {
 #if defined(DQN_IS_WIN32)
     CRITICAL_SECTION win32Handle;
@@ -3210,31 +3131,18 @@ typedef struct DqnLock
     void Release();
     void Delete ();
 
+    struct Guard_
+    {
+         Guard_(DqnLock *lock_) : lock(lock_) { lock->Acquire(); }
+        ~Guard_()                             { lock->Release(); }
+
+    private:
+        DqnLock *lock;
+    };
+
     // Create a lock guard on the lock this is invoked on.
-    struct DqnLockGuard LockGuard();
-} DqnLock;
-
-// Lock guard automatically acquires a lock on construction and releases the associated lock on
-// destruction. If the lock is unable to be acquired, the program blocks at construction until it
-// can.
-struct DqnLockGuard
-{
-    // lock: Takes a pointer to a pre-existing and already initialised lock
-    // bool: Pass in (optionally) a pointer to a bool which returns whether a lock was successful.
-    // FALSE if lock is nullptr.
-     DqnLockGuard(DqnLock *const lock_, bool *const succeeded);
-    ~DqnLockGuard();
-
-private:
-    DqnLock *lock;
+    Guard_ Guard() { return Guard_(this); }
 };
-
-// lock: Pass in a pointer to a default DqnLock struct.
-//       In Win32, you may optionally change the win32Spincount.
-DQN_FILE_SCOPE bool DqnLock_Init   (DqnLock *const lock);
-DQN_FILE_SCOPE void DqnLock_Acquire(DqnLock *const lock);
-DQN_FILE_SCOPE void DqnLock_Release(DqnLock *const lock);
-DQN_FILE_SCOPE void DqnLock_Delete (DqnLock *const lock);
 
 // XPlatform > #DqnJobQueue API
 // =================================================================================================
@@ -6449,13 +6357,6 @@ DQN_FILE_SCOPE inline u32 Dqn_BitToggle(u32 bits, u32 flag)
     return result;
 }
 
-
-DQN_FILE_SCOPE inline bool Dqn_QuickSortDqnStringSorter(struct DqnString const *a, struct DqnString const *b, void *)
-{
-    bool result =  DqnString::Cmp(a, b);
-    return result;
-}
-
 // #DqnString Impleemntation
 // =================================================================================================
 // TODO(doyle): SSO requires handling assign/copy op when copying strings, we need to reassign the
@@ -6922,56 +6823,6 @@ i32 Dqn_SplitString(char const *src, i32 srcLen, char splitChar, DqnSlice<char> 
     }
 
     return arrayIndex;
-}
-
-DQN_FILE_SCOPE i64 Dqn_BSearch(i64 *array, i64 size, i64 find,
-                               Dqn_BSearchBound bound)
-{
-    if (size == 0 || !array) return -1;
-
-    i64 start = 0;
-    i64 end   = size - 1;
-    i64 mid   = (i64)((start + end) * 0.5f);
-
-    while (start <= end)
-    {
-        if (array[mid] == find)
-        {
-            if (bound == Dqn_BSearchBound_Normal ||
-                bound == Dqn_BSearchBound_NormalLower ||
-                bound == Dqn_BSearchBound_NormalHigher)
-            {
-                return mid;
-            }
-            else if (bound == Dqn_BSearchBound_Lower)
-            {
-                return mid - 1;
-            }
-            else
-            {
-                if ((mid + 1) >= size) return -1;
-                return mid + 1;
-            }
-        }
-        else if (array[mid] <  find) start = mid + 1;
-        else                         end   = mid - 1;
-        mid = (i64)((start + end) * 0.5f);
-    }
-
-    if (bound == Dqn_BSearchBound_Normal)
-    {
-        return -1;
-    }
-    if (bound == Dqn_BSearchBound_Lower || bound == Dqn_BSearchBound_NormalLower)
-    {
-        if (find < array[mid]) return -1;
-        return mid;
-    }
-    else
-    {
-        if (find > array[mid]) return -1;
-        return mid;
-    }
 }
 
 // TODO(doyle): This should maybe be a tokenizer ...
@@ -9609,16 +9460,17 @@ DQN_FILE_SCOPE f64 DqnTimer_NowInS() { return DqnTimer_NowInMs() / 1000.0f; }
 
 // XPlatform > #DqnLock
 // =================================================================================================
-bool DqnLock_Init(DqnLock *lock)
+bool DqnLock::Init()
 {
-    if (!lock) return false;
-
 #if defined(DQN_IS_WIN32)
-    if (InitializeCriticalSectionEx(&lock->win32Handle, lock->win32SpinCount, 0))
+    if (InitializeCriticalSectionEx(&this->win32Handle, this->win32SpinCount, 0))
+    {
         return true;
+    }
+
 #else
     // NOTE: Static initialise, pre-empt a lock so that it gets initialised as per documentation
-    lock->unixHandle = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+    this->unixHandle = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
     DqnLock_Acquire(lock);
     DqnLock_Release(lock);
     return true;
@@ -9627,73 +9479,36 @@ bool DqnLock_Init(DqnLock *lock)
     return false;
 }
 
-void DqnLock_Acquire(DqnLock *lock)
+void DqnLock::Acquire()
 {
-    if (!lock) return;
-
 #if defined(DQN_IS_WIN32)
-    EnterCriticalSection(&lock->win32Handle);
-
+    EnterCriticalSection(&this->win32Handle);
 #else
     // TODO(doyle): Better error handling
-    i32 error = pthread_mutex_lock(&lock->unixHandle);
+    i32 error = pthread_mutex_lock(&this->unixHandle);
     DQN_ASSERT(error == 0);
 #endif
 }
 
-void DqnLock_Release(DqnLock *lock)
+void DqnLock::Release()
 {
-    if (!lock) return;
-
 #if defined(DQN_IS_WIN32)
-    LeaveCriticalSection(&lock->win32Handle);
-
+    LeaveCriticalSection(&this->win32Handle);
 #else
     // TODO(doyle): better error handling
-    i32 error = pthread_mutex_unlock(&lock->unixHandle);
+    i32 error = pthread_mutex_unlock(&this->unixHandle);
     DQN_ASSERT(error == 0);
 #endif
 }
 
-void DqnLock_Delete(DqnLock *lock)
+void DqnLock::Delete()
 {
-    if (!lock) return;
-
 #if defined(DQN_IS_WIN32)
-    DeleteCriticalSection(&lock->win32Handle);
+    DeleteCriticalSection(&this->win32Handle);
 #else
-    i32 error = pthread_mutex_destroy(&lock->unixHandle);
+    i32 error = pthread_mutex_destroy(&this->unixHandle);
     DQN_ASSERT(error == 0);
 #endif
-}
-
-bool DqnLock::Init()    { return DqnLock_Init   (this); }
-void DqnLock::Acquire() {        DqnLock_Acquire(this); }
-void DqnLock::Release() {        DqnLock_Release(this); }
-void DqnLock::Delete()  {        DqnLock_Delete (this); }
-
-DqnLockGuard DqnLock::LockGuard()
-{
-    return DqnLockGuard(this, nullptr);
-}
-
-DqnLockGuard::DqnLockGuard(DqnLock *lock_, bool *succeeded)
-{
-    if (lock_)
-    {
-        this->lock = lock_;
-        this->lock->Acquire();
-        if (succeeded) *succeeded = true;
-    }
-    else
-    {
-        if (succeeded) *succeeded = false;
-    }
-}
-
-DqnLockGuard::~DqnLockGuard()
-{
-    if (this->lock) this->lock->Release();
 }
 
 // XPlatform > #DqnJobQueue

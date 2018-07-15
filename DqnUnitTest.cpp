@@ -1882,7 +1882,7 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue, 
     (void)userData;
     DQN_ASSERT(queue->size == QUEUE_SIZE);
     {
-        DqnLockGuard guard = globalJobQueueLock.LockGuard();
+        auto guard = globalJobQueueLock.Guard();
         globalDebugCounter++;
 
         // u32 number = globalDebugCounter;
@@ -1915,7 +1915,7 @@ FILE_SCOPE void DqnJobQueue_Test()
     DQN_ASSERT(DqnJobQueue_Init(&jobQueue, jobList, QUEUE_SIZE, totalThreads));
 
     const u32 WORK_ENTRIES = 2048;
-    DQN_ASSERT(DqnLock_Init(&globalJobQueueLock));
+    DQN_ASSERT(globalJobQueueLock.Init());
     for (u32 i = 0; i < WORK_ENTRIES; i++)
     {
         DqnJob job   = {};
@@ -1928,7 +1928,7 @@ FILE_SCOPE void DqnJobQueue_Test()
 
     DqnJobQueue_BlockAndCompleteAllJobs(&jobQueue);
     DQN_ASSERT(globalDebugCounter == WORK_ENTRIES);
-    DqnLock_Delete(&globalJobQueueLock);
+    globalJobQueueLock.Delete();
 
     Log("Final incremented value: %d\n", globalDebugCounter);
 }
@@ -1977,7 +1977,7 @@ void DqnQuickSort_Test()
             // Time Dqn_QuickSort
             {
                 f64 start = DqnTimer_NowInS();
-                Dqn_QuickSort(dqnCPPArray, numInts);
+                DqnQuickSort(dqnCPPArray, numInts);
 
                 f64 duration = DqnTimer_NowInS() - start;
                 dqnCPPTimings[timingsIndex] = duration;
@@ -2102,33 +2102,22 @@ void DqnHashTable_Test()
     Log(Status::Ok, "HashTable");
 }
 
-void Dqn_BSearch_Test()
+void DqnBSearch_Test()
 {
     LOG_HEADER();
     if (1)
     {
-        auto IsLessThan = [](const u32 &a, const u32 &b) -> bool {
-            bool result = a < b;
-            return result;
-        };
-
-        auto Equals = [](const u32 &a, const u32 &b) -> bool {
-            bool result = (a == b);
-            return result;
-        };
-
-
         u32 array[] = {1, 2, 3};
-        i64 result = Dqn_BSearch<u32>(array, DQN_ARRAY_COUNT(array), 1, Equals, IsLessThan);
+        i64 result = DqnBSearch<u32>(array, DQN_ARRAY_COUNT(array), 1);
         DQN_ASSERT(result == 0);
 
-        result = Dqn_BSearch<u32>(array, DQN_ARRAY_COUNT(array), 2, Equals, IsLessThan);
+        result = DqnBSearch<u32>(array, DQN_ARRAY_COUNT(array), 2);
         DQN_ASSERT(result == 1);
 
-        result = Dqn_BSearch<u32>(array, DQN_ARRAY_COUNT(array), 3, Equals, IsLessThan);
+        result = DqnBSearch<u32>(array, DQN_ARRAY_COUNT(array), 3);
         DQN_ASSERT(result == 2);
 
-        result = Dqn_BSearch<u32>(array, DQN_ARRAY_COUNT(array), 4, Equals, IsLessThan);
+        result = DqnBSearch<u32>(array, DQN_ARRAY_COUNT(array), 4);
         DQN_ASSERT(result == -1);
         Log(Status::Ok, "With odd sized array and custom compare");
     }
@@ -2136,19 +2125,19 @@ void Dqn_BSearch_Test()
     if (1)
     {
         i64 array[] = {1, 2, 3, 4};
-        i64 result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 1);
+        i64 result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 1);
         DQN_ASSERT(result == 0);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 2);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 2);
         DQN_ASSERT(result == 1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 3);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 3);
         DQN_ASSERT(result == 2);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 4);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 4);
         DQN_ASSERT(result == 3);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 5);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 5);
         DQN_ASSERT(result == -1);
         Log(Status::Ok, "With even sized array");
     }
@@ -2156,22 +2145,22 @@ void Dqn_BSearch_Test()
     if (1)
     {
         i64 array[] = {1, 2, 3};
-        i64 result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 0, Dqn_BSearchBound_Lower);
+        i64 result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 0, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == -1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 1, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 1, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == -1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 2, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 2, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 0);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 3, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 3, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 4, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 4, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 2);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 5, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 2);
         Log(Status::Ok, "Lower bound with odd sized array");
     }
@@ -2180,25 +2169,25 @@ void Dqn_BSearch_Test()
     {
         i64 array[] = {1, 2, 3, 4};
 
-        i64 result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 0, Dqn_BSearchBound_Lower);
+        i64 result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 0, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == -1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 1, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 1, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == -1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 2, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 2, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 0);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 3, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 3, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 4, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 4, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 2);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 5, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 3);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 6, Dqn_BSearchBound_Lower);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 6, DqnBSearchType::MinusOne);
         DQN_ASSERT(result == 3);
         Log(Status::Ok, "Lower bound with even sized array");
     }
@@ -2206,22 +2195,22 @@ void Dqn_BSearch_Test()
     if (1)
     {
         i64 array[] = {1, 2, 3};
-        i64 result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 0, Dqn_BSearchBound_Higher);
+        i64 result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 0, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == 0);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 1, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 1, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == 1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 2, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 2, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == 2);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 3, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 3, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == -1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 4, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 4, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == -1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 5, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == -1);
         Log(Status::Ok, "Higher bound with odd sized array");
     }
@@ -2230,25 +2219,25 @@ void Dqn_BSearch_Test()
     {
         i64 array[] = {1, 2, 3, 4};
 
-        i64 result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 0, Dqn_BSearchBound_Higher);
+        i64 result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 0, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == 0);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 1, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 1, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == 1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 2, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 2, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == 2);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 3, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 3, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == 3);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 4, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 4, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == -1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 5, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 5, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == -1);
 
-        result = Dqn_BSearch(array, DQN_ARRAY_COUNT(array), 6, Dqn_BSearchBound_Higher);
+        result = DqnBSearch(array, DQN_ARRAY_COUNT(array), 6, DqnBSearchType::PlusOne);
         DQN_ASSERT(result == -1);
         Log(Status::Ok, "Higher bound with even sized array");
     }
@@ -2896,7 +2885,7 @@ int main(void)
     DqnArray_Test();
     DqnQuickSort_Test();
     DqnHashTable_Test();
-    Dqn_BSearch_Test();
+    DqnBSearch_Test();
     DqnMemSet_Test();
     DqnFixedString_Test();
     DqnJson_Test();
