@@ -1201,7 +1201,7 @@ public:
         } e;
     };
 
-    typedef u8 *Allocator(DqnMemAPI *, DqnMemAPI::Request);
+    typedef void *Allocator(DqnMemAPI *, DqnMemAPI::Request);
 
     Allocator *allocator;
     void      *userContext;
@@ -1410,7 +1410,7 @@ template <typename T> void DqnArray<T>::Reserve(isize newMax)
     DQN_ASSERT(data);
 }
 
-// #DqnAllocatorMetadata
+// #DqnMemTracker
 // =================================================================================================
 // Allocation Layout
 //                      +------------------------------------------------------------+                        +-----------------+
@@ -1424,7 +1424,7 @@ template <typename T> void DqnArray<T>::Reserve(isize newMax)
 // B. Guard:               Bounds Guard value.
 // Aligned Ptr For Client: The allocated memory for the client.
 // Offset To Src:          Number of bytes to subtract from the "Aligned Ptr For Client" to return to the "Ptr From ALlocator"
-struct DqnAllocatorMetadata
+struct DqnMemTracker
 {
     static u32 const HEAD_GUARD_VALUE   = 0xCAFEBABE;
     static u32 const TAIL_GUARD_VALUE   = 0xDEADBEEF;
@@ -1432,12 +1432,12 @@ struct DqnAllocatorMetadata
     static u32 const ALIGNMENT_SIZE     = sizeof(u8);
     static u32 const ALLOC_AMOUNT_SIZE  = sizeof(usize);
 
-    DqnArray<u8 *> allocations; // When BoundsGuard is enabled, tracks all allocations.
+    DqnArray<void *> allocations; // When BoundsGuard is enabled, tracks all allocations.
 
     void   Init                (bool boundsGuard);
     void   Free                ();
-    void   AddAllocation       (u8 *ptr)                        { DQN_ASSERT(allocations.Push(ptr) != nullptr); }
-    void   RemoveAllocation    (u8 *ptr);
+    void   AddAllocation       (char *ptr)                      { DQN_ASSERT(allocations.Push(ptr) != nullptr); }
+    void   RemoveAllocation    (char *ptr);
     void   CheckAllocations    ()                         const;
 
     auto   GetBoundsGuardSize  ()                         const { return boundsGuardSize; }
@@ -1446,11 +1446,11 @@ struct DqnAllocatorMetadata
 
     isize  GetAllocationSize   (isize size, u8 alignment) const { return GetAllocHeadSize() + size + GetAllocTailSize() + (alignment - 1); }
 
-    u32   *PtrToHeadBoundsGuard(u8 const *ptr)            const; // ptr: The ptr given to the client when allocating.
-    u32   *PtrToTailBoundsGuard(u8 const *ptr)            const; // IMPORTANT: Uses "Alloc Amount" metadata to find the tail!
-    u8    *PtrToAlignment      (u8 const *ptr)            const;
-    u8    *PtrToOffsetToSrc    (u8 const *ptr)            const;
-    isize *PtrToAllocAmount    (u8 const *ptr)            const;
+    u32   *PtrToHeadBoundsGuard(char *ptr)            const; // ptr: The ptr given to the client when allocating.
+    u32   *PtrToTailBoundsGuard(char *ptr)            const; // IMPORTANT: Uses "Alloc Amount" metadata to find the tail!
+    u8    *PtrToAlignment      (char *ptr)            const;
+    u8    *PtrToOffsetToSrc    (char *ptr)            const;
+    isize *PtrToAllocAmount    (char *ptr)            const;
 
 private:
     u32    boundsGuardSize; // sizeof(GUARD_VALUE) OR 0 if BoundsGuard is disabled.
@@ -1495,36 +1495,34 @@ struct DqnMemStack
         i32   numBlocks;
     };
 
-    // Blocks are freely modifiable if you want fine grained control. Size value and memory ptr should
-    // NOT be modified directly, only indirectly through the regular API.
     struct Block
     {
-        u8    *memory;
-        isize  size;      // Read-Only
-        isize  used_;     // Read/Write at your peril.
-        Block *prevBlock; // Uses a linked list approach for additional blocks
+        char  *memory;    // Read
+        isize  size;      // Read
+        isize  used_;     // Read
+        Block *prevBlock; // Read Uses a linked list approach for additional blocks
 
-        u8 *head;
-        u8 *tail;
+        char *head;       // Read
+        char *tail;       // Read
+
+        Block(void *memory_, isize size_) : memory((char *)memory_), size(size_), prevBlock(nullptr), head((char *)memory_), tail((char *)memory_ + size_) {}
     };
 
-    DqnAllocatorMetadata  metadata;
-    DqnMemAPI            *memAPI;          // API used to add additional memory blocks to this stack.
-    DqnMemAPI             myTailAPI;       // API for data structures to allocate to the tail of the stack
-    DqnMemAPI             myHeadAPI;       // API for data structures to allocate to the head of the stack
-    Block                *block;           // Memory block allocated for the stack
-    u32                   flags;
-    i32                   tempRegionCount;
+    DqnMemTracker  tracker;         // Read:
+    DqnMemAPI     *memAPI;          // Read: API used to add additional memory blocks to this stack.
+    DqnMemAPI      myTailAPI;       // Read: API for data structures to allocate to the tail of the stack
+    DqnMemAPI      myHeadAPI;       // Read: API for data structures to allocate to the head of the stack
+    Block         *block;           // Read: Memory block allocated for the stack
+    u32            flags;           // Read: DqnMemStack::Flags
+    i32            tempRegionCount;
 
-    // Initialisation API
-    // =============================================================================================
-    // Uses fixed buffer, allocations will be sourced from the buffer and fail after buffer is full.
-    // mem:       Memory to use for the memory stack
-    // return:    FALSE if args are invalid, or insufficient memSize.
-    bool Init(void *mem, isize size, Dqn::ZeroClear clear, u32 flags_ = 0);
+    DqnMemStack() = default;
+
+    // Uses fixed memory, will be sourced from the buffer and assert after buffer is full.
+    DqnMemStack(void *mem, isize size, Dqn::ZeroClear clear, u32 flags_ = 0);
 
     // Memory Stack capable of expanding when full, but only if NonExpandable flag is not set.
-    bool Init(isize size, Dqn::ZeroClear clear, u32 flags_ = 0, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+    DqnMemStack(isize size, Dqn::ZeroClear clear, u32 flags_ = 0, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 
     // Allocation API
     // =============================================================================================
@@ -1566,8 +1564,8 @@ struct DqnMemStack
     {
         DqnMemStack *stack;             // Stack associated with this TempRegion
         Block       *startingBlock;     // Remember the block to revert to and its memory usage.
-        u8          *startingBlockHead;
-        u8          *startingBlockTail;
+        char        *startingBlockHead;
+        char        *startingBlockTail;
         bool         keepHeadChanges = false;
         bool         keepTailChanges = false;
     };
@@ -1587,312 +1585,6 @@ struct DqnMemStack
     // Keep allocations that have occurred since Begin(). End() does not need to be called anymore.
     void             TempRegionKeepChanges(TempRegion region);
 };
-
-// Implementation taken from Milton, developed by Serge at
-// https://github.com/serge-rgb/milton#license
-#if 0
-template <typename T>
-void DqnArray<T>::Free()
-{
-    if (this->data)
-    {
-        if (this->memAPI)
-        {
-            auto sizeToFree = this->max * sizeof(T);
-            this->memAPI->Free(this->data, sizeToFree);
-        }
-    }
-
-    auto *memAPI_ = this->memAPI;
-    *this = {};
-    this->memAPI = memAPI_;
-}
-
-template <typename T>
-bool DqnArray<T>::Reserve(isize newMax)
-{
-    if (newMax <= this->max)
-    {
-        return true;
-    }
-
-    if (!this->memAPI)
-    {
-        this->memAPI = DQN_DEFAULT_HEAP_ALLOCATOR;
-    }
-
-    usize oldSize = this->max * sizeof(T);
-    usize newSize = newMax * sizeof(T);
-
-    T *result = nullptr;
-    if (this->data)
-    {
-        result = (T *)this->memAPI->Realloc(this->data, oldSize, newSize);
-    }
-    else
-    {
-        result = (T *)this->memAPI->Alloc(newSize, Dqn::ZeroClear::No);
-    }
-
-    if (result)
-    {
-        this->data = (T *)result;
-        this->max  = newMax;
-        return true;
-    }
-    else
-    {
-        DQN_LOGE("DqnArray out of memory error. Failed to request: %d bytes.", newSize);
-        return false;
-    }
-}
-
-template <typename T>
-bool DqnArray<T>::Grow(isize multiplier)
-{
-    isize newMax = this->max * multiplier;
-    newMax       = (newMax < 8) ? 8 : newMax;
-    bool result  = this->Reserve(newMax);
-    return result;
-}
-
-template <typename T>
-inline bool DqnArray__TryMakeEnoughSpace(DqnArray<T> *array, isize numNewItems)
-{
-    isize numToReserve = numNewItems;
-    if ((array->count + numNewItems) >= array->max)
-    {
-        numToReserve = array->count + numNewItems;
-    }
-
-    bool result = array->Reserve(numNewItems);
-    return result;
-}
-
-template <typename T>
-T *DqnArray<T>::Make(isize num)
-{
-    if (DqnArray__TryMakeEnoughSpace(this, num))
-    {
-        T *result = &this->data[this->count];
-        this->count += num;
-        return result;
-    }
-
-    return nullptr;
-}
-
-template <typename T>
-T *DqnArray<T>::Push(T const *item, isize num)
-{
-    if (!DqnArray__TryMakeEnoughSpace(this, num))
-    {
-        DQN_LOGE("DqnArray could not push %d item(s) onto array because growing failed.", num);
-        return nullptr;
-    }
-
-    for (auto i = 0; i < num; i++)
-        this->data[this->count++] = item[i];
-
-    DQN_ASSERT(this->count <= this->max);
-    T *result = this->data + (this->count - 1);
-    return result;
-}
-
-template <typename T>
-T *DqnArray<T>::Push(T const item)
-{
-    T* result = this->Push(&item, 1);
-    return result;
-}
-
-template <typename T>
-T *DqnArray<T>::Insert(T const *item, isize numItems, isize index)
-{
-    if (!DqnArray__TryMakeEnoughSpace(this, numItems))
-    {
-        DQN_LOGE("DqnArray could not push %d item(s) onto array because growing failed.", numItems);
-        return nullptr;
-    }
-
-    index = DQN_MIN(DQN_MAX(0, index), this->count);
-    if (index >= this->count)
-    {
-        T *result = this->Push(item, numItems);
-        return result;
-    }
-
-    isize numItemsToShift = this->count - index;
-    for (isize i = 0; i < numItemsToShift; i++)
-    {
-        isize backwardsIndex       = this->count + numItems - 1 - i;
-        this->data[backwardsIndex] = this->data[this->count - 1 - i];
-    }
-
-    this->count += numItems;
-    DqnMem_Copy(this->data + index, item, sizeof(*item) * numItems);
-    T *result = this->data + index;
-
-    DQN_ASSERT(this->count <= this->max);
-    return result;
-}
-
-template <typename T>
-T *DqnArray<T>::Insert(T const item, isize index)
-{
-    T *result = this->Insert(&item, 1, index);
-    return result;
-}
-
-template <typename T>
-void DqnArray<T>::Pop()
-{
-    this->Remove(this->count - 1);
-}
-
-template <typename T>
-T *DqnArray<T>::Peek()
-{
-    T *result = this->Get(this->count - 1);
-    return result;
-}
-
-template <typename T>
-T *DqnArray<T>::Get(isize index)
-{
-    T *result = nullptr;
-    if (index >= 0 && index < this->count) result = &this->data[index];
-    return result;
-}
-
-template <typename T>
-void DqnArray<T>::Clear(Dqn::ZeroClear clear)
-{
-    if (clear == Dqn::ZeroClear::Yes)
-    {
-        isize sizeToClear = sizeof(T) * this->count;
-        DqnMem_Clear(this->data, 0, sizeToClear);
-    }
-    this->count = 0;
-}
-
-template <typename T>
-bool DqnArray<T>::Remove(isize index)
-{
-    if (index >= this->count || index < 0)
-        return false;
-
-    bool isLastElement = (index == (this->count - 1));
-    if (isLastElement && this->count == 1)
-    {
-        this->count--;
-    }
-    else
-    {
-        this->data[index] = this->data[this->count - 1];
-        this->count--;
-    }
-
-    return true;
-}
-
-template <typename T>
-bool DqnArray<T>::EraseStable(isize index)
-{
-    if (index >= this->count || index < 0)
-        return false;
-
-    bool isLastElement = (index == (this->count - 1));
-    if (isLastElement && this->count == 1)
-    {
-        this->count--;
-        return true;
-    }
-
-    auto itemToRemoveByteOffset         = index * sizeof(T);
-    auto oneAfterItemToRemoveByteOffset = (index + 1)  * sizeof(T);
-    auto lastItemByteOffset             = this->count * sizeof(T);
-    auto numBytesToMove                 = lastItemByteOffset - oneAfterItemToRemoveByteOffset;
-
-    u8 *bytePtr = (u8 *)this->data;
-    u8 *dest    = &bytePtr[itemToRemoveByteOffset];
-    u8 *src     = &bytePtr[oneAfterItemToRemoveByteOffset];
-    memmove(dest, src, numBytesToMove);
-
-    this->count--;
-    return true;
-}
-
-template <typename T>
-void DqnArray<T>::EraseStable(isize *indexList, isize numIndexes)
-{
-    if (numIndexes == 0 || !indexList) return;
-
-    // NOTE: Sort the index list and ensure we only remove indexes up to the size of our array
-    DqnQuickSort<isize>(indexList, numIndexes);
-
-    auto arrayHighestIndex = this->count - 1;
-    auto realCount         = numIndexes;
-    if (indexList[numIndexes - 1] > arrayHighestIndex)
-    {
-        auto realNumIndexes =
-            DqnBSearch(indexList, numIndexes, arrayHighestIndex, DqnBSearchType::MinusOne);
-        // NOTE: If -1, then there's no index in the indexlist that is within the range of our array
-        // i.e. no index we can remove without out of array bounds access
-        if (realNumIndexes == -1)
-            return;
-
-        if (indexList[realNumIndexes] == arrayHighestIndex)
-        {
-            realCount = realNumIndexes++;
-        }
-        else
-        {
-            realCount = realNumIndexes += 2;
-        }
-        realCount = DQN_MIN(numIndexes, realCount);
-    }
-
-    if (realCount == 1)
-    {
-        this->EraseStable(indexList[0]);
-    }
-    else
-    {
-        auto indexListIndex  = 0;
-        auto indexToCopyTo   = indexList[indexListIndex++];
-        auto indexToCopyFrom = indexToCopyTo + 1;
-        auto deadIndex       = indexList[indexListIndex++];
-
-        bool breakLoop = false;
-        for (;
-             indexToCopyFrom < this->count;
-             indexToCopyTo++, indexToCopyFrom++)
-        {
-            while (indexToCopyFrom == deadIndex)
-            {
-                deadIndex = indexList[indexListIndex++];
-                indexToCopyFrom++;
-
-                breakLoop |= (indexToCopyFrom >= this->count);
-                breakLoop |= (indexListIndex > realCount);
-                if (breakLoop) break;
-            }
-            if (breakLoop) break;
-
-            this->data[indexToCopyTo] = this->data[indexToCopyFrom];
-        }
-
-        for (; indexToCopyFrom < this->count; indexToCopyTo++, indexToCopyFrom++)
-        {
-            this->data[indexToCopyTo] = this->data[indexToCopyFrom];
-        }
-
-        this->count -= realCount;
-        DQN_ASSERT(this->count >= 0);
-    }
-}
-#endif
 
 // #DqnHash API
 // =================================================================================================
@@ -2281,7 +1973,7 @@ struct DqnFixedString
 };
 
 template <unsigned int MAX>
-FILE_SCOPE int
+DQN_FILE_SCOPE int
 DqnFixedString__VSprintf(DqnFixedString<MAX> *me, char const *fmt, va_list argList, int bufOffset)
 {
     char *bufStart           = me->str + bufOffset;
@@ -2889,7 +2581,7 @@ struct DqnVArray
     isize  max;     // Read
     T     *data;    // Read
 
-          DqnVArray  () = default;
+          DqnVArray  () = default; // Zero is initialisation
           DqnVArray  (isize size)                                 { LazyInit(size); }
     void  LazyInit   (isize size)                                 { if (data) return; count = 0; max = size; data = (T *)DqnOS_VAlloc(max * sizeof(T)); DQN_ALWAYS_ASSERT(data); }
          // ~DqnVArray  ()                                           { if (data) DqnOS_VFree(data, sizeof(T) * max); }
@@ -3508,7 +3200,7 @@ DQN_FILE_SCOPE int DqnMem_Cmp(void const *src, void const *dest, usize numBytes)
 
 // #DqnMemAPI
 // =================================================================================================
-FILE_SCOPE void DqnMemAPIInternal_ValidateRequest(DqnMemAPI::Request request_)
+FILE_SCOPE void DqnMemAPI__ValidateRequest(DqnMemAPI::Request request_)
 {
     DQN_ASSERT(request_.type != DqnMemAPI::Type::Uninitialised);
 
@@ -3530,7 +3222,7 @@ FILE_SCOPE void DqnMemAPIInternal_ValidateRequest(DqnMemAPI::Request request_)
     }
 }
 
-FILE_SCOPE void DqnMemAPIInternal_UpdateAPIStatistics(DqnMemAPI *api, DqnMemAPI::Request *request_)
+FILE_SCOPE void DqnMemAPI__UpdateAPIStatistics(DqnMemAPI *api, DqnMemAPI::Request *request_)
 {
     if (request_->type == DqnMemAPI::Type::Alloc)
     {
@@ -3560,9 +3252,9 @@ FILE_SCOPE void DqnMemAPIInternal_UpdateAPIStatistics(DqnMemAPI *api, DqnMemAPI:
     }
 }
 
-FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI::Request request_)
+FILE_SCOPE void *DqnMemAPI__HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI::Request request_)
 {
-    DqnMemAPIInternal_ValidateRequest(request_);
+    DqnMemAPI__ValidateRequest(request_);
     DQN_ASSERT(!request_.userContext);
 
     u8 *result   = nullptr;
@@ -3603,13 +3295,13 @@ FILE_SCOPE u8 *DqnMemAPIInternal_HeapAllocatorCallback(DqnMemAPI *api, DqnMemAPI
 
     if (success)
     {
-        DqnMemAPIInternal_UpdateAPIStatistics(api, &request_);
+        DqnMemAPI__UpdateAPIStatistics(api, &request_);
     }
 
     return result;
 }
 
-struct DqnMemAPIInternal_DqnMemStackContext
+struct DqnMemAPI__DqnMemStackContext
 {
     enum Mode
     {
@@ -3621,14 +3313,15 @@ struct DqnMemAPIInternal_DqnMemStackContext
     Mode         mode;
 };
 
-FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAPI::Request request_,
-                                                        bool pushToHead)
+FILE_SCOPE void *DqnMemAPI__StackAllocatorCallback(DqnMemAPI *api,
+                                                          DqnMemAPI::Request request_,
+                                                          bool pushToHead)
 {
-    DqnMemAPIInternal_ValidateRequest(request_);
+    DqnMemAPI__ValidateRequest(request_);
     DQN_ASSERT(request_.userContext);
 
     auto *const stack = (DqnMemStack *)(request_.userContext);
-    u8 *result        = nullptr;
+    void *result      = nullptr;
     bool success      = false;
 
     enum class PtrType
@@ -3638,10 +3331,10 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
         Tail,
     };
 
-    auto ClassifyPtr = [](DqnMemStack::Block const *block, u8 const *ptr) -> PtrType {
+    auto ClassifyPtr = [](DqnMemStack::Block const *block, char const *ptr) -> PtrType {
 
-        PtrType result           = PtrType::NotInCurrentBlock;
-        u8 const *const blockEnd = block->memory + block->size;
+        PtrType result             = PtrType::NotInCurrentBlock;
+        char const *const blockEnd = block->memory + block->size;
         if (ptr >= block->memory && ptr < block->head)
         {
             result = PtrType::Head;
@@ -3654,20 +3347,20 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
         return result;
     };
 
-    auto PtrIsLastAllocationInBlock = [&ClassifyPtr](DqnAllocatorMetadata const *metadata,
+    auto PtrIsLastAllocationInBlock = [&ClassifyPtr](DqnMemTracker const *tracker,
                                                      DqnMemStack::Block const *block,
-                                                     u8 const *ptr) -> bool {
+                                                     char *ptr) -> bool {
         PtrType type = ClassifyPtr(block, ptr);
         bool result  = false;
         if (type == PtrType::Head)
         {
-            isize const oldMemSize = *(metadata->PtrToAllocAmount(ptr));
-            u8 const *ptrEnd       = ptr + oldMemSize + metadata->GetAllocTailSize();
+            isize const oldMemSize = *(tracker->PtrToAllocAmount(ptr));
+            char const *ptrEnd     = ptr + oldMemSize + tracker->GetAllocTailSize();
             result                 = (ptrEnd == (block->head - 1));
         }
         else if (type == PtrType::Tail)
         {
-            u8 offsetToSrc  = *(metadata->PtrToOffsetToSrc(ptr));
+            u8 offsetToSrc  = *(tracker->PtrToOffsetToSrc(ptr));
             auto *actualPtr = ptr - offsetToSrc;
             result          = (actualPtr == block->tail);
         }
@@ -3678,8 +3371,8 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
     if (request_.type == DqnMemAPI::Type::Alloc)
     {
         auto *request = &request_.e.alloc;
-        if (pushToHead) result = (u8 *)stack->Push(request->requestSize);
-        else            result = (u8 *)stack->PushOnTail(request->requestSize);
+        if (pushToHead) result = static_cast<char *>(stack->Push(request->requestSize));
+        else            result = static_cast<char *>(stack->PushOnTail(request->requestSize));
 
         if (result)
         {
@@ -3691,20 +3384,20 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
     {
         // IMPORTANT: This is a _naive_ realloc scheme for stack allocation.
         auto *request = &request_.e.realloc;
-        u8 *const ptr = (u8 *)request->oldMemPtr;
+        char *ptr     = static_cast<char *>(request->oldMemPtr);
         for (DqnMemStack::Block *block = stack->block; block; block = block->prevBlock)
         {
             DQN_ASSERT(ptr >= block->memory && ptr <= (block->memory + block->size));
         }
 
         DqnMemStack::Block *const block = stack->block;
-        isize const oldMemSize          = *stack->metadata.PtrToAllocAmount(ptr);
+        isize const oldMemSize          = *stack->tracker.PtrToAllocAmount(ptr);
         isize const extraBytesReq       = request->newSize - oldMemSize;
-        u8 const alignment              = *stack->metadata.PtrToAlignment(ptr);
+        u8 alignment                    = *stack->tracker.PtrToAlignment(ptr);
         DQN_ASSERT(extraBytesReq > 0);
 
         PtrType type = ClassifyPtr(block, ptr);
-        if (PtrIsLastAllocationInBlock(&stack->metadata, block, ptr))
+        if (PtrIsLastAllocationInBlock(&stack->tracker, block, ptr))
         {
             bool enoughSpace = false;
             if (type == PtrType::Head)
@@ -3715,7 +3408,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
                 if (enoughSpace)
                 {
                     stack->Pop(ptr, Dqn::ZeroClear::No);
-                    result = (u8 *)stack->Push(request->newSize, alignment);
+                    result = static_cast<char *>(stack->Push(request->newSize, alignment));
                     DQN_ASSERT(stack->block == block && result == request->oldMemPtr);
                     success = true;
                 }
@@ -3729,9 +3422,9 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
                 if (enoughSpace)
                 {
                     stack->PopOnTail(ptr, Dqn::ZeroClear::No);
-                    result = (u8 *)stack->PushOnTail(request->newSize, alignment);
+                    result = static_cast<char *>(stack->PushOnTail(request->newSize, alignment));
                     DqnMem_Copy(result, ptr, oldMemSize);
-                    result[oldMemSize] = 0;
+                    (static_cast<char *>(result))[oldMemSize] = 0;
 
                     success = true;
                     DQN_ASSERT(stack->block == block);
@@ -3746,7 +3439,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
                 DqnMemStack::Block *oldBlock = block;
                 if (type == PtrType::Head)
                 {
-                    result = (u8 *)stack->Push(request->newSize, alignment);
+                    result = static_cast<char *>(stack->Push(request->newSize, alignment));
                 }
                 else
                 {
@@ -3809,10 +3502,10 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
         auto *request = &request_.e.free;
         DQN_ASSERT(request_.type == DqnMemAPI::Type::Free);
 
-        DqnMemStack::Block *const block = stack->block;
-        u8 *const ptr                   = (u8 *)request->ptrToFree;
+        DqnMemStack::Block *block = stack->block;
+        char *ptr                 = static_cast<char *>(request->ptrToFree);
 
-        if (PtrIsLastAllocationInBlock(&stack->metadata, block, ptr))
+        if (PtrIsLastAllocationInBlock(&stack->tracker, block, ptr))
         {
             PtrType type = ClassifyPtr(block, ptr);
             if (type == PtrType::Head) stack->Pop(ptr, Dqn::ZeroClear::No);
@@ -3820,7 +3513,7 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
         }
         else
         {
-            isize const oldMemSize = *(stack->metadata.PtrToAllocAmount(ptr));
+            isize const oldMemSize = *(stack->tracker.PtrToAllocAmount(ptr));
             DQN_LOGE("Lost %$_d, the ptr to free is sandwiched between other allocations (LIFO)", oldMemSize);
         }
     }
@@ -3830,22 +3523,22 @@ FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallback(DqnMemAPI *api, DqnMemAP
     if (success)
     {
 #if 0
-        DqnMemAPIInternal_UpdateAPIStatistics(api, &request_);
+        DqnMemAPI__UpdateAPIStatistics(api, &request_);
 #endif
     }
 
     return result;
 }
 
-FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallbackPushToHead(DqnMemAPI *api, DqnMemAPI::Request request_)
+FILE_SCOPE void *DqnMemAPI__StackAllocatorCallbackPushToHead(DqnMemAPI *api, DqnMemAPI::Request request_)
 {
-    u8 *result = DqnMemAPIInternal_StackAllocatorCallback(api, request_, true);
+    void *result = DqnMemAPI__StackAllocatorCallback(api, request_, true);
     return result;
 }
 
-FILE_SCOPE u8 *DqnMemAPIInternal_StackAllocatorCallbackPushToTail(DqnMemAPI *api, DqnMemAPI::Request request_)
+FILE_SCOPE void *DqnMemAPI__StackAllocatorCallbackPushToTail(DqnMemAPI *api, DqnMemAPI::Request request_)
 {
-    u8 *result = DqnMemAPIInternal_StackAllocatorCallback(api, request_, false);
+    void *result = DqnMemAPI__StackAllocatorCallback(api, request_, false);
     return result;
 }
 
@@ -3887,7 +3580,7 @@ void DqnMemAPI::Free(void *const ptrToFree, isize sizeToFree)
 DqnMemAPI DqnMemAPI::HeapAllocator()
 {
     DqnMemAPI result   = {0};
-    result.allocator   = DqnMemAPIInternal_HeapAllocatorCallback;
+    result.allocator   = DqnMemAPI__HeapAllocatorCallback;
     result.userContext = nullptr;
     return result;
 }
@@ -3897,15 +3590,15 @@ DqnMemAPI DqnMemAPI::StackAllocator(struct DqnMemStack *stack, StackPushType typ
     DQN_ASSERT(stack);
     DqnMemAPI result   = {0};
     result.allocator   = (type == StackPushType::Head)
-                           ? DqnMemAPIInternal_StackAllocatorCallbackPushToHead
-                           : DqnMemAPIInternal_StackAllocatorCallbackPushToTail;
+                           ? DqnMemAPI__StackAllocatorCallbackPushToHead
+                           : DqnMemAPI__StackAllocatorCallbackPushToTail;
     result.userContext = stack;
     return result;
 }
 
-// #DqnAllocatorMetadata
+// #DqnMemTracker
 // =================================================================================================
-void DqnAllocatorMetadata::Init(bool boundsGuard)
+void DqnMemTracker::Init(bool boundsGuard)
 {
     // TODO(doyle): How to handle memory here.
     if (boundsGuard)
@@ -3924,15 +3617,15 @@ void DqnAllocatorMetadata::Init(bool boundsGuard)
     this->allocTailSize = this->boundsGuardSize;
 }
 
-void DqnAllocatorMetadata::Free()
+void DqnMemTracker::Free()
 {
     this->allocations.Free();
 }
 
-void DqnAllocatorMetadata::RemoveAllocation(u8 *ptr)
+void DqnMemTracker::RemoveAllocation(char *ptr)
 {
-    i32 deleteIndex = -1;
-    for (auto i = 0; i < this->allocations.count; i++)
+    isize deleteIndex = -1;
+    for (isize i = 0; i < this->allocations.count; i++)
     {
         if (allocations.data[i] == ptr)
         {
@@ -3941,16 +3634,15 @@ void DqnAllocatorMetadata::RemoveAllocation(u8 *ptr)
         }
     }
 
-    DQN_ASSERT(deleteIndex != -1);
+    DQN_ALWAYS_ASSERTM(deleteIndex != -1, "Ptr %p was not in the tracked pointers list", ptr);
     this->allocations.EraseStable(deleteIndex);
 }
 
-void DqnAllocatorMetadata::CheckAllocations() const
+void DqnMemTracker::CheckAllocations() const
 {
     for (auto index = 0; index < this->allocations.count; index++)
     {
-        u8 const *ptr = this->allocations.data[index];
-
+        char *ptr            = static_cast<char *>(this->allocations.data[index]);
         u32 const *headGuard = this->PtrToHeadBoundsGuard(ptr);
         u32 const *tailGuard = this->PtrToTailBoundsGuard(ptr);
 
@@ -3967,175 +3659,121 @@ void DqnAllocatorMetadata::CheckAllocations() const
 }
 
 
-u32 *DqnAllocatorMetadata::PtrToHeadBoundsGuard(u8 const *ptr) const
+u32 *DqnMemTracker::PtrToHeadBoundsGuard(char *ptr) const
 {
     union {
-        u8 const *u8Ptr;
-        u32 const *u32Ptr;
+        char *charPtr;
+        u32  *u32Ptr;
     };
-    u8Ptr = ptr - this->allocHeadSize + OFFSET_TO_SRC_SIZE + ALIGNMENT_SIZE + ALLOC_AMOUNT_SIZE;
-    return (u32 *)u32Ptr;
+    charPtr = ptr - this->allocHeadSize + OFFSET_TO_SRC_SIZE + ALIGNMENT_SIZE + ALLOC_AMOUNT_SIZE;
+    return u32Ptr;
 }
 
-u8 *DqnAllocatorMetadata::PtrToAlignment(u8 const *ptr) const
+u8 *DqnMemTracker::PtrToAlignment(char *ptr) const
 {
     union {
-        u8 const *u8Ptr;
-        u32 const *u32Ptr;
+        char *charPtr;
+        u8   *u8Ptr;
     };
-    u8Ptr = ptr - this->allocHeadSize + OFFSET_TO_SRC_SIZE;
-    return (u8 *)u8Ptr;
+    charPtr = ptr - this->allocHeadSize + OFFSET_TO_SRC_SIZE;
+    return u8Ptr;
 }
 
 
-u8 *DqnAllocatorMetadata::PtrToOffsetToSrc(u8 const *ptr) const
+u8 *DqnMemTracker::PtrToOffsetToSrc(char *ptr) const
 {
     union {
-        u8 const *u8Ptr;
-        u32 const *u32Ptr;
+        char *charPtr;
+        u8   *u8Ptr;
     };
-    u8Ptr = ptr - this->allocHeadSize;
-    return (u8 *)u8Ptr;
+    charPtr = ptr - this->allocHeadSize;
+    return u8Ptr;
 }
 
-isize *DqnAllocatorMetadata::PtrToAllocAmount(u8 const *ptr) const
+isize *DqnMemTracker::PtrToAllocAmount(char *ptr) const
 {
     union {
-        u8 const *u8Ptr;
-        u32 const *u32Ptr;
-        isize const *isizePtr;
+        char  *charPtr;
+        isize *isizePtr;
     };
-    u8Ptr = ptr - this->allocHeadSize + OFFSET_TO_SRC_SIZE + ALIGNMENT_SIZE;
-    return (isize *)isizePtr;
+    charPtr = ptr - this->allocHeadSize + OFFSET_TO_SRC_SIZE + ALIGNMENT_SIZE;
+    return isizePtr;
 }
 
-u32 *DqnAllocatorMetadata::PtrToTailBoundsGuard(u8 const *ptr) const
+u32 *DqnMemTracker::PtrToTailBoundsGuard(char *ptr) const
 {
     isize size = *PtrToAllocAmount(ptr);
     union {
-        u8 const *u8Ptr;
-        u32 const *u32Ptr;
+        char *charPtr;
+        u32  *u32Ptr;
     };
-    u8Ptr = (ptr + size);
-    return (u32 *)u32Ptr;
+    charPtr = ptr + size;
+    return u32Ptr;
 }
 
 // #DqnMemStack
 // =================================================================================================
 DQN_FILE_SCOPE DqnMemStack::Block *
-DqnMemStackInternal_AllocateBlock(isize size, Dqn::ZeroClear clear, DqnMemAPI *api)
+DqnMemStack__AllocateBlock(isize size, Dqn::ZeroClear clear, DqnMemAPI *api)
 {
-    DQN_ASSERT(size > 0);
-    if (!api || !api->IsValid())
-    {
-        DQN_LOGE("Could not allocate block with api, api is null or is valid check failed.");
-        return nullptr;
-    }
-
     isize totalSize = sizeof(DqnMemStack::Block) + size;
-    auto *result = (DqnMemStack::Block *)api->Alloc(totalSize, clear);
-    if (!result)
-    {
-        return nullptr;
-    }
+    auto *result    = static_cast<DqnMemStack::Block *>(api->Alloc(totalSize, clear));
+    DQN_ALWAYS_ASSERTM(result, "Allocated memory block was null");
 
-    result->memory    = ((u8 *)result) + sizeof(*result);
-    result->size      = size;
-    result->head      = result->memory;
-    result->tail      = result->memory + size;
-    result->prevBlock = nullptr;
+    char *blockOffset = reinterpret_cast<char *>(result) + sizeof(*result);
+    *result           = DqnMemStack::Block(blockOffset, size);
     return result;
 }
 
-bool DqnMemStack::Init(void *mem, isize size, Dqn::ZeroClear clear, u32 flags_)
+DqnMemStack::DqnMemStack(void *mem, isize size, Dqn::ZeroClear clear, u32 flags_)
 {
-    if (!mem)
-    {
-        DQN_LOGE("Supplied fixed memory buffer is nullptr, initialise with fixed memory failed.");
-        return false;
-    }
-
-    if (size < static_cast<isize>(sizeof(DqnMemStack::Block)))
-    {
-        DQN_LOGE(
-            "Memory size is too small to store the metadata, we received: %$d, the "
-            "memory block requires at minimum: %$d",
-            size, sizeof(*this->block));
-        return false;
-    }
+    DQN_ALWAYS_ASSERTM(mem, "Supplied fixed memory buffer is nullptr, initialise with fixed memory failed");
+    DQN_ALWAYS_ASSERTM(size > sizeof(DqnMemStack::Block), "(%zu < %zu) Buffer too small for block metadata", size, sizeof(DqnMemStack::Block));
+    *this = {};
 
     if (clear == Dqn::ZeroClear::Yes)
         DqnMem_Set(mem, 0, size);
 
-    this->block            = (DqnMemStack::Block *)mem;
-    this->block->memory    = (u8 *)mem + sizeof(DqnMemStack::Block);
-    this->block->size      = size - sizeof(DqnMemStack::Block);
-    this->block->head      = this->block->memory;
-    this->block->tail      = this->block->memory + this->block->size;
-    this->block->prevBlock = nullptr;
+    char *blockOffset     = static_cast<char *>(mem) + sizeof(*this->block);
+    isize const blockSize = size - sizeof(*this->block);
 
-    this->memAPI          = nullptr;
-    this->myHeadAPI       = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Head);
-    this->myTailAPI       = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Tail);
-    this->flags           = (flags_ | Flag::NonExpandable);
-    this->tempRegionCount = 0;
+    this->block     = static_cast<DqnMemStack::Block *>(mem);
+    *this->block    = Block(blockOffset, blockSize);
+    this->myHeadAPI = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Head);
+    this->myTailAPI = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Tail);
+    this->flags     = (flags_ | Flag::NonExpandable);
 
     bool boundsGuard = Dqn_BitIsSet(this->flags, Flag::BoundsGuard);
-    this->metadata.Init(boundsGuard);
-
-    return true;
+    this->tracker.Init(boundsGuard);
 }
 
-bool DqnMemStack::Init(isize size, Dqn::ZeroClear clear, u32 flags_, DqnMemAPI *api)
+DqnMemStack::DqnMemStack(isize size, Dqn::ZeroClear clear, u32 flags_, DqnMemAPI *api)
 {
-    if (!this || size < 0) return false;
+    DQN_ALWAYS_ASSERTM(size > 0, "%zu <= 0", size);
+    *this = {};
 
-    if (this->block)
-    {
-        DQN_LOGE("Memory stack has pre-existing block attached: %x\n", this->block);
-        return false;
-    }
-
-    if (size == 0)
-    {
-        this->block = nullptr;
-    }
-    else
-    {
-        this->block = DqnMemStackInternal_AllocateBlock(size, clear, api);
-        if (!this->block)
-        {
-            DQN_LOGE("Memory stack could not allocated memory error, requested: %d bytes", size);
-            return false;
-        }
-    }
-
-    this->tempRegionCount = 0;
-    this->flags           = flags_;
-    this->memAPI          = api;
-    this->myHeadAPI       = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Head);
-    this->myTailAPI       = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Tail);
+    this->block     = DqnMemStack__AllocateBlock(size, clear, api);
+    this->flags     = flags_;
+    this->memAPI    = api;
+    this->myHeadAPI = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Head);
+    this->myTailAPI = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Tail);
 
     bool boundsGuard = Dqn_BitIsSet(this->flags, Flag::BoundsGuard);
-    this->metadata.Init(boundsGuard);
-
-    return true;
+    this->tracker.Init(boundsGuard);
 }
 
-FILE_SCOPE void *DqnMemStackInternal_Push(DqnMemStack *stack, isize size, u8 alignment, bool pushToHead)
+FILE_SCOPE void *DqnMemStack__Push(DqnMemStack *stack, isize size, u8 alignment, bool pushToHead)
 {
     DQN_ASSERT(size >= 0 && (alignment % 2 == 0));
-    DQN_ASSERTM(alignment <= 128,
-                "Alignment > 128 not supported. Need to update metadata to use u16 for storing the "
-                "offset!");
+    DQN_ALWAYS_ASSERTM(alignment <= 128, "Alignment supported. Update metadata to use u16 for storing the offset!");
 
     if (size == 0)
         return nullptr;
 
     // Allocate New Block If Full
     // =============================================================================================
-    DqnAllocatorMetadata *myMetadata = &stack->metadata;
-    isize actualSize                 = myMetadata->GetAllocationSize(size, alignment);
+    DqnMemTracker *tracker = &stack->tracker;
+    isize actualSize                 = tracker->GetAllocationSize(size, alignment);
     bool needNewBlock                = false;
     if (stack->block)
     {
@@ -4155,7 +3793,7 @@ FILE_SCOPE void *DqnMemStackInternal_Push(DqnMemStack *stack, isize size, u8 ali
         }
 
         isize newBlockSize           = DQN_MAX(actualSize, DqnMemStack::MINIMUM_BLOCK_SIZE);
-        DqnMemStack::Block *newBlock = DqnMemStackInternal_AllocateBlock(newBlockSize, Dqn::ZeroClear::No, stack->memAPI);
+        DqnMemStack::Block *newBlock = DqnMemStack__AllocateBlock(newBlockSize, Dqn::ZeroClear::No, stack->memAPI);
         if (!newBlock)
         {
             DQN_LOGE(
@@ -4170,8 +3808,8 @@ FILE_SCOPE void *DqnMemStackInternal_Push(DqnMemStack *stack, isize size, u8 ali
 
     // Calculate Ptr To Give Client
     // =============================================================================================
-    u8 *currPtr = (pushToHead) ? (stack->block->head) : (stack->block->tail - actualSize);
-    u8 *result  = (u8 *)DQN_ALIGN_POW_N((currPtr + myMetadata->GetAllocHeadSize()), alignment);
+    char *currPtr = (pushToHead) ? (stack->block->head) : (stack->block->tail - actualSize);
+    char *result  = reinterpret_cast<char *>(DQN_ALIGN_POW_N((currPtr + tracker->GetAllocHeadSize()), alignment));
 
     isize const offsetToSrc = result - currPtr;
     DQN_ASSERT(offsetToSrc > 0 && offsetToSrc < (u8)-1);
@@ -4188,39 +3826,37 @@ FILE_SCOPE void *DqnMemStackInternal_Push(DqnMemStack *stack, isize size, u8 ali
     }
 
 
-    // Instrument allocation with guards and metadata
+    // Instrument allocation with guards and tracker
     // =============================================================================================
     {
-        auto *myOffsetToSrc = myMetadata->PtrToOffsetToSrc(result);
+        auto *myOffsetToSrc = tracker->PtrToOffsetToSrc(result);
         *myOffsetToSrc      = (u8)offsetToSrc;
 
-        auto *myAlignment = myMetadata->PtrToAlignment(result);
+        auto *myAlignment = tracker->PtrToAlignment(result);
         *myAlignment      = alignment;
 
-        auto *allocAmount = myMetadata->PtrToAllocAmount(result);
+        auto *allocAmount = tracker->PtrToAllocAmount(result);
         *allocAmount = size;
 
         if (Dqn_BitIsSet(stack->flags, DqnMemStack::Flag::BoundsGuard))
         {
-            auto *headGuard = myMetadata->PtrToHeadBoundsGuard(result);
-            auto *tailGuard = myMetadata->PtrToTailBoundsGuard(result);
-            *headGuard       = DqnAllocatorMetadata::HEAD_GUARD_VALUE;
-            *tailGuard       = DqnAllocatorMetadata::TAIL_GUARD_VALUE;
+            auto *headGuard = tracker->PtrToHeadBoundsGuard(result);
+            auto *tailGuard = tracker->PtrToTailBoundsGuard(result);
+            *headGuard       = DqnMemTracker::HEAD_GUARD_VALUE;
+            *tailGuard       = DqnMemTracker::TAIL_GUARD_VALUE;
         }
     }
 
     // Debug check (alignment, bounds guard)
     // =============================================================================================
     {
-        u8 *checkAlignment = (u8 *)DQN_ALIGN_POW_N(result, alignment);
-        DQN_ASSERTM(checkAlignment == result,
-                    "Adding bounds guard should not destroy alignment! %p != %p", result,
-                    checkAlignment);
+        char *checkAlignment = reinterpret_cast<char *>(DQN_ALIGN_POW_N(result, alignment));
+        DQN_ASSERTM(checkAlignment == result, "Adding bounds guard should not destroy alignment! %p != %p", result, checkAlignment);
 
         if (Dqn_BitIsSet(stack->flags, DqnMemStack::Flag::BoundsGuard))
         {
-            myMetadata->AddAllocation(result);
-            myMetadata->CheckAllocations();
+            tracker->AddAllocation(result);
+            tracker->CheckAllocations();
         }
     }
 
@@ -4229,63 +3865,61 @@ FILE_SCOPE void *DqnMemStackInternal_Push(DqnMemStack *stack, isize size, u8 ali
 
 void *DqnMemStack::PushOnTail(isize size, u8 alignment)
 {
-    void *result = DqnMemStackInternal_Push(this, size, alignment, false);
+    void *result = DqnMemStack__Push(this, size, alignment, false);
     return result;
 }
 
 void *DqnMemStack::Push(isize size, u8 alignment)
 {
-    void *result = DqnMemStackInternal_Push(this, size, alignment, true);
+    void *result = DqnMemStack__Push(this, size, alignment, true);
     return result;
 }
 
-FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingIn(DqnAllocatorMetadata *metadata,
-                                                               u8 const *start, u8 const *end)
+FILE_SCOPE void DqnMemStack__KillTrackerPtrsExistingIn(DqnMemTracker *tracker, char const *start, char const *end)
 {
     if (start >= end) return;
 
-    for (auto index = 0; index < metadata->allocations.count; index++)
+    for (auto index = 0; index < tracker->allocations.count; index++)
     {
-        u8 *ptr = metadata->allocations.data[index];
+        char *ptr = static_cast<char *>(tracker->allocations.data[index]);
         if (ptr >= start && ptr < end)
         {
-            metadata->allocations.EraseStable(index);
+            tracker->allocations.EraseStable(index);
             index--;
         }
     }
 }
 
-FILE_SCOPE void DqnMemStackInternal_KillMetadataPtrsExistingInBlock(DqnAllocatorMetadata *metadata,
-                                                                    DqnMemStack::Block const *block)
+FILE_SCOPE void DqnMemStack__KillTrackerPtrsExistingInBlock(DqnMemTracker *tracker, DqnMemStack::Block const *block)
 {
-    u8 const *blockStart = block->memory;
-    u8 const *blockEnd   = block->memory + block->size;
-    DqnMemStackInternal_KillMetadataPtrsExistingIn(metadata, blockStart, blockEnd);
+    char const *blockStart = block->memory;
+    char const *blockEnd   = block->memory + block->size;
+    DqnMemStack__KillTrackerPtrsExistingIn(tracker, blockStart, blockEnd);
 }
 
-FILE_SCOPE void DqnMemStackInternal_Pop(DqnMemStack *stack, void *ptr, Dqn::ZeroClear clear, bool popHead)
+FILE_SCOPE void DqnMemStack__Pop(DqnMemStack *stack, void *ptr, Dqn::ZeroClear clear, bool popHead)
 {
     if (!ptr) return;
     DQN_ASSERT(stack->block);
 
-    u8 *const bytePtr                = (u8 *)ptr;
-    DqnAllocatorMetadata *myMetadata = &stack->metadata;
+    char *const bytePtr    = static_cast<char *>(ptr);
+    DqnMemTracker *tracker = &stack->tracker;
 
     // Check instrumented data
     if (Dqn_BitIsSet(stack->flags, DqnMemStack::Flag::BoundsGuard))
     {
-        myMetadata->CheckAllocations();
-        myMetadata->RemoveAllocation(bytePtr);
+        tracker->CheckAllocations();
+        tracker->RemoveAllocation(bytePtr);
     }
 
-    isize const size     = *(myMetadata->PtrToAllocAmount(bytePtr));
-    u8 const alignment   = *(myMetadata->PtrToAlignment(bytePtr));
-    u8 const offsetToSrc = *(myMetadata->PtrToOffsetToSrc(bytePtr));
+    isize const size     = *(tracker->PtrToAllocAmount(bytePtr));
+    u8 const alignment   = *(tracker->PtrToAlignment(bytePtr));
+    u8 const offsetToSrc = *(tracker->PtrToOffsetToSrc(bytePtr));
 
-    isize actualSize         = myMetadata->GetAllocationSize(size, alignment);
-    u8 *const start          = bytePtr - offsetToSrc;
-    u8 *const end            = start + actualSize;
-    u8 const *const blockEnd = stack->block->memory + stack->block->size;
+    isize actualSize     = tracker->GetAllocationSize(size, alignment);
+    char *start          = bytePtr - offsetToSrc;
+    char *end            = start + actualSize;
+    char const *blockEnd = stack->block->memory + stack->block->size;
 
     if (popHead)
     {
@@ -4314,18 +3948,18 @@ FILE_SCOPE void DqnMemStackInternal_Pop(DqnMemStack *stack, void *ptr, Dqn::Zero
 
 void DqnMemStack::Pop(void *ptr, Dqn::ZeroClear clear)
 {
-    DqnMemStackInternal_Pop(this, ptr, clear, true);
+    DqnMemStack__Pop(this, ptr, clear, true);
 }
 
 void DqnMemStack::PopOnTail(void *ptr, Dqn::ZeroClear clear)
 {
-    DqnMemStackInternal_Pop(this, ptr, clear, false);
+    DqnMemStack__Pop(this, ptr, clear, false);
 }
 
 void DqnMemStack::Free()
 {
     if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
-        this->metadata.allocations.Free();
+        this->tracker.allocations.Free();
 
     if (this->memAPI)
     {
@@ -4354,7 +3988,7 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 
         if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
         {
-            DqnMemStackInternal_KillMetadataPtrsExistingInBlock(&this->metadata, blockToFree);
+            DqnMemStack__KillTrackerPtrsExistingInBlock(&this->tracker, blockToFree);
         }
 
         isize realSize = blockToFree->size + sizeof(DqnMemStack::Block);
@@ -4370,12 +4004,11 @@ bool DqnMemStack::FreeMemBlock(DqnMemStack::Block *memBlock)
 
 void DqnMemStack::ResetTail()
 {
-    u8 *start = this->block->tail;
-    u8 *end   = this->block->memory + this->block->size;
-
+    char *start = this->block->tail;
+    char *end   = this->block->memory + this->block->size;
     if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
     {
-        DqnMemStackInternal_KillMetadataPtrsExistingIn(&this->metadata, start, end);
+        DqnMemStack__KillTrackerPtrsExistingIn(&this->tracker, start, end);
     }
 
     this->block->tail = end;
@@ -4403,7 +4036,7 @@ void DqnMemStack::ClearCurrBlock(Dqn::ZeroClear clear)
     {
         if (Dqn_BitIsSet(this->flags, Flag::BoundsGuard))
         {
-            DqnMemStackInternal_KillMetadataPtrsExistingInBlock(&this->metadata, this->block);
+            DqnMemStack__KillTrackerPtrsExistingInBlock(&this->tracker, this->block);
         }
 
         this->block->head = this->block->memory;
@@ -4421,9 +4054,9 @@ DqnMemStack::Info DqnMemStack::GetInfo() const
     Info result = {};
     for (Block *block_ = this->block; block_; block_ = block_->prevBlock)
     {
-        u8 const *blockEnd  = block_->memory + block_->size;
-        isize usageFromHead = block_->head - block_->memory;
-        isize usageFromTail = blockEnd - block_->tail;
+        char const *blockEnd = block_->memory + block_->size;
+        isize usageFromHead  = block_->head - block_->memory;
+        isize usageFromTail  = blockEnd - block_->tail;
 
         result.totalUsed += usageFromHead + usageFromTail;
         result.totalSize += block_->size;
@@ -4431,9 +4064,9 @@ DqnMemStack::Info DqnMemStack::GetInfo() const
         result.numBlocks++;
     }
 
-    u8 const *blockEnd  = this->block->memory + this->block->size;
-    isize usageFromHead = this->block->head - this->block->memory;
-    isize usageFromTail = blockEnd - this->block->tail;
+    char const *blockEnd = this->block->memory + this->block->size;
+    isize usageFromHead  = this->block->head - this->block->memory;
+    isize usageFromTail  = blockEnd - this->block->tail;
     result.wastedSize -= (this->block->size - usageFromHead - usageFromTail); // Don't include the curr block
 
     return result;
@@ -4501,9 +4134,9 @@ void DqnMemStack::TempRegionEnd(TempRegion region)
 
             if (Dqn_BitIsSet(this->flags, DqnMemStack::Flag::BoundsGuard))
             {
-                u8 *blockStart = this->block->head;
-                u8 *blockEnd   = this->block->tail;
-                DqnMemStackInternal_KillMetadataPtrsExistingIn(&this->metadata, blockStart, blockEnd);
+                char *blockStart = this->block->head;
+                char *blockEnd   = this->block->tail;
+                DqnMemStack__KillTrackerPtrsExistingIn(&this->tracker, blockStart, blockEnd);
             }
             break;
         }
@@ -4511,8 +4144,8 @@ void DqnMemStack::TempRegionEnd(TempRegion region)
         {
             if (region.keepHeadChanges || region.keepTailChanges)
             {
-                u8 *blockStart = nullptr;
-                u8 *blockEnd   = nullptr;
+                char *blockStart = nullptr;
+                char *blockEnd   = nullptr;
                 if (region.keepHeadChanges)
                 {
                     blockStart   = block_->tail;
@@ -4528,7 +4161,7 @@ void DqnMemStack::TempRegionEnd(TempRegion region)
 
                 if (Dqn_BitIsSet(this->flags, DqnMemStack::Flag::BoundsGuard))
                 {
-                    DqnMemStackInternal_KillMetadataPtrsExistingIn(&this->metadata, blockStart, blockEnd);
+                    DqnMemStack__KillTrackerPtrsExistingIn(&this->tracker, blockStart, blockEnd);
                 }
             }
         }
@@ -6907,7 +6540,9 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(char const *buf, i32 bufLen, char const *find
     bufLen          = static_cast<int>((buf + bufLen) - tmp);
     buf             = tmp;
 
-    if (buf[0] == '{' || buf[1] == '[')
+    bool const findStructureInGlobalScope = (findPropertyLen == 1 && (findProperty[0] == '{' || findProperty[0] == '['));
+
+    if ((buf[0] == '{' || buf[1] == '[') && !findStructureInGlobalScope)
     {
         buf++;
         bufLen--;
@@ -6921,33 +6556,36 @@ TryNext:
         if (remainingLenInSrcStr < findPropertyLen) break;
 
         char const *bufSubStr = buf + indexIntoBuf;
-        if (bufSubStr[0] == '{' || bufSubStr[0] == '[')
+        if (!findStructureInGlobalScope)
         {
-            int bracketCount     = 0;
-            int braceCount       = 0;
-            int *searchCharCount = nullptr;
-            if (bufSubStr[0] == '[')
+            if (bufSubStr[0] == '{' || bufSubStr[0] == '[')
             {
-                bracketCount++;
-                searchCharCount = &bracketCount;
-            }
-            else
-            {
-                braceCount++;
-                searchCharCount = &braceCount;
-            }
+                int bracketCount     = 0;
+                int braceCount       = 0;
+                int *searchCharCount = nullptr;
+                if (bufSubStr[0] == '[')
+                {
+                    bracketCount++;
+                    searchCharCount = &bracketCount;
+                }
+                else
+                {
+                    braceCount++;
+                    searchCharCount = &braceCount;
+                }
 
-            for (++indexIntoBuf; (*searchCharCount) != 0; ++indexIntoBuf)
-            {
-                bufSubStr = buf + indexIntoBuf;
-                if (!bufSubStr[0])
-                    return result;
+                for (++indexIntoBuf; (*searchCharCount) != 0; ++indexIntoBuf)
+                {
+                    bufSubStr = buf + indexIntoBuf;
+                    if (!bufSubStr[0])
+                        return result;
 
-                if      (bufSubStr[0] == '{') ++braceCount;
-                else if (bufSubStr[0] == '}') --braceCount;
-                else if (bufSubStr[0] == '[') ++bracketCount;
-                else if (bufSubStr[0] == ']') --bracketCount;
-                else                         continue;
+                    if      (bufSubStr[0] == '{') ++braceCount;
+                    else if (bufSubStr[0] == '}') --braceCount;
+                    else if (bufSubStr[0] == '[') ++bracketCount;
+                    else if (bufSubStr[0] == ']') --bracketCount;
+                    else                         continue;
+                }
             }
         }
 
@@ -6963,10 +6601,9 @@ TryNext:
     // which doesn't have a specific property name
     char const *startOfValue = locate;
     char const *bufPtr = startOfValue;
-    if (findProperty[0] != '{' && findProperty[0] != '[')
+    if (!findStructureInGlobalScope)
     {
-        // NOTE: When true, the findProperty already includes the quotation marks, so don't need to
-        // check.
+        // NOTE: When true, the findProperty already includes the quotation marks, so don't need to check.
         if (!(findProperty[0] == '"' && findProperty[findPropertyLen - 1] == '"'))
         {
             if (locate[-1] != '"' || locate[findPropertyLen] != '"')

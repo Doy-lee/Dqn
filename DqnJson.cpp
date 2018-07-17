@@ -1,5 +1,6 @@
 void DqnJson_Test()
 {
+    LOG_HEADER();
     char const json[] =
     R"FOO(
     {
@@ -114,4 +115,5 @@ void DqnJson_Test()
             DQN_ASSERT(DQN_SLICE_CMP(it.value, DQN_SLICE("123"), Dqn::IgnoreCase::No));
         }
     }
+    Log(Status::Ok, "DqnJson sample structure parsed");
 }
