@@ -2340,6 +2340,7 @@ FILE_SCOPE void DqnMemStack_Test()
             u8 *result2 = (u8 *)DQN_ALIGN_POW_N(result1, ALIGN4);
             DQN_ASSERT(result1 == result2);
             stack.Pop(result1);
+            DQN_ASSERT(stack.block->head == stack.block->memory);
         }
 
         if (1)
@@ -2348,6 +2349,7 @@ FILE_SCOPE void DqnMemStack_Test()
             u8 *result2 = (u8 *)DQN_ALIGN_POW_N(result1, ALIGN16);
             DQN_ASSERT(result1 == result2);
             stack.Pop(result1);
+            DQN_ASSERT(stack.block->head == stack.block->memory);
         }
 
         if (1)
@@ -2356,6 +2358,7 @@ FILE_SCOPE void DqnMemStack_Test()
             u8 *result2 = (u8 *)DQN_ALIGN_POW_N(result1, ALIGN64);
             DQN_ASSERT(result1 == result2);
             stack.Pop(result1);
+            DQN_ASSERT(stack.block->head == stack.block->memory);
         }
 
         stack.Free();
