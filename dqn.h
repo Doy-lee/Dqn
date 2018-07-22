@@ -1413,8 +1413,6 @@ template <typename T> void DqnArray<T>::Reserve(isize newMax)
 // #DqnMemTracker
 // =================================================================================================
 // Allocation Layout
-//                      +-------------------------------------------------------------------------+                             +-----------------+
-//                      | Allocation Head                                                         |                             | Allocation Tail |
 // +--------------------+-------------------------------------------------------------------------+-----------------------------+-----------------+
 // | Ptr From Allocator | Offset To Src | Alignment | Alloc Type | Alloc Amount | B. Guard (Opt.) | Aligned Ptr For Client      | B. Guard (Opt.) |
 // +--------------------+-------------------------------------------------------------------------+-----------------------------+-----------------+
@@ -1425,7 +1423,6 @@ template <typename T> void DqnArray<T>::Reserve(isize newMax)
 // B. Guard:               Bounds Guard value.
 // Aligned Ptr For Client: The allocated memory for the client.
 // Offset To Src:          Number of bytes to subtract from the "Aligned Ptr For Client" to return to the "Ptr From Allocator"
-//
 
 #pragma pack(push, 1)
 struct DqnPtrHeader
@@ -1451,10 +1448,7 @@ struct DqnMemTracker
     void   RemoveAllocation    (char *ptr);
 
     void   CheckAllocations    ()                         const;
-    isize  GetAllocationSize   (isize size, u8 alignment) const
-    {
-        return sizeof(DqnPtrHeader) + boundsGuardSize + (alignment - 1) + size + boundsGuardSize;
-    }
+    isize  GetAllocationSize   (isize size, u8 alignment) const { return sizeof(DqnPtrHeader) + boundsGuardSize + (alignment - 1) + size + boundsGuardSize; }
 
     // ptr: The ptr given to the client when allocating.
     u32          *PtrToHeadGuard (char *ptr) const { return reinterpret_cast<u32 *>(ptr - boundsGuardSize);  }
@@ -1486,8 +1480,8 @@ struct DqnMemStack
     {
         NonExpandable       = (1 << 0), // Disallow additional memory blocks when full.
         NonExpandableAssert = (1 << 1), // Assert when non-expandable is set and we run out of space
-        BoundsGuard         = (1 << 2), // Track, check and add guards on all allocations
-        PushAssertsOnFail   = (1 << 3), // Assert when push*() fails.
+        BoundsGuard         = (1 << 2), // Track, check and add 4 byte guards on the boundaries of all allocations
+        PushAssertsOnFail   = (1 << 3), // Assert when push() fails.
         All                 = (NonExpandable | NonExpandableAssert | BoundsGuard | PushAssertsOnFail),
     };
 
@@ -1512,13 +1506,13 @@ struct DqnMemStack
         Block(void *memory_, isize size_) : memory((char *)memory_), size(size_), prevBlock(nullptr), head((char *)memory_), tail((char *)memory_ + size_) {}
     };
 
-    DqnMemTracker  tracker;         // Read:
+    DqnMemTracker  tracker;         // Read: Metadata for managing ptr allocation
     DqnMemAPI     *memAPI;          // Read: API used to add additional memory blocks to this stack.
     DqnMemAPI      myTailAPI;       // Read: API for data structures to allocate to the tail of the stack
     DqnMemAPI      myHeadAPI;       // Read: API for data structures to allocate to the head of the stack
     Block         *block;           // Read: Memory block allocated for the stack
-    u32            flags;           // Read: DqnMemStack::Flags
-    i32            tempRegionCount;
+    u32            flags;           // Read
+    i32            tempRegionCount; // Read: The number of temp memory regions in use
 
     DqnMemStack() = default;
 
@@ -3694,10 +3688,10 @@ void *DqnMemStack::Push(isize size, AllocTo allocTo, u8 alignment)
 
     if (needNewBlock)
     {
-        if (Dqn_BitIsSet(this->flags, Flag::NonExpandable))
+        if (Dqn_BitIsSet(this->flags, Flag::NonExpandable) && this->block)
         {
             if (Dqn_BitIsSet(this->flags, Flag::NonExpandableAssert))
-                DQN_ASSERTM(Dqn_BitIsSet(this->flags, Flag::NonExpandable), "Allocator is non-expandable and has run out of memory");
+                DQN_ASSERTM(Dqn_BitIsSet(this->flags, Flag::NonExpandableAssert), "Allocator is non-expandable and has run out of memory");
 
             return nullptr;
         }
