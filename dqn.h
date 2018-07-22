@@ -1441,15 +1441,9 @@ struct DqnMemTracker
 {
     static u32 const HEAD_GUARD_VALUE   = 0xCAFEBABE;
     static u32 const TAIL_GUARD_VALUE   = 0xDEADBEEF;
-    static u32 const OFFSET_TO_SRC_SIZE = sizeof(u8);
-    static u32 const ALIGNMENT_SIZE     = sizeof(u8);
-    static u32 const ALLOC_TYPE_SIZE    = sizeof(u8);
-    static u32 const ALLOC_AMOUNT_SIZE  = sizeof(usize);
 
     DqnArray<void *> allocations;     // Read: When BoundsGuard is enabled, tracks all allocations.
     u32              boundsGuardSize; // Read: sizeof(GUARD_VALUE) OR 0 if BoundsGuard is disabled.
-    u32              allocHeadSize;   // Read: The size of all the metadata at the head of the allocated ptr i.e. (offset, alignment ... bounds guard)
-    u32              allocTailSize;   // Read: The size of all the metadata at the end of the allocated ptr i.e.  (bounds guard)
 
     void   Init                (bool boundsGuard);
     void   Free                ()                               { allocations.Free(); }
@@ -1463,7 +1457,7 @@ struct DqnMemTracker
     }
 
     // ptr: The ptr given to the client when allocating.
-    u32          *PtrToHeadGuard (char *ptr) const { union { char *charPtr; u32 *u32Ptr; }; charPtr = ptr - allocHeadSize + OFFSET_TO_SRC_SIZE + ALIGNMENT_SIZE + ALLOC_TYPE_SIZE + ALLOC_AMOUNT_SIZE; return u32Ptr; }
+    u32          *PtrToHeadGuard (char *ptr) const { return reinterpret_cast<u32 *>(ptr - boundsGuardSize);  }
     u32          *PtrToTailGuard (char *ptr) const { return reinterpret_cast<u32 *>(ptr + PtrToHeader(ptr)->allocAmount); }
     DqnPtrHeader *PtrToHeader    (char *ptr) const { return reinterpret_cast<DqnPtrHeader *>(ptr - boundsGuardSize - sizeof(DqnPtrHeader)); }
 };
@@ -3589,9 +3583,6 @@ void DqnMemTracker::Init(bool boundsGuard)
     {
         this->boundsGuardSize = 0;
     }
-
-    this->allocHeadSize = OFFSET_TO_SRC_SIZE + ALIGNMENT_SIZE + ALLOC_TYPE_SIZE + ALLOC_AMOUNT_SIZE + this->boundsGuardSize;
-    this->allocTailSize = this->boundsGuardSize;
 }
 
 void DqnMemTracker::RemoveAllocation(char *ptr)
