@@ -2681,20 +2681,49 @@ DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
 
     Bucket    *buckets;
     isize      numBuckets;
-    isize      bucketsUsed;
+    isize     *indexesOfUsedBuckets;
+    isize      indexInIndexesOfUsedBuckets;
 
-     DqnVHashTable() = default;
-     DqnVHashTable(isize size) { LazyInit(size); }
-    ~DqnVHashTable()           { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * numBuckets); }
+    DqnVHashTable() = default;
+    DqnVHashTable(isize size) { LazyInit(size); }
 
-    void       LazyInit(isize size) { *this = {}; numBuckets = size; buckets = static_cast<Bucket *>(DqnOS_VAlloc(numBuckets * sizeof(*buckets))); DQN_ASSERT(buckets); }
+    void       Free    ()                                  { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * numBuckets); *this = {}; }
+    void       LazyInit(isize size);
     void       Erase   (Key const &key);
     Item      *Set     (Key const &key, Item const &item);
     Item      *Get     (Key const &key);
 
-    Item *operator[](Key const &key) { return Get(key); }
+    Item *operator[](Key const &key)                        { return Get(key); }
 
+    struct Iterator
+    {
+        DqnVHashTable *table;
+        isize          indexInIndexesOfUsedBuckets;
+        isize          indexInBucket;
+
+        Iterator(DqnVHashTable *table_, isize indexInIndexesOfUsedBuckets_ = 0, isize indexInBucket_ = 0) : table(table_), indexInIndexesOfUsedBuckets(indexInIndexesOfUsedBuckets_), indexInBucket(indexInBucket_) {}
+
+        Bucket *GetCurrBucket() const { return (table->buckets + table->indexesOfUsedBuckets[indexInIndexesOfUsedBuckets]); }
+        Entry  *GetCurrEntry()  const { return GetCurrBucket()->entries + indexInBucket; }
+        Item   *GetCurrItem ()  const { return &(GetCurrEntry()->item); }
+
+        bool      operator!=(Iterator const &other) const { return !Equals(GetCurrEntry()->key, other.GetCurrEntry()->key); }
+        Item     &operator* ()                      const { return *GetCurrItem(); }
+        Iterator  operator++()                            { if (++indexInBucket >= GetCurrBucket()->entryIndex) { indexInBucket = 0; indexInIndexesOfUsedBuckets++; } return *this; }
+    };
+
+    Iterator begin() { return Iterator(this); }
+    Iterator end()   { isize lastBucketIndex = indexesOfUsedBuckets[indexInIndexesOfUsedBuckets - 1]; isize lastIndexInBucket = DQN_MAX((buckets + lastBucketIndex)->entryIndex - 1, 0); return Iterator(this, DQN_MAX(lastBucketIndex, 0), DQN_MAX(lastIndexInBucket, 0)); }
 };
+
+DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::LazyInit(isize size)
+{
+    *this                      = {};
+    this->numBuckets           = size;
+    this->buckets              = static_cast<Bucket *>(DqnOS_VAlloc(size * sizeof(*this->buckets)));
+    this->indexesOfUsedBuckets = static_cast<isize *> (DqnOS_VAlloc(size * sizeof(*this->indexesOfUsedBuckets)));
+    DQN_ASSERT(this->buckets && this->indexesOfUsedBuckets);
+}
 
 DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Set(Key const &key, Item const &item)
 {
@@ -2713,8 +2742,10 @@ DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Set(Key const &key, Item co
     if (!entry)
     {
         DQN_ALWAYS_ASSERTM(bucket->entryIndex < DQN_ARRAY_COUNT(bucket->entries), "More than %zu collisions in hash table, increase the size of the table or buckets", DQN_ARRAY_COUNT(bucket->entries));
-        this->bucketsUsed = (bucket->entryIndex == 0) ? this->bucketsUsed + 1 : this->bucketsUsed;
-        entry             = bucket->entries + bucket->entryIndex++;
+        if (bucket->entryIndex == 0)
+            this->indexesOfUsedBuckets[this->indexInIndexesOfUsedBuckets++] = index;
+
+        entry = bucket->entries + bucket->entryIndex++;
     }
 
     // TODO(doyle): A maybe case. We're using virtual memory, so you should
@@ -2722,7 +2753,7 @@ DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Set(Key const &key, Item co
     // day we care about resizing the table but at the cost of a lot more code
     // complexity.
     isize const threshold = static_cast<isize>(0.75f * this->numBuckets);
-    DQN_ALWAYS_ASSERTM(this->bucketsUsed < threshold, "%zu >= %zu", this->bucketsUsed, threshold);
+    DQN_ALWAYS_ASSERTM(this->indexInIndexesOfUsedBuckets < threshold, "%zu >= %zu", this->indexInIndexesOfUsedBuckets, threshold);
 
     entry->key  = key;
     entry->item = item;
@@ -2759,7 +2790,7 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
     isize index    = Hash(this->numBuckets, key);
     Bucket *bucket = this->buckets + index;
 
-    for (isize i = 0; i < bucket->entryIndex; ++i)
+    DQN_FOR_EACH(i, bucket->entryIndex)
     {
         Entry *check  = bucket->entries + i;
         if (Equals(check->key, key))
@@ -2768,14 +2799,38 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
                 bucket->entries[j] = bucket->entries[j + 1];
 
             if (--bucket->entryIndex == 0)
-                --this->bucketsUsed;
+            {
+                DQN_FOR_EACH(bucketIndex, this->indexInIndexesOfUsedBuckets)
+                {
+                    if (this->indexesOfUsedBuckets[bucketIndex] == index)
+                    {
+                        indexesOfUsedBuckets[bucketIndex] =
+                            indexesOfUsedBuckets[--this->indexInIndexesOfUsedBuckets];
+                    }
+                }
+            }
 
-            DQN_ASSERT(this->bucketsUsed >= 0);
+            DQN_ASSERT(this->indexInIndexesOfUsedBuckets >= 0);
             DQN_ASSERT(bucket->entryIndex >= 0);
             return;
         }
     }
 }
+
+// XPlatform > #DqnCatalog API
+// =================================================================================================
+template <typename T>
+struct DqnCatalog
+{
+    struct Entry
+    {
+        u64  timeLastModified;
+        T   *data;
+    };
+
+    DqnVHashTable<DqnSlice<const char>, T> assetTable;
+    void Update();
+};
 
 // XPlatform > #DqnFile API
 // =================================================================================================
