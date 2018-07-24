@@ -2843,6 +2843,28 @@ FILE_SCOPE void DqnMemStack_Test()
     }
 }
 
+template <typename T>
+T *DqnCatalog<T>::Get(DqnFixedString128 file)
+{
+    Entry *result = this->assetTable.GetOrMake(file.str);
+    (void)result;
+
+    return nullptr;
+}
+
+void DqnCatalog_Test()
+{
+    struct TxtFile
+    {
+        char *buffer;
+        int   len;
+    };
+
+    DqnCatalog<TxtFile> textCatalog = {};
+    TxtFile *file = textCatalog.Get("makefile");
+    (void)file;
+}
+
 int main(void)
 {
     globalIndent  = 1;
@@ -2863,6 +2885,7 @@ int main(void)
     DqnJson_Test();
 
 #ifdef DQN_PLATFORM_HEADER
+    DqnCatalog_Test();
     DqnVHashTable_Test();
     DqnOS_Test();
     DqnFile_Test();

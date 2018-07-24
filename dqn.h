@@ -1935,9 +1935,9 @@ DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
 
 // #DqnFixedString Public API - Fixed sized strings at compile time
 // =================================================================================================
-FILE_SCOPE int DqnFixedString__Append(char *dest, int destSize, char const *src, int len = -1);
+FILE_SCOPE int DqnFixedString__Append  (char *dest, int destSize, char const *src, int len = -1);
 
-template <unsigned int MAX>
+template <int MAX>
 struct DqnFixedString
 {
     int  len;
@@ -1955,69 +1955,32 @@ struct DqnFixedString
     DqnFixedString &operator+=(DqnSlice<char> const &other)       { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
     DqnFixedString &operator+=(DqnFixedString const &other)       { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other.str, other.len); return *this; }
 
-    DqnFixedString  operator+ (char const *other)                 { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other); return result; }
-    DqnFixedString  operator+ (DqnSlice<char const> const &other) { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
-    DqnFixedString  operator+ (DqnSlice<char> const &other)       { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
-    DqnFixedString  operator+ (DqnFixedString const &other)       { DqnFixedString result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.str, other.len); return result; }
+    DqnFixedString  operator+ (char const *other)                 { auto result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other); return result; }
+    DqnFixedString  operator+ (DqnSlice<char const> const &other) { auto result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
+    DqnFixedString  operator+ (DqnSlice<char> const &other)       { auto result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
+    DqnFixedString  operator+ (DqnFixedString const &other)       { auto result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.str, other.len); return result; }
 
     // Xprintf functions always modifies buffer and null-terminates even with insufficient buffer size.
     // Asserts on failure if DQN_ASSERT is defined.
     // return: The number of characters copied to the buffer
-    int Sprintf       (char const *fmt, ...);
-    int SprintfAppend (char const *fmt, ...);
+    int  Sprintf         (char const *fmt, ...) { va_list va; va_start(va, fmt); int result = VSprintf      (fmt, va); va_end(va); return result; }
+    int  SprintfAppend   (char const *fmt, ...) { va_list va; va_start(va, fmt); int result = VSprintfAppend(fmt, va); va_end(va); return result; }
 
-    int VSprintf      (char const *fmt, va_list argList);
-    int VSprintfAppend(char const *fmt, va_list argList);
+    int  VSprintf        (char const *fmt, va_list va) { return VSprintfAtOffset(fmt, va, 0  /*offset*/); }
+    int  VSprintfAppend  (char const *fmt, va_list va) { return VSprintfAtOffset(fmt, va, len/*offset*/); }
 
-    void Clear        (Dqn::ZeroClear clear = Dqn::ZeroClear::No) { if (clear == Dqn::ZeroClear::Yes) DqnMem_Set(str, 0, MAX); *this = {}; }
+    void Clear           (Dqn::ZeroClear clear = Dqn::ZeroClear::No) { if (clear == Dqn::ZeroClear::Yes) DqnMem_Set(str, 0, MAX); *this = {}; }
+
+    int  VSprintfAtOffset(char const *fmt, va_list va, int offset) { char *start = str + offset; int result = Dqn_vsnprintf(start, static_cast<int>((str + MAX) - start), fmt, va); len = (offset + result); return result; }
 };
 
-template <unsigned int MAX>
-DQN_FILE_SCOPE int
-DqnFixedString__VSprintf(DqnFixedString<MAX> *me, char const *fmt, va_list argList, int bufOffset)
-{
-    char *bufStart           = me->str + bufOffset;
-    i32 const remainingSpace = static_cast<i32>((me->str + MAX) - bufStart);
-    int result               = Dqn_vsnprintf(bufStart, remainingSpace, fmt, argList);
-    me->len                  = bufOffset + result;
-    return result;
-}
-
-template <unsigned int MAX>
-int DqnFixedString<MAX>::VSprintf(char const *fmt, va_list argList)
-{
-    int bufOffset = 0;
-    int result    = DqnFixedString__VSprintf(this, fmt, argList, bufOffset);
-    return result;
-}
-
-template <unsigned int MAX>
-int DqnFixedString<MAX>::Sprintf(char const *fmt, ...)
-{
-    va_list argList;
-    va_start(argList, fmt);
-    int result = this->VSprintf(fmt, argList);
-    va_end(argList);
-    return result;
-}
-
-template <unsigned int MAX>
-int DqnFixedString<MAX>::VSprintfAppend(char const *fmt, va_list argList)
-{
-    int bufOffset = this->len;
-    int result = DqnFixedString__VSprintf(this, fmt, argList, bufOffset);
-    return result;
-}
-
-template <unsigned int MAX>
-int DqnFixedString<MAX>::SprintfAppend(char const *fmt, ...)
-{
-    va_list argList;
-    va_start(argList, fmt);
-    int result = this->VSprintfAppend(fmt, argList);
-    va_end(argList);
-    return result;
-}
+using DqnFixedString16   = DqnFixedString<16>;
+using DqnFixedString32   = DqnFixedString<32>;
+using DqnFixedString64   = DqnFixedString<64>;
+using DqnFixedString128  = DqnFixedString<128>;
+using DqnFixedString256  = DqnFixedString<256>;
+using DqnFixedString512  = DqnFixedString<512>;
+using DqnFixedString1024 = DqnFixedString<1024>;
 
 // TODO(doyle): Load factor
 // #DqnHashTable API
@@ -2684,16 +2647,19 @@ DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
     isize     *indexesOfUsedBuckets;
     isize      indexInIndexesOfUsedBuckets;
 
-    DqnVHashTable() = default;
-    DqnVHashTable(isize size) { LazyInit(size); }
+    DqnVHashTable       () = default;
+    DqnVHashTable       (isize size)                                                    { LazyInit(size); }
 
-    void       Free    ()                                  { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * numBuckets); *this = {}; }
-    void       LazyInit(isize size);
-    void       Erase   (Key const &key);
-    Item      *Set     (Key const &key, Item const &item);
-    Item      *Get     (Key const &key);
+    void       LazyInit (isize size = DQN_MAX(DQN_MEGABYTE(1)/sizeof(Bucket), 1024) );
+    void       Free     ()                                  { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * numBuckets); *this = {}; }
 
-    Item *operator[](Key const &key)                        { return Get(key); }
+    Entry     *GetEntry (Key const &key);                  // return: The (key, item) entry associated with the key, nullptr if key not in table yet.
+    void       Erase    (Key const &key);                  // Delete the element matching key, does nothing if key not found.
+    Item      *GetOrMake(Key const &key);                  // return: Item if found, otherwise make an entry (key, item) and return the ptr to the uninitialised item
+    Item      *Get      (Key const &key)                   { Entry *entry  = GetEntry(key); return (entry) ? &entry->item : nullptr; }
+    Item      *Set      (Key const &key, Item const &item) { Item  *result = GetOrMake(key); *result = item; return result; }
+
+    Item      *operator[](Key const &key)                  { return Get(key); }
 
     struct Iterator
     {
@@ -2717,8 +2683,8 @@ DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
         Iterator  operator- (int offset)            const { Iterator result = *this; DQN_FOR_EACH(i, offset) { (offset > 0) ? --result : ++result; } return result; } // TODO(doyle): Improve
     };
 
-    Iterator begin() { return Iterator(this); }
-    Iterator end()   { isize lastBucketIndex = indexesOfUsedBuckets[indexInIndexesOfUsedBuckets - 1]; isize lastIndexInBucket = (buckets + lastBucketIndex)->entryIndex - 1; return Iterator(this, DQN_MAX(lastBucketIndex, 0), DQN_MAX(lastIndexInBucket, 0)); }
+    Iterator   begin() { return Iterator(this); }
+    Iterator   end()   { isize lastBucketIndex = indexesOfUsedBuckets[indexInIndexesOfUsedBuckets - 1]; isize lastIndexInBucket = (buckets + lastBucketIndex)->entryIndex - 1; return Iterator(this, DQN_MAX(lastBucketIndex, 0), DQN_MAX(lastIndexInBucket, 0)); }
 };
 
 DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::LazyInit(isize size)
@@ -2730,14 +2696,32 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::LazyInit(isize size)
     DQN_ASSERT(this->buckets && this->indexesOfUsedBuckets);
 }
 
-DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Set(Key const &key, Item const &item)
+DQN_VHASH_TABLE_TEMPLATE typename DQN_VHASH_TABLE_DECL::Entry *
+DQN_VHASH_TABLE_DECL::GetEntry(Key const &key)
 {
-    if (!buckets) LazyInit(1024);
+    if (!buckets) return nullptr;
 
-    isize index       = Hash(this->numBuckets, key);
-    Bucket *bucket    = this->buckets + index;
-    Entry *entry      = nullptr;
+    isize index    = Hash(this->numBuckets, key);
+    Bucket *bucket = this->buckets + index;
 
+    Entry *result = nullptr;
+    for (isize i = 0; i < bucket->entryIndex && !result; i++)
+    {
+        Entry *entry = bucket->entries + i;
+        result       = Equals(entry->key, key) ? entry : nullptr;
+    }
+
+    return result;
+}
+
+DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::GetOrMake(Key const &key)
+{
+    if (!this->buckets) LazyInit();
+
+    isize index    = Hash(this->numBuckets, key);
+    Bucket *bucket = this->buckets + index;
+
+    Entry *entry = nullptr;
     for (isize i = 0; i < bucket->entryIndex && !entry; i++)
     {
         Entry *check = bucket->entries + i;
@@ -2746,51 +2730,32 @@ DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Set(Key const &key, Item co
 
     if (!entry)
     {
-        DQN_ALWAYS_ASSERTM(bucket->entryIndex < DQN_ARRAY_COUNT(bucket->entries), "More than %zu collisions in hash table, increase the size of the table or buckets", DQN_ARRAY_COUNT(bucket->entries));
+        DQN_ALWAYS_ASSERTM(bucket->entryIndex < DQN_ARRAY_COUNT(bucket->entries),
+                           "More than %zu collisions in hash table, increase the size of the table or buckets",
+                           DQN_ARRAY_COUNT(bucket->entries));
+
         if (bucket->entryIndex == 0)
             this->indexesOfUsedBuckets[this->indexInIndexesOfUsedBuckets++] = index;
 
-        entry = bucket->entries + bucket->entryIndex++;
+        entry      = bucket->entries + bucket->entryIndex++;
+        entry->key = key;
+
+        // TODO(doyle): A maybe case. We're using virtual memory, so you should
+        // just initialise a larger size. It's essentially free ... maybe one
+        // day we care about resizing the table but at the cost of a lot more code
+        // complexity.
+        isize const threshold = static_cast<isize>(0.75f * this->numBuckets);
+        DQN_ALWAYS_ASSERTM(this->indexInIndexesOfUsedBuckets < threshold, "%zu >= %zu", this->indexInIndexesOfUsedBuckets, threshold);
     }
 
-    // TODO(doyle): A maybe case. We're using virtual memory, so you should
-    // just initialise a larger size. It's essentially free ... maybe one
-    // day we care about resizing the table but at the cost of a lot more code
-    // complexity.
-    isize const threshold = static_cast<isize>(0.75f * this->numBuckets);
-    DQN_ALWAYS_ASSERTM(this->indexInIndexesOfUsedBuckets < threshold, "%zu >= %zu", this->indexInIndexesOfUsedBuckets, threshold);
-
-    entry->key  = key;
-    entry->item = item;
-    return &entry->item;
-}
-
-DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::Get(Key const &key)
-{
-    Item *result = nullptr;
-    if (!buckets)
-    {
-        return result;
-    }
-
-    isize index    = Hash(this->numBuckets, key);
-    Bucket *bucket = this->buckets + index;
-
-    for (isize i = 0; i < bucket->entryIndex && !result; i++)
-    {
-        Entry *entry = bucket->entries + i;
-        result       = Equals(entry->key, key) ? &entry->item : nullptr;
-    }
-
+    Item *result = &entry->item;
     return result;
 }
 
 DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
 {
     if (!buckets)
-    {
         return;
-    }
 
     isize index    = Hash(this->numBuckets, key);
     Bucket *bucket = this->buckets + index;
@@ -2830,11 +2795,12 @@ struct DqnCatalog
     struct Entry
     {
         u64  timeLastModified;
-        T   *data;
+        T    data;
     };
 
-    DqnVHashTable<DqnSlice<const char>, T> assetTable;
-    void Update();
+    DqnVHashTable<DqnFixedString128, Entry> assetTable;
+    // void  Update();
+    T    *Get   (DqnFixedString128 file);
 };
 
 // XPlatform > #DqnFile API
