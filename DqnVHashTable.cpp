@@ -30,8 +30,7 @@ void DqnVHashTable_Test()
     }
 
     {
-        Block blocks[]                          = {{0}, {1}, {2}, {3}, {4}};
-
+        Block blocks[] = {{0}, {1}, {2}, {3}, {4}};
         DqnVHashTable<Height, Block> table = {};
         DQN_DEFER(table.Free());
 
@@ -44,10 +43,11 @@ void DqnVHashTable_Test()
         {
             bool blockSeen[DQN_ARRAY_COUNT(blocks)] = {};
             isize blocksSeen = 0;
-            for (Block const &block : table)
+            for (auto const &entry : table)
             {
-                DQN_ASSERT(blockSeen[block.x] == false);
-                blockSeen[block.x] = true;
+                Block const *block = &entry.item;
+                DQN_ASSERT(blockSeen[block->x] == false);
+                blockSeen[block->x] = true;
                 blocksSeen++;
             }
             DQN_ASSERT(blocksSeen == DQN_ARRAY_COUNT(blockSeen));
@@ -59,12 +59,12 @@ void DqnVHashTable_Test()
             isize blocksSeen = 0;
             for (auto it = table.begin(); it != table.end();)
             {
-                it = it + 1;
-                Block *block = it.GetCurrItem();
+                Block *block = &it.entry->item;
 
                 DQN_ASSERT(blockSeen[block->x] == false);
                 blockSeen[block->x] = true;
                 blocksSeen++;
+                it = it + 1;
             }
             DQN_ASSERT(blocksSeen == DQN_ARRAY_COUNT(blockSeen));
             Log(Status::Ok, "Auto iterator using operator+");
@@ -75,7 +75,7 @@ void DqnVHashTable_Test()
             isize blocksSeen = 0;
             for (auto it = table.begin(); it != table.end(); it++)
             {
-                Block *block = it.GetCurrItem();
+                Block *block = &it.entry->item;
 
                 DQN_ASSERT(blockSeen[block->x] == false);
                 blockSeen[block->x] = true;

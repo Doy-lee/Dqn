@@ -2632,8 +2632,8 @@ DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
 {
     struct Entry
     {
-        Key  key;
-        Item item;
+        union { Key  key;  Key  first; };
+        union { Item item; Item second; };
     };
 
     struct Bucket
@@ -2653,9 +2653,9 @@ DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
     void       LazyInit (isize size = DQN_MAX(DQN_MEGABYTE(1)/sizeof(Bucket), 1024) );
     void       Free     ()                                  { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * numBuckets); *this = {}; }
 
-    Entry     *GetEntry (Key const &key);                  // return: The (key, item) entry associated with the key, nullptr if key not in table yet.
-    void       Erase    (Key const &key);                  // Delete the element matching key, does nothing if key not found.
-    Item      *GetOrMake(Key const &key);                  // return: Item if found, otherwise make an entry (key, item) and return the ptr to the uninitialised item
+    void       Erase    (Key const &key);                           // Delete the element matching key, does nothing if key not found.
+    Entry     *GetEntry (Key const &key);                           // return: The (key, item) entry associated with the key, nullptr if key not in table yet.
+    Item      *GetOrMake(Key const &key, bool *existed = nullptr);  // return: Item if found, otherwise make an entry (key, item) and return the ptr to the uninitialised item
     Item      *Get      (Key const &key)                   { Entry *entry  = GetEntry(key); return (entry) ? &entry->item : nullptr; }
     Item      *Set      (Key const &key, Item const &item) { Item  *result = GetOrMake(key); *result = item; return result; }
 
@@ -2663,28 +2663,37 @@ DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
 
     struct Iterator
     {
-        DqnVHashTable *table;
-        isize          indexInIndexesOfUsedBuckets;
-        isize          indexInBucket;
-
-        Iterator(DqnVHashTable *table_, isize indexInIndexesOfUsedBuckets_ = 0, isize indexInBucket_ = 0) : table(table_), indexInIndexesOfUsedBuckets(indexInIndexesOfUsedBuckets_), indexInBucket(indexInBucket_) {}
+        Entry  *entry;
+        Iterator(DqnVHashTable *table_, isize indexInIndexesOfUsedBuckets_ = 0, isize indexInBucket_ = 0)
+        : table(table_), indexInIndexesOfUsedBuckets(indexInIndexesOfUsedBuckets_), indexInBucket(indexInBucket_), entry(nullptr)
+        {
+            if (indexInIndexesOfUsedBuckets != -1 && indexInBucket != -1)
+                entry = GetCurrEntry();
+        }
 
         Bucket *GetCurrBucket() const { return (table->buckets + table->indexesOfUsedBuckets[indexInIndexesOfUsedBuckets]); }
         Entry  *GetCurrEntry()  const { return GetCurrBucket()->entries + indexInBucket; }
         Item   *GetCurrItem ()  const { return &(GetCurrEntry()->item); }
 
-        bool      operator!=(Iterator const &other) const { return !Equals(GetCurrEntry()->key, other.GetCurrEntry()->key); }
-        Item     &operator* ()                      const { return *GetCurrItem(); }
-        Iterator &operator++()                            { if (++indexInBucket >= GetCurrBucket()->entryIndex) { indexInBucket = 0; indexInIndexesOfUsedBuckets++; }                return *this; }
-        Iterator &operator--()                            { if (--indexInBucket < 0) { indexInBucket = 0; indexInIndexesOfUsedBuckets = DQN_MAX(--indexInIndexesOfUsedBuckets, 0); } return *this; }
+        bool      operator!=(Iterator const &other) const { return (indexInIndexesOfUsedBuckets == other.indexInIndexesOfUsedBuckets && indexInBucket == other.indexInBucket); }
+        Entry    &operator* ()                      const { return *GetCurrEntry(); }
+        Iterator &operator++()                            { if (++indexInBucket >= GetCurrBucket()->entryIndex) { indexInBucket = 0; indexInIndexesOfUsedBuckets++; }                entry = GetCurrEntry(); return *this; }
+        Iterator &operator--()                            { if (--indexInBucket < 0) { indexInBucket = 0; indexInIndexesOfUsedBuckets = DQN_MAX(--indexInIndexesOfUsedBuckets, 0); } entry = GetCurrEntry(); return *this; }
         Iterator  operator++(int)                         { Iterator result = *this; ++(*this); return result; }
         Iterator  operator--(int)                         { Iterator result = *this; --(*this); return result; }
-        Iterator  operator+ (int offset)            const { Iterator result = *this; DQN_FOR_EACH(i, offset) { (offset > 0) ? ++result : --result; } return result; } // TODO(doyle): Improve
-        Iterator  operator- (int offset)            const { Iterator result = *this; DQN_FOR_EACH(i, offset) { (offset > 0) ? --result : ++result; } return result; } // TODO(doyle): Improve
+        Iterator  operator+ (int offset)            const { Iterator result = *this; DQN_FOR_EACH(i, DQN_ABS(offset)) { (offset > 0) ? ++result : --result; } return result; } // TODO(doyle): Improve
+        Iterator  operator- (int offset)            const { Iterator result = *this; DQN_FOR_EACH(i, DQN_ABS(offset)) { (offset > 0) ? --result : ++result; } return result; } // TODO(doyle): Improve
+
+    private:
+        DqnVHashTable *table;
+        isize          indexInIndexesOfUsedBuckets;
+        isize          indexInBucket;
     };
 
+    Iterator   Begin() { return begin(); }
+    Iterator   End()   { return end(); }
     Iterator   begin() { return Iterator(this); }
-    Iterator   end()   { isize lastBucketIndex = indexesOfUsedBuckets[indexInIndexesOfUsedBuckets - 1]; isize lastIndexInBucket = (buckets + lastBucketIndex)->entryIndex - 1; return Iterator(this, DQN_MAX(lastBucketIndex, 0), DQN_MAX(lastIndexInBucket, 0)); }
+    Iterator   end()   { return Iterator(this, -1, -1); }
 };
 
 DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::LazyInit(isize size)
@@ -2714,7 +2723,7 @@ DQN_VHASH_TABLE_DECL::GetEntry(Key const &key)
     return result;
 }
 
-DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::GetOrMake(Key const &key)
+DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::GetOrMake(Key const &key, bool *existed)
 {
     if (!this->buckets) LazyInit();
 
@@ -2727,6 +2736,9 @@ DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::GetOrMake(Key const &key)
         Entry *check = bucket->entries + i;
         entry        = Equals(check->key, key) ? check : nullptr;
     }
+
+    if (existed)
+        *existed = (entry != nullptr);
 
     if (!entry)
     {
@@ -2789,19 +2801,97 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
 
 // XPlatform > #DqnCatalog API
 // =================================================================================================
-template <typename T>
-struct DqnCatalog
+template <typename T> using DqnCatalogLoadProc = bool (*)(DqnFixedString128 const &file, T *data);
+#define DQN_CATALOG_LOAD_PROC(name, type) bool name(DqnFixedString128 const &file, type *data)
+
+#define DQN_CATALOG_TEMPLATE template <typename T, DqnCatalogLoadProc<T> LoadAsset>
+#define DQN_CATALOG_DECL DqnCatalog<T, LoadAsset>
+
+DQN_CATALOG_TEMPLATE struct DqnCatalog
 {
     struct Entry
     {
-        u64  timeLastModified;
         T    data;
+        u64  lastWriteTimeInS;
+        bool updated;
     };
 
     DqnVHashTable<DqnFixedString128, Entry> assetTable;
-    // void  Update();
-    T    *Get   (DqnFixedString128 file);
+
+    // Register the asset and load it if it hasn't yet.
+    Entry *GetEntry    (DqnFixedString128 const &file); // return: Entry, or nullptr if the asset could not be loaded
+    T     *Get         (DqnFixedString128 const &file)  { Entry *entry = GetEntry(file.str); return (entry) ? &entry->data : nullptr; }
+    T     *GetIfUpdated(DqnFixedString128 const &file); // return: Asset if an update has been detected and not consumed yet. Update is consumed after called.
+
+    // Call to iterate all loaded assets for updates.
+    void   PollAssets  ();
+    void   Free        () { assetTable.Free(); }
 };
+
+DQN_CATALOG_TEMPLATE typename DQN_CATALOG_DECL::Entry *
+DQN_CATALOG_DECL::GetEntry(DqnFixedString128 const &file)
+{
+    bool existed  = false;
+    Entry *result = this->assetTable.GetOrMake(file, &existed);
+
+    if (!existed)
+    {
+        T newData        = {};
+        DqnFileInfo info = {};
+        if (DqnFile_GetInfo(file.str, &info) && LoadAsset(file, &newData))
+        {
+            result->lastWriteTimeInS = info.lastWriteTimeInS;
+            result->data             = newData;
+            result->updated          = true;
+        }
+        else
+        {
+            result = nullptr;
+            DQN_LOGE("Catalog could not load file: %s\n", file.str);
+        }
+    }
+
+    return result;
+}
+
+DQN_CATALOG_TEMPLATE T *DQN_CATALOG_DECL::GetIfUpdated(DqnFixedString128 const &file)
+{
+    Entry *entry = this->GetEntry(file.str);
+    if (entry)
+    {
+        if (entry->updated) entry->updated = false;
+        else                entry          = nullptr;
+    }
+
+    return (entry) ? &entry->data : nullptr;
+}
+
+DQN_CATALOG_TEMPLATE void DQN_CATALOG_DECL::PollAssets()
+{
+    for (auto it = this->assetTable.Begin(); it != this->assetTable.End(); ++it)
+    {
+        DqnFixedString128 const *file = &it.entry->key;
+        Entry *entry                  = &it.entry->item;
+
+        DqnFileInfo info = {};
+        if (!DqnFile_GetInfo(file->str, &info))
+            continue;
+
+        if (entry->lastWriteTimeInS == info.lastWriteTimeInS)
+            continue;
+
+        T newData = {};
+        if (LoadAsset(*file, &newData))
+        {
+            entry->lastWriteTimeInS = info.lastWriteTimeInS;
+            entry->data             = newData;
+        }
+        else
+        {
+            DQN_LOGE("Catalog could not load file: %s\n", file->str);
+        }
+    }
+}
 
 // XPlatform > #DqnFile API
 // =================================================================================================
