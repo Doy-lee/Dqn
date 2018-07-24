@@ -31,7 +31,6 @@ void DqnVHashTable_Test()
 
     {
         Block blocks[]                          = {{0}, {1}, {2}, {3}, {4}};
-        bool blockSeen[DQN_ARRAY_COUNT(blocks)] = {};
 
         DqnVHashTable<Height, Block> table = {};
         DQN_DEFER(table.Free());
@@ -42,14 +41,48 @@ void DqnVHashTable_Test()
         table.Set(4, blocks[3]);
         table.Set(5, blocks[4]);
 
-        isize blocksSeen = 0;
-        for (Block const &block : table)
         {
-            DQN_ASSERT(blockSeen[block.x] == false);
-            blockSeen[block.x] = true;
-            blocksSeen++;
+            bool blockSeen[DQN_ARRAY_COUNT(blocks)] = {};
+            isize blocksSeen = 0;
+            for (Block const &block : table)
+            {
+                DQN_ASSERT(blockSeen[block.x] == false);
+                blockSeen[block.x] = true;
+                blocksSeen++;
+            }
+            DQN_ASSERT(blocksSeen == DQN_ARRAY_COUNT(blockSeen));
+            Log(Status::Ok, "Auto iterator using prefix operator++");
         }
 
-        DQN_ASSERT(blocksSeen == DQN_ARRAY_COUNT(blockSeen));
+        {
+            bool blockSeen[DQN_ARRAY_COUNT(blocks)] = {};
+            isize blocksSeen = 0;
+            for (auto it = table.begin(); it != table.end();)
+            {
+                it = it + 1;
+                Block *block = it.GetCurrItem();
+
+                DQN_ASSERT(blockSeen[block->x] == false);
+                blockSeen[block->x] = true;
+                blocksSeen++;
+            }
+            DQN_ASSERT(blocksSeen == DQN_ARRAY_COUNT(blockSeen));
+            Log(Status::Ok, "Auto iterator using operator+");
+        }
+
+        {
+            bool blockSeen[DQN_ARRAY_COUNT(blocks)] = {};
+            isize blocksSeen = 0;
+            for (auto it = table.begin(); it != table.end(); it++)
+            {
+                Block *block = it.GetCurrItem();
+
+                DQN_ASSERT(blockSeen[block->x] == false);
+                blockSeen[block->x] = true;
+                blocksSeen++;
+            }
+            DQN_ASSERT(blocksSeen == DQN_ARRAY_COUNT(blockSeen));
+            Log(Status::Ok, "Auto iterator using postfix operator++");
+        }
     }
 }

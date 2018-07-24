@@ -2709,11 +2709,16 @@ DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
 
         bool      operator!=(Iterator const &other) const { return !Equals(GetCurrEntry()->key, other.GetCurrEntry()->key); }
         Item     &operator* ()                      const { return *GetCurrItem(); }
-        Iterator  operator++()                            { if (++indexInBucket >= GetCurrBucket()->entryIndex) { indexInBucket = 0; indexInIndexesOfUsedBuckets++; } return *this; }
+        Iterator &operator++()                            { if (++indexInBucket >= GetCurrBucket()->entryIndex) { indexInBucket = 0; indexInIndexesOfUsedBuckets++; }                return *this; }
+        Iterator &operator--()                            { if (--indexInBucket < 0) { indexInBucket = 0; indexInIndexesOfUsedBuckets = DQN_MAX(--indexInIndexesOfUsedBuckets, 0); } return *this; }
+        Iterator  operator++(int)                         { Iterator result = *this; ++(*this); return result; }
+        Iterator  operator--(int)                         { Iterator result = *this; --(*this); return result; }
+        Iterator  operator+ (int offset)            const { Iterator result = *this; DQN_FOR_EACH(i, offset) { (offset > 0) ? ++result : --result; } return result; } // TODO(doyle): Improve
+        Iterator  operator- (int offset)            const { Iterator result = *this; DQN_FOR_EACH(i, offset) { (offset > 0) ? --result : ++result; } return result; } // TODO(doyle): Improve
     };
 
     Iterator begin() { return Iterator(this); }
-    Iterator end()   { isize lastBucketIndex = indexesOfUsedBuckets[indexInIndexesOfUsedBuckets - 1]; isize lastIndexInBucket = DQN_MAX((buckets + lastBucketIndex)->entryIndex - 1, 0); return Iterator(this, DQN_MAX(lastBucketIndex, 0), DQN_MAX(lastIndexInBucket, 0)); }
+    Iterator end()   { isize lastBucketIndex = indexesOfUsedBuckets[indexInIndexesOfUsedBuckets - 1]; isize lastIndexInBucket = (buckets + lastBucketIndex)->entryIndex - 1; return Iterator(this, DQN_MAX(lastBucketIndex, 0), DQN_MAX(lastIndexInBucket, 0)); }
 };
 
 DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::LazyInit(isize size)
