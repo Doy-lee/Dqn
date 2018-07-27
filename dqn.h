@@ -164,6 +164,8 @@ using f32 = float;
 #define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE2(prefix, __COUNTER__)
 #define DQN_FOR_EACH(i, lim) for (isize (i) = 0; (i) < (isize)(lim); ++(i))
 
+#define DQN_SIZEOF(decl) (isize)sizeof(decl)
+
 template <typename Proc>
 struct DqnDefer__
 {
@@ -729,7 +731,7 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 
 // Always assert are enabled in release mode.
 #define DQN_ALWAYS_ASSERT(expr) DQN_ASSERTM(expr, "");
-#define DQN_ALWAYS_ASSERTM(expr, msg, ...) DQN_ASSERTM(expr, msg, __VA_ARGS__)
+#define DQN_ALWAYS_ASSERTM(expr, msg, ...) DQN_ASSERTM(expr, msg, ## __VA_ARGS__)
 
 #define DQN_ASSERT(expr) DQN_ASSERTM(expr, "");
 #define DQN_ASSERTM(expr, msg, ...)                                                                \
@@ -904,12 +906,6 @@ DQN_QUICK_SORT_LESS_THAN_PROC(DqnQuickSort_DefaultLessThan)
 {
     (void)userContext;
     bool result = a < b;
-    return result;
-}
-
-DQN_QUICK_SORT_LESS_THAN_PROC(DqnQuickSort_StringLessThan)
-{
-    bool result =  DqnString::Cmp(a, b);
     return result;
 }
 
@@ -2551,8 +2547,8 @@ struct DqnVArray
 
     void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::No)  { if (data) { count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); } }
     void  Free       ()                                           { if (data) { DqnOS_VFree(data, sizeof(T) * max); } *this = {}; }
-    T    *Front      ()                                           { return (count > 0) (data + 0)           : nullptr; }
-    T    *Back       ()                                           { return (count > 0) (data + (count - 1)) : nullptr; }
+    T    *Front      ()                                           { return (count > 0) ? (data + 0)           : nullptr; }
+    T    *Back       ()                                           { return (count > 0) ? (data + (count - 1)) : nullptr; }
     T    *Make       (isize num = 1)                              { LazyInit(1024); count += num; DQN_ASSERT(count <= max); return &data[count - num]; }
     T    *Push       (T const &v)                                 { return Insert(count, &v, 1); }
     T    *Push       (T const *v, isize numItems = 1)             { return Insert(count,  v, numItems); }
@@ -2623,12 +2619,16 @@ DQN_VHASH_TABLE_EQUALS_PROC(DqnVHashTableDefaultEquals)
 #define DQN_VHASH_TABLE_TEMPLATE                                                                   \
     template <typename Key,                                                                        \
               typename Item,                                                                       \
-              DqnVHashTableHashingProc<Key> Hash  = DqnVHashTableDefaultHash<Key>,                 \
-              DqnVHashTableEqualsProc<Key> Equals = DqnVHashTableDefaultEquals<Key>>
+              DqnVHashTableHashingProc<Key> Hash,                                                  \
+              DqnVHashTableEqualsProc<Key> Equals>
 
 #define DQN_VHASH_TABLE_DECL DqnVHashTable<Key, Item, Hash, Equals>
 
-DQN_VHASH_TABLE_TEMPLATE struct DqnVHashTable
+template <typename Key,
+          typename Item,
+          DqnVHashTableHashingProc<Key> Hash  = DqnVHashTableDefaultHash<Key>,
+          DqnVHashTableEqualsProc<Key> Equals = DqnVHashTableDefaultEquals<Key>>
+struct DqnVHashTable
 {
     struct Entry
     {
@@ -2799,6 +2799,100 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
     }
 }
 
+// XPlatform > #DqnFile API
+// =================================================================================================
+struct DqnFile
+{
+    enum Permission
+    {
+        FileRead  = (1 << 0),
+        FileWrite = (1 << 1),
+        Execute   = (1 << 2),
+        All       = (1 << 3)
+    };
+
+    enum struct Action
+    {
+        OpenOnly,         // Only open file if it exists. Fails and returns false if file did not exist or could not open.
+        CreateIfNotExist, // Try and create file. Return true if it was able to create. If it already exists, this fails.
+        ClearIfExist,     // Clear the file contents to zero if it exists. Fails and returns false if file does not exist.
+        ForceCreate,      // Always create, even if it exists
+    };
+
+    u32    flags;
+    void  *handle;
+    usize  size;
+
+    // API
+    // ==============================================================================================
+    // NOTE: W(ide) versions of functions only work on Win32, since Unix is already UTF-8 compatible.
+
+    // Open a handle for file read and writing. Deleting files does not need a handle. Handles should be
+    // closed before deleting files otherwise the OS may not be able to delete the file.
+    // return: FALSE if invalid args or failed to get handle (i.e. insufficient permissions)
+    bool   Open(char    const *path, u32 const flags_, Action const action);
+    bool   Open(wchar_t const *path, u32 const flags_, Action const action);
+
+    // fileOffset: The byte offset to starting writing from.
+    // return:     The number of bytes written. 0 if invalid args or it failed to write.
+    usize  Write(u8 const *buf, usize const numBytesToWrite, usize const fileOffset);
+
+    // IMPORTANT: You may want to allocate size+1 for null-terminating the file contents when reading into a buffer.
+    // return: The number of bytes read. 0 if invalid args or it failed to read.
+    usize  Read (u8 *buf, usize const numBytesToRead);
+
+    // File close invalidates the handle after it is called.
+    void   Close();
+};
+
+struct DqnFileInfo
+{
+    usize size;
+    u64   createTimeInS;
+    u64   lastWriteTimeInS;
+    u64   lastAccessTimeInS;
+};
+
+// Read entire file into the given buffer. To determine required bufSize size, use GetFileSize.
+// NOTE: You want size + 1 and add the null-terminator yourself if you want a null terminated buffer.
+// bytesRead: Pass in to get how many bytes of the buf was used. Basically the return value of Read
+// return:    False if insufficient bufSize OR file access failure OR nullptr arguments.
+DQN_FILE_SCOPE bool   DqnFile_ReadAll(char    const *path, u8 *buf, usize const bufSize, usize *bytesRead);
+DQN_FILE_SCOPE bool   DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize const bufSize, usize *bytesRead);
+
+// Buffer is null-terminated and should be freed when done with.
+// return: False if file access failure OR nullptr arguments.
+DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+
+// return: False if file access failure
+DQN_FILE_SCOPE bool   DqnFile_Size(char    const *path, usize *size);
+DQN_FILE_SCOPE bool   DqnFile_Size(wchar_t const *path, usize *size);
+
+// info:   Pass in to fill with file attributes.
+// return: False if file access failure
+DQN_FILE_SCOPE bool   DqnFile_GetInfo(char    const *path, DqnFileInfo *info);
+DQN_FILE_SCOPE bool   DqnFile_GetInfo(wchar_t const *path, DqnFileInfo *info);
+
+// NOTE: You can't delete a file unless the handle has been closed to it on Win32.
+// return: False if file access failure
+DQN_FILE_SCOPE bool   DqnFile_Delete (char    const *path);
+DQN_FILE_SCOPE bool   DqnFile_Delete (wchar_t const *path);
+DQN_FILE_SCOPE bool   DqnFile_Copy   (char    const *src, char    const *dest);
+DQN_FILE_SCOPE bool   DqnFile_Copy   (wchar_t const *src, wchar_t const *dest);
+
+// NOTE: Win32: Current directory is "*", Unix: "."
+// numFiles: Pass in a ref to a i32. The function fills it out with the number of entries.
+// return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
+//           allocated with malloc and must be freed using free() or the helper function ListDirFree()
+DQN_FILE_SCOPE char **DqnFile_ListDir       (char const *dir, i32 *numFiles, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+DQN_FILE_SCOPE void   DqnFile_ListDirFree   (char **fileList, i32 numFiles,  DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+
+struct DqnSmartFile : public DqnFile
+{
+    ~DqnSmartFile() { this->Close(); }
+};
+
 // XPlatform > #DqnCatalog API
 // =================================================================================================
 template <typename T> using DqnCatalogLoadProc = bool (*)(DqnFixedString128 const &file, T *data);
@@ -2893,99 +2987,6 @@ DQN_CATALOG_TEMPLATE void DQN_CATALOG_DECL::PollAssets()
     }
 }
 
-// XPlatform > #DqnFile API
-// =================================================================================================
-struct DqnFile
-{
-    enum Permission
-    {
-        FileRead  = (1 << 0),
-        FileWrite = (1 << 1),
-        Execute   = (1 << 2),
-        All       = (1 << 3)
-    };
-
-    enum struct Action
-    {
-        OpenOnly,         // Only open file if it exists. Fails and returns false if file did not exist or could not open.
-        CreateIfNotExist, // Try and create file. Return true if it was able to create. If it already exists, this fails.
-        ClearIfExist,     // Clear the file contents to zero if it exists. Fails and returns false if file does not exist.
-        ForceCreate,      // Always create, even if it exists
-    };
-
-    u32    flags;
-    void  *handle;
-    usize  size;
-
-    // API
-    // ==============================================================================================
-    // NOTE: W(ide) versions of functions only work on Win32, since Unix is already UTF-8 compatible.
-
-    // Open a handle for file read and writing. Deleting files does not need a handle. Handles should be
-    // closed before deleting files otherwise the OS may not be able to delete the file.
-    // return: FALSE if invalid args or failed to get handle (i.e. insufficient permissions)
-    bool   Open(char    const *path, u32 const flags_, Action const action);
-    bool   Open(wchar_t const *path, u32 const flags_, Action const action);
-
-    // fileOffset: The byte offset to starting writing from.
-    // return:     The number of bytes written. 0 if invalid args or it failed to write.
-    usize  Write(u8 const *buf, usize const numBytesToWrite, usize const fileOffset);
-
-    // IMPORTANT: You may want to allocate size+1 for null-terminating the file contents when reading into a buffer.
-    // return: The number of bytes read. 0 if invalid args or it failed to read.
-    usize  Read (u8 *buf, usize const numBytesToRead);
-
-    // File close invalidates the handle after it is called.
-    void   Close();
-};
-
-struct DqnFileInfo
-{
-    usize size;
-    u64   createTimeInS;
-    u64   lastWriteTimeInS;
-    u64   lastAccessTimeInS;
-};
-
-// Read entire file into the given buffer. To determine required bufSize size, use GetFileSize.
-// NOTE: You want size + 1 and add the null-terminator yourself if you want a null terminated buffer.
-// bytesRead: Pass in to get how many bytes of the buf was used. Basically the return value of Read
-// return:    False if insufficient bufSize OR file access failure OR nullptr arguments.
-DQN_FILE_SCOPE bool   DqnFile_ReadAll(char    const *path, u8 *buf, usize const bufSize, usize *bytesRead);
-DQN_FILE_SCOPE bool   DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize const bufSize, usize *bytesRead);
-
-// Buffer is null-terminated and should be freed when done with.
-// return: False if file access failure OR nullptr arguments.
-DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
-DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
-
-// return: False if file access failure
-DQN_FILE_SCOPE bool   DqnFile_Size(char    const *path, usize *size);
-DQN_FILE_SCOPE bool   DqnFile_Size(wchar_t const *path, usize *size);
-
-// info:   Pass in to fill with file attributes.
-// return: False if file access failure
-DQN_FILE_SCOPE bool   DqnFile_GetInfo(char    const *path, DqnFileInfo *info);
-DQN_FILE_SCOPE bool   DqnFile_GetInfo(wchar_t const *path, DqnFileInfo *info);
-
-// NOTE: You can't delete a file unless the handle has been closed to it on Win32.
-// return: False if file access failure
-DQN_FILE_SCOPE bool   DqnFile_Delete (char    const *path);
-DQN_FILE_SCOPE bool   DqnFile_Delete (wchar_t const *path);
-DQN_FILE_SCOPE bool   DqnFile_Copy   (char    const *src, char    const *dest);
-DQN_FILE_SCOPE bool   DqnFile_Copy   (wchar_t const *src, wchar_t const *dest);
-
-// NOTE: Win32: Current directory is "*", Unix: "."
-// numFiles: Pass in a ref to a i32. The function fills it out with the number of entries.
-// return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
-//           allocated with malloc and must be freed using free() or the helper function ListDirFree()
-DQN_FILE_SCOPE char **DqnFile_ListDir       (char const *dir, i32 *numFiles, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
-DQN_FILE_SCOPE void   DqnFile_ListDirFree   (char **fileList, i32 numFiles,  DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
-
-struct DqnSmartFile : public DqnFile
-{
-    ~DqnSmartFile() { this->Close(); }
-};
 
 // XPlatform > #DqnTimer API
 // =================================================================================================
@@ -3748,7 +3749,7 @@ DqnMemStack__AllocateBlock(isize size, Dqn::ZeroClear clear, DqnMemAPI *api)
 DqnMemStack::DqnMemStack(void *mem, isize size, Dqn::ZeroClear clear, u32 flags_)
 {
     DQN_ALWAYS_ASSERTM(mem, "Supplied fixed memory buffer is nullptr, initialise with fixed memory failed");
-    DQN_ALWAYS_ASSERTM(size > sizeof(DqnMemStack::Block), "(%zu < %zu) Buffer too small for block metadata", size, sizeof(DqnMemStack::Block));
+    DQN_ALWAYS_ASSERTM(size > DQN_SIZEOF(DqnMemStack::Block), "(%zu < %zu) Buffer too small for block metadata", size, DQN_SIZEOF(DqnMemStack::Block));
     *this = {};
 
     if (clear == Dqn::ZeroClear::Yes)
@@ -8606,7 +8607,9 @@ FILE_SCOPE bool DqnFile__UnixGetFileSize(char const *path, usize *size)
     {
         DQN_DEFER(fclose(file));
         while (fgetc(file) != EOF)
-            *size++;
+        {
+            (*size)++;
+        }
     }
 
     return true;
@@ -9163,8 +9166,8 @@ bool DqnLock::Init()
 #else
     // NOTE: Static initialise, pre-empt a lock so that it gets initialised as per documentation
     this->unixHandle = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
-    DqnLock_Acquire(lock);
-    DqnLock_Release(lock);
+    this->Acquire();
+    this->Release();
     return true;
 #endif
 
@@ -9462,7 +9465,7 @@ DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
     // TODO(doyle): Not exactly standard
 
     usize fileSize = 0;
-    if (u8 *readBuffer = DqnFile::ReadEntireFile("/proc/cpuinfo", &fileSize))
+    if (u8 *readBuffer = DqnFile_ReadAll("/proc/cpuinfo", &fileSize))
     {
         char const *srcPtr = reinterpret_cast<char *>(readBuffer);
         usize srcLen       = fileSize;
