@@ -2600,21 +2600,37 @@ template <typename T> void DqnVArray<T>::EraseStable(isize index)
 template <typename Key> using DqnVHashTableHashingProc = isize(*)(isize count, Key const &data);
 template <typename Key> using DqnVHashTableEqualsProc  = bool (*)(Key const &a, Key const &b);
 
-#define DQN_VHASH_TABLE_HASHING_PROC(name) template <typename Key> inline isize name(isize count, Key const &key)
-DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash)
-{
-    const u64 SEED = 0x9747B28CAB3F8A7B;
-    u64 index64    = DqnHash_Murmur64Seed(&key, sizeof(key), SEED);
-    isize result   = index64 % count;
-    return result;
-}
+const u64 DQN_VHASH_TABLE_DEFAULT_SEED = 0x9747B28CAB3F8A7B;
+#define DQN_VHASH_TABLE_HASHING_PROC(name, Type) inline isize name(isize count, Type const &key)
+#define DQN_VHASH_TABLE_EQUALS_PROC(name, Type) inline bool name(Type const &a, Type const &b)
 
-#define DQN_VHASH_TABLE_EQUALS_PROC(name) template <typename Key> inline bool name(Key const &a, Key const &b)
-DQN_VHASH_TABLE_EQUALS_PROC(DqnVHashTableDefaultEquals)
-{
-    bool result = (DqnMem_Cmp(&a, &b, sizeof(a)) == 0);
-    return result;
-}
+template <typename T> DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash, T)   { return DqnHash_Murmur64Seed(&key, sizeof(key), DQN_VHASH_TABLE_DEFAULT_SEED) % count; }
+template <typename T> DQN_VHASH_TABLE_EQUALS_PROC (DqnVHashTableDefaultEquals, T) { return (DqnMem_Cmp(&a, &b, sizeof(a)) == 0); }
+
+// TODO(doyle): Fix this so we don't have to manually declare the fixed string sizes for hashing and equals
+#define DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(StringCapacity)                                 \
+    template <>                                                                                    \
+    DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash<DqnFixedString<StringCapacity>>,         \
+                                 DqnFixedString<StringCapacity>)                                   \
+    {                                                                                              \
+        return DqnHash_Murmur64Seed(key.str, key.len, DQN_VHASH_TABLE_DEFAULT_SEED) % count;       \
+    }                                                                                              \
+    template <>                                                                                    \
+    DQN_VHASH_TABLE_EQUALS_PROC(DqnVHashTableDefaultEquals<DqnFixedString<StringCapacity>>,        \
+                                DqnFixedString<StringCapacity>)                                    \
+    {                                                                                              \
+        return (a.len == b.len) && (DqnStr_Cmp(a.str, b.str, a.len, Dqn::IgnoreCase::No) == 0);    \
+    }
+
+DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(1024)
+DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(512)
+DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(256)
+DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(128)
+DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(64)
+DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(32)
+DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(16)
+DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(8)
+
 
 #define DQN_VHASH_TABLE_TEMPLATE                                                                   \
     template <typename Key,                                                                        \
@@ -2934,11 +2950,39 @@ struct DqnSmartFile : public DqnFile
 
 // XPlatform > #DqnCatalog API
 // =================================================================================================
-template <typename T> using DqnCatalogLoadProc = bool (*)(DqnFixedString128 const &file, T *data);
-#define DQN_CATALOG_LOAD_PROC(name, type) bool name(DqnFixedString128 const &file, type *data)
+using DqnCatalogPath = DqnFixedString1024;
+template <typename T> using DqnCatalogLoadProc = bool (*)(DqnCatalogPath const &file, T *data);
+#define DQN_CATALOG_LOAD_PROC(name, type) bool name(DqnCatalogPath const &file, type *data)
 
 #define DQN_CATALOG_TEMPLATE template <typename T, DqnCatalogLoadProc<T> LoadAsset>
 #define DQN_CATALOG_DECL DqnCatalog<T, LoadAsset>
+
+#if 0
+struct RawBuf { char *buffer; int len; };
+DQN_CATALOG_LOAD_PROC(CatalogRawLoad, RawBuf)
+{
+    size_t bufSize;
+    uint8_t *buf = DqnFile_ReadAll(file.str, &bufSize);
+    if (!buf) return false;
+    data->buffer = reinterpret_cast<char *>(buf);
+    data->len    = static_cast<int>(bufSize);
+    return true;
+}
+
+int main(int, char)
+{
+    DqnCatalog<RawBuf, CatalogRawLoad> catalog = {};
+    RawBuf *file = catalog.GetIfUpdated("path/to/file/");
+    if (file) { (void)file; // do work on file }
+    else      { // file not updated since last query }
+
+    while (true) // Or event loop, poll the assets in the catalog
+    {
+        catalog.PollAssets();
+    }
+    catalog.Free();
+}
+#endif
 
 DQN_CATALOG_TEMPLATE struct DqnCatalog
 {
@@ -2949,81 +2993,79 @@ DQN_CATALOG_TEMPLATE struct DqnCatalog
         bool updated;
     };
 
-    DqnVHashTable<DqnFixedString128, Entry> assetTable;
+    DqnVHashTable<DqnCatalogPath, Entry> assetTable;
 
-    // Register the asset and load it if it hasn't yet.
-    Entry *GetEntry    (DqnFixedString128 const &file); // return: Entry, or nullptr if the asset could not be loaded
-    T     *Get         (DqnFixedString128 const &file)  { Entry *entry = GetEntry(file.str); return (entry) ? &entry->data : nullptr; }
-    T     *GetIfUpdated(DqnFixedString128 const &file); // return: Asset if an update has been detected and not consumed yet. Update is consumed after called.
+    // Adds the file to the catalog if it has not been added yet.
+    // return: Asset if an update has been detected and not consumed yet otherwise nullptr. Update is consumed after called.
+    T     *GetIfUpdated(DqnCatalogPath const &file);
+    Entry *GetEntry    (DqnCatalogPath const &file) { Entry *entry = assetTable.Get(file); return entry; }
+    T     *Get         (DqnCatalogPath const &file) { Entry *entry = assetTable.Get(file); return (entry) ? &entry->data : nullptr; }
+    void   Erase       (DqnCatalogPath const &file) { assetTable.Erase(file); };
 
-    // Call to iterate all loaded assets for updates.
-    void   PollAssets  ();
+    // return: Iterate all loaded assets for updates, true if atleast 1 asset was updated.
+    bool   PollAssets  ();
     void   Free        () { assetTable.Free(); }
+
+    // NOTE: Unlikely you will need to use. Prefer GetIfUpdated.
+    // Manually invoke an update on the entry by querying its last write time on disk and updating accordingly.
+    bool QueryAndUpdateAsset(DqnCatalogPath const &file, Entry *entry);
 };
 
-DQN_CATALOG_TEMPLATE typename DQN_CATALOG_DECL::Entry *
-DQN_CATALOG_DECL::GetEntry(DqnFixedString128 const &file)
+DQN_CATALOG_TEMPLATE bool DQN_CATALOG_DECL::QueryAndUpdateAsset(DqnCatalogPath const &file, Entry *entry)
 {
-    bool existed  = false;
-    Entry *result = this->assetTable.GetOrMake(file, &existed);
-
-    if (!existed)
+    DqnFileInfo info = {};
+    if (!DqnFile_GetInfo(file.str, &info))
     {
-        T newData        = {};
-        DqnFileInfo info = {};
-        if (DqnFile_GetInfo(file.str, &info) && LoadAsset(file, &newData))
-        {
-            result->lastWriteTimeInS = info.lastWriteTimeInS;
-            result->data             = newData;
-            result->updated          = true;
-        }
-        else
-        {
-            result = nullptr;
-            DQN_LOGE("Catalog could not load file: %s\n", file.str);
-        }
+        DQN_LOGE("Catalog could not get file info for: %s\n", file.str);
+        return false;
     }
 
-    return result;
+    if (entry->lastWriteTimeInS == info.lastWriteTimeInS)
+        return true;
+
+    T newData = {};
+    if (LoadAsset(file, &newData))
+    {
+        entry->lastWriteTimeInS = info.lastWriteTimeInS;
+        entry->data             = newData;
+        entry->updated          = true;
+    }
+    else
+    {
+        DQN_LOGE("Catalog could not load file: %s\n", file.str);
+        return false;
+    }
+
+    return true;
 }
 
-DQN_CATALOG_TEMPLATE T *DQN_CATALOG_DECL::GetIfUpdated(DqnFixedString128 const &file)
+DQN_CATALOG_TEMPLATE T *DQN_CATALOG_DECL::GetIfUpdated(DqnCatalogPath const &file)
 {
-    Entry *entry = this->GetEntry(file.str);
-    if (entry)
+    Entry *entry = this->assetTable.GetOrMake(file);
+    if (QueryAndUpdateAsset(file, entry))
     {
         if (entry->updated) entry->updated = false;
         else                entry          = nullptr;
     }
+    else
+    {
+        entry = nullptr;
+    }
 
-    return (entry) ? &entry->data : nullptr;
+    return &entry->data;
 }
 
-DQN_CATALOG_TEMPLATE void DQN_CATALOG_DECL::PollAssets()
+DQN_CATALOG_TEMPLATE bool DQN_CATALOG_DECL::PollAssets()
 {
+    bool result = false;
     for (auto it = this->assetTable.Begin(); it != this->assetTable.End(); ++it)
     {
-        DqnFixedString128 const *file = &it.entry->key;
-        Entry *entry                  = &it.entry->item;
-
-        DqnFileInfo info = {};
-        if (!DqnFile_GetInfo(file->str, &info))
-            continue;
-
-        if (entry->lastWriteTimeInS == info.lastWriteTimeInS)
-            continue;
-
-        T newData = {};
-        if (LoadAsset(*file, &newData))
-        {
-            entry->lastWriteTimeInS = info.lastWriteTimeInS;
-            entry->data             = newData;
-        }
-        else
-        {
-            DQN_LOGE("Catalog could not load file: %s\n", file->str);
-        }
+        DqnCatalogPath const *file = &it.entry->key;
+        Entry *entry               = &it.entry->item;
+        result |= QueryAndUpdateAsset(*file, entry);
     }
+
+    return result;
 }
 
 

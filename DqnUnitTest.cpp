@@ -1844,6 +1844,15 @@ void DqnFile_Test()
 
 }
 
+void PlatformSleep(int milliseconds)
+{
+#if defined(DQN__IS_UNIX)
+    usleep(milliseconds * 1000);
+#else
+    Sleep(milliseconds);
+#endif
+}
+
 void DqnTimer_Test()
 {
     LOG_HEADER();
@@ -1851,18 +1860,13 @@ void DqnTimer_Test()
     if (1)
     {
 
+        int sleepTimeInMs = 250;
         f64 startInMs = DqnTimer_NowInMs();
-#if defined(DQN__IS_UNIX)
-        u32 sleepTimeInMs = 1;
-        sleep(sleepTimeInMs);
-        Log("start: %f, end: %f", startInMs, endInMs);
-
-#else
-        u32 sleepTimeInMs = 1000;
-        Sleep(sleepTimeInMs);
-#endif
+        PlatformSleep(sleepTimeInMs);
         f64 endInMs = DqnTimer_NowInMs();
+
         DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
+        Log("start: %f, end: %f", startInMs, endInMs);
 
         Log(Status::Ok, "Timer advanced in time over 1 second");
         globalIndent++;
@@ -2342,44 +2346,52 @@ void DqnCatalog_Test()
 {
     LOG_HEADER();
 
-    DqnCatalog<RawBuf, CatalogRawLoad> textCatalog = {};
-    textCatalog.PollAssets();
+    DqnCatalog<RawBuf, CatalogRawLoad> catalog = {};
+    catalog.PollAssets();
 
-    char const bufA[] = "aaaa";
-    char const bufX[] = "xxxx";
+    DqnCatalogPath path = "DqnCatalog_TrackFile";
+    DqnFile_Delete(path.str);
 
-    DqnFixedString128 testFile = "DqnCatalog_TrackFile";
-
-    DqnFile file = {};
-
-    // Write file A and check we are able to open it up in the catalog
+    // Initially write the file and check the catalog is able to open it up
     {
-        DQN_ASSERTM(
-            file.Open(testFile.str, DqnFile::Flag::FileReadWrite, DqnFile::Action::ForceCreate),
-            "Could not create testing file for DqnCatalog");
-        file.Write(reinterpret_cast<u8 const *>(bufA), DQN_CHAR_COUNT(bufA), 0);
-        file.Close();
-
-        RawBuf *buf = textCatalog.GetIfUpdated(testFile);
-        DQN_ASSERT(DqnMem_Cmp(buf->buffer, bufA, DQN_CHAR_COUNT(bufA)) == 0);
+        char const writeBuf[] = "aaaa";
+        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(writeBuf), DQN_CHAR_COUNT(writeBuf));
+        RawBuf *buf = catalog.GetIfUpdated(path);
+        DQN_ASSERT(DqnMem_Cmp(buf->buffer, writeBuf, DQN_CHAR_COUNT(writeBuf)) == 0);
         Log(Status::Ok, "Catalog finds and loads on demand new file");
     }
 
-    // Write file B check that it has been updated
+    // Update the file and check that the GetIfUpdated returns a non-nullptr (because the entry is updated)
     {
-        file = {};
-        DQN_ASSERTM(
-            file.Open(testFile.str, DqnFile::Flag::FileReadWrite, DqnFile::Action::ForceCreate),
-            "Could not create testing file for DqnCatalog");
-        file.Write(reinterpret_cast<u8 const *>(bufX), DQN_CHAR_COUNT(bufX), 0);
-        file.Close();
-
-        RawBuf *buf = textCatalog.GetIfUpdated(testFile);
-        DQN_ASSERT(DqnMem_Cmp(buf->buffer, bufX, DQN_CHAR_COUNT(bufX)) == 0);
+        PlatformSleep(1000);
+        char const writeBuf[] = "xxxx";
+        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(writeBuf), DQN_CHAR_COUNT(writeBuf));
+        RawBuf *buf = catalog.GetIfUpdated(path);
+        DQN_ASSERT(DqnMem_Cmp(buf->buffer, writeBuf, DQN_CHAR_COUNT(writeBuf)) == 0);
         Log(Status::Ok, "Catalog finds updated file after subsequent write");
     }
 
-    DqnFile_Delete(testFile.str);
+    // Update the file and get the catalog to poll the entries and check it has been updated
+    {
+        PlatformSleep(1000);
+        char const writeBuf[] = "abcd";
+        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(writeBuf), DQN_CHAR_COUNT(writeBuf));
+        catalog.PollAssets();
+
+        RawBuf *buf = catalog.GetIfUpdated(path);
+        DQN_ASSERT(DqnMem_Cmp(buf->buffer, writeBuf, DQN_CHAR_COUNT(writeBuf)) == 0);
+        Log(Status::Ok, "Catalog finds updated file using the poll asset interface");
+    }
+
+    // Update the file and get the catalog to poll the entries and check it has been updated
+    {
+        catalog.Erase(path.str);
+        RawBuf *buf = catalog.Get(path);
+        DQN_ASSERT(buf == nullptr);
+        Log(Status::Ok, "Catalog erase removes file from catalog");
+    }
+
+    DqnFile_Delete(path.str);
 }
 
 int main(void)
