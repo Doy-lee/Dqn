@@ -1697,9 +1697,8 @@ void DqnFile_Test()
             }
 
             DqnFile file = {};
-            DQN_ASSERT(file.Open(".clang-format",
-                                    (DqnFile::Permission::FileWrite | DqnFile::Permission::FileRead),
-                                    DqnFile::Action::OpenOnly));
+            DQN_ASSERT(file.Open(
+                ".clang-format", DqnFile::Flag::FileReadWrite, DqnFile::Action::OpenOnly));
 
             DQN_ASSERTM(file.size == expectedSize,
                            "DqnFileOpen() failed: file.size: %d, expected:%d\n", file.size,
@@ -1715,9 +1714,8 @@ void DqnFile_Test()
             if (1)
             {
                 DqnSmartFile raiiFile = {};
-                if (raiiFile.Open(FILE_TO_OPEN,
-                                  DqnFile::Permission::FileWrite | DqnFile::Permission::FileRead,
-                                  DqnFile::Action::OpenOnly))
+                if (raiiFile.Open(
+                        FILE_TO_OPEN, DqnFile::Flag::FileReadWrite, DqnFile::Action::OpenOnly))
                 {
                     i32 breakHereToTestRaii = 0;
                     (void)breakHereToTestRaii;
@@ -1731,9 +1729,8 @@ void DqnFile_Test()
         if (1)
         {
             DqnFile file = {};
-            DQN_ASSERT(!file.Open("asdljasdnel;kajdf", (DqnFile::Permission::FileWrite |
-                                                        DqnFile::Permission::FileRead),
-                                  DqnFile::Action::OpenOnly));
+            DQN_ASSERT(!file.Open(
+                "asdljasdnel;kajdf", DqnFile::Flag::FileReadWrite, DqnFile::Action::OpenOnly));
             DQN_ASSERT(file.size == 0);
             DQN_ASSERT(file.flags == 0);
             DQN_ASSERT(!file.handle);
@@ -1751,8 +1748,8 @@ void DqnFile_Test()
         // Write data out to some files
         for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
         {
-            u32 permissions = DqnFile::Permission::FileRead | DqnFile::Permission::FileWrite;
-            DqnFile *file = files + i;
+            u32 permissions = DqnFile::Flag::FileReadWrite;
+            DqnFile *file   = files + i;
             if (!file->Open(fileNames[i], permissions, DqnFile::Action::ClearIfExist))
             {
                 bool result =
@@ -1773,7 +1770,7 @@ void DqnFile_Test()
         {
             // Manual read the file contents
             {
-                u32 permissions = DqnFile::Permission::FileRead;
+                u32 permissions = DqnFile::Flag::FileRead;
                 DqnFile *file = files + i;
                 bool result = file->Open(fileNames[i], permissions, DqnFile::Action::OpenOnly);
                 DQN_ASSERT(result);
@@ -1816,7 +1813,7 @@ void DqnFile_Test()
         for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
         {
             DqnFile dummy   = {};
-            u32 permissions = DqnFile::Permission::FileRead;
+            u32 permissions = DqnFile::Flag::FileRead;
             bool fileExists = dummy.Open(fileNames[i], permissions, DqnFile::Action::OpenOnly);
             DQN_ASSERT(!fileExists);
         }
@@ -2357,10 +2354,9 @@ void DqnCatalog_Test()
 
     // Write file A and check we are able to open it up in the catalog
     {
-        DQN_ASSERTM(file.Open(testFile.str,
-                              DqnFile::Permission::FileRead | DqnFile::Permission::FileWrite,
-                              DqnFile::Action::ForceCreate),
-                    "Could not create testing file for DqnCatalog");
+        DQN_ASSERTM(
+            file.Open(testFile.str, DqnFile::Flag::FileReadWrite, DqnFile::Action::ForceCreate),
+            "Could not create testing file for DqnCatalog");
         file.Write(reinterpret_cast<u8 const *>(bufA), DQN_CHAR_COUNT(bufA), 0);
         file.Close();
 
@@ -2372,10 +2368,9 @@ void DqnCatalog_Test()
     // Write file B check that it has been updated
     {
         file = {};
-        DQN_ASSERTM(file.Open(testFile.str,
-                              DqnFile::Permission::FileRead | DqnFile::Permission::FileWrite,
-                              DqnFile::Action::ForceCreate),
-                    "Could not create testing file for DqnCatalog");
+        DQN_ASSERTM(
+            file.Open(testFile.str, DqnFile::Flag::FileReadWrite, DqnFile::Action::ForceCreate),
+            "Could not create testing file for DqnCatalog");
         file.Write(reinterpret_cast<u8 const *>(bufX), DQN_CHAR_COUNT(bufX), 0);
         file.Close();
 

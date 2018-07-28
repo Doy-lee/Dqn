@@ -2838,12 +2838,13 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
 // =================================================================================================
 struct DqnFile
 {
-    enum Permission
+    enum Flag
     {
-        FileRead  = (1 << 0),
-        FileWrite = (1 << 1),
-        Execute   = (1 << 2),
-        All       = (1 << 3)
+        FileRead      = (1 << 0),
+        FileWrite     = (1 << 1),
+        Execute       = (1 << 2),
+        All           = (1 << 3),
+        FileReadWrite = FileRead | FileWrite
     };
 
     enum struct Action
@@ -2864,7 +2865,7 @@ struct DqnFile
 
     // Open a handle for file read and writing. Deleting files does not need a handle. Handles should be
     // closed before deleting files otherwise the OS may not be able to delete the file.
-    // return: FALSE if invalid args or failed to get handle (i.e. insufficient permissions)
+    // return: FALSE if invalid args or failed to get handle (i.e. insufficient permission)
     bool   Open(char    const *path, u32 const flags_, Action const action);
     bool   Open(wchar_t const *path, u32 const flags_, Action const action);
 
@@ -2899,6 +2900,9 @@ DQN_FILE_SCOPE bool   DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize const 
 // return: False if file access failure OR nullptr arguments.
 DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+
+DQN_FILE_SCOPE bool  DqnFile_WriteAll(char    const *path, u8 const *buf, usize const bufSize);
+DQN_FILE_SCOPE bool  DqnFile_WriteAll(wchar_t const *path, u8 const *buf, usize const bufSize);
 
 // return: False if file access failure
 DQN_FILE_SCOPE bool   DqnFile_Size(char    const *path, usize *size);
@@ -8484,16 +8488,16 @@ DqnFile__Win32Open(wchar_t const *path, DqnFile *file, u32 flags, DqnFile::Actio
 
     u32 const WIN32_FILE_ATTRIBUTE_NORMAL = 0x00000080;
 
-    DWORD win32Permission = 0;
-    if (flags & DqnFile::Permission::All)
+    DWORD win32Flag = 0;
+    if (flags & DqnFile::Flag::All)
     {
-        win32Permission = WIN32_GENERIC_ALL;
+        win32Flag = WIN32_GENERIC_ALL;
     }
     else
     {
-        if (flags & DqnFile::Permission::FileRead)  win32Permission |= WIN32_GENERIC_READ;
-        if (flags & DqnFile::Permission::FileWrite) win32Permission |= WIN32_GENERIC_WRITE;
-        if (flags & DqnFile::Permission::Execute)   win32Permission |= WIN32_GENERIC_EXECUTE;
+        if (flags & DqnFile::Flag::FileRead)  win32Flag |= WIN32_GENERIC_READ;
+        if (flags & DqnFile::Flag::FileWrite) win32Flag |= WIN32_GENERIC_WRITE;
+        if (flags & DqnFile::Flag::Execute)   win32Flag |= WIN32_GENERIC_EXECUTE;
     }
 
     DWORD win32Action = 0;
@@ -8507,7 +8511,7 @@ DqnFile__Win32Open(wchar_t const *path, DqnFile *file, u32 flags, DqnFile::Actio
         case DqnFile::Action::ForceCreate:      win32Action = WIN32_CREATE_ALWAYS; break;
     }
 
-    HANDLE handle = CreateFileW(path, win32Permission, 0, nullptr, win32Action,
+    HANDLE handle = CreateFileW(path, win32Flag, 0, nullptr, win32Action,
                                 WIN32_FILE_ATTRIBUTE_NORMAL, nullptr);
 
     if (handle == INVALID_HANDLE_VALUE)
@@ -8656,7 +8660,7 @@ DqnFile__UnixOpen(char const *path, DqnFile *file, u32 flags, DqnFile::Action ac
     char operation  = 0;
     bool updateFlag = false;
 
-    if (flags & DqnFile::Permission::FileWrite)
+    if (flags & DqnFile::Flag::FileWrite)
     {
         updateFlag = true;
         switch (action)
@@ -8677,10 +8681,10 @@ DqnFile__UnixOpen(char const *path, DqnFile *file, u32 flags, DqnFile::Action ac
             break;
         }
     }
-    else if ((flags & DqnFile::Permission::FileRead) ||
-             (flags & DqnFile::Permission::Execute))
+    else if ((flags & DqnFile::Flag::FileRead) ||
+             (flags & DqnFile::Flag::Execute))
     {
-        if (flags & DqnFile::Permission::Execute)
+        if (flags & DqnFile::Flag::Execute)
         {
             // TODO(doyle): Logging, UNIX doesn't have execute param for file
             // handles. Execution goes through system()
@@ -8924,10 +8928,50 @@ u8 *DqnFile_ReadAll(char const *path, usize *bufSize, DqnMemAPI *api)
     return nullptr;
 }
 
+DQN_FILE_SCOPE bool DqnFile_WriteAll(char const *path, u8 const *buf, usize const bufSize)
+{
+    DqnFile file = {};
+    if (!file.Open(path, DqnFile::Flag::FileReadWrite, DqnFile::Action::ForceCreate))
+    {
+        DQN_LOGE("Could not open file at: %s", path);
+        return false;
+    }
+
+    DQN_DEFER(file.Close());
+    usize bytesWritten = file.Write(buf, bufSize, 0);
+    if (bytesWritten != bufSize)
+    {
+        DQN_LOGE("Bytes written did not match the buffer size, %zu != %zu", bytesWritten, bufSize);
+        return false;
+    }
+
+    return true;
+}
+
+DQN_FILE_SCOPE bool DqnFile_WriteAll(wchar_t const *path, u8 const *buf, usize const bufSize)
+{
+    DqnFile file = {};
+    if (!file.Open(path, DqnFile::Flag::FileReadWrite, DqnFile::Action::ForceCreate))
+    {
+        DQN_LOGE("Could not open file at: %s", path);
+        return false;
+    }
+
+    DQN_DEFER(file.Close());
+    usize bytesWritten = file.Write(buf, bufSize, 0);
+    if (bytesWritten != bufSize)
+    {
+        DQN_LOGE("Bytes written did not match the buffer size, %zu != %zu", bytesWritten, bufSize);
+        return false;
+    }
+
+    return true;
+}
+
 bool DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize bufSize, usize *bytesRead)
 {
     DqnFile file = {};
-    bool result = file.Open(path, DqnFile::Permission::FileRead, DqnFile::Action::OpenOnly);
+    bool result = file.Open(path, DqnFile::Flag::FileRead, DqnFile::Action::OpenOnly);
     DQN_DEFER(file.Close());
 
     // TODO(doyle): Logging
@@ -8945,7 +8989,7 @@ bool DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize bufSize, usize *bytesRe
 bool DqnFile_ReadAll(const char *path, u8 *buf, usize bufSize, usize *bytesRead)
 {
     DqnFile file = {};
-    bool result  = file.Open(path, DqnFile::Permission::FileRead, DqnFile::Action::OpenOnly);
+    bool result  = file.Open(path, DqnFile::Flag::FileRead, DqnFile::Action::OpenOnly);
     DQN_DEFER(file.Close());
 
     if (!result || file.size > bufSize)
