@@ -2365,7 +2365,7 @@ void DqnCatalog_Test()
         file.Close();
 
         RawBuf *buf = textCatalog.GetIfUpdated(testFile);
-        DQN_ASSERT(DqnMem_Cmp(buf, bufA, DQN_CHAR_COUNT(bufA)) == 0);
+        DQN_ASSERT(DqnMem_Cmp(buf->buffer, bufA, DQN_CHAR_COUNT(bufA)) == 0);
         Log(Status::Ok, "Catalog finds and loads on demand new file");
     }
 
@@ -2380,7 +2380,7 @@ void DqnCatalog_Test()
         file.Close();
 
         RawBuf *buf = textCatalog.GetIfUpdated(testFile);
-        DQN_ASSERT(DqnMem_Cmp(buf, bufX, DQN_CHAR_COUNT(bufX)) == 0);
+        DQN_ASSERT(DqnMem_Cmp(buf->buffer, bufX, DQN_CHAR_COUNT(bufX)) == 0);
         Log(Status::Ok, "Catalog finds updated file after subsequent write");
     }
 
