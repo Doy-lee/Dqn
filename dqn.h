@@ -1329,7 +1329,7 @@ struct DqnArray
 
      DqnArray        () = default;
      DqnArray        (DqnMemAPI *memAPI_)                         { *this = {}; this->memAPI = memAPI_; }
-    ~DqnArray        ()                                           { if (this->data && this->memAPI) this->memAPI->Free(data); }
+    // ~DqnArray        ()                                           { if (this->data && this->memAPI) this->memAPI->Free(data); }
 
     void  UseMemory  (T *data_, isize max_, isize count_ = 0)     { this->memAPI = nullptr; this->data = data_; this->max = max_; this->count = count_; }
     void  Clear      (Dqn::ZeroClear clear = Dqn::ZeroClear::No)  { if (!data) return; count = 0; if (clear == Dqn::ZeroClear::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); }
@@ -1914,20 +1914,47 @@ struct DqnString
     }
 };
 
-struct DqnSmartString : public DqnString
+struct DqnString_
 {
-    ~DqnSmartString() { this->Free(); }
+    DqnMemAPI *memAPI = DQN_DEFAULT_HEAP_ALLOCATOR;
+    int        len;
+    int        max;
+    char      *str;
+
+    DqnString_() = default;
+    DqnString_(char const *str_)                  { Append(str_); }
+    DqnString_(char const *str_, int len_)        { Append(str_, len_); }
+    DqnString_(DqnSlice<char const> const &other) { Append(other.data, other.len); }
+    DqnString_(DqnSlice<char> const &other)       { Append(other.data, other.len); }
+    DqnString_(DqnString_ const &other)            { if (this == &other) return; Append(other.str, other.len);  }
+
+    DqnString_ &operator+=(char const *other)                 { Append(other); return *this; }
+    DqnString_ &operator+=(DqnSlice<char const> const &other) { Append(other.data, other.len); return *this; }
+    DqnString_ &operator+=(DqnSlice<char> const &other)       { Append(other.data, other.len); return *this; }
+    DqnString_ &operator+=(DqnString const &other)            { Append(other.str, other.len); return *this; }
+
+    DqnString_  operator+ (char const *other)                 { auto result = *this; result.Append(other); return result; }
+    DqnString_  operator+ (DqnSlice<char const> const &other) { auto result = *this; result.Append(other.data, other.len); return result; }
+    DqnString_  operator+ (DqnSlice<char> const &other)       { auto result = *this; result.Append(other.data, other.len); return result; }
+    DqnString_  operator+ (DqnString const &other)            { auto result = *this; result.Append(other.str,  other.len); return result; }
+
+    // Xprintf functions always modifies buffer and null-terminates even with insufficient buffer size.
+    // return: The number of characters copied to the buffer
+    int  Sprintf         (char const *fmt, ...) { va_list va; va_start(va, fmt); int result = VSprintf      (fmt, va); va_end(va); return result; }
+    int  SprintfAppend   (char const *fmt, ...) { va_list va; va_start(va, fmt); int result = VSprintfAppend(fmt, va); va_end(va); return result; }
+
+    int  VSprintf        (char const *fmt, va_list va) { return VSprintfAtOffset(fmt, va, 0  /*offset*/); }
+    int  VSprintfAppend  (char const *fmt, va_list va) { return VSprintfAtOffset(fmt, va, len/*offset*/); }
+
+    void NullTerminate   () { str[len] = 0; } // NOTE: If you modify the storage directly, this can be handy.
+    void Clear           (Dqn::ZeroClear clear = Dqn::ZeroClear::No) { if (clear == Dqn::ZeroClear::Yes) DqnMem_Set(str, 0, max); len = max = 0; str[0] = 0; }
+    void Free            () { if (str) memAPI->Free(str); str = nullptr; }
+    void Reserve         (int newMax);
+
+    void Append          (char const *src, int len_ = -1);
+    int  VSprintfAtOffset(char const *fmt, va_list va, int offset) { Reserve(len + VAListLen(fmt, va)); int result = Dqn_vsnprintf(str + offset, max - len, fmt, va); len = (offset + result); return result; }
+    static int VAListLen (char const *fmt, va_list va);
 };
-
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemAPI   *const api = DQN_DEFAULT_HEAP_ALLOCATOR);
-DQN_FILE_SCOPE DqnString DqnString_(DqnMemStack *const stack);
-
-// NOTE: First level of indirection needs to turn the combined dqnstring_(guid) into a name. Otherwise
-//       each use of literalVarName will increment __COUNTER__
-#define DQN_STRING_LITERAL_INTERNAL(srcVariable, literal, literalVarName)                          \
-    {};                                                                                            \
-    char literalVarName[] = literal;                                                               \
-    srcVariable.InitLiteralNoAlloc(literalVarName, DQN_CHAR_COUNT(literalVarName))
 
 // #DqnFixedString Public API - Fixed sized strings at compile time
 // =================================================================================================
@@ -6514,6 +6541,40 @@ wchar_t *DqnString::ToWChar(DqnMemAPI *api) const
     return nullptr;
 
 #endif
+}
+
+int DqnString_::VAListLen(char const *fmt, va_list va)
+{
+    LOCAL_PERSIST char tmp[STB_SPRINTF_MIN];
+    auto PrintCallback = [](char *buf, void * /*user*/, int /*len*/) -> char * { return buf; };
+    int result = Dqn_vsprintfcb(PrintCallback, nullptr, tmp, fmt, va);
+    return result;
+}
+
+void DqnString_::Reserve(int newMax)
+{
+    if (newMax >= this->max)
+    {
+        char *newPtr =
+            (this->str)
+                ? static_cast<char *>(memAPI->Realloc(this->str, sizeof(this->str[0]) * this->len, newMax * sizeof(this->str[0])))
+                : static_cast<char *>(memAPI->Alloc(newMax * sizeof(this->str[0])));
+
+        DQN_ALWAYS_ASSERT(newPtr);
+        this->str = newPtr;
+        this->max = newMax;
+    }
+}
+
+void DqnString_::Append(char const *src, int len_)
+{
+    if (len_ == -1)
+        len_ = DqnStr_Len(src);
+
+    Reserve(this->len + len_);
+    DqnMem_Copy(this->str + this->len, src, len_);
+    this->len += len_;
+    this->str[this->len] = 0;
 }
 
 // #DqnFixedString Implementation
