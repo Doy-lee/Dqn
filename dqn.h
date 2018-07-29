@@ -1949,11 +1949,22 @@ struct DqnString_
     void NullTerminate   () { str[len] = 0; } // NOTE: If you modify the storage directly, this can be handy.
     void Clear           (Dqn::ZeroClear clear = Dqn::ZeroClear::No) { if (clear == Dqn::ZeroClear::Yes) DqnMem_Set(str, 0, max); len = max = 0; str[0] = 0; }
     void Free            () { if (str) memAPI->Free(str); str = nullptr; }
+    void Resize          (int newMax) { if (newMax > max) Reserve(newMax); len = DQN_MIN(newMax, len); NullTerminate(); }
     void Reserve         (int newMax);
 
     void Append          (char const *src, int len_ = -1);
     int  VSprintfAtOffset(char const *fmt, va_list va, int offset) { Reserve(len + VAListLen(fmt, va)); int result = Dqn_vsnprintf(str + offset, max - len, fmt, va); len = (offset + result); return result; }
+
     static int VAListLen (char const *fmt, va_list va);
+    static bool Cmp      (DqnString_ const *a, DqnString_ const *b,          Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b->len) && (DqnStr_Cmp(a->str, b->str, a->len, ignore) == 0); }
+    static bool Cmp      (DqnString_ const *a, DqnSlice<char const> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b.len)  && (DqnStr_Cmp(a->str, b.data, b.len, ignore) == 0);  }
+    static bool Cmp      (DqnString_ const *a, DqnSlice<char> const b,       Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b.len)  && (DqnStr_Cmp(a->str, b.data, b.len, ignore) == 0);  }
+
+    // return: -1 if invalid, or if bufSize is 0 the required buffer length in wchar_t characters
+    i32      ToWChar(wchar_t *const buf, i32 const bufSize) const;
+    // return: String allocated using api.
+    wchar_t *ToWChar(DqnMemAPI *const api = DQN_DEFAULT_HEAP_ALLOCATOR) const;
+
 };
 
 // #DqnFixedString Public API - Fixed sized strings at compile time
