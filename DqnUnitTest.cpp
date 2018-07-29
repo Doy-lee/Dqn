@@ -647,37 +647,103 @@ void DqnString_Test()
 {
     LOG_HEADER();
 
-    // Check fixed mem string doesn't allow string to expand and fail if try to append
-    if (1)
-    {
-        char space[4] = {};
-        DqnString str = {};
-        DQN_ASSERT(str.InitFixedMem(space, DQN_ARRAY_COUNT(space)));
-
-        DQN_ASSERT(str.Append("test_doesnt_fit") == false);
-        DQN_ASSERT(str.Append("tooo") == false);
-        DQN_ASSERT(str.Append("fit") == true);
-        DQN_ASSERT(str.Append("test_doesnt_fit") == false);
-        DQN_ASSERT(str.Append("1") == false);
-
-        DQN_ASSERT(str.str[str.len] == 0);
-        DQN_ASSERT(str.len <= str.max);
-        Log(Status::Ok, "Append: Check fixed mem string doesn't expand and fails");
-    }
-
     // Try expanding string
     if (1)
     {
-        DqnString str = {};
-        DQN_ASSERT(str.InitLiteral("hello world"));
-        DQN_ASSERT(str.Append(", hello again"));
-        DQN_ASSERT(str.Append(", and hello again"));
+        DqnString str = "hello world";
+        DQN_DEFER(str.Free());
+        str = "hello world2";
+        str.Append(", hello again");
+        str.Append(", and hello again");
 
         DQN_ASSERT(str.str[str.len] == 0);
         DQN_ASSERT(str.len <= str.max);
+        DQN_ASSERTM(DqnStr_Cmp("hello world2, hello again, and hello again", str.str) == 0, "str: %s", str.str);
 
         str.Free();
         Log(Status::Ok, "Check expand on append");
+    }
+
+    {
+        DqnString str  = DQN_SLICE("hello world");
+        DQN_DEFER(str.Free());
+        DQN_ASSERT(DqnStr_Cmp(str.str, "hello world") == 0);
+
+        Log(Status::Ok, "Copy constructor DqnSlice<char>");
+    }
+
+    {
+        DqnString zero = {};
+        DqnString str  = DQN_SLICE("hello world");
+        str.Free();
+        str = zero;
+
+        DqnSlice<char const> helloSlice = DQN_SLICE("hello");
+        str = helloSlice;
+        DQN_DEFER(str.Free());
+        DQN_ASSERT(DqnStr_Cmp(str.str, "hello") == 0);
+
+        Log(Status::Ok, "Copy constructor (DqnFixedString<>)");
+    }
+
+    {
+        DqnString str = DQN_SLICE("hello world");
+        DQN_DEFER(str.Free());
+        DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
+        DQN_ASSERTM(DqnStr_Cmp(str.str, "hello sailor") == 0, "Result: %s", str.str);
+
+        Log(Status::Ok, "Sprintf");
+    }
+
+    {
+        {
+            DqnString str = DQN_SLICE("hello world");
+            DQN_DEFER(str.Free());
+            DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
+            str += DQN_SLICE(".end");
+            DQN_ASSERTM(DqnStr_Cmp(str.str, "hello sailor.end") == 0, "Result: %s", str.str);
+        }
+
+        {
+            DqnString str = DQN_SLICE("hello world");
+            DQN_DEFER(str.Free());
+            DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
+            DQN_ASSERT(str.SprintfAppend(" %d, %d", 100, 200));
+            DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor 100, 200") == 0);
+        }
+
+        Log(Status::Ok, "Concatenation, operator +=, SprintfAppend");
+    }
+
+    {
+        DqnString str;
+        str = "hello big world";
+        DQN_ASSERT(DqnStr_Cmp(str.str, "hello big world") == 0);
+        str.Free();
+
+        str = DqnString("goodbye", DQN_CHAR_COUNT("goodbye"));
+        DQN_ASSERT(DqnStr_Cmp(str.str, "goodbye") == 0);
+        Log(Status::Ok, "Copy constructor (char const *str, int len)");
+    }
+
+    {
+        DqnString str = DQN_SLICE("hello world");
+        DQN_DEFER(str.Free());
+        DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
+        str = str + " end" + DQN_SLICE(" of");
+        DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor end of") == 0);
+
+        Log(Status::Ok, "Operator +");
+    }
+
+    {
+        DqnString str = "localhost";
+        DQN_DEFER(str.Free());
+        str.SprintfAppend(":%d", 16832);
+        str += "/json_rpc";
+        DQN_ASSERT(str.len == 24 && DqnStr_Cmp("localhost:16832/json_rpc", str.str) == 0);
+
+        Log(Status::Ok, "Copy constructor, sprintf, operator +=");
     }
 }
 
@@ -2023,85 +2089,6 @@ void DqnQuickSort_Test()
     }
 }
 
-void DqnHashTable_Test()
-{
-    LOG_HEADER();
-    DqnHashTable<u32> hashTable = {};
-    hashTable.Init(1);
-
-    {
-        hashTable.AddNewEntriesToFreeList(+2);
-        DQN_ASSERT(hashTable.freeList && hashTable.freeList->next);
-        DQN_ASSERT(hashTable.numFreeEntries == 2);
-
-        hashTable.AddNewEntriesToFreeList(-1);
-        DQN_ASSERT(hashTable.freeList && !hashTable.freeList->next);
-        DQN_ASSERT(hashTable.numFreeEntries == 1);
-    }
-
-    {
-        DQN_ASSERT(hashTable.Get("hello world") == nullptr);
-        DQN_ASSERT(hashTable.Get("collide key") == nullptr);
-        DQN_ASSERT(hashTable.Get("crash again") == nullptr);
-
-        bool entryAlreadyExisted = true;
-        auto helloEntry = hashTable.Make("hello world", -1, &entryAlreadyExisted);
-        DQN_ASSERT(entryAlreadyExisted == false);
-
-        entryAlreadyExisted = true;
-        auto collideEntry   = hashTable.Make("collide key", -1, &entryAlreadyExisted);
-        DQN_ASSERT(entryAlreadyExisted == false);
-
-        entryAlreadyExisted = true;
-        auto crashEntry     = hashTable.Make("crash again", -1, &entryAlreadyExisted);
-        DQN_ASSERT(entryAlreadyExisted == false);
-
-        helloEntry->data   = 5;
-        collideEntry->data = 10;
-        crashEntry->data   = 15;
-
-        DQN_ASSERT(hashTable.numFreeEntries == 0);
-
-        DqnHashTable<u32>::Entry *entry = *hashTable.entries;
-        DQN_ASSERT(entry->data == 15);
-
-        entry = entry->next;
-        DQN_ASSERT(entry->data == 10);
-
-        entry = entry->next;
-        DQN_ASSERT(entry->data == 5);
-
-        DQN_ASSERT(hashTable.usedEntriesIndex == 1);
-        DQN_ASSERT(hashTable.usedEntries[0] == 0);
-        DQN_ASSERT(hashTable.numFreeEntries == 0);
-    }
-
-    hashTable.Remove("hello world");
-    DQN_ASSERT(hashTable.ChangeNumEntries(512));
-
-    {
-        auto helloEntry  = hashTable.Get("hello world");
-        DQN_ASSERT(helloEntry == nullptr);
-
-        auto collideEntry  = hashTable.Get("collide key");
-        DQN_ASSERT(collideEntry->data == 10);
-
-        auto crashEntry  = hashTable.Get("crash again");
-        DQN_ASSERT(crashEntry->data == 15);
-
-        bool entryAlreadyExisted = false;
-        collideEntry = hashTable.Make("collide key", -1, &entryAlreadyExisted);
-        DQN_ASSERT(entryAlreadyExisted == true);
-
-        entryAlreadyExisted = false;
-        crashEntry = hashTable.Make("crash again", -1, &entryAlreadyExisted);
-        DQN_ASSERT(entryAlreadyExisted == true);
-    }
-
-    hashTable.Free();
-    Log(Status::Ok, "HashTable");
-}
-
 void DqnBSearch_Test()
 {
     LOG_HEADER();
@@ -2407,7 +2394,6 @@ int main(void)
     DqnRect_Test();
     DqnArray_Test();
     DqnQuickSort_Test();
-    DqnHashTable_Test();
     DqnBSearch_Test();
     DqnMemSet_Test();
     DqnFixedString_Test();
