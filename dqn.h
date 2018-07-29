@@ -1965,6 +1965,7 @@ struct DqnFixedString
     int  VSprintf        (char const *fmt, va_list va) { return VSprintfAtOffset(fmt, va, 0  /*offset*/); }
     int  VSprintfAppend  (char const *fmt, va_list va) { return VSprintfAtOffset(fmt, va, len/*offset*/); }
 
+    void NullTerminate   () { str[len] = 0; } // NOTE: If you modify the storage directly, this can be handy.
     void Clear           (Dqn::ZeroClear clear = Dqn::ZeroClear::No) { if (clear == Dqn::ZeroClear::Yes) DqnMem_Set(str, 0, MAX); *this = {}; }
 
     int  VSprintfAtOffset(char const *fmt, va_list va, int offset) { char *start = str + offset; int result = Dqn_vsnprintf(start, static_cast<int>((str + MAX) - start), fmt, va); len = (offset + result); return result; }
@@ -2924,6 +2925,8 @@ DQN_FILE_SCOPE bool  DqnFile_WriteAll(wchar_t const *path, u8 const *buf, usize 
 DQN_FILE_SCOPE bool   DqnFile_Size(char    const *path, usize *size);
 DQN_FILE_SCOPE bool   DqnFile_Size(wchar_t const *path, usize *size);
 
+DQN_FILE_SCOPE bool   DqnFile_MakeDir(char const *path);
+
 // info:   Pass in to fill with file attributes.
 // return: False if file access failure
 DQN_FILE_SCOPE bool   DqnFile_GetInfo(char    const *path, DqnFileInfo *info);
@@ -3877,7 +3880,7 @@ void *DqnMemStack::Push(isize size, AllocTo allocTo, u8 alignment)
 
     // Allocate New Block If Full
     // =============================================================================================
-    bool needNewBlock      = false;
+    bool needNewBlock = true;
     if (this->block)
     {
         if (pushToHead) needNewBlock = ((this->block->head + sizeToAllocate) > this->block->tail);
@@ -9089,6 +9092,18 @@ bool DqnFile_Size(char const *path, usize *size)
     // TODO(doyle): Error logging
     bool result = DqnFile__UnixGetFileSize(path, size);
     return result;
+#endif
+}
+
+bool DqnFile_MakeDir(char const *path)
+{
+#if defined(DQN_IS_WIN32)
+    // TODO(doyle): Handle error and this is super incomplete. Cannot create
+    // directories recursively
+    CreateDirectoryA(path, nullptr /*lpSecurityAttributes*/);
+    return true;
+#else
+    return false;
 #endif
 }
 
