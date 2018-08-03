@@ -3363,7 +3363,7 @@ void *DqnMemStack::Push(isize size, AllocTo allocTo, u8 alignment)
             return nullptr;
         }
 
-        if (!this->block && !this->memAPI) // we assume this is a zero initialised mem stack
+        if (!this->block && !this->memAPI) // we /ssume this is a zero initialised mem stack
         {
             this->memAPI = DQN_DEFAULT_HEAP_ALLOCATOR;
             this->tracker.Init(Dqn_BitIsSet(this->flags, DqnMemStack::Flag::BoundsGuard));
@@ -5730,7 +5730,7 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(char const *buf, i32 bufLen, char const *find
     bufLen          = static_cast<int>((buf + bufLen) - tmp);
     buf             = tmp;
 
-    bool const findStructureInGlobalScope = ((findProperty[0] == '{' || findProperty[0] == '['));
+    bool const findStructureInGlobalScope = (findPropertyLen == 1 && (findProperty[0] == '{' || findProperty[0] == '['));
 
     if ((buf[0] == '{' || buf[1] == '[') && !findStructureInGlobalScope)
     {
@@ -5895,7 +5895,7 @@ TryNext:
         }
 
     }
-    else if (bufPtr[0] == '"' || DqnChar_IsAlphaNum(bufPtr[0]))
+    else if (bufPtr[0] == '"' || DqnChar_IsAlphaNum(bufPtr[0]) || bufPtr[0] == '-')
     {
         while(bufPtr[0] && (bufPtr[0] != '\n' && bufPtr[0] != ',' && bufPtr[0] != '}'))
             bufPtr++;
