@@ -385,6 +385,7 @@ FILE_SCOPE void DqnMemStack_Test()
     // Check stack allocator mem api callbacks
     if (1)
     {
+#if 0
         // Realloc in same block and allow it to grow in place.
         if (1)
         {
@@ -517,6 +518,7 @@ FILE_SCOPE void DqnMemStack_Test()
         }
 
         // TODO(doyle): Realloc to smaller size logic
+#endif
     }
 }
 

@@ -1684,7 +1684,8 @@ void DqnArray_Test()
         {
             auto stack =
                 DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
-
+            DQN_DEFER(stack.Free());
+#if 0
             if (1)
             {
                 auto memGuard0 = stack.TempRegionGuard();
@@ -1702,7 +1703,7 @@ void DqnArray_Test()
                 stack.Push(1024);
                 DqnArray_TestRealDataInternal(&array);
             }
-            stack.Free();
+#endif
         }
     }
 }
@@ -1863,9 +1864,7 @@ void DqnFile_Test()
                 u8 *buffer = (u8 *)memStack.Push(reqSize);
                 DQN_ASSERT(buffer);
 
-                size_t bytesRead = 0;
-                DQN_ASSERT(DqnFile_ReadAll(fileNames[i], buffer, reqSize, &bytesRead));
-                DQN_ASSERT(bytesRead == reqSize);
+                DQN_ASSERT(DqnFile_ReadAll(fileNames[i], buffer, reqSize));
 
                 // Verify the data is the same as we wrote out
                 DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i]), (i32)reqSize) == 0);

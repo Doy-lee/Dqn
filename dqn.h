@@ -1352,7 +1352,9 @@ struct DqnArray
 
     T    &operator[] (isize i) const                              { DQN_ASSERT(i < count && i > 0); return this->data[i]; }
     T    *begin      ()                                           { return data; }
+    T    *begin      () const                                     { return data; }
     T    *end        ()                                           { return data + count; }
+    T    *end        () const                                     { return data + count; }
 
 private:
     isize GrowCapacity_(isize size) const                         { isize newMax = max ? (max * 2) : 8; return newMax > size ? newMax : size; }
@@ -1504,8 +1506,6 @@ struct DqnMemStack
 
     DqnMemTracker  tracker;         // Read: Metadata for managing ptr allocation
     DqnMemAPI     *memAPI;          // Read: API used to add additional memory blocks to this stack.
-    DqnMemAPI      myTailAPI;       // Read: API for data structures to allocate to the tail of the stack
-    DqnMemAPI      myHeadAPI;       // Read: API for data structures to allocate to the head of the stack
     Block         *block;           // Read: Memory block allocated for the stack
     u32            flags;           // Read
     i32            tempRegionCount; // Read: The number of temp memory regions in use
@@ -2379,13 +2379,15 @@ struct DqnFileInfo
 // NOTE: You want size + 1 and add the null-terminator yourself if you want a null terminated buffer.
 // bytesRead: Pass in to get how many bytes of the buf was used. Basically the return value of Read
 // return:    False if insufficient bufSize OR file access failure OR nullptr arguments.
-DQN_FILE_SCOPE bool   DqnFile_ReadAll(char    const *path, u8 *buf, usize const bufSize, usize *bytesRead);
-DQN_FILE_SCOPE bool   DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize const bufSize, usize *bytesRead);
+DQN_FILE_SCOPE bool   DqnFile_ReadAll(char    const *path, u8 *buf, usize bufSize);
+DQN_FILE_SCOPE bool   DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize bufSize);
 
 // Buffer is null-terminated and should be freed when done with.
 // return: False if file access failure OR nullptr arguments.
 DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
+DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemStack *stack, DqnMemStack::AllocTo allocTo = DqnMemStack::AllocTo::Head);
+DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *bufSize, DqnMemStack *stack, DqnMemStack::AllocTo allocTo = DqnMemStack::AllocTo::Head);
 
 DQN_FILE_SCOPE bool  DqnFile_WriteAll(char    const *path, u8 const *buf, usize const bufSize);
 DQN_FILE_SCOPE bool  DqnFile_WriteAll(wchar_t const *path, u8 const *buf, usize const bufSize);
@@ -2760,7 +2762,7 @@ DQN_FILE_SCOPE void DqnLog(char const *file, char const *functionName, i32 lineN
     char const *const formatStr = "%s:%s,%d: DqnLog: %s\n";
     fprintf(stderr, formatStr, file, functionName, lineNum, userMsg);
 
-    #if defined(DQN_IS_WIN32)
+    #if defined(DQN_PLATFORM_IMPLEMENTATION) && defined(DQN_IS_WIN32)
         DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, userMsg);
     #endif
 }
@@ -2795,7 +2797,7 @@ DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *functionName, i32 l
     char const *const formatStr = ":%s:%s,%d(%s): DqnLog: %s\n";
     fprintf(stderr, formatStr, file, functionName, lineNum, expr, userMsg);
 
-    #if defined(DQN_IS_WIN32)
+    #if defined(DQN_PLATFORM_IMPLEMENTATION) && defined(DQN_IS_WIN32)
         DqnWin32_OutputDebugString(formatStr, file, functionName, lineNum, expr, userMsg);
     #endif
 }
@@ -3313,8 +3315,6 @@ DqnMemStack::DqnMemStack(void *mem, isize size, Dqn::ZeroClear clear, u32 flags_
 
     this->block     = static_cast<DqnMemStack::Block *>(mem);
     *this->block    = Block(blockOffset, blockSize);
-    this->myHeadAPI = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Head);
-    this->myTailAPI = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Tail);
     this->flags     = (flags_ | Flag::NonExpandable);
 
     bool boundsGuard = Dqn_BitIsSet(this->flags, Flag::BoundsGuard);
@@ -3329,9 +3329,6 @@ DqnMemStack::DqnMemStack(isize size, Dqn::ZeroClear clear, u32 flags_, DqnMemAPI
     this->block     = DqnMemStack__AllocateBlock(size, clear, api);
     this->flags     = flags_;
     this->memAPI    = api;
-    this->myHeadAPI = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Head);
-    this->myTailAPI = DqnMemAPI::StackAllocator(this, DqnMemAPI::StackPushType::Tail);
-
     bool boundsGuard = Dqn_BitIsSet(this->flags, Flag::BoundsGuard);
     this->tracker.Init(boundsGuard);
 }
@@ -3364,6 +3361,12 @@ void *DqnMemStack::Push(isize size, AllocTo allocTo, u8 alignment)
                 DQN_ASSERTM(Dqn_BitIsSet(this->flags, Flag::NonExpandableAssert), "Allocator is non-expandable and has run out of memory");
 
             return nullptr;
+        }
+
+        if (!this->block && !this->memAPI) // we assume this is a zero initialised mem stack
+        {
+            this->memAPI = DQN_DEFAULT_HEAP_ALLOCATOR;
+            this->tracker.Init(Dqn_BitIsSet(this->flags, DqnMemStack::Flag::BoundsGuard));
         }
 
         isize newBlockSize  = DQN_MAX(sizeToAllocate, MINIMUM_BLOCK_SIZE);
@@ -5727,7 +5730,7 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get(char const *buf, i32 bufLen, char const *find
     bufLen          = static_cast<int>((buf + bufLen) - tmp);
     buf             = tmp;
 
-    bool const findStructureInGlobalScope = (findPropertyLen == 1 && (findProperty[0] == '{' || findProperty[0] == '['));
+    bool const findStructureInGlobalScope = ((findProperty[0] == '{' || findProperty[0] == '['));
 
     if ((buf[0] == '{' || buf[1] == '[') && !findStructureInGlobalScope)
     {
@@ -8005,7 +8008,7 @@ usize DqnFile::Write(u8 const *buf, usize numBytesToWrite, usize fileOffset)
 usize DqnFile::Read(u8 *buf, usize numBytesToRead)
 {
     usize numBytesRead = 0;
-    if (this->handle)
+    if (buf && this->handle)
     {
 #if defined(DQN_IS_WIN32)
         DWORD bytesToRead = (DWORD)numBytesToRead;
@@ -8043,21 +8046,12 @@ u8 *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemAPI *api)
     // TODO(doyle): Logging
     usize requiredSize = 0;
     if (!DqnFile_Size(path, &requiredSize) || requiredSize == 0)
-    {
         return nullptr;
-    }
 
     auto *buf = (u8 *)api->Alloc(requiredSize, Dqn::ZeroClear::No);
-    if (!buf)
+    if (DqnFile_ReadAll(path, buf, requiredSize))
     {
-        return nullptr;
-    }
-
-    usize bytesRead = 0;
-    if (DqnFile_ReadAll(path, buf, requiredSize, &bytesRead))
-    {
-        *bufSize          = requiredSize;
-        DQN_ASSERTM(bytesRead == requiredSize, "%zu != %zu", bytesRead, requiredSize);
+        *bufSize = requiredSize;
         return buf;
     }
 
@@ -8065,31 +8059,72 @@ u8 *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemAPI *api)
     return nullptr;
 }
 
-u8 *DqnFile_ReadAll(char const *path, usize *bufSize, DqnMemAPI *api)
+DQN_FILE_SCOPE u8 *DqnFile_ReadAll(char const *path, usize *bufSize, DqnMemAPI *api)
 {
     // TODO(doyle): Logging
     usize requiredSize = 0;
     if (!DqnFile_Size(path, &requiredSize) || requiredSize == 0)
-    {
         return nullptr;
-    }
 
     auto *buf = (u8 *)api->Alloc(requiredSize, Dqn::ZeroClear::No);
-    if (!buf)
-    {
-        return nullptr;
-    }
-
-    usize bytesRead = 0;
-    if (DqnFile_ReadAll(path, buf, requiredSize, &bytesRead))
+    if (DqnFile_ReadAll(path, buf, requiredSize))
     {
         *bufSize = requiredSize;
-        DQN_ASSERTM(bytesRead == requiredSize, "%zu != %zu", bytesRead, requiredSize);
         return buf;
     }
 
     api->Free(buf, requiredSize);
     return nullptr;
+}
+
+DQN_FILE_SCOPE u8 *DqnFile_ReadAll(wchar_t const *path, usize *bufSize, DqnMemStack *stack, DqnMemStack::AllocTo allocTo)
+{
+    u8 *result = nullptr;
+    DqnFile file = {};
+    if (!file.Open(path, DqnFile::Flag::FileRead, DqnFile::Action::OpenOnly))
+    {
+        DQN_LOGE("Could not open file: %s", path);
+        return result;
+    }
+    DQN_DEFER(file.Close());
+
+    result = static_cast<u8 *>(stack->Push(file.size, allocTo));
+    usize bytesRead = file.Read(result, file.size);
+    if (bytesRead == file.size)
+    {
+        *bufSize = file.size;
+    }
+    else
+    {
+        DQN_LOGE("bytesRead != file.size", bytesRead, file.size);
+    }
+
+    return result;
+}
+
+DQN_FILE_SCOPE u8 *DqnFile_ReadAll(char const *path, usize *bufSize, DqnMemStack *stack, DqnMemStack::AllocTo allocTo)
+{
+    u8 *result = nullptr;
+    DqnFile file = {};
+    if (!file.Open(path, DqnFile::Flag::FileRead, DqnFile::Action::OpenOnly))
+    {
+        DQN_LOGE("Could not open file: %s", path);
+        return result;
+    }
+    DQN_DEFER(file.Close());
+
+    result = static_cast<u8 *>(stack->Push(file.size, allocTo));
+    usize bytesRead = file.Read(result, file.size);
+    if (bytesRead == file.size)
+    {
+        *bufSize = file.size;
+    }
+    else
+    {
+        DQN_LOGE("bytesRead != file.size", bytesRead, file.size);
+    }
+
+    return result;
 }
 
 DQN_FILE_SCOPE bool DqnFile_WriteAll(char const *path, u8 const *buf, usize const bufSize)
@@ -8132,7 +8167,7 @@ DQN_FILE_SCOPE bool DqnFile_WriteAll(wchar_t const *path, u8 const *buf, usize c
     return true;
 }
 
-bool DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize bufSize, usize *bytesRead)
+DQN_FILE_SCOPE bool DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize bufSize)
 {
     DqnFile file = {};
     bool result = file.Open(path, DqnFile::Flag::FileRead, DqnFile::Action::OpenOnly);
@@ -8145,12 +8180,12 @@ bool DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize bufSize, usize *bytesRe
         return false;
     }
 
-    *bytesRead = file.Read(buf, file.size);
-    DQN_ASSERT(*bytesRead == file.size);
+    usize bytesRead = file.Read(buf, file.size);
+    DQN_ASSERT(bytesRead == file.size);
     return result;
 }
 
-bool DqnFile_ReadAll(const char *path, u8 *buf, usize bufSize, usize *bytesRead)
+DQN_FILE_SCOPE bool DqnFile_ReadAll(char const *path, u8 *buf, usize bufSize)
 {
     DqnFile file = {};
     bool result  = file.Open(path, DqnFile::Flag::FileRead, DqnFile::Action::OpenOnly);
@@ -8161,8 +8196,8 @@ bool DqnFile_ReadAll(const char *path, u8 *buf, usize bufSize, usize *bytesRead)
         return false;
     }
 
-    *bytesRead = file.Read(buf, file.size);
-    DQN_ASSERTM(*bytesRead == file.size, "%zu != %zu", *bytesRead, file.size);
+    usize bytesRead = file.Read(buf, file.size);
+    DQN_ASSERTM(bytesRead == file.size, "%zu != %zu", bytesRead, file.size);
     return result;
 }
 
