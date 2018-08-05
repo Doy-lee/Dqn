@@ -28,26 +28,26 @@ void DqnJson_Test()
     }
     )FOO";
 
-    DqnJson result               = DqnJson_Get(DqnSlice<const char>(json, DQN_ARRAY_COUNT(json)), DQN_SLICE("result"));
-    DqnJson cumulativeDifficulty = DqnJson_Get(result, DQN_SLICE("cumulative_difficulty"));
-    DqnJson difficulty           = DqnJson_Get(result, DQN_SLICE("difficulty"));
-    DqnJson name                 = DqnJson_Get(result, DQN_SLICE("name"));
-    DqnJson arrayOfObjects       = DqnJson_Get(result, DQN_SLICE("array_of_objects"));
-    DqnJson time                 = DqnJson_Get(result, DQN_SLICE("time"));
-    DqnJson embedObject          = DqnJson_Get(result, DQN_SLICE("embed_object"));
-    DqnJson bits                 = DqnJson_Get(result, DQN_SLICE("bits"));
-    DqnJson hex                  = DqnJson_Get(result, DQN_SLICE("hex"));
-    DqnJson extra                = DqnJson_Get(result, DQN_SLICE("extra"));
-    DqnJson serialise            = DqnJson_Get(result, DQN_SLICE("serialise"));
+    DqnJson result           = DqnJson_Get(DqnSlice<const char>(json, DQN_ARRAY_COUNT(json)), DQN_SLICE("result"));
+    DqnJson cum_difficulty   = DqnJson_Get(result, DQN_SLICE("cumulative_difficulty"));
+    DqnJson difficulty       = DqnJson_Get(result, DQN_SLICE("difficulty"));
+    DqnJson name             = DqnJson_Get(result, DQN_SLICE("name"));
+    DqnJson array_of_objects = DqnJson_Get(result, DQN_SLICE("array_of_objects"));
+    DqnJson time             = DqnJson_Get(result, DQN_SLICE("time"));
+    DqnJson embed_object     = DqnJson_Get(result, DQN_SLICE("embed_object"));
+    DqnJson bits             = DqnJson_Get(result, DQN_SLICE("bits"));
+    DqnJson hex              = DqnJson_Get(result, DQN_SLICE("hex"));
+    DqnJson extra            = DqnJson_Get(result, DQN_SLICE("extra"));
+    DqnJson serialise        = DqnJson_Get(result, DQN_SLICE("serialise"));
 
-    DQN_ASSERT(DQN_SLICE_CMP(cumulativeDifficulty.value, DQN_SLICE("282912831023"), Dqn::IgnoreCase::No));
+    DQN_ASSERT(DQN_SLICE_CMP(cum_difficulty.value, DQN_SLICE("282912831023"), Dqn::IgnoreCase::No));
     DQN_ASSERT(DQN_SLICE_CMP(difficulty.value, DQN_SLICE("18293"), Dqn::IgnoreCase::No));
     DQN_ASSERT(DQN_SLICE_CMP(name.value, DQN_SLICE("\"Block\""), Dqn::IgnoreCase::No));
 
     {
-        DQN_ASSERT(arrayOfObjects.IsArray() && arrayOfObjects.numEntries == 2);
+        DQN_ASSERT(array_of_objects.IsArray() && array_of_objects.num_entries == 2);
         isize count = 0;
-        while(DqnJson it = DqnJson_GetNextArrayItem(&arrayOfObjects))
+        while(DqnJson it = DqnJson_GetNextArrayItem(&array_of_objects))
         {
             DqnJson hash = DqnJson_Get(it, DQN_SLICE("hash"));
             DqnJson time2 = DqnJson_Get(it, DQN_SLICE("time"));
@@ -67,8 +67,8 @@ void DqnJson_Test()
     }
 
     {
-        DqnJson proof     = DqnJson_Get(embedObject, DQN_SLICE("proof"));
-        DqnJson signature = DqnJson_Get(embedObject, DQN_SLICE("signature"));
+        DqnJson proof     = DqnJson_Get(embed_object, DQN_SLICE("proof"));
+        DqnJson signature = DqnJson_Get(embed_object, DQN_SLICE("signature"));
         DQN_ASSERT(DQN_SLICE_CMP(proof.value, DQN_SLICE("\"axcbde\""), Dqn::IgnoreCase::No));
         DQN_ASSERT(DQN_SLICE_CMP(signature.value, DQN_SLICE("\"l9382kjabmznmx129aslzejs\""), Dqn::IgnoreCase::No));
     }
@@ -76,40 +76,40 @@ void DqnJson_Test()
     DQN_ASSERT(DQN_SLICE_CMP(time.value, DQN_SLICE("3498573485"), Dqn::IgnoreCase::No));
 
     {
-        DQN_ASSERT(bits.IsArray() && bits.numEntries == 7);
-        DqnJson bitsArray[7];
+        DQN_ASSERT(bits.IsArray() && bits.num_entries == 7);
+        DqnJson bits_array[7];
         isize bitsIndex = 0;
 
         while(DqnJson it = DqnJson_GetNextArrayItem(&bits))
-            bitsArray[bitsIndex++] = it;
+            bits_array[bitsIndex++] = it;
 
-        DQN_ASSERT(bitsIndex == DQN_ARRAY_COUNT(bitsArray));
-        DQN_ASSERT(DQN_SLICE_CMP(bitsArray[0].value, DQN_SLICE("1"), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(bitsArray[1].value, DQN_SLICE("0"), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(bitsArray[2].value, DQN_SLICE("1"), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(bitsArray[3].value, DQN_SLICE("1"), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(bitsArray[4].value, DQN_SLICE("0"), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(bitsArray[5].value, DQN_SLICE("1"), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(bitsArray[6].value, DQN_SLICE("0"), Dqn::IgnoreCase::No));
+        DQN_ASSERT(bitsIndex == DQN_ARRAY_COUNT(bits_array));
+        DQN_ASSERT(DQN_SLICE_CMP(bits_array[0].value, DQN_SLICE("1"), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(bits_array[1].value, DQN_SLICE("0"), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(bits_array[2].value, DQN_SLICE("1"), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(bits_array[3].value, DQN_SLICE("1"), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(bits_array[4].value, DQN_SLICE("0"), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(bits_array[5].value, DQN_SLICE("1"), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(bits_array[6].value, DQN_SLICE("0"), Dqn::IgnoreCase::No));
     }
 
     {
-        DQN_ASSERT(hex.IsArray() && hex.numEntries == 4);
-        DqnJson hexArray[4];
-        isize hexIndex = 0;
+        DQN_ASSERT(hex.IsArray() && hex.num_entries == 4);
+        DqnJson hex_array[4];
+        isize hex_index = 0;
 
         while(DqnJson it = DqnJson_GetNextArrayItem(&hex))
-            hexArray[hexIndex++] = it;
+            hex_array[hex_index++] = it;
 
-        DQN_ASSERT(hexIndex == DQN_ARRAY_COUNT(hexArray));
-        DQN_ASSERT(DQN_SLICE_CMP(hexArray[0].value, DQN_SLICE("\"AF\""), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(hexArray[1].value, DQN_SLICE("\"BE\""), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(hexArray[2].value, DQN_SLICE("\"0C\""), Dqn::IgnoreCase::No));
-        DQN_ASSERT(DQN_SLICE_CMP(hexArray[3].value, DQN_SLICE("\"FF\""), Dqn::IgnoreCase::No));
+        DQN_ASSERT(hex_index == DQN_ARRAY_COUNT(hex_array));
+        DQN_ASSERT(DQN_SLICE_CMP(hex_array[0].value, DQN_SLICE("\"AF\""), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(hex_array[1].value, DQN_SLICE("\"BE\""), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(hex_array[2].value, DQN_SLICE("\"0C\""), Dqn::IgnoreCase::No));
+        DQN_ASSERT(DQN_SLICE_CMP(hex_array[3].value, DQN_SLICE("\"FF\""), Dqn::IgnoreCase::No));
     }
 
     {
-        DQN_ASSERT(extra.IsArray() && extra.numEntries == 1);
+        DQN_ASSERT(extra.IsArray() && extra.num_entries == 1);
         while(DqnJson it = DqnJson_GetNextArrayItem(&extra))
         {
             DQN_ASSERT(DQN_SLICE_CMP(it.value, DQN_SLICE("123"), Dqn::IgnoreCase::No));

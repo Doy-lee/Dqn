@@ -30,8 +30,8 @@
 // some sort of testing framework to track successes and failures.
 
 #define LOG_HEADER() LogHeader(__func__)
-FILE_SCOPE i32  globalIndent;
-FILE_SCOPE bool globalNewLine;
+FILE_SCOPE i32  global_indent;
+FILE_SCOPE bool global_new_line;
 
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"
@@ -48,50 +48,50 @@ enum class Status
     Ok,
     Error
 };
-void Log(Status status, char const *fmt, va_list argList)
+void Log(Status status, char const *fmt, va_list va)
 {
-    DQN_ASSERT(globalIndent >= 0);
-    LOCAL_PERSIST i32 lineLen = 0;
+    DQN_ASSERT(global_indent >= 0);
+    LOCAL_PERSIST i32 line_len = 0;
 
     char buf[1024] = {};
-    i32 bufLen     = 0;
+    i32 buf_len     = 0;
     {
-        bufLen = Dqn_vsprintf(buf, fmt, argList);
-        DQN_ASSERT(bufLen < (i32)DQN_ARRAY_COUNT(buf));
-        lineLen += bufLen;
+        buf_len = Dqn_vsprintf(buf, fmt, va);
+        DQN_ASSERT(buf_len < (i32)DQN_ARRAY_COUNT(buf));
+        line_len += buf_len;
     }
 
-    char indentStr[] = "    ";
-    i32 indentLen    = DQN_CHAR_COUNT(indentStr);
+    char indent_str[] = "    ";
+    i32 indent_len    = DQN_CHAR_COUNT(indent_str);
     {
-        lineLen += (indentLen * globalIndent);
-        for (auto i = 0; i < globalIndent; i++)
-            printf("%s", indentStr);
+        line_len += (indent_len * global_indent);
+        for (auto i = 0; i < global_indent; i++)
+            printf("%s", indent_str);
 
         printf("%s", &(buf[0]));
     }
 
     if (status == Status::Ok || status == Status::Error)
     {
-        char okStatus[] = "OK";
-        char errStatus[] = "ERROR";
+        char ok_status[] = "OK";
+        char err_status[] = "ERROR";
         
         char *statusStr;
-        i32 statusStrLen;
+        i32 status_str_len;
         if (status == Status::Ok)
         {
-            statusStr = okStatus;
-            statusStrLen = DQN_CHAR_COUNT(okStatus);
+            statusStr = ok_status;
+            status_str_len = DQN_CHAR_COUNT(ok_status);
         }
         else
         {
-            statusStr = errStatus;
-            statusStrLen = DQN_CHAR_COUNT(errStatus);
+            statusStr = err_status;
+            status_str_len = DQN_CHAR_COUNT(err_status);
         }
-        lineLen += statusStrLen;
+        line_len += status_str_len;
 
-        i32 targetLen = 90;
-        i32 remaining = targetLen - lineLen;
+        i32 target_len = 90;
+        i32 remaining = target_len - line_len;
         remaining     = DQN_MAX(remaining, 0);
 
         for (auto i = 0; i < remaining; i++)
@@ -107,34 +107,34 @@ void Log(Status status, char const *fmt, va_list argList)
         }
     }
 
-    if (globalNewLine)
+    if (global_new_line)
     {
-        lineLen = 0;
+        line_len = 0;
         printf("\n");
     }
 }
 
 void Log(Status status, char const *fmt, ...)
 {
-    va_list argList;
-    va_start(argList, fmt);
-    Log(status, fmt, argList);
-    va_end(argList);
+    va_list va;
+    va_start(va, fmt);
+    Log(status, fmt, va);
+    va_end(va);
 }
 
 void Log(char const *fmt, ...)
 {
-    va_list argList;
-    va_start(argList, fmt);
-    Log(Status::None, fmt, argList);
-    va_end(argList);
+    va_list va;
+    va_start(va, fmt);
+    Log(Status::None, fmt, va);
+    va_end(va);
 }
 
-void LogHeader(char const *funcName)
+void LogHeader(char const *func_name)
 {
-    globalIndent--;
-    Log("\n[%s]", funcName);
-    globalIndent++;
+    global_indent--;
+    Log("\n[%s]", func_name);
+    global_indent++;
 }
 
 #include "DqnFixedString.cpp"
@@ -143,24 +143,24 @@ void LogHeader(char const *funcName)
 #include "DqnVHashTable.cpp"
 #include "DqnMemStack.cpp"
 
-void HandmadeMathVerifyMat4(DqnMat4 dqnMat, hmm_mat4 hmmMat)
+void HandmadeMathVerifyMat4(DqnMat4 dqn_mat, hmm_mat4 hmm_mat)
 {
-    f32 *hmmMatf = (f32 *)&hmmMat;
-    f32 *dqnMatf = (f32 *)&dqnMat;
+    f32 *hmm_matf = (f32 *)&hmm_mat;
+    f32 *dqn_matf = (f32 *)&dqn_mat;
 
     const u32 EXPECTED_SIZE = 16;
-    u32 totalSize           = DQN_ARRAY_COUNT(dqnMat.e) * DQN_ARRAY_COUNT(dqnMat.e[0]);
+    u32 totalSize           = DQN_ARRAY_COUNT(dqn_mat.e) * DQN_ARRAY_COUNT(dqn_mat.e[0]);
     DQN_ASSERT(totalSize == EXPECTED_SIZE);
     DQN_ASSERT(totalSize ==
-               (DQN_ARRAY_COUNT(hmmMat.Elements) * DQN_ARRAY_COUNT(hmmMat.Elements[0])));
+               (DQN_ARRAY_COUNT(hmm_mat.Elements) * DQN_ARRAY_COUNT(hmm_mat.Elements[0])));
 
     for (u32 i = 0; i < EXPECTED_SIZE; i++)
     {
         const f32 EPSILON = 0.001f;
-        f32 diff          = hmmMatf[i] - dqnMatf[i];
+        f32 diff          = hmm_matf[i] - dqn_matf[i];
         diff              = DQN_ABS(diff);
-        DQN_ASSERTM(diff < EPSILON, "hmmMatf[%d]: %f, dqnMatf[%d]: %f\n", i, hmmMatf[i], i,
-                       dqnMatf[i]);
+        DQN_ASSERTM(diff < EPSILON, "hmm_matf[%d]: %f, dqn_matf[%d]: %f\n", i, hmm_matf[i], i,
+                       dqn_matf[i]);
     }
 }
 
@@ -323,13 +323,13 @@ void Dqn_Test()
             u32 codepoint = '@';
             u32 string[1] = {};
 
-            u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
-            DQN_ASSERT(bytesUsed == 1);
+            u32 bytes_used = Dqn_UCSToUTF8(&string[0], codepoint);
+            DQN_ASSERT(bytes_used == 1);
             DQN_ASSERT(string[0] == '@');
 
-            bytesUsed = Dqn_UTF8ToUCS(&string[0], codepoint);
+            bytes_used = Dqn_UTF8ToUCS(&string[0], codepoint);
             DQN_ASSERT(string[0] >= 0 && string[0] < 0x80);
-            DQN_ASSERT(bytesUsed == 1);
+            DQN_ASSERT(bytes_used == 1);
 
             Log("Dqn_UTF8ToUCS(): Test ascii characters");
         }
@@ -340,13 +340,13 @@ void Dqn_Test()
             u32 codepoint = 0x278;
             u32 string[1] = {};
 
-            u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
-            DQN_ASSERT(bytesUsed == 2);
+            u32 bytes_used = Dqn_UCSToUTF8(&string[0], codepoint);
+            DQN_ASSERT(bytes_used == 2);
             DQN_ASSERT(string[0] == 0xC9B8);
 
-            bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
+            bytes_used = Dqn_UTF8ToUCS(&string[0], string[0]);
             DQN_ASSERT(string[0] == codepoint);
-            DQN_ASSERT(bytesUsed == 2);
+            DQN_ASSERT(bytes_used == 2);
 
             Log("Dqn_UTF8ToUCS(): Test 2 byte characters");
         }
@@ -357,13 +357,13 @@ void Dqn_Test()
             u32 codepoint = 0x0A0A;
             u32 string[1] = {};
 
-            u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
-            DQN_ASSERT(bytesUsed == 3);
+            u32 bytes_used = Dqn_UCSToUTF8(&string[0], codepoint);
+            DQN_ASSERT(bytes_used == 3);
             DQN_ASSERT(string[0] == 0xE0A88A);
 
-            bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
+            bytes_used = Dqn_UTF8ToUCS(&string[0], string[0]);
             DQN_ASSERT(string[0] == codepoint);
-            DQN_ASSERT(bytesUsed == 3);
+            DQN_ASSERT(bytes_used == 3);
 
             Log("Dqn_UTF8ToUCS(): Test 3 byte characters");
         }
@@ -373,14 +373,14 @@ void Dqn_Test()
         {
             u32 codepoint = 0x10912;
             u32 string[1] = {};
-            u32 bytesUsed = Dqn_UCSToUTF8(&string[0], codepoint);
+            u32 bytes_used = Dqn_UCSToUTF8(&string[0], codepoint);
 
-            DQN_ASSERT(bytesUsed == 4);
+            DQN_ASSERT(bytes_used == 4);
             DQN_ASSERT(string[0] == 0xF090A492);
 
-            bytesUsed = Dqn_UTF8ToUCS(&string[0], string[0]);
+            bytes_used = Dqn_UTF8ToUCS(&string[0], string[0]);
             DQN_ASSERT(string[0] == codepoint);
-            DQN_ASSERT(bytesUsed == 4);
+            DQN_ASSERT(bytes_used == 4);
 
             Log("Dqn_UTF8ToUCS(): Test 4 byte characters");
         }
@@ -388,11 +388,11 @@ void Dqn_Test()
         if (1)
         {
             u32 codepoint = 0x10912;
-            u32 bytesUsed = Dqn_UCSToUTF8(NULL, codepoint);
-            DQN_ASSERT(bytesUsed == 0);
+            u32 bytes_used = Dqn_UCSToUTF8(NULL, codepoint);
+            DQN_ASSERT(bytes_used == 0);
 
-            bytesUsed = Dqn_UTF8ToUCS(NULL, codepoint);
-            DQN_ASSERT(bytesUsed == 0);
+            bytes_used = Dqn_UTF8ToUCS(NULL, codepoint);
+            DQN_ASSERT(bytes_used == 0);
 
             Log("Dqn_UTF8ToUCS(): Test return result on on NULL output param");
         }
@@ -759,8 +759,8 @@ void DqnRnd_Test()
         i32 result = pcg.Range(min, max);
         DQN_ASSERT(result >= min && result <= max);
 
-        f32 randF32 = pcg.Nextf();
-        DQN_ASSERT(randF32 >= 0.0f && randF32 <= 1.0f);
+        f32 rand_f32 = pcg.Nextf();
+        DQN_ASSERT(rand_f32 >= 0.0f && rand_f32 <= 1.0f);
     }
     Log(Status::Ok, "DqnRndPCG");
 }
@@ -803,10 +803,10 @@ void DqnMath_Test()
     {
         if (1)
         {
-            f32 aspectRatio         = 1;
-            DqnMat4 dqnPerspective  = DqnMat4_Perspective(90, aspectRatio, 100, 1000);
-            hmm_mat4 hmmPerspective = HMM_Perspective(90, aspectRatio, 100, 1000);
-            HandmadeMathVerifyMat4(dqnPerspective, hmmPerspective);
+            f32 aspect_ratio         = 1;
+            DqnMat4 dqn_perspective  = DqnMat4_Perspective(90, aspect_ratio, 100, 1000);
+            hmm_mat4 hmm_perspective = HMM_Perspective(90, aspect_ratio, 100, 1000);
+            HandmadeMathVerifyMat4(dqn_perspective, hmm_perspective);
 
             Log(Status::Ok, "HandmadeMathTest: Perspective");
         }
@@ -814,44 +814,44 @@ void DqnMath_Test()
         // Test Mat4 translate * scale
         if (1)
         {
-            hmm_vec3 hmmVec       = HMM_Vec3i(1, 2, 3);
-            DqnV3 dqnVec          = DqnV3(1, 2, 3);
-            DqnMat4 dqnTranslate  = DqnMat4_Translate3f(dqnVec.x, dqnVec.y, dqnVec.z);
-            hmm_mat4 hmmTranslate = HMM_Translate(hmmVec);
-            HandmadeMathVerifyMat4(dqnTranslate, hmmTranslate);
+            hmm_vec3 hmm_vec       = HMM_Vec3i(1, 2, 3);
+            DqnV3 dqn_vec          = DqnV3(1, 2, 3);
+            DqnMat4 dqn_translate  = DqnMat4_Translate3f(dqn_vec.x, dqn_vec.y, dqn_vec.z);
+            hmm_mat4 hmm_translate = HMM_Translate(hmm_vec);
+            HandmadeMathVerifyMat4(dqn_translate, hmm_translate);
 
-            hmm_vec3 hmmAxis      = HMM_Vec3(0.5f, 0.2f, 0.7f);
-            DqnV3 dqnAxis         = DqnV3(0.5f, 0.2f, 0.7f);
-            f32 rotationInDegrees = 80.0f;
+            hmm_vec3 hmm_axis      = HMM_Vec3(0.5f, 0.2f, 0.7f);
+            DqnV3 dqn_axis         = DqnV3(0.5f, 0.2f, 0.7f);
+            f32 rotation_in_degrees = 80.0f;
 
-            DqnMat4 dqnRotate = DqnMat4_Rotate(DQN_DEGREES_TO_RADIANS(rotationInDegrees), dqnAxis.x,
-                                               dqnAxis.y, dqnAxis.z);
-            hmm_mat4 hmmRotate = HMM_Rotate(rotationInDegrees, hmmAxis);
-            HandmadeMathVerifyMat4(dqnRotate, hmmRotate);
+            DqnMat4 dqn_rotate = DqnMat4_Rotate(DQN_DEGREES_TO_RADIANS(rotation_in_degrees), dqn_axis.x,
+                                               dqn_axis.y, dqn_axis.z);
+            hmm_mat4 hmm_rotate = HMM_Rotate(rotation_in_degrees, hmm_axis);
+            HandmadeMathVerifyMat4(dqn_rotate, hmm_rotate);
 
-            dqnVec *= 2;
-            hmmVec *= 2;
-            DqnMat4 dqnScale  = DqnMat4_Scale(dqnVec.x, dqnVec.y, dqnVec.z);
-            hmm_mat4 hmmScale = HMM_Scale(hmmVec);
-            HandmadeMathVerifyMat4(dqnScale, hmmScale);
+            dqn_vec *= 2;
+            hmm_vec *= 2;
+            DqnMat4 dqn_scale  = DqnMat4_Scale(dqn_vec.x, dqn_vec.y, dqn_vec.z);
+            hmm_mat4 hmm_scale = HMM_Scale(hmm_vec);
+            HandmadeMathVerifyMat4(dqn_scale, hmm_scale);
 
-            DqnMat4 dqnTSMatrix  = DqnMat4_Mul(dqnTranslate, dqnScale);
-            hmm_mat4 hmmTSMatrix = HMM_MultiplyMat4(hmmTranslate, hmmScale);
-            HandmadeMathVerifyMat4(dqnTSMatrix, hmmTSMatrix);
+            DqnMat4 dqn_ts_matrix  = DqnMat4_Mul(dqn_translate, dqn_scale);
+            hmm_mat4 hmm_ts_matrix = HMM_MultiplyMat4(hmm_translate, hmm_scale);
+            HandmadeMathVerifyMat4(dqn_ts_matrix, hmm_ts_matrix);
 
             // Test Mat4 * MulV4
             if (1)
             {
-                DqnV4 dqnV4    = DqnV4(1, 2, 3, 4);
-                hmm_vec4 hmmV4 = HMM_Vec4(1, 2, 3, 4);
+                DqnV4 dqn_v4    = DqnV4(1, 2, 3, 4);
+                hmm_vec4 hmm_v4 = HMM_Vec4(1, 2, 3, 4);
 
-                DqnV4 dqnResult    = DqnMat4_MulV4(dqnTSMatrix, dqnV4);
-                hmm_vec4 hmmResult = HMM_MultiplyMat4ByVec4(hmmTSMatrix, hmmV4);
+                DqnV4 dqn_result    = DqnMat4_MulV4(dqn_ts_matrix, dqn_v4);
+                hmm_vec4 hmmResult = HMM_MultiplyMat4ByVec4(hmm_ts_matrix, hmm_v4);
 
-                DQN_ASSERT(dqnResult.x == hmmResult.X);
-                DQN_ASSERT(dqnResult.y == hmmResult.Y);
-                DQN_ASSERT(dqnResult.z == hmmResult.Z);
-                DQN_ASSERT(dqnResult.w == hmmResult.W);
+                DQN_ASSERT(dqn_result.x == hmmResult.X);
+                DQN_ASSERT(dqn_result.y == hmmResult.Y);
+                DQN_ASSERT(dqn_result.z == hmmResult.Z);
+                DQN_ASSERT(dqn_result.w == hmmResult.W);
 
                 Log(Status::Ok, "HandmadeMathTest: Mat4 * MulV4");
             }
@@ -890,13 +890,13 @@ void DqnVX_Test()
         // V2 Arithmetic
         if (1)
         {
-            DqnV2 vecA = DqnV2(5, 10);
-            DqnV2 vecB = DqnV2(2, 3);
-            DQN_ASSERT(DqnV2_Equals(vecA, vecB) == false);
-            DQN_ASSERT(DqnV2_Equals(vecA, DqnV2(5, 10)) == true);
-            DQN_ASSERT(DqnV2_Equals(vecB, DqnV2(2, 3)) == true);
+            DqnV2 vec_a = DqnV2(5, 10);
+            DqnV2 vec_b = DqnV2(2, 3);
+            DQN_ASSERT(DqnV2_Equals(vec_a, vec_b) == false);
+            DQN_ASSERT(DqnV2_Equals(vec_a, DqnV2(5, 10)) == true);
+            DQN_ASSERT(DqnV2_Equals(vec_b, DqnV2(2, 3)) == true);
 
-            DqnV2 result = DqnV2_Add(vecA,  DqnV2(5, 10));
+            DqnV2 result = DqnV2_Add(vec_a,  DqnV2(5, 10));
             DQN_ASSERT(DqnV2_Equals(result, DqnV2(10, 20)) == true);
 
             result = DqnV2_Sub(result, DqnV2(5, 10));
@@ -908,21 +908,21 @@ void DqnVX_Test()
             result = DqnV2_Hadamard(result, DqnV2(10.0f, 0.5f));
             DQN_ASSERT(DqnV2_Equals(result, DqnV2(250, 25)) == true);
 
-            f32 dotResult = DqnV2_Dot(DqnV2(5, 10), DqnV2(3, 4));
-            DQN_ASSERT(dotResult == 55);
+            f32 dot_result = DqnV2_Dot(DqnV2(5, 10), DqnV2(3, 4));
+            DQN_ASSERT(dot_result == 55);
             Log(Status::Ok, "DqnV2: Arithmetic");
         }
 
         // Test operator overloading
         if (1)
         {
-            DqnV2 vecA = DqnV2(5, 10);
-            DqnV2 vecB = DqnV2(2, 3);
-            DQN_ASSERT((vecA == vecB) == false);
-            DQN_ASSERT((vecA == DqnV2(5, 10)) == true);
-            DQN_ASSERT((vecB == DqnV2(2, 3)) == true);
+            DqnV2 vec_a = DqnV2(5, 10);
+            DqnV2 vec_b = DqnV2(2, 3);
+            DQN_ASSERT((vec_a == vec_b) == false);
+            DQN_ASSERT((vec_a == DqnV2(5, 10)) == true);
+            DQN_ASSERT((vec_b == DqnV2(2, 3)) == true);
 
-            DqnV2 result = vecA + DqnV2(5, 10);
+            DqnV2 result = vec_a + DqnV2(5, 10);
             DQN_ASSERT((result == DqnV2(10, 20)) == true);
 
             result -= DqnV2(5, 10);
@@ -949,19 +949,19 @@ void DqnVX_Test()
             DqnV2 a           = DqnV2(0, 0);
             DqnV2 b           = DqnV2(3, 4);
 
-            f32 lengthSq = DqnV2_LengthSquared(a, b);
-            DQN_ASSERT(lengthSq == 25);
+            f32 len_sq = DqnV2_LengthSquared(a, b);
+            DQN_ASSERT(len_sq == 25);
 
             f32 length = DqnV2_Length(a, b);
             DQN_ASSERT(length == 5);
 
             DqnV2 normalised = DqnV2_Normalise(b);
-            f32 normX        = b.x / 5.0f;
-            f32 normY        = b.y / 5.0f;
-            f32 diffNormX    = normalised.x - normX;
-            f32 diffNormY    = normalised.y - normY;
-            DQN_ASSERTM(diffNormX < EPSILON, "normalised.x: %f, normX: %f\n", normalised.x, normX);
-            DQN_ASSERTM(diffNormY < EPSILON, "normalised.y: %f, normY: %f\n", normalised.y, normY);
+            f32 norm_x        = b.x / 5.0f;
+            f32 norm_y        = b.y / 5.0f;
+            f32 diff_norm_x    = normalised.x - norm_x;
+            f32 diff_norm_y    = normalised.y - norm_y;
+            DQN_ASSERTM(diff_norm_x < EPSILON, "normalised.x: %f, norm_x: %f\n", normalised.x, norm_x);
+            DQN_ASSERTM(diff_norm_y < EPSILON, "normalised.y: %f, norm_y: %f\n", normalised.y, norm_y);
 
             DqnV2 c = DqnV2(3.5f, 8.0f);
             DQN_ASSERT(DqnV2_Overlaps(b, c) == true);
@@ -1013,13 +1013,13 @@ void DqnVX_Test()
             // Arithmetic
             if (1)
             {
-                DqnV3 vecA = DqnV3(5, 10, 15);
-                DqnV3 vecB = DqnV3(2, 3, 6);
-                DQN_ASSERT(DqnV3_Equals(vecA, vecB) == false);
-                DQN_ASSERT(DqnV3_Equals(vecA, DqnV3(5, 10, 15)) == true);
-                DQN_ASSERT(DqnV3_Equals(vecB, DqnV3(2, 3, 6)) == true);
+                DqnV3 vec_a = DqnV3(5, 10, 15);
+                DqnV3 vec_b = DqnV3(2, 3, 6);
+                DQN_ASSERT(DqnV3_Equals(vec_a, vec_b) == false);
+                DQN_ASSERT(DqnV3_Equals(vec_a, DqnV3(5, 10, 15)) == true);
+                DQN_ASSERT(DqnV3_Equals(vec_b, DqnV3(2, 3, 6)) == true);
 
-                DqnV3 result = DqnV3_Add(vecA, DqnV3(5, 10, 15));
+                DqnV3 result = DqnV3_Add(vec_a, DqnV3(5, 10, 15));
                 DQN_ASSERT(DqnV3_Equals(result, DqnV3(10, 20, 30)) == true);
 
                 result = DqnV3_Sub(result, DqnV3(5, 10, 15));
@@ -1031,23 +1031,23 @@ void DqnVX_Test()
                 result = DqnV3_Hadamard(result, DqnV3(10.0f, 0.5f, 10.0f));
                 DQN_ASSERT(DqnV3_Equals(result, DqnV3(250, 25, 750)) == true);
 
-                f32 dotResult = DqnV3_Dot(DqnV3(5, 10, 2), DqnV3(3, 4, 6));
-                DQN_ASSERT(dotResult == 67);
+                f32 dot_result = DqnV3_Dot(DqnV3(5, 10, 2), DqnV3(3, 4, 6));
+                DQN_ASSERT(dot_result == 67);
 
-                DqnV3 cross = DqnV3_Cross(vecA, vecB);
+                DqnV3 cross = DqnV3_Cross(vec_a, vec_b);
                 DQN_ASSERT(DqnV3_Equals(cross, DqnV3(15, 0, -5)) == true);
             }
 
             // Operator overloading
             if (1)
             {
-                DqnV3 vecA = DqnV3(5, 10, 15);
-                DqnV3 vecB = DqnV3(2, 3, 6);
-                DQN_ASSERT((vecA == vecB) == false);
-                DQN_ASSERT((vecA == DqnV3(5, 10, 15)) == true);
-                DQN_ASSERT((vecB == DqnV3(2, 3, 6)) == true);
+                DqnV3 vec_a = DqnV3(5, 10, 15);
+                DqnV3 vec_b = DqnV3(2, 3, 6);
+                DQN_ASSERT((vec_a == vec_b) == false);
+                DQN_ASSERT((vec_a == DqnV3(5, 10, 15)) == true);
+                DQN_ASSERT((vec_b == DqnV3(2, 3, 6)) == true);
 
-                DqnV3 result = vecA + DqnV3(5, 10, 15);
+                DqnV3 result = vec_a + DqnV3(5, 10, 15);
                 DQN_ASSERT((result == DqnV3(10, 20, 30)) == true);
 
                 result -= DqnV3(5, 10, 15);
@@ -1098,13 +1098,13 @@ void DqnVX_Test()
         {
             // Arithmetic
             {
-                DqnV4 vecA = DqnV4(5, 10, 15, 20);
-                DqnV4 vecB = DqnV4(2, 3, 6, 8);
-                DQN_ASSERT(DqnV4_Equals(vecA, vecB) == false);
-                DQN_ASSERT(DqnV4_Equals(vecA, DqnV4(5, 10, 15, 20)) == true);
-                DQN_ASSERT(DqnV4_Equals(vecB, DqnV4(2, 3, 6, 8)) == true);
+                DqnV4 vec_a = DqnV4(5, 10, 15, 20);
+                DqnV4 vec_b = DqnV4(2, 3, 6, 8);
+                DQN_ASSERT(DqnV4_Equals(vec_a, vec_b) == false);
+                DQN_ASSERT(DqnV4_Equals(vec_a, DqnV4(5, 10, 15, 20)) == true);
+                DQN_ASSERT(DqnV4_Equals(vec_b, DqnV4(2, 3, 6, 8)) == true);
 
-                DqnV4 result = DqnV4_Add(vecA, DqnV4(5, 10, 15, 20));
+                DqnV4 result = DqnV4_Add(vec_a, DqnV4(5, 10, 15, 20));
                 DQN_ASSERT(DqnV4_Equals(result, DqnV4(10, 20, 30, 40)) == true);
 
                 result = DqnV4_Sub(result, DqnV4(5, 10, 15, 20));
@@ -1116,20 +1116,20 @@ void DqnVX_Test()
                 result = DqnV4_Hadamard(result, DqnV4(10.0f, 0.5f, 10.0f, 0.25f));
                 DQN_ASSERT(DqnV4_Equals(result, DqnV4(250, 25, 750, 25)) == true);
 
-                f32 dotResult = DqnV4_Dot(DqnV4(5, 10, 2, 8), DqnV4(3, 4, 6, 5));
-                DQN_ASSERT(dotResult == 107);
+                f32 dot_result = DqnV4_Dot(DqnV4(5, 10, 2, 8), DqnV4(3, 4, 6, 5));
+                DQN_ASSERT(dot_result == 107);
             }
 
             // Operator Overloading
             if (1)
             {
-                DqnV4 vecA = DqnV4(5, 10, 15, 20);
-                DqnV4 vecB = DqnV4(2, 3, 6, 8);
-                DQN_ASSERT((vecA == vecB) == false);
-                DQN_ASSERT((vecA == DqnV4(5, 10, 15, 20)) == true);
-                DQN_ASSERT((vecB == DqnV4(2, 3, 6, 8)) == true);
+                DqnV4 vec_a = DqnV4(5, 10, 15, 20);
+                DqnV4 vec_b = DqnV4(2, 3, 6, 8);
+                DQN_ASSERT((vec_a == vec_b) == false);
+                DQN_ASSERT((vec_a == DqnV4(5, 10, 15, 20)) == true);
+                DQN_ASSERT((vec_b == DqnV4(2, 3, 6, 8)) == true);
 
-                DqnV4 result = vecA + DqnV4(5, 10, 15, 20);
+                DqnV4 result = vec_a + DqnV4(5, 10, 15, 20);
                 DQN_ASSERT((result == DqnV4(10, 20, 30, 40)) == true);
 
                 result = result - DqnV4(5, 10, 15, 20);
@@ -1168,10 +1168,10 @@ void DqnRect_Test()
             DQN_ASSERT(rect4i.max.x == 4 && rect4i.max.y == 6);
 
             const f32 EPSILON = 0.001f;
-            f32 diffMaxX      = rect4f.max.x - 4.4f;
-            f32 diffMaxY      = rect4f.max.y - 6.6f;
+            f32 diff_max_x      = rect4f.max.x - 4.4f;
+            f32 diff_max_y      = rect4f.max.y - 6.6f;
             DQN_ASSERT(rect4f.min.x == 1.1f && rect4f.min.y == 2.2f);
-            DQN_ASSERT(DQN_ABS(diffMaxX) < EPSILON && DQN_ABS(diffMaxY) < EPSILON);
+            DQN_ASSERT(DQN_ABS(diff_max_x) < EPSILON && DQN_ABS(diff_max_y) < EPSILON);
 
             DqnRect rect = DqnRect(-10, -10, 20, 20);
             DQN_ASSERT(DqnV2_Equals(rect.min, DqnV2(-10, -10)));
@@ -1200,33 +1200,33 @@ void DqnRect_Test()
 
         // Test rect get centre
         DqnRect rect     = DqnRect(DqnV2(-10, -10), DqnV2(20, 20));
-        DqnV2 rectCenter = rect.GetCenter();
-        DQN_ASSERT(DqnV2_Equals(rectCenter, DqnV2(0, 0)));
+        DqnV2 rect_centre = rect.GetCenter();
+        DQN_ASSERT(DqnV2_Equals(rect_centre, DqnV2(0, 0)));
         Log(Status::Ok, "GetCentre");
 
         // Test clipping rect get centre
-        DqnRect clipRect   = DqnRect(DqnV2(-15, -15), DqnV2(10, 10) + DqnV2(15));
-        DqnRect clipResult = rect.ClipRect(clipRect);
-        DQN_ASSERT(clipResult.min.x == -10 && clipResult.min.y == -10);
-        DQN_ASSERT(clipResult.max.x == 10 && clipResult.max.y == 10);
+        DqnRect clip_rect   = DqnRect(DqnV2(-15, -15), DqnV2(10, 10) + DqnV2(15));
+        DqnRect clip_result = rect.ClipRect(clip_rect);
+        DQN_ASSERT(clip_result.min.x == -10 && clip_result.min.y == -10);
+        DQN_ASSERT(clip_result.max.x == 10 && clip_result.max.y == 10);
         Log(Status::Ok, "ClipRect");
 
         // Test shifting rect
         if (1)
         {
-            DqnRect shiftedRect = rect.Move(DqnV2(10, 0));
-            DQN_ASSERT(DqnV2_Equals(shiftedRect.min, DqnV2(0, -10)));
-            DQN_ASSERT(DqnV2_Equals(shiftedRect.max, DqnV2(20, 10)));
+            DqnRect shifted_rect = rect.Move(DqnV2(10, 0));
+            DQN_ASSERT(DqnV2_Equals(shifted_rect.min, DqnV2(0, -10)));
+            DQN_ASSERT(DqnV2_Equals(shifted_rect.max, DqnV2(20, 10)));
 
             // Ensure dimensions have remained the same
             if (1)
             {
                 f32 width, height;
-                shiftedRect.GetSize(&width, &height);
+                shifted_rect.GetSize(&width, &height);
                 DQN_ASSERT(width == 20);
                 DQN_ASSERT(height == 20);
 
-                DqnV2 dim = shiftedRect.GetSize();
+                DqnV2 dim = shifted_rect.GetSize();
                 DQN_ASSERT(DqnV2_Equals(dim, DqnV2(20, 20)));
             }
 
@@ -1235,8 +1235,8 @@ void DqnRect_Test()
             {
                 DqnV2 inP  = DqnV2(5, 5);
                 DqnV2 outP = DqnV2(100, 100);
-                DQN_ASSERT(shiftedRect.ContainsP(inP));
-                DQN_ASSERT(!shiftedRect.ContainsP(outP));
+                DQN_ASSERT(shifted_rect.ContainsP(inP));
+                DQN_ASSERT(!shifted_rect.ContainsP(outP));
             }
 
             Log(Status::Ok, "Move");
@@ -1244,16 +1244,16 @@ void DqnRect_Test()
     }
 }
 
-void DqnArray_TestInternal(DqnMemAPI *const memAPI)
+void DqnArray_TestInternal(DqnMemAPI *const mem_api)
 {
     if (1)
     {
-        DqnArray<DqnV2> array(memAPI);
+        DqnArray<DqnV2> array(mem_api);
         if (1)
         {
             array.Reserve(1);
             DQN_ASSERT(array.max >= 1);
-            DQN_ASSERT(array.count == 0);
+            DQN_ASSERT(array.len == 0);
 
             // Test basic push
             if (1)
@@ -1265,7 +1265,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
                 DQN_ASSERT(DqnV2_Equals(va, vb));
 
                 DQN_ASSERT(array.max >= 1);
-                DQN_ASSERT(array.count == 1);
+                DQN_ASSERT(array.len == 1);
                 Log(Status::Ok, "Test basic push");
             }
 
@@ -1282,48 +1282,48 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
                 DQN_ASSERT(DqnV2_Equals(va, vb) == true);
 
                 DQN_ASSERT(array.max >= 2);
-                DQN_ASSERT(array.count == 2);
+                DQN_ASSERT(array.len == 2);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 3);
-                DQN_ASSERT(array.count == 3);
+                DQN_ASSERT(array.len == 3);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 4);
-                DQN_ASSERT(array.count == 4);
+                DQN_ASSERT(array.len == 4);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 5);
-                DQN_ASSERT(array.count == 5);
+                DQN_ASSERT(array.len == 5);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 6);
-                DQN_ASSERT(array.count == 6);
+                DQN_ASSERT(array.len == 6);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 7);
-                DQN_ASSERT(array.count == 7);
+                DQN_ASSERT(array.len == 7);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 8);
-                DQN_ASSERT(array.count == 8);
+                DQN_ASSERT(array.len == 8);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 9);
-                DQN_ASSERT(array.count == 9);
+                DQN_ASSERT(array.len == 9);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 10);
-                DQN_ASSERT(array.count == 10);
+                DQN_ASSERT(array.len == 10);
 
                 DQN_ASSERT(array.Push(va));
                 DQN_ASSERT(array.max >= 11);
-                DQN_ASSERT(array.count == 11);
+                DQN_ASSERT(array.len == 11);
 
                 DqnV2 vc = DqnV2(90, 100);
                 DQN_ASSERT(array.Push(vc));
                 DQN_ASSERT(array.max >= 12);
-                DQN_ASSERT(array.count == 12);
+                DQN_ASSERT(array.len == 12);
                 DQN_ASSERT(DqnV2_Equals(vc, array.data[11]));
 
                 Log(Status::Ok, "Test resizing and free");
@@ -1343,8 +1343,8 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
                 DQN_ASSERT(DqnV2_Equals(array.data[0], vb));
 
                 DqnV2 vc = DqnV2(2, 1);
-                array.Insert(array.count, vc);
-                DQN_ASSERT(DqnV2_Equals(array.data[array.count-1], vc));
+                array.Insert(array.len, vc);
+                DQN_ASSERT(DqnV2_Equals(array.data[array.len-1], vc));
 
                 DqnV2 vd = DqnV2(8, 9);
                 array.Insert(1, vd);
@@ -1386,7 +1386,7 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         {
             array.Reserve(1);
             DQN_ASSERT(array.max >= 1);
-            DQN_ASSERT(array.count == 0);
+            DQN_ASSERT(array.len == 0);
             Log(Status::Ok, "Empty array");
         }
         array.Free();
@@ -1400,45 +1400,45 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
 
             array.Reserve(16);
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 0);
+            DQN_ASSERT(array.len == 0);
 
             array.Clear();
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 0);
+            DQN_ASSERT(array.len == 0);
 
             DQN_ASSERT(array.Push(a));
             DQN_ASSERT(array.Push(b));
             DQN_ASSERT(array.Push(c));
             DQN_ASSERT(array.Push(d));
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 4);
+            DQN_ASSERT(array.len == 4);
 
             array.Erase(0);
             DQN_ASSERT(DqnV2_Equals(array.data[0], d));
             DQN_ASSERT(DqnV2_Equals(array.data[1], b));
             DQN_ASSERT(DqnV2_Equals(array.data[2], c));
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 3);
+            DQN_ASSERT(array.len == 3);
 
             array.Erase(2);
             DQN_ASSERT(DqnV2_Equals(array.data[0], d));
             DQN_ASSERT(DqnV2_Equals(array.data[1], b));
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 2);
+            DQN_ASSERT(array.len == 2);
 
             // array.Erase(100);
             DQN_ASSERT(DqnV2_Equals(array.data[0], d));
             DQN_ASSERT(DqnV2_Equals(array.data[1], b));
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 2);
+            DQN_ASSERT(array.len == 2);
 
             array.Clear();
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 0);
+            DQN_ASSERT(array.len == 0);
             Log(Status::Ok, "Test removal");
         }
         array.Free();
-        array.memAPI = memAPI;
+        array.mem_api = mem_api;
 
         if (1)
         {
@@ -1454,25 +1454,25 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
             DQN_ASSERT(array.Push(c));
             DQN_ASSERT(array.Push(d));
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 4);
+            DQN_ASSERT(array.len == 4);
 
             array.EraseStable(0);
             DQN_ASSERT(DqnV2_Equals(array.data[0], b));
             DQN_ASSERT(DqnV2_Equals(array.data[1], c));
             DQN_ASSERT(DqnV2_Equals(array.data[2], d));
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 3);
+            DQN_ASSERT(array.len == 3);
 
             array.EraseStable(1);
             DQN_ASSERT(DqnV2_Equals(array.data[0], b));
             DQN_ASSERT(DqnV2_Equals(array.data[1], d));
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 2);
+            DQN_ASSERT(array.len == 2);
 
             array.EraseStable(1);
             DQN_ASSERT(DqnV2_Equals(array.data[0], b));
             DQN_ASSERT(array.max >= 16);
-            DQN_ASSERT(array.count == 1);
+            DQN_ASSERT(array.len == 1);
 
             Log(Status::Ok, "Test stable removal");
         }
@@ -1486,29 +1486,29 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         // Test normal remove list scenario
         if (1)
         {
-            i64 indexesToFree[] = {3, 2, 1, 0};
-            i32 intList[]       = {128, 32, 29, 31};
+            i64 indexes_to_free[] = {3, 2, 1, 0};
+            i32 int_list[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array(memAPI);
-            array.Reserve(DQN_ARRAY_COUNT(intList));
+            DqnArray<i32> array(mem_api);
+            array.Reserve(DQN_ARRAY_COUNT(int_list));
 
-            array.Push(intList, DQN_ARRAY_COUNT(intList));
-            array.EraseStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
-            DQN_ASSERT(array.count == 0);
+            array.Push(int_list, DQN_ARRAY_COUNT(int_list));
+            array.EraseStable(indexes_to_free, DQN_ARRAY_COUNT(indexes_to_free));
+            DQN_ASSERT(array.len == 0);
             array.Free();
         }
 
         // Test all indexes invalid
         if (1)
         {
-            i64 indexesToFree[] = {100, 200, 300, 400};
-            i32 intList[]       = {128, 32, 29, 31};
+            i64 indexes_to_free[] = {100, 200, 300, 400};
+            i32 int_list[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array(memAPI);
-            array.Reserve(DQN_ARRAY_COUNT(intList));
-            array.Push(intList, DQN_ARRAY_COUNT(intList));
-            array.EraseStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
-            DQN_ASSERT(array.count == 4);
+            DqnArray<i32> array(mem_api);
+            array.Reserve(DQN_ARRAY_COUNT(int_list));
+            array.Push(int_list, DQN_ARRAY_COUNT(int_list));
+            array.EraseStable(indexes_to_free, DQN_ARRAY_COUNT(indexes_to_free));
+            DQN_ASSERT(array.len == 4);
             DQN_ASSERT(array.data[0] == 128);
             DQN_ASSERT(array.data[1] == 32);
             DQN_ASSERT(array.data[2] == 29);
@@ -1519,14 +1519,14 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         // Test remove singular index
         if (1)
         {
-            i64 indexesToFree[] = {1};
-            i32 intList[]       = {128, 32, 29, 31};
+            i64 indexes_to_free[] = {1};
+            i32 int_list[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array(memAPI);
-            array.Reserve(DQN_ARRAY_COUNT(intList));
-            array.Push(intList, DQN_ARRAY_COUNT(intList));
-            array.EraseStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
-            DQN_ASSERT(array.count == 3);
+            DqnArray<i32> array(mem_api);
+            array.Reserve(DQN_ARRAY_COUNT(int_list));
+            array.Push(int_list, DQN_ARRAY_COUNT(int_list));
+            array.EraseStable(indexes_to_free, DQN_ARRAY_COUNT(indexes_to_free));
+            DQN_ASSERT(array.len == 3);
             DQN_ASSERT(array.data[0] == 128);
             DQN_ASSERT(array.data[1] == 29);
             DQN_ASSERT(array.data[2] == 31);
@@ -1536,14 +1536,14 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         // Test remove singular invalid index
         if (1)
         {
-            i64 indexesToFree[] = {100};
-            i32 intList[]       = {128, 32, 29, 31};
+            i64 indexes_to_free[] = {100};
+            i32 int_list[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array(memAPI);
-            array.Reserve(DQN_ARRAY_COUNT(intList));
-            array.Push(intList, DQN_ARRAY_COUNT(intList));
-            array.EraseStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
-            DQN_ASSERT(array.count == 4);
+            DqnArray<i32> array(mem_api);
+            array.Reserve(DQN_ARRAY_COUNT(int_list));
+            array.Push(int_list, DQN_ARRAY_COUNT(int_list));
+            array.EraseStable(indexes_to_free, DQN_ARRAY_COUNT(indexes_to_free));
+            DQN_ASSERT(array.len == 4);
             DQN_ASSERT(array.data[0] == 128);
             DQN_ASSERT(array.data[1] == 32);
             DQN_ASSERT(array.data[2] == 29);
@@ -1554,14 +1554,14 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         // Test remove second last index
         if (1)
         {
-            i64 indexesToFree[] = {2};
-            i32 intList[]       = {128, 32, 29, 31};
+            i64 indexes_to_free[] = {2};
+            i32 int_list[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array(memAPI);
-            array.Reserve(DQN_ARRAY_COUNT(intList));
-            array.Push(intList, DQN_ARRAY_COUNT(intList));
-            array.EraseStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
-            DQN_ASSERT(array.count == 3);
+            DqnArray<i32> array(mem_api);
+            array.Reserve(DQN_ARRAY_COUNT(int_list));
+            array.Push(int_list, DQN_ARRAY_COUNT(int_list));
+            array.EraseStable(indexes_to_free, DQN_ARRAY_COUNT(indexes_to_free));
+            DQN_ASSERT(array.len == 3);
             DQN_ASSERT(array.data[0] == 128);
             DQN_ASSERT(array.data[1] == 32);
             DQN_ASSERT(array.data[2] == 31);
@@ -1571,14 +1571,14 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         // Test remove last 2 indexes
         if (1)
         {
-            i64 indexesToFree[] = {2, 3};
-            i32 intList[]       = {128, 32, 29, 31};
+            i64 indexes_to_free[] = {2, 3};
+            i32 int_list[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array(memAPI);
-            array.Reserve(DQN_ARRAY_COUNT(intList));
-            array.Push(intList, DQN_ARRAY_COUNT(intList));
-            array.EraseStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
-            DQN_ASSERT(array.count == 2);
+            DqnArray<i32> array(mem_api);
+            array.Reserve(DQN_ARRAY_COUNT(int_list));
+            array.Push(int_list, DQN_ARRAY_COUNT(int_list));
+            array.EraseStable(indexes_to_free, DQN_ARRAY_COUNT(indexes_to_free));
+            DQN_ASSERT(array.len == 2);
             DQN_ASSERT(array.data[0] == 128);
             DQN_ASSERT(array.data[1] == 32);
             array.Free();
@@ -1587,15 +1587,15 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         // Test invalid free index doesn't delete out of bounds
         if (1)
         {
-            i64 indexesToFree[] = {30, 1, 3};
-            i32 intList[]       = {128, 32, 29, 31};
+            i64 indexes_to_free[] = {30, 1, 3};
+            i32 int_list[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array(memAPI);
-            array.Reserve(DQN_ARRAY_COUNT(intList));
-            array.Push(intList, DQN_ARRAY_COUNT(intList));
-            array.EraseStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+            DqnArray<i32> array(mem_api);
+            array.Reserve(DQN_ARRAY_COUNT(int_list));
+            array.Push(int_list, DQN_ARRAY_COUNT(int_list));
+            array.EraseStable(indexes_to_free, DQN_ARRAY_COUNT(indexes_to_free));
 
-            DQN_ASSERT(array.count == 2);
+            DQN_ASSERT(array.len == 2);
             DQN_ASSERT(array.data[0] == 128);
             DQN_ASSERT(array.data[1] == 29);
             array.Free();
@@ -1604,15 +1604,15 @@ void DqnArray_TestInternal(DqnMemAPI *const memAPI)
         // Test a free list including the first index
         if (1)
         {
-            i64 indexesToFree[] = {0, 1, 2};
-            i32 intList[]       = {128, 32, 29, 31};
+            i64 indexes_to_free[] = {0, 1, 2};
+            i32 int_list[]       = {128, 32, 29, 31};
 
-            DqnArray<i32> array(memAPI);
-            array.Reserve(DQN_ARRAY_COUNT(intList));
-            array.Push(intList, DQN_ARRAY_COUNT(intList));
-            array.EraseStable(indexesToFree, DQN_ARRAY_COUNT(indexesToFree));
+            DqnArray<i32> array(mem_api);
+            array.Reserve(DQN_ARRAY_COUNT(int_list));
+            array.Push(int_list, DQN_ARRAY_COUNT(int_list));
+            array.EraseStable(indexes_to_free, DQN_ARRAY_COUNT(indexes_to_free));
 
-            DQN_ASSERT(array.count == 1);
+            DQN_ASSERT(array.len == 1);
             DQN_ASSERT(array.data[0] == 31);
             array.Free();
         }
@@ -1625,15 +1625,15 @@ void DqnArray_TestRealDataInternal(DqnArray<char> *array)
 {
     (void)array;
 #ifdef DQN_PLATFORM_HEADER
-    size_t bufSize = 0;
-    u8 *buf        = DqnFile_ReadAll("tests/google-10000-english.txt", &bufSize);
+    size_t buf_size = 0;
+    u8 *buf        = DqnFile_ReadAll("tests/google-10000-english.txt", &buf_size);
     DQN_ASSERT(buf);
 
-    for (usize i = 0; i < bufSize; i++)
+    for (usize i = 0; i < buf_size; i++)
         array->Push(buf[i]);
 
-    DQN_ASSERT((size_t)array->count == bufSize);
-    for (auto i = 0; i < array->count; i++)
+    DQN_ASSERT((size_t)array->len == buf_size);
+    for (auto i = 0; i < array->len; i++)
         DQN_ASSERT(array->data[i] == buf[i]);
 
     array->Free();
@@ -1658,16 +1658,16 @@ void DqnArray_Test()
         {
             DqnArray<char> array1 = {};
             array1.Reserve(3);
-            DQN_ASSERT(array1.count == 0);
+            DQN_ASSERT(array1.len == 0);
             DQN_ASSERT(array1.max == 3);
             array1.Free();
 
             array1.Reserve(0);
-            DQN_ASSERT(array1.count == 0);
+            DQN_ASSERT(array1.len == 0);
             DQN_ASSERT(array1.max == 0);
 
             array1.Push('c');
-            DQN_ASSERT(array1.count == 1);
+            DQN_ASSERT(array1.len == 1);
             array1.Free();
 
             Log(Status::Ok, "Testing faux-array constructors DqnArray_()");
@@ -1808,19 +1808,19 @@ void DqnFile_Test()
     // Write Test
     if (1)
     {
-        const char *fileNames[]                   = {"dqn_1", "dqn_2", "dqn_3", "dqn_4", "dqn_5"};
+        const char *file_names[]                   = {"dqn_1", "dqn_2", "dqn_3", "dqn_4", "dqn_5"};
         const char *writeData[]                   = {"1234", "2468", "36912", "481216", "5101520"};
-        DqnFile files[DQN_ARRAY_COUNT(fileNames)] = {};
+        DqnFile files[DQN_ARRAY_COUNT(file_names)] = {};
 
         // Write data out to some files
-        for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+        for (u32 i = 0; i < DQN_ARRAY_COUNT(file_names); i++)
         {
             u32 permissions = DqnFile::Flag::FileReadWrite;
             DqnFile *file   = files + i;
-            if (!file->Open(fileNames[i], permissions, DqnFile::Action::ClearIfExist))
+            if (!file->Open(file_names[i], permissions, DqnFile::Action::ClearIfExist))
             {
                 bool result =
-                    file->Open(fileNames[i], permissions, DqnFile::Action::CreateIfNotExist);
+                    file->Open(file_names[i], permissions, DqnFile::Action::CreateIfNotExist);
                 DQN_ASSERT(result);
             }
 
@@ -1831,18 +1831,18 @@ void DqnFile_Test()
             file->Close();
         }
 
-        auto memStack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
+        auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
         // Read data back in
-        for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+        for (u32 i = 0; i < DQN_ARRAY_COUNT(file_names); i++)
         {
             // Manual read the file contents
             {
                 u32 permissions = DqnFile::Flag::FileRead;
                 DqnFile *file = files + i;
-                bool result = file->Open(fileNames[i], permissions, DqnFile::Action::OpenOnly);
+                bool result = file->Open(file_names[i], permissions, DqnFile::Action::OpenOnly);
                 DQN_ASSERT(result);
 
-                u8 *buffer = (u8 *)memStack.Push(file->size);
+                u8 *buffer = (u8 *)memstack.Push(file->size);
                 DQN_ASSERT(buffer);
 
                 size_t bytesRead = file->Read(buffer, file->size);
@@ -1852,37 +1852,37 @@ void DqnFile_Test()
                 DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i]), (i32)bytesRead) == 0);
 
                 // Delete when we're done with it
-                memStack.Pop(buffer);
+                memstack.Pop(buffer);
                 file->Close();
             }
 
             // Read using the ReadEntireFile api which doesn't need a file handle as an argument
             {
                 size_t reqSize = 0;
-                DQN_ASSERT(DqnFile_Size(fileNames[i], &reqSize));
+                DQN_ASSERT(DqnFile_Size(file_names[i], &reqSize));
 
-                u8 *buffer = (u8 *)memStack.Push(reqSize);
+                u8 *buffer = (u8 *)memstack.Push(reqSize);
                 DQN_ASSERT(buffer);
 
-                DQN_ASSERT(DqnFile_ReadAll(fileNames[i], buffer, reqSize));
+                DQN_ASSERT(DqnFile_ReadAll(file_names[i], buffer, reqSize));
 
                 // Verify the data is the same as we wrote out
                 DQN_ASSERT(DqnStr_Cmp((char *)buffer, (writeData[i]), (i32)reqSize) == 0);
-                memStack.Pop(buffer);
+                memstack.Pop(buffer);
             }
 
-            DQN_ASSERT(DqnFile_Delete(fileNames[i]));
+            DQN_ASSERT(DqnFile_Delete(file_names[i]));
         }
 
         // Then check delete actually worked, files should not exist.
-        for (u32 i = 0; i < DQN_ARRAY_COUNT(fileNames); i++)
+        for (u32 i = 0; i < DQN_ARRAY_COUNT(file_names); i++)
         {
             DqnFile dummy   = {};
             u32 permissions = DqnFile::Flag::FileRead;
-            bool fileExists = dummy.Open(fileNames[i], permissions, DqnFile::Action::OpenOnly);
+            bool fileExists = dummy.Open(file_names[i], permissions, DqnFile::Action::OpenOnly);
             DQN_ASSERT(!fileExists);
         }
-        memStack.Free();
+        memstack.Free();
 
         Log(Status::Ok, "Write file");
     }
@@ -1890,20 +1890,20 @@ void DqnFile_Test()
     // Test directory listing
     if (1)
     {
-        i32 numFiles;
+        i32 num_files;
 #if defined(DQN___IS_UNIX)
-        char **filelist = DqnFile_ListDir(".", &numFiles);
+        char **file_list = DqnFile_ListDir(".", &num_files);
 #else
-        char **filelist = DqnFile_ListDir("*", &numFiles);
+        char **file_list = DqnFile_ListDir("*", &num_files);
 #endif
 
         Log("Test directory listing");
-        globalIndent++;
-        for (auto i = 0; i < numFiles; i++)
-            Log("%02d: %s", i, filelist[i]);
+        global_indent++;
+        for (auto i = 0; i < num_files; i++)
+            Log("%02d: %s", i, file_list[i]);
 
-        DqnFile_ListDirFree(filelist, numFiles);
-        globalIndent--;
+        DqnFile_ListDirFree(file_list, num_files);
+        global_indent--;
         Log(Status::Ok, "List directory files");
     }
 
@@ -1926,33 +1926,33 @@ void DqnTimer_Test()
     {
 
         int sleepTimeInMs = 250;
-        f64 startInMs = DqnTimer_NowInMs();
+        f64 start_in_ms = DqnTimer_NowInMs();
         PlatformSleep(sleepTimeInMs);
-        f64 endInMs = DqnTimer_NowInMs();
+        f64 end_in_ms = DqnTimer_NowInMs();
 
-        DQN_ASSERT((startInMs + sleepTimeInMs) <= endInMs);
-        Log("start: %f, end: %f", startInMs, endInMs);
+        DQN_ASSERT((start_in_ms + sleepTimeInMs) <= end_in_ms);
+        Log("start: %f, end: %f", start_in_ms, end_in_ms);
 
         Log(Status::Ok, "Timer advanced in time over 1 second");
-        globalIndent++;
-        Log("Start: %f, End: %f", startInMs, endInMs);
-        globalIndent--;
+        global_indent++;
+        Log("Start: %f, End: %f", start_in_ms, end_in_ms);
+        global_indent--;
     }
 }
 
 
-FILE_SCOPE u32 volatile globalDebugCounter;
-FILE_SCOPE DqnLock globalJobQueueLock;
+FILE_SCOPE u32 volatile global_debug_counter;
+FILE_SCOPE DqnLock global_job_queue_lock;
 const u32 QUEUE_SIZE = 256;
-FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue, void *const userData)
+FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue, void *const user_data)
 {
-    (void)userData;
+    (void)user_data;
     DQN_ASSERT(queue->size == QUEUE_SIZE);
     {
-        auto guard = globalJobQueueLock.Guard();
-        globalDebugCounter++;
+        auto guard = global_job_queue_lock.Guard();
+        global_debug_counter++;
 
-        // u32 number = globalDebugCounter;
+        // u32 number = global_debug_counter;
 #if defined(DQN__IS_WIN32)
         // Log("JobQueueDebugCallbackIncrementCounter(): Thread %d: Incrementing Number: %d", GetCurrentThreadId(), number);
 #else
@@ -1965,38 +1965,38 @@ FILE_SCOPE void JobQueueDebugCallbackIncrementCounter(DqnJobQueue *const queue, 
 FILE_SCOPE void DqnJobQueue_Test()
 {
     LOG_HEADER();
-    globalDebugCounter = 0;
+    global_debug_counter = 0;
 
-    auto memStack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
+    auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
 
-    u32 numThreads, numCores;
-    DqnOS_GetThreadsAndCores(&numCores, &numThreads);
-    DQN_ASSERT(numThreads > 0 && numCores > 0);
+    u32 num_threads, num_cores;
+    DqnOS_GetThreadsAndCores(&num_cores, &num_threads);
+    DQN_ASSERT(num_threads > 0 && num_cores > 0);
 
-    u32 totalThreads = (numCores - 1) * numThreads;
-    if (totalThreads == 0) totalThreads = 1;
+    u32 total_threads = (num_cores - 1) * num_threads;
+    if (total_threads == 0) total_threads = 1;
 
-    DqnJobQueue jobQueue = {};
-    DqnJob *jobList      = (DqnJob *)memStack.Push(sizeof(*jobQueue.jobList) * QUEUE_SIZE);
-    DQN_ASSERT(DqnJobQueue_Init(&jobQueue, jobList, QUEUE_SIZE, totalThreads));
+    DqnJobQueue job_queue = {};
+    DqnJob *job_list      = (DqnJob *)memstack.Push(sizeof(*job_queue.job_list) * QUEUE_SIZE);
+    DQN_ASSERT(DqnJobQueue_Init(&job_queue, job_list, QUEUE_SIZE, total_threads));
 
     const u32 WORK_ENTRIES = 2048;
-    DQN_ASSERT(globalJobQueueLock.Init());
+    DQN_ASSERT(global_job_queue_lock.Init());
     for (u32 i = 0; i < WORK_ENTRIES; i++)
     {
         DqnJob job   = {};
         job.callback = JobQueueDebugCallbackIncrementCounter;
-        while (!DqnJobQueue_AddJob(&jobQueue, job))
+        while (!DqnJobQueue_AddJob(&job_queue, job))
         {
-            DqnJobQueue_TryExecuteNextJob(&jobQueue);
+            DqnJobQueue_TryExecuteNextJob(&job_queue);
         }
     }
 
-    DqnJobQueue_BlockAndCompleteAllJobs(&jobQueue);
-    DQN_ASSERT(globalDebugCounter == WORK_ENTRIES);
-    globalJobQueueLock.Delete();
+    DqnJobQueue_BlockAndCompleteAllJobs(&job_queue);
+    DQN_ASSERT(global_debug_counter == WORK_ENTRIES);
+    global_job_queue_lock.Delete();
 
-    Log("Final incremented value: %d\n", globalDebugCounter);
+    Log("Final incremented value: %d\n", global_debug_counter);
 }
 
 #else
@@ -2014,74 +2014,74 @@ void DqnQuickSort_Test()
         auto stack = DqnMemStack(DQN_KILOBYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
 
         // Create array of ints
-        u32 numInts      = 1000000;
-        u32 sizeInBytes  = sizeof(u32) * numInts;
-        u32 *dqnCPPArray = (u32 *)stack.Push(sizeInBytes);
-        u32 *stdArray    = (u32 *)stack.Push(sizeInBytes);
-        DQN_ASSERT(dqnCPPArray && stdArray);
+        u32 num_ints      = 1000000;
+        u32 size_in_bytes  = sizeof(u32) * num_ints;
+        u32 *dqn_cpp_array = (u32 *)stack.Push(size_in_bytes);
+        u32 *std_array    = (u32 *)stack.Push(size_in_bytes);
+        DQN_ASSERT(dqn_cpp_array && std_array);
 
-        f64 dqnCPPTimings[2]                           = {};
-        f64 stdTimings[DQN_ARRAY_COUNT(dqnCPPTimings)] = {};
+        f64 dqn_cpp_timings[2]                           = {};
+        f64 std_timings[DQN_ARRAY_COUNT(dqn_cpp_timings)] = {};
 
-        f64 dqnCPPAverage = 0;
-        f64 stdAverage    = 0;
+        f64 dqn_cpp_avg = 0;
+        f64 std_avg    = 0;
 
-        Log("Timings"); globalIndent++;
-        for (u32 timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(dqnCPPTimings); timingsIndex++)
+        Log("Timings"); global_indent++;
+        for (u32 timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(dqn_cpp_timings); timingsIndex++)
         {
             // Populate with random numbers
-            for (u32 i = 0; i < numInts; i++)
+            for (u32 i = 0; i < num_ints; i++)
             {
-                dqnCPPArray[i] = state.Next();
-                stdArray[i]    = dqnCPPArray[i];
+                dqn_cpp_array[i] = state.Next();
+                std_array[i]    = dqn_cpp_array[i];
             }
 
-            globalNewLine = false;
+            global_new_line = false;
             Log("%02d: ", timingsIndex);
-            globalIndent -= 2;
+            global_indent -= 2;
             // Time Dqn_QuickSort
             {
                 f64 start = DqnTimer_NowInS();
-                DqnQuickSort(dqnCPPArray, numInts);
+                DqnQuickSort(dqn_cpp_array, num_ints);
 
                 f64 duration = DqnTimer_NowInS() - start;
-                dqnCPPTimings[timingsIndex] = duration;
-                dqnCPPAverage += duration;
-                Log("Dqn_QuickSort: %f vs ", dqnCPPTimings[timingsIndex]);
+                dqn_cpp_timings[timingsIndex] = duration;
+                dqn_cpp_avg += duration;
+                Log("Dqn_QuickSort: %f vs ", dqn_cpp_timings[timingsIndex]);
             }
 
             // Time std::sort
-            globalNewLine = true;
+            global_new_line = true;
             {
                 f64 start = DqnTimer_NowInS();
-                std::sort(stdArray, stdArray + numInts);
+                std::sort(std_array, std_array + num_ints);
                 f64 duration = DqnTimer_NowInS() - start;
 
-                stdTimings[timingsIndex] = duration;
-                stdAverage += duration;
+                std_timings[timingsIndex] = duration;
+                std_avg += duration;
 
-                Log("std::sort: %f", stdTimings[timingsIndex]);
+                Log("std::sort: %f", std_timings[timingsIndex]);
             }
-            globalIndent += 2;
+            global_indent += 2;
 
             // Validate algorithm is correct
-            for (u32 i = 0; i < numInts; i++)
+            for (u32 i = 0; i < num_ints; i++)
             {
-                DQN_ASSERTM(dqnCPPArray[i] == stdArray[i], "DqnArray[%d]: %d, stdArray[%d]: %d", i,
-                            dqnCPPArray[i], stdArray[i], i);
+                DQN_ASSERTM(dqn_cpp_array[i] == std_array[i], "DqnArray[%d]: %d, std_array[%d]: %d", i,
+                            dqn_cpp_array[i], std_array[i], i);
             }
         }
-        globalIndent--;
+        global_indent--;
 
         // Print averages
         if (1)
         {
-            dqnCPPAverage /= (f64)DQN_ARRAY_COUNT(dqnCPPTimings);
-            stdAverage    /= (f64)DQN_ARRAY_COUNT(stdTimings);
+            dqn_cpp_avg /= (f64)DQN_ARRAY_COUNT(dqn_cpp_timings);
+            std_avg    /= (f64)DQN_ARRAY_COUNT(std_timings);
             Log("Average Timings");
-            globalIndent++;
-            Log("Dqn_QuickSort: %f vs std::sort: %f\n", dqnCPPAverage, stdAverage);
-            globalIndent--;
+            global_indent++;
+            Log("Dqn_QuickSort: %f vs std::sort: %f\n", dqn_cpp_avg, std_avg);
+            global_indent--;
         }
         stack.Free();
         Log(Status::Ok, "QuickSort");
@@ -2236,7 +2236,7 @@ void DqnMemSet_Test()
 
     const int NUM_TIMINGS = 5;
     f64 timings[2][NUM_TIMINGS] = {};
-    f64 avgTimings[DQN_ARRAY_COUNT(timings)] = {};
+    f64 avg_timings[DQN_ARRAY_COUNT(timings)] = {};
     void *buffers[DQN_ARRAY_COUNT(timings)]  = {};
 
     const i32 NUM_ITERATIONS = DQN_ARRAY_COUNT(timings[0]);
@@ -2246,11 +2246,11 @@ void DqnMemSet_Test()
         i32 size = rnd.Range(DQN_MEGABYTE(16), DQN_MEGABYTE(32));
         u8 value = (u8)rnd.Range(0, 255);
 
-        globalIndent++;
-        globalNewLine = false;
+        global_indent++;
+        global_new_line = false;
         Log("%02d: ", i);
-        globalIndent--;
-        globalIndent--;
+        global_indent--;
+        global_indent--;
 
         i32 timingsIndex = 0;
         // DqnMem_Set
@@ -2277,12 +2277,12 @@ void DqnMemSet_Test()
             timings[timingsIndex++][i] = duration;
             Log("memset: %5.3f\n", duration);
         }
-        globalIndent++;
-        globalNewLine = true;
+        global_indent++;
+        global_new_line = true;
 
-        for (auto testIndex = 0; testIndex < size; testIndex++)
+        for (auto test_index = 0; test_index < size; test_index++)
         {
-            DQN_ASSERT(((u8 *)buffers[0])[testIndex] == ((u8 *)buffers[1])[testIndex]);
+            DQN_ASSERT(((u8 *)buffers[0])[test_index] == ((u8 *)buffers[1])[test_index]);
         }
 
         for (usize bufferIndex = 0; bufferIndex < DQN_ARRAY_COUNT(buffers); bufferIndex++)
@@ -2293,18 +2293,18 @@ void DqnMemSet_Test()
 
     for (usize timingsIndex = 0; timingsIndex < DQN_ARRAY_COUNT(timings); timingsIndex++)
     {
-        f64 totalTime = 0;
-        for (auto iterationIndex = 0; iterationIndex < NUM_ITERATIONS; iterationIndex++)
+        f64 total_time = 0;
+        for (auto iteration_index = 0; iteration_index < NUM_ITERATIONS; iteration_index++)
         {
-            totalTime += timings[timingsIndex][iterationIndex];
+            total_time += timings[timingsIndex][iteration_index];
         }
-        avgTimings[timingsIndex] = totalTime / (f64)NUM_ITERATIONS;
+        avg_timings[timingsIndex] = total_time / (f64)NUM_ITERATIONS;
     }
 
     Log("Average Timings");
-    globalIndent++;
-    Log("DqnMem_Set: %f vs memset: %f\n", avgTimings[0], avgTimings[1]);
-    globalIndent--;
+    global_indent++;
+    Log("DqnMem_Set: %f vs memset: %f\n", avg_timings[0], avg_timings[1]);
+    global_indent--;
 
     Log(Status::Ok, "MemSet");
 }
@@ -2317,14 +2317,14 @@ struct RawBuf
 
 DQN_CATALOG_LOAD_PROC(CatalogRawLoad, RawBuf)
 {
-    usize bufSize;
-    u8 *buf = DqnFile_ReadAll(file.str, &bufSize);
+    usize buf_size;
+    u8 *buf = DqnFile_ReadAll(file.str, &buf_size);
 
     if (!buf)
         return false;
 
     data->buffer = reinterpret_cast<char *>(buf);
-    data->len    = static_cast<int>(bufSize);
+    data->len    = static_cast<int>(buf_size);
     return true;
 }
 
@@ -2340,32 +2340,32 @@ void DqnCatalog_Test()
 
     // Initially write the file and check the catalog is able to open it up
     {
-        char const writeBuf[] = "aaaa";
-        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(writeBuf), DQN_CHAR_COUNT(writeBuf));
+        char const write_buf[] = "aaaa";
+        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(write_buf), DQN_CHAR_COUNT(write_buf));
         RawBuf *buf = catalog.GetIfUpdated(path);
-        DQN_ASSERT(DqnMem_Cmp(buf->buffer, writeBuf, DQN_CHAR_COUNT(writeBuf)) == 0);
+        DQN_ASSERT(DqnMem_Cmp(buf->buffer, write_buf, DQN_CHAR_COUNT(write_buf)) == 0);
         Log(Status::Ok, "Catalog finds and loads on demand new file");
     }
 
     // Update the file and check that the GetIfUpdated returns a non-nullptr (because the entry is updated)
     {
         PlatformSleep(1000);
-        char const writeBuf[] = "xxxx";
-        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(writeBuf), DQN_CHAR_COUNT(writeBuf));
+        char const write_buf[] = "xxxx";
+        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(write_buf), DQN_CHAR_COUNT(write_buf));
         RawBuf *buf = catalog.GetIfUpdated(path);
-        DQN_ASSERT(DqnMem_Cmp(buf->buffer, writeBuf, DQN_CHAR_COUNT(writeBuf)) == 0);
+        DQN_ASSERT(DqnMem_Cmp(buf->buffer, write_buf, DQN_CHAR_COUNT(write_buf)) == 0);
         Log(Status::Ok, "Catalog finds updated file after subsequent write");
     }
 
     // Update the file and get the catalog to poll the entries and check it has been updated
     {
         PlatformSleep(1000);
-        char const writeBuf[] = "abcd";
-        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(writeBuf), DQN_CHAR_COUNT(writeBuf));
+        char const write_buf[] = "abcd";
+        DqnFile_WriteAll(path.str, reinterpret_cast<u8 const *>(write_buf), DQN_CHAR_COUNT(write_buf));
         catalog.PollAssets();
 
         RawBuf *buf = catalog.GetIfUpdated(path);
-        DQN_ASSERT(DqnMem_Cmp(buf->buffer, writeBuf, DQN_CHAR_COUNT(writeBuf)) == 0);
+        DQN_ASSERT(DqnMem_Cmp(buf->buffer, write_buf, DQN_CHAR_COUNT(write_buf)) == 0);
         Log(Status::Ok, "Catalog finds updated file using the poll asset interface");
     }
 
@@ -2382,8 +2382,8 @@ void DqnCatalog_Test()
 
 int main(void)
 {
-    globalIndent  = 1;
-    globalNewLine = true;
+    global_indent  = 1;
+    global_new_line = true;
     DqnString_Test();
     DqnMemStack_Test();
     DqnChar_Test();

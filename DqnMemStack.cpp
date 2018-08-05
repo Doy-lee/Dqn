@@ -48,7 +48,7 @@ FILE_SCOPE void DqnMemStack_Test()
         auto stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::NonExpandable);
         auto *result1 = stack.Push(DQN_MEGABYTE(2));
         DQN_ASSERT(result1 == nullptr);
-        DQN_ASSERT(stack.block->prevBlock == nullptr);
+        DQN_ASSERT(stack.block->prev_block == nullptr);
 
         stack.Free();
         Log(Status::Ok, "Check non-expandable flag prevents expansion.");
@@ -58,19 +58,19 @@ FILE_SCOPE void DqnMemStack_Test()
     if (1)
     {
         auto stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes);
-        DQN_ASSERT(stack.tracker.boundsGuardSize == 0);
+        DQN_ASSERT(stack.tracker.bounds_guard_size == 0);
 
-        auto *oldBlock = stack.block;
-        DQN_ASSERT(oldBlock);
-        DQN_ASSERT(oldBlock->size == DQN_MEGABYTE(1));
-        DQN_ASSERT(oldBlock->head == oldBlock->head);
-        DQN_ASSERT(oldBlock->tail == oldBlock->tail);
-        DQN_ASSERT(oldBlock->prevBlock == nullptr);
+        auto *old_block = stack.block;
+        DQN_ASSERT(old_block);
+        DQN_ASSERT(old_block->size == DQN_MEGABYTE(1));
+        DQN_ASSERT(old_block->head == old_block->head);
+        DQN_ASSERT(old_block->tail == old_block->tail);
+        DQN_ASSERT(old_block->prev_block == nullptr);
 
         auto *result1 = stack.Push(DQN_MEGABYTE(2));
         DQN_ASSERT(result1);
-        DQN_ASSERT(stack.block->prevBlock == oldBlock);
-        DQN_ASSERT(stack.block != oldBlock);
+        DQN_ASSERT(stack.block->prev_block == old_block);
+        DQN_ASSERT(stack.block != old_block);
 
         Log(Status::Ok, "Check memory stack allocates additional memory blocks.");
         stack.Free();
@@ -86,7 +86,7 @@ FILE_SCOPE void DqnMemStack_Test()
 
             DqnMemStack::Block *blockToReturnTo = stack.block;
             auto headBefore                     = blockToReturnTo->head;
-            auto tailBefore                     = blockToReturnTo->tail;
+            auto tail_before                     = blockToReturnTo->tail;
             if (1)
             {
                 auto memGuard1 = stack.TempRegionGuard();
@@ -95,19 +95,19 @@ FILE_SCOPE void DqnMemStack_Test()
                 auto *result4  = stack.Push(100);
                 DQN_ASSERT(result2 && result3 && result4);
                 DQN_ASSERT(stack.block->head != headBefore);
-                DQN_ASSERT(stack.block->tail == tailBefore);
+                DQN_ASSERT(stack.block->tail == tail_before);
                 DQN_ASSERT(stack.block->memory == blockToReturnTo->memory);
 
                 // Force allocation of new block
                 auto *result5 = stack.Push(DQN_MEGABYTE(5));
                 DQN_ASSERT(result5);
                 DQN_ASSERT(stack.block != blockToReturnTo);
-                DQN_ASSERT(stack.tempRegionCount == 1);
+                DQN_ASSERT(stack.tmp_region_count == 1);
             }
 
             DQN_ASSERT(stack.block == blockToReturnTo);
             DQN_ASSERT(stack.block->head == headBefore);
-            DQN_ASSERT(stack.block->tail == tailBefore);
+            DQN_ASSERT(stack.block->tail == tail_before);
 
             stack.Free();
         }
@@ -118,7 +118,7 @@ FILE_SCOPE void DqnMemStack_Test()
             auto stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
             DqnMemStack::Block *blockToReturnTo = stack.block;
             auto headBefore                     = blockToReturnTo->head;
-            auto tailBefore                     = blockToReturnTo->tail;
+            auto tail_before                     = blockToReturnTo->tail;
             if (1)
             {
                 auto memGuard1 = stack.TempRegionGuard();
@@ -127,20 +127,20 @@ FILE_SCOPE void DqnMemStack_Test()
                 auto *result4  = stack.Push(100);
                 DQN_ASSERT(result2 && result3 && result4);
                 DQN_ASSERT(stack.block->head != headBefore);
-                DQN_ASSERT(stack.block->tail == tailBefore);
+                DQN_ASSERT(stack.block->tail == tail_before);
                 DQN_ASSERT(stack.block->memory == blockToReturnTo->memory);
 
                 // Force allocation of new block
                 auto *result5 = stack.Push(DQN_MEGABYTE(5));
                 DQN_ASSERT(result5);
                 DQN_ASSERT(stack.block != blockToReturnTo);
-                DQN_ASSERT(stack.tempRegionCount == 1);
-                memGuard1.region.keepHeadChanges = true;
+                DQN_ASSERT(stack.tmp_region_count == 1);
+                memGuard1.region.keep_head_changes = true;
             }
 
             DQN_ASSERT(stack.block != blockToReturnTo);
-            DQN_ASSERT(stack.block->prevBlock == blockToReturnTo);
-            DQN_ASSERT(stack.tempRegionCount == 0);
+            DQN_ASSERT(stack.block->prev_block == blockToReturnTo);
+            DQN_ASSERT(stack.tmp_region_count == 0);
 
             stack.Free();
         }
@@ -155,7 +155,7 @@ FILE_SCOPE void DqnMemStack_Test()
 
             DqnMemStack::Block *blockToReturnTo = stack.block;
             auto headBefore = blockToReturnTo->head;
-            auto tailBefore = blockToReturnTo->tail;
+            auto tail_before = blockToReturnTo->tail;
             if (1)
             {
                 auto memGuard1 = stack.TempRegionGuard();
@@ -174,12 +174,12 @@ FILE_SCOPE void DqnMemStack_Test()
                 auto *result6 = stack.Push(DQN_MEGABYTE(5));
                 DQN_ASSERT(result6);
                 DQN_ASSERT(stack.block != blockToReturnTo);
-                DQN_ASSERT(stack.tempRegionCount == 1);
+                DQN_ASSERT(stack.tmp_region_count == 1);
             }
 
             DQN_ASSERT(stack.block == blockToReturnTo);
             DQN_ASSERT(stack.block->head == headBefore);
-            DQN_ASSERT(stack.block->tail == tailBefore);
+            DQN_ASSERT(stack.block->tail == tail_before);
 
             stack.Pop(pop1);
             stack.Pop(pop2);
@@ -197,24 +197,24 @@ FILE_SCOPE void DqnMemStack_Test()
         // Check success
         if (1)
         {
-            isize const bufSize = sizeof(DqnMemStack::Block) * 5;
-            char buf[bufSize]   = {};
-            auto stack          = DqnMemStack(&buf, bufSize, Dqn::ZeroClear::No);
+            isize const buf_size = sizeof(DqnMemStack::Block) * 5;
+            char buf[buf_size]   = {};
+            auto stack          = DqnMemStack(&buf, buf_size, Dqn::ZeroClear::No);
 
             DQN_ASSERT(stack.block);
-            DQN_ASSERT(stack.block->prevBlock == false);
-            DQN_ASSERT(stack.tempRegionCount == 0);
+            DQN_ASSERT(stack.block->prev_block == false);
+            DQN_ASSERT(stack.tmp_region_count == 0);
             DQN_ASSERT(stack.flags == DqnMemStack::Flag::NonExpandable);
 
             auto *result1 = stack.Push(32);
             DQN_ASSERT(result1);
             stack.Pop(result1);
 
-            auto *result2 = stack.Push(bufSize * 2);
+            auto *result2 = stack.Push(buf_size * 2);
             DQN_ASSERT(result2 == nullptr);
             DQN_ASSERT(stack.block);
-            DQN_ASSERT(stack.block->prevBlock == false);
-            DQN_ASSERT(stack.tempRegionCount == 0);
+            DQN_ASSERT(stack.block->prev_block == false);
+            DQN_ASSERT(stack.tmp_region_count == 0);
             DQN_ASSERT(stack.flags == DqnMemStack::Flag::NonExpandable);
 
             stack.Free();
@@ -227,51 +227,51 @@ FILE_SCOPE void DqnMemStack_Test()
     if (1)
     {
         usize size           = 32;
-        usize additionalSize = DqnMemStack::MINIMUM_BLOCK_SIZE;
+        usize additional_size = DqnMemStack::MINIMUM_BLOCK_SIZE;
         DqnMemAPI heap = DqnMemAPI::HeapAllocator();
 
         auto stack   = DqnMemStack(size, Dqn::ZeroClear::Yes, 0, &heap);
         auto *block1 = stack.block;
 
-        size += additionalSize;
+        size += additional_size;
         auto *result1 = stack.Push(size);
         auto *block2  = stack.block;
 
-        size += additionalSize;
+        size += additional_size;
         auto *result2 = stack.Push(size);
         auto *block3  = stack.block;
 
-        size += additionalSize;
+        size += additional_size;
         auto *result3 = stack.Push(size);
         auto *block4  = stack.block;
 
-        size += additionalSize;
+        size += additional_size;
         auto *result4 = stack.Push(size);
         auto *block5  = stack.block;
 
         DQN_ASSERT(result1 && result2 && result3 && result4);
         DQN_ASSERT(block1 && block2 && block3 && block4 && block5);
-        DQN_ASSERT(block5->prevBlock == block4);
-        DQN_ASSERT(block4->prevBlock == block3);
-        DQN_ASSERT(block3->prevBlock == block2);
-        DQN_ASSERT(block2->prevBlock == block1);
-        DQN_ASSERT(block1->prevBlock == nullptr);
+        DQN_ASSERT(block5->prev_block == block4);
+        DQN_ASSERT(block4->prev_block == block3);
+        DQN_ASSERT(block3->prev_block == block2);
+        DQN_ASSERT(block2->prev_block == block1);
+        DQN_ASSERT(block1->prev_block == nullptr);
 
         DQN_ASSERT(stack.FreeMemBlock(block4));
         DQN_ASSERT(stack.block == block5);
-        DQN_ASSERT(block5->prevBlock == block3);
-        DQN_ASSERT(block3->prevBlock == block2);
-        DQN_ASSERT(block2->prevBlock == block1);
-        DQN_ASSERT(block1->prevBlock == nullptr);
+        DQN_ASSERT(block5->prev_block == block3);
+        DQN_ASSERT(block3->prev_block == block2);
+        DQN_ASSERT(block2->prev_block == block1);
+        DQN_ASSERT(block1->prev_block == nullptr);
 
         DQN_ASSERT(stack.FreeMemBlock(block5));
         DQN_ASSERT(stack.block == block3);
-        DQN_ASSERT(block3->prevBlock == block2);
-        DQN_ASSERT(block2->prevBlock == block1);
-        DQN_ASSERT(block1->prevBlock == nullptr);
+        DQN_ASSERT(block3->prev_block == block2);
+        DQN_ASSERT(block2->prev_block == block1);
+        DQN_ASSERT(block1->prev_block == nullptr);
 
         stack.Free();
-        DQN_ASSERT(stack.memAPI->bytesAllocated == 0);
+        DQN_ASSERT(stack.mem_api->bytes_allocated == 0);
         DQN_ASSERT(stack.block == nullptr);
         Log(Status::Ok, "Check freeing arbitrary blocks and freeing");
     }
@@ -302,16 +302,16 @@ FILE_SCOPE void DqnMemStack_Test()
             auto *result1    = stack.Push(100);
             auto *result2    = stack.Push(100, DqnMemStack::AllocTo::Tail);
             auto *headBefore = stack.block->head;
-            auto *tailBefore = stack.block->tail;
+            auto *tail_before = stack.block->tail;
             DQN_ASSERT(result2 && result1);
             DQN_ASSERT(result2 != result1 && result1 < result2);
 
             stack.Pop(result2);
             DQN_ASSERT(headBefore == stack.block->head)
-            DQN_ASSERT(tailBefore != stack.block->tail)
+            DQN_ASSERT(tail_before != stack.block->tail)
 
             stack.Pop(result1);
-            DQN_ASSERT(stack.block->prevBlock == false);
+            DQN_ASSERT(stack.block->prev_block == false);
             DQN_ASSERT(stack.block->head == stack.block->memory);
             DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
             stack.Free();
@@ -327,26 +327,26 @@ FILE_SCOPE void DqnMemStack_Test()
                 DqnMemStack stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
 
                 auto *result1 = stack.Push(100);
-                DQN_ASSERT(stack.block->prevBlock == nullptr);
+                DQN_ASSERT(stack.block->prev_block == nullptr);
                 DQN_ASSERT(stack.block->head > stack.block->memory && stack.block->head < stack.block->tail);
                 DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
-                auto *blockBefore = stack.block;
+                auto *block_before = stack.block;
 
                 auto *result2 = stack.Push(DQN_MEGABYTE(1), DqnMemStack::AllocTo::Tail);
                 DQN_ASSERT(result2 && result1);
                 DQN_ASSERT(result2 != result1);
-                DQN_ASSERT(stack.block->prevBlock == blockBefore);
-                DQN_ASSERT(stack.block != blockBefore);
+                DQN_ASSERT(stack.block->prev_block == block_before);
+                DQN_ASSERT(stack.block != block_before);
 
                 DQN_ASSERT(stack.block->head == stack.block->memory);
                 DQN_ASSERT(stack.block->tail < stack.block->memory + stack.block->size &&
                            stack.block->tail >= stack.block->head);
 
                 stack.Pop(result2);
-                DQN_ASSERT(blockBefore == stack.block);
+                DQN_ASSERT(block_before == stack.block);
 
                 stack.Pop(result1);
-                DQN_ASSERT(blockBefore == stack.block);
+                DQN_ASSERT(block_before == stack.block);
 
                 stack.Free();
             }
@@ -357,23 +357,23 @@ FILE_SCOPE void DqnMemStack_Test()
                 DqnMemStack stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::NonExpandable);
 
                 auto *result1 = stack.Push(100);
-                DQN_ASSERT(stack.block->prevBlock == nullptr);
+                DQN_ASSERT(stack.block->prev_block == nullptr);
                 DQN_ASSERT(stack.block->head != stack.block->memory);
                 DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
-                auto *blockBefore = stack.block;
+                auto *block_before = stack.block;
 
                 auto *result2 = stack.Push(DQN_MEGABYTE(1), DqnMemStack::AllocTo::Tail);
                 DQN_ASSERT(result2 == nullptr);
-                DQN_ASSERT(stack.block->prevBlock == nullptr);
-                DQN_ASSERT(stack.block == blockBefore);
+                DQN_ASSERT(stack.block->prev_block == nullptr);
+                DQN_ASSERT(stack.block == block_before);
                 DQN_ASSERT(stack.block->head > stack.block->memory && stack.block->head < stack.block->tail);
                 DQN_ASSERT(stack.block->tail == stack.block->memory + stack.block->size);
 
                 stack.Pop(result2);
-                DQN_ASSERT(blockBefore == stack.block);
+                DQN_ASSERT(block_before == stack.block);
 
                 stack.Pop(result1);
-                DQN_ASSERT(blockBefore == stack.block);
+                DQN_ASSERT(block_before == stack.block);
 
                 stack.Free();
             }
@@ -395,25 +395,25 @@ FILE_SCOPE void DqnMemStack_Test()
                 DqnMemStack stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
                 auto *api = &stack.myHeadAPI;
 
-                auto *blockBefore = stack.block;
+                auto *block_before = stack.block;
                 auto *headBefore  = stack.block->head;
 
-                isize bufSize = 16;
-                char *buf     = (char *)stack.Push(bufSize);
-                DqnMem_Set(buf, 'X', bufSize);
-                for (auto i = 0; i < bufSize; i++) DQN_ASSERT(buf[i] == 'X');
+                isize buf_size = 16;
+                char *buf     = (char *)stack.Push(buf_size);
+                DqnMem_Set(buf, 'X', buf_size);
+                for (auto i = 0; i < buf_size; i++) DQN_ASSERT(buf[i] == 'X');
 
-                isize oldBufSize = bufSize;
-                bufSize          = 32;
-                buf        = (char *)api->Realloc(buf, oldBufSize, bufSize);
-                for (auto i = 0; i < oldBufSize; i++) DQN_ASSERT(buf[i] == 'X');
-                DqnMem_Set(buf, '@', bufSize);
+                isize old_buf_size = buf_size;
+                buf_size          = 32;
+                buf        = (char *)api->Realloc(buf, old_buf_size, buf_size);
+                for (auto i = 0; i < old_buf_size; i++) DQN_ASSERT(buf[i] == 'X');
+                DqnMem_Set(buf, '@', buf_size);
 
-                DQN_ASSERT(blockBefore == stack.block);
+                DQN_ASSERT(block_before == stack.block);
                 DQN_ASSERT(headBefore < stack.block->head);
                 stack.Pop(buf);
 
-                DQN_ASSERT(blockBefore == stack.block);
+                DQN_ASSERT(block_before == stack.block);
                 DQN_ASSERT(headBefore == stack.block->head);
                 DQN_ASSERT(headBefore == stack.block->memory);
                 stack.Free();
@@ -425,26 +425,26 @@ FILE_SCOPE void DqnMemStack_Test()
                 DqnMemStack stack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
                 auto *api = &stack.myHeadAPI;
 
-                auto *blockBefore = stack.block;
-                auto *tailBefore  = stack.block->tail;
+                auto *block_before = stack.block;
+                auto *tail_before  = stack.block->tail;
 
-                isize bufSize = 16;
-                char *buf     = (char *)stack.Push(bufSize, DqnMemStack::AllocTo::Tail);
-                DqnMem_Set(buf, 'X', bufSize);
-                for (auto i = 0; i < bufSize; i++) DQN_ASSERT(buf[i] == 'X');
+                isize buf_size = 16;
+                char *buf     = (char *)stack.Push(buf_size, DqnMemStack::AllocTo::Tail);
+                DqnMem_Set(buf, 'X', buf_size);
+                for (auto i = 0; i < buf_size; i++) DQN_ASSERT(buf[i] == 'X');
 
-                isize oldBufSize = bufSize;
-                bufSize          = 32;
-                buf        = (char *)api->Realloc(buf, oldBufSize, bufSize);
-                for (auto i = 0; i < oldBufSize; i++) DQN_ASSERT(buf[i] == 'X');
-                DqnMem_Set(buf, '@', bufSize);
+                isize old_buf_size = buf_size;
+                buf_size          = 32;
+                buf        = (char *)api->Realloc(buf, old_buf_size, buf_size);
+                for (auto i = 0; i < old_buf_size; i++) DQN_ASSERT(buf[i] == 'X');
+                DqnMem_Set(buf, '@', buf_size);
 
-                DQN_ASSERT(blockBefore == stack.block);
-                DQN_ASSERT(tailBefore > stack.block->tail);
+                DQN_ASSERT(block_before == stack.block);
+                DQN_ASSERT(tail_before > stack.block->tail);
                 stack.Pop(buf);
 
-                DQN_ASSERT(blockBefore == stack.block);
-                DQN_ASSERT(tailBefore == stack.block->tail);
+                DQN_ASSERT(block_before == stack.block);
+                DQN_ASSERT(tail_before == stack.block->tail);
                 DQN_ASSERT(stack.block->head == stack.block->memory);
                 stack.Free();
             }
@@ -460,24 +460,24 @@ FILE_SCOPE void DqnMemStack_Test()
                 auto stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
                 auto *api = &stack.myHeadAPI;
 
-                auto *blockBefore = stack.block;
+                auto *block_before = stack.block;
                 auto *headBefore  = stack.block->head;
 
-                isize bufSize = 16;
-                char *buf     = (char *)stack.Push(bufSize);
-                DqnMem_Set(buf, 'X', bufSize);
-                for (auto i = 0; i < bufSize; i++) DQN_ASSERT(buf[i] == 'X');
+                isize buf_size = 16;
+                char *buf     = (char *)stack.Push(buf_size);
+                DqnMem_Set(buf, 'X', buf_size);
+                for (auto i = 0; i < buf_size; i++) DQN_ASSERT(buf[i] == 'X');
 
-                isize oldBufSize = bufSize;
-                bufSize          = DQN_MEGABYTE(2);
-                buf              = (char *)api->Realloc(buf, oldBufSize, bufSize);
-                for (auto i = 0; i < oldBufSize; i++) DQN_ASSERT(buf[i] == 'X');
-                DqnMem_Set(buf, '@', bufSize);
+                isize old_buf_size = buf_size;
+                buf_size          = DQN_MEGABYTE(2);
+                buf              = (char *)api->Realloc(buf, old_buf_size, buf_size);
+                for (auto i = 0; i < old_buf_size; i++) DQN_ASSERT(buf[i] == 'X');
+                DqnMem_Set(buf, '@', buf_size);
 
-                DQN_ASSERT(blockBefore == stack.block->prevBlock);
+                DQN_ASSERT(block_before == stack.block->prev_block);
                 stack.Pop(buf);
 
-                DQN_ASSERT(blockBefore == stack.block);
+                DQN_ASSERT(block_before == stack.block);
                 DQN_ASSERT(headBefore == stack.block->head);
                 DQN_ASSERT(headBefore == stack.block->memory);
                 stack.Free();
@@ -489,27 +489,27 @@ FILE_SCOPE void DqnMemStack_Test()
                 DqnMemStack stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
                 auto *api = &stack.myHeadAPI;
 
-                auto *blockBefore = stack.block;
-                auto *tailBefore  = stack.block->tail;
+                auto *block_before = stack.block;
+                auto *tail_before  = stack.block->tail;
 
-                isize bufSize = 16;
-                char *buf     = (char *)stack.Push(bufSize, DqnMemStack::AllocTo::Tail);
-                DqnMem_Set(buf, 'X', bufSize);
-                for (auto i = 0; i < bufSize; i++) DQN_ASSERT(buf[i] == 'X');
+                isize buf_size = 16;
+                char *buf     = (char *)stack.Push(buf_size, DqnMemStack::AllocTo::Tail);
+                DqnMem_Set(buf, 'X', buf_size);
+                for (auto i = 0; i < buf_size; i++) DQN_ASSERT(buf[i] == 'X');
 
-                isize oldBufSize = bufSize;
-                bufSize          = DQN_MEGABYTE(2);
-                buf              = (char *)api->Realloc(buf, oldBufSize, bufSize);
-                for (auto i = 0; i < oldBufSize; i++)
+                isize old_buf_size = buf_size;
+                buf_size          = DQN_MEGABYTE(2);
+                buf              = (char *)api->Realloc(buf, old_buf_size, buf_size);
+                for (auto i = 0; i < old_buf_size; i++)
                     DQN_ASSERT(buf[i] == 'X');
-                DqnMem_Set(buf, '@', bufSize);
+                DqnMem_Set(buf, '@', buf_size);
 
-                DQN_ASSERT(blockBefore != stack.block);
-                DQN_ASSERT(blockBefore == stack.block->prevBlock);
+                DQN_ASSERT(block_before != stack.block);
+                DQN_ASSERT(block_before == stack.block->prev_block);
                 stack.Pop(buf);
 
-                DQN_ASSERT(blockBefore == stack.block);
-                DQN_ASSERT(tailBefore == stack.block->tail);
+                DQN_ASSERT(block_before == stack.block);
+                DQN_ASSERT(tail_before == stack.block->tail);
 
                 DQN_ASSERT(stack.block->head == stack.block->memory);
                 stack.Free();
