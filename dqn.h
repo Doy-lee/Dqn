@@ -1939,6 +1939,7 @@ using DqnFixedString128  = DqnFixedString<128>;
 using DqnFixedString256  = DqnFixedString<256>;
 using DqnFixedString512  = DqnFixedString<512>;
 using DqnFixedString1024 = DqnFixedString<1024>;
+using DqnFixedString2048 = DqnFixedString<2048>;
 
 struct DqnJson
 {
@@ -2692,6 +2693,9 @@ DQN_FILE_SCOPE i32 DqnWin32_WCharToUTF8(const wchar_t *const in, char    *const 
 DQN_FILE_SCOPE void DqnWin32_GetClientDim     (HWND const window, LONG *width, LONG *height);
 DQN_FILE_SCOPE void DqnWin32_GetRectDim       (RECT const rect,   LONG *width, LONG *height);
 
+DQN_FILE_SCOPE char const *DqnWin32_GetLastError();
+
+// TODO(doyle): #deprecate #delete Display Last Error is mostly useless.
 // Displays error in the format <err_prefix>: <Win32 Error Message> in a Win32 Dialog Box.
 // err_prefix: The message before the Win32 error, can be nullptr
 DQN_FILE_SCOPE void DqnWin32_DisplayLastError (const char *const err_prefix);
@@ -8917,22 +8921,29 @@ DQN_FILE_SCOPE void DqnWin32_GetRectDim(RECT const rect, LONG *width, LONG *heig
     if (height) *height = rect.bottom - rect.top;
 }
 
-DQN_FILE_SCOPE void DqnWin32_DisplayLastError(char const *err_prefix)
+DQN_FILE_SCOPE char const *DqnWin32_GetLastError()
 {
-    DWORD error         = GetLastError();
-    char err_msg[1024] = {0};
+    LOCAL_PERSIST char err_msg[2048];
+    err_msg[0] = 0;
+
+    DWORD error = GetLastError();
     FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                    nullptr, error, 0, err_msg, DQN_ARRAY_COUNT(err_msg), nullptr);
 
+    return err_msg;
+}
+
+DQN_FILE_SCOPE void DqnWin32_DisplayLastError(char const *err_prefix)
+{
     if (err_prefix)
     {
         char formatted_err[2048] = {0};
-        Dqn_sprintf(formatted_err, "%s: %s", err_prefix, err_msg);
+        Dqn_sprintf(formatted_err, "%s: %s", err_prefix, DqnWin32_GetLastError());
         DQN__WIN32_ERROR_BOX(formatted_err, nullptr);
     }
     else
     {
-        DQN__WIN32_ERROR_BOX(err_msg, nullptr);
+        DQN__WIN32_ERROR_BOX(DqnWin32_GetLastError(), nullptr);
     }
 }
 
