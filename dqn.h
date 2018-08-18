@@ -44,7 +44,8 @@
 // #DqnRect        Rectangles
 // #DqnString      String library
 // #DqnFixedString Fixed sized strings at compile time.
-// #DqnHashTable   Hash Tables using Templates
+// #DqnLogger
+// #DqnJson        Zero Allocation Json Parser
 
 // #XPlatform (Win32 & Unix)
 // #DqnVArray     Array backed by virtual memory
@@ -1940,6 +1941,56 @@ using DqnFixedString256  = DqnFixedString<256>;
 using DqnFixedString512  = DqnFixedString<512>;
 using DqnFixedString1024 = DqnFixedString<1024>;
 using DqnFixedString2048 = DqnFixedString<2048>;
+
+// #DqnLogger Public API
+// =================================================================================================
+struct DqnLogger
+{
+#define LOG_TYPES \
+    X(Warning, "WARN ") \
+    X(Error, "ERROR") \
+    X(Debug, "DEBUG")
+
+#define X(type, prefix) type,
+    enum struct Type { LOG_TYPES };
+#undef X
+
+#define X(type, prefix) prefix,
+    static char const *TypePrefix(Type type)
+    {
+        LOCAL_PERSIST char const *type_string[] = {LOG_TYPES};
+        return type_string[static_cast<i32>(type)];
+    }
+#undef X
+#undef LOG_TYPES
+
+    struct Context
+    {
+        char *filename;
+        int   filename_len;
+        char *function;
+        int   function_len;
+        int   line_number;
+    };
+
+    #define DQN_LOGGER_CONTEXT {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}
+    #define DQN_LOGGER_D(logger, fmt, ...) logger.Log(DqnLogger::Type::Debug,   {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_W(logger, fmt, ...) logger.Log(DqnLogger::Type::Warning, {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_E(logger, fmt, ...) logger.Log(DqnLogger::Type::Error,   {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
+
+    DqnFixedString1024 log_builder;
+    b32                no_console; // Log to console if false.
+    b32                no_print_error;
+    b32                no_print_debug;
+    b32                no_print_warning;
+
+    // Build up a log line that gets prepended to the next log. When Log() is called and is then reset.
+    // <file context> <prepend to log> <log message>
+    void PrependToLog(char const *fmt, ...) { va_list va; va_start (va, fmt); log_builder.VSprintfAppend(fmt, va); va_end(va); }
+
+    // return: A static string whose lifetime persists until the next log call.
+    char const *Log(Type type, Context const log_context, char const *fmt, ...);
+};
 
 struct DqnJson
 {
@@ -5669,6 +5720,43 @@ FILE_SCOPE int DqnFixedString__Append(char *dest, int dest_size, char const *src
     DQN_ASSERT(len < dest_size && len >= 0);
     dest[len] = 0;
     return len;
+}
+
+// #DqnLogger Implementation
+// =================================================================================================
+char const *DqnLogger::Log(Type type, Context const log_context, char const *fmt, ...)
+{
+    va_list va;
+    va_start(va, fmt);
+    DQN_DEFER(va_end(va));
+
+    LOCAL_PERSIST DqnFixedString2048 fmt_msg;
+    fmt_msg.Clear();
+
+    char const *stripped_filename = nullptr;
+    for (size_t i = log_context.filename_len; i >= 0 && !stripped_filename; i--)
+        stripped_filename = (log_context.filename[i] == '\\') ? log_context.filename + (i + 1) : nullptr;
+
+    fmt_msg.SprintfAppend("%s|%05d|%s| `%s`: ",
+                          (stripped_filename) ? stripped_filename : log_context.filename,
+                          log_context.line_number,
+                          TypePrefix(type),
+                          log_context.function);
+
+    fmt_msg.SprintfAppend("%s", this->log_builder.str);
+    this->log_builder.Clear();
+
+    fmt_msg.VSprintfAppend(fmt, va);
+    fmt_msg.SprintfAppend("\n");
+    char const *result = fmt_msg.str;
+
+    if (this->no_console) return result;
+    if (this->no_print_error && type == Type::Error) return result;
+    if (this->no_print_debug && type == Type::Debug) return result;
+    if (this->no_print_warning && type == Type::Warning) return result;
+
+    fprintf(stderr, "%s", result);
+    return result;
 }
 
 // #Dqn
