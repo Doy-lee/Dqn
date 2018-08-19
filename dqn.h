@@ -24,7 +24,8 @@
 // #Portable Code
 // #DqnSprintf     Cross-platform Sprintf Implementation (Public Domain lib stb_sprintf)
 // #DqnAssert      Assertions and Logging
-// #DqnSlice       Slices
+// #DqnSlice       A ptr and length into memory but doesn't imply ownership of memory
+// #DqnBuffer      Typedef to slices, but indicates ownership of the memory
 // #DqnChar        Char  Operations (IsDigit(), IsAlpha() etc)
 // #DqnStr         Str   Operations (Str_Len(), Str_Copy() etc)
 // #DqnWChar       WChar Operations (IsDigit(), IsAlpha() etc)
@@ -758,20 +759,30 @@ DQN_FILE_SCOPE void DqnLogExpr(char const *file, char const *function_name, i32 
 
 DQN_COMPILE_ASSERT(sizeof(isize) == sizeof(usize));
 
-// #DqnSlice API
+// #DqnSlice/#DqnBuffer
 // =================================================================================================
+// NOTE: A slice and buffer is the same thing but, slices have the pre-existing concepts of being a
+// a ptr and length into pre-existing allocated memory. So instead, I use buffer to indicate the
+// data structure it self owns the memory it's holding.
 template <typename T>
 struct DqnSlice
 {
-    T   *data;
-    i32  len;
+    union { T *data; T *str; };
+    int  len;
 
     DqnSlice() = default;
-    DqnSlice(T *str, i32 len) { this->data = str; this->len = len; }
+    DqnSlice(T *data_, int len_) : data(data_), len(len_) {}
 };
-#define DQN_SLICE(literal) DqnSlice<char const>(literal, DQN_CHAR_COUNT(literal))
 
-#define DQN_SLICE_CMP(a, b, ignoreCase)  (a.len == b.len && (DqnStr_Cmp(a.data, b.data, a.len, ignoreCase) == 0))
+template<typename T>
+using DqnBuffer = DqnSlice<T>;
+
+#define DQN_BUFFER_STR_LIT(literal) DqnBuffer<char const>(literal, DQN_CHAR_COUNT(literal))
+#define DQN_BUFFER_STRCMP(a, b, ignore_case) ((a).len == (b).len && (DqnStr_Cmp((char *)((a).str), (char *)((b).str), (a).len, ignore_case) == 0))
+#define DQN_BUFFER_MEMCMP(a, b)              ((a).len == (b).len && (DqnMem_Cmp((void *)((a).str), (void *)((b).str), (a).len) == 0))
+
+#define DQN_BUFFER_STR_LIT_STRCMP(a, b, ignore_case) ((a).len == (b).len && (DqnStr_Cmp((char *)((a).str), (char *)((b).str), (a).len, ignore_case) == 0))
+#define DQN_BUFFER_STR_LIT_MEMCMP(a, b)              ((a).len == (b).len && (DqnMem_Cmp((void *)((a).str), (void *)((b).str), (a).len) == 0))
 // #DqnChar API
 // =================================================================================================
 DQN_FILE_SCOPE char DqnChar_ToLower     (char c);
@@ -1470,7 +1481,8 @@ struct DqnMemTracker
 //             stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard);
 // u8 *data =  stack.Push(128);
 
-#define DQN_MEM_STACK_PUSH_STRUCT(memStack, Type, num) (Type *)(memStack)->Push(sizeof(Type) * num)
+#define DQN_MEMSTACK_PUSH_STRUCT(memstack, Type)     (Type *)(memstack)->Push(sizeof(Type))
+#define DQN_MEMSTACK_PUSH_ARRAY(memstack, Type, num) (Type *)(memstack)->Push(sizeof(Type) * (num))
 struct DqnMemStack
 {
     static const i32 MINIMUM_BLOCK_SIZE = DQN_KILOBYTE(64);
@@ -1506,10 +1518,10 @@ struct DqnMemStack
     };
 
     DqnMemTracker  tracker;         // Read: Metadata for managing ptr allocation
-    DqnMemAPI     *mem_api;          // Read: API used to add additional memory blocks to this stack.
+    DqnMemAPI     *mem_api;         // Read: API used to add additional memory blocks to this stack.
     Block         *block;           // Read: Memory block allocated for the stack
     u32            flags;           // Read
-    i32            tmp_region_count; // Read: The number of temp memory regions in use
+    i32            tmp_region_count;// Read: The number of temp memory regions in use
 
     DqnMemStack() = default;
 
@@ -1550,7 +1562,7 @@ struct DqnMemStack
     void  ResetTail     ();
 
     // Reset the current memory block usage to 0.
-    void  ClearCurrBlock(Dqn::ZeroClear clear);
+    void  ClearCurrBlock(Dqn::ZeroClear clear = Dqn::ZeroClear::No);
     Info  GetInfo       ()                      const;
 
     // Temporary Memory Regions API
@@ -1949,7 +1961,8 @@ struct DqnLogger
 #define LOG_TYPES \
     X(Warning, "WARN ") \
     X(Error, "ERROR") \
-    X(Debug, "DEBUG")
+    X(Debug, "DEBUG") \
+    X(Message, "MSG  ")
 
 #define X(type, prefix) type,
     enum struct Type { LOG_TYPES };
@@ -1974,9 +1987,10 @@ struct DqnLogger
     };
 
     #define DQN_LOGGER_CONTEXT {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}
-    #define DQN_LOGGER_D(logger, fmt, ...) logger.Log(DqnLogger::Type::Debug,   {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
-    #define DQN_LOGGER_W(logger, fmt, ...) logger.Log(DqnLogger::Type::Warning, {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
-    #define DQN_LOGGER_E(logger, fmt, ...) logger.Log(DqnLogger::Type::Error,   {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_D(logger, fmt, ...) (logger)->Log(DqnLogger::Type::Debug,   {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_W(logger, fmt, ...) (logger)->Log(DqnLogger::Type::Warning, {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_E(logger, fmt, ...) (logger)->Log(DqnLogger::Type::Error,   {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_M(logger, fmt, ...) (logger)->Log(DqnLogger::Type::Message, {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
 
     DqnFixedString1024 log_builder;
     b32                no_console; // Log to console if false.
@@ -6045,7 +6059,7 @@ DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson *iterator)
 
     if (iterator->type == DqnJson::Type::ArrayOfObjects)
     {
-        if (result = DqnJson_Get(iterator->value, DQN_SLICE("{")))
+        if (result = DqnJson_Get(iterator->value, DQN_BUFFER_STR_LIT("{")))
         {
             char const *end      = iterator->value.data + iterator->value.len;
             iterator->value.data = result.value.data + result.value.len;
@@ -8860,7 +8874,7 @@ DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
         {
             *num_threads_per_core = 0;
             // Find the offset to the processor field and move to it
-            DqnSlice<char const> processor = DQN_SLICE("processor");
+            DqnBuffer<char const> processor = DQN_BUFFER_STR_LIT("processor");
             i32 processorOffset            = DqnStr_FindFirstOccurence(src_ptr, src_len, processor.data, processor.len);
 
             DQN_ASSERT(processorOffset != -1);
@@ -8880,8 +8894,8 @@ DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
         {
             *num_cores   = 0;
             // Find the offset to the cpu cores field and move to it
-            DqnSlice<char const> cpuCores = DQN_SLICE("cpu cores");
-            i32 cpu_cores_offset            = DqnStr_FindFirstOccurence(src_ptr, src_len, cpuCores.data, cpuCores.len);
+            DqnBuffer<char const> cpuCores = DQN_BUFFER_STR_LIT("cpu cores");
+            i32 cpu_cores_offset          = DqnStr_FindFirstOccurence(src_ptr, src_len, cpuCores.data, cpuCores.len);
             DQN_ASSERT(cpu_cores_offset != -1);
 
             DQN_ADVANCE_CHAR_PTR_AND_LEN_INTERNAL(src_ptr, src_len, cpu_cores_offset);

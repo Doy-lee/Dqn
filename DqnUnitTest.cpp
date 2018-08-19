@@ -665,7 +665,7 @@ void DqnString_Test()
     }
 
     {
-        DqnString str  = DQN_SLICE("hello world");
+        DqnString str  = DQN_BUFFER_STR_LIT("hello world");
         DQN_DEFER(str.Free());
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello world") == 0);
 
@@ -674,11 +674,11 @@ void DqnString_Test()
 
     {
         DqnString zero = {};
-        DqnString str  = DQN_SLICE("hello world");
+        DqnString str  = DQN_BUFFER_STR_LIT("hello world");
         str.Free();
         str = zero;
 
-        DqnSlice<char const> helloSlice = DQN_SLICE("hello");
+        DqnBuffer<char const> helloSlice = DQN_BUFFER_STR_LIT("hello");
         str = helloSlice;
         DQN_DEFER(str.Free());
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello") == 0);
@@ -687,7 +687,7 @@ void DqnString_Test()
     }
 
     {
-        DqnString str = DQN_SLICE("hello world");
+        DqnString str = DQN_BUFFER_STR_LIT("hello world");
         DQN_DEFER(str.Free());
         DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
         DQN_ASSERTM(DqnStr_Cmp(str.str, "hello sailor") == 0, "Result: %s", str.str);
@@ -697,15 +697,15 @@ void DqnString_Test()
 
     {
         {
-            DqnString str = DQN_SLICE("hello world");
+            DqnString str = DQN_BUFFER_STR_LIT("hello world");
             DQN_DEFER(str.Free());
             DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
-            str += DQN_SLICE(".end");
+            str += DQN_BUFFER_STR_LIT(".end");
             DQN_ASSERTM(DqnStr_Cmp(str.str, "hello sailor.end") == 0, "Result: %s", str.str);
         }
 
         {
-            DqnString str = DQN_SLICE("hello world");
+            DqnString str = DQN_BUFFER_STR_LIT("hello world");
             DQN_DEFER(str.Free());
             DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
             DQN_ASSERT(str.SprintfAppend(" %d, %d", 100, 200));
@@ -727,10 +727,10 @@ void DqnString_Test()
     }
 
     {
-        DqnString str = DQN_SLICE("hello world");
+        DqnString str = DQN_BUFFER_STR_LIT("hello world");
         DQN_DEFER(str.Free());
         DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
-        str = str + " end" + DQN_SLICE(" of");
+        str = str + " end" + DQN_BUFFER_STR_LIT(" of");
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor end of") == 0);
 
         Log(Status::Ok, "Operator +");
