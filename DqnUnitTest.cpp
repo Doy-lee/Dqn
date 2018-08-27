@@ -1778,17 +1778,6 @@ void DqnFile_Test()
             file.Close();
             DQN_ASSERT(!file.handle && file.size == 0 && file.flags == 0);
 
-            if (1)
-            {
-                DqnSmartFile raiiFile = {};
-                if (raiiFile.Open(
-                        FILE_TO_OPEN, DqnFile::Flag::FileReadWrite, DqnFile::Action::OpenOnly))
-                {
-                    i32 breakHereToTestRaii = 0;
-                    (void)breakHereToTestRaii;
-                }
-            }
-
             Log(Status::Ok, "General test");
         }
 

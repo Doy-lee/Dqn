@@ -803,12 +803,6 @@ DQN_FILE_SCOPE char *DqnChar_SkipWhitespace      (char const *ptr);
 // return:    The ptr to the last char, null if it could not find.
 DQN_FILE_SCOPE char *DqnChar_FindLastChar  (char *ptr, char ch, i32 len, u32 *len_to_char);
 
-// Finds up to the first [\r]\n and destroy the line, giving you a null terminated line at the newline.
-// returns: The value to advance the ptr by, this can be different from the line
-//          length if there are new lines or leading whitespaces in the next line
-DQN_FILE_SCOPE i32   DqnChar_FindNextLine(char *ptr, i32 *line_len);
-DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *line_len);
-
 // #DqnStr API
 // =================================================================================================
 // num_bytes_to_cmp: If -1, cmp runs until \0 is encountered.
@@ -906,6 +900,11 @@ i32 Dqn_SplitString(char const *src, i32 src_len, char split_char, DqnSlice<char
 // Util function that uses Dqn_SplitString
 // return: The number of splits, splitting by "split_char" would generate.
 i32 Dqn_GetNumSplits(char const *src, i32 src_len, char split_char);
+
+// Skips whitespace then reads UTF8 rune upto first \r or \n and null terminates at that point. Advances input to the start of the next line.
+// return: The immediate null terminated line
+DQN_FILE_SCOPE char    *Dqn_EatLine(char **input, int *line_len);
+DQN_FILE_SCOPE wchar_t *Dqn_EatLine(wchar_t **input, int *line_len);
 
 DQN_FILE_SCOPE inline bool Dqn_BitIsSet (u32 bits, u32 flag);
 DQN_FILE_SCOPE inline u32  Dqn_BitSet   (u32 bits, u32 flag);
@@ -1514,7 +1513,8 @@ struct DqnMemStack
         char *head;       // Read
         char *tail;       // Read
 
-        Block(void *memory_, isize size_) : memory((char *)memory_), size(size_), prev_block(nullptr), head((char *)memory_), tail((char *)memory_ + size_) {}
+        Block() = default;
+        Block(void *memory_, isize size_) { *this = {}; memory = (char *)memory_; size = size_; head = memory; tail = memory + size; }
     };
 
     DqnMemTracker  tracker;         // Read: Metadata for managing ptr allocation
@@ -2142,6 +2142,11 @@ const u64 DQN_VHASH_TABLE_DEFAULT_SEED = 0x9747B28CAB3F8A7B;
 template <typename T> DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash, T)   { return DqnHash_Murmur64Seed(&key, sizeof(key), DQN_VHASH_TABLE_DEFAULT_SEED) % count; }
 template <typename T> DQN_VHASH_TABLE_EQUALS_PROC (DqnVHashTableDefaultEquals, T) { return (DqnMem_Cmp(&a, &b, sizeof(a)) == 0); }
 
+template <> DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash<DqnString>,   DqnString) { return DqnHash_Murmur64Seed(&key.str, key.len, DQN_VHASH_TABLE_DEFAULT_SEED) % count; }
+template <> DQN_VHASH_TABLE_EQUALS_PROC (DqnVHashTableDefaultEquals<DqnString>, DqnString) { return (a.len == b.len) && (DqnStr_Cmp(a.str, b.str, a.len) == 0); }
+template <> DQN_VHASH_TABLE_HASHING_PROC(DqnVHashTableDefaultHash<DqnBuffer<char>>,   DqnBuffer<char>) { return DqnHash_Murmur64Seed(&key.str, key.len, DQN_VHASH_TABLE_DEFAULT_SEED) % count; }
+template <> DQN_VHASH_TABLE_EQUALS_PROC (DqnVHashTableDefaultEquals<DqnBuffer<char>>, DqnBuffer<char>) { return DQN_BUFFER_STRCMP(a, b, Dqn::IgnoreCase::No); }
+
 // TODO(doyle): Fix this so we don't have to manually declare the fixed string sizes for hashing and equals
 #define DQN_VHASH_TABLE_DEFAULT_FIXED_STRING_PROCS(StringCapacity)                                 \
     template <>                                                                                    \
@@ -2190,19 +2195,19 @@ struct DqnVHashTable
     struct Bucket
     {
         Entry entries[4];
-        isize entryIndex;
+        isize entry_index;
     };
 
     Bucket    *buckets;
-    isize      numBuckets;
-    isize     *indexesOfUsedBuckets;
-    isize      indexInUsedBuckets;
+    isize      num_buckets;
+    isize     *indexes_of_used_buckets;
+    isize      num_used_buckets;
 
     DqnVHashTable       () = default;
-    DqnVHashTable       (isize size)                                                    { LazyInit(size); }
+    DqnVHashTable       (isize size)                       { LazyInit(size); }
 
     void       LazyInit (isize size = DQN_MAX(DQN_MEGABYTE(1)/sizeof(Bucket), 1024) );
-    void       Free     ()                                  { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * numBuckets); *this = {}; }
+    void       Free     ()                                 { if (buckets) DqnOS_VFree(buckets, sizeof(buckets) * num_buckets); *this = {}; }
 
     void       Erase    (Key const &key);                           // Delete the element matching key, does nothing if key not found.
     Entry     *GetEntry (Key const &key);                           // return: The (key, item) entry associated with the key, nullptr if key not in table yet.
@@ -2215,15 +2220,15 @@ struct DqnVHashTable
     struct Iterator
     {
         Entry  *entry;
-        Iterator(DqnVHashTable *table_, isize indexInUsedBuckets_ = 0, isize indexInBucket_ = 0);
-        Bucket *GetCurrBucket() const { return (table->buckets + table->indexesOfUsedBuckets[indexInUsedBuckets]); }
-        Entry  *GetCurrEntry()  const { return GetCurrBucket()->entries + indexInBucket; }
+        Iterator(DqnVHashTable *table_, isize num_used_buckets_ = 0, isize index_in_bucket_ = 0);
+        Bucket *GetCurrBucket() const { return (table->buckets + table->indexes_of_used_buckets[num_used_buckets]); }
+        Entry  *GetCurrEntry()  const { return GetCurrBucket()->entries + index_in_bucket; }
         Item   *GetCurrItem ()  const { return &(GetCurrEntry()->item); }
 
-        bool      operator!=(Iterator const &other) const { return !(indexInUsedBuckets == other.indexInUsedBuckets && indexInBucket == other.indexInBucket); }
+        bool      operator!=(Iterator const &other) const { return !(num_used_buckets == other.num_used_buckets && index_in_bucket == other.index_in_bucket); }
         Entry    &operator* ()                      const { return *GetCurrEntry(); }
         Iterator &operator++();
-        Iterator &operator--()                            { if (--indexInBucket < 0) { indexInBucket = 0; indexInUsedBuckets = DQN_MAX(--indexInUsedBuckets, 0); } entry = GetCurrEntry(); return *this; }
+        Iterator &operator--()                            { if (--index_in_bucket < 0) { index_in_bucket = 0; num_used_buckets = DQN_MAX(--num_used_buckets, 0); } entry = GetCurrEntry(); return *this; }
         Iterator  operator++(int)                         { Iterator result = *this; ++(*this); return result; }
         Iterator  operator--(int)                         { Iterator result = *this; --(*this); return result; }
         Iterator  operator+ (int offset)            const { Iterator result = *this; DQN_FOR_EACH(i, DQN_ABS(offset)) { (offset > 0) ? ++result : --result; } return result; } // TODO(doyle): Improve
@@ -2231,33 +2236,33 @@ struct DqnVHashTable
 
     private:
         DqnVHashTable *table;
-        isize          indexInUsedBuckets;
-        isize          indexInBucket;
+        isize          num_used_buckets;
+        isize          index_in_bucket;
     };
 
     Iterator   Begin() { return begin(); }
     Iterator   End()   { return end(); }
     Iterator   begin() { return Iterator(this); }
-    Iterator   end()   { return Iterator(this, numBuckets, DQN_ARRAY_COUNT(this->buckets[0].entries)); }
+    Iterator   end()   { return Iterator(this, num_buckets, DQN_ARRAY_COUNT(this->buckets[0].entries)); }
 };
 
 DQN_VHASH_TABLE_TEMPLATE DQN_VHASH_TABLE_DECL::Iterator::Iterator(DqnVHashTable *table_,
-                                                                  isize indexInUsedBuckets_,
-                                                                  isize indexInBucket_)
+                                                                  isize num_used_buckets_,
+                                                                  isize index_in_bucket_)
 : table(table_)
-, indexInUsedBuckets(indexInUsedBuckets_)
-, indexInBucket(indexInBucket_)
+, num_used_buckets(num_used_buckets_)
+, index_in_bucket(index_in_bucket_)
 , entry(nullptr)
 {
-    bool sentinelIndex = (indexInUsedBuckets == table->numBuckets &&
-                          indexInBucket == DQN_ARRAY_COUNT(table->buckets[0].entries));
-    bool emptyTable = (table->indexInUsedBuckets == 0);
-    if (emptyTable || sentinelIndex)
+    bool sentinel_index = (num_used_buckets == table->num_buckets &&
+                          index_in_bucket == DQN_ARRAY_COUNT(table->buckets[0].entries));
+    bool empty_table = (table->num_used_buckets == 0);
+    if (empty_table || sentinel_index)
     {
-        if (emptyTable)
+        if (empty_table)
         {
-            this->indexInUsedBuckets = table->numBuckets;
-            this->indexInBucket      = DQN_ARRAY_COUNT(table->buckets[0].entries);
+            this->num_used_buckets = table->num_buckets;
+            this->index_in_bucket      = DQN_ARRAY_COUNT(table->buckets[0].entries);
         }
     }
     else
@@ -2268,13 +2273,13 @@ DQN_VHASH_TABLE_TEMPLATE DQN_VHASH_TABLE_DECL::Iterator::Iterator(DqnVHashTable 
 
 DQN_VHASH_TABLE_TEMPLATE typename DQN_VHASH_TABLE_DECL::Iterator &DQN_VHASH_TABLE_DECL::Iterator::operator++()
 {
-    if (++indexInBucket >= GetCurrBucket()->entryIndex)
+    if (++index_in_bucket >= GetCurrBucket()->entry_index)
     {
-        indexInBucket = 0;
-        indexInUsedBuckets++;
+        index_in_bucket = 0;
+        num_used_buckets++;
     }
 
-    if (indexInUsedBuckets < table->indexInUsedBuckets)
+    if (num_used_buckets < table->num_used_buckets)
         entry = GetCurrEntry();
     else
         *this = table->end();
@@ -2285,10 +2290,10 @@ DQN_VHASH_TABLE_TEMPLATE typename DQN_VHASH_TABLE_DECL::Iterator &DQN_VHASH_TABL
 DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::LazyInit(isize size)
 {
     *this                      = {};
-    this->numBuckets           = size;
+    this->num_buckets           = size;
     this->buckets              = static_cast<Bucket *>(DqnOS_VAlloc(size * sizeof(*this->buckets)));
-    this->indexesOfUsedBuckets = static_cast<isize *> (DqnOS_VAlloc(size * sizeof(*this->indexesOfUsedBuckets)));
-    DQN_ASSERT(this->buckets && this->indexesOfUsedBuckets);
+    this->indexes_of_used_buckets = static_cast<isize *> (DqnOS_VAlloc(size * sizeof(*this->indexes_of_used_buckets)));
+    DQN_ASSERT(this->buckets && this->indexes_of_used_buckets);
 }
 
 DQN_VHASH_TABLE_TEMPLATE typename DQN_VHASH_TABLE_DECL::Entry *
@@ -2296,11 +2301,11 @@ DQN_VHASH_TABLE_DECL::GetEntry(Key const &key)
 {
     if (!buckets) return nullptr;
 
-    isize index    = Hash(this->numBuckets, key);
+    isize index    = Hash(this->num_buckets, key);
     Bucket *bucket = this->buckets + index;
 
     Entry *result = nullptr;
-    for (isize i = 0; i < bucket->entryIndex && !result; i++)
+    for (isize i = 0; i < bucket->entry_index && !result; i++)
     {
         Entry *entry = bucket->entries + i;
         result       = Equals(entry->key, key) ? entry : nullptr;
@@ -2313,11 +2318,11 @@ DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::GetOrMake(Key const &key, b
 {
     if (!this->buckets) LazyInit();
 
-    isize index    = Hash(this->numBuckets, key);
+    isize index    = Hash(this->num_buckets, key);
     Bucket *bucket = this->buckets + index;
 
     Entry *entry = nullptr;
-    for (isize i = 0; i < bucket->entryIndex && !entry; i++)
+    for (isize i = 0; i < bucket->entry_index && !entry; i++)
     {
         Entry *check = bucket->entries + i;
         entry        = Equals(check->key, key) ? check : nullptr;
@@ -2328,22 +2333,22 @@ DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::GetOrMake(Key const &key, b
 
     if (!entry)
     {
-        DQN_ALWAYS_ASSERTM(bucket->entryIndex < DQN_ARRAY_COUNT(bucket->entries),
+        DQN_ALWAYS_ASSERTM(bucket->entry_index < DQN_ARRAY_COUNT(bucket->entries),
                            "More than %zu collisions in hash table, increase the size of the table or buckets",
                            DQN_ARRAY_COUNT(bucket->entries));
 
-        if (bucket->entryIndex == 0)
-            this->indexesOfUsedBuckets[this->indexInUsedBuckets++] = index;
+        if (bucket->entry_index == 0)
+            this->indexes_of_used_buckets[this->num_used_buckets++] = index;
 
-        entry      = bucket->entries + bucket->entryIndex++;
+        entry      = bucket->entries + bucket->entry_index++;
         entry->key = key;
 
         // TODO(doyle): A maybe case. We're using virtual memory, so you should
         // just initialise a larger size. It's essentially free ... maybe one
         // day we care about resizing the table but at the cost of a lot more code
         // complexity.
-        isize const threshold = static_cast<isize>(0.75f * this->numBuckets);
-        DQN_ALWAYS_ASSERTM(this->indexInUsedBuckets < threshold, "%zu >= %zu", this->indexInUsedBuckets, threshold);
+        isize const threshold = static_cast<isize>(0.75f * this->num_buckets);
+        DQN_ALWAYS_ASSERTM(this->num_used_buckets < threshold, "%zu >= %zu", this->num_used_buckets, threshold);
     }
 
     Item *result = &entry->item;
@@ -2355,31 +2360,31 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
     if (!buckets)
         return;
 
-    isize index    = Hash(this->numBuckets, key);
+    isize index    = Hash(this->num_buckets, key);
     Bucket *bucket = this->buckets + index;
 
-    DQN_FOR_EACH(i, bucket->entryIndex)
+    DQN_FOR_EACH(i, bucket->entry_index)
     {
         Entry *check  = bucket->entries + i;
         if (Equals(check->key, key))
         {
-            for (isize j = i; j < (bucket->entryIndex - 1); ++j)
+            for (isize j = i; j < (bucket->entry_index - 1); ++j)
                 bucket->entries[j] = bucket->entries[j + 1];
 
-            if (--bucket->entryIndex == 0)
+            if (--bucket->entry_index == 0)
             {
-                DQN_FOR_EACH(bucketIndex, this->indexInUsedBuckets)
+                DQN_FOR_EACH(bucketIndex, this->num_used_buckets)
                 {
-                    if (this->indexesOfUsedBuckets[bucketIndex] == index)
+                    if (this->indexes_of_used_buckets[bucketIndex] == index)
                     {
-                        indexesOfUsedBuckets[bucketIndex] =
-                            indexesOfUsedBuckets[--this->indexInUsedBuckets];
+                        indexes_of_used_buckets[bucketIndex] =
+                            indexes_of_used_buckets[--this->num_used_buckets];
                     }
                 }
             }
 
-            DQN_ASSERT(this->indexInUsedBuckets >= 0);
-            DQN_ASSERT(bucket->entryIndex >= 0);
+            DQN_ASSERT(this->num_used_buckets >= 0);
+            DQN_ASSERT(bucket->entry_index >= 0);
             return;
         }
     }
@@ -2463,7 +2468,7 @@ DQN_FILE_SCOPE bool   DqnFile_Size(wchar_t const *path, usize *size);
 
 DQN_FILE_SCOPE bool   DqnFile_MakeDir(char const *path);
 
-// info:   Pass in to fill with file attributes.
+// info:   (Optional) Pass in to fill with file attributes
 // return: False if file access failure
 DQN_FILE_SCOPE bool   DqnFile_GetInfo(char    const *path, DqnFileInfo *info);
 DQN_FILE_SCOPE bool   DqnFile_GetInfo(wchar_t const *path, DqnFileInfo *info);
@@ -2481,11 +2486,6 @@ DQN_FILE_SCOPE bool   DqnFile_Copy   (wchar_t const *src, wchar_t const *dest);
 //           allocated with malloc and must be freed using free() or the helper function ListDirFree()
 DQN_FILE_SCOPE char **DqnFile_ListDir       (char const *dir, i32 *num_files, DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
 DQN_FILE_SCOPE void   DqnFile_ListDirFree   (char **file_list, i32 num_files,  DqnMemAPI *api = DQN_DEFAULT_HEAP_ALLOCATOR);
-
-struct DqnSmartFile : public DqnFile
-{
-    ~DqnSmartFile() { this->Close(); }
-};
 
 // XPlatform > #DqnCatalog API
 // =================================================================================================
@@ -3365,7 +3365,7 @@ DqnMemStack__AllocateBlock(isize size, Dqn::ZeroClear clear, DqnMemAPI *api)
     DQN_ALWAYS_ASSERTM(result, "Allocated memory block was null");
 
     char *block_offset = reinterpret_cast<char *>(result) + sizeof(*result);
-    *result           = DqnMemStack::Block(block_offset, size);
+    *result            = DqnMemStack::Block(block_offset, size);
     return result;
 }
 
@@ -3463,6 +3463,7 @@ void *DqnMemStack::Push(isize size, AllocTo allocTo, u8 alignment)
         DQN_ASSERT(this->block->tail >= this->block->head);
     }
 
+    this->block->used_ = this->block->size - (this->block->tail - this->block->head);
     // Instrument allocation with guards and tracker
     // =============================================================================================
     {
@@ -4645,48 +4646,58 @@ DQN_FILE_SCOPE char *DqnChar_FindLastChar(char *ptr, char ch, i32 len, u32 *len_
     return nullptr;
 }
 
-DQN_FILE_SCOPE i32 DqnChar_FindNextLine(char *ptr, i32 *line_len)
+DQN_FILE_SCOPE char *Dqn_EatLine(char **input, int *line_len)
 {
-    i32 len = 0;
-    ptr     = DqnChar_SkipWhitespace(ptr);
+    *input       = DqnChar_SkipWhitespace(*input);
+    char *result = *input;
 
-    // Advance pointer to first new line
-    while (ptr && *ptr != 0 && *ptr != '\r' && *ptr != '\n')
+    for (int rune_len = -1;; rune_len = -1)
     {
-        ptr++;
-        len++;
-    }
+        u32 rune = 0;
+        for (; rune_len != 0 && rune_len != 1; *input += rune_len)
+            rune_len = DqnStr_ReadUTF8Codepoint(reinterpret_cast<u32 *>(*input), &rune);
 
-    if (!ptr || *ptr == 0)
-    {
-        if (line_len) *line_len = len;
-        return -1;
+        if (rune_len == 1)
+        {
+            if (rune == '\r' || rune == '\n')
+            {
+                char *ptr_to_rune = (*input - rune_len);
+                *ptr_to_rune = 0;
+                *line_len = static_cast<int>(ptr_to_rune - result);
+                return result;
+            }
+        }
+        else if (rune_len == 0)
+        {
+            *line_len = static_cast<int>(*input - result);
+            *input    = nullptr;
+            return result;
+        }
     }
-
-    // Destroy all new lines
-    i32 extra_chars = 0;
-    while (ptr && (*ptr == '\r' || *ptr == '\n' || *ptr == ' '))
-    {
-        *ptr = 0;
-        ptr++;
-        extra_chars++;
-    }
-
-    if (line_len) *line_len = len;
-    return len + extra_chars;
 }
 
-DQN_FILE_SCOPE char *DqnChar_GetNextLine (char *ptr, i32 *line_len)
+DQN_FILE_SCOPE wchar_t *Dqn_EatLine(wchar_t **input, int *line_len)
 {
-    i32 offset_to_next_line = DqnChar_FindNextLine(ptr, line_len);
+    *input          = DqnWChar_SkipWhitespace(*input);
+    wchar_t *result = *input;
 
-    char *result = nullptr;
-    if (offset_to_next_line != -1)
+    for (;; (*input)++)
     {
-        result = ptr + offset_to_next_line;
-    }
+        if (!(*input))
+        {
+            *line_len = static_cast<int>(*input - result);
+            return result;
+        }
 
-    return result;
+        wchar_t ch = (*input)[0];
+        if (ch == '\r' || ch == '\n')
+        {
+            (*input)[0] = 0;
+            *line_len   = static_cast<int>(*input - result);
+            (*input)++;
+            return result;
+        }
+    }
 }
 
 // #DqnStr Implementation
@@ -7908,14 +7919,14 @@ FILE_SCOPE bool DqnFile__UnixGetFileSize(char const *path, usize *size)
 {
     struct stat file_stat = {};
     stat(path, &file_stat);
-    *size = file_stat.st_size;
+    if (size) *size = file_stat.st_size;
 
-    if (*size != 0)
+    if (file_stat.st_size != 0)
       return true;
 
     // NOTE: Can occur in some instances where files are generated on demand, i.e. /proc/cpuinfo.
     // But there can also be zero-byte files, we can't be sure. So manual check by counting bytes
-    if (FILE *file = fopen(path, "rb"))
+    if (size && FILE *file = fopen(path, "rb"))
     {
         DQN_DEFER(fclose(file));
         while (fgetc(file) != EOF)
@@ -8332,7 +8343,7 @@ bool DqnFile_Size(wchar_t const *path, usize *size)
     DqnFileInfo info = {};
     if (DqnFile_GetInfo(path, &info))
     {
-        *size = info.size;
+        if (size) *size = info.size;
         return true;
     }
 
@@ -8382,15 +8393,18 @@ bool DqnFile_GetInfo(wchar_t const *path, DqnFileInfo *info)
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     if (GetFileAttributesExW(path, GetFileExInfoStandard, &attrib_data))
     {
-        info->create_time_in_s     = FileTimeToSeconds(&attrib_data.ftCreationTime);
-        info->last_access_time_in_s = FileTimeToSeconds(&attrib_data.ftLastAccessTime);
-        info->last_write_time_in_s  = FileTimeToSeconds(&attrib_data.ftLastWriteTime);
+        if (info)
+        {
+            info->create_time_in_s     = FileTimeToSeconds(&attrib_data.ftCreationTime);
+            info->last_access_time_in_s = FileTimeToSeconds(&attrib_data.ftLastAccessTime);
+            info->last_write_time_in_s  = FileTimeToSeconds(&attrib_data.ftLastWriteTime);
 
-        // TODO(doyle): What if usize is < Quad.part?
-        LARGE_INTEGER large_int = {};
-        large_int.HighPart      = attrib_data.nFileSizeHigh;
-        large_int.LowPart       = attrib_data.nFileSizeLow;
-        info->size            = (usize)large_int.QuadPart;
+            // TODO(doyle): What if usize is < Quad.part?
+            LARGE_INTEGER large_int = {};
+            large_int.HighPart      = attrib_data.nFileSizeHigh;
+            large_int.LowPart       = attrib_data.nFileSizeLow;
+            info->size            = (usize)large_int.QuadPart;
+        }
 
         return true;
     }
@@ -8419,10 +8433,13 @@ bool DqnFile_GetInfo(char const *path, DqnFileInfo *info)
         return false;
     }
 
-    info->size                  = file_stat.st_size;
-    info->create_time_in_s      = 0;
-    info->last_write_time_in_s  = file_stat.st_mtime;
-    info->last_access_time_in_s = file_stat.st_atime;
+    if (info)
+    {
+        info->size                  = file_stat.st_size;
+        info->create_time_in_s      = 0;
+        info->last_write_time_in_s  = file_stat.st_mtime;
+        info->last_access_time_in_s = file_stat.st_atime;
+    }
 
     return true;
 #endif
