@@ -228,9 +228,8 @@ FILE_SCOPE void DqnMemStack_Test()
     {
         usize size           = 32;
         usize additional_size = DqnMemStack::MINIMUM_BLOCK_SIZE;
-        DqnMemAPI heap = DqnMemAPI::HeapAllocator();
 
-        auto stack   = DqnMemStack(size, Dqn::ZeroClear::Yes, 0, &heap);
+        auto stack   = DqnMemStack(size, Dqn::ZeroClear::Yes, 0);
         auto *block1 = stack.block;
 
         size += additional_size;
@@ -271,7 +270,6 @@ FILE_SCOPE void DqnMemStack_Test()
         DQN_ASSERT(block1->prev_block == nullptr);
 
         stack.Free();
-        DQN_ASSERT(stack.mem_api->bytes_allocated == 0);
         DQN_ASSERT(stack.block == nullptr);
         Log(Status::Ok, "Check freeing arbitrary blocks and freeing");
     }
