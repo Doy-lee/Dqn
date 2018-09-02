@@ -11,7 +11,7 @@ void DqnVHashTable_Test()
         Block block = {};
 
         DqnVHashTable<Height, Block> table = {};
-        DQN_DEFER(table.Free());
+        DQN_DEFER { table.Free(); };
         table.Set(12, block);
 
         Block *getResult      = table.Get(12);
@@ -32,7 +32,7 @@ void DqnVHashTable_Test()
     {
         Block blocks[] = {{0}, {1}, {2}, {3}, {4}};
         DqnVHashTable<Height, Block> table = {};
-        DQN_DEFER(table.Free());
+        DQN_DEFER { table.Free(); };
 
         table.Set(1, blocks[0]);
         table.Set(2, blocks[1]);

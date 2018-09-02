@@ -1,32 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 	<Type Name="DqnArray&lt;*&gt;">
-		<DisplayString>{{count={count}/{max}}}</DisplayString>
+		<DisplayString>{{len={len}/{max}}}</DisplayString>
 		<Expand>
-			<Item Name="[count]">count</Item>
+			<Item Name="[len]">len</Item>
 			<Item Name="[max]">max</Item>
 			<ArrayItems>
-				<Size>count</Size>
+				<Size>len</Size>
 				<ValuePointer>data</ValuePointer>
 			</ArrayItems>
 		</Expand>
 	</Type>
 
 	<Type Name="DqnMemStack::Block">
-		<DisplayString>{{used={used}/{size} prevBlock={prevBlock}}}</DisplayString>
-	</Type>
-
-	<Type Name="DqnMemAPI">
-		<DisplayString>{{bytesAllocated={bytesAllocated} lifetimeBytesAllocated={lifetimeBytesAllocated} lifetimeBytesFreed={lifetimeBytesFreed}}}</DisplayString>
-	</Type>
-
-	<Type Name="DqnHashTable&lt;*&gt;">
-		<DisplayString>{{numEntries={numEntries} numFreeEntries={numFreeEntries} usedEntriesIndex={usedEntriesIndex}}}</DisplayString>
+		<DisplayString>{{used={head-tail}/{size} prev_block={prev_block}}}</DisplayString>
 	</Type>
 
 	<Type Name="DqnSlice&lt;*&gt;">
 		<DisplayString>{len={len} data={data,[len]}}</DisplayString>
 		<StringView>data,s</StringView>
+	</Type>
+
+	<Type Name="DqnBuffer&lt;*&gt;">
+		<DisplayString>{len={len} data={data,[len]}}</DisplayString>
+		<StringView>data,s</StringView>
+	</Type>
+
+	<Type Name="DqnFixedString&lt;*&gt;">
+		<DisplayString>{{len={len} {str,s}}}</DisplayString>
+		<StringView>str,s</StringView>
 	</Type>
 
 	<Type Name="DqnString">

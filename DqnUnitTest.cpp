@@ -651,7 +651,7 @@ void DqnString_Test()
     if (1)
     {
         DqnString str = "hello world";
-        DQN_DEFER(str.Free());
+        DQN_DEFER { str.Free(); };
         str = "hello world2";
         str.Append(", hello again");
         str.Append(", and hello again");
@@ -666,7 +666,7 @@ void DqnString_Test()
 
     {
         DqnString str  = DQN_BUFFER_STR_LIT("hello world");
-        DQN_DEFER(str.Free());
+        DQN_DEFER { str.Free(); };
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello world") == 0);
 
         Log(Status::Ok, "Copy constructor DqnSlice<char>");
@@ -680,7 +680,7 @@ void DqnString_Test()
 
         DqnBuffer<char const> helloSlice = DQN_BUFFER_STR_LIT("hello");
         str = helloSlice;
-        DQN_DEFER(str.Free());
+        DQN_DEFER { str.Free(); };
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello") == 0);
 
         Log(Status::Ok, "Copy constructor (DqnFixedString<>)");
@@ -688,7 +688,7 @@ void DqnString_Test()
 
     {
         DqnString str = DQN_BUFFER_STR_LIT("hello world");
-        DQN_DEFER(str.Free());
+        DQN_DEFER { str.Free(); };
         DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
         DQN_ASSERTM(DqnStr_Cmp(str.str, "hello sailor") == 0, "Result: %s", str.str);
 
@@ -698,7 +698,7 @@ void DqnString_Test()
     {
         {
             DqnString str = DQN_BUFFER_STR_LIT("hello world");
-            DQN_DEFER(str.Free());
+            DQN_DEFER { str.Free(); };
             DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
             str += DQN_BUFFER_STR_LIT(".end");
             DQN_ASSERTM(DqnStr_Cmp(str.str, "hello sailor.end") == 0, "Result: %s", str.str);
@@ -706,7 +706,7 @@ void DqnString_Test()
 
         {
             DqnString str = DQN_BUFFER_STR_LIT("hello world");
-            DQN_DEFER(str.Free());
+            DQN_DEFER { str.Free(); };
             DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
             DQN_ASSERT(str.SprintfAppend(" %d, %d", 100, 200));
             DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor 100, 200") == 0);
@@ -728,7 +728,7 @@ void DqnString_Test()
 
     {
         DqnString str = DQN_BUFFER_STR_LIT("hello world");
-        DQN_DEFER(str.Free());
+        DQN_DEFER { str.Free(); };
         DQN_ASSERT(str.Sprintf("hello %s", "sailor"));
         str = str + " end" + DQN_BUFFER_STR_LIT(" of");
         DQN_ASSERT(DqnStr_Cmp(str.str, "hello sailor end of") == 0);
@@ -738,7 +738,7 @@ void DqnString_Test()
 
     {
         DqnString str = "localhost";
-        DQN_DEFER(str.Free());
+        DQN_DEFER { str.Free(); };
         str.SprintfAppend(":%d", 16832);
         str += "/json_rpc";
         DQN_ASSERT(str.len == 24 && DqnStr_Cmp("localhost:16832/json_rpc", str.str) == 0);
@@ -1299,9 +1299,8 @@ void DqnArray_Test()
 
         if (1)
         {
-            auto stack =
-                DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
-            DQN_DEFER(stack.Free());
+            auto stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, DqnMemStack::Flag::BoundsGuard);
+            DQN_DEFER { stack.Free(); };
 #if 0
             if (1)
             {
@@ -1432,12 +1431,12 @@ void DqnFile_Test()
 
             size_t bytesToWrite = DqnStr_Len(writeData[i]);
             u8 *dataToWrite     = (u8 *)(writeData[i]);
-            size_t bytesWritten = file->Write(dataToWrite, bytesToWrite, 0);
+            size_t bytesWritten = file->Write(dataToWrite, bytesToWrite);
             DQN_ASSERT(bytesWritten == bytesToWrite);
             file->Close();
         }
 
-        auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
+        auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, DqnMemStack::Flag::BoundsGuard);
         // Read data back in
         for (u32 i = 0; i < DQN_ARRAY_COUNT(file_names); i++)
         {
@@ -1573,7 +1572,7 @@ FILE_SCOPE void DqnJobQueue_Test()
     LOG_HEADER();
     global_debug_counter = 0;
 
-    auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
+    auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, DqnMemStack::Flag::BoundsGuard);
 
     u32 num_threads, num_cores;
     DqnOS_GetThreadsAndCores(&num_cores, &num_threads);
@@ -1617,7 +1616,7 @@ void DqnQuickSort_Test()
     auto state = DqnRndPCG();
     if (1)
     {
-        auto stack = DqnMemStack(DQN_KILOBYTE(1), Dqn::ZeroClear::Yes, DqnMemStack::Flag::BoundsGuard);
+        auto stack = DqnMemStack(DQN_KILOBYTE(1), Dqn::ZeroMem::Yes, DqnMemStack::Flag::BoundsGuard);
 
         // Create array of ints
         u32 num_ints      = 1000000;
