@@ -62,11 +62,6 @@
 //   - #DqnWin32     Common Win32 API Helpers
 
 // TODO
-// - DqnMemStack
-//   - Allow 0 size memblock stack initialisation/block-less stack for situations where you don't
-//     care about specifying a size upfront
-//   - Default block size for when new blocks are required
-//
 // - Win32
 //   - Get rid of reliance on MAX_PATH
 //
@@ -1287,9 +1282,9 @@ struct DqnArray
     void  Resize     (isize new_len)                              { if (new_len > max) Reserve(GrowCapacity_(new_len)); len = new_len; }
     void  Resize     (isize new_len, T const *v)                  { if (new_len > max) Reserve(GrowCapacity_(new_len)); if (new_len > len) for (isize n = len; n < new_len; n++) data[n] = *v; len = new_len; }
     void  Reserve    (isize new_max);
-    T    *Make       (isize len = 1)                              { len += len; if (len > max) Reserve(GrowCapacity_(len)); return &data[len - len]; }
+    T    *Make       (isize len_ = 1)                             { len += len_; if (len > max) Reserve(GrowCapacity_(len)); return &data[len - len_]; }
     T    *Push       (T const &v)                                 { if (len + 1 > max) Reserve(GrowCapacity_(len + 1)); data[len++] = v; return data + (len-1); }
-    T    *Push       (T const *v, isize v_len = 1)                { isize new_len = len + v_len; if (new_len > max) Reserve(GrowCapacity_(new_len)); T *result = data + len; for (isize i = 0; i < new_len; ++i) data[len++] = v[i]; return result; }
+    T    *Push       (T const *v, isize v_len)                    { isize new_len = len + v_len; if (new_len > max) Reserve(GrowCapacity_(new_len)); T *result = data + len; for (isize i = 0; i < v_len; ++i) data[len++] = v[i]; return result; }
     void  Pop        ()                                           { if (len > 0) len--; }
     void  Erase      (isize index)                                { DQN_ASSERT(index >= 0 && index < len); data[index] = data[--len]; }
     void  EraseStable(isize index);
@@ -1404,18 +1399,26 @@ struct DqnMemTracker
 
 // #DqnMemStack API
 // =================================================================================================
-// DqnMemStack is an memory allocator in a stack like, push-pop style. It pre-allocates a block of
-// memory at init and sub-allocates from this block to take advantage of memory locality.
+// DqnMemStack is a memory allocator in a stack like, push-pop style. It
+// pre-allocates a block of memory at init and sub-allocates from this block to
+// take advantage of memory locality. You can allocate and grow the stack from
+// the bottom and/or allocate from the top and grow downwards until space is
+// insufficient in the memory block.
 
-// When an allocation requires a larger amount of memory than available in the block then the
-// MemStack will allocate a new block of sufficient size for you in DqnMemStack_Push(..). This DOES
-// mean that there will be wasted spaceat the end of each block and is a tradeoff for memory
-// locality against optimal space usage.
+// When an allocation requires a larger amount of memory than available in the
+// block then the MemStack will allocate a new block of sufficient size for you
+// in Push(..). This DOES mean that occasionally there will be wasted space at
+// the end of each block and is a tradeoff for memory locality against optimal
+// space usage.
 
-// How To Use:
-// DqnMemStack stack = {};
-//             stack.Init(DQN_MEGABYTE(1), true, DqnMemStack::Flag::BoundsGuard);
-// u8 *data =  stack.Push(128);
+// My convention with using a memory stack is, any function that takes a memory
+// stack must revert all allocations from the the end of the stack in the scope
+// it was used in. If the function takes an allocator, then it must always do
+// some operation that allocates persistent data into the head of the allocator.
+
+// If a function requires an allocator purely for temporary purposes, then there
+// always exists some non-user facing global allocator that is accessible which
+// it can use.
 
 #define DQN_MEMSTACK_PUSH_STRUCT(memstack, Type)     (Type *)(memstack)->Push(sizeof(Type))
 #define DQN_MEMSTACK_PUSH_ARRAY(memstack, Type, num) (Type *)(memstack)->Push(sizeof(Type) * (num))
@@ -1454,31 +1457,63 @@ struct DqnMemStack
         isize  Usage() const                     { return size - (tail - head); }
     };
 
-    DqnMemTracker  tracker;         // Read: Metadata for managing ptr allocation
-    DqnAllocator  *block_allocator; // Read: Allocator used to allocator blocks for this memory stack
-    Block         *block;           // Read: Memory block allocated for the stack
-    u32            flags;           // Read
-    i32            mem_region_count;// Read: The number of temp memory regions in use
+    DqnMemTracker  tracker;          // Metadata for managing ptr allocation
+    DqnAllocator  *block_allocator;  // Allocator used to allocator blocks for this memory stack
+    Block         *block;            // Memory block allocated for the stack
+    u32            flags;
+    i32            mem_region_count; // The number of temp memory regions in use
 
-    DqnMemStack() = default;
+    // Initialisation API
+    // =============================================================================================
+    DqnMemStack() = default;                                                // Zero Is Initialisation, on first allocation LazyInit() is called.
+    DqnMemStack(void *mem, isize size, Dqn::ZeroMem clear, u32 flags_ = 0); // Use fixed memory from the given buffer. Assert after buffer is full.
 
-    // Uses fixed memory, will be sourced from the buffer and assert after buffer is full.
-    DqnMemStack(void *mem, isize size, Dqn::ZeroMem clear, u32 flags_ = 0);
-
-    // Memory Stack capable of expanding when full, but only if NonExpandable flag is not set.
+    // Init and alloc additional memory blocks when full, but only if NonExpandable flag is not set.
     DqnMemStack  (isize size, Dqn::ZeroMem clear, u32 flags_ = 0, DqnAllocator *block_allocator_ = DQN_DEFAULT_ALLOCATOR) { LazyInit(size, clear, flags_, block_allocator_); }
     void LazyInit(isize size, Dqn::ZeroMem clear, u32 flags_ = 0, DqnAllocator *block_allocator_ = DQN_DEFAULT_ALLOCATOR);
 
     // Allocation API
     // =============================================================================================
-    enum struct PushType { Default, Head, Tail };
+    enum struct AllocMode
+    {
+        Head, // Set the default to allocating to the start of the memory block
+        Tail, // Set the default to allocating from the end of the memory block
+    };
+
+    enum struct PushType
+    {
+        Default,  // Allocation defaults to the AllocMode set in SetAllocMode(), by default this is initialised to be from the start of the memory stack.
+        Opposite, // Opposite is always the opposite side of the current default allocation mode.
+
+        // TODO(doyle): Head and Tail are possibly redundant modes now. When the
+        // client changes the default allocation mode outside of functions that
+        // take a memory stack as an allocator, it means if the function wants
+        // to use the "temporary" side of the memory stack, they need to be
+        // aware of what the opposite side of the memory stack is as to not
+        // trample over the memory that the client wants allocated memory from.
+
+        // This is what the 2 new PushType options above facilitate. I can't
+        // immediately see a situation now where you want to actually specify
+        // the side and override the allocation mode which could make for
+        // unintuitive behaviour, but I'm going to sit on this for awhile and
+        // see how the actual real world use cases pan out.
+
+        Head,    // Ignores the AllocMode, always allocate from the start of the memory block
+        Tail,    // Ignores the AllocMode, always allocate from the end of the memory block
+    };
 
     // Allocate memory from the MemStack.
-    // alignment: Ptr returned from allocator is aligned to this value and MUST be power of 2.
-    // return:    nullptr if out of space OR stack is using fixed memory/size and out of memory OR stack full and malloc fails (or flags prevent expansion).
+    // alignment: Must be a power of 2, ptr returned from allocator is address aligned to this value.
+    // return:    Ptr to memory, nullptr if out of space and is disallowed to expand OR the stack is full and malloc fails
     void *Push              (isize size, PushType push_type = PushType::Default, u8 alignment = 4);
 
-    void  SetDefaultAllocate(PushType type)                                    { if (type == PushType::Default) return; if (type == PushType::Head) flags &= ~Flag::DefaultAllocateTail; else flags |= Flag::DefaultAllocateTail; }
+    // On Push, if push_type is PushType::Default, it will behave according to the AllocMode last set.
+    void  SetAllocMode      (AllocMode mode)                                    { if (mode == AllocMode::Head) flags &= ~Flag::DefaultAllocateTail; else flags |= Flag::DefaultAllocateTail; }
+
+    // TODO(doyle): Edge case where Pop fails. If you Push to the head and it
+    // fits in the existing block. Then push to the tail a size larger than the
+    // remaining space and generate a new block, then, if you try to Pop the ptr
+    // from the head, it will not find the right block to pop from and assert.
     void  Pop               (void *ptr, Dqn::ZeroMem zero = Dqn::ZeroMem::No); // Free the ptr. MUST be the last allocated ptr on the block head or tail, assert otherwise.
     void  PopBlock          ()                                                 { FreeBlock(block); }
     void  Free              ()                                                 { if (flags & Flag::BoundsGuard) tracker.allocations.Free(); while (block_allocator && block) PopBlock(); }
@@ -2129,6 +2164,7 @@ struct DqnVHashTable
     Bucket    *buckets;
     isize      num_buckets;
     isize     *indexes_of_used_buckets;
+    isize      num_used_entries;
     isize      num_used_buckets;
 
     DqnVHashTable       () = default;
@@ -2215,9 +2251,9 @@ DQN_VHASH_TABLE_TEMPLATE typename DQN_VHASH_TABLE_DECL::Iterator &DQN_VHASH_TABL
 
 DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::LazyInit(isize size)
 {
-    *this                      = {};
-    this->num_buckets           = size;
-    this->buckets              = static_cast<Bucket *>(DqnOS_VAlloc(size * sizeof(*this->buckets)));
+    *this                         = {};
+    this->num_buckets             = size;
+    this->buckets                 = static_cast<Bucket *>(DqnOS_VAlloc(size * sizeof(*this->buckets)));
     this->indexes_of_used_buckets = static_cast<isize *> (DqnOS_VAlloc(size * sizeof(*this->indexes_of_used_buckets)));
     DQN_ASSERT(this->buckets && this->indexes_of_used_buckets);
 }
@@ -2268,6 +2304,7 @@ DQN_VHASH_TABLE_TEMPLATE Item *DQN_VHASH_TABLE_DECL::GetOrMake(Key const &key, b
 
         entry      = bucket->entries + bucket->entry_index++;
         entry->key = key;
+        ++this->num_used_entries;
 
         // TODO(doyle): A maybe case. We're using virtual memory, so you should
         // just initialise a larger size. It's essentially free ... maybe one
@@ -2292,27 +2329,31 @@ DQN_VHASH_TABLE_TEMPLATE void DQN_VHASH_TABLE_DECL::Erase(Key const &key)
     DQN_FOR_EACH(i, bucket->entry_index)
     {
         Entry *check  = bucket->entries + i;
-        if (Equals(check->key, key))
+        if (!Equals(check->key, key))
         {
-            for (isize j = i; j < (bucket->entry_index - 1); ++j)
-                bucket->entries[j] = bucket->entries[j + 1];
+            continue;
+        }
 
-            if (--bucket->entry_index == 0)
+        for (isize j = i; j < (bucket->entry_index - 1); ++j)
+            bucket->entries[j] = bucket->entries[j + 1];
+
+        --this->num_used_entries;
+        if (--bucket->entry_index == 0)
+        {
+            DQN_FOR_EACH(bucketIndex, this->num_used_buckets)
             {
-                DQN_FOR_EACH(bucketIndex, this->num_used_buckets)
+                if (this->indexes_of_used_buckets[bucketIndex] == index)
                 {
-                    if (this->indexes_of_used_buckets[bucketIndex] == index)
-                    {
-                        indexes_of_used_buckets[bucketIndex] =
-                            indexes_of_used_buckets[--this->num_used_buckets];
-                    }
+                    indexes_of_used_buckets[bucketIndex] =
+                        indexes_of_used_buckets[--this->num_used_buckets];
                 }
             }
-
-            DQN_ASSERT(this->num_used_buckets >= 0);
-            DQN_ASSERT(bucket->entry_index >= 0);
-            return;
         }
+
+        DQN_ASSERT(this->num_used_entries >= 0);
+        DQN_ASSERT(this->num_used_buckets >= 0);
+        DQN_ASSERT(bucket->entry_index >= 0);
+        return;
     }
 }
 
@@ -2978,10 +3019,10 @@ void *DqnMemStack::Push(isize size, PushType push_type, u8 alignment)
 
     isize size_to_alloc = this->tracker.GetAllocationSize(size, alignment);
     bool push_to_head   = true;
-    if (push_type == PushType::Default)
+    if (push_type == PushType::Default || push_type == PushType::Opposite)
     {
-        if (this->flags & Flag::DefaultAllocateTail) push_to_head = false;
-        else                                         push_to_head = true;
+        push_to_head = !(this->flags & Flag::DefaultAllocateTail);
+        if (push_type == PushType::Opposite) push_to_head = !push_to_head;
     }
     else
     {
@@ -8293,7 +8334,7 @@ void *DqnOS_VAlloc(isize size, void *base_addr)
     void *result = nullptr;
 #if defined (DQN_IS_WIN32)
     result = VirtualAlloc(base_addr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    DQN_ASSERT(result);
+    DQN_ASSERTM(result, "VirtualAlloc failed: %s\n", DqnWin32_GetLastError());
 #else
     result = mmap(
         base_addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1 /*fd*/, 0 /*offset into fd*/);
