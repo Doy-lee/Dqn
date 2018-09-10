@@ -1299,7 +1299,7 @@ void DqnArray_Test()
 
         if (1)
         {
-            auto stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, DqnMemStack::Flag::BoundsGuard);
+            auto stack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, 0, DqnMemTracker::Flag::Simple);
             DQN_DEFER { stack.Free(); };
 #if 0
             if (1)
@@ -1436,7 +1436,7 @@ void DqnFile_Test()
             file->Close();
         }
 
-        auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, DqnMemStack::Flag::BoundsGuard);
+        auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, DqnMemTracker::Flag::Simple);
         // Read data back in
         for (u32 i = 0; i < DQN_ARRAY_COUNT(file_names); i++)
         {
@@ -1447,7 +1447,7 @@ void DqnFile_Test()
                 bool result = file->Open(file_names[i], permissions, DqnFile::Action::OpenOnly);
                 DQN_ASSERT(result);
 
-                u8 *buffer = (u8 *)memstack.Push(file->size);
+                u8 *buffer = (u8 *)memstack.Push_(file->size);
                 DQN_ASSERT(buffer);
 
                 size_t bytesRead = file->Read(buffer, file->size);
@@ -1466,7 +1466,7 @@ void DqnFile_Test()
                 size_t reqSize = 0;
                 DQN_ASSERT(DqnFile_Size(file_names[i], &reqSize));
 
-                u8 *buffer = (u8 *)memstack.Push(reqSize);
+                u8 *buffer = (u8 *)memstack.Push_(reqSize);
                 DQN_ASSERT(buffer);
 
                 DQN_ASSERT(DqnFile_ReadAll(file_names[i], buffer, reqSize));
@@ -1572,7 +1572,7 @@ FILE_SCOPE void DqnJobQueue_Test()
     LOG_HEADER();
     global_debug_counter = 0;
 
-    auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, DqnMemStack::Flag::BoundsGuard);
+    auto memstack = DqnMemStack(DQN_MEGABYTE(1), Dqn::ZeroMem::Yes, 0, DqnMemTracker::Flag::Simple);
 
     u32 num_threads, num_cores;
     DqnOS_GetThreadsAndCores(&num_cores, &num_threads);
@@ -1582,7 +1582,7 @@ FILE_SCOPE void DqnJobQueue_Test()
     if (total_threads == 0) total_threads = 1;
 
     DqnJobQueue job_queue = {};
-    DqnJob *job_list      = (DqnJob *)memstack.Push(sizeof(*job_queue.job_list) * QUEUE_SIZE);
+    DqnJob *job_list      = (DqnJob *)memstack.Push_(sizeof(*job_queue.job_list) * QUEUE_SIZE);
     DQN_ASSERT(DqnJobQueue_Init(&job_queue, job_list, QUEUE_SIZE, total_threads));
 
     const u32 WORK_ENTRIES = 2048;
@@ -1616,13 +1616,13 @@ void DqnQuickSort_Test()
     auto state = DqnRndPCG();
     if (1)
     {
-        auto stack = DqnMemStack(DQN_KILOBYTE(1), Dqn::ZeroMem::Yes, DqnMemStack::Flag::BoundsGuard);
+        auto stack = DqnMemStack(DQN_KILOBYTE(1), Dqn::ZeroMem::Yes, 0, DqnMemTracker::Flag::Simple);
 
         // Create array of ints
         u32 num_ints      = 1000000;
         u32 size_in_bytes  = sizeof(u32) * num_ints;
-        u32 *dqn_cpp_array = (u32 *)stack.Push(size_in_bytes);
-        u32 *std_array    = (u32 *)stack.Push(size_in_bytes);
+        u32 *dqn_cpp_array = (u32 *)stack.Push_(size_in_bytes);
+        u32 *std_array    = (u32 *)stack.Push_(size_in_bytes);
         DQN_ASSERT(dqn_cpp_array && std_array);
 
         f64 dqn_cpp_timings[2]                           = {};
