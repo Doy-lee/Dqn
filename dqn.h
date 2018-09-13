@@ -707,16 +707,22 @@ struct DqnDeferHelper_
 // implicitly swallows the trailing comma.
 
 // Always assert are enabled in release mode.
-#define DQN_ALWAYS_ASSERT(expr) DQN_ASSERTM(expr, "");
+#define DQN_ALWAYS_ASSERT(expr) DQN_ASSERTM(expr, "")
 #define DQN_ALWAYS_ASSERTM(expr, msg, ...) DQN_ASSERTM(expr, msg, ## __VA_ARGS__)
 
-#define DQN_ASSERT(expr) DQN_ASSERTM(expr, "asserted.");
+// Generate a DqnLogger::Context structure
+#define DQN_LOGGER_MAKE_CONTEXT_ \
+    {                                                                                              \
+        (char *)__FILE__, DQN_CHAR_COUNT(__FILE__), (char *)__func__, DQN_CHAR_COUNT(__func__),  __LINE__                                                                               \
+    }
+
+#define DQN_ASSERT(expr) DQN_ASSERTM(expr, "asserted.")
 #define DQN_ASSERTM(expr, msg, ...)                                                                \
     do                                                                                             \
     {                                                                                              \
         if (!(expr))                                                                               \
         {                                                                                          \
-            dqn_lib_context_->logger.Log(DqnLogger::Type::Error, {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, "["#expr"] " msg, ## __VA_ARGS__); \
+            dqn_lib_context_.logger->Log(DqnLogger::Type::Error, DQN_LOGGER_MAKE_CONTEXT_, "[" #expr "] " msg, ##__VA_ARGS__);           \
             (*((int *)0)) = 0;                                                                     \
         }                                                                                          \
     } while (0)
@@ -725,7 +731,13 @@ struct DqnDeferHelper_
 #define DQN_COMPILE_ASSERT(expr)                DQN_COMPILE_ASSERT_INTERNAL(expr, DQN_UNIQUE_NAME(DqnCompileAssertInternal_))
 #define DQN_COMPILE_ASSERT_INTERNAL(expr, name) typedef char name[((int)(expr)) * 2 - 1];
 
-extern struct DqnLibContext *dqn_lib_context_;
+struct DqnLibContext
+{
+    struct DqnAllocator *xallocator;
+    struct DqnAllocator *allocator;
+    struct DqnLogger    *logger;
+};
+extern DqnLibContext dqn_lib_context_;
 
 DQN_COMPILE_ASSERT(sizeof(isize) == sizeof(usize));
 
@@ -736,7 +748,7 @@ struct DqnAllocator
 {
     enum struct Type
     {
-        None,          // Malloc, realloc, free
+        Default,       // Malloc, realloc, free
         XAllocator,    // Malloc, realloc, free, crash on failure
         VirtualMemory, // VirtualAlloc, VirtualFree, mmap, munmap
         DqnMemStack,
@@ -753,11 +765,6 @@ struct DqnAllocator
     void *Realloc(void *ptr, size_t new_size);
     void  Free   (void *ptr, size_t old_size);
 };
-
-DqnAllocator  DQN_DEFAULT_ALLOCATOR_ = {};
-DqnAllocator  DQN_XALLOCATOR_(DqnAllocator::Type::XAllocator);
-DqnAllocator *DQN_DEFAULT_ALLOCATOR  = &DQN_DEFAULT_ALLOCATOR_;
-DqnAllocator *DQN_XALLOCATOR         = &DQN_XALLOCATOR_;
 
 // #DqnSlice/#DqnBuffer
 // =================================================================================================
@@ -791,7 +798,7 @@ DQN_FILE_SCOPE DqnBuffer<T> DqnBuffer_Copy(DqnAllocator *allocator, T const *dat
     DqnBuffer<T> result;
     result.len = len;
     result.data = static_cast<T *>(allocator->Malloc(len * sizeof(T), Dqn::ZeroMem::No));
-    DqnMem_Copy(result.data, data, len);
+    DqnMem_Copy(result.data, data, len * sizeof(T));
     return result;
 }
 
@@ -801,12 +808,10 @@ DQN_FILE_SCOPE DqnBuffer<T> DqnBuffer_CopyAndNullTerminate(DqnAllocator *allocat
     DqnBuffer<T> result;
     result.len = len;
     result.data = static_cast<T *>(allocator->Malloc((len + 1) * sizeof(T), Dqn::ZeroMem::No));
-    DqnMem_Copy(result.data, data, len);
+    DqnMem_Copy(result.data, data, len * sizeof(T));
     result.data[len] = 0;
     return result;
 }
-
-DQN_FILE_SCOPE DqnBuffer<char> DqnBuffer_CopyString(struct DqnAllocator *allocator, void const *str, int len = -1);
 
 // #DqnFixedString Public API - Fixed sized strings at compile time
 // =================================================================================================
@@ -849,7 +854,7 @@ struct DqnFixedString
 
     int VSprintfAtOffset(char const *fmt, va_list va, int offset)
     {
-        if (Dqn::is_debug) DQN_ASSERT(Dqn_vsnprintf(nullptr, 0, fmt, va) < MAX);
+        if (Dqn::is_debug) { DQN_ASSERT(Dqn_vsnprintf(nullptr, 0, fmt, va) < MAX); }
         char *start = str + offset;
         int result  = Dqn_vsnprintf(start, static_cast<int>((str + MAX) - start), fmt, va);
         len         = (offset + result);
@@ -997,6 +1002,10 @@ struct DqnMemTracker
 #define DQN_MEMSTACK_PUSH_STRUCT(stack, Type)     DQN_MEMSTACK_PUSH_ARRAY(stack, Type, 1)
 #define DQN_MEMSTACK_PUSH_ARRAY(stack, Type, num) (Type *)(stack)->Push_(sizeof(Type) * (num)); DQN_MEMTRACKER_TAG_ALLOC(&(stack)->tracker, sizeof(Type) * num)
 
+#define DQN_MEMSTACK_PUSH_BACK(stack, size)            DQN_MEMSTACK_PUSH_BACK_ARRAY(stack, char, size)
+#define DQN_MEMSTACK_PUSH_BACK_STRUCT(stack, Type)     DQN_MEMSTACK_PUSH_BACK_ARRAY(stack, Type, 1)
+#define DQN_MEMSTACK_PUSH_BACK_ARRAY(stack, Type, num) (Type *)(stack)->Push_(sizeof(Type) * (num), DqnMemStack::PushType::Opposite); DQN_MEMTRACKER_TAG_ALLOC(&(stack)->tracker, sizeof(Type) * num)
+
 struct DqnMemStack
 {
     static const i32 MINIMUM_BLOCK_SIZE = DQN_KILOBYTE(64);
@@ -1041,8 +1050,8 @@ struct DqnMemStack
     DqnMemStack(void *mem, isize size, Dqn::ZeroMem clear, u32 flags_ = 0, DqnMemTracker::Flag flags = DqnMemTracker::Flag::Simple); // Use fixed memory from the given buffer. Assert after buffer is full.
 
     // Init and alloc additional memory blocks when full, but only if NonExpandable flag is not set.
-    DqnMemStack  (isize size, Dqn::ZeroMem clear, u32 flags_ = 0, DqnMemTracker::Flag tracker_flags = DqnMemTracker::Simple, DqnAllocator *block_allocator_ = DQN_DEFAULT_ALLOCATOR) { LazyInit(size, clear, flags_, tracker_flags, block_allocator_); }
-    void LazyInit(isize size, Dqn::ZeroMem clear, u32 flags_ = 0, DqnMemTracker::Flag tracker_flags = DqnMemTracker::Simple, DqnAllocator *block_allocator_ = DQN_DEFAULT_ALLOCATOR);
+    DqnMemStack  (isize size, Dqn::ZeroMem clear, u32 flags_ = 0, DqnMemTracker::Flag tracker_flags = DqnMemTracker::Simple, DqnAllocator *block_allocator_ = dqn_lib_context_.allocator) { LazyInit(size, clear, flags_, tracker_flags, block_allocator_); }
+    void LazyInit(isize size, Dqn::ZeroMem clear, u32 flags_ = 0, DqnMemTracker::Flag tracker_flags = DqnMemTracker::Simple, DqnAllocator *block_allocator_ = dqn_lib_context_.allocator);
 
     // Allocation
     // =============================================================================================
@@ -1156,12 +1165,12 @@ struct DqnLogger
         int   line_num;
     };
 
-    #define DQN_LOGGER_CONTEXT {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}
-    #define DQN_LOGGER_D(logger, fmt, ...) (logger)->Log(DqnLogger::Type::Debug,   {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
-    #define DQN_LOGGER_W(logger, fmt, ...) (logger)->Log(DqnLogger::Type::Warning, {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
-    #define DQN_LOGGER_E(logger, fmt, ...) (logger)->Log(DqnLogger::Type::Error,   {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
-    #define DQN_LOGGER_M(logger, fmt, ...) (logger)->Log(DqnLogger::Type::Message, {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
-    #define DQN_LOGGER(logger, type, fmt, ...) (logger)->Log(type, {__FILE__, DQN_CHAR_COUNT(__FILE__), __func__, DQN_CHAR_COUNT(__func__), __LINE__}, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER(logger, type, fmt, ...) (logger)->Log(type,                     DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_E(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Error,   DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_E(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Error,   DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_W(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Warning, DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_D(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Debug,   DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
+    #define DQN_LOGGER_M(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Message, DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
 
     DqnMemStack        allocator;
     DqnFixedString1024 log_builder;
@@ -1180,8 +1189,8 @@ struct DqnLogger
 
     // return: A static string whose lifetime persists until the next log call.
     char const *LogNoContext(Type type, char const *fmt, ...);
-    char const *Log         (Type type, Context const log_context, char const *fmt, ...);
-    char const *LogVA       (Type type, Context const log_context, char const *fmt, va_list va);
+    char const *Log         (Type type, Context log_context, char const *fmt, ...);
+    char const *LogVA       (Type type, Context log_context, char const *fmt, va_list va);
 };
 
 // #DqnArray
@@ -1189,7 +1198,7 @@ struct DqnLogger
 template<typename T>
 struct DqnArray
 {
-    DqnAllocator               *allocator = DQN_DEFAULT_ALLOCATOR;
+    DqnAllocator               *allocator = dqn_lib_context_.allocator;
     isize                       len;
     isize                       max;
     T                          *data;
@@ -1354,7 +1363,7 @@ DQN_FILE_SCOPE void     DqnWStr_Reverse           (wchar_t *buf, i32 buf_size);
 // =================================================================================================
 struct DqnString
 {
-    DqnAllocator *allocator = DQN_DEFAULT_ALLOCATOR;
+    DqnAllocator *allocator = dqn_lib_context_.allocator;
     int len                 = 0;
     int max                 = 0;
     char *str               = nullptr;
@@ -1401,7 +1410,7 @@ struct DqnString
     // return: -1 if invalid, or if buf_size is 0 the required buffer length in wchar_t characters
     i32      ToWChar(wchar_t *const buf, i32 const buf_size) const;
     // return: String allocated using api.
-    wchar_t *ToWChar(DqnAllocator *allocator = DQN_DEFAULT_ALLOCATOR) const;
+    wchar_t *ToWChar(DqnAllocator *allocator = dqn_lib_context_.allocator) const;
 
 };
 
@@ -2066,12 +2075,6 @@ DQN_FILE_SCOPE DqnJson DqnJson_Get             (DqnJson const input, DqnSlice<ch
 // return:   The array item.
 DQN_FILE_SCOPE DqnJson DqnJson_GetNextArrayItem(DqnJson *iterator);
 
-struct DqnLibContext
-{
-    DqnAllocator         allocator = DqnAllocator(DqnAllocator::Type::XAllocator);
-    DqnLogger            logger;
-};
-
 #endif  /* DQN_H */
 
 // #XPlatform (Win32 & Unix)
@@ -2121,7 +2124,7 @@ struct DqnVArray
     T    *Back       ()                                           { return (len > 0) ? (data + (len - 1)) : nullptr; }
     T    *Make       (isize num = 1)                              { if (!data) LazyInit(1024); len += num; DQN_ASSERT(len <= max); return &data[len - num]; }
     T    *Push       (T const &v)                                 { data[len++] = v; return data + (len - 1); }
-    T    *Push       (T const *v, isize v_len = 1)                { T *result = data + len; for (isize i = 0; i < new_len; ++i) data[len++] = v[i]; return result; }
+    T    *Push       (T const *v, isize v_len = 1)                { T *result = data + len; for (isize i = 0; i < v_len; ++i) data[len++] = v[i]; return result; }
     void  Pop        ()                                           { if (len > 0) len--; }
     void  Erase      (isize index)                                { if (!data) return; DQN_ASSERT(index >= 0 && index < len); data[index] = data[--len]; }
     void  EraseStable(isize index);
@@ -2494,8 +2497,8 @@ DQN_FILE_SCOPE bool   DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize buf_si
 
 // Buffer is null-terminated and should be freed when done with.
 // return: False if file access failure OR nullptr arguments.
-DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *buf_size, DqnAllocator *allocator = DQN_DEFAULT_ALLOCATOR);
-DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *buf_size, DqnAllocator *allocator = DQN_DEFAULT_ALLOCATOR);
+DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *buf_size, DqnAllocator *allocator = dqn_lib_context_.allocator);
+DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *buf_size, DqnAllocator *allocator = dqn_lib_context_.allocator);
 DQN_FILE_SCOPE u8    *DqnFile_ReadAll(wchar_t const *path, usize *buf_size, DqnMemStack *stack);
 DQN_FILE_SCOPE u8    *DqnFile_ReadAll(char    const *path, usize *buf_size, DqnMemStack *stack);
 
@@ -2524,8 +2527,8 @@ DQN_FILE_SCOPE bool   DqnFile_Copy   (wchar_t const *src, wchar_t const *dest);
 // num_files: Pass in a ref to a i32. The function fills it out with the number of entries.
 // return:   An array of strings of the files in the directory in UTF-8. The directory lisiting is
 //           allocated with malloc and must be freed using free() or the helper function ListDirFree()
-DQN_FILE_SCOPE char **DqnFile_ListDir       (char const *dir, i32 *num_files, DqnAllocator *allocator = DQN_DEFAULT_ALLOCATOR);
-DQN_FILE_SCOPE void   DqnFile_ListDirFree   (char **file_list, i32 num_files, DqnAllocator *allocator = DQN_DEFAULT_ALLOCATOR);
+DQN_FILE_SCOPE char **DqnFile_ListDir       (char const *dir, i32 *num_files, DqnAllocator *allocator = dqn_lib_context_.allocator);
+DQN_FILE_SCOPE void   DqnFile_ListDirFree   (char **file_list, i32 num_files, DqnAllocator *allocator = dqn_lib_context_.allocator);
 
 // XPlatform > #DqnCatalog
 // =================================================================================================
@@ -2595,7 +2598,7 @@ DQN_CATALOG_TEMPLATE bool DQN_CATALOG_DECL::QueryAndUpdateAsset(DqnCatalogPath c
     DqnFileInfo info = {};
     if (!DqnFile_GetInfo(file.str, &info))
     {
-        DQN_LOGGER_W(&dqn_lib_context_->logger, "Catalog could not get file info for: %s\n", file.str);
+        DQN_LOGGER_W(dqn_lib_context_.logger, "Catalog could not get file info for: %s\n", file.str);
         return false;
     }
 
@@ -2611,7 +2614,7 @@ DQN_CATALOG_TEMPLATE bool DQN_CATALOG_DECL::QueryAndUpdateAsset(DqnCatalogPath c
     }
     else
     {
-        DQN_LOGGER_W(&dqn_lib_context_->logger, "Catalog could not load file: %s\n", file.str);
+        DQN_LOGGER_W(dqn_lib_context_.logger, "Catalog could not load file: %s\n", file.str);
         return false;
     }
 
@@ -2812,12 +2815,6 @@ DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode (const DWORD error, const char *co
 // ...: Variable args alike printf, powered by stb_sprintf
 DQN_FILE_SCOPE void DqnWin32_OutputDebugString(const char *const fmt_str, ...);
 
-// Get the full path of to the current processes executable, and return the char offset in the
-// string to the last backslash, i.e. the directory.
-// buf:    Filled with the path to the executable file.
-// return: The offset to the last backslash. -1 if buf_len was not large enough or buf is null. (i.e.
-//         buf + offsetToLastSlash + 1, gives C:/Path/)
-DQN_FILE_SCOPE i32  DqnWin32_GetExeDirectory       (wchar_t *const buf, const u32 buf_len);
 DQN_FILE_SCOPE void DqnWin32_GetExeNameAndDirectory(DqnMemStack *allocator, DqnBuffer<wchar_t> *exe_name, DqnBuffer<wchar_t> *exe_directory);
 DQN_FILE_SCOPE u64  DqnWin32_EpochTimeUTC          ();
 DQN_FILE_SCOPE u64  DqnWin32_EpochTimeLocal        ();
@@ -2833,8 +2830,10 @@ DQN_FILE_SCOPE u64  DqnWin32_EpochTimeLocal        ();
 #include <stdlib.h>  // For calloc, malloc, free
 #include <stdio.h>   // For printf
 
-DqnLibContext dqn_lib_context__;
-DqnLibContext *dqn_lib_context_ = &dqn_lib_context__;
+DqnAllocator xallocator_;
+DqnAllocator allocator_;
+DqnLogger    logger_;
+DqnLibContext dqn_lib_context_ = {&xallocator_, &allocator_, &logger_};
 
 // NOTE: STB_SPRINTF is included when DQN_IMPLEMENTATION defined
 // #define STB_SPRINTF_IMPLEMENTATION
@@ -2940,7 +2939,7 @@ DQN_FILE_SCOPE void *DqnAllocator::Malloc(size_t size, Dqn::ZeroMem zero)
     void *result = nullptr;
     switch(this->type)
     {
-        case Type::None:        (zero == Dqn::ZeroMem::Yes) ? result = DqnMem_Alloc(size) : result = DqnMem_Calloc(size); break;
+        case Type::Default:    (zero == Dqn::ZeroMem::Yes) ? result = DqnMem_Alloc(size) : result = DqnMem_Calloc(size); break;
         case Type::XAllocator:
         {
             (zero == Dqn::ZeroMem::Yes) ? result = DqnMem_Alloc(size) : result = DqnMem_Calloc(size);
@@ -2976,7 +2975,7 @@ DQN_FILE_SCOPE void *DqnAllocator::Realloc(void *ptr, size_t new_size)
     void *result = nullptr;
     switch(this->type)
     {
-        case Type::None:          result = DqnMem_Realloc(ptr, new_size); break;
+        case Type::Default:    result = DqnMem_Realloc(ptr, new_size); break;
         case Type::XAllocator:
         {
             result = DqnMem_Realloc(ptr, new_size);
@@ -2990,7 +2989,7 @@ DQN_FILE_SCOPE void *DqnAllocator::Realloc(void *ptr, size_t new_size)
             DqnPtrHeader *ptr_header = mem_stack->tracker.PtrToHeader(static_cast<char *>(ptr));
             result                   = DQN_MEMSTACK_PUSH(mem_stack, new_size);
             DqnMem_Copy(result, ptr, ptr_header->alloc_amount);
-            DQN_LOGGER_W(&dqn_lib_context_->logger, "Memory stack used realloc and ptr: %p with: %zu bytes has been lost", ptr, ptr_header->alloc_amount);
+            DQN_LOGGER_W(dqn_lib_context_.logger, "Memory stack used realloc and ptr: %p with: %zu bytes has been lost", ptr, ptr_header->alloc_amount);
         }
         break;
         default: DQN_ASSERTM(DQN_INVALID_CODE_PATH, "New context type not handled."); break;
@@ -3004,7 +3003,7 @@ DQN_FILE_SCOPE void DqnAllocator::Free(void *ptr, size_t old_size)
     switch(this->type)
     {
         case Type::XAllocator:
-        case Type::None:          DqnMem_Free(ptr); break;
+        case Type::Default: DqnMem_Free(ptr); break;
         case Type::VirtualMemory:
         {
             #if defined(DQN_PLATFORM_HEADER)
@@ -3032,14 +3031,14 @@ void DqnMemTracker::Init(DqnMemTracker::Flag flag)
     if (flag & DqnMemTracker::TrackPtr)
     {
         this->ptrs_max = 8192;
-        this->ptrs     = (void **)dqn_lib_context_->allocator.Malloc(this->ptrs_max * sizeof(this->ptrs));
+        this->ptrs     = (void **)dqn_lib_context_.allocator->Malloc(this->ptrs_max * sizeof(this->ptrs));
     }
 
     if (flag & DqnMemTracker::TagAllocation)
     {
         this->tagged_allocs_max = 4096;
-        this->tagged_allocs = (decltype(this->tagged_allocs))dqn_lib_context_->allocator.Malloc(this->tagged_allocs_max * sizeof(*this->tagged_allocs));
-        this->tagged_allocs_used_list = (decltype(this->tagged_allocs_used_list))dqn_lib_context_->allocator.Malloc(this->tagged_allocs_max * sizeof(*this->tagged_allocs_used_list));
+        this->tagged_allocs = (decltype(this->tagged_allocs))dqn_lib_context_.allocator->Malloc(this->tagged_allocs_max * sizeof(*this->tagged_allocs));
+        this->tagged_allocs_used_list = (decltype(this->tagged_allocs_used_list))dqn_lib_context_.allocator->Malloc(this->tagged_allocs_max * sizeof(*this->tagged_allocs_used_list));
     }
 }
 
@@ -3054,15 +3053,15 @@ void DqnMemTracker::Free()
             {
                 TaggedAllocation *tag_to_free = tagged_alloc;
                 tagged_alloc                  = tagged_alloc->next;
-                dqn_lib_context_->allocator.Free(tag_to_free->filename.str, tag_to_free->filename.len);
-                dqn_lib_context_->allocator.Free(tag_to_free->function.str, tag_to_free->function.len);
-                dqn_lib_context_->allocator.Free(tag_to_free, sizeof(tag_to_free));
+                dqn_lib_context_.allocator->Free(tag_to_free->filename.str, tag_to_free->filename.len);
+                dqn_lib_context_.allocator->Free(tag_to_free->function.str, tag_to_free->function.len);
+                dqn_lib_context_.allocator->Free(tag_to_free, sizeof(tag_to_free));
             }
         }
     }
 
     if (this->IsTrackingPtrs())
-        dqn_lib_context_->allocator.Free(this->ptrs, sizeof(*this->ptrs) * ptrs_max);
+        dqn_lib_context_.allocator->Free(this->ptrs, sizeof(*this->ptrs) * ptrs_max);
 }
 
 void DqnMemTracker::Tag_(DqnBuffer<const char> filename, DqnBuffer<const char> function, int line_num, DqnBuffer<const char> filename_line_num_data, isize bytes)
@@ -3079,13 +3078,13 @@ void DqnMemTracker::Tag_(DqnBuffer<const char> filename, DqnBuffer<const char> f
     }
 
     if (!(*entry))
-        *entry = (TaggedAllocation *)dqn_lib_context_->allocator.Malloc(sizeof(**entry), Dqn::ZeroMem::Yes);
+        *entry = (TaggedAllocation *)dqn_lib_context_.allocator->Malloc(sizeof(**entry), Dqn::ZeroMem::Yes);
 
     if ((*entry)->filename.len == 0)
     {
         this->tagged_allocs_used_list[this->tagged_allocs_used_index++] = index;
-        (*entry)->filename = DqnBuffer_CopyAndNullTerminate(&dqn_lib_context_->allocator, filename.str, filename.len);
-        (*entry)->function = DqnBuffer_CopyAndNullTerminate(&dqn_lib_context_->allocator, function.str, function.len);
+        (*entry)->filename = DqnBuffer_CopyAndNullTerminate(dqn_lib_context_.allocator, filename.str, filename.len);
+        (*entry)->function = DqnBuffer_CopyAndNullTerminate(dqn_lib_context_.allocator, function.str, function.len);
         (*entry)->line_num = line_num;
     }
 
@@ -3098,7 +3097,7 @@ void DqnMemTracker::Tag_(DqnBuffer<const char> filename, DqnBuffer<const char> f
     context.function           = (*entry)->function.str;
     context.function_len       = (*entry)->function.len;
     context.line_num           = line_num;
-    dqn_lib_context_->logger.Log(DqnLogger::Type::Memory, context, "Currently allocated: %zu bytes", (*entry)->bytes_allocated);
+    dqn_lib_context_.logger->Log(DqnLogger::Type::Memory, context, "Currently allocated: %zu bytes", (*entry)->bytes_allocated);
 }
 
 void *DqnMemTracker::SetupPtr(void *ptr, isize size, u8 alignment)
@@ -5375,20 +5374,6 @@ void DqnString::Append(char const *src, int len_)
     this->str[this->len] = 0;
 }
 
-DQN_FILE_SCOPE DqnBuffer<char> DqnBuffer_CopyString(DqnAllocator *allocator, char const *str, int len)
-{
-    if (len == -1)
-        len = DqnStr_Len(str);
-
-    DqnBuffer<char> result;
-    result.len = len;
-    result.str = static_cast<char *>(allocator->Malloc((len + 1) * sizeof(*str), Dqn::ZeroMem::No));
-    DqnMem_Copy(result.str, str, len);
-    result.str[len] = 0;
-
-    return result;
-}
-
 // #DqnFixedString Implementation
 // =================================================================================================
 // return: The number of bytes written to dest
@@ -5431,7 +5416,7 @@ char const *DqnLogger::LogNoContext(Type type, char const *fmt, ...)
     return result;
 }
 
-char const *DqnLogger::Log(Type type, Context const log_context, char const *fmt, ...)
+char const *DqnLogger::Log(Type type, Context log_context, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
@@ -5440,7 +5425,7 @@ char const *DqnLogger::Log(Type type, Context const log_context, char const *fmt
     return result;
 }
 
-char const *DqnLogger::LogVA(Type type, Context const log_context, char const *fmt, va_list va)
+char const *DqnLogger::LogVA(Type type, Context log_context, char const *fmt, va_list va)
 {
     if (!this->allocator.block)
     {
@@ -7621,7 +7606,7 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
 
         if (!list)
         {
-            DQN_LOGGER_E(&dqn_lib_context_->logger, "Memory allocation failed, required: %$_d", sizeof(*list) * curr_num_files);
+            DQN_LOGGER_E(dqn_lib_context_.logger, "Memory allocation failed, required: %$_d", sizeof(*list) * curr_num_files);
             *num_files = 0;
             return nullptr;
         }
@@ -7636,7 +7621,7 @@ DQN_FILE__LIST_DIR(DqnFile__PlatformListDir)
                 DQN_FOR_EACH(j, i)
                     allocator->Free(list[j], bytes_required);
 
-                DQN_LOGGER_E(&dqn_lib_context_->logger, "Memory allocation failed, required: %$_d", sizeof(**list) * MAX_PATH);
+                DQN_LOGGER_E(dqn_lib_context_.logger, "Memory allocation failed, required: %$_d", sizeof(**list) * MAX_PATH);
                 *num_files = 0;
                 return nullptr;
             }
@@ -7942,7 +7927,7 @@ DQN_FILE_SCOPE u8 *DqnFile_ReadAll(wchar_t const *path, usize *buf_size, DqnMemS
     DqnFile file = {};
     if (!file.Open(path, DqnFile::Flag::FileRead, DqnFile::Action::OpenOnly))
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "Could not open file: %s", path);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "Could not open file: %s", path);
         return result;
     }
     DQN_DEFER { file.Close(); };
@@ -7955,7 +7940,7 @@ DQN_FILE_SCOPE u8 *DqnFile_ReadAll(wchar_t const *path, usize *buf_size, DqnMemS
     }
     else
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "bytes_read != file.size", bytes_read, file.size);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "bytes_read != file.size", bytes_read, file.size);
     }
 
     return result;
@@ -7967,7 +7952,7 @@ DQN_FILE_SCOPE u8 *DqnFile_ReadAll(char const *path, usize *buf_size, DqnMemStac
     DqnFile file = {};
     if (!file.Open(path, DqnFile::Flag::FileRead, DqnFile::Action::OpenOnly))
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "Could not open file: %s", path);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "Could not open file: %s", path);
         return result;
     }
     DQN_DEFER { file.Close(); };
@@ -7980,7 +7965,7 @@ DQN_FILE_SCOPE u8 *DqnFile_ReadAll(char const *path, usize *buf_size, DqnMemStac
     }
     else
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "bytes_read != file.size", bytes_read, file.size);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "bytes_read != file.size", bytes_read, file.size);
     }
 
     return result;
@@ -7991,7 +7976,7 @@ DQN_FILE_SCOPE bool DqnFile_WriteAll(char const *path, u8 const *buf, usize cons
     DqnFile file = {};
     if (!file.Open(path, DqnFile::Flag::FileReadWrite, DqnFile::Action::ForceCreate))
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "Could not open file at: %s", path);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "Could not open file at: %s", path);
         return false;
     }
 
@@ -7999,7 +7984,7 @@ DQN_FILE_SCOPE bool DqnFile_WriteAll(char const *path, u8 const *buf, usize cons
     usize bytes_written = file.Write(buf, buf_size);
     if (bytes_written != buf_size)
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "Bytes written did not match the buffer size, %zu != %zu", bytes_written, buf_size);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "Bytes written did not match the buffer size, %zu != %zu", bytes_written, buf_size);
         return false;
     }
 
@@ -8011,7 +7996,7 @@ DQN_FILE_SCOPE bool DqnFile_WriteAll(wchar_t const *path, u8 const *buf, usize c
     DqnFile file = {};
     if (!file.Open(path, DqnFile::Flag::FileReadWrite, DqnFile::Action::ForceCreate))
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "Could not open file at: %s", path);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "Could not open file at: %s", path);
         return false;
     }
 
@@ -8019,7 +8004,7 @@ DQN_FILE_SCOPE bool DqnFile_WriteAll(wchar_t const *path, u8 const *buf, usize c
     usize bytes_written = file.Write(buf, buf_size);
     if (bytes_written != buf_size)
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "Bytes written did not match the buffer size, %zu != %zu", bytes_written, buf_size);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "Bytes written did not match the buffer size, %zu != %zu", bytes_written, buf_size);
         return false;
     }
 
@@ -8035,7 +8020,7 @@ DQN_FILE_SCOPE bool DqnFile_ReadAll(wchar_t const *path, u8 *buf, usize buf_size
     // TODO(doyle): Logging
     if (file.size > buf_size || !result)
     {
-        DQN_LOGGER_E(&dqn_lib_context_->logger, "Insufficient buffer size given: %zu, required: %zu\n", buf_size, file.size);
+        DQN_LOGGER_E(dqn_lib_context_.logger, "Insufficient buffer size given: %zu, required: %zu\n", buf_size, file.size);
         return false;
     }
 
@@ -8701,7 +8686,7 @@ DQN_OS_GET_THREADS_AND_CORES(DqnOS_GetThreadsAndCores)
         auto *raw_proc_info_array = (u8 *)DqnMem_Calloc(required_size);
         if (!raw_proc_info_array)
         {
-            DQN_LOGGER_E(&dqn_lib_context_->logger, "Could not allocate memory for array required: %$d\n");
+            DQN_LOGGER_E(dqn_lib_context_.logger, "Could not allocate memory for array required: %$d\n");
             return;
         }
 
@@ -8840,49 +8825,40 @@ DQN_FILE_SCOPE void DqnWin32_GetExeNameAndDirectory(DqnMemStack *mem_stack, DqnB
 {
     if (!exe_name && !exe_directory) return;
 
-    i32 offset_to_last_backslash = -1;
     int exe_buf_len              = 512;
     wchar_t *exe_buf             = nullptr;
-    while(offset_to_last_backslash == -1)
+    int exe_len                  = exe_buf_len;
+    while(exe_buf_len == exe_len)
     {
         if (exe_buf)
-        {
             exe_buf_len += 128;
-        }
 
-        exe_buf = DQN_MEMSTACK_PUSH_ARRAY(mem_stack, wchar_t, exe_buf_len);
+        exe_buf = DQN_MEMSTACK_PUSH_BACK_ARRAY(mem_stack, wchar_t, exe_buf_len);
         DQN_DEFER { mem_stack->Pop(exe_buf); };
-        offset_to_last_backslash = DqnWin32_GetExeDirectory(exe_buf, exe_buf_len);
+        exe_len = GetModuleFileNameW(nullptr, exe_buf, exe_buf_len);
     }
 
     DqnAllocator allocator(mem_stack);
 
-    if (exe_name)
-        *exe_name = DqnBuffer_CopyAndNullTerminate(&allocator, exe_buf, offset_to_last_backslash + 1);
-
-    if (exe_directory)
-        *exe_directory = DqnBuffer_CopyAndNullTerminate(&allocator, exe_buf, offset_to_last_backslash);
-}
-
-DQN_FILE_SCOPE i32 DqnWin32_GetExeDirectory(wchar_t *buf, u32 buf_len)
-{
-    if (!buf || buf_len == 0) return -1;
-    u32 copied_len = GetModuleFileNameW(nullptr, buf, buf_len);
-    if (copied_len == buf_len) return -1;
-
-    // NOTE: Should always work if GetModuleFileName works and we're running an
-    // executable.
     i32 last_slash_index = 0;
-    for (i32 i = copied_len; i > 0; i--)
+    for (i32 i = (exe_len - 1); i >= 0; --i)
     {
-        if (buf[i] == '\\')
+        if (exe_buf[i] == '\\')
         {
             last_slash_index = i;
             break;
         }
     }
 
-    return last_slash_index;
+    if (exe_name)
+    {
+        wchar_t *start_of_exe_name = exe_buf + last_slash_index + 1;
+        wchar_t *end               = exe_buf + exe_len;
+        *exe_name = DqnBuffer_CopyAndNullTerminate(&allocator, start_of_exe_name, static_cast<int>(end - start_of_exe_name));
+    }
+
+    if (exe_directory)
+        *exe_directory = DqnBuffer_CopyAndNullTerminate(&allocator, exe_buf, last_slash_index);
 }
 
 FILE_SCOPE inline u64 DqnWin32__FileTimeToEpoch(FILETIME file_time)
