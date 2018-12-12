@@ -1385,7 +1385,7 @@ struct DqnString
     void Reserve         (int new_max);
 
     void Append          (char const *src, int len_ = -1);
-    int  VSprintfAtOffset(char const *fmt, va_list va, int offset)      { Reserve(len + Dqn_vsnprintf(nullptr, 0, fmt, va) + 1); int result = Dqn_vsnprintf(str + offset, max - len, fmt, va); len = (offset + result); return result; }
+    int  VSprintfAtOffset(char const *fmt, va_list va, int offset)      { Reserve(len + stbsp_vsnprintf(nullptr, 0, fmt, va) + 1); int result = stbsp_vsnprintf(str + offset, max - len, fmt, va); len = (offset + result); return result; }
 
     static bool Cmp      (DqnString const *a, DqnString const *b,           Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b->len) && (DqnStr_Cmp(a->str, b->str, a->len, ignore) == 0); }
     static bool Cmp      (DqnString const *a, DqnSlice<char const> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b.len)  && (DqnStr_Cmp(a->str, b.data, b.len, ignore) == 0);  }
@@ -5411,16 +5411,16 @@ char const *DqnLogger::LogVA(Type type, Context log_context, char const *fmt, va
 #if defined(DQN_PLATFORM_HEADER) && defined(DQN_IS_WIN32)
     SYSTEMTIME sys_time = {};
     GetLocalTime(&sys_time);
-    required_len += Dqn_snprintf(nullptr, 0, "%02d-%02d-%02d|%02d:%02d:%02d|", sys_time.wYear % 100, sys_time.wMonth, sys_time.wDay, sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
+    required_len += stbsp_snprintf(nullptr, 0, "%02d-%02d-%02d|%02d:%02d:%02d|", sys_time.wYear % 100, sys_time.wMonth, sys_time.wDay, sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
 #endif
 
     if (have_context)
     {
-        required_len += Dqn_snprintf(nullptr, 0, "%s|%05d|%s|`%s`: ", filename, log_context.line_num, TypePrefix(type), log_context.function);
+        required_len += stbsp_snprintf(nullptr, 0, "%s|%05d|%s|`%s`: ", filename, log_context.line_num, TypePrefix(type), log_context.function);
     }
 
-    required_len += Dqn_snprintf(nullptr, 0, "%s", this->log_builder.str);
-    required_len += Dqn_vsnprintf(nullptr, 0, fmt, va);
+    required_len += stbsp_snprintf(nullptr, 0, "%s", this->log_builder.str);
+    required_len += stbsp_vsnprintf(nullptr, 0, fmt, va);
     required_len += 2; // newline + null byte
 
     // Build string
@@ -5434,14 +5434,14 @@ char const *DqnLogger::LogVA(Type type, Context log_context, char const *fmt, va
     if (have_context)
     {
 #if defined(DQN_PLATFORM_HEADER) && defined(DQN_IS_WIN32)
-        result_ptr += Dqn_sprintf(result_ptr, "%02d-%02d-%02d|%02d:%02d:%02d|", sys_time.wYear % 100, sys_time.wMonth, sys_time.wDay, sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
+        result_ptr += stbsp_sprintf(result_ptr, "%02d-%02d-%02d|%02d:%02d:%02d|", sys_time.wYear % 100, sys_time.wMonth, sys_time.wDay, sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
 #endif
-        result_ptr += Dqn_sprintf(result_ptr, "%s|%05d|%s|`%s`: ", filename, log_context.line_num, TypePrefix(type), log_context.function);
+        result_ptr += stbsp_sprintf(result_ptr, "%s|%05d|%s|`%s`: ", filename, log_context.line_num, TypePrefix(type), log_context.function);
     }
 
-    result_ptr += Dqn_sprintf(result_ptr, "%s", this->log_builder.str);
-    result_ptr += Dqn_vsprintf(result_ptr, fmt, va);
-    result_ptr += Dqn_sprintf(result_ptr, "\n");
+    result_ptr += stbsp_sprintf(result_ptr, "%s", this->log_builder.str);
+    result_ptr += stbsp_vsprintf(result_ptr, fmt, va);
+    result_ptr += stbsp_sprintf(result_ptr, "\n");
     *result_ptr = 0;
     this->log_builder.Clear();
 
@@ -8739,7 +8739,7 @@ DQN_FILE_SCOPE void DqnWin32_DisplayLastError(char const *err_prefix)
     if (err_prefix)
     {
         char formatted_err[2048] = {0};
-        Dqn_sprintf(formatted_err, "%s: %s", err_prefix, DqnWin32_GetLastError());
+        stbsp_sprintf(formatted_err, "%s: %s", err_prefix, DqnWin32_GetLastError());
         DQN__WIN32_ERROR_BOX(formatted_err, nullptr);
     }
     else
@@ -8756,7 +8756,7 @@ DQN_FILE_SCOPE void DqnWin32_DisplayErrorCode(DWORD error, char const *err_prefi
                    nullptr, error, 0, err_msg, DQN_ARRAY_COUNT(err_msg), nullptr);
 
     char formatted_err[2048] = {0};
-    Dqn_sprintf(formatted_err, "%s: %s", err_prefix, err_msg);
+    stbsp_sprintf(formatted_err, "%s: %s", err_prefix, err_msg);
     DQN__WIN32_ERROR_BOX(formatted_err, nullptr);
 }
 
@@ -8767,7 +8767,7 @@ DQN_FILE_SCOPE void DqnWin32_OutputDebugString(char const *fmt_str, ...)
     va_list va;
     va_start(va, fmt_str);
     {
-        i32 num_copied = Dqn_vsprintf(str, fmt_str, va);
+        i32 num_copied = stbsp_vsprintf(str, fmt_str, va);
         DQN_ASSERT(num_copied < DQN_ARRAY_COUNT(str));
     }
     va_end(va);
