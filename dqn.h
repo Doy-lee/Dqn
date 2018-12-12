@@ -505,7 +505,6 @@ BOOL    VirtualFree                     (void *lpAddress, size_t dwSize, DWORD  
 #endif // defined(DQN_PLATFORM_HEADER) && defined(DQN_IS_WIN32) && !defined(_WINDOWS_)
 #ifndef STB_SPRINTF_H_INCLUDE
 #define STB_SPRINTF_H_INCLUDE
-#define STB_SPRINTF_DECORATE(name) Dqn_##name
 
 ////////////////////////////////////////////////////////////////////////////////
 // #DqnSprintf Public API - Cross-platform Sprintf Implementation
@@ -815,8 +814,6 @@ DQN_FILE_SCOPE DqnBuffer<T> DqnBuffer_CopyAndNullTerminate(DqnAllocator *allocat
 
 // #DqnFixedString Public API - Fixed sized strings at compile time
 // =================================================================================================
-FILE_SCOPE int DqnFixedString__Append  (char *dest, int dest_size, char const *src, int len = -1);
-
 template <int MAX>
 struct DqnFixedString
 {
@@ -824,42 +821,29 @@ struct DqnFixedString
     char str[MAX];
 
     DqnFixedString(): len(0)                          { this->str[0] = 0; }
-    DqnFixedString(char const *str)                   {                     this->len = DqnFixedString__Append(this->str, MAX, str, -1);               }
-    DqnFixedString(char const *str, int len)          {                     this->len = DqnFixedString__Append(this->str, MAX, str, len);              }
-    DqnFixedString(DqnSlice<char const> const &other) {                     this->len = DqnFixedString__Append(this->str, MAX, other.data, other.len); }
-    DqnFixedString(DqnSlice<char> const &other)       {                     this->len = DqnFixedString__Append(this->str, MAX, other.data, other.len); }
-    DqnFixedString(DqnFixedString const &other)       { if (this != &other) this->len = DqnFixedString__Append(this->str, MAX, other.str, other.len);  }
+    DqnFixedString(char const *fmt, ...)              { va_list va; va_start(va, fmt); len = stbsp_vsnprintf(str, MAX, fmt, va); va_end(va); DQN_ASSERT(len < MAX); }
+    DqnFixedString(char const *fmt, va_list va)       {                                len = stbsp_vsnprintf(str, MAX, fmt, va);             DQN_ASSERT(len < MAX); }
+    DqnFixedString(DqnSlice<char const> const &other) {                       DqnMem_Copy(str, other.str, other.len); len = other.len; str[len] = 0; }
+    DqnFixedString(DqnSlice<char>       const &other) {                       DqnMem_Copy(str, other.str, other.len); len = other.len; str[len] = 0; }
+    DqnFixedString(DqnFixedString       const &other) { if (this != &other) { DqnMem_Copy(str, other.str, other.len); len = other.len; str[len] = 0; } }
 
-    DqnFixedString &operator+=(char const *other)                 { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other); return *this; }
-    DqnFixedString &operator+=(DqnSlice<char const> const &other) { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
-    DqnFixedString &operator+=(DqnSlice<char> const &other)       { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other.data, other.len); return *this; }
-    DqnFixedString &operator+=(DqnFixedString const &other)       { this->len += DqnFixedString__Append(this->str + this->len, MAX - this->len, other.str, other.len); return *this; }
+    DqnFixedString &operator+=(char const *other)                 { int other_len = Dqn_StrLen(other); DqnMem_Copy(str + len, other,     other_len); len += other_len; str[len] = 0; DQN_ASSERT(len < MAX); return *this; }
+    DqnFixedString &operator+=(DqnSlice<char const> const &other) {                                    DqnMem_Copy(str + len, other.str, other.len); len += other.len; str[len] = 0; DQN_ASSERT(len < MAX); return *this; }
+    DqnFixedString &operator+=(DqnSlice<char> const &other)       {                                    DqnMem_Copy(str + len, other.str, other.len); len += other.len; str[len] = 0; DQN_ASSERT(len < MAX); return *this; }
+    DqnFixedString &operator+=(DqnFixedString const &other)       {                                    DqnMem_Copy(str + len, other.str, other.len); len += other.len; str[len] = 0; DQN_ASSERT(len < MAX); return *this; }
 
-    DqnFixedString  operator+ (char const *other)                 { auto result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other); return result; }
-    DqnFixedString  operator+ (DqnSlice<char const> const &other) { auto result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
-    DqnFixedString  operator+ (DqnSlice<char> const &other)       { auto result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.data, other.len); return result; }
-    DqnFixedString  operator+ (DqnFixedString const &other)       { auto result = *this; result.len += DqnFixedString__Append(result.str + result.len, MAX - result.len, other.str, other.len); return result; }
+    DqnFixedString  operator+ (char const *other)                 { auto result = *this; int other_len = Dqn_StrLen(other); DqnMem_Copy(str + len, other,     other_len); len += other_len; str[len] = 0; DQN_ASSERT(len < MAX); return result; }
+    DqnFixedString  operator+ (DqnSlice<char const> const &other) { auto result = *this;                                    DqnMem_Copy(str + len, other.str, other.len); len += other.len; str[len] = 0; DQN_ASSERT(len < MAX); return result; }
+    DqnFixedString  operator+ (DqnSlice<char> const &other)       { auto result = *this;                                    DqnMem_Copy(str + len, other.str, other.len); len += other.len; str[len] = 0; DQN_ASSERT(len < MAX); return result; }
+    DqnFixedString  operator+ (DqnFixedString const &other)       { auto result = *this;                                    DqnMem_Copy(str + len, other.str, other.len); len += other.len; str[len] = 0; DQN_ASSERT(len < MAX); return result; }
 
     // Xprintf functions always modifies buffer and null-terminates even with insufficient buffer size.
     // Asserts on failure if DQN_ASSERT is defined.
     // return: The number of characters copied to the buffer
-    int  Sprintf         (char const *fmt, ...) { va_list va; va_start(va, fmt); int result = VSprintf      (fmt, va); va_end(va); return result; }
-    int  SprintfAppend   (char const *fmt, ...) { va_list va; va_start(va, fmt); int result = VSprintfAppend(fmt, va); va_end(va); return result; }
-
-    int  VSprintf        (char const *fmt, va_list va) { return VSprintfAtOffset(fmt, va, 0  /*offset*/); }
-    int  VSprintfAppend  (char const *fmt, va_list va) { return VSprintfAtOffset(fmt, va, len/*offset*/); }
-
-    void NullTerminate   () { str[len] = 0; } // NOTE: If you modify the storage directly, this can be handy.
-    void Clear           (Dqn::ZeroMem clear = Dqn::ZeroMem::No) { if (clear == Dqn::ZeroMem::Yes) DqnMem_Set(str, 0, MAX); *this = {}; }
-
-    int VSprintfAtOffset(char const *fmt, va_list va, int offset)
-    {
-        if (Dqn::is_debug) { DQN_ASSERT(Dqn_vsnprintf(nullptr, 0, fmt, va) < MAX); }
-        char *start = str + offset;
-        int result  = Dqn_vsnprintf(start, static_cast<int>((str + MAX) - start), fmt, va);
-        len         = (offset + result);
-        return result;
-    }
+    int  SprintfAppend (char const *fmt, ...)        { va_list va; va_start(va, fmt); int extra = stbsp_sprintf  (str + len, MAX, fmt, va); len += extra; DQN_ASSERT(len < MAX); va_end(va); return extra; }
+    int  VSprintfAppend(char const *fmt, va_list va) {                                int extra = stbsp_vsnprintf(str + len, MAX, fmt, va); len += extra; DQN_ASSERT(len < MAX);             return extra; }
+    void NullTerminate ()                            { str[len] = 0; } // NOTE: If you modify the storage directly, this can be handy.
+    void Clear         (Dqn::ZeroMem clear = Dqn::ZeroMem::No) { if (clear == Dqn::ZeroMem::Yes) DqnMem_Set(str, 0, MAX); *this = {}; }
 };
 
 using DqnFixedString16   = DqnFixedString<16>;
@@ -5372,36 +5356,6 @@ void DqnString::Append(char const *src, int len_)
     DqnMem_Copy(this->str + this->len, src, len_);
     this->len += len_;
     this->str[this->len] = 0;
-}
-
-// #DqnFixedString Implementation
-// =================================================================================================
-// return: The number of bytes written to dest
-FILE_SCOPE int DqnFixedString__Append(char *dest, int dest_size, char const *src, int len)
-{
-    if (len <= -1)
-    {
-        char *ptr = dest;
-        char *end = ptr + dest_size;
-
-        while (*src && ptr != end)
-            *ptr++ = *src++;
-
-        if (ptr == end)
-        {
-            DQN_ASSERT(!src[0]);
-        }
-
-        len = static_cast<i32>(ptr - dest);
-    }
-    else
-    {
-        DqnMem_Copy(dest, src, len);
-    }
-
-    DQN_ASSERT(len < dest_size && len >= 0);
-    dest[len] = 0;
-    return len;
 }
 
 // #DqnLogger Implementation
