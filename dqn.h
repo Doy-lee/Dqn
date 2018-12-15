@@ -110,10 +110,11 @@
 using usize = size_t;
 using isize = ptrdiff_t;
 
-using u64 = uint64_t;
-using u32 = uint32_t;
-using u16 = uint16_t;
-using u8  = uint8_t;
+using uint = unsigned int;
+using u64  = uint64_t;
+using u32  = uint32_t;
+using u16  = uint16_t;
+using u8   = uint8_t;
 
 using i64 = int64_t;
 using i32 = int32_t;
@@ -706,8 +707,8 @@ struct DqnDeferHelper_
 // implicitly swallows the trailing comma.
 
 // Always assert are enabled in release mode.
-#define DQN_ALWAYS_ASSERT(expr) DQN_ASSERTM(expr, "")
-#define DQN_ALWAYS_ASSERTM(expr, msg, ...) DQN_ASSERTM(expr, msg, ## __VA_ARGS__)
+#define DQN_ALWAYS_ASSERT(expr) DQN_ASSERT_MSG(expr, "")
+#define DQN_ALWAYS_ASSERTM(expr, msg, ...) DQN_ASSERT_MSG(expr, msg, ## __VA_ARGS__)
 
 // Generate a DqnLogger::Context structure
 #define DQN_LOGGER_MAKE_CONTEXT_ \
@@ -715,8 +716,8 @@ struct DqnDeferHelper_
         (char *)__FILE__, DQN_CHAR_COUNT(__FILE__), (char *)__func__, DQN_CHAR_COUNT(__func__),  __LINE__                                                                               \
     }
 
-#define DQN_ASSERT(expr) DQN_ASSERTM(expr, "asserted.")
-#define DQN_ASSERTM(expr, msg, ...)                                                                \
+#define DQN_ASSERT(expr) DQN_ASSERT_MSG(expr, "asserted.")
+#define DQN_ASSERT_MSG(expr, msg, ...)                                                                \
     do                                                                                             \
     {                                                                                              \
         if (!(expr))                                                                               \
@@ -776,7 +777,8 @@ struct DqnSlice
     union { T *data; T *str; };
     int  len;
 
-    operator bool() const { bool result = (str != nullptr); return result; }
+    inline   int SizeInBytes() const { return len * sizeof(T); }
+    operator bool()            const { bool result = (str != nullptr); return result; }
     DqnSlice() = default;
     DqnSlice(T *data_, int len_) : data(data_), len(len_) {}
 };
@@ -790,6 +792,15 @@ using DqnBuffer = DqnSlice<T>;
 
 #define DQN_SLICE_STRCMP(a, b, ignore_case) ((a).len == (b).len && (DqnStr_Cmp((char *)((a).str), (char *)((b).str), (a).len, ignore_case) == 0))
 #define DQN_SLICE_MEMCMP(a, b)              ((a).len == (b).len && (DqnMem_Cmp((void *)((a).str), (void *)((b).str), (a).len) == 0))
+
+template <typename T>
+DQN_FILE_SCOPE DqnBuffer<T> DqnBuffer_Make(DqnAllocator *allocator, int num, Dqn::ZeroMem clear = Dqn::ZeroMem::Yes)
+{
+    DqnBuffer<T> result = {};
+    result.len          = num;
+    result.data         = static_cast<T *>(allocator->Malloc(num * sizeof(T), clear));
+    return result;
+}
 
 template <typename T>
 DQN_FILE_SCOPE DqnBuffer<T> DqnBuffer_Copy(DqnAllocator *allocator, T const *data, int len)
@@ -1193,8 +1204,8 @@ struct DqnArray
 
     void  Clear      (Dqn::ZeroMem clear = Dqn::ZeroMem::No)      { if (!data) return; len = 0; if (clear == Dqn::ZeroMem::Yes) DqnMem_Clear(data, 0, sizeof(T) * max); }
     void  Free       ()                                           { if (data) { allocator->Free(data, sizeof(*data) * max); } *this = {}; }
-    T    *Front      ()                                           { DQN_ASSERTM(len > 0, "len: %zu", len); return data + 0; }
-    T    *Back       ()                                           { DQN_ASSERTM(len > 0, "len: %zu", len); return data + (len - 1); }
+    T    *Front      ()                                           { DQN_ASSERT_MSG(len > 0, "len: %zu", len); return data + 0; }
+    T    *Back       ()                                           { DQN_ASSERT_MSG(len > 0, "len: %zu", len); return data + (len - 1); }
     void  Resize     (isize new_len)                              { if (new_len > max) Reserve(GrowCapacity_(new_len)); len = new_len; }
     void  Resize     (isize new_len, T const *v)                  { if (new_len > max) Reserve(GrowCapacity_(new_len)); if (new_len > len) for (isize n = len; n < new_len; n++) data[n] = *v; len = new_len; }
     void  Reserve    (isize new_max);
@@ -1202,14 +1213,14 @@ struct DqnArray
     T    *Push       (T const &v)                                 { if (len + 1 > max) Reserve(GrowCapacity_(len + 1)); data[len++] = v; return data + (len-1); }
     T    *Push       (T const *v, isize v_len)                    { isize new_len = len + v_len; if (new_len > max) Reserve(GrowCapacity_(new_len)); T *result = data + len; for (isize i = 0; i < v_len; ++i) data[len++] = v[i]; return result; }
     void  Pop        ()                                           { if (len > 0) len--; }
-    void  Erase      (isize index)                                { DQN_ASSERTM(index >= 0 && index < len, "index: %zu, len: %zu", index, len); data[index] = data[--len]; }
+    void  Erase      (isize index)                                { DQN_ASSERT_MSG(index >= 0 && index < len, "index: %zu, len: %zu", index, len); data[index] = data[--len]; }
     void  EraseStable(isize index);
     T    *Insert     (isize index, T const *v)                    { return Insert(index,  v, 1); }
     T    *Insert     (isize index, T const &v)                    { return Insert(index, &v, 1); }
     T    *Insert     (isize index, T const *v, isize len_items);
     bool  Contains   (T const *v) const                           { T const *ptr = data;  T const *end = data + len; while (ptr < end) if (*ptr++ == *v) return true; return false; }
 
-    T    &operator[] (isize i) const                              { DQN_ASSERTM(i >= 0 && i < len, "i: %zu, len: %zu", i, len); return this->data[i]; }
+    T    &operator[] (isize i) const                              { DQN_ASSERT_MSG(i >= 0 && i < len, "i: %zu, len: %zu", i, len); return this->data[i]; }
     T    *begin      ()                                           { return data; }
     T    *begin      () const                                     { return data; }
     T    *end        ()                                           { return data + len; }
@@ -1385,7 +1396,7 @@ struct DqnString
     void Reserve         (int new_max);
 
     void Append          (char const *src, int len_ = -1);
-    int  VSprintfAtOffset(char const *fmt, va_list va, int offset)      { Reserve(len + stbsp_vsnprintf(nullptr, 0, fmt, va) + 1); int result = stbsp_vsnprintf(str + offset, max - len, fmt, va); len = (offset + result); return result; }
+    int  VSprintfAtOffset(char const *fmt, va_list va, int offset)      { Reserve(len + Dqn_vsnprintf(nullptr, 0, fmt, va) + 1); int result = Dqn_vsnprintf(str + offset, max - len, fmt, va); len = (offset + result); return result; }
 
     static bool Cmp      (DqnString const *a, DqnString const *b,           Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b->len) && (DqnStr_Cmp(a->str, b->str, a->len, ignore) == 0); }
     static bool Cmp      (DqnString const *a, DqnSlice<char const> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b.len)  && (DqnStr_Cmp(a->str, b.data, b.len, ignore) == 0);  }
@@ -2936,7 +2947,7 @@ DQN_FILE_SCOPE void *DqnAllocator::Malloc(size_t size, Dqn::ZeroMem zero)
             #if defined(DQN_PLATFORM_HEADER)
                 result = DqnOS_VAlloc(size);
             #else
-                DQN_ASSERTM(DQN_INVALID_CODE_PATH,
+                DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH,
                             "Dqn library hasn't been built with the platform header. I don't know how "
                             "to allocate virtual memory!");
             #endif
@@ -2949,7 +2960,7 @@ DQN_FILE_SCOPE void *DqnAllocator::Malloc(size_t size, Dqn::ZeroMem zero)
             if (zero == Dqn::ZeroMem::Yes) DqnMem_Clear(result, 0, size);
         }
         break;
-        default: DQN_ASSERTM(DQN_INVALID_CODE_PATH, "New context type not handled."); break;
+        default: DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "New context type not handled."); break;
     }
     return result;
 }
@@ -2966,7 +2977,7 @@ DQN_FILE_SCOPE void *DqnAllocator::Realloc(void *ptr, size_t new_size)
             DQN_ASSERT(result);
         }
         break;
-        case Type::VirtualMemory: DQN_ASSERTM(DQN_INVALID_CODE_PATH, "Realloc is disallowed on virtual memory! Reserve a bigger range!"); break;
+        case Type::VirtualMemory: DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "Realloc is disallowed on virtual memory! Reserve a bigger range!"); break;
         case Type::DqnMemStack:
         {
             auto *mem_stack          = reinterpret_cast<DqnMemStack *>(user_context);
@@ -2976,7 +2987,7 @@ DQN_FILE_SCOPE void *DqnAllocator::Realloc(void *ptr, size_t new_size)
             DQN_LOGGER_W(dqn_lib_context_.logger, "Memory stack used realloc and ptr: %p with: %zu bytes has been lost", ptr, ptr_header->alloc_amount);
         }
         break;
-        default: DQN_ASSERTM(DQN_INVALID_CODE_PATH, "New context type not handled."); break;
+        default: DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "New context type not handled."); break;
     }
     return result;
 }
@@ -2993,13 +3004,13 @@ DQN_FILE_SCOPE void DqnAllocator::Free(void *ptr, size_t old_size)
             #if defined(DQN_PLATFORM_HEADER)
                 DqnOS_VFree(ptr, old_size);
             #else
-                DQN_ASSERTM(DQN_INVALID_CODE_PATH,
+                DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH,
                             "Dqn library hasn't been built with the platform header. I don't know how to free virtual memory!");
             #endif
         }
         break;
         case Type::DqnMemStack: /*do nothing*/    break;
-        default: DQN_ASSERTM(DQN_INVALID_CODE_PATH, "New context type not handled."); break;
+        default: DQN_ASSERT_MSG(DQN_INVALID_CODE_PATH, "New context type not handled."); break;
     }
 }
 
@@ -3094,7 +3105,7 @@ void *DqnMemTracker::SetupPtr(void *ptr, isize size, u8 alignment)
     DQN_ASSERT(offset_to_ptr_header >= 0 && offset_to_ptr_header <= (alignment - 1));
 
     char *check_allignment = reinterpret_cast<char *>(DQN_ALIGN_POW_N(aligned_result, alignment));
-    DQN_ASSERTM(check_allignment == aligned_result, "Adding bounds guard should not destroy alignment! %p != %p", aligned_result, check_allignment);
+    DQN_ASSERT_MSG(check_allignment == aligned_result, "Adding bounds guard should not destroy alignment! %p != %p", aligned_result, check_allignment);
     // Instrument allocation with guards and tracker
     {
         auto *ptr_header              = reinterpret_cast<DqnPtrHeader *>(byte_ptr + offset_to_ptr_header);
@@ -3171,12 +3182,12 @@ void DqnMemTracker::CheckPtrs() const
         u32 const *head_guard = this->PtrToHeadGuard(ptr);
         u32 const *tail_guard = this->PtrToTailGuard(ptr);
 
-        DQN_ASSERTM(*head_guard == HEAD_GUARD_VALUE,
+        DQN_ASSERT_MSG(*head_guard == HEAD_GUARD_VALUE,
                     "Bounds guard has been destroyed at the head end of the allocation! Expected: "
                     "%x, received: %x",
                     HEAD_GUARD_VALUE, *head_guard);
 
-        DQN_ASSERTM(*tail_guard == TAIL_GUARD_VALUE,
+        DQN_ASSERT_MSG(*tail_guard == TAIL_GUARD_VALUE,
                     "Bounds guard has been destroyed at the tail end of the allocation! Expected: "
                     "%x, received: %x",
                     TAIL_GUARD_VALUE, *tail_guard);
@@ -3259,7 +3270,7 @@ void *DqnMemStack::Push_(usize size, PushType push_type, u8 alignment)
     {
         if ((this->flags & Flag::NonExpandable) && this->block)
         {
-            DQN_ASSERTM(!(this->flags & Flag::NonExpandableAssert), "Allocator is non-expandable and has run out of memory");
+            DQN_ASSERT_MSG(!(this->flags & Flag::NonExpandableAssert), "Allocator is non-expandable and has run out of memory");
             return nullptr;
         }
 
@@ -3307,13 +3318,13 @@ void DqnMemStack::Pop(void *ptr, Dqn::ZeroMem clear)
 
     if (ptr_header->alloc_type == 0)
     {
-        DQN_ASSERTM(end == this->block->head, "Pointer to pop was not the last allocation! %p != %p", end, this->block->head);
+        DQN_ASSERT_MSG(end == this->block->head, "Pointer to pop was not the last allocation! %p != %p", end, this->block->head);
         this->block->head -= full_alloc_size;
         DQN_ASSERT(this->block->head >= this->block->memory);
     }
     else
     {
-        DQN_ASSERTM(start == this->block->tail, "Pointer to pop was not the last allocation! %p != %p", start, this->block->tail);
+        DQN_ASSERT_MSG(start == this->block->tail, "Pointer to pop was not the last allocation! %p != %p", start, this->block->tail);
         this->block->tail += full_alloc_size;
         DQN_ASSERT(this->block->tail <= block_end);
     }
@@ -7995,7 +8006,7 @@ DQN_FILE_SCOPE bool DqnFile_ReadAll(char const *path, u8 *buf, usize buf_size)
     }
 
     usize bytes_read = file.Read(buf, file.size);
-    DQN_ASSERTM(bytes_read == file.size, "%zu != %zu", bytes_read, file.size);
+    DQN_ASSERT_MSG(bytes_read == file.size, "%zu != %zu", bytes_read, file.size);
     return result;
 }
 
@@ -8527,7 +8538,7 @@ void *DqnOS_VAlloc(isize size, void *base_addr)
     void *result = nullptr;
 #if defined (DQN_IS_WIN32)
     result = VirtualAlloc(base_addr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    DQN_ASSERTM(result, "VirtualAlloc failed: %s\n", DqnWin32_GetLastError());
+    DQN_ASSERT_MSG(result, "VirtualAlloc failed: %s\n", DqnWin32_GetLastError());
 #else
     result = mmap(
         base_addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1 /*fd*/, 0 /*offset into fd*/);
