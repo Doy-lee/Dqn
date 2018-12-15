@@ -1132,11 +1132,11 @@ struct DqnMemStack
 struct DqnLogger
 {
 #define LOG_TYPES \
-    X(Warning, "WARN  ") \
-    X(Error,   "ERROR ") \
-    X(Debug,   "DEBUG ") \
-    X(Memory,  "MEMORY") \
-    X(Message, "MSG   ")
+    X(Warning, "WRN") \
+    X(Error,   "ERR") \
+    X(Debug,   "DBG") \
+    X(Memory,  "MEM") \
+    X(Message, "MSG")
 
 #define X(type, prefix) type,
     enum struct Type { LOG_TYPES };
@@ -1161,7 +1161,6 @@ struct DqnLogger
     };
 
     #define DQN_LOGGER(logger, type, fmt, ...) (logger)->Log(type,                     DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
-    #define DQN_LOGGER_E(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Error,   DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
     #define DQN_LOGGER_E(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Error,   DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
     #define DQN_LOGGER_W(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Warning, DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
     #define DQN_LOGGER_D(logger, fmt, ...)     (logger)->Log(DqnLogger::Type::Debug,   DQN_LOGGER_MAKE_CONTEXT_, fmt, ## __VA_ARGS__)
@@ -1210,8 +1209,8 @@ struct DqnArray
     void  Resize     (isize new_len, T const *v)                  { if (new_len > max) Reserve(GrowCapacity_(new_len)); if (new_len > len) for (isize n = len; n < new_len; n++) data[n] = *v; len = new_len; }
     void  Reserve    (isize new_max);
     T    *Make       (isize len_ = 1)                             { len += len_; if (len > max) Reserve(GrowCapacity_(len)); return &data[len - len_]; }
-    T    *Push       (T const &v)                                 { if (len + 1 > max) Reserve(GrowCapacity_(len + 1)); data[len++] = v; return data + (len-1); }
-    T    *Push       (T const *v, isize v_len)                    { isize new_len = len + v_len; if (new_len > max) Reserve(GrowCapacity_(new_len)); T *result = data + len; for (isize i = 0; i < v_len; ++i) data[len++] = v[i]; return result; }
+    T    *Add        (T const &v)                                 { if (len + 1 > max) Reserve(GrowCapacity_(len + 1)); data[len++] = v; return data + (len-1); }
+    T    *Add        (T const *v, isize v_len)                    { isize new_len = len + v_len; if (new_len > max) Reserve(GrowCapacity_(new_len)); T *result = data + len; for (isize i = 0; i < v_len; ++i) data[len++] = v[i]; return result; }
     void  Pop        ()                                           { if (len > 0) len--; }
     void  Erase      (isize index)                                { DQN_ASSERT_MSG(index >= 0 && index < len, "index: %zu, len: %zu", index, len); data[index] = data[--len]; }
     void  EraseStable(isize index);
@@ -2118,8 +2117,8 @@ struct DqnVArray
     T    *Front      ()                                           { return (len > 0) ? (data + 0)           : nullptr; }
     T    *Back       ()                                           { return (len > 0) ? (data + (len - 1)) : nullptr; }
     T    *Make       (isize num = 1)                              { if (!data) LazyInit(1024); len += num; DQN_ASSERT(len <= max); return &data[len - num]; }
-    T    *Push       (T const &v)                                 { data[len++] = v; return data + (len - 1); }
-    T    *Push       (T const *v, isize v_len = 1)                { T *result = data + len; for (isize i = 0; i < v_len; ++i) data[len++] = v[i]; return result; }
+    T    *Add        (T const &v)                                 { data[len++] = v; return data + (len - 1); }
+    T    *Add        (T const *v, isize v_len = 1)                { T *result = data + len; for (isize i = 0; i < v_len; ++i) data[len++] = v[i]; return result; }
     void  Pop        ()                                           { if (len > 0) len--; }
     void  Erase      (isize index)                                { if (!data) return; DQN_ASSERT(index >= 0 && index < len); data[index] = data[--len]; }
     void  EraseStable(isize index);
@@ -5422,12 +5421,12 @@ char const *DqnLogger::LogVA(Type type, Context log_context, char const *fmt, va
 #if defined(DQN_PLATFORM_HEADER) && defined(DQN_IS_WIN32)
     SYSTEMTIME sys_time = {};
     GetLocalTime(&sys_time);
-    required_len += stbsp_snprintf(nullptr, 0, "%02d-%02d-%02d|%02d:%02d:%02d|", sys_time.wYear % 100, sys_time.wMonth, sys_time.wDay, sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
+    required_len += stbsp_snprintf(nullptr, 0, "%02d-%02d-%02d %02d:%02d:%02d  ", sys_time.wYear % 100, sys_time.wMonth, sys_time.wDay, sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
 #endif
 
     if (have_context)
     {
-        required_len += stbsp_snprintf(nullptr, 0, "%s|%05d|%s|`%s`: ", filename, log_context.line_num, TypePrefix(type), log_context.function);
+        required_len += stbsp_snprintf(nullptr, 0, "%s %05d  %s %s: ", filename, log_context.line_num, TypePrefix(type), log_context.function);
     }
 
     required_len += stbsp_snprintf(nullptr, 0, "%s", this->log_builder.str);
@@ -5445,15 +5444,17 @@ char const *DqnLogger::LogVA(Type type, Context log_context, char const *fmt, va
     if (have_context)
     {
 #if defined(DQN_PLATFORM_HEADER) && defined(DQN_IS_WIN32)
-        result_ptr += stbsp_sprintf(result_ptr, "%02d-%02d-%02d|%02d:%02d:%02d|", sys_time.wYear % 100, sys_time.wMonth, sys_time.wDay, sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
+        result_ptr += stbsp_sprintf(result_ptr, "%02d-%02d-%02d %02d:%02d:%02d  ", sys_time.wYear % 100, sys_time.wMonth, sys_time.wDay, sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
 #endif
-        result_ptr += stbsp_sprintf(result_ptr, "%s|%05d|%s|`%s`: ", filename, log_context.line_num, TypePrefix(type), log_context.function);
+        result_ptr += stbsp_sprintf(result_ptr, "%s %05d  %s %s: ", filename, log_context.line_num, TypePrefix(type), log_context.function);
     }
 
-    result_ptr += stbsp_sprintf(result_ptr, "%s", this->log_builder.str);
-    result_ptr += stbsp_vsprintf(result_ptr, fmt, va);
-    result_ptr += stbsp_sprintf(result_ptr, "\n");
-    *result_ptr = 0;
+    DqnMem_Copy(result_ptr, this->log_builder.str, this->log_builder.len);
+    result_ptr   += this->log_builder.len;
+    result_ptr   += stbsp_vsprintf(result_ptr, fmt, va);
+    *result_ptr++ = '\n';
+    *result_ptr++ = 0;
+
     this->log_builder.Clear();
 
     int buf_len_remaining = this->log_buf.len - this->log_buf_index;
