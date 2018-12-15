@@ -1396,7 +1396,7 @@ struct DqnString
     void Reserve         (int new_max);
 
     void Append          (char const *src, int len_ = -1);
-    int  VSprintfAtOffset(char const *fmt, va_list va, int offset)      { Reserve(len + Dqn_vsnprintf(nullptr, 0, fmt, va) + 1); int result = Dqn_vsnprintf(str + offset, max - len, fmt, va); len = (offset + result); return result; }
+    int  VSprintfAtOffset(char const *fmt, va_list va, int offset)      { Reserve(len + stbsp_vsnprintf(nullptr, 0, fmt, va) + 1); int result = stbsp_vsnprintf(str + offset, max - len, fmt, va); len = (offset + result); return result; }
 
     static bool Cmp      (DqnString const *a, DqnString const *b,           Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b->len) && (DqnStr_Cmp(a->str, b->str, a->len, ignore) == 0); }
     static bool Cmp      (DqnString const *a, DqnSlice<char const> const b, Dqn::IgnoreCase ignore = Dqn::IgnoreCase::No) { return (a->len == b.len)  && (DqnStr_Cmp(a->str, b.data, b.len, ignore) == 0);  }
