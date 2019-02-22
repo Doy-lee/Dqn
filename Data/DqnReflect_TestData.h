@@ -13,6 +13,17 @@ DQN_REFLECT enum struct OpenGLShader
 #define MAXIMUM_MACRO(a, b) (a > b) ? (a) : (b)
 #endif
 
+struct V3
+{
+    float test;
+};
+
+struct V4
+{
+    float test;
+};
+
+
 DQN_REFLECT struct OpenGLState
 {
 // #if 0

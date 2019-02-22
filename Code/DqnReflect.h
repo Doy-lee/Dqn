@@ -9,12 +9,10 @@ enum struct DqnReflect_StructMemberMetadataType { String, Int, Float };
 struct DqnReflect_StructMemberMetadata
 {
     DqnReflect_StructMemberMetadataType type;
-    union
-    {
-        char *str_val;
-        int   int_val;
-        float flt_val;
-    };
+    char const *key;
+    int         key_len;
+    char const *val_str;     // Metadata value is always reflected to a string
+    int         val_str_len;
 };
 
 struct DqnReflect_StructMember
@@ -24,8 +22,10 @@ struct DqnReflect_StructMember
     char const *name;
     int         name_len;
 
+#if 0
     DqnReflect_StructMemberMetadata *metadata;
     int                              metadata_len;
+#endif
 };
 
 struct DqnReflect_Struct
@@ -35,6 +35,9 @@ struct DqnReflect_Struct
     DqnReflect_StructMember *members;
     int                      members_len;
 };
+
+// #include "../Data/DqnReflect_TestData.h"
+// #include "Output.cpp"
 
 //
 // HOW TO REFLECT ANNOTATED CODE
@@ -531,7 +534,8 @@ CPPReflectMetadataArray ParseCPPReflectMeta(CPPTokeniser *tokeniser)
         }
     }
 
-    while (token.type != CPPTokenType::EndOfStream && token.type != CPPTokenType::Comma)
+    while (token.type != CPPTokenType::EndOfStream &&
+           (token.type != CPPTokenType::Comma && token.type != CPPTokenType::SemiColon))
         token = CPPTokeniser_NextToken(tokeniser);
 
     return result;
@@ -831,29 +835,68 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
     // Write DqnReflect_Struct Definition
     //
     {
-        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_Struct DqnReflect_%.*s_Struct =\n{\n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_Struct const DqnReflect_%.*s_Struct =\n{\n", name.len, name.str);
         tokeniser->indent_level++;
 
-        CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\", // name \n", name.len, name.str);
-        CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"), // name_len \n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\", // name\n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"), // name_len\n", name.len, name.str);
 
-        CPPTokeniser_SprintfToFile(tokeniser, "{ // members \n");
+        CPPTokeniser_SprintfToFile(tokeniser, "{ // members\n");
         tokeniser->indent_level++;
         for (CPPDeclLinkedList<CPPVariableDecl> const *link = struct_members; link; link = link->next)
         {
             CPPVariableDecl const *decl = &link->value;
             CPPTokeniser_SprintfToFile(tokeniser, "{\n");
             tokeniser->indent_level++;
+
+            // member->type
             CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n",                         decl->type.len, decl->type.str);
             CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"),\n", decl->type.len, decl->type.str);
+
+            // member->name
             CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n",                         decl->name.len, decl->name.str);
             CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"),\n", decl->name.len, decl->name.str);
+
+            // member->metadata
+            if (1)
+            {
+            if (link->metadata_array.len <= 0)
+            {
+                CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // metadata\n");
+            }
+            else
+            {
+                CPPTokeniser_SprintfToFile(tokeniser, "{ // metadata\n");
+                tokeniser->indent_level++;
+                for (CPPReflectMetadataEntry const &entry : link->metadata_array)
+                {
+                    CPPTokeniser_SprintfToFile(tokeniser, "{\n");
+                    tokeniser->indent_level++;
+                    CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_StructMemberMetadataType::String,\n");
+
+                    // metadata->key
+                    CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n", entry.key.len, entry.key.str);
+                    CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"),\n", entry.key.len, entry.key.str);
+
+                    // metadata->value
+                    CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n", entry.value.len, entry.value.str);
+                    CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"),\n", entry.value.len, entry.value.str);
+
+                    tokeniser->indent_level--;
+                    CPPTokeniser_SprintfToFile(tokeniser, "},\n");
+                }
+                tokeniser->indent_level--;
+                CPPTokeniser_SprintfToFile(tokeniser, "},\n");
+            }
+            CPPTokeniser_SprintfToFile(tokeniser, "%d // metadata_len\n", link->metadata_array.len);
+            }
+
             tokeniser->indent_level--;
             CPPTokeniser_SprintfToFile(tokeniser, "},\n");
         }
         tokeniser->indent_level--;
         CPPTokeniser_SprintfToFile(tokeniser, "},\n");
-        CPPTokeniser_SprintfToFile(tokeniser, "%d // members_len \n", struct_members_len);
+        CPPTokeniser_SprintfToFile(tokeniser, "%d // members_len\n", struct_members_len);
 
         tokeniser->indent_level--;
         CPPTokeniser_SprintfToFile(tokeniser, "};\n\n");
@@ -867,6 +910,7 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
         CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_Struct const *DqnReflect_GetStruct(%.*s const *val)\n", name.len, name.str);
         CPPTokeniser_SprintfToFile(tokeniser, "{\n");
         tokeniser->indent_level++;
+        CPPTokeniser_SprintfToFile(tokeniser, "(void)val;\n");
         CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_Struct const *result = &DqnReflect_%.*s_Struct;\n", name.len, name.str);
         CPPTokeniser_SprintfToFile(tokeniser, "return result;\n");
         tokeniser->indent_level--;
