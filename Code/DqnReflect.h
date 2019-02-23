@@ -4,7 +4,7 @@
 #define DQN_REFLECT
 #define DQN_REFLECT_META(...)
 
-enum struct DqnReflect_StructMemberMetadataType { String, Int, Float };
+enum DqnReflect_StructMemberMetadataType { String, Int, Float };
 
 struct DqnReflect_StructMemberMetadata
 {
@@ -22,22 +22,17 @@ struct DqnReflect_StructMember
     char const *name;
     int         name_len;
 
-#if 0
-    DqnReflect_StructMemberMetadata *metadata;
-    int                              metadata_len;
-#endif
+    DqnReflect_StructMemberMetadata const *metadata;
+    int                                    metadata_len;
 };
 
 struct DqnReflect_Struct
 {
-    char const              *name;
-    int                      name_len;
-    DqnReflect_StructMember *members;
-    int                      members_len;
+    char const                    *name;
+    int                            name_len;
+    DqnReflect_StructMember const *members;
+    int                            members_len;
 };
-
-// #include "../Data/DqnReflect_TestData.h"
-// #include "Output.cpp"
 
 //
 // HOW TO REFLECT ANNOTATED CODE
@@ -828,8 +823,74 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
         }
     }
 
+    // TODO(doyle): Don't support anonymous/nameless structs yet
     if (name.len == 0)
         return;
+
+    //
+    // Write DqnReflect_StructMemberMetadata Definition
+    //
+    for (CPPDeclLinkedList<CPPVariableDecl> const *member = struct_members; member; member = member->next)
+    {
+        CPPVariableDecl const *decl = &member->value;
+        if (member->metadata_array.len <= 0)
+            continue;
+
+        CPPTokeniser_SprintfToFile(
+            tokeniser,
+            "DqnReflect_StructMemberMetadata const DqnReflect_%.*s_%.*s_StructMemberMetadata[] =\n{\n",
+            name.len,
+            name.str,
+            decl->name.len,
+            decl->name.str);
+
+        tokeniser->indent_level++;
+        for (CPPReflectMetadataEntry const &entry : member->metadata_array)
+        {
+            CPPTokeniser_SprintfToFile(tokeniser, "{\n");
+            tokeniser->indent_level++;
+            CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_StructMemberMetadataType::String,\n");
+
+            // metadata->key
+            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", entry.key.len, entry.key.str);
+
+            // metadata->value
+            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", entry.value.len, entry.value.str);
+
+            tokeniser->indent_level--;
+            CPPTokeniser_SprintfToFile(tokeniser, "},\n");
+        }
+        tokeniser->indent_level--;
+        CPPTokeniser_SprintfToFile(tokeniser, "};\n\n");
+    }
+
+    //
+    // Write DqnReflect_StructMembers Definition
+    //
+    {
+        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_StructMember const DqnReflect_%.*s_StructMembers[] =\n{\n", name.len, name.str);
+        tokeniser->indent_level++;
+
+        for (CPPDeclLinkedList<CPPVariableDecl> const *member = struct_members; member; member = member->next)
+        {
+            CPPVariableDecl const *decl = &member->value;
+            CPPTokeniser_SprintfToFile(tokeniser, "{\n");
+            tokeniser->indent_level++;
+
+            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->type.len, decl->type.str);
+            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
+
+            if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // metadata\n");
+            else                                 CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_%.*s_%.*s_StructMemberMetadata,\n", name.len, name.str, decl->name.len, decl->name.str);
+            CPPTokeniser_SprintfToFile(tokeniser, "%d // metadata_len\n", member->metadata_array.len);
+
+            tokeniser->indent_level--;
+            CPPTokeniser_SprintfToFile(tokeniser, "},\n");
+        }
+
+        tokeniser->indent_level--;
+        CPPTokeniser_SprintfToFile(tokeniser, "};\n\n");
+    }
 
     //
     // Write DqnReflect_Struct Definition
@@ -838,64 +899,8 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
         CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_Struct const DqnReflect_%.*s_Struct =\n{\n", name.len, name.str);
         tokeniser->indent_level++;
 
-        CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\", // name\n", name.len, name.str);
-        CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"), // name_len\n", name.len, name.str);
-
-        CPPTokeniser_SprintfToFile(tokeniser, "{ // members\n");
-        tokeniser->indent_level++;
-        for (CPPDeclLinkedList<CPPVariableDecl> const *link = struct_members; link; link = link->next)
-        {
-            CPPVariableDecl const *decl = &link->value;
-            CPPTokeniser_SprintfToFile(tokeniser, "{\n");
-            tokeniser->indent_level++;
-
-            // member->type
-            CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n",                         decl->type.len, decl->type.str);
-            CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"),\n", decl->type.len, decl->type.str);
-
-            // member->name
-            CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n",                         decl->name.len, decl->name.str);
-            CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"),\n", decl->name.len, decl->name.str);
-
-            // member->metadata
-            if (1)
-            {
-            if (link->metadata_array.len <= 0)
-            {
-                CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // metadata\n");
-            }
-            else
-            {
-                CPPTokeniser_SprintfToFile(tokeniser, "{ // metadata\n");
-                tokeniser->indent_level++;
-                for (CPPReflectMetadataEntry const &entry : link->metadata_array)
-                {
-                    CPPTokeniser_SprintfToFile(tokeniser, "{\n");
-                    tokeniser->indent_level++;
-                    CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_StructMemberMetadataType::String,\n");
-
-                    // metadata->key
-                    CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n", entry.key.len, entry.key.str);
-                    CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"),\n", entry.key.len, entry.key.str);
-
-                    // metadata->value
-                    CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n", entry.value.len, entry.value.str);
-                    CPPTokeniser_SprintfToFile(tokeniser, "DQN_REFLECT_CHAR_COUNT(\"%.*s\"),\n", entry.value.len, entry.value.str);
-
-                    tokeniser->indent_level--;
-                    CPPTokeniser_SprintfToFile(tokeniser, "},\n");
-                }
-                tokeniser->indent_level--;
-                CPPTokeniser_SprintfToFile(tokeniser, "},\n");
-            }
-            CPPTokeniser_SprintfToFile(tokeniser, "%d // metadata_len\n", link->metadata_array.len);
-            }
-
-            tokeniser->indent_level--;
-            CPPTokeniser_SprintfToFile(tokeniser, "},\n");
-        }
-        tokeniser->indent_level--;
-        CPPTokeniser_SprintfToFile(tokeniser, "},\n");
+        CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_%.*s_StructMembers, // members\n", name.len, name.str);
         CPPTokeniser_SprintfToFile(tokeniser, "%d // members_len\n", struct_members_len);
 
         tokeniser->indent_level--;
@@ -949,8 +954,10 @@ int main(int argc, char *argv[])
             "#define DQN_REFLECT_GENERATED_H\n\n"
             "// This is an auto generated file using Dqn_Reflect\n"
             "\n"
-            "#define DQN_REFLECT_ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
-            "#define DQN_REFLECT_CHAR_COUNT(str) (DQN_REFLECT_ARRAY_COUNT(str) - 1)\n"
+            " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
+            "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
+            "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
+            "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
             "\n");
 
     for (usize arg_index = 1; arg_index < argc; ++arg_index)
@@ -1152,7 +1159,12 @@ int main(int argc, char *argv[])
                 file_include_contents_hash_define);
     }
 
-    fprintf(output_file, "#endif // DQN_REFLECT_GENERATED_H\n");
+    fprintf(output_file,
+            "#undef ARRAY_COUNT\n"
+            "#undef CHAR_COUNT\n"
+            "#undef STR_AND_LEN\n"
+            "#endif // DQN_REFLECT_GENERATED_H\n"
+            );
     fclose(output_file);
 
     return 0;
