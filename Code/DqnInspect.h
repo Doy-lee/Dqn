@@ -538,8 +538,7 @@ CPPInspectMetadataArray ParseCPPInspectMeta(CPPTokeniser *tokeniser)
         }
     }
 
-    while (token.type != CPPTokenType::EndOfStream &&
-           (token.type != CPPTokenType::Comma && token.type != CPPTokenType::SemiColon))
+    while (token.type != CPPTokenType::EndOfStream && token.type != CPPTokenType::CloseParen)
         token = CPPTokeniser_NextToken(tokeniser);
 
     return result;
@@ -783,7 +782,6 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
         name = StringLiteral(token.str, token.len);
     }
 
-    int struct_members_len                             = 0;
     CPPDeclLinkedList<CPPVariableDecl> *struct_members = nullptr;
     MemArenaScopedRegion mem_region                    = MemArena_MakeScopedRegion(&global_main_arena);
 
@@ -809,20 +807,39 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
                 CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
                 if (peek_token.type == CPPTokenType::Identifier)
                 {
-                    auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<CPPVariableDecl>);
-                    *link      = {};
-                    if (!link_iterator) struct_members      = link; // Set struct_members to first linked list entry
-                    else                link_iterator->next = link;
-                    link_iterator = link;
-                    struct_members_len++;
+                    CPPToken const variable_type = token;
+                    CPPToken variable_name       = peek_token;
+                    for (;;)
+                    {
+                        auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<CPPVariableDecl>);
+                        *link      = {};
+                        if (!link_iterator) struct_members      = link; // Set struct_members to first linked list entry
+                        else                link_iterator->next = link;
+                        link_iterator = link;
 
-                    link->value.type = StringLiteral(token.str, token.len);
-                    link->value.name = StringLiteral(peek_token.str, peek_token.len);
+                        link->value.type = StringLiteral(variable_type.str, variable_type.len);
+                        link->value.name = StringLiteral(variable_name.str, variable_name.len);
 
-                    CPPTokeniser_NextToken(tokeniser);
-                    peek_token = CPPTokeniser_PeekToken(tokeniser);
-                    if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
-                        link->metadata_array = ParseCPPInspectMeta(tokeniser);
+                        CPPTokeniser_NextToken(tokeniser);
+                        peek_token = CPPTokeniser_PeekToken(tokeniser);
+                        if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
+                        {
+                            link->metadata_array = ParseCPPInspectMeta(tokeniser);
+                            peek_token           = CPPTokeniser_PeekToken(tokeniser);
+                        }
+
+                        if (peek_token.type == CPPTokenType::Comma)
+                        {
+                            CPPTokeniser_NextToken(tokeniser);
+                            variable_name = CPPTokeniser_PeekToken(tokeniser);
+                            if (!ExpectToken(variable_name, CPPTokenType::Identifier))
+                                return;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -906,7 +923,7 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
 
         CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", name.len, name.str);
         CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_%.*s_StructMembers, // members\n", name.len, name.str);
-        CPPTokeniser_SprintfToFile(tokeniser, "%d // members_len\n", struct_members_len);
+        CPPTokeniser_SprintfToFile(tokeniser, "ARRAY_COUNT(DqnInspect_%.*s_StructMembers) // members_len\n", name.len, name.str);
 
         tokeniser->indent_level--;
         CPPTokeniser_SprintfToFile(tokeniser, "};\n\n");
