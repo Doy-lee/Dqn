@@ -347,6 +347,8 @@ b32 StrCmp(StringLiteral a, StringLiteral b)
     X(EndOfStream, "End Of Stream") \
     X(LeftBrace, "{") \
     X(RightBrace, "}") \
+    X(LeftSqBracket, "[") \
+    X(RightSqBracket, "]") \
     X(OpenParen, "(") \
     X(CloseParen, ")") \
     X(Comma, ",") \
@@ -857,7 +859,16 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
                     link->value.array_dimensions = total_asterisks_count;
 
                     CPPTokeniser_NextToken(tokeniser);
-                    peek_token = CPPTokeniser_PeekToken(tokeniser);
+                    for (peek_token = CPPTokeniser_PeekToken(tokeniser);
+                         peek_token.type == CPPTokenType::LeftSqBracket && peek_token.type != CPPTokenType::EndOfStream;
+                         peek_token = CPPTokeniser_NextToken(tokeniser))
+                    {
+                        // TODO(doyle): Parsing array size is difficult if it's an expression, so maybe don't do it at all
+                        ++link->value.array_dimensions;
+                        while (token.type != CPPTokenType::RightSqBracket && token.type != CPPTokenType::EndOfStream)
+                            token = CPPTokeniser_NextToken(tokeniser);
+                    }
+
                     if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
                     {
                         link->metadata_array = ParseCPPInspectMeta(tokeniser);
@@ -1099,6 +1110,8 @@ int main(int argc, char *argv[])
                 {
                     case '{': { token->type = CPPTokenType::LeftBrace;  started_lexing_scope = true; indent_level++; } break;
                     case '}': { token->type = CPPTokenType::RightBrace; indent_level--; } break;
+                    case '[': { token->type = CPPTokenType::LeftSqBracket;  } break;
+                    case ']': { token->type = CPPTokenType::RightSqBracket; } break;
                     case '(': { token->type = CPPTokenType::OpenParen;   } break;
                     case ')': { token->type = CPPTokenType::CloseParen;  } break;
                     case ',': { token->type = CPPTokenType::Comma;       } break;

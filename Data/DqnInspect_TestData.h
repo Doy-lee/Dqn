@@ -28,9 +28,9 @@ DQN_INSPECT struct OpenGLState
 {
 // #if 0
 // #endif
+    u32                           shaders[(int)OpenGLShader::Count];
     void                         *win32_handle;
     int                           ebo DQN_INSPECT_META(DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(DisplayName = "Vertex Array Object", OpenGLVersion = "330");
-    // u32                           shaders[(int)OpenGLShader::Count];
     V4                            draw_color DQN_INSPECT_META(DisplayName = "HelloWorld");
     V3                            lighting_ambient_coeff;
     char                        **bitmaps;
