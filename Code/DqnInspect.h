@@ -793,6 +793,8 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
         {
             if (token.type == CPPTokenType::Identifier)
             {
+                if (IsIdentifierToken(token, STR_LITERAL("const")))
+                    token = CPPTokeniser_NextToken(tokeniser);
 
 #if 0
                 int asterisks_count = 0;
@@ -809,6 +811,12 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
                 {
                     CPPToken const variable_type = token;
                     CPPToken variable_name       = peek_token;
+                    if (IsIdentifierToken(variable_name, STR_LITERAL("const")))
+                    {
+                        token         = CPPTokeniser_NextToken(tokeniser);
+                        variable_name = CPPTokeniser_PeekToken(tokeniser);
+                    }
+
                     for (;;)
                     {
                         auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<CPPVariableDecl>);
