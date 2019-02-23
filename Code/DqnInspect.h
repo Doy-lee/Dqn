@@ -103,6 +103,7 @@ struct DqnInspect_StructMember
     int         type_len;
     char const *name;
     int         name_len;
+    int         array_dimensions; // > 0 means array
 
     DqnInspect_StructMemberMetadata const *metadata;
     int                                    metadata_len;
@@ -396,8 +397,7 @@ struct CPPVariableDecl
 {
     StringLiteral type;
     StringLiteral name;
-    b32           is_array;
-    int           array_len;
+    int           array_dimensions;
 };
 
 struct CPPTokeniser
@@ -765,6 +765,35 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
     }
 }
 
+int ConsumeAsterisks(CPPTokeniser *tokeniser)
+{
+    int result = 0;
+    for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
+         peek_token.type == CPPTokenType::Asterisks;
+         ++result)
+    {
+        CPPTokeniser_NextToken(tokeniser);
+        peek_token = CPPTokeniser_PeekToken(tokeniser);
+    }
+
+    return result;
+}
+
+b32 ConsumeConstIdentifier(CPPTokeniser *tokeniser)
+{
+    b32 result = false;
+    for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
+         IsIdentifierToken(peek_token, STR_LITERAL("const"));
+         )
+    {
+        result = true;
+        CPPTokeniser_NextToken(tokeniser);
+        peek_token = CPPTokeniser_PeekToken(tokeniser);
+    }
+
+    return result;
+}
+
 void ParseCPPStruct(CPPTokeniser *tokeniser)
 {
     CPPToken token = CPPTokeniser_NextToken(tokeniser);
@@ -793,60 +822,48 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
         {
             if (token.type == CPPTokenType::Identifier)
             {
-                if (IsIdentifierToken(token, STR_LITERAL("const")))
-                    token = CPPTokeniser_NextToken(tokeniser);
-
-#if 0
-                int asterisks_count = 0;
-                for (;; ++asterisks_count)
+                ConsumeConstIdentifier(tokeniser);
+                CPPToken const variable_type = token;
+                for (int total_asterisks_count = 0;;)
                 {
-                    Token peek_token = CPPTokeniser_PeekToken(tokeniser);
-                    if (peek_token == CPPTokenType::Asterisks) CPPTokeniser_NextToken(tokeniser);
-                    else                                       break;
-                }
-#endif
-
-                CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
-                if (peek_token.type == CPPTokenType::Identifier)
-                {
-                    CPPToken const variable_type = token;
-                    CPPToken variable_name       = peek_token;
-                    if (IsIdentifierToken(variable_name, STR_LITERAL("const")))
+                    total_asterisks_count = ConsumeAsterisks(tokeniser);
+                    if (ConsumeConstIdentifier(tokeniser))
                     {
-                        token         = CPPTokeniser_NextToken(tokeniser);
-                        variable_name = CPPTokeniser_PeekToken(tokeniser);
+                        total_asterisks_count += ConsumeAsterisks(tokeniser);
+                        ConsumeConstIdentifier(tokeniser);
                     }
 
-                    for (;;)
+                    CPPToken peek_token    = CPPTokeniser_PeekToken(tokeniser);
+                    CPPToken variable_name = peek_token;
+                    if (variable_name.type != CPPTokenType::Identifier)
+                        break;
+
+                    // Allocate A Member Declaration
+                    auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<CPPVariableDecl>);
+                    *link      = {};
+                    if (!link_iterator) struct_members      = link; // Set struct_members to first linked list entry
+                    else                link_iterator->next = link;
+                    link_iterator = link;
+
+                    link->value.type             = StringLiteral(variable_type.str, variable_type.len);
+                    link->value.name             = StringLiteral(variable_name.str, variable_name.len);
+                    link->value.array_dimensions = total_asterisks_count;
+
+                    CPPTokeniser_NextToken(tokeniser);
+                    peek_token = CPPTokeniser_PeekToken(tokeniser);
+                    if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
                     {
-                        auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<CPPVariableDecl>);
-                        *link      = {};
-                        if (!link_iterator) struct_members      = link; // Set struct_members to first linked list entry
-                        else                link_iterator->next = link;
-                        link_iterator = link;
+                        link->metadata_array = ParseCPPInspectMeta(tokeniser);
+                        peek_token           = CPPTokeniser_PeekToken(tokeniser);
+                    }
 
-                        link->value.type = StringLiteral(variable_type.str, variable_type.len);
-                        link->value.name = StringLiteral(variable_name.str, variable_name.len);
-
+                    if (peek_token.type == CPPTokenType::Comma)
+                    {
                         CPPTokeniser_NextToken(tokeniser);
-                        peek_token = CPPTokeniser_PeekToken(tokeniser);
-                        if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
-                        {
-                            link->metadata_array = ParseCPPInspectMeta(tokeniser);
-                            peek_token           = CPPTokeniser_PeekToken(tokeniser);
-                        }
-
-                        if (peek_token.type == CPPTokenType::Comma)
-                        {
-                            CPPTokeniser_NextToken(tokeniser);
-                            variable_name = CPPTokeniser_PeekToken(tokeniser);
-                            if (!ExpectToken(variable_name, CPPTokenType::Identifier))
-                                return;
-                        }
-                        else
-                        {
-                            break;
-                        }
+                    }
+                    else
+                    {
+                        break;
                     }
                 }
             }
@@ -909,6 +926,7 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
 
             CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->type.len, decl->type.str);
             CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
+            CPPTokeniser_SprintfToFile(tokeniser, "%d, // array_dimensions\n", decl->array_dimensions);
 
             if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // metadata\n");
             else                                 CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_%.*s_%.*s_StructMemberMetadata,\n", name.len, name.str, decl->name.len, decl->name.str);
