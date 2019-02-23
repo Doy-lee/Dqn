@@ -1,4 +1,4 @@
-DQN_REFLECT enum struct OpenGLShader
+DQN_INSPECT enum struct OpenGLShader
 {
     Invalid,
     Rect DQN_REFLECT_META(VertexShaderFilePath = "Rect.vert", FragmentShaderFilePath = "Rect.frag"),
@@ -24,7 +24,7 @@ struct V4
 };
 
 
-DQN_REFLECT struct OpenGLState
+DQN_INSPECT struct OpenGLState
 {
 // #if 0
 // #endif

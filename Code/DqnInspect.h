@@ -1,113 +1,122 @@
-#ifndef DQN_REFLECT_H
-#define DQN_REFLECT_H
-
-#define DQN_REFLECT
-#define DQN_REFLECT_META(...)
-
-enum DqnReflect_StructMemberMetadataType { String, Int, Float };
-
-struct DqnReflect_StructMemberMetadata
-{
-    DqnReflect_StructMemberMetadataType type;
-    char const *key;
-    int         key_len;
-    char const *val_str;     // Metadata value is always reflected to a string
-    int         val_str_len;
-};
-
-struct DqnReflect_StructMember
-{
-    char const *type;
-    int         type_len;
-    char const *name;
-    int         name_len;
-
-    DqnReflect_StructMemberMetadata const *metadata;
-    int                                    metadata_len;
-};
-
-struct DqnReflect_Struct
-{
-    char const                    *name;
-    int                            name_len;
-    DqnReflect_StructMember const *members;
-    int                            members_len;
-};
+#ifndef DQN_INSPECT_H
+#define DQN_INSPECT_H
 
 //
-// HOW TO REFLECT ANNOTATED CODE
-// Define in the preprocessor, DQN_REFLECT_IMPLEMENTATION and compile
-// Dqn_Reflect.h to produce the metaprogram binary. Run the binary on the
-// desired C++ source files. The reflected file will be printed out to stdout.
-//
+// DqnInspect.h - Minimal Inspection System, Single Header, CRT Dependencies Only
+//                Public Domain or MIT License
+// =================================================================================================
 
 //
-// DqnReflect.exe YourSourceCode.cpp > YourSourceCode_Reflected.cpp
+// HOW TO BUILD AND INSPECT ANNOTATED CODE
+// =================================================================================================
+// Define in the preprocessor, DQN_INSPECT_EXECUTABLE_IMPLEMENTATION and compile
+// Dqn_Inspect.h to produce the metaprogram binary. Run the binary on the
+// desired C++ source files. The inspected file will be printed out to stdout.
 //
+// DqnInspect.exe YourSourceCode.cpp > YourSourceCode_Inspected.cpp
 
 //
 // HOW TO ANNOTATE CODE
-// This header file should be included in all files containing information you
-// wish to reflect, you may reflect C-like data structures, such as in the
-// following example.
+// =================================================================================================
+// This header only file contains all the necessary definitions for inspected
+// members and should be included in all files containing information you wish
+// to inspect. You may inspect C-like POD data structures, such as in the following
+// example.
 //
 
 //
-// Your Source Code
-//
+// Example Annotation
+// =================================================================================================
 
-#if 0
-DQN_REFLECT enum struct OpenGLShader
+/*
+//
+// YourSourceCode.cpp
+//
+DQN_INSPECT enum struct OpenGLShader
 {
     Invalid,
-    Rect DQN_REFLECT_META(VertexShaderFilePath = "Rect.vert", FragmentShaderFilePath = "Rect.frag"),
-    Text DQN_REFLECT_META(VertexShaderFilePath = "Text.vert",   FragmentShaderFilePath = "Text.frag"),
+    Rect DQN_INSPECT_META(VertexShaderFilePath = "Rect.vert", FragmentShaderFilePath = "Rect.frag"),
+    Text DQN_INSPECT_META(VertexShaderFilePath = "Text.vert", FragmentShaderFilePath = "Text.frag"),
 };
-#endif
 
 //
-// Generated code in DqnReflect_Generated.cpp
+// Example Output
 //
-
-#if 0
-#ifndef DQN_REFLECT_GENERATED_H
-#define DQN_REFLECT_GENERATED_H
+// =================================================================================================
 
 //
-// OpenGL.h
+// YourSourceCode_Inspected.cpp
+//
+#ifndef DQN_INSPECT_GENERATED_H
+#define DQN_INSPECT_GENERATED_H
+
+//
+// YourSourceCode.cpp
 //
 
-#if !defined(DQN_REFLECT_DISABLE_OPENGL_H)
-char const *DqnReflect_OpenGLShader_Strings[] = {"Invalid", "Bitmap", "Text" };
+#if !defined(DQN_INSPECT_YOUR_SOURCE_CODE_H)
+char const *DqnInspect_OpenGLShader_Strings[] = {"Invalid", "Bitmap", "Text" };
 
-char const *DqnReflect_EnumString(OpenGLShader val)
+char const *DqnInspect_EnumString(OpenGLShader val)
 {
-    if (val == OpenGLShader::Invalid) return DqnReflect_OpenGLShader_Strings[0]; // "Invalid"
-    if (val == OpenGLShader::Rect)    return DqnReflect_OpenGLShader_Strings[1]; // "Rect"
-    if (val == OpenGLShader::Bitmap)  return DqnReflect_OpenGLShader_Strings[2]; // "Bitmap"
+    if (val == OpenGLShader::Invalid) return DqnInspect_OpenGLShader_Strings[0]; // "Invalid"
+    if (val == OpenGLShader::Rect)    return DqnInspect_OpenGLShader_Strings[1]; // "Rect"
+    if (val == OpenGLShader::Bitmap)  return DqnInspect_OpenGLShader_Strings[2]; // "Bitmap"
     return nullptr;
 }
 
-char const *DqnReflect_VertexFilePathMetadata(OpenGLShader val)
+char const *DqnInspect_VertexFilePathMetadata(OpenGLShader val)
 {
     if (val == OpenGLShader::Rect)   return "Rect.vert";
     if (val == OpenGLShader::Bitmap) return "Bitmap.vert";
     return nullptr;
 }
 
-char const *DqnReflect_FragmentFilePathMetadata(OpenGLShader val)
+char const *DqnInspect_FragmentFilePathMetadata(OpenGLShader val)
 {
     if (val == OpenGLShader::Rect)   return "Rect.frag";
     if (val == OpenGLShader::Bitmap) return "Bitmap.frag";
     return nullptr;
 }
 
-#endif // DQN_REFLECT_DISABLE_OPENGL_H
+#endif // DQN_INSPECT_DISABLE_YOUR_SOURCE_CODE_H
+#endif // DQN_INSPECT_GENERATED_H
+*/
 
-#endif // DQN_REFLECT_GENERATED_H
-#endif
+#define DQN_INSPECT
+#define DQN_INSPECT_META(...)
 
-#ifdef DQN_REFLECT_IMPLEMENTATION
+enum DqnInspect_StructMemberMetadataType { String, Int, Float };
+
+struct DqnInspect_StructMemberMetadata
+{
+    DqnInspect_StructMemberMetadataType type;
+    char const *key;
+    int         key_len;
+    char const *val_str;     // Metadata value is always inspected to a string
+    int         val_str_len;
+};
+
+struct DqnInspect_StructMember
+{
+    char const *type;
+    int         type_len;
+    char const *name;
+    int         name_len;
+
+    DqnInspect_StructMemberMetadata const *metadata;
+    int                                    metadata_len;
+};
+
+struct DqnInspect_Struct
+{
+    char const                    *name;
+    int                            name_len;
+    DqnInspect_StructMember const *members;
+    int                            members_len;
+};
+
+#ifdef DQN_INSPECT_EXECUTABLE_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <assert.h>
@@ -154,7 +163,7 @@ struct LinkedList
     LinkedList *next;
 };
 
-#define REFLECT_MAX(a, b) ((a) > (b)) ? (a) : (b)
+#define INSPECT_MAX(a, b) ((a) > (b)) ? (a) : (b)
 #define ARRAY_COUNT(str) sizeof(str)/sizeof(str[0])
 #define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
 #define TOKEN_COMBINE(x, y) x ## y
@@ -367,18 +376,18 @@ struct CPPToken
     int   len;
 };
 
-struct CPPReflectMetadataEntry
+struct CPPInspectMetadataEntry
 {
     StringLiteral key;
     StringLiteral value;
 };
 
-using CPPReflectMetadataArray = FixedArray<CPPReflectMetadataEntry, 8>;
+using CPPInspectMetadataArray = FixedArray<CPPInspectMetadataEntry, 8>;
 
 template <typename T>
 struct CPPDeclLinkedList
 {
-    CPPReflectMetadataArray metadata_array;
+    CPPInspectMetadataArray metadata_array;
     T                       value;
     CPPDeclLinkedList      *next;
 };
@@ -493,11 +502,11 @@ b32 ExpectToken(CPPToken token, CPPTokenType type)
 // CPP Parsing Functions
 //
 
-CPPReflectMetadataArray ParseCPPReflectMeta(CPPTokeniser *tokeniser)
+CPPInspectMetadataArray ParseCPPInspectMeta(CPPTokeniser *tokeniser)
 {
-    CPPReflectMetadataArray result = {};
+    CPPInspectMetadataArray result = {};
     CPPToken token                 = CPPTokeniser_NextToken(tokeniser);
-    if (!ExpectToken(token, CPPTokenType::Identifier) || !IsIdentifierToken(token, STR_LITERAL("DQN_REFLECT_META")))
+    if (!ExpectToken(token, CPPTokenType::Identifier) || !IsIdentifierToken(token, STR_LITERAL("DQN_INSPECT_META")))
         return result;
 
     token = CPPTokeniser_NextToken(tokeniser);
@@ -522,7 +531,7 @@ CPPReflectMetadataArray ParseCPPReflectMeta(CPPTokeniser *tokeniser)
                 token = CPPTokeniser_NextToken(tokeniser);
                 if (IsIdentifierToken(token, STR_LITERAL("nullptr"))) continue;
 
-                CPPReflectMetadataEntry *entry = FixedArray_Make(&result, 1);
+                CPPInspectMetadataEntry *entry = FixedArray_Make(&result, 1);
                 entry->key                     = metadata_key;
                 entry->value                   = StringLiteral(token.str, token.len);
             }
@@ -542,14 +551,14 @@ struct CPPDeclToMetaValue
     StringLiteral value;
 };
 
-// i.e. DataType cpp_decl DQN_REFLECT_META(key = value, key2 = value2, ...);
+// i.e. DataType cpp_decl DQN_INSPECT_META(key = value, key2 = value2, ...);
 struct MetadataEntry
 {
     StringLiteral                      key;
     FixedArray<CPPDeclToMetaValue, 32> cpp_decl_to_val;
 };
 
-void WriteMetadataReflectionMethods()
+void WriteMetadataInspectionMethods()
 {
 }
 
@@ -598,9 +607,9 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
 
                 link->value         = StringLiteral(token.str, token.len);
                 CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
-                if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_REFLECT_META")))
+                if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
                 {
-                    link->metadata_array = ParseCPPReflectMeta(tokeniser);
+                    link->metadata_array = ParseCPPInspectMeta(tokeniser);
                 }
             }
         }
@@ -610,7 +619,7 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
     // Write Stringified Enum Array
     //
     {
-        CPPTokeniser_SprintfToFile(tokeniser, "char const *DqnReflect_%.*s_Strings[] = {", enum_name.len, enum_name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "char const *DqnInspect_%.*s_Strings[] = {", enum_name.len, enum_name.str);
         tokeniser->indent_level++;
         for (CPPDeclLinkedList<StringLiteral> *link = enum_members; link; link = link->next)
         {
@@ -623,10 +632,10 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
     }
 
     //
-    // Write ReflectEnumString Function
+    // Write InspectEnumString Function
     //
     {
-        CPPTokeniser_SprintfToFile(tokeniser, "char const *DqnReflect_EnumString(%.*s val)\n{\n", enum_name.len, enum_name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "char const *DqnInspect_EnumString(%.*s val)\n{\n", enum_name.len, enum_name.str);
         tokeniser->indent_level++;
         DEFER
         {
@@ -661,7 +670,7 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
                 if (enum_is_struct_or_class) required_len = snprintf(nullptr, 0, fmt, enum_name.len, enum_name.str, enum_value.len, enum_value.str) + 1;
                 else                         required_len = snprintf(nullptr, 0, fmt, enum_value.len, enum_value.str) + 1;
 
-                longest_decl_len                = REFLECT_MAX(longest_decl_len, required_len);
+                longest_decl_len                = INSPECT_MAX(longest_decl_len, required_len);
                 curr_src_code->value.decl.str   = MEM_ARENA_ALLOC_ARRAY(&global_main_arena, char, required_len);
                 curr_src_code->value.decl.len   = required_len;
                 curr_src_code->value.enum_value = enum_value;
@@ -681,7 +690,7 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
             int padding              = longest_decl_len - src_code_ptr->value.decl.len;
             CPPTokeniser_SprintfToFile(tokeniser, "%.*s%*s", src_code_ptr->value.decl.len, src_code_ptr->value.decl.str, padding, "");
             CPPTokeniser_SprintfToFileNoIndenting(tokeniser,
-                                                  "return DqnReflect_%.*s_Strings[%d]; // \"%.*s\"\n",
+                                                  "return DqnInspect_%.*s_Strings[%d]; // \"%.*s\"\n",
                                                   enum_name.len, enum_name.str,
                                                   enum_index,
                                                   enum_value.len, enum_value.str);
@@ -697,12 +706,12 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
              link;
              link = link->next)
         {
-            for (CPPReflectMetadataEntry const &reflect_entry : link->metadata_array)
+            for (CPPInspectMetadataEntry const &inspect_entry : link->metadata_array)
             {
                 MetadataEntry *metadata_entry_to_append_to = nullptr;
                 for (MetadataEntry &check_metadata_entry : metadata_entries)
                 {
-                    if (StrCmp(check_metadata_entry.key, reflect_entry.key))
+                    if (StrCmp(check_metadata_entry.key, inspect_entry.key))
                     {
                         metadata_entry_to_append_to = &check_metadata_entry;
                         break;
@@ -712,12 +721,12 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
                 if (!metadata_entry_to_append_to)
                 {
                     metadata_entry_to_append_to      = FixedArray_Make(&metadata_entries, 1);
-                    metadata_entry_to_append_to->key = reflect_entry.key;
+                    metadata_entry_to_append_to->key = inspect_entry.key;
                 }
 
                 CPPDeclToMetaValue decl_to_val = {};
                 decl_to_val.cpp_decl       = StringLiteral(link->value.str, link->value.len);
-                decl_to_val.value          = reflect_entry.value;
+                decl_to_val.value          = inspect_entry.value;
                 FixedArray_Add(&metadata_entry_to_append_to->cpp_decl_to_val, decl_to_val);
             }
         }
@@ -725,7 +734,7 @@ void ParseCPPEnum(CPPTokeniser *tokeniser)
         for (MetadataEntry const &metadata : metadata_entries)
         {
             CPPTokeniser_SprintfToFile(tokeniser,
-                                       "char const *DqnReflect_%.*sMetadata(%.*s val)\n{\n",
+                                       "char const *DqnInspect_%.*sMetadata(%.*s val)\n{\n",
                                        metadata.key.len, metadata.key.str,
                                        enum_name.len, enum_name.str);
 
@@ -816,8 +825,8 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
 
                     CPPTokeniser_NextToken(tokeniser);
                     peek_token = CPPTokeniser_PeekToken(tokeniser);
-                    if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_REFLECT_META")))
-                        link->metadata_array = ParseCPPReflectMeta(tokeniser);
+                    if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
+                        link->metadata_array = ParseCPPInspectMeta(tokeniser);
                 }
             }
         }
@@ -828,7 +837,7 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
         return;
 
     //
-    // Write DqnReflect_StructMemberMetadata Definition
+    // Write DqnInspect_StructMemberMetadata Definition
     //
     for (CPPDeclLinkedList<CPPVariableDecl> const *member = struct_members; member; member = member->next)
     {
@@ -838,18 +847,18 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
 
         CPPTokeniser_SprintfToFile(
             tokeniser,
-            "DqnReflect_StructMemberMetadata const DqnReflect_%.*s_%.*s_StructMemberMetadata[] =\n{\n",
+            "DqnInspect_StructMemberMetadata const DqnInspect_%.*s_%.*s_StructMemberMetadata[] =\n{\n",
             name.len,
             name.str,
             decl->name.len,
             decl->name.str);
 
         tokeniser->indent_level++;
-        for (CPPReflectMetadataEntry const &entry : member->metadata_array)
+        for (CPPInspectMetadataEntry const &entry : member->metadata_array)
         {
             CPPTokeniser_SprintfToFile(tokeniser, "{\n");
             tokeniser->indent_level++;
-            CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_StructMemberMetadataType::String,\n");
+            CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_StructMemberMetadataType::String,\n");
 
             // metadata->key
             CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", entry.key.len, entry.key.str);
@@ -865,10 +874,10 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
     }
 
     //
-    // Write DqnReflect_StructMembers Definition
+    // Write DqnInspect_StructMembers Definition
     //
     {
-        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_StructMember const DqnReflect_%.*s_StructMembers[] =\n{\n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_StructMember const DqnInspect_%.*s_StructMembers[] =\n{\n", name.len, name.str);
         tokeniser->indent_level++;
 
         for (CPPDeclLinkedList<CPPVariableDecl> const *member = struct_members; member; member = member->next)
@@ -881,7 +890,7 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
             CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
 
             if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // metadata\n");
-            else                                 CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_%.*s_%.*s_StructMemberMetadata,\n", name.len, name.str, decl->name.len, decl->name.str);
+            else                                 CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_%.*s_%.*s_StructMemberMetadata,\n", name.len, name.str, decl->name.len, decl->name.str);
             CPPTokeniser_SprintfToFile(tokeniser, "%d // metadata_len\n", member->metadata_array.len);
 
             tokeniser->indent_level--;
@@ -893,14 +902,14 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
     }
 
     //
-    // Write DqnReflect_Struct Definition
+    // Write DqnInspect_Struct Definition
     //
     {
-        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_Struct const DqnReflect_%.*s_Struct =\n{\n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_Struct const DqnInspect_%.*s_Struct =\n{\n", name.len, name.str);
         tokeniser->indent_level++;
 
         CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", name.len, name.str);
-        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_%.*s_StructMembers, // members\n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_%.*s_StructMembers, // members\n", name.len, name.str);
         CPPTokeniser_SprintfToFile(tokeniser, "%d // members_len\n", struct_members_len);
 
         tokeniser->indent_level--;
@@ -909,14 +918,14 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
     }
 
     //
-    // Write DqnReflect_Struct getter
+    // Write DqnInspect_Struct getter
     //
     {
-        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_Struct const *DqnReflect_GetStruct(%.*s const *val)\n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_Struct const *DqnInspect_GetStruct(%.*s const *val)\n", name.len, name.str);
         CPPTokeniser_SprintfToFile(tokeniser, "{\n");
         tokeniser->indent_level++;
         CPPTokeniser_SprintfToFile(tokeniser, "(void)val;\n");
-        CPPTokeniser_SprintfToFile(tokeniser, "DqnReflect_Struct const *result = &DqnReflect_%.*s_Struct;\n", name.len, name.str);
+        CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_Struct const *result = &DqnInspect_%.*s_Struct;\n", name.len, name.str);
         CPPTokeniser_SprintfToFile(tokeniser, "return result;\n");
         tokeniser->indent_level--;
         CPPTokeniser_SprintfToFile(tokeniser, "}\n\n");
@@ -944,21 +953,13 @@ int main(int argc, char *argv[])
     void *main_arena_mem      = malloc(main_arena_mem_size);
     global_main_arena         = MemArena_Init(main_arena_mem, main_arena_mem_size);
 #if 0
-    FILE *output_file         = fopen("DqnReflect_Generated.cpp", "w");
+    FILE *output_file         = fopen("DqnInspect_Generated.cpp", "w");
 #else
     FILE *output_file         = stdout;
 #endif
 
     fprintf(output_file,
-            "#ifndef DQN_REFLECT_GENERATED_H\n"
-            "#define DQN_REFLECT_GENERATED_H\n\n"
-            "// This is an auto generated file using Dqn_Reflect\n"
-            "\n"
-            " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
-            "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
-            "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
-            "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
-            "\n");
+            "// This is an auto generated file using Dqn_Inspect\n\n");
 
     for (usize arg_index = 1; arg_index < argc; ++arg_index)
     {
@@ -1008,10 +1009,20 @@ int main(int argc, char *argv[])
                 "// %s\n"
                 "//\n"
                 "\n"
-                "#if !defined(DQN_REFLECT_DISABLE_%.*s)\n",
+                "#ifndef DQN_INSPECT_%.*s\n"
+                "#define DQN_INSPECT_%.*s\n"
+                "\n"
+                " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
+                "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
+                "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
+                "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
+                "\n",
                 file_name,
                 file_include_contents_hash_define_len,
-                file_include_contents_hash_define);
+                file_include_contents_hash_define,
+                file_include_contents_hash_define_len,
+                file_include_contents_hash_define
+                );
 
         CPPTokeniser tokeniser      = {};
         tokeniser.spaces_per_indent = 4;
@@ -1019,15 +1030,15 @@ int main(int argc, char *argv[])
         tokeniser.tokens_max        = 16384;
         tokeniser.tokens            = MEM_ARENA_ALLOC_ARRAY(&global_main_arena, CPPToken, tokeniser.tokens_max);
 
-        StringLiteral const REFLECT_MARKER = STR_LITERAL("DQN_REFLECT");
+        StringLiteral const INSPECT_MARKER = STR_LITERAL("DQN_INSPECT");
         char *file_buf_end                 = file_buf + file_size;
         StringLiteral buffer               = StringLiteral(file_buf, static_cast<int>(file_size));
 
-        for (char *ptr = StrFind(buffer, REFLECT_MARKER);
+        for (char *ptr = StrFind(buffer, INSPECT_MARKER);
              ptr;
-             ptr = StrFind(buffer, REFLECT_MARKER))
+             ptr = StrFind(buffer, INSPECT_MARKER))
         {
-            ptr += REFLECT_MARKER.len;
+            ptr += INSPECT_MARKER.len;
             int indent_level          = 0;
             bool started_lexing_scope = false;
             for (; ptr;)
@@ -1154,21 +1165,61 @@ int main(int argc, char *argv[])
                 break;
         }
 
-        fprintf(output_file, "#endif // DQN_REFLECT_DISABLE_%.*s\n\n",
+        fprintf(output_file,
+                "#undef ARRAY_COUNT\n"
+                "#undef CHAR_COUNT\n"
+                "#undef STR_AND_LEN\n"
+                "#endif // DQN_INSPECT_%.*s\n\n",
                 file_include_contents_hash_define_len,
                 file_include_contents_hash_define);
     }
 
-    fprintf(output_file,
-            "#undef ARRAY_COUNT\n"
-            "#undef CHAR_COUNT\n"
-            "#undef STR_AND_LEN\n"
-            "#endif // DQN_REFLECT_GENERATED_H\n"
-            );
     fclose(output_file);
 
     return 0;
 }
 
-#endif // DQN_REFLECT_IMPLEMENTATION
-#endif // DQN_REFLECT_H
+#endif // DQN_INSPECT_EXECUTABLE_IMPLEMENTATION
+#endif // DQN_INSPECT_H
+
+/*
+------------------------------------------------------------------------------
+This software is available under 2 licenses -- choose whichever you prefer.
+------------------------------------------------------------------------------
+ALTERNATIVE A - MIT License
+Copyright (c) 2019 doy-lee
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
+ALTERNATIVE B - Public Domain (www.unlicense.org)
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+------------------------------------------------------------------------------
+*/
