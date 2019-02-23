@@ -3,7 +3,7 @@
 
 //
 // DqnInspect.h - Minimal Inspection System, Single Header, CRT Dependencies Only
-//                Public Domain or MIT License
+//                Public Domain or MIT License (see bottom of file)
 // =================================================================================================
 
 //
@@ -557,10 +557,6 @@ struct MetadataEntry
     StringLiteral                      key;
     FixedArray<CPPDeclToMetaValue, 32> cpp_decl_to_val;
 };
-
-void WriteMetadataInspectionMethods()
-{
-}
 
 void ParseCPPEnum(CPPTokeniser *tokeniser)
 {
