@@ -111,6 +111,8 @@ struct DqnInspect_StructMember
     char const *name;
     int         name_len;
     int         array_dimensions; // > 0 means array
+    char const *template_expr;
+    int         template_expr_len;
 
     DqnInspect_StructMemberMetadata const *metadata;
     int                                    metadata_len;
@@ -406,6 +408,7 @@ struct CPPVariableDecl
 {
     StringLiteral type;
     StringLiteral name;
+    StringLiteral template_expr;
     int           array_dimensions;
 };
 
@@ -484,6 +487,19 @@ CPPToken *CPPTokeniser_MakeToken(CPPTokeniser *tokeniser)
     assert(tokeniser->tokens_len < tokeniser->tokens_max);
     CPPToken *result = tokeniser->tokens + tokeniser->tokens_len++;
     return result;
+}
+
+void CPPTokeniser_SkipToIndentLevel(CPPTokeniser *tokeniser, int indent_level)
+{
+    assert(tokeniser->indent_level >= indent_level);
+    if (tokeniser->indent_level == indent_level) return;
+
+    for (CPPToken token = CPPTokeniser_NextToken(tokeniser);
+         tokeniser->indent_level > indent_level && token.type != CPPTokenType::EndOfStream;
+         )
+    {
+        token = CPPTokeniser_NextToken(tokeniser);
+    }
 }
 
 //
@@ -835,6 +851,32 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
                 CPPToken const variable_type = token;
                 for (int total_asterisks_count = 0;;)
                 {
+                    CPPToken peek_token                  = CPPTokeniser_PeekToken(tokeniser);
+                    StringLiteral variable_template_expr = {};
+                    if (peek_token.type == CPPTokenType::LessThan)
+                    {
+                        token              = CPPTokeniser_NextToken(tokeniser);
+                        int template_depth = 1;
+                        while (template_depth != 0 && token.type != CPPTokenType::EndOfStream)
+                        {
+                            token = CPPTokeniser_NextToken(tokeniser);
+                            if (token.type == CPPTokenType::LessThan)
+                                template_depth++;
+                            else if (token.type == CPPTokenType::GreaterThan)
+                                template_depth--;
+                        }
+
+                        if (template_depth == 0)
+                        {
+                            char *expr_start = peek_token.str + 1;
+                            char *expr_end   = token.str - 1;
+                            int expr_len     = static_cast<int>(expr_end - expr_start);
+
+                            variable_template_expr.str = expr_start;
+                            variable_template_expr.len = expr_len;
+                        }
+                    }
+
                     total_asterisks_count = ConsumeAsterisks(tokeniser);
                     if (ConsumeConstIdentifier(tokeniser))
                     {
@@ -842,7 +884,7 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
                         ConsumeConstIdentifier(tokeniser);
                     }
 
-                    CPPToken peek_token    = CPPTokeniser_PeekToken(tokeniser);
+                    peek_token             = CPPTokeniser_PeekToken(tokeniser);
                     CPPToken variable_name = peek_token;
                     if (variable_name.type != CPPTokenType::Identifier)
                         break;
@@ -856,6 +898,7 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
 
                     link->value.type             = StringLiteral(variable_type.str, variable_type.len);
                     link->value.name             = StringLiteral(variable_name.str, variable_name.len);
+                    link->value.template_expr    = variable_template_expr;
                     link->value.array_dimensions = total_asterisks_count;
 
                     CPPTokeniser_NextToken(tokeniser);
@@ -945,6 +988,10 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
             CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
             CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
             CPPTokeniser_SprintfToFile(tokeniser, "%d, // array_dimensions\n", decl->array_dimensions);
+
+            if (decl->template_expr.len <= 0)  CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // template_expr\n");
+            else                               CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n", decl->template_expr.len, decl->template_expr.str);
+            CPPTokeniser_SprintfToFile(tokeniser, "%d // template_expr_len\n", decl->template_expr.len);
 
             if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // metadata\n");
             else                                 CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_%.*s_%.*s_StructMemberMetadata,\n", name.len, name.str, decl->name.len, decl->name.str);

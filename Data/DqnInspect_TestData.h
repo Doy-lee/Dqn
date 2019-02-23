@@ -28,14 +28,14 @@ DQN_INSPECT struct OpenGLState
 {
 // #if 0
 // #endif
+    FixedArray<RendererLight, 32> lights;
+    FixedArray<Mat4, 32>          camera_matrixes;
     u32                           shaders[(int)OpenGLShader::Count];
     void                         *win32_handle;
     int                           ebo DQN_INSPECT_META(DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(DisplayName = "Vertex Array Object", OpenGLVersion = "330");
     V4                            draw_color DQN_INSPECT_META(DisplayName = "HelloWorld");
     V3                            lighting_ambient_coeff;
     char                        **bitmaps;
-    // FixedArray<RendererLight, 32> lights;
-    // FixedArray<Mat4, 32>          camera_matrixes;
     int                           draw_call_count;
 
     const int *const a;
