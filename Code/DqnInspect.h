@@ -95,6 +95,13 @@ struct DqnInspect_StructMemberMetadata
     int         key_len;
     char const *val_str;     // Metadata value is always inspected to a string
     int         val_str_len;
+
+    // TODO(doyle): Implement
+    union
+    {
+        int   int_val;
+        float flt_val;
+    };
 };
 
 struct DqnInspect_StructMember
@@ -899,10 +906,10 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
             CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_StructMemberMetadataType::String,\n");
 
             // metadata->key
-            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", entry.key.len, entry.key.str);
+            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"), ", entry.key.len, entry.key.str);
 
             // metadata->value
-            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", entry.value.len, entry.value.str);
+            CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", entry.value.len, entry.value.str);
 
             tokeniser->indent_level--;
             CPPTokeniser_SprintfToFile(tokeniser, "},\n");
@@ -924,8 +931,8 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
             CPPTokeniser_SprintfToFile(tokeniser, "{\n");
             tokeniser->indent_level++;
 
-            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->type.len, decl->type.str);
-            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
+            CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
+            CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
             CPPTokeniser_SprintfToFile(tokeniser, "%d, // array_dimensions\n", decl->array_dimensions);
 
             if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // metadata\n");

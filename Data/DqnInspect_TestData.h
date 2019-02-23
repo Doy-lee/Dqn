@@ -33,16 +33,16 @@ DQN_INSPECT struct OpenGLState
     // u32                           shaders[(int)OpenGLShader::Count];
     V4                            draw_color DQN_INSPECT_META(DisplayName = "HelloWorld");
     V3                            lighting_ambient_coeff;
-    // u8                          **bitmaps;
+    char                        **bitmaps;
     // FixedArray<RendererLight, 32> lights;
     // FixedArray<Mat4, 32>          camera_matrixes;
     int                           draw_call_count;
 
     const int *const a;
-    int const *const b, c, const *const d, *const e;
+    int const *const b, c, *d, *e;
     const int f;
     int const g;
     int *const h;
     int const* i;
-    int *********const j, k, ******l, const *m;
+    int *********const j, k, ******l, *m;
 };
