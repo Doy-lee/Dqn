@@ -3,6 +3,7 @@ DQN_INSPECT enum struct OpenGLShader
     Invalid,
     Rect DQN_INSPECT_META(VertexShaderFilePath = "Rect.vert", FragmentShaderFilePath = "Rect.frag"),
     Text DQN_INSPECT_META(VertexShaderFilePath = "Text.vert", FragmentShaderFilePath = "Text.frag"),
+    Count,
 };
 
 #if 0
@@ -13,30 +14,28 @@ DQN_INSPECT enum struct OpenGLShader
 #define MAXIMUM_MACRO(a, b) (a > b) ? (a) : (b)
 #endif
 
-struct V3
-{
-    float test;
-};
+struct V3 { float test; };
+struct V4 { float test; };
 
-struct V4
+template <typename T, int Size>
+struct Array
 {
-    float test;
+    T data[Size];
 };
-
 
 DQN_INSPECT struct OpenGLState
 {
 // #if 0
 // #endif
-    FixedArray<RendererLight, 32> lights;
-    FixedArray<Mat4, 32>          camera_matrixes;
-    u32                           shaders[(int)OpenGLShader::Count];
-    void                         *win32_handle;
-    int                           ebo DQN_INSPECT_META(DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(DisplayName = "Vertex Array Object", OpenGLVersion = "330");
-    V4                            draw_color DQN_INSPECT_META(DisplayName = "HelloWorld");
-    V3                            lighting_ambient_coeff;
-    char                        **bitmaps;
-    int                           draw_call_count;
+    Array<V3, 32>   lights;
+    Array<V4, 32>   camera_matrixes;
+    char          **bitmaps;
+    int             shaders[(int)OpenGLShader::Count];
+    void           *win32_handle;
+    int             ebo DQN_INSPECT_META(DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(DisplayName = "Vertex Array Object", OpenGLVersion = "330");
+    V4              draw_color DQN_INSPECT_META(DisplayName = "HelloWorld");
+    V3              lighting_ambient_coeff;
+    int             draw_call_count;
 
     const int *const a;
     int const *const b, c, *d, *e;

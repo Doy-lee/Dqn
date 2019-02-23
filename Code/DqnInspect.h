@@ -25,62 +25,199 @@
 //
 
 //
-// Example Annotation
+// INSPECT USAGE
 // =================================================================================================
 
 /*
+    InspectedStruct foo = {};
+    InspectedEnum   bar = InspectedEnum::HelloWorld;
+
+    printf("%s\n", DqnInspect_EnumString(bar)); // Prints "HelloWorld"
+
+    // Print out each member of the struct
+    DqnInspect_Struct const *inspector = DqnReflect_GetStruct(&foo);
+    for (int i = 0; i < inspector->members_len; ++i)
+        printf("%s\n", inspect_struct->members[i].name);
+*/
+
 //
-// YourSourceCode.cpp
-//
+// ANNOTATION EXAMPLE
+// =================================================================================================
+// For full example see Data/DqnInspect_TestData.h
+
+/*
 DQN_INSPECT enum struct OpenGLShader
 {
     Invalid,
     Rect DQN_INSPECT_META(VertexShaderFilePath = "Rect.vert", FragmentShaderFilePath = "Rect.frag"),
     Text DQN_INSPECT_META(VertexShaderFilePath = "Text.vert", FragmentShaderFilePath = "Text.frag"),
+    Count,
+};
+
+struct V4 { float test; };
+template <typename T, int Size>
+struct Array { T data[Size]; };
+
+DQN_INSPECT struct OpenGLState
+{
+    Array<V4, 32>   camera_matrixes;
+    char          **bitmaps;
+    int             shaders[(int)OpenGLShader::Count];
+    void           *win32_handle;
+    int             ebo DQN_INSPECT_META(DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(DisplayName = "Vertex Array Object", OpenGLVersion = "330");
+    V4              draw_color DQN_INSPECT_META(DisplayName = "HelloWorld");
+    int             draw_call_count;
 };
 
 //
-// Example Output
-//
+// INSPECTION OUTPUT EXAMPLE
 // =================================================================================================
+// For full example see Data/DqnInspect_TestDataGenerated.cpp
+
+
+// This is an auto generated file using Dqn_Inspect
 
 //
-// YourSourceCode_Inspected.cpp
-//
-#ifndef DQN_INSPECT_GENERATED_H
-#define DQN_INSPECT_GENERATED_H
-
-//
-// YourSourceCode.cpp
+// ..\Data\DqnInspect_TestData.h
 //
 
-#if !defined(DQN_INSPECT_YOUR_SOURCE_CODE_H)
-char const *DqnInspect_OpenGLShader_Strings[] = {"Invalid", "Bitmap", "Text" };
+#ifndef DQN_INSPECT_DQNINSPECT_TESTDATA_H
+#define DQN_INSPECT_DQNINSPECT_TESTDATA_H
+
+ // NOTE: These macros are undefined at the end of the file so to not pollute namespace
+#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])
+#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
+#define STR_AND_LEN(str) str, CHAR_COUNT(str)
+
+char const *DqnInspect_OpenGLShader_Strings[] = {"Invalid", "Rect", "Text", "Count", };
 
 char const *DqnInspect_EnumString(OpenGLShader val)
 {
     if (val == OpenGLShader::Invalid) return DqnInspect_OpenGLShader_Strings[0]; // "Invalid"
     if (val == OpenGLShader::Rect)    return DqnInspect_OpenGLShader_Strings[1]; // "Rect"
-    if (val == OpenGLShader::Bitmap)  return DqnInspect_OpenGLShader_Strings[2]; // "Bitmap"
+    if (val == OpenGLShader::Text)    return DqnInspect_OpenGLShader_Strings[2]; // "Text"
+    if (val == OpenGLShader::Count)   return DqnInspect_OpenGLShader_Strings[3]; // "Count"
     return nullptr;
 }
 
-char const *DqnInspect_VertexFilePathMetadata(OpenGLShader val)
+char const *DqnInspect_VertexShaderFilePathMetadata(OpenGLShader val)
 {
-    if (val == OpenGLShader::Rect)   return "Rect.vert";
-    if (val == OpenGLShader::Bitmap) return "Bitmap.vert";
+    if (val == OpenGLShader::Rect) return "Rect.vert";
+    if (val == OpenGLShader::Text) return "Text.vert";
     return nullptr;
 }
 
-char const *DqnInspect_FragmentFilePathMetadata(OpenGLShader val)
+char const *DqnInspect_FragmentShaderFilePathMetadata(OpenGLShader val)
 {
-    if (val == OpenGLShader::Rect)   return "Rect.frag";
-    if (val == OpenGLShader::Bitmap) return "Bitmap.frag";
+    if (val == OpenGLShader::Rect) return "Rect.frag";
+    if (val == OpenGLShader::Text) return "Text.frag";
     return nullptr;
 }
 
-#endif // DQN_INSPECT_DISABLE_YOUR_SOURCE_CODE_H
-#endif // DQN_INSPECT_GENERATED_H
+DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_ebo_StructMemberMetadata[] =
+{
+    {
+        DqnInspect_StructMemberMetadataType::String,
+        STR_AND_LEN("DisplayName"), STR_AND_LEN("Element Buffer Object"),
+    },
+};
+
+DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_vao_StructMemberMetadata[] =
+{
+    {
+        DqnInspect_StructMemberMetadataType::String,
+        STR_AND_LEN("DisplayName"), STR_AND_LEN("Vertex Array Object"),
+    },
+    {
+        DqnInspect_StructMemberMetadataType::String,
+        STR_AND_LEN("OpenGLVersion"), STR_AND_LEN("330"),
+    },
+};
+
+DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_draw_color_StructMemberMetadata[] =
+{
+    {
+        DqnInspect_StructMemberMetadataType::String,
+        STR_AND_LEN("DisplayName"), STR_AND_LEN("HelloWorld"),
+    },
+};
+
+DqnInspect_StructMember const DqnInspect_OpenGLState_StructMembers[] =
+{
+    {
+        STR_AND_LEN("Array"), STR_AND_LEN("camera_matrixes"),
+        STR_AND_LEN("V4, 3"), // template_expr
+        nullptr, 0, // metadata and metadata_len
+        0 // array_dimensions
+    },
+    {
+        STR_AND_LEN("char"), STR_AND_LEN("bitmaps"),
+        nullptr, 0, // template_expr and template_expr_len
+        nullptr, 0, // metadata and metadata_len
+        2 // array_dimensions
+    },
+    {
+        STR_AND_LEN("int"), STR_AND_LEN("shaders"),
+        nullptr, 0, // template_expr and template_expr_len
+        nullptr, 0, // metadata and metadata_len
+        1 // array_dimensions
+    },
+    {
+        STR_AND_LEN("void"), STR_AND_LEN("win32_handle"),
+        nullptr, 0, // template_expr and template_expr_len
+        nullptr, 0, // metadata and metadata_len
+        1 // array_dimensions
+    },
+    {
+        STR_AND_LEN("int"), STR_AND_LEN("ebo"),
+        nullptr, 0, // template_expr and template_expr_len
+        DqnInspect_OpenGLState_ebo_StructMemberMetadata, 1,
+        0 // array_dimensions
+    },
+    {
+        STR_AND_LEN("int"), STR_AND_LEN("vbo"),
+        nullptr, 0, // template_expr and template_expr_len
+        nullptr, 0, // metadata and metadata_len
+        0 // array_dimensions
+    },
+    {
+        STR_AND_LEN("int"), STR_AND_LEN("vao"),
+        nullptr, 0, // template_expr and template_expr_len
+        DqnInspect_OpenGLState_vao_StructMemberMetadata, 2,
+        0 // array_dimensions
+    },
+    {
+        STR_AND_LEN("V4"), STR_AND_LEN("draw_color"),
+        nullptr, 0, // template_expr and template_expr_len
+        DqnInspect_OpenGLState_draw_color_StructMemberMetadata, 1,
+        0 // array_dimensions
+    },
+    {
+        STR_AND_LEN("int"), STR_AND_LEN("draw_call_count"),
+        nullptr, 0, // template_expr and template_expr_len
+        nullptr, 0, // metadata and metadata_len
+        0 // array_dimensions
+    },
+};
+
+DqnInspect_Struct const DqnInspect_OpenGLState_Struct =
+{
+    STR_AND_LEN("OpenGLState"),
+    DqnInspect_OpenGLState_StructMembers, // members
+    ARRAY_COUNT(DqnInspect_OpenGLState_StructMembers) // members_len
+};
+
+DqnInspect_Struct const *DqnInspect_GetStruct(OpenGLState const *val)
+{
+    (void)val;
+    DqnInspect_Struct const *result = &DqnInspect_OpenGLState_Struct;
+    return result;
+}
+
+#undef ARRAY_COUNT
+#undef CHAR_COUNT
+#undef STR_AND_LEN
+#endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
 */
 
 #define DQN_INSPECT
@@ -110,12 +247,13 @@ struct DqnInspect_StructMember
     int         type_len;
     char const *name;
     int         name_len;
-    int         array_dimensions; // > 0 means array
     char const *template_expr;
     int         template_expr_len;
 
     DqnInspect_StructMemberMetadata const *metadata;
     int                                    metadata_len;
+
+    int         array_dimensions; // > 0 means array
 };
 
 struct DqnInspect_Struct
@@ -987,15 +1125,15 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
 
             CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
             CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
-            CPPTokeniser_SprintfToFile(tokeniser, "%d, // array_dimensions\n", decl->array_dimensions);
 
-            if (decl->template_expr.len <= 0)  CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // template_expr\n");
-            else                               CPPTokeniser_SprintfToFile(tokeniser, "\"%.*s\",\n", decl->template_expr.len, decl->template_expr.str);
-            CPPTokeniser_SprintfToFile(tokeniser, "%d // template_expr_len\n", decl->template_expr.len);
+            if (decl->template_expr.len <= 0)
+                CPPTokeniser_SprintfToFile(tokeniser, "nullptr, 0, // template_expr and template_expr_len\n");
+            else
+                CPPTokeniser_SprintfToFile(tokeniser, "STR_AND_LEN(\"%.*s\"), // template_expr\n", decl->template_expr.len, decl->template_expr.str);
 
-            if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(tokeniser, "nullptr, // metadata\n");
-            else                                 CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_%.*s_%.*s_StructMemberMetadata,\n", name.len, name.str, decl->name.len, decl->name.str);
-            CPPTokeniser_SprintfToFile(tokeniser, "%d // metadata_len\n", member->metadata_array.len);
+            if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(tokeniser, "nullptr, 0, // metadata and metadata_len\n");
+            else                                 CPPTokeniser_SprintfToFile(tokeniser, "DqnInspect_%.*s_%.*s_StructMemberMetadata, %d,\n", name.len, name.str, decl->name.len, decl->name.str, member->metadata_array.len);
+            CPPTokeniser_SprintfToFile(tokeniser, "%d // array_dimensions\n", decl->array_dimensions);
 
             tokeniser->indent_level--;
             CPPTokeniser_SprintfToFile(tokeniser, "},\n");
