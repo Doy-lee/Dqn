@@ -233,6 +233,8 @@ DqnInspect_Struct const *DqnInspect_GetStruct(OpenGLState const *val)
     return result;
 }
 
+void RenderRect(V3 pos, V2 size = {}, char const *texture = nullptr, bool depth_test = false, int type = 1, char *user_msg = Hello world");
+
 #undef ARRAY_COUNT
 #undef CHAR_COUNT
 #undef STR_AND_LEN

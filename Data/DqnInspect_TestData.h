@@ -45,3 +45,9 @@ DQN_INSPECT struct OpenGLState
     int const* i;
     int *********const j, k, ******l, *m;
 };
+
+DQN_INSPECT_GENERATE_PROTOTYPE(texture = nullptr, size = {}, depth_test = false, type = 1, user_msg = "Hello world")
+void RenderRect(V3 pos, V2 size, char const *texture, bool depth_test, int type, char *user_msg)
+{
+    (void)pos; void(size); (void)texture; (void)depth_test;
+}
