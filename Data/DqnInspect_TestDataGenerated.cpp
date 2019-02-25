@@ -7,11 +7,6 @@
 #ifndef DQN_INSPECT_DQNINSPECT_TESTDATA_H
 #define DQN_INSPECT_DQNINSPECT_TESTDATA_H
 
- // NOTE: These macros are undefined at the end of the file so to not pollute namespace
-#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])
-#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
-#define STR_AND_LEN(str) str, CHAR_COUNT(str)
-
 char const *DqnInspect_OpenGLShader_Strings[] = {"Invalid", "Rect", "Text", "Count", };
 
 char const *DqnInspect_EnumString(OpenGLShader val)
@@ -233,10 +228,7 @@ DqnInspect_Struct const *DqnInspect_GetStruct(OpenGLState const *val)
     return result;
 }
 
-void RenderRect(V3 pos, V2 size = {}, char const *texture = nullptr, bool depth_test = false, int type = 1, char *user_msg = Hello world");
+void RenderRect(V3 pos, V2 size = {}, char const *texture = nullptr, bool depth_test = false, int type = 1, char *user_msg = "Hello world");
 
-#undef ARRAY_COUNT
-#undef CHAR_COUNT
-#undef STR_AND_LEN
 #endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
 

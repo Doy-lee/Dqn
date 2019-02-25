@@ -222,6 +222,7 @@ DqnInspect_Struct const *DqnInspect_GetStruct(OpenGLState const *val)
 
 #define DQN_INSPECT
 #define DQN_INSPECT_META(...)
+#define DQN_INSPECT_GENERATE_PROTOTYPE(...)
 
 enum DqnInspect_StructMemberMetadataType { String, Int, Float };
 
@@ -1270,6 +1271,11 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
             token                     = CPPTokeniser_NextToken(tokeniser);
             char *default_param_start = token.str;
 
+            // NOTE(doyle): Include the quotes in the param value
+            CPPToken prev_token = CPPTokeniser_PrevToken(tokeniser);
+            if (prev_token.type == CPPTokenType::String)
+                default_param_start--;
+
             SkipFunctionParam(tokeniser);
             CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
             if (peek_token.type != CPPTokenType::Comma && peek_token.type != CPPTokenType::CloseParen)
@@ -1591,25 +1597,45 @@ int main(int argc, char *argv[])
             file_include_contents_hash_define_len = extracted_file_name_len;
         }
 
-        fprintf(output_file,
-                "//\n"
-                "// %s\n"
-                "//\n"
-                "\n"
-                "#ifndef DQN_INSPECT_%.*s\n"
-                "#define DQN_INSPECT_%.*s\n"
-                "\n"
-                " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
-                "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
-                "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
-                "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
-                "\n",
-                file_name,
-                file_include_contents_hash_define_len,
-                file_include_contents_hash_define,
-                file_include_contents_hash_define_len,
-                file_include_contents_hash_define
-                );
+        if (mode == InspectMode::Code)
+        {
+            fprintf(output_file,
+                    "//\n"
+                    "// %s\n"
+                    "//\n"
+                    "\n"
+                    "#ifndef DQN_INSPECT_%.*s\n"
+                    "#define DQN_INSPECT_%.*s\n"
+                    "\n"
+                    " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
+                    "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
+                    "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
+                    "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
+                    "\n",
+                    file_name,
+                    file_include_contents_hash_define_len,
+                    file_include_contents_hash_define,
+                    file_include_contents_hash_define_len,
+                    file_include_contents_hash_define
+                    );
+        }
+        else
+        {
+            fprintf(output_file,
+                    "//\n"
+                    "// %s\n"
+                    "//\n"
+                    "\n"
+                    "#ifndef DQN_INSPECT_%.*s\n"
+                    "#define DQN_INSPECT_%.*s\n"
+                    "\n",
+                    file_name,
+                    file_include_contents_hash_define_len,
+                    file_include_contents_hash_define,
+                    file_include_contents_hash_define_len,
+                    file_include_contents_hash_define
+                    );
+        }
 
         CPPTokeniser tokeniser      = {};
         tokeniser.spaces_per_indent = 4;
@@ -1697,13 +1723,23 @@ int main(int argc, char *argv[])
                 break;
         }
 
-        fprintf(output_file,
-                "\n#undef ARRAY_COUNT\n"
-                "#undef CHAR_COUNT\n"
-                "#undef STR_AND_LEN\n"
-                "#endif // DQN_INSPECT_%.*s\n\n",
-                file_include_contents_hash_define_len,
-                file_include_contents_hash_define);
+        if (mode == InspectMode::Code)
+        {
+            fprintf(output_file,
+                    "\n#undef ARRAY_COUNT\n"
+                    "#undef CHAR_COUNT\n"
+                    "#undef STR_AND_LEN\n"
+                    "#endif // DQN_INSPECT_%.*s\n\n",
+                    file_include_contents_hash_define_len,
+                    file_include_contents_hash_define);
+        }
+        else
+        {
+            fprintf(output_file,
+                    "\n#endif // DQN_INSPECT_%.*s\n\n",
+                    file_include_contents_hash_define_len,
+                    file_include_contents_hash_define);
+        }
     }
 
     fclose(output_file);
