@@ -1,29 +1,16 @@
-DQN_INSPECT enum struct OpenGLShader
+DQN_INSPECT enum struct EnumWithMetadata
 {
-    Invalid,
-    Rect DQN_INSPECT_META(VertexShaderFilePath = "Rect.vert", FragmentShaderFilePath = "Rect.frag"),
-    Text DQN_INSPECT_META(VertexShaderFilePath = "Text.vert", FragmentShaderFilePath = "Text.frag"),
+    Rect DQN_INSPECT_META(FilePath = "Rect.vert", FilePath2 = "Rect.frag"),
     Count,
 };
-
-#if 0
-#define EXAMPLE_MACRO \
-    X(EndOfStream, "End Of Stream") \
-    X(Hash, "#")
-
-#define MAXIMUM_MACRO(a, b) (a > b) ? (a) : (b)
-#endif
 
 struct V3 { float test; };
 struct V4 { float test; };
 
 template <typename T, int Size>
-struct Array
-{
-    T data[Size];
-};
+struct Array { T data[Size]; };
 
-DQN_INSPECT struct OpenGLState
+DQN_INSPECT struct SampleStruct
 {
 // #if 0
 // #endif
@@ -46,8 +33,11 @@ DQN_INSPECT struct OpenGLState
     int *********const j, k, ******l, *m;
 };
 
-DQN_INSPECT_GENERATE_PROTOTYPE(texture = nullptr, size = {}, depth_test = false, type = 1, user_msg = "Hello world")
-void RenderRect(V3 pos, V2 size, char const *texture, bool depth_test, int type, char *user_msg)
-{
-    (void)pos; void(size); (void)texture; (void)depth_test;
-}
+DQN_INSPECT_GENERATE_PROTOTYPE(b = {}, c = nullptr, e = false, f = 1, g = "Hello world")
+void Function1(int a, float b, char const *c, bool e, int f, char *g) { }
+
+DQN_INSPECT_GENERATE_PROTOTYPE()
+void *Function2() { }
+
+DQN_INSPECT_GENERATE_PROTOTYPE()
+Array<int const *, 3> const *const Function3() { }

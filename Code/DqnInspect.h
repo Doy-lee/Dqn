@@ -951,15 +951,81 @@ b32 ConsumeConstIdentifier(CPPTokeniser *tokeniser)
     b32 result = false;
     for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
          IsIdentifierToken(peek_token, STR_LITERAL("const"));
-         )
+         peek_token = CPPTokeniser_PeekToken(tokeniser))
     {
         result = true;
         CPPTokeniser_NextToken(tokeniser);
-        peek_token = CPPTokeniser_PeekToken(tokeniser);
     }
 
     return result;
 }
+
+b32 ParseCPPVariableType(CPPTokeniser *tokeniser, StringLiteral *type)
+{
+    CPPToken token = CPPTokeniser_NextToken(tokeniser);
+    if (!ExpectToken(token, CPPTokenType::Identifier))
+        return false;
+
+    char *var_type_start = token.str;
+    ConsumeConstIdentifier(tokeniser);
+
+    //
+    // Parse Template If Any
+    //
+    StringLiteral template_expr = {};
+    {
+        CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
+        if (peek_token.type == CPPTokenType::LessThan)
+        {
+            token              = CPPTokeniser_NextToken(tokeniser);
+            int template_depth = 1;
+            while (template_depth != 0 && token.type != CPPTokenType::EndOfStream)
+            {
+                token = CPPTokeniser_NextToken(tokeniser);
+                if (token.type == CPPTokenType::LessThan)
+                    template_depth++;
+                else if (token.type == CPPTokenType::GreaterThan)
+                    template_depth--;
+            }
+
+            if (template_depth == 0)
+            {
+                char *expr_start = peek_token.str + 1;
+                char *expr_end   = token.str - 1;
+                int expr_len     = static_cast<int>(expr_end - expr_start);
+
+                template_expr.str = expr_start;
+                template_expr.len = expr_len;
+            }
+        }
+    }
+
+    int total_asterisks_count = ConsumeAsterisks(tokeniser);
+    if (ConsumeConstIdentifier(tokeniser))
+    {
+        total_asterisks_count += ConsumeAsterisks(tokeniser);
+        ConsumeConstIdentifier(tokeniser);
+    }
+
+    CPPToken var_name  = CPPTokeniser_PeekToken(tokeniser);
+    if (!ExpectToken(var_name, CPPTokenType::Identifier))
+        return false;
+
+    char *var_type_end = var_name.str;
+    if (type)
+    {
+        type->str = var_type_start;
+        type->len = static_cast<int>(var_type_end - var_type_start);
+
+        // NOTE(doyle): Remove space(s) at the end of the return type if
+        // any, because we parse the function type weirdly by getting the
+        // identifier for the function name and looking one token back.
+        while (type->len >= 1 && CharIsWhitespace(type->str[type->len - 1]))
+            type->len--;
+    }
+
+    return true;
+};
 
 // NOTE(doyle): Doesn't parse the ending semicolon so we can reuse this function for parsing function arguments
 CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *tokeniser, b32 parse_function_param)
@@ -1205,15 +1271,6 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
         tokeniser->indent_level--;
         CPPTokeniser_SprintfToFile(tokeniser, "}\n\n");
     }
-
-    //
-    // Write User Annotated Metadata Getter Functions
-    //
-    {
-    }
-
-    int break_here = 5;
-    (void)break_here;
 }
 
 void SkipFunctionParam(CPPTokeniser *tokeniser)
@@ -1310,21 +1367,25 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
     // Grab return type token
     {
         token = CPPTokeniser_PeekToken(tokeniser);
-        if (!ExpectToken(token, CPPTokenType::Identifier))
-            return;
-
-        token       = CPPTokeniser_NextToken(tokeniser);
-        return_type = StringLiteral(token.str, token.len);
+        if (!ExpectToken(token, CPPTokenType::Identifier))  return;
+        if (!ParseCPPVariableType(tokeniser, &return_type)) return;
     }
 
     // Grab function name token
     {
         token = CPPTokeniser_PeekToken(tokeniser);
-        if (!ExpectToken(token, CPPTokenType::Identifier))
-            return;
+        if (!ExpectToken(token, CPPTokenType::Identifier)) return;
 
-        token         = CPPTokeniser_NextToken(tokeniser);
-        function_name = StringLiteral(token.str, token.len);
+        char *name_start = token.str;
+        while (token.type != CPPTokenType::OpenParen && token.type != CPPTokenType::EndOfStream)
+        {
+            CPPTokeniser_NextToken(tokeniser);
+            token = CPPTokeniser_PeekToken(tokeniser);
+        }
+
+        if (!ExpectToken(token, CPPTokenType::OpenParen)) return;
+        char *name_end = token.str;
+        function_name        = StringLiteral(name_start, static_cast<int>(name_end - name_start));
     }
 
     token = CPPTokeniser_PeekToken(tokeniser);
@@ -1369,15 +1430,22 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
         }
     }
 
-    CPPTokeniser_SprintfToFile(tokeniser, "%.*s %.*s(", return_type.len, return_type.str, function_name.len, function_name.str);
-    for (CPPDeclLinkedList<CPPVariableDecl> const *param_link = param_list; param_link; param_link = param_link->next)
+    if (return_type.str[return_type.len-1] == '*') // NOTE(doyle): Align the pointer to the name
+        CPPTokeniser_SprintfToFile(tokeniser, "%.*s%.*s(", return_type.len, return_type.str, function_name.len, function_name.str);
+    else
+        CPPTokeniser_SprintfToFile(tokeniser, "%.*s %.*s(", return_type.len, return_type.str, function_name.len, function_name.str);
+
+    for (CPPDeclLinkedList<CPPVariableDecl> *param_link = param_list; param_link; param_link = param_link->next)
     {
         // TODO(doyle): HACK. We should parse ptrs into the CPPVariableDecl, fixed size arrays into the name and const-ness into the type
-        CPPVariableDecl const *decl = &param_link->value;
+        CPPVariableDecl *decl = &param_link->value;
+        StringLiteral *type   = &decl->type;
+        StringLiteral *name   = &decl->name;
 
-        char *name_start = decl->type.str + (decl->type.len + 1);
-        char *name_end   = decl->name.str + decl->name.len;
-        StringLiteral hack_decl_name = StringLiteral(name_start, static_cast<int>(name_end - name_start));
+        char *name_start    = type->str + (type->len + 1);
+        char *name_end      = name->str + name->len;
+        auto hack_decl_name = StringLiteral(name_start, static_cast<int>(name_end - name_start));
+
         CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "%.*s %.*s", decl->type.len, decl->type.str, hack_decl_name.len, hack_decl_name.str);
         if (decl->default_value.len > 0)
             CPPTokeniser_SprintfToFileNoIndenting(tokeniser, " = %.*s", decl->default_value.len, decl->default_value.str);

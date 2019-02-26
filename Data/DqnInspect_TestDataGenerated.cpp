@@ -7,32 +7,28 @@
 #ifndef DQN_INSPECT_DQNINSPECT_TESTDATA_H
 #define DQN_INSPECT_DQNINSPECT_TESTDATA_H
 
-char const *DqnInspect_OpenGLShader_Strings[] = {"Invalid", "Rect", "Text", "Count", };
+char const *DqnInspect_EnumWithMetadata_Strings[] = {"Rect", "Count", };
 
-char const *DqnInspect_EnumString(OpenGLShader val)
+char const *DqnInspect_EnumString(EnumWithMetadata val)
 {
-    if (val == OpenGLShader::Invalid) return DqnInspect_OpenGLShader_Strings[0]; // "Invalid"
-    if (val == OpenGLShader::Rect)    return DqnInspect_OpenGLShader_Strings[1]; // "Rect"
-    if (val == OpenGLShader::Text)    return DqnInspect_OpenGLShader_Strings[2]; // "Text"
-    if (val == OpenGLShader::Count)   return DqnInspect_OpenGLShader_Strings[3]; // "Count"
+    if (val == EnumWithMetadata::Rect)  return DqnInspect_EnumWithMetadata_Strings[0]; // "Rect"
+    if (val == EnumWithMetadata::Count) return DqnInspect_EnumWithMetadata_Strings[1]; // "Count"
     return nullptr;
 }
 
-char const *DqnInspect_VertexShaderFilePathMetadata(OpenGLShader val)
+char const *DqnInspect_FilePathMetadata(EnumWithMetadata val)
 {
-    if (val == OpenGLShader::Rect) return "Rect.vert";
-    if (val == OpenGLShader::Text) return "Text.vert";
+    if (val == EnumWithMetadata::Rect) return "Rect.vert";
     return nullptr;
 }
 
-char const *DqnInspect_FragmentShaderFilePathMetadata(OpenGLShader val)
+char const *DqnInspect_FilePath2Metadata(EnumWithMetadata val)
 {
-    if (val == OpenGLShader::Rect) return "Rect.frag";
-    if (val == OpenGLShader::Text) return "Text.frag";
+    if (val == EnumWithMetadata::Rect) return "Rect.frag";
     return nullptr;
 }
 
-DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_ebo_StructMemberMetadata[] =
+DqnInspect_StructMemberMetadata const DqnInspect_SampleStruct_ebo_StructMemberMetadata[] =
 {
     {
         DqnInspect_StructMemberMetadataType::String,
@@ -40,7 +36,7 @@ DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_ebo_StructMemberMet
     },
 };
 
-DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_vao_StructMemberMetadata[] =
+DqnInspect_StructMemberMetadata const DqnInspect_SampleStruct_vao_StructMemberMetadata[] =
 {
     {
         DqnInspect_StructMemberMetadataType::String,
@@ -52,7 +48,7 @@ DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_vao_StructMemberMet
     },
 };
 
-DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_draw_color_StructMemberMetadata[] =
+DqnInspect_StructMemberMetadata const DqnInspect_SampleStruct_draw_color_StructMemberMetadata[] =
 {
     {
         DqnInspect_StructMemberMetadataType::String,
@@ -60,7 +56,7 @@ DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_draw_color_StructMe
     },
 };
 
-DqnInspect_StructMember const DqnInspect_OpenGLState_StructMembers[] =
+DqnInspect_StructMember const DqnInspect_SampleStruct_StructMembers[] =
 {
     {
         STR_AND_LEN("Array"), STR_AND_LEN("lights"),
@@ -95,7 +91,7 @@ DqnInspect_StructMember const DqnInspect_OpenGLState_StructMembers[] =
     {
         STR_AND_LEN("int"), STR_AND_LEN("ebo"),
         nullptr, 0, // template_expr and template_expr_len
-        DqnInspect_OpenGLState_ebo_StructMemberMetadata, 1,
+        DqnInspect_SampleStruct_ebo_StructMemberMetadata, 1,
         0 // array_dimensions
     },
     {
@@ -107,13 +103,13 @@ DqnInspect_StructMember const DqnInspect_OpenGLState_StructMembers[] =
     {
         STR_AND_LEN("int"), STR_AND_LEN("vao"),
         nullptr, 0, // template_expr and template_expr_len
-        DqnInspect_OpenGLState_vao_StructMemberMetadata, 2,
+        DqnInspect_SampleStruct_vao_StructMemberMetadata, 2,
         0 // array_dimensions
     },
     {
         STR_AND_LEN("V4"), STR_AND_LEN("draw_color"),
         nullptr, 0, // template_expr and template_expr_len
-        DqnInspect_OpenGLState_draw_color_StructMemberMetadata, 1,
+        DqnInspect_SampleStruct_draw_color_StructMemberMetadata, 1,
         0 // array_dimensions
     },
     {
@@ -214,21 +210,23 @@ DqnInspect_StructMember const DqnInspect_OpenGLState_StructMembers[] =
     },
 };
 
-DqnInspect_Struct const DqnInspect_OpenGLState_Struct =
+DqnInspect_Struct const DqnInspect_SampleStruct_Struct =
 {
-    STR_AND_LEN("OpenGLState"),
-    DqnInspect_OpenGLState_StructMembers, // members
-    ARRAY_COUNT(DqnInspect_OpenGLState_StructMembers) // members_len
+    STR_AND_LEN("SampleStruct"),
+    DqnInspect_SampleStruct_StructMembers, // members
+    ARRAY_COUNT(DqnInspect_SampleStruct_StructMembers) // members_len
 };
 
-DqnInspect_Struct const *DqnInspect_GetStruct(OpenGLState const *val)
+DqnInspect_Struct const *DqnInspect_GetStruct(SampleStruct const *val)
 {
     (void)val;
-    DqnInspect_Struct const *result = &DqnInspect_OpenGLState_Struct;
+    DqnInspect_Struct const *result = &DqnInspect_SampleStruct_Struct;
     return result;
 }
 
-void RenderRect(V3 pos, V2 size = {}, char const *texture = nullptr, bool depth_test = false, int type = 1, char *user_msg = "Hello world");
+void Function1(int a, float b = {}, char const *c = nullptr, bool e = false, int f = 1, char *g = "Hello world");
+void *Function2();
+Array<int const *, 3> const *const Function3();
 
 #endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
 
