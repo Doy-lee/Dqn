@@ -40,4 +40,4 @@ DQN_INSPECT_GENERATE_PROTOTYPE()
 void *Function2() { }
 
 DQN_INSPECT_GENERATE_PROTOTYPE()
-Array<int const *, 3> const *const Function3() { }
+Array<int const *, 3> const *const Function3(Array<int, 32> const *foobar) { }

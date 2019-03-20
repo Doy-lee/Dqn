@@ -60,13 +60,13 @@ DqnInspect_StructMember const DqnInspect_SampleStruct_StructMembers[] =
 {
     {
         STR_AND_LEN("Array"), STR_AND_LEN("lights"),
-        STR_AND_LEN("V3, 3"), // template_expr
+        STR_AND_LEN("V3, 32"), // template_expr
         nullptr, 0, // metadata and metadata_len
         0 // array_dimensions
     },
     {
         STR_AND_LEN("Array"), STR_AND_LEN("camera_matrixes"),
-        STR_AND_LEN("V4, 3"), // template_expr
+        STR_AND_LEN("V4, 32"), // template_expr
         nullptr, 0, // metadata and metadata_len
         0 // array_dimensions
     },
@@ -226,7 +226,7 @@ DqnInspect_Struct const *DqnInspect_GetStruct(SampleStruct const *val)
 
 void Function1(int a, float b = {}, char const *c = nullptr, bool e = false, int f = 1, char *g = "Hello world");
 void *Function2();
-Array<int const *, 3> const *const Function3();
+Array<int const *, 3> const *const Function3(Array<int, 32> const *foobar);
 
 #endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
 

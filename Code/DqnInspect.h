@@ -644,6 +644,19 @@ void CPPTokeniser_SkipToIndentLevel(CPPTokeniser *tokeniser, int indent_level)
     }
 }
 
+bool CPPTokeniser_AcceptTokenIfType(CPPTokeniser *tokeniser, CPPTokenType type, CPPToken *token)
+{
+    CPPToken check = CPPTokeniser_PeekToken(tokeniser);
+    bool result    = (check.type == type);
+    if (result && token)
+    {
+        CPPTokeniser_NextToken(tokeniser);
+        *token = check;
+    }
+
+    return result;
+}
+
 //
 // CPP Parsing Helpers
 //
@@ -991,7 +1004,7 @@ b32 ParseCPPVariableType(CPPTokeniser *tokeniser, StringLiteral *type)
             if (template_depth == 0)
             {
                 char *expr_start = peek_token.str + 1;
-                char *expr_end   = token.str - 1;
+                char *expr_end   = token.str;
                 int expr_len     = static_cast<int>(expr_end - expr_start);
 
                 template_expr.str = expr_start;
@@ -1041,11 +1054,10 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
     CPPToken variable_type = token;
     for (int total_asterisks_count = 0;;)
     {
-        CPPToken peek_token                  = CPPTokeniser_PeekToken(tokeniser);
+        CPPToken peek_token                  = {};
         StringLiteral variable_template_expr = {};
-        if (peek_token.type == CPPTokenType::LessThan)
+        if (CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::LessThan, &peek_token))
         {
-            token              = CPPTokeniser_NextToken(tokeniser);
             int template_depth = 1;
             while (template_depth != 0 && token.type != CPPTokenType::EndOfStream)
             {
@@ -1059,7 +1071,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
             if (template_depth == 0)
             {
                 char *expr_start = peek_token.str + 1;
-                char *expr_end   = token.str - 1;
+                char *expr_end   = token.str;
                 int expr_len     = static_cast<int>(expr_end - expr_start);
 
                 variable_template_expr.str = expr_start;
@@ -1438,15 +1450,21 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
     for (CPPDeclLinkedList<CPPVariableDecl> *param_link = param_list; param_link; param_link = param_link->next)
     {
         // TODO(doyle): HACK. We should parse ptrs into the CPPVariableDecl, fixed size arrays into the name and const-ness into the type
-        CPPVariableDecl *decl = &param_link->value;
-        StringLiteral *type   = &decl->type;
-        StringLiteral *name   = &decl->name;
+        CPPVariableDecl *decl        = &param_link->value;
+        StringLiteral *type          = &decl->type;
+        char *type_end = (decl->template_expr.len > 0) ? decl->template_expr.str + decl->template_expr.len + 1 // +1 for the ending ">" on the template
+                                                       : type->str + type->len;
 
-        char *name_start    = type->str + (type->len + 1);
+        StringLiteral *name = &decl->name;
+        char *name_start    = type_end + 1;
         char *name_end      = name->str + name->len;
         auto hack_decl_name = StringLiteral(name_start, static_cast<int>(name_end - name_start));
 
-        CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "%.*s %.*s", decl->type.len, decl->type.str, hack_decl_name.len, hack_decl_name.str);
+        CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "%.*s", type->len, type->str);
+        if (decl->template_expr.len > 0)
+            CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "<%.*s>", decl->template_expr.len, decl->template_expr.str);
+        CPPTokeniser_SprintfToFileNoIndenting(tokeniser, " %.*s", hack_decl_name.len, hack_decl_name.str);
+
         if (decl->default_value.len > 0)
             CPPTokeniser_SprintfToFileNoIndenting(tokeniser, " = %.*s", decl->default_value.len, decl->default_value.str);
 
