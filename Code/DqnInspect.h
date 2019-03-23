@@ -265,6 +265,10 @@ struct DqnInspect_Struct
     int                            members_len;
 };
 
+// NOTE(doyle): For compiler testing
+// #include "../Data/DqnInspect_TestData.h"
+// #include "../Data/DqnInspect_TestDataGenerated.cpp"
+
 #ifdef DQN_INSPECT_EXECUTABLE_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
 
@@ -1288,9 +1292,41 @@ void ParseCPPStruct(CPPTokeniser *tokeniser)
 void SkipFunctionParam(CPPTokeniser *tokeniser)
 {
     CPPToken token = CPPTokeniser_PeekToken(tokeniser);
-    while (token.type != CPPTokenType::EndOfStream && token.type != CPPTokenType::Comma &&
-           token.type != CPPTokenType::CloseParen)
+    while (token.type != CPPTokenType::EndOfStream)
     {
+        if (token.type == CPPTokenType::OpenParen)
+        {
+            for (int level = 1; level != 0;)
+            {
+                CPPTokeniser_NextToken(tokeniser);
+                token = CPPTokeniser_PeekToken(tokeniser);
+                if (token.type == CPPTokenType::OpenParen) level++;
+                if (token.type == CPPTokenType::CloseParen) level--;
+            }
+
+            CPPTokeniser_NextToken(tokeniser);
+            token = CPPTokeniser_PeekToken(tokeniser);
+        }
+
+        if (token.type == CPPTokenType::LeftBrace)
+        {
+            for (int level = 1; level != 0;)
+            {
+                CPPTokeniser_NextToken(tokeniser);
+                token = CPPTokeniser_PeekToken(tokeniser);
+                if (token.type == CPPTokenType::LeftBrace) level++;
+                if (token.type == CPPTokenType::RightBrace) level--;
+            }
+            CPPTokeniser_NextToken(tokeniser);
+            token = CPPTokeniser_PeekToken(tokeniser);
+        }
+
+        if (token.type == CPPTokenType::CloseParen)
+            break;
+
+        if (token.type == CPPTokenType::Comma)
+            break;
+
         CPPTokeniser_NextToken(tokeniser);
         token = CPPTokeniser_PeekToken(tokeniser);
     }
@@ -1312,9 +1348,8 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
     MemArenaScopedRegion mem_region                      = MemArena_MakeScopedRegion(&global_main_arena);
     {
         LinkedList<FunctionDefaultParam> *link_iterator = nullptr;
-        token = CPPTokeniser_PeekToken(tokeniser);
-        if (!ExpectToken(token, CPPTokenType::OpenParen)) return;
-        token = CPPTokeniser_NextToken(tokeniser);
+        if (!CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::OpenParen, &token))
+            return;
 
         for (token = CPPTokeniser_NextToken(tokeniser);
              token.type != CPPTokenType::CloseParen && token.type != CPPTokenType::EndOfStream;
@@ -1337,20 +1372,18 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
                 continue;
             }
 
-            token                     = CPPTokeniser_NextToken(tokeniser);
-            char *default_param_start = token.str;
+            token                     = CPPTokeniser_PeekToken(tokeniser);
+            char *default_value_start = token.str;
 
-            // NOTE(doyle): Include the quotes in the param value
-            CPPToken prev_token = CPPTokeniser_PrevToken(tokeniser);
-            if (prev_token.type == CPPTokenType::String)
-                default_param_start--;
+            if (token.type == CPPTokenType::String) // NOTE(doyle): Include the quotes in the param value
+                default_value_start--;
 
             SkipFunctionParam(tokeniser);
             CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
             if (peek_token.type != CPPTokenType::Comma && peek_token.type != CPPTokenType::CloseParen)
                 continue;
 
-            char *default_param_end = peek_token.str;
+            char *default_value_end = peek_token.str;
 
             auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, LinkedList<FunctionDefaultParam>);
             *link      = {};
@@ -1359,7 +1392,7 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
             link_iterator = link;
 
             link->value.name  = default_param_name;
-            link->value.value = StringLiteral(default_param_start, static_cast<int>(default_param_end - default_param_start));
+            link->value.value = StringLiteral(default_value_start, static_cast<int>(default_value_end - default_value_start));
         }
     }
 
@@ -1483,121 +1516,127 @@ enum struct InspectMode
 
 char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing_function)
 {
-    int indent_level                = 0;
-    bool started_lexing_brace_scope = false;
-    bool started_lexing_function    = false;
-    int open_paren_level            = 0;
-    int close_paren_level           = 0;
-    for (; ptr;)
+    // NOTE(doyle): If we're lexing a function we're doing DQN_INSPECT_GENERATE_PROTOTYPE()
+    // Where we want to lex the macro and then the function following it, so 2 iterations
+    int iterations = lexing_function ? 2 : 1;
+
+    for (int i = 0; i < iterations; ++i)
     {
-        while (CharIsWhitespace(ptr[0])) ptr++;
-        if (!ptr[0]) break;
-
-        CPPToken *token = CPPTokeniser_MakeToken(tokeniser);
-        token->str      = ptr++;
-        token->len      = 1;
-        switch(token->str[0])
+        int indent_level                = 0;
+        bool started_lexing_brace_scope = false;
+        bool started_lexing_function    = false;
+        int paren_level                 = 0;
+        for (; ptr;)
         {
-            case '{': { token->type = CPPTokenType::LeftBrace;  started_lexing_brace_scope = true; indent_level++; } break;
-            case '}': { token->type = CPPTokenType::RightBrace; indent_level--; } break;
-            case '[': { token->type = CPPTokenType::LeftSqBracket;  } break;
-            case ']': { token->type = CPPTokenType::RightSqBracket; } break;
-            case '(': { token->type = CPPTokenType::OpenParen;   started_lexing_function = true; open_paren_level++; } break;
-            case ')': { token->type = CPPTokenType::CloseParen;  close_paren_level++; } break;
-            case ',': { token->type = CPPTokenType::Comma;       } break;
-            case ';': { token->type = CPPTokenType::SemiColon;   } break;
-            case '=': { token->type = CPPTokenType::Equals;      } break;
-            case '<': { token->type = CPPTokenType::LessThan;    } break;
-            case '>': { token->type = CPPTokenType::GreaterThan; } break;
-            case ':': { token->type = CPPTokenType::Colon;       } break;
-            case '*': { token->type = CPPTokenType::Asterisks;   } break;
-            case '/':
+            while (CharIsWhitespace(ptr[0])) ptr++;
+            if (!ptr[0]) break;
+
+            CPPToken *token = CPPTokeniser_MakeToken(tokeniser);
+            token->str      = ptr++;
+            token->len      = 1;
+            switch(token->str[0])
             {
-                token->type = CPPTokenType::FwdSlash;
-                if (ptr[0] == '/' || ptr[0] == '*')
+                case '{': { token->type = CPPTokenType::LeftBrace;  started_lexing_brace_scope = true; indent_level++; } break;
+                case '}': { token->type = CPPTokenType::RightBrace; indent_level--; } break;
+                case '[': { token->type = CPPTokenType::LeftSqBracket;  } break;
+                case ']': { token->type = CPPTokenType::RightSqBracket; } break;
+                case '(': { token->type = CPPTokenType::OpenParen;   started_lexing_function = true; paren_level++; } break;
+                case ')': { token->type = CPPTokenType::CloseParen;  paren_level--; } break;
+                case ',': { token->type = CPPTokenType::Comma;       } break;
+                case ';': { token->type = CPPTokenType::SemiColon;   } break;
+                case '=': { token->type = CPPTokenType::Equals;      } break;
+                case '<': { token->type = CPPTokenType::LessThan;    } break;
+                case '>': { token->type = CPPTokenType::GreaterThan; } break;
+                case ':': { token->type = CPPTokenType::Colon;       } break;
+                case '*': { token->type = CPPTokenType::Asterisks;   } break;
+                case '/':
                 {
-                    token->type = CPPTokenType::Comment;
-                    if (ptr[0] == '/')
+                    token->type = CPPTokenType::FwdSlash;
+                    if (ptr[0] == '/' || ptr[0] == '*')
                     {
-                        while (ptr[0] == ' ' || ptr[0] == '\t') ptr++;
-                        token->str = ptr;
-                        while (ptr[0] != '\n') ptr++;
-                    }
-                    else
-                    {
-                        for (;;)
+                        token->type = CPPTokenType::Comment;
+                        if (ptr[0] == '/')
                         {
-                            while (ptr[0] != '*') ptr++;
-                            ptr++;
-                            if (ptr[0] == '\\') break;
-                            token->len = static_cast<int>(ptr - token->str);
+                            while (ptr[0] == ' ' || ptr[0] == '\t') ptr++;
+                            token->str = ptr;
+                            while (ptr[0] != '\n') ptr++;
                         }
-                    }
+                        else
+                        {
+                            for (;;)
+                            {
+                                while (ptr[0] != '*') ptr++;
+                                ptr++;
+                                if (ptr[0] == '\\') break;
+                                token->len = static_cast<int>(ptr - token->str);
+                            }
+                        }
 
-                    token->len = static_cast<int>(ptr - token->str);
-                }
-            }
-            break;
-
-            default:
-            {
-                ptr--;
-                if (ptr[0] == '"')
-                {
-                    token->type = CPPTokenType::String;
-                    for (token->str = ++ptr;;)
-                    {
-                        while (ptr[0] != '"') ptr++;
                         token->len = static_cast<int>(ptr - token->str);
-                        if (ptr[-1] != '\\')
-                        {
-                            ptr++;
-                            break;
-                        }
                     }
                 }
-                else
-                {
-                    if (CharIsDigit(ptr[0]))
-                    {
-                        while (CharIsDigit(ptr[0]) || ptr[0] == 'x' || ptr[0] == 'b' || ptr[0] == 'e' || ptr[0] == '.' || ptr[0] == 'f')
-                            ptr++;
+                break;
 
-                        token->type = CPPTokenType::Number;
+                default:
+                {
+                    ptr--;
+                    if (ptr[0] == '"')
+                    {
+                        token->type = CPPTokenType::String;
+                        for (token->str = ++ptr;;)
+                        {
+                            while (ptr[0] != '"') ptr++;
+                            token->len = static_cast<int>(ptr - token->str);
+                            if (ptr[-1] != '\\')
+                            {
+                                ptr++;
+                                break;
+                            }
+                        }
                     }
                     else
                     {
-                        token->type = CPPTokenType::Identifier;
-                        if (CharIsAlpha(ptr[0]) || ptr[0] == '_')
+                        if (CharIsDigit(ptr[0]))
                         {
-                            ptr++;
-                            while (CharIsAlphaNum(ptr[0]) || ptr[0] == '_') ptr++;
+                            while (CharIsDigit(ptr[0]) || ptr[0] == 'x' || ptr[0] == 'b' || ptr[0] == 'e' || ptr[0] == '.' || ptr[0] == 'f')
+                                ptr++;
+
+                            token->type = CPPTokenType::Number;
                         }
+                        else
+                        {
+                            token->type = CPPTokenType::Identifier;
+                            if (CharIsAlpha(ptr[0]) || ptr[0] == '_')
+                            {
+                                ptr++;
+                                while (CharIsAlphaNum(ptr[0]) || ptr[0] == '_') ptr++;
+                            }
+                        }
+
+                        token->len = static_cast<int>(ptr - token->str);
                     }
 
-                    token->len = static_cast<int>(ptr - token->str);
                 }
-
+                break;
             }
-            break;
-        }
 
-        if (token->len == 0)
-        {
-            *token = {};
-            tokeniser->tokens_len--;
-        }
-        else
-        {
-            if (lexing_function)
+            if (token->len == 0)
             {
-                if (started_lexing_function && open_paren_level == close_paren_level && open_paren_level == 2)
-                    return ptr;
+                *token = {};
+                tokeniser->tokens_len--;
             }
             else
             {
-                if (started_lexing_brace_scope && indent_level == 0)
-                    return ptr;
+                if (lexing_function)
+                {
+                    if (started_lexing_function && paren_level == 0)
+                        break;
+                }
+                else
+                {
+                    if (started_lexing_brace_scope && indent_level == 0)
+                        break;
+                }
             }
         }
     }
@@ -1683,45 +1722,25 @@ int main(int argc, char *argv[])
             file_include_contents_hash_define_len = extracted_file_name_len;
         }
 
-        if (mode == InspectMode::Code)
-        {
-            fprintf(output_file,
-                    "//\n"
-                    "// %s\n"
-                    "//\n"
-                    "\n"
-                    "#ifndef DQN_INSPECT_%.*s\n"
-                    "#define DQN_INSPECT_%.*s\n"
-                    "\n"
-                    " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
-                    "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
-                    "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
-                    "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
-                    "\n",
-                    file_name,
-                    file_include_contents_hash_define_len,
-                    file_include_contents_hash_define,
-                    file_include_contents_hash_define_len,
-                    file_include_contents_hash_define
-                    );
-        }
-        else
-        {
-            fprintf(output_file,
-                    "//\n"
-                    "// %s\n"
-                    "//\n"
-                    "\n"
-                    "#ifndef DQN_INSPECT_%.*s\n"
-                    "#define DQN_INSPECT_%.*s\n"
-                    "\n",
-                    file_name,
-                    file_include_contents_hash_define_len,
-                    file_include_contents_hash_define,
-                    file_include_contents_hash_define_len,
-                    file_include_contents_hash_define
-                    );
-        }
+        fprintf(output_file,
+                "//\n"
+                "// %s\n"
+                "//\n"
+                "\n"
+                "#ifndef DQN_INSPECT_%.*s\n"
+                "#define DQN_INSPECT_%.*s\n"
+                "\n"
+                " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
+                "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
+                "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
+                "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
+                "\n",
+                file_name,
+                file_include_contents_hash_define_len,
+                file_include_contents_hash_define,
+                file_include_contents_hash_define_len,
+                file_include_contents_hash_define
+                );
 
         CPPTokeniser tokeniser      = {};
         tokeniser.spaces_per_indent = 4;
@@ -1809,23 +1828,13 @@ int main(int argc, char *argv[])
                 break;
         }
 
-        if (mode == InspectMode::Code)
-        {
-            fprintf(output_file,
-                    "\n#undef ARRAY_COUNT\n"
-                    "#undef CHAR_COUNT\n"
-                    "#undef STR_AND_LEN\n"
-                    "#endif // DQN_INSPECT_%.*s\n\n",
-                    file_include_contents_hash_define_len,
-                    file_include_contents_hash_define);
-        }
-        else
-        {
-            fprintf(output_file,
-                    "\n#endif // DQN_INSPECT_%.*s\n\n",
-                    file_include_contents_hash_define_len,
-                    file_include_contents_hash_define);
-        }
+        fprintf(output_file,
+                "\n#undef ARRAY_COUNT\n"
+                "#undef CHAR_COUNT\n"
+                "#undef STR_AND_LEN\n"
+                "#endif // DQN_INSPECT_%.*s\n\n",
+                file_include_contents_hash_define_len,
+                file_include_contents_hash_define);
     }
 
     fclose(output_file);

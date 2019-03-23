@@ -4,11 +4,13 @@ DQN_INSPECT enum struct EnumWithMetadata
     Count,
 };
 
-struct V3 { float test; };
+struct V3 { V3(float a, float b) { (void)a; (void)b; } float test; };
 struct V4 { float test; };
 
 template <typename T, int Size>
 struct Array { T data[Size]; };
+
+enum struct OpenGLShader { Vertex, Count, };
 
 DQN_INSPECT struct SampleStruct
 {
@@ -34,10 +36,13 @@ DQN_INSPECT struct SampleStruct
 };
 
 DQN_INSPECT_GENERATE_PROTOTYPE(b = {}, c = nullptr, e = false, f = 1, g = "Hello world")
-void Function1(int a, float b, char const *c, bool e, int f, char *g) { }
+void Function1(int a, float b, char const *c, bool e, int f, char *g)
+{
+    (void)a; (void)b; (void)c; (void)e; (void)f; (void)g;
+}
+
+DQN_INSPECT_GENERATE_PROTOTYPE(foo = V3(10, 20), bar = {120, 150})
+void *Function2(V3 foo, V3 bar) { (void)foo; (void)bar; return nullptr; }
 
 DQN_INSPECT_GENERATE_PROTOTYPE()
-void *Function2() { }
-
-DQN_INSPECT_GENERATE_PROTOTYPE()
-Array<int const *, 3> const *const Function3(Array<int, 32> const *foobar) { }
+Array<int const *, 3> const *const Function3(Array<int, 32> const *foobar) { (void)foobar; return {}; }

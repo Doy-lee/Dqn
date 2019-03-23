@@ -7,6 +7,11 @@
 #ifndef DQN_INSPECT_DQNINSPECT_TESTDATA_H
 #define DQN_INSPECT_DQNINSPECT_TESTDATA_H
 
+ // NOTE: These macros are undefined at the end of the file so to not pollute namespace
+#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])
+#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
+#define STR_AND_LEN(str) str, CHAR_COUNT(str)
+
 char const *DqnInspect_EnumWithMetadata_Strings[] = {"Rect", "Count", };
 
 char const *DqnInspect_EnumString(EnumWithMetadata val)
@@ -225,8 +230,11 @@ DqnInspect_Struct const *DqnInspect_GetStruct(SampleStruct const *val)
 }
 
 void Function1(int a, float b = {}, char const *c = nullptr, bool e = false, int f = 1, char *g = "Hello world");
-void *Function2();
+void *Function2(V3 foo = V3(10, 20), V3 bar = {120, 150});
 Array<int const *, 3> const *const Function3(Array<int, 32> const *foobar);
 
+#undef ARRAY_COUNT
+#undef CHAR_COUNT
+#undef STR_AND_LEN
 #endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
 
