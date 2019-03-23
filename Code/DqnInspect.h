@@ -508,6 +508,7 @@ b32 StrCmp(StringLiteral a, StringLiteral b)
     X(Identifier, "Identifier") \
     X(Number, "[0-9]") \
     X(Asterisks, "*") \
+    X(VarArgs, "Variable Args (...)") \
     X(InspectCode, "DQN_INSPECT") \
     X(InspectGeneratePrototype, "DQN_INSPECT_GENERATE_PROTOTYPE") \
     X(Hash, "#")
@@ -1050,8 +1051,9 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
     CPPDeclLinkedList<CPPVariableDecl> *result        = nullptr;
     CPPDeclLinkedList<CPPVariableDecl> *link_iterator = nullptr;
 
+
     CPPToken token = CPPTokeniser_NextToken(tokeniser);
-    if (!ExpectToken(token, CPPTokenType::Identifier))
+    if (token.type != CPPTokenType::Identifier && token.type != CPPTokenType::VarArgs)
         return result;
 
     ConsumeConstIdentifier(tokeniser);
@@ -1090,10 +1092,21 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
             ConsumeConstIdentifier(tokeniser);
         }
 
-        peek_token             = CPPTokeniser_PeekToken(tokeniser);
-        CPPToken variable_name = peek_token;
-        if (variable_name.type != CPPTokenType::Identifier)
-            break;
+        CPPToken variable_name = {};
+        if (variable_type.type == CPPTokenType::Identifier)
+        {
+            peek_token    = CPPTokeniser_PeekToken(tokeniser);
+            variable_name = peek_token;
+            if (variable_name.type != CPPTokenType::Identifier)
+                break;
+
+            CPPTokeniser_NextToken(tokeniser);
+        }
+        else
+        {
+            int break_here = 5;
+            (void)break_here;
+        }
 
         // Allocate A Member Declaration
         auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<CPPVariableDecl>);
@@ -1107,7 +1120,6 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
         link->value.template_expr    = variable_template_expr;
         link->value.array_dimensions = total_asterisks_count;
 
-        CPPTokeniser_NextToken(tokeniser);
         for (peek_token = CPPTokeniser_PeekToken(tokeniser);
              peek_token.type == CPPTokenType::LeftSqBracket && peek_token.type != CPPTokenType::EndOfStream;
              peek_token = CPPTokeniser_NextToken(tokeniser))
@@ -1445,7 +1457,7 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
              token.type != CPPTokenType::CloseParen && token.type != CPPTokenType::EndOfStream;
              token = CPPTokeniser_NextToken(tokeniser))
         {
-            if (token.type == CPPTokenType::Identifier)
+            if (token.type == CPPTokenType::Identifier || token.type == CPPTokenType::VarArgs)
             {
                 CPPTokeniser_RewindToken(tokeniser);
                 CPPDeclLinkedList<CPPVariableDecl> *link = ParseCPPTypeAndVariableDecl(tokeniser, true);
@@ -1489,14 +1501,20 @@ void ParseCPPInspectPrototype(CPPTokeniser *tokeniser)
                                                        : type->str + type->len;
 
         StringLiteral *name = &decl->name;
-        char *name_start    = type_end + 1;
-        char *name_end      = name->str + name->len;
-        auto hack_decl_name = StringLiteral(name_start, static_cast<int>(name_end - name_start));
+        StringLiteral hack_decl_name = {};
+        if (name->len > 0)
+        {
+            char *name_start = type_end + 1;
+            char *name_end   = name->str + name->len;
+            hack_decl_name   = StringLiteral(name_start, static_cast<int>(name_end - name_start));
+        }
 
         CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "%.*s", type->len, type->str);
         if (decl->template_expr.len > 0)
             CPPTokeniser_SprintfToFileNoIndenting(tokeniser, "<%.*s>", decl->template_expr.len, decl->template_expr.str);
-        CPPTokeniser_SprintfToFileNoIndenting(tokeniser, " %.*s", hack_decl_name.len, hack_decl_name.str);
+
+        if (hack_decl_name.len > 0)
+            CPPTokeniser_SprintfToFileNoIndenting(tokeniser, " %.*s", hack_decl_name.len, hack_decl_name.str);
 
         if (decl->default_value.len > 0)
             CPPTokeniser_SprintfToFileNoIndenting(tokeniser, " = %.*s", decl->default_value.len, decl->default_value.str);
@@ -1549,6 +1567,22 @@ char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing
                 case '>': { token->type = CPPTokenType::GreaterThan; } break;
                 case ':': { token->type = CPPTokenType::Colon;       } break;
                 case '*': { token->type = CPPTokenType::Asterisks;   } break;
+
+                case '.':
+                {
+                    if (token->str[1] == '.' && token->str[2] == '.')
+                    {
+                        token->type = CPPTokenType::VarArgs;
+                        token->len  = 3;
+                        ptr += 2;
+                    }
+                    else
+                    {
+                        token->len = 0; // NOTE: Skip
+                    }
+                }
+                break;
+
                 case '/':
                 {
                     token->type = CPPTokenType::FwdSlash;
