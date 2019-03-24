@@ -229,8 +229,8 @@ DqnInspect_Struct const *DqnInspect_GetStruct(SampleStruct const *val)
     return result;
 }
 
-void Function1(int a, float b = {}, char const *c = nullptr, bool e = false, int f = 1, char *g = "Hello world");
-void *Function2(V3 foo = V3(10, 20), V3 bar = {120, 150}, ...);
+void                               Function1(int a, float b = {}, char const *c = nullptr, bool e = false, int f = 1, char *g = "Hello world");
+void *                             Function2(V3 foo = V3(10, 20), V3 bar = {120, 150}, ...);
 Array<int const *, 3> const *const Function3(Array<int, 32> const *foobar);
 
 #undef ARRAY_COUNT
