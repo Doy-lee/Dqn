@@ -266,8 +266,8 @@ struct DqnInspect_Struct
 };
 
 // NOTE(doyle): For compiler testing
-#include "../Data/DqnInspect_TestData.h"
-#include "../Data/DqnInspect_TestDataGenerated.cpp"
+// #include "../Data/DqnInspect_TestData.h"
+// #include "../Data/DqnInspect_TestDataGenerated.cpp"
 
 #ifdef DQN_INSPECT_EXECUTABLE_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
@@ -1662,7 +1662,7 @@ int main(int argc, char *argv[])
                     // Write InspectEnumString Function
                     //
                     {
-                        CPPTokeniser_SprintfToFile(&tokeniser, "char const *DqnInspect_EnumString(%.*s val)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
+                        CPPTokeniser_SprintfToFile(&tokeniser, "char const *DqnInspect_EnumString(%.*s val, int *len = nullptr)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
                         tokeniser.indent_level++;
                         DEFER
                         {
@@ -1687,7 +1687,7 @@ int main(int argc, char *argv[])
                                 if (!curr_src_code) curr_src_code = &src_code;
                                 else
                                 {
-                                    curr_src_code->next = static_cast<LinkedList<SourceCode> *>( MemArena_Alloc(&global_main_arena, sizeof(*curr_src_code)));
+                                    curr_src_code->next = static_cast<LinkedList<SourceCode> *>(MemArena_Alloc(&global_main_arena, sizeof(*curr_src_code)));
                                     curr_src_code       = curr_src_code->next;
                                 }
 
@@ -1717,10 +1717,10 @@ int main(int argc, char *argv[])
                             int padding              = longest_decl_len - src_code_ptr->value.decl.len;
                             CPPTokeniser_SprintfToFile(&tokeniser, "%.*s%*s", src_code_ptr->value.decl.len, src_code_ptr->value.decl.str, padding, "");
                             CPPTokeniser_SprintfToFileNoIndenting(&tokeniser,
-                                                                  "return DqnInspect_%.*s_Strings[%d]; // \"%.*s\"\n",
+                                                                  "{ if (len) *len = CHAR_COUNT(\"%.*s\"); return DqnInspect_%.*s_Strings[%d]; }\n",
+                                                                  enum_value.len, enum_value.str,
                                                                   parsed_enum->name.len, parsed_enum->name.str,
-                                                                  enum_index,
-                                                                  enum_value.len, enum_value.str);
+                                                                  enum_index);
                         }
                     }
 
