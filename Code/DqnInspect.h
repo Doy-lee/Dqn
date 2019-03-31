@@ -43,182 +43,7 @@
 //
 // ANNOTATION EXAMPLE
 // =================================================================================================
-// For full example see Data/DqnInspect_TestData.h
-
-/*
-DQN_INSPECT enum struct OpenGLShader
-{
-    Invalid,
-    Rect DQN_INSPECT_META(VertexShaderFilePath = "Rect.vert", FragmentShaderFilePath = "Rect.frag"),
-    Text DQN_INSPECT_META(VertexShaderFilePath = "Text.vert", FragmentShaderFilePath = "Text.frag"),
-    Count,
-};
-
-struct V4 { float test; };
-template <typename T, int Size>
-struct Array { T data[Size]; };
-
-DQN_INSPECT struct OpenGLState
-{
-    Array<V4, 32>   camera_matrixes;
-    char          **bitmaps;
-    int             shaders[(int)OpenGLShader::Count];
-    void           *win32_handle;
-    int             ebo DQN_INSPECT_META(DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(DisplayName = "Vertex Array Object", OpenGLVersion = "330");
-    V4              draw_color DQN_INSPECT_META(DisplayName = "HelloWorld");
-    int             draw_call_count;
-};
-
-//
-// INSPECTION OUTPUT EXAMPLE
-// =================================================================================================
-// For full example see Data/DqnInspect_TestDataGenerated.cpp
-
-
-// This is an auto generated file using Dqn_Inspect
-
-//
-// ..\Data\DqnInspect_TestData.h
-//
-
-#ifndef DQN_INSPECT_DQNINSPECT_TESTDATA_H
-#define DQN_INSPECT_DQNINSPECT_TESTDATA_H
-
- // NOTE: These macros are undefined at the end of the file so to not pollute namespace
-#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])
-#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
-#define STR_AND_LEN(str) str, CHAR_COUNT(str)
-
-char const *DqnInspect_OpenGLShader_Strings[] = {"Invalid", "Rect", "Text", "Count", };
-
-char const *DqnInspect_EnumString(OpenGLShader val)
-{
-    if (val == OpenGLShader::Invalid) return DqnInspect_OpenGLShader_Strings[0]; // "Invalid"
-    if (val == OpenGLShader::Rect)    return DqnInspect_OpenGLShader_Strings[1]; // "Rect"
-    if (val == OpenGLShader::Text)    return DqnInspect_OpenGLShader_Strings[2]; // "Text"
-    if (val == OpenGLShader::Count)   return DqnInspect_OpenGLShader_Strings[3]; // "Count"
-    return nullptr;
-}
-
-char const *DqnInspect_VertexShaderFilePathMetadata(OpenGLShader val)
-{
-    if (val == OpenGLShader::Rect) return "Rect.vert";
-    if (val == OpenGLShader::Text) return "Text.vert";
-    return nullptr;
-}
-
-char const *DqnInspect_FragmentShaderFilePathMetadata(OpenGLShader val)
-{
-    if (val == OpenGLShader::Rect) return "Rect.frag";
-    if (val == OpenGLShader::Text) return "Text.frag";
-    return nullptr;
-}
-
-DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_ebo_StructMemberMetadata[] =
-{
-    {
-        DqnInspect_StructMemberMetadataType::String,
-        STR_AND_LEN("DisplayName"), STR_AND_LEN("Element Buffer Object"),
-    },
-};
-
-DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_vao_StructMemberMetadata[] =
-{
-    {
-        DqnInspect_StructMemberMetadataType::String,
-        STR_AND_LEN("DisplayName"), STR_AND_LEN("Vertex Array Object"),
-    },
-    {
-        DqnInspect_StructMemberMetadataType::String,
-        STR_AND_LEN("OpenGLVersion"), STR_AND_LEN("330"),
-    },
-};
-
-DqnInspect_StructMemberMetadata const DqnInspect_OpenGLState_draw_color_StructMemberMetadata[] =
-{
-    {
-        DqnInspect_StructMemberMetadataType::String,
-        STR_AND_LEN("DisplayName"), STR_AND_LEN("HelloWorld"),
-    },
-};
-
-DqnInspect_StructMember const DqnInspect_OpenGLState_StructMembers[] =
-{
-    {
-        STR_AND_LEN("Array"), STR_AND_LEN("camera_matrixes"),
-        STR_AND_LEN("V4, 3"), // template_expr
-        nullptr, 0, // metadata and metadata_len
-        0 // array_dimensions
-    },
-    {
-        STR_AND_LEN("char"), STR_AND_LEN("bitmaps"),
-        nullptr, 0, // template_expr and template_expr_len
-        nullptr, 0, // metadata and metadata_len
-        2 // array_dimensions
-    },
-    {
-        STR_AND_LEN("int"), STR_AND_LEN("shaders"),
-        nullptr, 0, // template_expr and template_expr_len
-        nullptr, 0, // metadata and metadata_len
-        1 // array_dimensions
-    },
-    {
-        STR_AND_LEN("void"), STR_AND_LEN("win32_handle"),
-        nullptr, 0, // template_expr and template_expr_len
-        nullptr, 0, // metadata and metadata_len
-        1 // array_dimensions
-    },
-    {
-        STR_AND_LEN("int"), STR_AND_LEN("ebo"),
-        nullptr, 0, // template_expr and template_expr_len
-        DqnInspect_OpenGLState_ebo_StructMemberMetadata, 1,
-        0 // array_dimensions
-    },
-    {
-        STR_AND_LEN("int"), STR_AND_LEN("vbo"),
-        nullptr, 0, // template_expr and template_expr_len
-        nullptr, 0, // metadata and metadata_len
-        0 // array_dimensions
-    },
-    {
-        STR_AND_LEN("int"), STR_AND_LEN("vao"),
-        nullptr, 0, // template_expr and template_expr_len
-        DqnInspect_OpenGLState_vao_StructMemberMetadata, 2,
-        0 // array_dimensions
-    },
-    {
-        STR_AND_LEN("V4"), STR_AND_LEN("draw_color"),
-        nullptr, 0, // template_expr and template_expr_len
-        DqnInspect_OpenGLState_draw_color_StructMemberMetadata, 1,
-        0 // array_dimensions
-    },
-    {
-        STR_AND_LEN("int"), STR_AND_LEN("draw_call_count"),
-        nullptr, 0, // template_expr and template_expr_len
-        nullptr, 0, // metadata and metadata_len
-        0 // array_dimensions
-    },
-};
-
-DqnInspect_Struct const DqnInspect_OpenGLState_Struct =
-{
-    STR_AND_LEN("OpenGLState"),
-    DqnInspect_OpenGLState_StructMembers, // members
-    ARRAY_COUNT(DqnInspect_OpenGLState_StructMembers) // members_len
-};
-
-DqnInspect_Struct const *DqnInspect_GetStruct(OpenGLState const *val)
-{
-    (void)val;
-    DqnInspect_Struct const *result = &DqnInspect_OpenGLState_Struct;
-    return result;
-}
-
-#undef ARRAY_COUNT
-#undef CHAR_COUNT
-#undef STR_AND_LEN
-#endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
-*/
+// See Data/DqnInspect_TestData.h
 
 #define DQN_INSPECT
 #define DQN_INSPECT_META(...)
@@ -251,8 +76,10 @@ struct DqnInspect_StructMember
     char const *template_expr;
     int         template_expr_len;
 
+#if 0 // TODO(doyle): Broken
     DqnInspect_StructMemberMetadata const *metadata;
     int                                    metadata_len;
+#endif
 
     int         array_dimensions; // > 0 means array
 };
@@ -266,8 +93,8 @@ struct DqnInspect_Struct
 };
 
 // NOTE(doyle): For compiler testing
-// #include "../Data/DqnInspect_TestData.h"
-// #include "../Data/DqnInspect_TestDataGenerated.cpp"
+#include "../Data/DqnInspect_TestData.h"
+#include "../Data/DqnInspect_TestDataGenerated.cpp"
 
 #ifdef DQN_INSPECT_EXECUTABLE_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
@@ -535,22 +362,6 @@ struct CPPToken
     int   len;
 };
 
-struct CPPInspectMetadataEntry
-{
-    StringLiteral key;
-    StringLiteral value;
-};
-
-using CPPInspectMetadataArray = FixedArray<CPPInspectMetadataEntry, 8>;
-
-template <typename T>
-struct CPPDeclLinkedList
-{
-    CPPInspectMetadataArray metadata_array;
-    T                       value;
-    CPPDeclLinkedList      *next;
-};
-
 struct CPPVariableDecl
 {
     StringLiteral type;
@@ -558,6 +369,14 @@ struct CPPVariableDecl
     StringLiteral template_expr;
     int           array_dimensions;
     StringLiteral default_value;
+};
+
+template <typename T>
+struct CPPDeclLinkedList
+{
+    CPPDeclLinkedList<CPPVariableDecl> *metadata_list;
+    T                                   value;
+    CPPDeclLinkedList                  *next;
 };
 
 struct CPPTokeniser
@@ -688,60 +507,230 @@ b32 ExpectToken(CPPToken token, CPPTokenType type)
 // CPP Parsing Functions
 //
 
-CPPInspectMetadataArray ParseCPPInspectMeta(CPPTokeniser *tokeniser)
+#if 0
+DQN_INSPECT enum struct EnumWithMetadata
 {
-    CPPInspectMetadataArray result = {};
-    CPPToken token                 = CPPTokeniser_NextToken(tokeniser);
-    if (!ExpectToken(token, CPPTokenType::Identifier) || !IsIdentifierToken(token, STR_LITERAL("DQN_INSPECT_META")))
-        return result;
+    Rect   DQN_INSPECT_META(char const *FilePath = "Rect.vert", V3 Coords = V3(1, 2, 3)),
+    Square DQN_INSPECT_META(char *file_path = "Rect.vert"),
+    Count,
+};
+#endif
 
-    token = CPPTokeniser_NextToken(tokeniser);
-    if (!ExpectToken(token, CPPTokenType::OpenParen)) return result;
-
-    for (token       = CPPTokeniser_NextToken(tokeniser);
-         token.type != CPPTokenType::EndOfStream && token.type != CPPTokenType::CloseParen;
-         token       = CPPTokeniser_NextToken(tokeniser))
+int ConsumeAsterisks(CPPTokeniser *tokeniser, CPPToken *token = nullptr)
+{
+    int result = 0;
+    CPPToken last_asterisks_token = {};
+    for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
+         peek_token.type == CPPTokenType::Asterisks;
+         ++result)
     {
-        if (token.type == CPPTokenType::Identifier)
-        {
-            auto metadata_key   = StringLiteral(token.str, token.len);
-            CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
-            if (!ExpectToken(peek_token, CPPTokenType::Equals))
-                continue;
-
-            token      = CPPTokeniser_NextToken(tokeniser);
-            peek_token = CPPTokeniser_PeekToken(tokeniser);
-
-            if (peek_token.type == CPPTokenType::String || peek_token.type == CPPTokenType::Identifier)
-            {
-                token = CPPTokeniser_NextToken(tokeniser);
-                if (IsIdentifierToken(token, STR_LITERAL("nullptr"))) continue;
-
-                CPPInspectMetadataEntry *entry = FixedArray_Make(&result, 1);
-                entry->key                     = metadata_key;
-                entry->value                   = StringLiteral(token.str, token.len);
-            }
-        }
+        last_asterisks_token = peek_token;
+        CPPTokeniser_NextToken(tokeniser);
+        peek_token = CPPTokeniser_PeekToken(tokeniser);
     }
 
-    while (token.type != CPPTokenType::EndOfStream && token.type != CPPTokenType::CloseParen)
-        token = CPPTokeniser_NextToken(tokeniser);
+    if (token && last_asterisks_token.type != CPPTokenType::EndOfStream) *token = last_asterisks_token;
+    return result;
+}
+
+b32 ConsumeConstIdentifier(CPPTokeniser *tokeniser, CPPToken *token = nullptr)
+{
+    b32 result = false;
+    CPPToken last_const_token = {};
+    for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
+         IsIdentifierToken(peek_token, STR_LITERAL("const"));
+         peek_token = CPPTokeniser_PeekToken(tokeniser))
+    {
+        last_const_token = peek_token;
+        result = true;
+        CPPTokeniser_NextToken(tokeniser);
+    }
+
+    if (token && last_const_token.type != CPPTokenType::EndOfStream) *token = last_const_token;
+    return result;
+}
+
+void SkipFunctionParam(CPPTokeniser *tokeniser)
+{
+    CPPToken token = CPPTokeniser_PeekToken(tokeniser);
+    while (token.type != CPPTokenType::EndOfStream)
+    {
+        if (token.type == CPPTokenType::OpenParen)
+        {
+            for (int level = 1; level != 0;)
+            {
+                CPPTokeniser_NextToken(tokeniser);
+                token = CPPTokeniser_PeekToken(tokeniser);
+                if (token.type == CPPTokenType::OpenParen) level++;
+                if (token.type == CPPTokenType::CloseParen) level--;
+            }
+
+            CPPTokeniser_NextToken(tokeniser);
+            token = CPPTokeniser_PeekToken(tokeniser);
+        }
+
+        if (token.type == CPPTokenType::LeftBrace)
+        {
+            for (int level = 1; level != 0;)
+            {
+                CPPTokeniser_NextToken(tokeniser);
+                token = CPPTokeniser_PeekToken(tokeniser);
+                if (token.type == CPPTokenType::LeftBrace) level++;
+                if (token.type == CPPTokenType::RightBrace) level--;
+            }
+            CPPTokeniser_NextToken(tokeniser);
+            token = CPPTokeniser_PeekToken(tokeniser);
+        }
+
+        if (token.type == CPPTokenType::CloseParen)
+            break;
+
+        if (token.type == CPPTokenType::Comma)
+            break;
+
+        CPPTokeniser_NextToken(tokeniser);
+        token = CPPTokeniser_PeekToken(tokeniser);
+    }
+}
+
+CPPDeclLinkedList<CPPVariableDecl> *ParseCPPInspectMeta(CPPTokeniser *tokeniser);
+// NOTE(doyle): Doesn't parse the ending semicolon so we can reuse this function for parsing function arguments
+CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *tokeniser, b32 parse_function_param)
+{
+    CPPDeclLinkedList<CPPVariableDecl> *result        = nullptr;
+    CPPDeclLinkedList<CPPVariableDecl> *link_iterator = nullptr;
+
+    CPPToken token = CPPTokeniser_NextToken(tokeniser);
+    if (token.type != CPPTokenType::Identifier && token.type != CPPTokenType::VarArgs)
+        return result;
+
+    ConsumeConstIdentifier(tokeniser);
+    CPPToken variable_type = token;
+    for (int total_asterisks_count = 0;;)
+    {
+        StringLiteral variable_template_expr = {};
+        if (CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::LessThan, &token))
+        {
+            int template_depth = 1;
+            while (template_depth != 0 && token.type != CPPTokenType::EndOfStream)
+            {
+                token = CPPTokeniser_NextToken(tokeniser);
+                if (token.type == CPPTokenType::LessThan)
+                    template_depth++;
+                else if (token.type == CPPTokenType::GreaterThan)
+                    template_depth--;
+            }
+
+            if (template_depth == 0)
+            {
+                char *expr_start = token.str + 1;
+                char *expr_end   = token.str;
+                int expr_len     = static_cast<int>(expr_end - expr_start);
+
+                variable_template_expr.str = expr_start;
+                variable_template_expr.len = expr_len;
+            }
+        }
+
+        CPPToken last_modifier_token = {};
+        total_asterisks_count        = ConsumeAsterisks(tokeniser, &last_modifier_token);
+        if (ConsumeConstIdentifier(tokeniser, &last_modifier_token))
+        {
+            total_asterisks_count += ConsumeAsterisks(tokeniser, &last_modifier_token);
+            ConsumeConstIdentifier(tokeniser, &last_modifier_token);
+        }
+
+        CPPToken variable_name = {};
+        if (variable_type.type == CPPTokenType::Identifier)
+        {
+            token    = CPPTokeniser_PeekToken(tokeniser);
+            variable_name = token;
+            if (variable_name.type != CPPTokenType::Identifier)
+                break;
+
+            CPPTokeniser_NextToken(tokeniser);
+        }
+
+        // Allocate A Member Declaration
+        auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<CPPVariableDecl>);
+        *link      = {};
+        if (!result) result              = link; // Set result to first linked list entry
+        else         link_iterator->next = link;
+        link_iterator = link;
+
+        int variable_type_len = variable_type.len;
+        if (last_modifier_token.type != CPPTokenType::EndOfStream)
+            variable_type_len = static_cast<int>(last_modifier_token.str - variable_type.str) + 1;
+
+        link->value.type             = StringLiteral(variable_type.str, variable_type_len);
+        link->value.name             = StringLiteral(variable_name.str, variable_name.len);
+        link->value.template_expr    = variable_template_expr;
+        link->value.array_dimensions = total_asterisks_count;
+
+        for (token = CPPTokeniser_PeekToken(tokeniser);
+             token.type == CPPTokenType::LeftSqBracket && token.type != CPPTokenType::EndOfStream;
+             token = CPPTokeniser_NextToken(tokeniser))
+        {
+            // TODO(doyle): Parsing array size is difficult if it's an expression, so maybe don't do it at all
+            ++link->value.array_dimensions;
+            while (token.type != CPPTokenType::RightSqBracket && token.type != CPPTokenType::EndOfStream)
+                token = CPPTokeniser_NextToken(tokeniser);
+        }
+
+        if (IsIdentifierToken(token, STR_LITERAL("DQN_INSPECT_META")))
+        {
+            link->metadata_list = ParseCPPInspectMeta(tokeniser);
+            token          = CPPTokeniser_PeekToken(tokeniser);
+        }
+
+        if (token.type == CPPTokenType::Equals)
+        {
+            token                     = CPPTokeniser_NextToken(tokeniser);
+            token                     = CPPTokeniser_PeekToken(tokeniser);
+            char *default_value_start = token.str;
+
+            if (token.type == CPPTokenType::String) // NOTE(doyle): Include the quotes in the param value
+                default_value_start--;
+
+            SkipFunctionParam(tokeniser);
+            token = CPPTokeniser_PeekToken(tokeniser);
+            if (token.type != CPPTokenType::Comma && token.type != CPPTokenType::CloseParen)
+                continue;
+
+            char *default_value_end = token.str;
+            link->value.default_value = StringLiteral(default_value_start, static_cast<int>(default_value_end - default_value_start));
+        }
+
+        if (token.type == CPPTokenType::Comma)
+        {
+            if (parse_function_param)
+            {
+                CPPTokeniser_NextToken(tokeniser);
+                variable_type = CPPTokeniser_PeekToken(tokeniser);
+            }
+            token = CPPTokeniser_NextToken(tokeniser);
+        }
+        else
+        {
+            break;
+        }
+    }
 
     return result;
 }
 
-struct CPPDeclToMetaValue
+CPPDeclLinkedList<CPPVariableDecl> *ParseCPPInspectMeta(CPPTokeniser *tokeniser)
 {
-    StringLiteral cpp_decl;
-    StringLiteral value;
-};
+    CPPToken token = CPPTokeniser_NextToken(tokeniser);
+    if (!ExpectToken(token, CPPTokenType::Identifier) || !IsIdentifierToken(token, STR_LITERAL("DQN_INSPECT_META")))
+        return nullptr;
 
-// i.e. DataType cpp_decl DQN_INSPECT_META(key = value, key2 = value2, ...);
-struct MetadataEntry
-{
-    StringLiteral                      key;
-    FixedArray<CPPDeclToMetaValue, 32> cpp_decl_to_val;
-};
+    token = CPPTokeniser_NextToken(tokeniser);
+    if (!ExpectToken(token, CPPTokenType::OpenParen)) return nullptr;
+
+    CPPDeclLinkedList<CPPVariableDecl> *result = ParseCPPTypeAndVariableDecl(tokeniser, true);
+    return result;
+}
 
 enum struct ParsedResultType
 {
@@ -827,41 +816,13 @@ b32 ParseCPPEnum(CPPTokeniser *tokeniser, ParsedEnum *parsed_enum)
                 CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
                 if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
                 {
-                    link->metadata_array = ParseCPPInspectMeta(tokeniser);
+                    link->metadata_list = ParseCPPInspectMeta(tokeniser);
                 }
             }
         }
     }
 
     return true;
-}
-
-int ConsumeAsterisks(CPPTokeniser *tokeniser)
-{
-    int result = 0;
-    for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
-         peek_token.type == CPPTokenType::Asterisks;
-         ++result)
-    {
-        CPPTokeniser_NextToken(tokeniser);
-        peek_token = CPPTokeniser_PeekToken(tokeniser);
-    }
-
-    return result;
-}
-
-b32 ConsumeConstIdentifier(CPPTokeniser *tokeniser)
-{
-    b32 result = false;
-    for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
-         IsIdentifierToken(peek_token, STR_LITERAL("const"));
-         peek_token = CPPTokeniser_PeekToken(tokeniser))
-    {
-        result = true;
-        CPPTokeniser_NextToken(tokeniser);
-    }
-
-    return result;
 }
 
 b32 ParseCPPVariableType(CPPTokeniser *tokeniser, StringLiteral *type)
@@ -931,110 +892,6 @@ b32 ParseCPPVariableType(CPPTokeniser *tokeniser, StringLiteral *type)
     return true;
 }
 
-// NOTE(doyle): Doesn't parse the ending semicolon so we can reuse this function for parsing function arguments
-CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *tokeniser, b32 parse_function_param)
-{
-    CPPDeclLinkedList<CPPVariableDecl> *result        = nullptr;
-    CPPDeclLinkedList<CPPVariableDecl> *link_iterator = nullptr;
-
-
-    CPPToken token = CPPTokeniser_NextToken(tokeniser);
-    if (token.type != CPPTokenType::Identifier && token.type != CPPTokenType::VarArgs)
-        return result;
-
-    ConsumeConstIdentifier(tokeniser);
-    CPPToken variable_type = token;
-    for (int total_asterisks_count = 0;;)
-    {
-        CPPToken peek_token                  = {};
-        StringLiteral variable_template_expr = {};
-        if (CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::LessThan, &peek_token))
-        {
-            int template_depth = 1;
-            while (template_depth != 0 && token.type != CPPTokenType::EndOfStream)
-            {
-                token = CPPTokeniser_NextToken(tokeniser);
-                if (token.type == CPPTokenType::LessThan)
-                    template_depth++;
-                else if (token.type == CPPTokenType::GreaterThan)
-                    template_depth--;
-            }
-
-            if (template_depth == 0)
-            {
-                char *expr_start = peek_token.str + 1;
-                char *expr_end   = token.str;
-                int expr_len     = static_cast<int>(expr_end - expr_start);
-
-                variable_template_expr.str = expr_start;
-                variable_template_expr.len = expr_len;
-            }
-        }
-
-        total_asterisks_count = ConsumeAsterisks(tokeniser);
-        if (ConsumeConstIdentifier(tokeniser))
-        {
-            total_asterisks_count += ConsumeAsterisks(tokeniser);
-            ConsumeConstIdentifier(tokeniser);
-        }
-
-        CPPToken variable_name = {};
-        if (variable_type.type == CPPTokenType::Identifier)
-        {
-            peek_token    = CPPTokeniser_PeekToken(tokeniser);
-            variable_name = peek_token;
-            if (variable_name.type != CPPTokenType::Identifier)
-                break;
-
-            CPPTokeniser_NextToken(tokeniser);
-        }
-
-        // Allocate A Member Declaration
-        auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<CPPVariableDecl>);
-        *link      = {};
-        if (!result) result              = link; // Set result to first linked list entry
-        else         link_iterator->next = link;
-        link_iterator = link;
-
-        link->value.type             = StringLiteral(variable_type.str, variable_type.len);
-        link->value.name             = StringLiteral(variable_name.str, variable_name.len);
-        link->value.template_expr    = variable_template_expr;
-        link->value.array_dimensions = total_asterisks_count;
-
-        for (peek_token = CPPTokeniser_PeekToken(tokeniser);
-             peek_token.type == CPPTokenType::LeftSqBracket && peek_token.type != CPPTokenType::EndOfStream;
-             peek_token = CPPTokeniser_NextToken(tokeniser))
-        {
-            // TODO(doyle): Parsing array size is difficult if it's an expression, so maybe don't do it at all
-            ++link->value.array_dimensions;
-            while (token.type != CPPTokenType::RightSqBracket && token.type != CPPTokenType::EndOfStream)
-                token = CPPTokeniser_NextToken(tokeniser);
-        }
-
-        if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
-        {
-            link->metadata_array = ParseCPPInspectMeta(tokeniser);
-            peek_token           = CPPTokeniser_PeekToken(tokeniser);
-        }
-
-        if (peek_token.type == CPPTokenType::Comma)
-        {
-            if (parse_function_param)
-            {
-                CPPTokeniser_NextToken(tokeniser);
-                variable_type = CPPTokeniser_PeekToken(tokeniser);
-            }
-            token = CPPTokeniser_NextToken(tokeniser);
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return result;
-}
-
 b32 ParseCPPStruct(CPPTokeniser *tokeniser, ParsedStruct *parsed_struct)
 {
     *parsed_struct = {};
@@ -1079,49 +936,6 @@ b32 ParseCPPStruct(CPPTokeniser *tokeniser, ParsedStruct *parsed_struct)
         return false;
 
     return true;
-}
-
-void SkipFunctionParam(CPPTokeniser *tokeniser)
-{
-    CPPToken token = CPPTokeniser_PeekToken(tokeniser);
-    while (token.type != CPPTokenType::EndOfStream)
-    {
-        if (token.type == CPPTokenType::OpenParen)
-        {
-            for (int level = 1; level != 0;)
-            {
-                CPPTokeniser_NextToken(tokeniser);
-                token = CPPTokeniser_PeekToken(tokeniser);
-                if (token.type == CPPTokenType::OpenParen) level++;
-                if (token.type == CPPTokenType::CloseParen) level--;
-            }
-
-            CPPTokeniser_NextToken(tokeniser);
-            token = CPPTokeniser_PeekToken(tokeniser);
-        }
-
-        if (token.type == CPPTokenType::LeftBrace)
-        {
-            for (int level = 1; level != 0;)
-            {
-                CPPTokeniser_NextToken(tokeniser);
-                token = CPPTokeniser_PeekToken(tokeniser);
-                if (token.type == CPPTokenType::LeftBrace) level++;
-                if (token.type == CPPTokenType::RightBrace) level--;
-            }
-            CPPTokeniser_NextToken(tokeniser);
-            token = CPPTokeniser_PeekToken(tokeniser);
-        }
-
-        if (token.type == CPPTokenType::CloseParen)
-            break;
-
-        if (token.type == CPPTokenType::Comma)
-            break;
-
-        CPPTokeniser_NextToken(tokeniser);
-        token = CPPTokeniser_PeekToken(tokeniser);
-    }
 }
 
 b32 ParseCPPInspectPrototype(CPPTokeniser *tokeniser, ParsedFunctionPrototype *parsed_func)
@@ -1662,7 +1476,7 @@ int main(int argc, char *argv[])
                     // Write InspectEnumString Function
                     //
                     {
-                        CPPTokeniser_SprintfToFile(&tokeniser, "char const *DqnInspect_EnumString(%.*s val, int *len = nullptr)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
+                        CPPTokeniser_SprintfToFile(&tokeniser, "char const *DqnInspectEnum_Stringify(%.*s val, int *len = nullptr)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
                         tokeniser.indent_level++;
                         DEFER
                         {
@@ -1728,17 +1542,33 @@ int main(int argc, char *argv[])
                     // Write User Annotated Metadata Getter Functions
                     //
                     {
+                        struct CPPDeclToMetaValue
+                        {
+                            StringLiteral cpp_decl;
+                            StringLiteral value;
+                        };
+
+                        // i.e. DataType cpp_decl DQN_INSPECT_META(type1 name1 = value, type2 name2 = value2, ...);
+                        struct MetadataEntry
+                        {
+                            StringLiteral type;
+                            StringLiteral name;
+                            FixedArray<CPPDeclToMetaValue, 32> cpp_decl_to_val;
+                        };
+
                         FixedArray<MetadataEntry, 32> metadata_entries = {};
                         for (CPPDeclLinkedList<StringLiteral> *link = parsed_enum->members;
                              link;
                              link = link->next)
                         {
-                            for (CPPInspectMetadataEntry const &inspect_entry : link->metadata_array)
+                            for (CPPDeclLinkedList<CPPVariableDecl> const *metadata_link = link->metadata_list;
+                                 metadata_link;
+                                 metadata_link = metadata_link->next)
                             {
                                 MetadataEntry *metadata_entry_to_append_to = nullptr;
                                 for (MetadataEntry &check_metadata_entry : metadata_entries)
                                 {
-                                    if (StrCmp(check_metadata_entry.key, inspect_entry.key))
+                                    if (StrCmp(check_metadata_entry.type, metadata_link->value.type) && StrCmp(check_metadata_entry.name, metadata_link->value.name))
                                     {
                                         metadata_entry_to_append_to = &check_metadata_entry;
                                         break;
@@ -1747,52 +1577,97 @@ int main(int argc, char *argv[])
 
                                 if (!metadata_entry_to_append_to)
                                 {
-                                    metadata_entry_to_append_to      = FixedArray_Make(&metadata_entries, 1);
-                                    metadata_entry_to_append_to->key = inspect_entry.key;
+                                    metadata_entry_to_append_to       = FixedArray_Make(&metadata_entries, 1);
+                                    metadata_entry_to_append_to->type = metadata_link->value.type;
+                                    metadata_entry_to_append_to->name = metadata_link->value.name;
                                 }
 
                                 CPPDeclToMetaValue decl_to_val = {};
                                 decl_to_val.cpp_decl       = StringLiteral(link->value.str, link->value.len);
-                                decl_to_val.value          = inspect_entry.value;
+                                decl_to_val.value          = metadata_link->value.default_value;
                                 FixedArray_Add(&metadata_entry_to_append_to->cpp_decl_to_val, decl_to_val);
                             }
                         }
 
                         for (MetadataEntry const &metadata : metadata_entries)
                         {
-                            CPPTokeniser_SprintfToFile(&tokeniser,
-                                                       "char const *DqnInspect_%.*sMetadata(%.*s val)\n{\n",
-                                                       metadata.key.len, metadata.key.str,
-                                                       parsed_enum->name.len, parsed_enum->name.str);
-
-                            tokeniser.indent_level++;
-                            DEFER
+                            StringLiteral const char_type = STR_LITERAL("char");
+                            if (metadata.type.len >= char_type.len && strncmp(metadata.type.str, char_type.str, char_type.len) == 0)
                             {
-                                CPPTokeniser_SprintfToFile(&tokeniser, "return nullptr;\n");
-                                tokeniser.indent_level--;
-                                CPPTokeniser_SprintfToFile(&tokeniser, "}\n\n");
-                            };
+                                CPPTokeniser_SprintfToFile(&tokeniser,
+                                                           "%.*s DqnInspectMetadata_%.*s(%.*s val)\n{\n",
+                                                           metadata.type.len, metadata.type.str,
+                                                           metadata.name.len, metadata.name.str,
+                                                           parsed_enum->name.len, parsed_enum->name.str);
 
-                            for (CPPDeclToMetaValue const &decl_to_val : metadata.cpp_decl_to_val)
-                            {
-                                StringLiteral const *cpp_decl = &decl_to_val.cpp_decl;
-                                StringLiteral const *value    = &decl_to_val.value;
+                                tokeniser.indent_level++;
+                                DEFER
+                                {
+                                    CPPTokeniser_SprintfToFile(&tokeniser, "return nullptr;\n");
+                                    tokeniser.indent_level--;
+                                    CPPTokeniser_SprintfToFile(&tokeniser, "}\n\n");
+                                };
 
-                                if (parsed_enum->struct_or_class_decl)
+                                for (CPPDeclToMetaValue const &decl_to_val : metadata.cpp_decl_to_val)
                                 {
-                                    CPPTokeniser_SprintfToFile(&tokeniser,
-                                                               "if (val == %.*s::%.*s) ",
-                                                               parsed_enum->name.len, parsed_enum->name.str,
-                                                               cpp_decl->len, cpp_decl->str);
+                                    StringLiteral const *cpp_decl = &decl_to_val.cpp_decl;
+                                    StringLiteral const *value    = &decl_to_val.value;
+
+                                    if (parsed_enum->struct_or_class_decl)
+                                    {
+                                        CPPTokeniser_SprintfToFile(&tokeniser,
+                                                                   "if (val == %.*s::%.*s) ",
+                                                                   parsed_enum->name.len, parsed_enum->name.str,
+                                                                   cpp_decl->len, cpp_decl->str);
+                                    }
+                                    else
+                                    {
+                                        CPPTokeniser_SprintfToFile(&tokeniser,
+                                                                   "if (val == %.*s) ",
+                                                                   cpp_decl->len, cpp_decl->str);
+                                    }
+                                    CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "{ return %.*s; }\n", value->len, value->str);
                                 }
-                                else
-                                {
-                                    CPPTokeniser_SprintfToFile(&tokeniser,
-                                                               "if (val == %.*s) ",
-                                                               cpp_decl->len, cpp_decl->str);
-                                }
-                                CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "return \"%.*s\";\n", value->len, value->str);
                             }
+                            else
+                            {
+                                CPPTokeniser_SprintfToFile(&tokeniser,
+                                                           "bool DqnInspectMetadata_%.*s(%.*s val, %.*s *value)\n{\n",
+                                                           metadata.name.len, metadata.name.str,
+                                                           parsed_enum->name.len, parsed_enum->name.str,
+                                                           metadata.type.len, metadata.type.str
+                                                           );
+
+                                tokeniser.indent_level++;
+                                DEFER
+                                {
+                                    CPPTokeniser_SprintfToFile(&tokeniser, "return false;\n");
+                                    tokeniser.indent_level--;
+                                    CPPTokeniser_SprintfToFile(&tokeniser, "}\n\n");
+                                };
+
+                                for (CPPDeclToMetaValue const &decl_to_val : metadata.cpp_decl_to_val)
+                                {
+                                    StringLiteral const *cpp_decl = &decl_to_val.cpp_decl;
+                                    StringLiteral const *value    = &decl_to_val.value;
+
+                                    if (parsed_enum->struct_or_class_decl)
+                                    {
+                                        CPPTokeniser_SprintfToFile(&tokeniser,
+                                                                   "if (val == %.*s::%.*s) ",
+                                                                   parsed_enum->name.len, parsed_enum->name.str,
+                                                                   cpp_decl->len, cpp_decl->str);
+                                    }
+                                    else
+                                    {
+                                        CPPTokeniser_SprintfToFile(&tokeniser,
+                                                                   "if (val == %.*s) ",
+                                                                   cpp_decl->len, cpp_decl->str);
+                                    }
+                                    CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "{ *value = %.*s; return true; }\n", value->len, value->str);
+                                }
+                            }
+
                         }
                     }
                 }
@@ -1804,6 +1679,7 @@ int main(int argc, char *argv[])
                     //
                     // NOTE: Write DqnInspect_StructMemberMetadata Definition
                     //
+#if 0
                     for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
                     {
                         CPPVariableDecl const *decl = &member->value;
@@ -1837,6 +1713,7 @@ int main(int argc, char *argv[])
                         tokeniser.indent_level--;
                         CPPTokeniser_SprintfToFile(&tokeniser, "};\n\n");
                     }
+#endif
 
                     //
                     // Write DqnInspect_StructMembers Definition
@@ -1859,8 +1736,10 @@ int main(int argc, char *argv[])
                             else
                                 CPPTokeniser_SprintfToFile(&tokeniser, "STR_AND_LEN(\"%.*s\"), // template_expr\n", decl->template_expr.len, decl->template_expr.str);
 
+#if 0
                             if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(&tokeniser, "nullptr, 0, // metadata and metadata_len\n");
                             else                                 CPPTokeniser_SprintfToFile(&tokeniser, "DqnInspect_%.*s_%.*s_StructMemberMetadata, %d,\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str, member->metadata_array.len);
+#endif
                             CPPTokeniser_SprintfToFile(&tokeniser, "%d // array_dimensions\n", decl->array_dimensions);
 
                             tokeniser.indent_level--;
@@ -1925,6 +1804,7 @@ int main(int argc, char *argv[])
                     {
                         // TODO(doyle): HACK. We should parse ptrs into the CPPVariableDecl, fixed size arrays into the name and const-ness into the type
                         CPPVariableDecl *decl = &param_link->value;
+#if 0
                         StringLiteral *type   = &decl->type;
                         char *type_end        = (decl->template_expr.len > 0)
                                                    ? decl->template_expr.str + decl->template_expr.len + 1 // +1 for the ending ">" on the template
@@ -1938,13 +1818,13 @@ int main(int argc, char *argv[])
                             char *name_end   = name->str + name->len;
                             hack_decl_name   = StringLiteral(name_start, static_cast<int>(name_end - name_start));
                         }
-
-                        CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "%.*s", type->len, type->str);
+#endif
+                        CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "%.*s", decl->type.len, decl->type.str);
                         if (decl->template_expr.len > 0)
                             CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "<%.*s>", decl->template_expr.len, decl->template_expr.str);
 
-                        if (hack_decl_name.len > 0)
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, " %.*s", hack_decl_name.len, hack_decl_name.str);
+                        if (decl->name.len > 0)
+                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, " %.*s", decl->name.len, decl->name.str);
 
                         if (decl->default_value.len > 0)
                             CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, " = %.*s", decl->default_value.len, decl->default_value.str);
