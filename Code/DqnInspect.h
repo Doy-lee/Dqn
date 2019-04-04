@@ -49,52 +49,39 @@
 #define DQN_INSPECT_META(...)
 #define DQN_INSPECT_GENERATE_PROTOTYPE(...)
 
-enum DqnInspect_StructMemberMetadataType { String, Int, Float };
-
-struct DqnInspect_StructMemberMetadata
+struct DqnInspectMetadata
 {
-    DqnInspect_StructMemberMetadataType type;
-    char const *key;
-    int         key_len;
-    char const *val_str;     // Metadata value is always inspected to a string
-    int         val_str_len;
-
-    // TODO(doyle): Implement
-    union
-    {
-        int   int_val;
-        float flt_val;
-    };
+    enum DqnInspectMetaType meta_type;
+    enum DqnInspectDeclType decl_type;
+    void const             *data;
 };
 
-struct DqnInspect_StructMember
+struct DqnInspectMember
 {
-    char const *type;
-    int         type_len;
-    char const *name;
-    int         name_len;
-    char const *template_expr;
-    int         template_expr_len;
+    enum DqnInspectMemberType type_enum;
+    char const *              type;
+    int                       type_len;
+    char const *              name;
+    int                       name_len;
+    char const *              template_expr;
+    int                       template_expr_len;
+    int                       array_dimensions; // > 0 means array
 
-#if 0 // TODO(doyle): Broken
-    DqnInspect_StructMemberMetadata const *metadata;
-    int                                    metadata_len;
-#endif
-
-    int         array_dimensions; // > 0 means array
+    DqnInspectMetadata const *metadata;
+    int                       metadata_len;
 };
 
-struct DqnInspect_Struct
+struct DqnInspectStruct
 {
-    char const                    *name;
-    int                            name_len;
-    DqnInspect_StructMember const *members;
-    int                            members_len;
+    char const             *name;
+    int                     name_len;
+    DqnInspectMember const *members;
+    int                     members_len;
 };
 
 // NOTE(doyle): For compiler testing
-#include "../Data/DqnInspect_TestData.h"
-#include "../Data/DqnInspect_TestDataGenerated.cpp"
+// #include "../Data/DqnInspect_TestData.h"
+// #include "../Data/DqnInspect_TestDataGenerated.cpp"
 
 #ifdef DQN_INSPECT_EXECUTABLE_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
@@ -105,7 +92,11 @@ struct DqnInspect_Struct
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+
 #include <vector>
+#include <set>
+
+static const int SPACES_PER_INDENT = 4;
 
 using usize = size_t;
 using isize = ptrdiff_t;
@@ -128,14 +119,31 @@ struct DeferHelper
     Defer<Lambda> operator+(Lambda lambda) { return Defer<Lambda>(lambda); }
 };
 
-#define STR_LITERAL(str) {str, CHAR_COUNT(str)}
-struct StringLiteral
+#define SLICE_LITERAL(str) Slice<char const>{str, CHAR_COUNT(str)}
+template <typename T>
+struct Slice
 {
-    StringLiteral() = default;
-    StringLiteral(char *string, int string_len) : str(string) , len(string_len) { }
-    char *str;
+    Slice() = default;
+    Slice(T *str, int len) : str(str) , len(len) { }
+    T    *str;
     int   len;
+
+    bool operator<(Slice const &rhs) const
+    {
+        if (this->len == rhs.len)
+            return (memcmp(this->str, rhs.str, this->len) < 0);
+        return this->len < rhs.len;
+    }
 };
+
+template <typename T>
+b32 Slice_Cmp(T const a, T const b)
+{
+    if (a.len != b.len)
+        return false;
+    b32 result = (memcmp(a.str, b.str, a.len) == 0);
+    return result;
+}
 
 template <typename T>
 struct LinkedList
@@ -284,7 +292,7 @@ char const *StrSkipWhitespace(char const *src)
 char const *StrSkipToNextWordInplace(char const **src) { *src = StrSkipToNextWord(*src); return *src; }
 char const *StrSkipWhitespaceInplace(char const **src) { *src = StrSkipWhitespace(*src); return *src; }
 
-char *StrFind(StringLiteral src, StringLiteral find)
+char *StrFind(Slice<char> src, Slice<char const> find)
 {
   char *buf_ptr = src.str;
   char *buf_end = buf_ptr + src.len;
@@ -304,11 +312,52 @@ char *StrFind(StringLiteral src, StringLiteral find)
   return result;
 }
 
-b32 StrCmp(StringLiteral a, StringLiteral b)
+Slice<char> RemoveConsecutiveSpaces(Slice<char> input)
 {
-    if (a.len != b.len)
-        return false;
-    b32 result = (memcmp(a.str, b.str, a.len) == 0);
+    Slice<char> result = input;
+    for (size_t i = 0; i < (result.len - 1); ++i)
+    {
+        char curr = result.str[i];
+        char next = result.str[i + 1];
+        if (curr == ' ' && next == ' ')
+        {
+            char const *end    = result.str + result.len;
+            char const *str    = (result.str + (i + 1));
+            int bytes_to_shift = static_cast<int>(end - str);
+            memcpy(result.str + i, str, bytes_to_shift);
+            --result.len;
+            --i;
+        }
+    }
+
+    return result;
+}
+
+Slice<char> TrimSpaceAround(Slice<char> const input)
+{
+    Slice<char> result = input;
+    while (result.str[0] == ' ' && result.len > 0)
+    {
+        ++result.str;
+        --result.len;
+    }
+
+    while (result.len > 0 && result.str[result.len - 1] == ' ')
+        --result.len;
+
+    return result;
+}
+
+Slice<char> Asprintf(MemArena *arena, char const *fmt, ...)
+{
+    va_list va;
+    va_start(va, fmt);
+    Slice<char> result         = {};
+    result.len                 = vsnprintf(nullptr, 0, fmt, va) + 1;
+    result.str                 = MEM_ARENA_ALLOC_ARRAY(arena, char, result.len);
+    vsnprintf(result.str, result.len, fmt, va);
+    result.str[result.len - 1] = 0;
+    va_end(va);
     return result;
 }
 
@@ -364,11 +413,13 @@ struct CPPToken
 
 struct CPPVariableDecl
 {
-    StringLiteral type;
-    StringLiteral name;
-    StringLiteral template_expr;
-    int           array_dimensions;
-    StringLiteral default_value;
+    b32         type_has_const;
+    Slice<char> type;
+    Slice<char> name;
+    Slice<char> template_expr;
+    b32         array_has_const;
+    int         array_dimensions;
+    Slice<char> default_value;
 };
 
 template <typename T>
@@ -386,27 +437,25 @@ struct CPPTokeniser
     int        tokens_len;
     int        tokens_max;
 
-    int        spaces_per_indent;
     int        indent_level;
-    FILE      *output_file;
 };
 
-void CPPTokeniser_SprintfToFile(CPPTokeniser *tokeniser, char const *fmt, ...)
+void SprintfToFile(FILE *output_file, int indent_level, char const *fmt, ...)
 {
-    int const num_spaces = tokeniser->spaces_per_indent * tokeniser->indent_level;
-    fprintf(tokeniser->output_file, "%*s", num_spaces, "");
+    int const num_spaces = SPACES_PER_INDENT * indent_level;
+    fprintf(output_file, "%*s", num_spaces, "");
 
     va_list va;
     va_start(va, fmt);
-    vfprintf(tokeniser->output_file, fmt, va);
+    vfprintf(output_file, fmt, va);
     va_end(va);
 }
 
-void CPPTokeniser_SprintfToFileNoIndenting(CPPTokeniser *tokeniser, char const *fmt, ...)
+void SprintfToFileNoIndenting(FILE *output_file, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    vfprintf(tokeniser->output_file, fmt, va);
+    vfprintf(output_file, fmt, va);
     va_end(va);
 }
 
@@ -456,19 +505,6 @@ CPPToken *CPPTokeniser_MakeToken(CPPTokeniser *tokeniser)
     return result;
 }
 
-void CPPTokeniser_SkipToIndentLevel(CPPTokeniser *tokeniser, int indent_level)
-{
-    assert(tokeniser->indent_level >= indent_level);
-    if (tokeniser->indent_level == indent_level) return;
-
-    for (CPPToken token = CPPTokeniser_NextToken(tokeniser);
-         tokeniser->indent_level > indent_level && token.type != CPPTokenType::EndOfStream;
-         )
-    {
-        token = CPPTokeniser_NextToken(tokeniser);
-    }
-}
-
 bool CPPTokeniser_AcceptTokenIfType(CPPTokeniser *tokeniser, CPPTokenType type, CPPToken *token)
 {
     CPPToken check = CPPTokeniser_PeekToken(tokeniser);
@@ -486,9 +522,9 @@ bool CPPTokeniser_AcceptTokenIfType(CPPTokeniser *tokeniser, CPPTokenType type, 
 // CPP Parsing Helpers
 //
 
-b32 IsIdentifierToken(CPPToken token, StringLiteral expect_str)
+b32 IsIdentifierToken(CPPToken token, Slice<char const> expect_str)
 {
-    b32 result = (token.type == CPPTokenType::Identifier) && (StrCmp(StringLiteral(token.str, token.len), expect_str));
+    b32 result = (token.type == CPPTokenType::Identifier) && (Slice_Cmp(Slice<char const>(token.str, token.len), expect_str));
     return result;
 }
 
@@ -538,7 +574,7 @@ b32 ConsumeConstIdentifier(CPPTokeniser *tokeniser, CPPToken *token = nullptr)
     b32 result = false;
     CPPToken last_const_token = {};
     for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
-         IsIdentifierToken(peek_token, STR_LITERAL("const"));
+         IsIdentifierToken(peek_token, SLICE_LITERAL("const"));
          peek_token = CPPTokeniser_PeekToken(tokeniser))
     {
         last_const_token = peek_token;
@@ -600,15 +636,15 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
     CPPDeclLinkedList<CPPVariableDecl> *result        = nullptr;
     CPPDeclLinkedList<CPPVariableDecl> *link_iterator = nullptr;
 
-    CPPToken token = CPPTokeniser_NextToken(tokeniser);
+    b32 type_has_const = ConsumeConstIdentifier(tokeniser);
+    CPPToken token     = CPPTokeniser_NextToken(tokeniser);
     if (token.type != CPPTokenType::Identifier && token.type != CPPTokenType::VarArgs)
         return result;
 
-    ConsumeConstIdentifier(tokeniser);
     CPPToken variable_type = token;
     for (int total_asterisks_count = 0;;)
     {
-        StringLiteral variable_template_expr = {};
+        Slice<char> variable_template_expr = {};
         if (CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::LessThan, &token))
         {
             int template_depth = 1;
@@ -634,8 +670,14 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
 
         CPPToken last_modifier_token = {};
         total_asterisks_count        = ConsumeAsterisks(tokeniser, &last_modifier_token);
+        b32 array_has_const          = false;
         if (ConsumeConstIdentifier(tokeniser, &last_modifier_token))
         {
+            if (type_has_const)
+                array_has_const = true; // Then this const is applying on the pointer type
+            else
+                type_has_const = true;
+
             total_asterisks_count += ConsumeAsterisks(tokeniser, &last_modifier_token);
             ConsumeConstIdentifier(tokeniser, &last_modifier_token);
         }
@@ -656,15 +698,49 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
         *link      = {};
         if (!result) result              = link; // Set result to first linked list entry
         else         link_iterator->next = link;
-        link_iterator = link;
+        auto *prev_link = link_iterator;
+        link_iterator   = link;
 
-        int variable_type_len = variable_type.len;
+        Slice<char> variable_type_str_lit = {variable_type.str, variable_type.len};
         if (last_modifier_token.type != CPPTokenType::EndOfStream)
-            variable_type_len = static_cast<int>(last_modifier_token.str - variable_type.str) + 1;
+        {
+            if (!prev_link)
+            {
+                variable_type_str_lit.len =
+                    static_cast<int>((last_modifier_token.str + (last_modifier_token.len - 1)) - variable_type.str) + 1;
+            }
+            else
+            {
+                CPPTokeniser copy_tokeniser = *tokeniser;
+                CPPTokeniser_RewindToken(&copy_tokeniser);
+                CPPToken rewind_token = CPPTokeniser_PeekToken(&copy_tokeniser);
+                while (rewind_token.type != CPPTokenType::Comma)
+                {
+                    CPPTokeniser_RewindToken(&copy_tokeniser);
+                    rewind_token = CPPTokeniser_PeekToken(&copy_tokeniser);
+                }
 
-        link->value.type             = StringLiteral(variable_type.str, variable_type_len);
-        link->value.name             = StringLiteral(variable_name.str, variable_name.len);
+                Slice<char> comma_to_var_name = {};
+                comma_to_var_name.str         = rewind_token.str + 1;
+                comma_to_var_name.len         = static_cast<int>(variable_name.str - comma_to_var_name.str);
+
+                comma_to_var_name     = TrimSpaceAround(comma_to_var_name);
+                variable_type_str_lit = Asprintf(&global_main_arena,
+                                                 "%.*s %.*s",
+                                                 variable_type.len,
+                                                 variable_type.str,
+                                                 comma_to_var_name.len,
+                                                 comma_to_var_name.str);
+            }
+        }
+        variable_type_str_lit = TrimSpaceAround(variable_type_str_lit);
+        variable_type_str_lit = RemoveConsecutiveSpaces(variable_type_str_lit);
+
+        link->value.type_has_const   = type_has_const;
+        link->value.type             = variable_type_str_lit;
+        link->value.name             = Slice<char>(variable_name.str, variable_name.len);
         link->value.template_expr    = variable_template_expr;
+        link->value.array_has_const  = array_has_const;
         link->value.array_dimensions = total_asterisks_count;
 
         for (token = CPPTokeniser_PeekToken(tokeniser);
@@ -677,10 +753,10 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
                 token = CPPTokeniser_NextToken(tokeniser);
         }
 
-        if (IsIdentifierToken(token, STR_LITERAL("DQN_INSPECT_META")))
+        if (IsIdentifierToken(token, SLICE_LITERAL("DQN_INSPECT_META")))
         {
             link->metadata_list = ParseCPPInspectMeta(tokeniser);
-            token          = CPPTokeniser_PeekToken(tokeniser);
+            token               = CPPTokeniser_PeekToken(tokeniser);
         }
 
         if (token.type == CPPTokenType::Equals)
@@ -698,7 +774,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
                 continue;
 
             char *default_value_end = token.str;
-            link->value.default_value = StringLiteral(default_value_start, static_cast<int>(default_value_end - default_value_start));
+            link->value.default_value = Slice<char>(default_value_start, static_cast<int>(default_value_end - default_value_start));
         }
 
         if (token.type == CPPTokenType::Comma)
@@ -722,7 +798,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
 CPPDeclLinkedList<CPPVariableDecl> *ParseCPPInspectMeta(CPPTokeniser *tokeniser)
 {
     CPPToken token = CPPTokeniser_NextToken(tokeniser);
-    if (!ExpectToken(token, CPPTokenType::Identifier) || !IsIdentifierToken(token, STR_LITERAL("DQN_INSPECT_META")))
+    if (!ExpectToken(token, CPPTokenType::Identifier) || !IsIdentifierToken(token, SLICE_LITERAL("DQN_INSPECT_META")))
         return nullptr;
 
     token = CPPTokeniser_NextToken(tokeniser);
@@ -732,7 +808,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPInspectMeta(CPPTokeniser *tokeniser)
     return result;
 }
 
-enum struct ParsedResultType
+enum struct ParsedCodeType
 {
     Invalid,
     Struct,
@@ -742,28 +818,28 @@ enum struct ParsedResultType
 
 struct ParsedEnum
 {
-    b32                               struct_or_class_decl;
-    StringLiteral                     name;
-    CPPDeclLinkedList<StringLiteral> *members;
+    b32                             struct_or_class_decl;
+    Slice<char>                     name;
+    CPPDeclLinkedList<Slice<char>> *members;
 };
 
 struct ParsedStruct
 {
-    StringLiteral                       name;
+    Slice<char>                       name;
     CPPDeclLinkedList<CPPVariableDecl> *members;
 };
 
 
 struct ParsedFunctionPrototype
 {
-    StringLiteral                       return_type;
-    StringLiteral                       name;
+    Slice<char>                       return_type;
+    Slice<char>                       name;
     CPPDeclLinkedList<CPPVariableDecl> *members;
 };
 
-struct ParsedResult
+struct ParsedCode
 {
-    ParsedResultType type;
+    ParsedCodeType type;
     union
     {
         ParsedEnum              parsed_enum;
@@ -772,16 +848,26 @@ struct ParsedResult
     };
 };
 
+struct ParsingResult
+{
+    std::vector<ParsedCode> code;
+    int                     file_include_contents_hash_define_len;
+    char                   *file_include_contents_hash_define;
+    int                     max_func_return_type_decl_len;
+    int                     max_func_name_decl_len;
+};
+
+
 b32 ParseCPPEnum(CPPTokeniser *tokeniser, ParsedEnum *parsed_enum)
 {
     *parsed_enum = {};
     CPPToken token = CPPTokeniser_NextToken(tokeniser);
-    if (!ExpectToken(token, CPPTokenType::Identifier) || !IsIdentifierToken(token, STR_LITERAL("enum")))
+    if (!ExpectToken(token, CPPTokenType::Identifier) || !IsIdentifierToken(token, SLICE_LITERAL("enum")))
         return false;
 
     token = CPPTokeniser_NextToken(tokeniser);
-    if (IsIdentifierToken(token, STR_LITERAL("class")) ||
-        IsIdentifierToken(token, STR_LITERAL("struct")))
+    if (IsIdentifierToken(token, SLICE_LITERAL("class")) ||
+        IsIdentifierToken(token, SLICE_LITERAL("struct")))
     {
         parsed_enum->struct_or_class_decl = true;
         token                              = CPPTokeniser_NextToken(tokeniser);
@@ -797,24 +883,24 @@ b32 ParseCPPEnum(CPPTokeniser *tokeniser, ParsedEnum *parsed_enum)
     if (!ExpectToken(token, CPPTokenType::LeftBrace))
         return false;
 
-    parsed_enum->name = StringLiteral(enum_name.str, enum_name.len);
+    parsed_enum->name = Slice<char>(enum_name.str, enum_name.len);
     {
-        CPPDeclLinkedList<StringLiteral> *link_iterator = nullptr;
+        CPPDeclLinkedList<Slice<char>> *link_iterator = nullptr;
         for (token       = CPPTokeniser_NextToken(tokeniser);
              tokeniser->indent_level != original_indent_level && token.type != CPPTokenType::EndOfStream;
              token       = CPPTokeniser_NextToken(tokeniser))
         {
             if (token.type == CPPTokenType::Identifier)
             {
-                auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<StringLiteral>);
+                auto *link = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, CPPDeclLinkedList<Slice<char>>);
                 *link      = {};
                 if (!link_iterator) parsed_enum->members = link; // Set members to first linked list entry
-                else                link_iterator->next   = link;
+                else                link_iterator->next  = link;
                 link_iterator = link;
 
-                link->value         = StringLiteral(token.str, token.len);
+                link->value         = Slice<char>(token.str, token.len);
                 CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
-                if (IsIdentifierToken(peek_token, STR_LITERAL("DQN_INSPECT_META")))
+                if (IsIdentifierToken(peek_token, SLICE_LITERAL("DQN_INSPECT_META")))
                 {
                     link->metadata_list = ParseCPPInspectMeta(tokeniser);
                 }
@@ -825,7 +911,7 @@ b32 ParseCPPEnum(CPPTokeniser *tokeniser, ParsedEnum *parsed_enum)
     return true;
 }
 
-b32 ParseCPPVariableType(CPPTokeniser *tokeniser, StringLiteral *type)
+b32 ParseCPPVariableType(CPPTokeniser *tokeniser, Slice<char> *type)
 {
     CPPToken token = CPPTokeniser_NextToken(tokeniser);
     if (!ExpectToken(token, CPPTokenType::Identifier))
@@ -837,7 +923,7 @@ b32 ParseCPPVariableType(CPPTokeniser *tokeniser, StringLiteral *type)
     //
     // Parse Template If Any
     //
-    StringLiteral template_expr = {};
+    Slice<char> template_expr = {};
     {
         CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
         if (peek_token.type == CPPTokenType::LessThan)
@@ -897,7 +983,7 @@ b32 ParseCPPStruct(CPPTokeniser *tokeniser, ParsedStruct *parsed_struct)
     *parsed_struct = {};
     CPPToken token = CPPTokeniser_NextToken(tokeniser);
     if (!ExpectToken(token, CPPTokenType::Identifier) ||
-        (!IsIdentifierToken(token, STR_LITERAL("struct")) && !IsIdentifierToken(token, STR_LITERAL("class"))))
+        (!IsIdentifierToken(token, SLICE_LITERAL("struct")) && !IsIdentifierToken(token, SLICE_LITERAL("class"))))
         return false;
 
     int const original_indent_level = tokeniser->indent_level;
@@ -906,7 +992,7 @@ b32 ParseCPPStruct(CPPTokeniser *tokeniser, ParsedStruct *parsed_struct)
     if (token.type != CPPTokenType::LeftBrace)
     {
         if (!ExpectToken(token, CPPTokenType::Identifier)) return false;
-        parsed_struct->name = StringLiteral(token.str, token.len);
+        parsed_struct->name = Slice<char>(token.str, token.len);
     }
 
     {
@@ -947,8 +1033,8 @@ b32 ParseCPPInspectPrototype(CPPTokeniser *tokeniser, ParsedFunctionPrototype *p
 
     struct FunctionDefaultParam
     {
-        StringLiteral name;
-        StringLiteral value;
+        Slice<char> name;
+        Slice<char> value;
     };
 
     //
@@ -967,7 +1053,7 @@ b32 ParseCPPInspectPrototype(CPPTokeniser *tokeniser, ParsedFunctionPrototype *p
             if (token.type == CPPTokenType::Comma)
                 continue;
 
-            StringLiteral default_param_name = StringLiteral(token.str, token.len);
+            Slice<char> default_param_name = Slice<char>(token.str, token.len);
             if (token.type != CPPTokenType::Identifier)
             {
                 SkipFunctionParam(tokeniser);
@@ -1001,19 +1087,19 @@ b32 ParseCPPInspectPrototype(CPPTokeniser *tokeniser, ParsedFunctionPrototype *p
             link_iterator = link;
 
             link->value.name  = default_param_name;
-            link->value.value = StringLiteral(default_value_start, static_cast<int>(default_value_end - default_value_start));
+            link->value.value = Slice<char>(default_value_start, static_cast<int>(default_value_end - default_value_start));
         }
     }
 
     struct FunctionParam
     {
-        StringLiteral type;
-        StringLiteral name;
+        Slice<char> type;
+        Slice<char> name;
 
          // NOTE(doyle): This is resolved after function parsing, iterate over
          // the default params specified in the macro and match them to the
          // first param that has the same name
-        StringLiteral default_value;
+        Slice<char> default_value;
     };
 
     // Grab return type token
@@ -1037,7 +1123,7 @@ b32 ParseCPPInspectPrototype(CPPTokeniser *tokeniser, ParsedFunctionPrototype *p
 
         if (!ExpectToken(token, CPPTokenType::OpenParen)) return false;
         char *name_end    = token.str;
-        parsed_func->name = StringLiteral(name_start, static_cast<int>(name_end - name_start));
+        parsed_func->name = Slice<char>(name_start, static_cast<int>(name_end - name_start));
     }
 
     token = CPPTokeniser_PeekToken(tokeniser);
@@ -1079,7 +1165,7 @@ b32 ParseCPPInspectPrototype(CPPTokeniser *tokeniser, ParsedFunctionPrototype *p
         for (CPPDeclLinkedList<CPPVariableDecl> *param_link = parsed_func->members; param_link; param_link = param_link->next)
         {
             CPPVariableDecl *decl = &param_link->value;
-            if (StrCmp(decl->name, default_param->name))
+            if (Slice_Cmp(decl->name, default_param->name))
             {
                 decl->default_value = default_param->value;
                 break;
@@ -1251,7 +1337,7 @@ int main(int argc, char *argv[])
                 "Usage: %s [code|generate_prototypes] [<source code filename>, ...]\n"
                 "Options: If ommitted, both modes are run\n"
                 " code                Only generate the inspection data for structs/enums marked with DQN_INSPECT\n"
-                " generate_prototypes Only generate the function prototypes for functions marked with DQN_INSPECT_GENERATE_PROTOTYPE\n",
+                " generate_prototypes Only generate the function prototypes for functions marked with DQN_INSPECT_GENERATE_PROTOTYPE(...)\n",
                 argv[0]);
         return 0;
     }
@@ -1265,7 +1351,7 @@ int main(int argc, char *argv[])
     if (mode != InspectMode::All)
         starting_arg_index++;
 
-    usize main_arena_mem_size = MEGABYTE(2);
+    usize main_arena_mem_size = MEGABYTE(8);
     void *main_arena_mem      = malloc(main_arena_mem_size);
     global_main_arena         = MemArena_Init(main_arena_mem, main_arena_mem_size);
 #if 0
@@ -1274,13 +1360,25 @@ int main(int argc, char *argv[])
     FILE *output_file         = stdout;
 #endif
 
-
     fprintf(output_file,
-            "// This is an auto generated file using Dqn_Inspect\n\n");
+            "// This is an auto generated file using DqnInspect\n\n");
+
+    if (mode == InspectMode::All || mode == InspectMode::Code)
+    {
+        fprintf(output_file,
+                " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
+                "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
+                "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
+                "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
+                "\n"
+                );
+    }
+
+    std::vector<ParsingResult> parsing_results_per_file = {};
+    parsing_results_per_file.reserve(64);
 
     for (usize arg_index = starting_arg_index; arg_index < argc; ++arg_index)
     {
-        MemArenaScopedRegion mem_region = MemArena_MakeScopedRegion(&global_main_arena);
         char *file_name = argv[arg_index];
         FILE *file      = fopen(file_name, "rb");
         fseek(file, 0, SEEK_END);
@@ -1296,9 +1394,9 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        int const file_name_len                   = (int)strlen(file_name);
-        int file_include_contents_hash_define_len = 0;
-        char *file_include_contents_hash_define   = nullptr;
+        ParsingResult parsing_results = {};
+        parsing_results.code.reserve(128);
+        int const file_name_len = (int)strlen(file_name);
         {
             char *extracted_file_name_buf   = static_cast<char *>(MemArena_Alloc(&global_main_arena, file_name_len));
             int extracted_file_name_len     = 0;
@@ -1317,8 +1415,8 @@ int main(int argc, char *argv[])
                 extracted_file_name_buf[i] = ch;
             }
 
-            file_include_contents_hash_define     = extracted_file_name_buf + file_name_len - extracted_file_name_len;
-            file_include_contents_hash_define_len = extracted_file_name_len;
+            parsing_results.file_include_contents_hash_define     = extracted_file_name_buf + file_name_len - extracted_file_name_len;
+            parsing_results.file_include_contents_hash_define_len = extracted_file_name_len;
         }
 
         fprintf(output_file,
@@ -1330,33 +1428,20 @@ int main(int argc, char *argv[])
                 "#define DQN_INSPECT_%.*s\n"
                 "\n",
                 file_name,
-                file_include_contents_hash_define_len,
-                file_include_contents_hash_define,
-                file_include_contents_hash_define_len,
-                file_include_contents_hash_define
+                parsing_results.file_include_contents_hash_define_len,
+                parsing_results.file_include_contents_hash_define,
+                parsing_results.file_include_contents_hash_define_len,
+                parsing_results.file_include_contents_hash_define
                 );
 
-        if (mode == InspectMode::All || mode == InspectMode::Code)
-        {
-            fprintf(output_file,
-                    " // NOTE: These macros are undefined at the end of the file so to not pollute namespace\n"
-                    "#define ARRAY_COUNT(array) sizeof(array)/sizeof((array)[0])\n"
-                    "#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)\n"
-                    "#define STR_AND_LEN(str) str, CHAR_COUNT(str)\n"
-                    "\n"
-                    );
-        }
+        CPPTokeniser tokeniser = {};
+        tokeniser.tokens_max   = 16384;
+        tokeniser.tokens       = MEM_ARENA_ALLOC_ARRAY(&global_main_arena, CPPToken, tokeniser.tokens_max);
 
-        CPPTokeniser tokeniser      = {};
-        tokeniser.spaces_per_indent = 4;
-        tokeniser.output_file       = output_file;
-        tokeniser.tokens_max        = 16384;
-        tokeniser.tokens            = MEM_ARENA_ALLOC_ARRAY(&global_main_arena, CPPToken, tokeniser.tokens_max);
-
-        StringLiteral const INSPECT_PROTOTYPE = STR_LITERAL("DQN_INSPECT_GENERATE_PROTOTYPE");
-        StringLiteral const INSPECT_PREFIX    = STR_LITERAL("DQN_INSPECT");
-        char *file_buf_end                    = file_buf + file_size;
-        StringLiteral buffer                  = StringLiteral(file_buf, static_cast<int>(file_size));
+        Slice<char const> const INSPECT_PROTOTYPE = SLICE_LITERAL("DQN_INSPECT_GENERATE_PROTOTYPE");
+        Slice<char const> const INSPECT_PREFIX    = SLICE_LITERAL("DQN_INSPECT");
+        char *file_buf_end                        = file_buf + file_size;
+        Slice<char> buffer                        = Slice<char>(file_buf, static_cast<int>(file_size));
 
         for (char *ptr = StrFind(buffer, INSPECT_PREFIX);
              ptr;
@@ -1372,7 +1457,7 @@ int main(int argc, char *argv[])
             };
 
             CPPTokenType inspect_type = CPPTokenType::InspectCode;
-            if (StrCmp(StringLiteral(ptr, INSPECT_PROTOTYPE.len), INSPECT_PROTOTYPE))
+            if (Slice_Cmp(Slice<char const>(ptr, INSPECT_PROTOTYPE.len), INSPECT_PROTOTYPE))
             {
                 inspect_type = CPPTokenType::InspectGeneratePrototype;
             }
@@ -1399,16 +1484,13 @@ int main(int argc, char *argv[])
         CPPToken *sentinel = CPPTokeniser_MakeToken(&tokeniser);
         sentinel->type     = CPPTokenType::EndOfStream;
 
-        std::vector<ParsedResult> parsing_results;
-        parsing_results.reserve(1024);
-
         int max_func_return_type_decl_len = 0;
         int max_func_name_decl_len        = 0;
         for (CPPToken token = CPPTokeniser_PeekToken(&tokeniser);
              ;
              token          = CPPTokeniser_PeekToken(&tokeniser))
         {
-            ParsedResult parse_result = {};
+            ParsedCode parsed_code = {};
             if (token.type == CPPTokenType::InspectCode || token.type == CPPTokenType::InspectGeneratePrototype)
             {
                 if (token.type == CPPTokenType::InspectCode)
@@ -1416,24 +1498,24 @@ int main(int argc, char *argv[])
                     token = CPPTokeniser_NextToken(&tokeniser);
                     token = CPPTokeniser_PeekToken(&tokeniser);
 
-                    if (IsIdentifierToken(token, STR_LITERAL("enum")))
+                    if (IsIdentifierToken(token, SLICE_LITERAL("enum")))
                     {
-                        if (ParseCPPEnum(&tokeniser, &parse_result.parsed_enum))
-                            parse_result.type = ParsedResultType::Enum;
+                        if (ParseCPPEnum(&tokeniser, &parsed_code.parsed_enum))
+                            parsed_code.type = ParsedCodeType::Enum;
                     }
-                    else if (IsIdentifierToken(token, STR_LITERAL("struct")) || IsIdentifierToken(token, STR_LITERAL("class")))
+                    else if (IsIdentifierToken(token, SLICE_LITERAL("struct")) || IsIdentifierToken(token, SLICE_LITERAL("class")))
                     {
-                        if (ParseCPPStruct(&tokeniser, &parse_result.parsed_struct))
-                            parse_result.type = ParsedResultType::Struct;
+                        if (ParseCPPStruct(&tokeniser, &parsed_code.parsed_struct))
+                            parsed_code.type = ParsedCodeType::Struct;
                     }
                 }
                 else
                 {
-                    if (ParseCPPInspectPrototype(&tokeniser, &parse_result.parsed_func_prototype))
+                    if (ParseCPPInspectPrototype(&tokeniser, &parsed_code.parsed_func_prototype))
                     {
-                        parse_result.type = ParsedResultType::FunctionPrototype;
-                        max_func_return_type_decl_len = INSPECT_MAX(max_func_return_type_decl_len, parse_result.parsed_func_prototype.return_type.len);
-                        max_func_name_decl_len        = INSPECT_MAX(max_func_name_decl_len, parse_result.parsed_func_prototype.name.len);
+                        parsed_code.type = ParsedCodeType::FunctionPrototype;
+                        parsing_results.max_func_return_type_decl_len = INSPECT_MAX(max_func_return_type_decl_len, parsed_code.parsed_func_prototype.return_type.len);
+                        parsing_results.max_func_name_decl_len        = INSPECT_MAX(max_func_name_decl_len, parsed_code.parsed_func_prototype.name.len);
                     }
                 }
             }
@@ -1442,53 +1524,198 @@ int main(int argc, char *argv[])
                 token = CPPTokeniser_NextToken(&tokeniser);
             }
 
-            if (parse_result.type != ParsedResultType::Invalid)
-                parsing_results.push_back(parse_result);
+            if (parsed_code.type != ParsedCodeType::Invalid)
+                parsing_results.code.push_back(parsed_code);
 
             if (token.type == CPPTokenType::EndOfStream)
                 break;
         }
+        parsing_results_per_file.push_back(std::move(parsing_results));
+    }
 
-        for (ParsedResult &parser : parsing_results)
+    //
+    // NOTE: Build the global definition table
+    //
+    int indent_level = 0;
+    SprintfToFile(output_file, indent_level, "enum struct DqnInspectMemberType\n{\n");
+    indent_level++;
+    for (ParsingResult &parsing_results : parsing_results_per_file)
+    {
+        for (ParsedCode &code : parsing_results.code)
         {
-            switch(parser.type)
+            switch(code.type)
             {
-                case ParsedResultType::Enum:
+                case ParsedCodeType::Enum:
                 {
-                    ParsedEnum const *parsed_enum = &parser.parsed_enum;
+                    ParsedEnum const *parsed_enum = &code.parsed_enum;
+                    SprintfToFile(output_file, indent_level, "%.*s,\n", parsed_enum->name.len, parsed_enum->name.str);
+                    for (CPPDeclLinkedList<Slice<char>> const *link = parsed_enum->members;
+                         link;
+                         link = link->next)
+                    {
+                        SprintfToFile(output_file, indent_level,
+                                      "%.*s_%.*s,\n",
+                                      parsed_enum->name.len, parsed_enum->name.str,
+                                      link->value.len, link->value.str
+                                      );
+                    }
+
+                }
+                break;
+
+                case ParsedCodeType::Struct:
+                {
+                    ParsedStruct const *parsed_struct = &code.parsed_struct;
+                    SprintfToFile(output_file, indent_level, "%.*s,\n", parsed_struct->name.len, parsed_struct->name.str);
+                    for (CPPDeclLinkedList<CPPVariableDecl> const *link = parsed_struct->members;
+                         link;
+                         link = link->next)
+                    {
+                        SprintfToFile(output_file, indent_level,
+                                      "%.*s_%.*s,\n",
+                                      parsed_struct->name.len, parsed_struct->name.str,
+                                      link->value.name.len, link->value.name.str
+                                      );
+                    }
+                }
+                break;
+            }
+        }
+    }
+    indent_level--;
+    SprintfToFile(output_file, indent_level, "};\n\n");
+
+    //
+    // NOTE: Build the global type table
+    //
+    {
+        std::set<Slice<char>> unique_decl_type_table;
+        for (ParsingResult &parsing_results : parsing_results_per_file)
+        {
+            for (ParsedCode &code : parsing_results.code)
+            {
+                switch(code.type)
+                {
+                    case ParsedCodeType::Enum:
+                    {
+                        ParsedEnum const *parsed_enum = &code.parsed_enum;
+                        unique_decl_type_table.insert(parsed_enum->name);
+                    }
+                    break;
+
+                    case ParsedCodeType::Struct:
+                    {
+                        ParsedStruct const *parsed_struct = &code.parsed_struct;
+                        unique_decl_type_table.insert(parsed_struct->name);
+
+                        for (CPPDeclLinkedList<CPPVariableDecl> const *link = parsed_struct->members;
+                             link;
+                             link = link->next)
+                        {
+                            CPPVariableDecl const *decl = &link->value;
+                            Slice<char> type_name       = {};
+                            if (decl->template_expr.len > 0)
+                                type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", decl->type.len, decl->type.str, decl->template_expr.len, decl->template_expr.str);
+                            else
+                                type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
+
+                            unique_decl_type_table.insert(type_name);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        SprintfToFile(output_file, indent_level, "enum struct DqnInspectDeclType\n{\n");
+        indent_level++;
+        for(Slice<char> const &type : unique_decl_type_table )
+            SprintfToFile(output_file, indent_level, "%.*s,\n", type.len, type.str);
+        indent_level--;
+        SprintfToFile(output_file, indent_level, "};\n\n");
+    }
+
+    //
+    // NOTE: Build the global metadata type table
+    //
+    {
+        std::set<Slice<char>> unique_meta_types;
+        for (ParsingResult &parsing_results : parsing_results_per_file)
+        {
+            for (ParsedCode &code : parsing_results.code)
+            {
+                switch(code.type)
+                {
+                    case ParsedCodeType::Struct:
+                    {
+                        ParsedStruct const *parsed_struct = &code.parsed_struct;
+                        for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
+                        {
+                            for (CPPDeclLinkedList<CPPVariableDecl> const *metadata_link = member->metadata_list;
+                                 metadata_link;
+                                 metadata_link = metadata_link->next)
+                            {
+                                CPPVariableDecl const *metadata = &metadata_link->value;
+                                unique_meta_types.insert(metadata->name);
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        SprintfToFile(output_file, indent_level, "enum struct DqnInspectMetaType\n{\n");
+        indent_level++;
+        for (Slice<char> const &metadata : unique_meta_types)
+            SprintfToFile(output_file, indent_level, "%.*s,\n", metadata.len, metadata.str);
+        indent_level--;
+        SprintfToFile(output_file, indent_level, "};\n\n");
+    }
+
+    assert(indent_level == 0);
+    for (ParsingResult &parsing_results : parsing_results_per_file)
+    {
+        for (ParsedCode &code : parsing_results.code)
+        {
+            switch(code.type)
+            {
+                case ParsedCodeType::Enum:
+                {
+                    ParsedEnum const *parsed_enum = &code.parsed_enum;
                     //
                     // NOTE: Write Stringified Enum Array
                     //
                     {
-                        CPPTokeniser_SprintfToFile(&tokeniser, "char const *DqnInspect_%.*s_Strings[] = {", parsed_enum->name.len, parsed_enum->name.str);
-                        tokeniser.indent_level++;
-                        for (CPPDeclLinkedList<StringLiteral> const *link = parsed_enum->members; link; link = link->next)
+                        SprintfToFile(output_file, indent_level, "char const *DqnInspect_%.*s_Strings[] = {", parsed_enum->name.len, parsed_enum->name.str);
+                        indent_level++;
+                        for (CPPDeclLinkedList<Slice<char>> const *link = parsed_enum->members; link; link = link->next)
                         {
-                            StringLiteral const enum_value = link->value;
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "\"%.*s\", ", enum_value.len, enum_value.str);
+                            Slice<char> const enum_value = link->value;
+                            SprintfToFileNoIndenting(output_file, "\"%.*s\", ", enum_value.len, enum_value.str);
                         }
 
-                        tokeniser.indent_level--;
-                        CPPTokeniser_SprintfToFile(&tokeniser, "};\n\n");
+                        indent_level--;
+                        SprintfToFile(output_file, indent_level, "};\n\n");
                     }
 
                     //
                     // Write InspectEnumString Function
                     //
                     {
-                        CPPTokeniser_SprintfToFile(&tokeniser, "char const *DqnInspectEnum_Stringify(%.*s val, int *len = nullptr)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
-                        tokeniser.indent_level++;
+                        SprintfToFile(output_file, indent_level, "char const *DqnInspectEnum_Stringify(%.*s val, int *len = nullptr)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
+                        indent_level++;
                         DEFER
                         {
-                            CPPTokeniser_SprintfToFile(&tokeniser, "return nullptr;\n");
-                            tokeniser.indent_level--;
-                            CPPTokeniser_SprintfToFile(&tokeniser, "}\n\n");
+                            SprintfToFile(output_file, indent_level, "return nullptr;\n");
+                            indent_level--;
+                            SprintfToFile(output_file, indent_level, "}\n\n");
                         };
 
                         struct SourceCode
                         {
-                            StringLiteral decl;
-                            StringLiteral enum_value;
+                            Slice<char> decl;
+                            Slice<char> enum_value;
                         };
 
                         LinkedList<SourceCode> src_code = {};
@@ -1496,7 +1723,7 @@ int main(int argc, char *argv[])
                         {
                             LinkedList<SourceCode> *curr_src_code = nullptr;
                             char const *fmt = (parsed_enum->struct_or_class_decl) ? "if (val == %.*s::%.*s) " : "if (val == %.*s) ";
-                            for (CPPDeclLinkedList<StringLiteral> *link = parsed_enum->members; link; link = link->next)
+                            for (CPPDeclLinkedList<Slice<char>> *link = parsed_enum->members; link; link = link->next)
                             {
                                 if (!curr_src_code) curr_src_code = &src_code;
                                 else
@@ -1505,7 +1732,7 @@ int main(int argc, char *argv[])
                                     curr_src_code       = curr_src_code->next;
                                 }
 
-                                StringLiteral enum_value = link->value;
+                                Slice<char> enum_value = link->value;
                                 int required_len         = 0;
 
                                 if (parsed_enum->struct_or_class_decl) required_len = snprintf(nullptr, 0, fmt, parsed_enum->name.len, parsed_enum->name.str, enum_value.len, enum_value.str) + 1;
@@ -1527,37 +1754,37 @@ int main(int argc, char *argv[])
                              src_code_ptr;
                              src_code_ptr = src_code_ptr->next, ++enum_index)
                         {
-                            StringLiteral enum_value = src_code_ptr->value.enum_value;
+                            Slice<char> enum_value = src_code_ptr->value.enum_value;
                             int padding              = longest_decl_len - src_code_ptr->value.decl.len;
-                            CPPTokeniser_SprintfToFile(&tokeniser, "%.*s%*s", src_code_ptr->value.decl.len, src_code_ptr->value.decl.str, padding, "");
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser,
-                                                                  "{ if (len) *len = CHAR_COUNT(\"%.*s\"); return DqnInspect_%.*s_Strings[%d]; }\n",
-                                                                  enum_value.len, enum_value.str,
-                                                                  parsed_enum->name.len, parsed_enum->name.str,
-                                                                  enum_index);
+                            SprintfToFile(output_file, indent_level, "%.*s%*s", src_code_ptr->value.decl.len, src_code_ptr->value.decl.str, padding, "");
+                            SprintfToFileNoIndenting(output_file,
+                                                     "{ if (len) *len = CHAR_COUNT(\"%.*s\"); return DqnInspect_%.*s_Strings[%d]; }\n",
+                                                     enum_value.len, enum_value.str,
+                                                     parsed_enum->name.len, parsed_enum->name.str,
+                                                     enum_index);
                         }
                     }
 
                     //
-                    // Write User Annotated Metadata Getter Functions
+                    // NOTE: Write User Annotated Metadata Getter Functions
                     //
                     {
                         struct CPPDeclToMetaValue
                         {
-                            StringLiteral cpp_decl;
-                            StringLiteral value;
+                            Slice<char> cpp_decl;
+                            Slice<char> value;
                         };
 
                         // i.e. DataType cpp_decl DQN_INSPECT_META(type1 name1 = value, type2 name2 = value2, ...);
                         struct MetadataEntry
                         {
-                            StringLiteral type;
-                            StringLiteral name;
+                            Slice<char> type;
+                            Slice<char> name;
                             FixedArray<CPPDeclToMetaValue, 32> cpp_decl_to_val;
                         };
 
                         FixedArray<MetadataEntry, 32> metadata_entries = {};
-                        for (CPPDeclLinkedList<StringLiteral> *link = parsed_enum->members;
+                        for (CPPDeclLinkedList<Slice<char>> *link = parsed_enum->members;
                              link;
                              link = link->next)
                         {
@@ -1568,7 +1795,7 @@ int main(int argc, char *argv[])
                                 MetadataEntry *metadata_entry_to_append_to = nullptr;
                                 for (MetadataEntry &check_metadata_entry : metadata_entries)
                                 {
-                                    if (StrCmp(check_metadata_entry.type, metadata_link->value.type) && StrCmp(check_metadata_entry.name, metadata_link->value.name))
+                                    if (Slice_Cmp(check_metadata_entry.type, metadata_link->value.type) && Slice_Cmp(check_metadata_entry.name, metadata_link->value.name))
                                     {
                                         metadata_entry_to_append_to = &check_metadata_entry;
                                         break;
@@ -1583,7 +1810,7 @@ int main(int argc, char *argv[])
                                 }
 
                                 CPPDeclToMetaValue decl_to_val = {};
-                                decl_to_val.cpp_decl       = StringLiteral(link->value.str, link->value.len);
+                                decl_to_val.cpp_decl       = Slice<char>(link->value.str, link->value.len);
                                 decl_to_val.value          = metadata_link->value.default_value;
                                 FixedArray_Add(&metadata_entry_to_append_to->cpp_decl_to_val, decl_to_val);
                             }
@@ -1591,80 +1818,80 @@ int main(int argc, char *argv[])
 
                         for (MetadataEntry const &metadata : metadata_entries)
                         {
-                            StringLiteral const char_type = STR_LITERAL("char");
+                            Slice<char const> const char_type = SLICE_LITERAL("char");
                             if (metadata.type.len >= char_type.len && strncmp(metadata.type.str, char_type.str, char_type.len) == 0)
                             {
-                                CPPTokeniser_SprintfToFile(&tokeniser,
-                                                           "%.*s DqnInspectMetadata_%.*s(%.*s val)\n{\n",
-                                                           metadata.type.len, metadata.type.str,
-                                                           metadata.name.len, metadata.name.str,
-                                                           parsed_enum->name.len, parsed_enum->name.str);
+                                SprintfToFile(output_file, indent_level,
+                                              "%.*s DqnInspectMetadata_%.*s(%.*s val)\n{\n",
+                                              metadata.type.len, metadata.type.str,
+                                              metadata.name.len, metadata.name.str,
+                                              parsed_enum->name.len, parsed_enum->name.str);
 
-                                tokeniser.indent_level++;
+                                indent_level++;
                                 DEFER
                                 {
-                                    CPPTokeniser_SprintfToFile(&tokeniser, "return nullptr;\n");
-                                    tokeniser.indent_level--;
-                                    CPPTokeniser_SprintfToFile(&tokeniser, "}\n\n");
+                                    SprintfToFile(output_file, indent_level, "return nullptr;\n");
+                                    indent_level--;
+                                    SprintfToFile(output_file, indent_level, "}\n\n");
                                 };
 
                                 for (CPPDeclToMetaValue const &decl_to_val : metadata.cpp_decl_to_val)
                                 {
-                                    StringLiteral const *cpp_decl = &decl_to_val.cpp_decl;
-                                    StringLiteral const *value    = &decl_to_val.value;
+                                    Slice<char> const *cpp_decl = &decl_to_val.cpp_decl;
+                                    Slice<char> const *value    = &decl_to_val.value;
 
                                     if (parsed_enum->struct_or_class_decl)
                                     {
-                                        CPPTokeniser_SprintfToFile(&tokeniser,
+                                        SprintfToFile(output_file, indent_level,
                                                                    "if (val == %.*s::%.*s) ",
                                                                    parsed_enum->name.len, parsed_enum->name.str,
                                                                    cpp_decl->len, cpp_decl->str);
                                     }
                                     else
                                     {
-                                        CPPTokeniser_SprintfToFile(&tokeniser,
+                                        SprintfToFile(output_file, indent_level,
                                                                    "if (val == %.*s) ",
                                                                    cpp_decl->len, cpp_decl->str);
                                     }
-                                    CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "{ return %.*s; }\n", value->len, value->str);
+                                    SprintfToFileNoIndenting(output_file, "{ return %.*s; }\n", value->len, value->str);
                                 }
                             }
                             else
                             {
-                                CPPTokeniser_SprintfToFile(&tokeniser,
+                                SprintfToFile(output_file, indent_level,
                                                            "bool DqnInspectMetadata_%.*s(%.*s val, %.*s *value)\n{\n",
                                                            metadata.name.len, metadata.name.str,
                                                            parsed_enum->name.len, parsed_enum->name.str,
                                                            metadata.type.len, metadata.type.str
                                                            );
 
-                                tokeniser.indent_level++;
+                                indent_level++;
                                 DEFER
                                 {
-                                    CPPTokeniser_SprintfToFile(&tokeniser, "return false;\n");
-                                    tokeniser.indent_level--;
-                                    CPPTokeniser_SprintfToFile(&tokeniser, "}\n\n");
+                                    SprintfToFile(output_file, indent_level, "return false;\n");
+                                    indent_level--;
+                                    SprintfToFile(output_file, indent_level, "}\n\n");
                                 };
 
                                 for (CPPDeclToMetaValue const &decl_to_val : metadata.cpp_decl_to_val)
                                 {
-                                    StringLiteral const *cpp_decl = &decl_to_val.cpp_decl;
-                                    StringLiteral const *value    = &decl_to_val.value;
+                                    Slice<char> const *cpp_decl = &decl_to_val.cpp_decl;
+                                    Slice<char> const *value    = &decl_to_val.value;
 
                                     if (parsed_enum->struct_or_class_decl)
                                     {
-                                        CPPTokeniser_SprintfToFile(&tokeniser,
+                                        SprintfToFile(output_file, indent_level,
                                                                    "if (val == %.*s::%.*s) ",
                                                                    parsed_enum->name.len, parsed_enum->name.str,
                                                                    cpp_decl->len, cpp_decl->str);
                                     }
                                     else
                                     {
-                                        CPPTokeniser_SprintfToFile(&tokeniser,
+                                        SprintfToFile(output_file, indent_level,
                                                                    "if (val == %.*s) ",
                                                                    cpp_decl->len, cpp_decl->str);
                                     }
-                                    CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "{ *value = %.*s; return true; }\n", value->len, value->str);
+                                    SprintfToFileNoIndenting(output_file, "{ *value = %.*s; return true; }\n", value->len, value->str);
                                 }
                             }
 
@@ -1673,131 +1900,162 @@ int main(int argc, char *argv[])
                 }
                 break;
 
-                case ParsedResultType::Struct:
+                case ParsedCodeType::Struct:
                 {
-                    ParsedStruct const *parsed_struct = &parser.parsed_struct;
+                    ParsedStruct const *parsed_struct = &code.parsed_struct;
                     //
-                    // NOTE: Write DqnInspect_StructMemberMetadata Definition
+                    // NOTE: Write Metadata Global Variables
                     //
-#if 0
                     for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
                     {
                         CPPVariableDecl const *decl = &member->value;
-                        if (member->metadata_array.len <= 0)
+                        for (CPPDeclLinkedList<CPPVariableDecl> const *metadata_link = member->metadata_list;
+                             metadata_link;
+                             metadata_link = metadata_link->next)
+                        {
+                            CPPVariableDecl const *metadata = &metadata_link->value;
+                            SprintfToFile(output_file, indent_level,
+                                          "%.*s DqnInspectMetadata_%.*s_%.*s_%.*s = %.*s;\n",
+                                          metadata->type.len, metadata->type.str,
+                                          parsed_struct->name.len, parsed_struct->name.str,
+                                          decl->name.len, decl->name.str,
+                                          metadata->name.len, metadata->name.str,
+                                          metadata->default_value.len, metadata->default_value.str
+                                          );
+                        }
+                    }
+                    SprintfToFile(output_file, indent_level, "\n");
+
+                    //
+                    // NOTE: Write metadata variants for each member
+                    //
+                    for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
+                    {
+                        CPPVariableDecl const *decl = &member->value;
+
+                        if (!member->metadata_list)
                             continue;
 
-                        CPPTokeniser_SprintfToFile(
-                            &tokeniser,
-                            "DqnInspect_StructMemberMetadata const DqnInspect_%.*s_%.*s_StructMemberMetadata[] =\n{\n",
-                            parsed_struct->name.len,
-                            parsed_struct->name.str,
-                            decl->name.len,
-                            decl->name.str);
+                        SprintfToFile(output_file, indent_level,
+                                      "DqnInspectMetadata const DqnInspectMetadata_%.*s_%.*s[] =\n{\n",
+                                      parsed_struct->name.len, parsed_struct->name.str,
+                                      decl->name.len, decl->name.str
+                                      );
 
-                        tokeniser.indent_level++;
-                        for (CPPInspectMetadataEntry const &entry : member->metadata_array)
+                        indent_level++;
+                        for (CPPDeclLinkedList<CPPVariableDecl> const *metadata_link = member->metadata_list;
+                             metadata_link;
+                             metadata_link = metadata_link->next)
                         {
-                            CPPTokeniser_SprintfToFile(&tokeniser, "{\n");
-                            tokeniser.indent_level++;
-                            CPPTokeniser_SprintfToFile(&tokeniser, "DqnInspect_StructMemberMetadataType::String,\n");
+                            CPPVariableDecl const *metadata = &metadata_link->value;
+                            SprintfToFile(output_file, indent_level,
+                                          "{ DqnInspectDeclType::%.*s_, DqnInspectMetaType::%.*s, &DqnInspectMetadata_%.*s_%.*s_%.*s},\n",
+                                          metadata->type.len, metadata->type.str,
 
-                            // metadata->key
-                            CPPTokeniser_SprintfToFile(&tokeniser, "STR_AND_LEN(\"%.*s\"), ", entry.key.len, entry.key.str);
+                                          metadata->name.len, metadata->name.str,
 
-                            // metadata->value
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "STR_AND_LEN(\"%.*s\"),\n", entry.value.len, entry.value.str);
-
-                            tokeniser.indent_level--;
-                            CPPTokeniser_SprintfToFile(&tokeniser, "},\n");
+                                          // NOTE: Assign variant data to void *, &DqnInspectMetdata ...
+                                          parsed_struct->name.len, parsed_struct->name.str,
+                                          decl->name.len, decl->name.str,
+                                          metadata->name.len, metadata->name.str
+                                          );
                         }
-                        tokeniser.indent_level--;
-                        CPPTokeniser_SprintfToFile(&tokeniser, "};\n\n");
+                        indent_level--;
+                        SprintfToFile(output_file, indent_level, "};\n\n");
                     }
-#endif
+
 
                     //
-                    // Write DqnInspect_StructMembers Definition
+                    // NOTE: Write DqnInspectStructMembers Definition
                     //
                     {
-                        CPPTokeniser_SprintfToFile(&tokeniser, "DqnInspect_StructMember const DqnInspect_%.*s_StructMembers[] =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
-                        tokeniser.indent_level++;
+                        SprintfToFile(output_file, indent_level, "DqnInspectStructMember const DqnInspect_%.*s_StructMembers[] =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
+                        indent_level++;
 
                         for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
                         {
                             CPPVariableDecl const *decl = &member->value;
-                            CPPTokeniser_SprintfToFile(&tokeniser, "{\n");
-                            tokeniser.indent_level++;
+                            SprintfToFile(output_file, indent_level, "{\n");
+                            indent_level++;
 
-                            CPPTokeniser_SprintfToFile(&tokeniser, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
+                            SprintfToFile(output_file, indent_level, "DqnInspectMemberType::%.*s_%.*s,\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                            SprintfToFile(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
+                            SprintfToFileNoIndenting(output_file, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
 
                             if (decl->template_expr.len <= 0)
-                                CPPTokeniser_SprintfToFile(&tokeniser, "nullptr, 0, // template_expr and template_expr_len\n");
+                                SprintfToFile(output_file, indent_level, "nullptr, 0, // template_expr and template_expr_len\n");
                             else
-                                CPPTokeniser_SprintfToFile(&tokeniser, "STR_AND_LEN(\"%.*s\"), // template_expr\n", decl->template_expr.len, decl->template_expr.str);
+                                SprintfToFile(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), // template_expr\n", decl->template_expr.len, decl->template_expr.str);
 
-#if 0
-                            if (member->metadata_array.len <= 0) CPPTokeniser_SprintfToFile(&tokeniser, "nullptr, 0, // metadata and metadata_len\n");
-                            else                                 CPPTokeniser_SprintfToFile(&tokeniser, "DqnInspect_%.*s_%.*s_StructMemberMetadata, %d,\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str, member->metadata_array.len);
-#endif
-                            CPPTokeniser_SprintfToFile(&tokeniser, "%d // array_dimensions\n", decl->array_dimensions);
+                            SprintfToFile(output_file, indent_level, "%d // array_dimensions,\n", decl->array_dimensions);
 
-                            tokeniser.indent_level--;
-                            CPPTokeniser_SprintfToFile(&tokeniser, "},\n");
+                            if (member->metadata_list)
+                            {
+                                SprintfToFile(output_file, indent_level, "DqnInspectVariant_%.*s_%.*s, ", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                                SprintfToFileNoIndenting(output_file, "ARRAY_COUNT(DqnInspectVariant_%.*s_%.*s),", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                            }
+                            else
+                            {
+                                SprintfToFile(output_file, indent_level, "nullptr, 0,");
+                            }
+                            SprintfToFileNoIndenting(output_file, " // metadata array\n");
+
+                            indent_level--;
+                            SprintfToFile(output_file, indent_level, "},\n");
                         }
 
-                        tokeniser.indent_level--;
-                        CPPTokeniser_SprintfToFile(&tokeniser, "};\n\n");
+                        indent_level--;
+                        SprintfToFile(output_file, indent_level, "};\n\n");
                     }
 
                     //
-                    // Write DqnInspect_Struct Definition
+                    // NOTE: Write DqnInspect_Struct Definition
                     //
                     {
-                        CPPTokeniser_SprintfToFile(&tokeniser, "DqnInspect_Struct const DqnInspect_%.*s_Struct =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
-                        tokeniser.indent_level++;
+                        SprintfToFile(output_file, indent_level, "DqnInspectStruct const DqnInspect_%.*s_Struct =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
+                        indent_level++;
 
-                        CPPTokeniser_SprintfToFile(&tokeniser, "STR_AND_LEN(\"%.*s\"),\n", parsed_struct->name.len, parsed_struct->name.str);
-                        CPPTokeniser_SprintfToFile(&tokeniser, "DqnInspect_%.*s_StructMembers, // members\n", parsed_struct->name.len, parsed_struct->name.str);
-                        CPPTokeniser_SprintfToFile(&tokeniser, "ARRAY_COUNT(DqnInspect_%.*s_StructMembers) // members_len\n", parsed_struct->name.len, parsed_struct->name.str);
+                        SprintfToFile(output_file, indent_level, "STR_AND_LEN(\"%.*s\"),\n", parsed_struct->name.len, parsed_struct->name.str);
+                        SprintfToFile(output_file, indent_level, "DqnInspect_%.*s_StructMembers, // members\n", parsed_struct->name.len, parsed_struct->name.str);
+                        SprintfToFile(output_file, indent_level, "ARRAY_COUNT(DqnInspect_%.*s_StructMembers) // members_len\n", parsed_struct->name.len, parsed_struct->name.str);
 
-                        tokeniser.indent_level--;
-                        CPPTokeniser_SprintfToFile(&tokeniser, "};\n\n");
-                        assert(tokeniser.indent_level == 0);
+                        indent_level--;
+                        SprintfToFile(output_file, indent_level, "};\n\n");
+                        assert(indent_level == 0);
                     }
 
                     //
-                    // Write DqnInspect_Struct getter
+                    // NOTE: Write DqnInspect_Struct getter
                     //
                     {
-                        CPPTokeniser_SprintfToFile(&tokeniser, "DqnInspect_Struct const *DqnInspect_GetStruct(%.*s const *val)\n", parsed_struct->name.len, parsed_struct->name.str);
-                        CPPTokeniser_SprintfToFile(&tokeniser, "{\n");
-                        tokeniser.indent_level++;
-                        CPPTokeniser_SprintfToFile(&tokeniser, "(void)val;\n");
-                        CPPTokeniser_SprintfToFile(&tokeniser, "DqnInspect_Struct const *result = &DqnInspect_%.*s_Struct;\n", parsed_struct->name.len, parsed_struct->name.str);
-                        CPPTokeniser_SprintfToFile(&tokeniser, "return result;\n");
-                        tokeniser.indent_level--;
-                        CPPTokeniser_SprintfToFile(&tokeniser, "}\n\n");
+                        SprintfToFile(output_file, indent_level, "DqnInspectStruct const *DqnInspect_Struct(%.*s const *)\n", parsed_struct->name.len, parsed_struct->name.str);
+                        SprintfToFile(output_file, indent_level, "{\n");
+                        indent_level++;
+                        SprintfToFile(output_file, indent_level, "DqnInspect_Struct const *result = &DqnInspect_%.*s_Struct;\n", parsed_struct->name.len, parsed_struct->name.str);
+                        SprintfToFile(output_file, indent_level, "return result;\n");
+                        indent_level--;
+                        SprintfToFile(output_file, indent_level, "}\n\n");
                     }
+
                 }
                 break;
 
-                case ParsedResultType::FunctionPrototype:
+                case ParsedCodeType::FunctionPrototype:
                 {
-                    ParsedFunctionPrototype *parsed_func = &parser.parsed_func_prototype;
+                    ParsedFunctionPrototype *parsed_func = &code.parsed_func_prototype;
                     {
-                        StringLiteral return_type            = parsed_func->return_type;
-                        StringLiteral func_name              = parsed_func->name;
+                        Slice<char> return_type            = parsed_func->return_type;
+                        Slice<char> func_name              = parsed_func->name;
 
-                        int spaces_remaining = max_func_return_type_decl_len - return_type.len;
-                        CPPTokeniser_SprintfToFile(&tokeniser, "%.*s ", return_type.len, return_type.str);
-                        for (int i = 0; i < spaces_remaining; ++i) CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, " ");
+                        int spaces_remaining = parsing_results.max_func_return_type_decl_len - return_type.len;
+                        SprintfToFile(output_file, indent_level, "%.*s ", return_type.len, return_type.str);
+                        for (int i = 0; i < spaces_remaining; ++i) SprintfToFileNoIndenting(output_file, " ");
 
-                        spaces_remaining = max_func_name_decl_len - func_name.len;
-                        CPPTokeniser_SprintfToFile(&tokeniser, "%.*s", func_name.len, func_name.str);
-                        for (int i = 0; i < spaces_remaining; ++i) CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, " ");
+                        spaces_remaining = parsing_results.max_func_name_decl_len - func_name.len;
+                        SprintfToFile(output_file, indent_level, "%.*s", func_name.len, func_name.str);
+                        for (int i = 0; i < spaces_remaining; ++i) SprintfToFileNoIndenting(output_file, " ");
 
-                        CPPTokeniser_SprintfToFile(&tokeniser, "(");
+                        SprintfToFile(output_file, indent_level, "(");
                     }
 
                     for (CPPDeclLinkedList<CPPVariableDecl> *param_link = parsed_func->members; param_link; param_link = param_link->next)
@@ -1805,47 +2063,48 @@ int main(int argc, char *argv[])
                         // TODO(doyle): HACK. We should parse ptrs into the CPPVariableDecl, fixed size arrays into the name and const-ness into the type
                         CPPVariableDecl *decl = &param_link->value;
 #if 0
-                        StringLiteral *type   = &decl->type;
+                        Slice<char> *type   = &decl->type;
                         char *type_end        = (decl->template_expr.len > 0)
                                                    ? decl->template_expr.str + decl->template_expr.len + 1 // +1 for the ending ">" on the template
                                                    : type->str + type->len;
 
-                        StringLiteral *name = &decl->name;
-                        StringLiteral hack_decl_name = {};
+                        Slice<char> *name = &decl->name;
+                        Slice<char> hack_decl_name = {};
                         if (name->len > 0)
                         {
                             char *name_start = type_end + 1;
                             char *name_end   = name->str + name->len;
-                            hack_decl_name   = StringLiteral(name_start, static_cast<int>(name_end - name_start));
+                            hack_decl_name   = Slice<char>(name_start, static_cast<int>(name_end - name_start));
                         }
 #endif
-                        CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "%.*s", decl->type.len, decl->type.str);
+                        SprintfToFileNoIndenting(output_file, "%.*s", decl->type.len, decl->type.str);
                         if (decl->template_expr.len > 0)
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, "<%.*s>", decl->template_expr.len, decl->template_expr.str);
+                            SprintfToFileNoIndenting(output_file, "<%.*s>", decl->template_expr.len, decl->template_expr.str);
 
                         if (decl->name.len > 0)
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, " %.*s", decl->name.len, decl->name.str);
+                            SprintfToFileNoIndenting(output_file, " %.*s", decl->name.len, decl->name.str);
 
                         if (decl->default_value.len > 0)
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, " = %.*s", decl->default_value.len, decl->default_value.str);
+                            SprintfToFileNoIndenting(output_file, " = %.*s", decl->default_value.len, decl->default_value.str);
 
                         if (param_link->next)
-                            CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, ", ", parsed_func->return_type.len, parsed_func->return_type.str, parsed_func->name.len, parsed_func->name.str);
+                            SprintfToFileNoIndenting(output_file, ", ", parsed_func->return_type.len, parsed_func->return_type.str, parsed_func->name.len, parsed_func->name.str);
                     }
-                    CPPTokeniser_SprintfToFileNoIndenting(&tokeniser, ");\n");
+                    SprintfToFileNoIndenting(output_file, ");\n");
                 }
                 break;
             }
         }
 
-        fprintf(output_file,
-                "\n#undef ARRAY_COUNT\n"
-                "#undef CHAR_COUNT\n"
-                "#undef STR_AND_LEN\n"
-                "#endif // DQN_INSPECT_%.*s\n\n",
-                file_include_contents_hash_define_len,
-                file_include_contents_hash_define);
+        fprintf(output_file, "#endif // DQN_INSPECT_%.*s\n\n",
+            parsing_results.file_include_contents_hash_define_len,
+            parsing_results.file_include_contents_hash_define);
     }
+
+    fprintf(output_file,
+            "\n#undef ARRAY_COUNT\n"
+            "#undef CHAR_COUNT\n"
+            "#undef STR_AND_LEN\n");
 
     fclose(output_file);
 

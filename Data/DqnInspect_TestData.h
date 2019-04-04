@@ -12,7 +12,10 @@ enum struct OpenGLShader { Vertex, Count, };
 DQN_INSPECT struct SampleStruct
 {
     // TODO(doyle): This shit not support yet, you can imagine why
+    const int *const a;
     int const *const b, c, *d, *e;
+    int             ebo                                 DQN_INSPECT_META(char const *DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(char const *DisplayName = "Vertex Array Object", int OpenGLVersion = 330);
+    V4              draw_color                          DQN_INSPECT_META(char const *DisplayName = "HelloWorld");
 // #if 0
 // #endif
     Array<V3, 32>   lights;
@@ -20,12 +23,9 @@ DQN_INSPECT struct SampleStruct
     char          **bitmaps;
     int             shaders[(int)OpenGLShader::Count];
     void           *win32_handle;
-    int             ebo DQN_INSPECT_META(DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(DisplayName = "Vertex Array Object", OpenGLVersion = "330");
-    V4              draw_color DQN_INSPECT_META(DisplayName = "HelloWorld");
     V3              lighting_ambient_coeff;
     int             draw_call_count;
 
-    const int *const a;
     const int f;
     int const g;
     int *const h;
