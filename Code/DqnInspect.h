@@ -122,6 +122,18 @@ struct DeferHelper
     Defer<Lambda> operator+(Lambda lambda) { return Defer<Lambda>(lambda); }
 };
 
+#define INSPECT_MAX(a, b) ((a) > (b)) ? (a) : (b)
+#define INSPECT_MIN(a, b) ((a) < (b)) ? (a) : (b)
+#define ARRAY_COUNT(str) sizeof(str)/sizeof(str[0])
+#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
+#define TOKEN_COMBINE(x, y) x ## y
+#define TOKEN_COMBINE2(x, y) TOKEN_COMBINE(x, y)
+#define DEFER auto const TOKEN_COMBINE(defer_lambda_, __COUNTER__) = DeferHelper() + [&]()
+
+#define KILOBYTE(val) (1024ULL * (val))
+#define MEGABYTE(val) (1024ULL * KILOBYTE(val))
+
+
 #define SLICE_LITERAL(str) Slice<char const>{str, CHAR_COUNT(str)}
 template <typename T>
 struct Slice
@@ -154,16 +166,6 @@ struct LinkedList
     T           value;
     LinkedList *next;
 };
-
-#define INSPECT_MAX(a, b) ((a) > (b)) ? (a) : (b)
-#define ARRAY_COUNT(str) sizeof(str)/sizeof(str[0])
-#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
-#define TOKEN_COMBINE(x, y) x ## y
-#define TOKEN_COMBINE2(x, y) TOKEN_COMBINE(x, y)
-#define DEFER auto const TOKEN_COMBINE(defer_lambda_, __COUNTER__) = DeferHelper() + [&]()
-
-#define KILOBYTE(val) (1024ULL * (val))
-#define MEGABYTE(val) (1024ULL * KILOBYTE(val))
 
 //
 // Memory Utilities
@@ -868,6 +870,7 @@ struct ParsingResult
     char                   *file_include_contents_hash_define;
     int                     max_func_return_type_decl_len;
     int                     max_func_name_decl_len;
+    Slice<char>             file_name;
 };
 
 
@@ -1452,22 +1455,8 @@ int main(int argc, char *argv[])
 
             parsing_results.file_include_contents_hash_define     = extracted_file_name_buf + file_name_len - extracted_file_name_len;
             parsing_results.file_include_contents_hash_define_len = extracted_file_name_len;
+            parsing_results.file_name                             = Slice<char>(file_name, file_name_len);
         }
-
-        fprintf(output_file,
-                "//\n"
-                "// %s\n"
-                "//\n"
-                "\n"
-                "#ifndef DQN_INSPECT_%.*s\n"
-                "#define DQN_INSPECT_%.*s\n"
-                "\n",
-                file_name,
-                parsing_results.file_include_contents_hash_define_len,
-                parsing_results.file_include_contents_hash_define,
-                parsing_results.file_include_contents_hash_define_len,
-                parsing_results.file_include_contents_hash_define
-                );
 
         CPPTokeniser tokeniser = {};
         tokeniser.tokens_max   = 16384;
@@ -1519,8 +1508,6 @@ int main(int argc, char *argv[])
         CPPToken *sentinel = CPPTokeniser_MakeToken(&tokeniser);
         sentinel->type     = CPPTokenType::EndOfStream;
 
-        int max_func_return_type_decl_len = 0;
-        int max_func_name_decl_len        = 0;
         for (CPPToken token = CPPTokeniser_PeekToken(&tokeniser);
              ;
              token          = CPPTokeniser_PeekToken(&tokeniser))
@@ -1549,8 +1536,8 @@ int main(int argc, char *argv[])
                     if (ParseCPPInspectPrototype(&tokeniser, &parsed_code.parsed_func_prototype))
                     {
                         parsed_code.type = ParsedCodeType::FunctionPrototype;
-                        parsing_results.max_func_return_type_decl_len = INSPECT_MAX(max_func_return_type_decl_len, parsed_code.parsed_func_prototype.return_type.len);
-                        parsing_results.max_func_name_decl_len        = INSPECT_MAX(max_func_name_decl_len, parsed_code.parsed_func_prototype.name.len);
+                        parsing_results.max_func_return_type_decl_len = INSPECT_MAX(parsing_results.max_func_return_type_decl_len, parsed_code.parsed_func_prototype.return_type.len);
+                        parsing_results.max_func_name_decl_len        = INSPECT_MAX(parsing_results.max_func_name_decl_len, parsed_code.parsed_func_prototype.name.len);
                     }
                 }
             }
@@ -1568,161 +1555,189 @@ int main(int argc, char *argv[])
         parsing_results_per_file.push_back(std::move(parsing_results));
     }
 
-    //
-    // NOTE: Build the global definition table
-    //
     int indent_level = 0;
-    FprintfIndented(output_file, indent_level, "enum struct DqnInspectMemberType\n{\n");
-    indent_level++;
-    for (ParsingResult &parsing_results : parsing_results_per_file)
+    if (mode == InspectMode::All || mode == InspectMode::Code)
     {
-        for (ParsedCode &code : parsing_results.code)
+        //
+        // NOTE: Build the global definition table
+        //
         {
-            switch(code.type)
+            std::set<Slice<char>> member_type_table;
+            for (ParsingResult &parsing_results : parsing_results_per_file)
             {
-                case ParsedCodeType::Enum:
+                for (ParsedCode &code : parsing_results.code)
                 {
-                    ParsedEnum const *parsed_enum = &code.parsed_enum;
-                    FprintfIndented(output_file, indent_level, "%.*s,\n", parsed_enum->name.len, parsed_enum->name.str);
-                    for (CPPDeclLinkedList<Slice<char>> const *link = parsed_enum->members;
-                         link;
-                         link = link->next)
+                    switch(code.type)
                     {
-                        FprintfIndented(output_file, indent_level,
-                                      "%.*s_%.*s,\n",
-                                      parsed_enum->name.len, parsed_enum->name.str,
-                                      link->value.len, link->value.str
-                                      );
-                    }
-
-                }
-                break;
-
-                case ParsedCodeType::Struct:
-                {
-                    ParsedStruct const *parsed_struct = &code.parsed_struct;
-                    FprintfIndented(output_file, indent_level, "%.*s,\n", parsed_struct->name.len, parsed_struct->name.str);
-                    for (CPPDeclLinkedList<CPPVariableDecl> const *link = parsed_struct->members;
-                         link;
-                         link = link->next)
-                    {
-                        FprintfIndented(output_file, indent_level,
-                                      "%.*s_%.*s,\n",
-                                      parsed_struct->name.len, parsed_struct->name.str,
-                                      link->value.name.len, link->value.name.str
-                                      );
-                    }
-                }
-                break;
-            }
-        }
-    }
-    indent_level--;
-    FprintfIndented(output_file, indent_level, "};\n\n");
-
-    //
-    // NOTE: Build the global type table
-    //
-    {
-        std::set<Slice<char>> unique_decl_type_table;
-        for (ParsingResult &parsing_results : parsing_results_per_file)
-        {
-            for (ParsedCode &code : parsing_results.code)
-            {
-                switch(code.type)
-                {
-                    case ParsedCodeType::Enum:
-                    {
-                        ParsedEnum const *parsed_enum = &code.parsed_enum;
-                        unique_decl_type_table.insert(parsed_enum->name);
-                    }
-                    break;
-
-                    case ParsedCodeType::Struct:
-                    {
-                        ParsedStruct const *parsed_struct = &code.parsed_struct;
-                        unique_decl_type_table.insert(parsed_struct->name);
-
-                        for (CPPDeclLinkedList<CPPVariableDecl> const *link = parsed_struct->members;
-                             link;
-                             link = link->next)
+                        case ParsedCodeType::Enum:
                         {
-                            CPPVariableDecl const *decl = &link->value;
-                            Slice<char> type_name       = {};
-                            if (decl->template_expr.len > 0) type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", decl->type.len, decl->type.str, decl->template_expr.len, decl->template_expr.str);
-                            else                             type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
-                            unique_decl_type_table.insert(type_name);
-
-                            for (CPPDeclLinkedList<CPPVariableDecl> const *meta_link = link->metadata_list;
-                                 meta_link;
-                                 meta_link = meta_link->next)
+                            ParsedEnum const *parsed_enum = &code.parsed_enum;
+                            member_type_table.insert(parsed_enum->name);
+                            for (CPPDeclLinkedList<Slice<char>> const *link = parsed_enum->members;
+                                 link;
+                                 link = link->next)
                             {
-                                CPPVariableDecl const *meta_decl = &meta_link->value;
-                                Slice<char> meta_type_name       = {};
-                                if (meta_decl->template_expr.len > 0) meta_type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", meta_decl->type.len, meta_decl->type.str, meta_decl->template_expr.len, meta_decl->template_expr.str);
-                                else                                  meta_type_name = Asprintf(&global_main_arena, "%.*s",       meta_decl->type.len, meta_decl->type.str);
-                                unique_decl_type_table.insert(meta_type_name);
+                                Slice<char> entry = Asprintf(&global_main_arena, "%.*s_%.*s",
+                                                             parsed_enum->name.len, parsed_enum->name.str,
+                                                             link->value.len, link->value.str
+                                                             );
+                                member_type_table.insert(entry);
+                            }
+
+                        }
+                        break;
+
+                        case ParsedCodeType::Struct:
+                        {
+                            ParsedStruct const *parsed_struct = &code.parsed_struct;
+                            member_type_table.insert(parsed_struct->name);
+                            for (CPPDeclLinkedList<CPPVariableDecl> const *link = parsed_struct->members;
+                                 link;
+                                 link = link->next)
+                            {
+                                Slice<char> entry = Asprintf(&global_main_arena, "%.*s_%.*s",
+                                                             parsed_struct->name.len, parsed_struct->name.str,
+                                                             link->value.name.len, link->value.name.str
+                                                             );
+                                member_type_table.insert(entry);
                             }
                         }
+                        break;
                     }
-                    break;
                 }
             }
-        }
 
-        FprintfIndented(output_file, indent_level, "enum struct DqnInspectDeclType\n{\n");
-        indent_level++;
-        for(Slice<char> const &type : unique_decl_type_table )
-        {
-            FprintfIndented(output_file, indent_level, "");
-            FprintDeclType(output_file, type);
-            fprintf(output_file, ",\n");
-        }
-        indent_level--;
-        FprintfIndented(output_file, indent_level, "};\n\n");
-    }
-
-    //
-    // NOTE: Build the global metadata type table
-    //
-    {
-        std::set<Slice<char>> unique_meta_types;
-        for (ParsingResult &parsing_results : parsing_results_per_file)
-        {
-            for (ParsedCode &code : parsing_results.code)
+            FprintfIndented(output_file, indent_level, "enum struct DqnInspectMemberType\n{\n");
+            indent_level++;
+            for (Slice<char> const &member : member_type_table)
             {
-                switch(code.type)
+                FprintfIndented(output_file, indent_level, "%.*s,\n", member.len, member.str);
+            }
+            indent_level--;
+            FprintfIndented(output_file, indent_level, "};\n\n");
+        }
+
+        //
+        // NOTE: Build the global type table
+        //
+        {
+            std::set<Slice<char>> unique_decl_type_table;
+            for (ParsingResult &parsing_results : parsing_results_per_file)
+            {
+                for (ParsedCode &code : parsing_results.code)
                 {
-                    case ParsedCodeType::Struct:
+                    switch(code.type)
                     {
-                        ParsedStruct const *parsed_struct = &code.parsed_struct;
-                        for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
+                        case ParsedCodeType::Enum:
                         {
-                            for (CPPDeclLinkedList<CPPVariableDecl> const *metadata_link = member->metadata_list;
-                                 metadata_link;
-                                 metadata_link = metadata_link->next)
+                            ParsedEnum const *parsed_enum = &code.parsed_enum;
+                            unique_decl_type_table.insert(parsed_enum->name);
+                        }
+                        break;
+
+                        case ParsedCodeType::Struct:
+                        {
+                            ParsedStruct const *parsed_struct = &code.parsed_struct;
+                            unique_decl_type_table.insert(parsed_struct->name);
+
+                            for (CPPDeclLinkedList<CPPVariableDecl> const *link = parsed_struct->members;
+                                 link;
+                                 link = link->next)
                             {
-                                CPPVariableDecl const *metadata = &metadata_link->value;
-                                unique_meta_types.insert(metadata->name);
+                                CPPVariableDecl const *decl = &link->value;
+                                Slice<char> type_name       = {};
+                                if (decl->template_expr.len > 0) type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", decl->type.len, decl->type.str, decl->template_expr.len, decl->template_expr.str);
+                                else                             type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
+                                unique_decl_type_table.insert(type_name);
+
+                                for (CPPDeclLinkedList<CPPVariableDecl> const *meta_link = link->metadata_list;
+                                     meta_link;
+                                     meta_link = meta_link->next)
+                                {
+                                    CPPVariableDecl const *meta_decl = &meta_link->value;
+                                    Slice<char> meta_type_name       = {};
+                                    if (meta_decl->template_expr.len > 0) meta_type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", meta_decl->type.len, meta_decl->type.str, meta_decl->template_expr.len, meta_decl->template_expr.str);
+                                    else                                  meta_type_name = Asprintf(&global_main_arena, "%.*s",       meta_decl->type.len, meta_decl->type.str);
+                                    unique_decl_type_table.insert(meta_type_name);
+                                }
                             }
                         }
+                        break;
                     }
-                    break;
                 }
             }
+
+            FprintfIndented(output_file, indent_level, "enum struct DqnInspectDeclType\n{\n");
+            indent_level++;
+            for (Slice<char> const &type : unique_decl_type_table)
+            {
+                FprintfIndented(output_file, indent_level, "");
+                FprintDeclType(output_file, type);
+                fprintf(output_file, ",\n");
+            }
+            indent_level--;
+            FprintfIndented(output_file, indent_level, "};\n\n");
         }
 
-        FprintfIndented(output_file, indent_level, "enum struct DqnInspectMetaType\n{\n");
-        indent_level++;
-        for (Slice<char> const &metadata : unique_meta_types)
-            FprintfIndented(output_file, indent_level, "%.*s,\n", metadata.len, metadata.str);
-        indent_level--;
-        FprintfIndented(output_file, indent_level, "};\n\n");
+        //
+        // NOTE: Build the global metadata type table
+        //
+        {
+            std::set<Slice<char>> unique_meta_types;
+            for (ParsingResult &parsing_results : parsing_results_per_file)
+            {
+                for (ParsedCode &code : parsing_results.code)
+                {
+                    switch(code.type)
+                    {
+                        case ParsedCodeType::Struct:
+                        {
+                            ParsedStruct const *parsed_struct = &code.parsed_struct;
+                            for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
+                            {
+                                for (CPPDeclLinkedList<CPPVariableDecl> const *metadata_link = member->metadata_list;
+                                     metadata_link;
+                                     metadata_link = metadata_link->next)
+                                {
+                                    CPPVariableDecl const *metadata = &metadata_link->value;
+                                    unique_meta_types.insert(metadata->name);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            FprintfIndented(output_file, indent_level, "enum struct DqnInspectMetaType\n{\n");
+            indent_level++;
+            for (Slice<char> const &metadata : unique_meta_types)
+                FprintfIndented(output_file, indent_level, "%.*s,\n", metadata.len, metadata.str);
+            indent_level--;
+            FprintfIndented(output_file, indent_level, "};\n\n");
+        }
+
     }
 
     assert(indent_level == 0);
     for (ParsingResult &parsing_results : parsing_results_per_file)
     {
+        fprintf(output_file,
+                "//\n"
+                "// %.*s\n"
+                "//\n"
+                "\n"
+                "#ifndef DQN_INSPECT_%.*s\n"
+                "#define DQN_INSPECT_%.*s\n"
+                "\n",
+                parsing_results.file_name.len,
+                parsing_results.file_name.str,
+                parsing_results.file_include_contents_hash_define_len,
+                parsing_results.file_include_contents_hash_define,
+                parsing_results.file_include_contents_hash_define_len,
+                parsing_results.file_include_contents_hash_define
+                );
+
         for (ParsedCode &code : parsing_results.code)
         {
             switch(code.type)
@@ -2116,23 +2131,7 @@ int main(int argc, char *argv[])
 
                     for (CPPDeclLinkedList<CPPVariableDecl> *param_link = parsed_func->members; param_link; param_link = param_link->next)
                     {
-                        // TODO(doyle): HACK. We should parse ptrs into the CPPVariableDecl, fixed size arrays into the name and const-ness into the type
                         CPPVariableDecl *decl = &param_link->value;
-#if 0
-                        Slice<char> *type   = &decl->type;
-                        char *type_end        = (decl->template_expr.len > 0)
-                                                   ? decl->template_expr.str + decl->template_expr.len + 1 // +1 for the ending ">" on the template
-                                                   : type->str + type->len;
-
-                        Slice<char> *name = &decl->name;
-                        Slice<char> hack_decl_name = {};
-                        if (name->len > 0)
-                        {
-                            char *name_start = type_end + 1;
-                            char *name_end   = name->str + name->len;
-                            hack_decl_name   = Slice<char>(name_start, static_cast<int>(name_end - name_start));
-                        }
-#endif
                         fprintf(output_file, "%.*s", decl->type.len, decl->type.str);
                         if (decl->template_expr.len > 0)
                             fprintf(output_file, "<%.*s>", decl->template_expr.len, decl->template_expr.str);

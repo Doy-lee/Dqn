@@ -5,32 +5,14 @@
 #define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
 #define STR_AND_LEN(str) str, CHAR_COUNT(str)
 
-//
-// ..\Data\DqnInspect_TestData.h
-//
-
-#ifndef DQN_INSPECT_DQNINSPECT_TESTDATA_H
-#define DQN_INSPECT_DQNINSPECT_TESTDATA_H
-
 enum struct DqnInspectMemberType
 {
     SampleStruct,
-    SampleStruct_ebo,
-    SampleStruct_vbo,
-    SampleStruct_vao,
     SampleStruct_a,
     SampleStruct_b,
     SampleStruct_c,
     SampleStruct_d,
     SampleStruct_e,
-    SampleStruct_draw_color,
-    SampleStruct_lights,
-    SampleStruct_camera_matrixes,
-    SampleStruct_bitmaps,
-    SampleStruct_shaders,
-    SampleStruct_win32_handle,
-    SampleStruct_lighting_ambient_coeff,
-    SampleStruct_draw_call_count,
     SampleStruct_f,
     SampleStruct_g,
     SampleStruct_h,
@@ -40,9 +22,20 @@ enum struct DqnInspectMemberType
     SampleStruct_l,
     SampleStruct_m,
     EnumWithMetadata,
+    SampleStruct_ebo,
+    SampleStruct_vao,
+    SampleStruct_vbo,
+    SampleStruct_lights,
+    SampleStruct_bitmaps,
+    SampleStruct_shaders,
     EnumWithMetadata_Rect,
-    EnumWithMetadata_Square,
     EnumWithMetadata_Count,
+    EnumWithMetadata_Square,
+    SampleStruct_draw_color,
+    SampleStruct_win32_handle,
+    SampleStruct_camera_matrixes,
+    SampleStruct_draw_call_count,
+    SampleStruct_lighting_ambient_coeff,
 };
 
 enum struct DqnInspectDeclType
@@ -70,6 +63,13 @@ enum struct DqnInspectMetaType
     DisplayName,
     OpenGLVersion,
 };
+
+//
+// ..\Data\DqnInspect_TestData.h
+//
+
+#ifndef DQN_INSPECT_DQNINSPECT_TESTDATA_H
+#define DQN_INSPECT_DQNINSPECT_TESTDATA_H
 
 char const * DqnInspectMetadata_SampleStruct_ebo_DisplayName = "Element Buffer Object";
 char const * DqnInspectMetadata_SampleStruct_vao_DisplayName = "Vertex Array Object";

@@ -30,6 +30,7 @@ DQN_INSPECT struct SampleStruct
     int *const h;
     int const* i;
     int *********const j, k, ******l, *m;
+
 };
 
 DQN_INSPECT enum struct EnumWithMetadata
