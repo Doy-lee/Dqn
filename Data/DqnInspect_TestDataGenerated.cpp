@@ -287,6 +287,8 @@ char const *DqnInspectEnum_Stringify(EnumWithMetadata val, int *len = nullptr)
     return nullptr;
 }
 
+int DqnInspectEnum_Count(EnumWithMetadata) { return 3; }
+
 char const * DqnInspectMetadata_FilePath(EnumWithMetadata val)
 {
     if (val == EnumWithMetadata::Rect) { return "Rect.vert"; }

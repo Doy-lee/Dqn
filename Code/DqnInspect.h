@@ -45,6 +45,9 @@
 // =================================================================================================
 // See Data/DqnInspect_TestData.h
 
+// TODO(doyle): Make the enum system similar to struct members for consistency?
+// TODO(doyle): Handle namespaces .. maybe.
+
 #define DQN_INSPECT
 #define DQN_INSPECT_META(...)
 #define DQN_INSPECT_GENERATE_PROTOTYPE(...)
@@ -1744,7 +1747,7 @@ int main(int argc, char *argv[])
                     }
 
                     //
-                    // Write InspectEnumString Function
+                    // NOTE: Write DqnInspectEnum_Stringify Function
                     //
                     {
                         FprintfIndented(output_file, indent_level, "char const *DqnInspectEnum_Stringify(%.*s val, int *len = nullptr)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
@@ -1807,6 +1810,15 @@ int main(int argc, char *argv[])
                                                      parsed_enum->name.len, parsed_enum->name.str,
                                                      enum_index);
                         }
+                    }
+
+                    //
+                    // NOTE: Write DqnInspectEnum_Count Function
+                    //
+                    {
+                        int count = 0;
+                        for (CPPDeclLinkedList<Slice<char>> *link = parsed_enum->members; link; link = link->next) count++;
+                        FprintfIndented(output_file, indent_level, "int DqnInspectEnum_Count(%.*s) { return %d; }\n\n", parsed_enum->name.len, parsed_enum->name.str, count);
                     }
 
                     //
