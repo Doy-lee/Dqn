@@ -51,24 +51,24 @@
 
 struct DqnInspectMetadata
 {
-    enum DqnInspectMetaType meta_type;
-    enum DqnInspectDeclType decl_type;
-    void const             *data;
+    enum struct DqnInspectDeclType decl_type;
+    enum struct DqnInspectMetaType meta_type;
+    void const                    *data;
 };
 
 struct DqnInspectMember
 {
-    enum DqnInspectMemberType type_enum;
-    char const *              type;
-    int                       type_len;
-    char const *              name;
-    int                       name_len;
-    char const *              template_expr;
-    int                       template_expr_len;
-    int                       array_dimensions; // > 0 means array
+    enum struct DqnInspectMemberType type_enum;
+    char const *                     type;
+    int                              type_len;
+    char const *                     name;
+    int                              name_len;
+    char const *                     template_expr;
+    int                              template_expr_len;
+    int                              array_dimensions; // > 0 means array
 
-    DqnInspectMetadata const *metadata;
-    int                       metadata_len;
+    DqnInspectMetadata const        *metadata;
+    int                              metadata_len;
 };
 
 struct DqnInspectStruct
@@ -353,10 +353,10 @@ Slice<char> Asprintf(MemArena *arena, char const *fmt, ...)
     va_list va;
     va_start(va, fmt);
     Slice<char> result         = {};
-    result.len                 = vsnprintf(nullptr, 0, fmt, va) + 1;
-    result.str                 = MEM_ARENA_ALLOC_ARRAY(arena, char, result.len);
-    vsnprintf(result.str, result.len, fmt, va);
-    result.str[result.len - 1] = 0;
+    result.len                 = vsnprintf(nullptr, 0, fmt, va);
+    result.str                 = MEM_ARENA_ALLOC_ARRAY(arena, char, result.len + 1);
+    vsnprintf(result.str, result.len + 1, fmt, va);
+    result.str[result.len] = 0;
     va_end(va);
     return result;
 }
@@ -440,19 +440,11 @@ struct CPPTokeniser
     int        indent_level;
 };
 
-void SprintfToFile(FILE *output_file, int indent_level, char const *fmt, ...)
+void FprintfIndented(FILE *output_file, int indent_level, char const *fmt, ...)
 {
     int const num_spaces = SPACES_PER_INDENT * indent_level;
     fprintf(output_file, "%*s", num_spaces, "");
 
-    va_list va;
-    va_start(va, fmt);
-    vfprintf(output_file, fmt, va);
-    va_end(va);
-}
-
-void SprintfToFileNoIndenting(FILE *output_file, char const *fmt, ...)
-{
     va_list va;
     va_start(va, fmt);
     vfprintf(output_file, fmt, va);
@@ -509,10 +501,10 @@ bool CPPTokeniser_AcceptTokenIfType(CPPTokeniser *tokeniser, CPPTokenType type, 
 {
     CPPToken check = CPPTokeniser_PeekToken(tokeniser);
     bool result    = (check.type == type);
-    if (result && token)
+    if (result)
     {
         CPPTokeniser_NextToken(tokeniser);
-        *token = check;
+        if (token) *token = check;
     }
 
     return result;
@@ -723,14 +715,31 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
                 Slice<char> comma_to_var_name = {};
                 comma_to_var_name.str         = rewind_token.str + 1;
                 comma_to_var_name.len         = static_cast<int>(variable_name.str - comma_to_var_name.str);
+                comma_to_var_name             = TrimSpaceAround(comma_to_var_name);
 
-                comma_to_var_name     = TrimSpaceAround(comma_to_var_name);
-                variable_type_str_lit = Asprintf(&global_main_arena,
-                                                 "%.*s %.*s",
-                                                 variable_type.len,
-                                                 variable_type.str,
-                                                 comma_to_var_name.len,
-                                                 comma_to_var_name.str);
+                if (parse_function_param)
+                {
+                    variable_type_str_lit = Asprintf(&global_main_arena,
+                                                     "%.*s",
+                                                     comma_to_var_name.len,
+                                                     comma_to_var_name.str);
+                }
+                else
+                {
+                    // If not function param, we're parsing something of the likes
+                    // int var, const *var1
+
+                    // In which case you want to pull the base variable type,
+                    // crrently stored in variable_type and then you want to
+                    // pull in everything from the comma to var1, to grab the
+                    // pointer modifiers on the type.
+                    variable_type_str_lit = Asprintf(&global_main_arena,
+                                                     "%.*s %.*s",
+                                                     variable_type.len,
+                                                     variable_type.str,
+                                                     comma_to_var_name.len,
+                                                     comma_to_var_name.str);
+                }
             }
         }
         variable_type_str_lit = TrimSpaceAround(variable_type_str_lit);
@@ -805,6 +814,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPInspectMeta(CPPTokeniser *tokeniser)
     if (!ExpectToken(token, CPPTokenType::OpenParen)) return nullptr;
 
     CPPDeclLinkedList<CPPVariableDecl> *result = ParseCPPTypeAndVariableDecl(tokeniser, true);
+    CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::CloseParen, nullptr);
     return result;
 }
 
@@ -1329,6 +1339,28 @@ char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing
     return ptr;
 }
 
+void FprintDeclType(FILE *output_file, Slice<char> const type)
+{
+    for (int i = 0; i < type.len; ++i)
+    {
+        char ch = type.str[i];
+        if (ch == '*')
+        {
+            char prev_ch = type.str[i - 1];
+            if (prev_ch != ' ' && prev_ch != '*') fputc('_', output_file);
+
+            fputs("Ptr", output_file);
+            if (i < (type.len - 1)) fputc('_', output_file);
+        }
+        else
+        {
+            if (ch == ' ') ch = '_';
+            fputc(ch, output_file);
+        }
+    }
+    fprintf(output_file, "_");
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 1)
@@ -1537,7 +1569,7 @@ int main(int argc, char *argv[])
     // NOTE: Build the global definition table
     //
     int indent_level = 0;
-    SprintfToFile(output_file, indent_level, "enum struct DqnInspectMemberType\n{\n");
+    FprintfIndented(output_file, indent_level, "enum struct DqnInspectMemberType\n{\n");
     indent_level++;
     for (ParsingResult &parsing_results : parsing_results_per_file)
     {
@@ -1548,12 +1580,12 @@ int main(int argc, char *argv[])
                 case ParsedCodeType::Enum:
                 {
                     ParsedEnum const *parsed_enum = &code.parsed_enum;
-                    SprintfToFile(output_file, indent_level, "%.*s,\n", parsed_enum->name.len, parsed_enum->name.str);
+                    FprintfIndented(output_file, indent_level, "%.*s,\n", parsed_enum->name.len, parsed_enum->name.str);
                     for (CPPDeclLinkedList<Slice<char>> const *link = parsed_enum->members;
                          link;
                          link = link->next)
                     {
-                        SprintfToFile(output_file, indent_level,
+                        FprintfIndented(output_file, indent_level,
                                       "%.*s_%.*s,\n",
                                       parsed_enum->name.len, parsed_enum->name.str,
                                       link->value.len, link->value.str
@@ -1566,12 +1598,12 @@ int main(int argc, char *argv[])
                 case ParsedCodeType::Struct:
                 {
                     ParsedStruct const *parsed_struct = &code.parsed_struct;
-                    SprintfToFile(output_file, indent_level, "%.*s,\n", parsed_struct->name.len, parsed_struct->name.str);
+                    FprintfIndented(output_file, indent_level, "%.*s,\n", parsed_struct->name.len, parsed_struct->name.str);
                     for (CPPDeclLinkedList<CPPVariableDecl> const *link = parsed_struct->members;
                          link;
                          link = link->next)
                     {
-                        SprintfToFile(output_file, indent_level,
+                        FprintfIndented(output_file, indent_level,
                                       "%.*s_%.*s,\n",
                                       parsed_struct->name.len, parsed_struct->name.str,
                                       link->value.name.len, link->value.name.str
@@ -1583,7 +1615,7 @@ int main(int argc, char *argv[])
         }
     }
     indent_level--;
-    SprintfToFile(output_file, indent_level, "};\n\n");
+    FprintfIndented(output_file, indent_level, "};\n\n");
 
     //
     // NOTE: Build the global type table
@@ -1614,12 +1646,20 @@ int main(int argc, char *argv[])
                         {
                             CPPVariableDecl const *decl = &link->value;
                             Slice<char> type_name       = {};
-                            if (decl->template_expr.len > 0)
-                                type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", decl->type.len, decl->type.str, decl->template_expr.len, decl->template_expr.str);
-                            else
-                                type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
-
+                            if (decl->template_expr.len > 0) type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", decl->type.len, decl->type.str, decl->template_expr.len, decl->template_expr.str);
+                            else                             type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
                             unique_decl_type_table.insert(type_name);
+
+                            for (CPPDeclLinkedList<CPPVariableDecl> const *meta_link = link->metadata_list;
+                                 meta_link;
+                                 meta_link = meta_link->next)
+                            {
+                                CPPVariableDecl const *meta_decl = &meta_link->value;
+                                Slice<char> meta_type_name       = {};
+                                if (meta_decl->template_expr.len > 0) meta_type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", meta_decl->type.len, meta_decl->type.str, meta_decl->template_expr.len, meta_decl->template_expr.str);
+                                else                                  meta_type_name = Asprintf(&global_main_arena, "%.*s",       meta_decl->type.len, meta_decl->type.str);
+                                unique_decl_type_table.insert(meta_type_name);
+                            }
                         }
                     }
                     break;
@@ -1627,12 +1667,16 @@ int main(int argc, char *argv[])
             }
         }
 
-        SprintfToFile(output_file, indent_level, "enum struct DqnInspectDeclType\n{\n");
+        FprintfIndented(output_file, indent_level, "enum struct DqnInspectDeclType\n{\n");
         indent_level++;
         for(Slice<char> const &type : unique_decl_type_table )
-            SprintfToFile(output_file, indent_level, "%.*s,\n", type.len, type.str);
+        {
+            FprintfIndented(output_file, indent_level, "");
+            FprintDeclType(output_file, type);
+            fprintf(output_file, ",\n");
+        }
         indent_level--;
-        SprintfToFile(output_file, indent_level, "};\n\n");
+        FprintfIndented(output_file, indent_level, "};\n\n");
     }
 
     //
@@ -1665,12 +1709,12 @@ int main(int argc, char *argv[])
             }
         }
 
-        SprintfToFile(output_file, indent_level, "enum struct DqnInspectMetaType\n{\n");
+        FprintfIndented(output_file, indent_level, "enum struct DqnInspectMetaType\n{\n");
         indent_level++;
         for (Slice<char> const &metadata : unique_meta_types)
-            SprintfToFile(output_file, indent_level, "%.*s,\n", metadata.len, metadata.str);
+            FprintfIndented(output_file, indent_level, "%.*s,\n", metadata.len, metadata.str);
         indent_level--;
-        SprintfToFile(output_file, indent_level, "};\n\n");
+        FprintfIndented(output_file, indent_level, "};\n\n");
     }
 
     assert(indent_level == 0);
@@ -1687,29 +1731,29 @@ int main(int argc, char *argv[])
                     // NOTE: Write Stringified Enum Array
                     //
                     {
-                        SprintfToFile(output_file, indent_level, "char const *DqnInspect_%.*s_Strings[] = {", parsed_enum->name.len, parsed_enum->name.str);
+                        FprintfIndented(output_file, indent_level, "char const *DqnInspect_%.*s_Strings[] = {", parsed_enum->name.len, parsed_enum->name.str);
                         indent_level++;
                         for (CPPDeclLinkedList<Slice<char>> const *link = parsed_enum->members; link; link = link->next)
                         {
                             Slice<char> const enum_value = link->value;
-                            SprintfToFileNoIndenting(output_file, "\"%.*s\", ", enum_value.len, enum_value.str);
+                            fprintf(output_file, "\"%.*s\", ", enum_value.len, enum_value.str);
                         }
 
                         indent_level--;
-                        SprintfToFile(output_file, indent_level, "};\n\n");
+                        FprintfIndented(output_file, indent_level, "};\n\n");
                     }
 
                     //
                     // Write InspectEnumString Function
                     //
                     {
-                        SprintfToFile(output_file, indent_level, "char const *DqnInspectEnum_Stringify(%.*s val, int *len = nullptr)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
+                        FprintfIndented(output_file, indent_level, "char const *DqnInspectEnum_Stringify(%.*s val, int *len = nullptr)\n{\n", parsed_enum->name.len, parsed_enum->name.str);
                         indent_level++;
                         DEFER
                         {
-                            SprintfToFile(output_file, indent_level, "return nullptr;\n");
+                            FprintfIndented(output_file, indent_level, "return nullptr;\n");
                             indent_level--;
-                            SprintfToFile(output_file, indent_level, "}\n\n");
+                            FprintfIndented(output_file, indent_level, "}\n\n");
                         };
 
                         struct SourceCode
@@ -1756,8 +1800,8 @@ int main(int argc, char *argv[])
                         {
                             Slice<char> enum_value = src_code_ptr->value.enum_value;
                             int padding              = longest_decl_len - src_code_ptr->value.decl.len;
-                            SprintfToFile(output_file, indent_level, "%.*s%*s", src_code_ptr->value.decl.len, src_code_ptr->value.decl.str, padding, "");
-                            SprintfToFileNoIndenting(output_file,
+                            FprintfIndented(output_file, indent_level, "%.*s%*s", src_code_ptr->value.decl.len, src_code_ptr->value.decl.str, padding, "");
+                            fprintf(output_file,
                                                      "{ if (len) *len = CHAR_COUNT(\"%.*s\"); return DqnInspect_%.*s_Strings[%d]; }\n",
                                                      enum_value.len, enum_value.str,
                                                      parsed_enum->name.len, parsed_enum->name.str,
@@ -1821,7 +1865,7 @@ int main(int argc, char *argv[])
                             Slice<char const> const char_type = SLICE_LITERAL("char");
                             if (metadata.type.len >= char_type.len && strncmp(metadata.type.str, char_type.str, char_type.len) == 0)
                             {
-                                SprintfToFile(output_file, indent_level,
+                                FprintfIndented(output_file, indent_level,
                                               "%.*s DqnInspectMetadata_%.*s(%.*s val)\n{\n",
                                               metadata.type.len, metadata.type.str,
                                               metadata.name.len, metadata.name.str,
@@ -1830,9 +1874,9 @@ int main(int argc, char *argv[])
                                 indent_level++;
                                 DEFER
                                 {
-                                    SprintfToFile(output_file, indent_level, "return nullptr;\n");
+                                    FprintfIndented(output_file, indent_level, "return nullptr;\n");
                                     indent_level--;
-                                    SprintfToFile(output_file, indent_level, "}\n\n");
+                                    FprintfIndented(output_file, indent_level, "}\n\n");
                                 };
 
                                 for (CPPDeclToMetaValue const &decl_to_val : metadata.cpp_decl_to_val)
@@ -1842,23 +1886,23 @@ int main(int argc, char *argv[])
 
                                     if (parsed_enum->struct_or_class_decl)
                                     {
-                                        SprintfToFile(output_file, indent_level,
+                                        FprintfIndented(output_file, indent_level,
                                                                    "if (val == %.*s::%.*s) ",
                                                                    parsed_enum->name.len, parsed_enum->name.str,
                                                                    cpp_decl->len, cpp_decl->str);
                                     }
                                     else
                                     {
-                                        SprintfToFile(output_file, indent_level,
+                                        FprintfIndented(output_file, indent_level,
                                                                    "if (val == %.*s) ",
                                                                    cpp_decl->len, cpp_decl->str);
                                     }
-                                    SprintfToFileNoIndenting(output_file, "{ return %.*s; }\n", value->len, value->str);
+                                    fprintf(output_file, "{ return %.*s; }\n", value->len, value->str);
                                 }
                             }
                             else
                             {
-                                SprintfToFile(output_file, indent_level,
+                                FprintfIndented(output_file, indent_level,
                                                            "bool DqnInspectMetadata_%.*s(%.*s val, %.*s *value)\n{\n",
                                                            metadata.name.len, metadata.name.str,
                                                            parsed_enum->name.len, parsed_enum->name.str,
@@ -1868,9 +1912,9 @@ int main(int argc, char *argv[])
                                 indent_level++;
                                 DEFER
                                 {
-                                    SprintfToFile(output_file, indent_level, "return false;\n");
+                                    FprintfIndented(output_file, indent_level, "return false;\n");
                                     indent_level--;
-                                    SprintfToFile(output_file, indent_level, "}\n\n");
+                                    FprintfIndented(output_file, indent_level, "}\n\n");
                                 };
 
                                 for (CPPDeclToMetaValue const &decl_to_val : metadata.cpp_decl_to_val)
@@ -1880,18 +1924,18 @@ int main(int argc, char *argv[])
 
                                     if (parsed_enum->struct_or_class_decl)
                                     {
-                                        SprintfToFile(output_file, indent_level,
+                                        FprintfIndented(output_file, indent_level,
                                                                    "if (val == %.*s::%.*s) ",
                                                                    parsed_enum->name.len, parsed_enum->name.str,
                                                                    cpp_decl->len, cpp_decl->str);
                                     }
                                     else
                                     {
-                                        SprintfToFile(output_file, indent_level,
+                                        FprintfIndented(output_file, indent_level,
                                                                    "if (val == %.*s) ",
                                                                    cpp_decl->len, cpp_decl->str);
                                     }
-                                    SprintfToFileNoIndenting(output_file, "{ *value = %.*s; return true; }\n", value->len, value->str);
+                                    fprintf(output_file, "{ *value = %.*s; return true; }\n", value->len, value->str);
                                 }
                             }
 
@@ -1914,7 +1958,7 @@ int main(int argc, char *argv[])
                              metadata_link = metadata_link->next)
                         {
                             CPPVariableDecl const *metadata = &metadata_link->value;
-                            SprintfToFile(output_file, indent_level,
+                            FprintfIndented(output_file, indent_level,
                                           "%.*s DqnInspectMetadata_%.*s_%.*s_%.*s = %.*s;\n",
                                           metadata->type.len, metadata->type.str,
                                           parsed_struct->name.len, parsed_struct->name.str,
@@ -1924,10 +1968,10 @@ int main(int argc, char *argv[])
                                           );
                         }
                     }
-                    SprintfToFile(output_file, indent_level, "\n");
+                    FprintfIndented(output_file, indent_level, "\n");
 
                     //
-                    // NOTE: Write metadata variants for each member
+                    // NOTE: Write metadata for each member
                     //
                     for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
                     {
@@ -1936,7 +1980,7 @@ int main(int argc, char *argv[])
                         if (!member->metadata_list)
                             continue;
 
-                        SprintfToFile(output_file, indent_level,
+                        FprintfIndented(output_file, indent_level,
                                       "DqnInspectMetadata const DqnInspectMetadata_%.*s_%.*s[] =\n{\n",
                                       parsed_struct->name.len, parsed_struct->name.str,
                                       decl->name.len, decl->name.str
@@ -1948,79 +1992,79 @@ int main(int argc, char *argv[])
                              metadata_link = metadata_link->next)
                         {
                             CPPVariableDecl const *metadata = &metadata_link->value;
-                            SprintfToFile(output_file, indent_level,
-                                          "{ DqnInspectDeclType::%.*s_, DqnInspectMetaType::%.*s, &DqnInspectMetadata_%.*s_%.*s_%.*s},\n",
-                                          metadata->type.len, metadata->type.str,
+                            FprintfIndented(output_file, indent_level, "{ DqnInspectDeclType::");
+                            FprintDeclType(output_file, metadata->type);
+                            fprintf(output_file,
+                                    ", DqnInspectMetaType::%.*s, &DqnInspectMetadata_%.*s_%.*s_%.*s},\n",
+                                    metadata->name.len, metadata->name.str,
 
-                                          metadata->name.len, metadata->name.str,
-
-                                          // NOTE: Assign variant data to void *, &DqnInspectMetdata ...
-                                          parsed_struct->name.len, parsed_struct->name.str,
-                                          decl->name.len, decl->name.str,
-                                          metadata->name.len, metadata->name.str
-                                          );
+                                    // NOTE: Assign variant data to void *, &DqnInspectMetdata ...
+                                    parsed_struct->name.len, parsed_struct->name.str,
+                                    decl->name.len, decl->name.str,
+                                    metadata->name.len, metadata->name.str
+                                    );
                         }
                         indent_level--;
-                        SprintfToFile(output_file, indent_level, "};\n\n");
+                        FprintfIndented(output_file, indent_level, "};\n\n");
                     }
 
 
                     //
-                    // NOTE: Write DqnInspectStructMembers Definition
+                    // NOTE: Write DqnInspectMember Definition
                     //
                     {
-                        SprintfToFile(output_file, indent_level, "DqnInspectStructMember const DqnInspect_%.*s_StructMembers[] =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
+                        FprintfIndented(output_file, indent_level, "DqnInspectMember const DqnInspect_%.*s_Members[] =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
                         indent_level++;
 
                         for (CPPDeclLinkedList<CPPVariableDecl> const *member = parsed_struct->members; member; member = member->next)
                         {
                             CPPVariableDecl const *decl = &member->value;
-                            SprintfToFile(output_file, indent_level, "{\n");
+                            FprintfIndented(output_file, indent_level, "{\n");
                             indent_level++;
 
-                            SprintfToFile(output_file, indent_level, "DqnInspectMemberType::%.*s_%.*s,\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
-                            SprintfToFile(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
-                            SprintfToFileNoIndenting(output_file, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
+                            FprintfIndented(output_file, indent_level, "DqnInspectMemberType::%.*s_%.*s,\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                            FprintfIndented(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
+                            fprintf(output_file, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
 
                             if (decl->template_expr.len <= 0)
-                                SprintfToFile(output_file, indent_level, "nullptr, 0, // template_expr and template_expr_len\n");
+                                FprintfIndented(output_file, indent_level, "nullptr, 0, // template_expr and template_expr_len\n");
                             else
-                                SprintfToFile(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), // template_expr\n", decl->template_expr.len, decl->template_expr.str);
+                                FprintfIndented(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), // template_expr\n", decl->template_expr.len, decl->template_expr.str);
 
-                            SprintfToFile(output_file, indent_level, "%d // array_dimensions,\n", decl->array_dimensions);
+                            FprintfIndented(output_file, indent_level, "%d, // array_dimensions\n", decl->array_dimensions);
 
                             if (member->metadata_list)
                             {
-                                SprintfToFile(output_file, indent_level, "DqnInspectVariant_%.*s_%.*s, ", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
-                                SprintfToFileNoIndenting(output_file, "ARRAY_COUNT(DqnInspectVariant_%.*s_%.*s),", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                                FprintfIndented(output_file, indent_level, "DqnInspectMetadata_%.*s_%.*s, ", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                                fprintf(output_file, "ARRAY_COUNT(DqnInspectMetadata_%.*s_%.*s),", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
                             }
                             else
                             {
-                                SprintfToFile(output_file, indent_level, "nullptr, 0,");
+                                FprintfIndented(output_file, indent_level, "nullptr, 0,");
                             }
-                            SprintfToFileNoIndenting(output_file, " // metadata array\n");
+                            fprintf(output_file, " // metadata array\n");
 
                             indent_level--;
-                            SprintfToFile(output_file, indent_level, "},\n");
+                            FprintfIndented(output_file, indent_level, "},\n");
                         }
 
                         indent_level--;
-                        SprintfToFile(output_file, indent_level, "};\n\n");
+                        FprintfIndented(output_file, indent_level, "};\n\n");
                     }
 
                     //
                     // NOTE: Write DqnInspect_Struct Definition
                     //
                     {
-                        SprintfToFile(output_file, indent_level, "DqnInspectStruct const DqnInspect_%.*s_Struct =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
+                        FprintfIndented(output_file, indent_level, "DqnInspectStruct const DqnInspect_%.*s_Struct =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
                         indent_level++;
 
-                        SprintfToFile(output_file, indent_level, "STR_AND_LEN(\"%.*s\"),\n", parsed_struct->name.len, parsed_struct->name.str);
-                        SprintfToFile(output_file, indent_level, "DqnInspect_%.*s_StructMembers, // members\n", parsed_struct->name.len, parsed_struct->name.str);
-                        SprintfToFile(output_file, indent_level, "ARRAY_COUNT(DqnInspect_%.*s_StructMembers) // members_len\n", parsed_struct->name.len, parsed_struct->name.str);
+                        FprintfIndented(output_file, indent_level, "STR_AND_LEN(\"%.*s\"),\n", parsed_struct->name.len, parsed_struct->name.str);
+                        FprintfIndented(output_file, indent_level, "DqnInspect_%.*s_Members, // members\n", parsed_struct->name.len, parsed_struct->name.str);
+                        FprintfIndented(output_file, indent_level, "ARRAY_COUNT(DqnInspect_%.*s_Members) // members_len\n", parsed_struct->name.len, parsed_struct->name.str);
 
                         indent_level--;
-                        SprintfToFile(output_file, indent_level, "};\n\n");
+                        FprintfIndented(output_file, indent_level, "};\n\n");
                         assert(indent_level == 0);
                     }
 
@@ -2028,13 +2072,13 @@ int main(int argc, char *argv[])
                     // NOTE: Write DqnInspect_Struct getter
                     //
                     {
-                        SprintfToFile(output_file, indent_level, "DqnInspectStruct const *DqnInspect_Struct(%.*s const *)\n", parsed_struct->name.len, parsed_struct->name.str);
-                        SprintfToFile(output_file, indent_level, "{\n");
+                        FprintfIndented(output_file, indent_level, "DqnInspectStruct const *DqnInspect_Struct(%.*s const *)\n", parsed_struct->name.len, parsed_struct->name.str);
+                        FprintfIndented(output_file, indent_level, "{\n");
                         indent_level++;
-                        SprintfToFile(output_file, indent_level, "DqnInspect_Struct const *result = &DqnInspect_%.*s_Struct;\n", parsed_struct->name.len, parsed_struct->name.str);
-                        SprintfToFile(output_file, indent_level, "return result;\n");
+                        FprintfIndented(output_file, indent_level, "DqnInspectStruct const *result = &DqnInspect_%.*s_Struct;\n", parsed_struct->name.len, parsed_struct->name.str);
+                        FprintfIndented(output_file, indent_level, "return result;\n");
                         indent_level--;
-                        SprintfToFile(output_file, indent_level, "}\n\n");
+                        FprintfIndented(output_file, indent_level, "}\n\n");
                     }
 
                 }
@@ -2048,14 +2092,14 @@ int main(int argc, char *argv[])
                         Slice<char> func_name              = parsed_func->name;
 
                         int spaces_remaining = parsing_results.max_func_return_type_decl_len - return_type.len;
-                        SprintfToFile(output_file, indent_level, "%.*s ", return_type.len, return_type.str);
-                        for (int i = 0; i < spaces_remaining; ++i) SprintfToFileNoIndenting(output_file, " ");
+                        FprintfIndented(output_file, indent_level, "%.*s ", return_type.len, return_type.str);
+                        for (int i = 0; i < spaces_remaining; ++i) fprintf(output_file, " ");
 
                         spaces_remaining = parsing_results.max_func_name_decl_len - func_name.len;
-                        SprintfToFile(output_file, indent_level, "%.*s", func_name.len, func_name.str);
-                        for (int i = 0; i < spaces_remaining; ++i) SprintfToFileNoIndenting(output_file, " ");
+                        FprintfIndented(output_file, indent_level, "%.*s", func_name.len, func_name.str);
+                        for (int i = 0; i < spaces_remaining; ++i) fprintf(output_file, " ");
 
-                        SprintfToFile(output_file, indent_level, "(");
+                        FprintfIndented(output_file, indent_level, "(");
                     }
 
                     for (CPPDeclLinkedList<CPPVariableDecl> *param_link = parsed_func->members; param_link; param_link = param_link->next)
@@ -2077,20 +2121,20 @@ int main(int argc, char *argv[])
                             hack_decl_name   = Slice<char>(name_start, static_cast<int>(name_end - name_start));
                         }
 #endif
-                        SprintfToFileNoIndenting(output_file, "%.*s", decl->type.len, decl->type.str);
+                        fprintf(output_file, "%.*s", decl->type.len, decl->type.str);
                         if (decl->template_expr.len > 0)
-                            SprintfToFileNoIndenting(output_file, "<%.*s>", decl->template_expr.len, decl->template_expr.str);
+                            fprintf(output_file, "<%.*s>", decl->template_expr.len, decl->template_expr.str);
 
                         if (decl->name.len > 0)
-                            SprintfToFileNoIndenting(output_file, " %.*s", decl->name.len, decl->name.str);
+                            fprintf(output_file, " %.*s", decl->name.len, decl->name.str);
 
                         if (decl->default_value.len > 0)
-                            SprintfToFileNoIndenting(output_file, " = %.*s", decl->default_value.len, decl->default_value.str);
+                            fprintf(output_file, " = %.*s", decl->default_value.len, decl->default_value.str);
 
                         if (param_link->next)
-                            SprintfToFileNoIndenting(output_file, ", ", parsed_func->return_type.len, parsed_func->return_type.str, parsed_func->name.len, parsed_func->name.str);
+                            fprintf(output_file, ", ");
                     }
-                    SprintfToFileNoIndenting(output_file, ");\n");
+                    fprintf(output_file, ");\n");
                 }
                 break;
             }

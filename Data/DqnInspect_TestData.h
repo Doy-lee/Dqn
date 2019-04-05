@@ -11,10 +11,9 @@ enum struct OpenGLShader { Vertex, Count, };
 
 DQN_INSPECT struct SampleStruct
 {
-    // TODO(doyle): This shit not support yet, you can imagine why
+    int             ebo                                 DQN_INSPECT_META(char const *DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(char const *DisplayName = "Vertex Array Object", int OpenGLVersion = 330);
     const int *const a;
     int const *const b, c, *d, *e;
-    int             ebo                                 DQN_INSPECT_META(char const *DisplayName = "Element Buffer Object"), vbo, vao DQN_INSPECT_META(char const *DisplayName = "Vertex Array Object", int OpenGLVersion = 330);
     V4              draw_color                          DQN_INSPECT_META(char const *DisplayName = "HelloWorld");
 // #if 0
 // #endif
