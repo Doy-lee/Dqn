@@ -96,6 +96,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
 {
     {
         DqnInspectMemberType::SampleStruct_ebo,
+        DqnInspectDeclType::int_,
         STR_AND_LEN("int"), STR_AND_LEN("ebo"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -103,6 +104,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_vbo,
+        DqnInspectDeclType::int_,
         STR_AND_LEN("int"), STR_AND_LEN("vbo"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -110,6 +112,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_vao,
+        DqnInspectDeclType::int_,
         STR_AND_LEN("int"), STR_AND_LEN("vao"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -117,6 +120,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_a,
+        DqnInspectDeclType::int *const_,
         STR_AND_LEN("int *const"), STR_AND_LEN("a"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
@@ -124,6 +128,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_b,
+        DqnInspectDeclType::int const *const_,
         STR_AND_LEN("int const *const"), STR_AND_LEN("b"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
@@ -131,6 +136,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_c,
+        DqnInspectDeclType::int_,
         STR_AND_LEN("int"), STR_AND_LEN("c"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -138,6 +144,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_d,
+        DqnInspectDeclType::int *_,
         STR_AND_LEN("int *"), STR_AND_LEN("d"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
@@ -145,6 +152,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_e,
+        DqnInspectDeclType::int *_,
         STR_AND_LEN("int *"), STR_AND_LEN("e"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
@@ -152,6 +160,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_draw_color,
+        DqnInspectDeclType::V4_,
         STR_AND_LEN("V4"), STR_AND_LEN("draw_color"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -159,6 +168,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_lights,
+        DqnInspectDeclType::Array_,
         STR_AND_LEN("Array"), STR_AND_LEN("lights"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -166,6 +176,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_camera_matrixes,
+        DqnInspectDeclType::Array_,
         STR_AND_LEN("Array"), STR_AND_LEN("camera_matrixes"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -173,6 +184,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_bitmaps,
+        DqnInspectDeclType::char **_,
         STR_AND_LEN("char **"), STR_AND_LEN("bitmaps"),
         nullptr, 0, // template_expr and template_expr_len
         2, // array_dimensions
@@ -180,6 +192,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_shaders,
+        DqnInspectDeclType::int_,
         STR_AND_LEN("int"), STR_AND_LEN("shaders"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
@@ -187,6 +200,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_win32_handle,
+        DqnInspectDeclType::void *_,
         STR_AND_LEN("void *"), STR_AND_LEN("win32_handle"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
@@ -194,6 +208,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_lighting_ambient_coeff,
+        DqnInspectDeclType::V3_,
         STR_AND_LEN("V3"), STR_AND_LEN("lighting_ambient_coeff"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -201,6 +216,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_draw_call_count,
+        DqnInspectDeclType::int_,
         STR_AND_LEN("int"), STR_AND_LEN("draw_call_count"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -208,6 +224,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_f,
+        DqnInspectDeclType::int_,
         STR_AND_LEN("int"), STR_AND_LEN("f"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -215,6 +232,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_g,
+        DqnInspectDeclType::int const_,
         STR_AND_LEN("int const"), STR_AND_LEN("g"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -222,6 +240,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_h,
+        DqnInspectDeclType::int *const_,
         STR_AND_LEN("int *const"), STR_AND_LEN("h"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
@@ -229,6 +248,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_i,
+        DqnInspectDeclType::int const*_,
         STR_AND_LEN("int const*"), STR_AND_LEN("i"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
@@ -236,6 +256,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_j,
+        DqnInspectDeclType::int *********const_,
         STR_AND_LEN("int *********const"), STR_AND_LEN("j"),
         nullptr, 0, // template_expr and template_expr_len
         9, // array_dimensions
@@ -243,6 +264,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_k,
+        DqnInspectDeclType::int_,
         STR_AND_LEN("int"), STR_AND_LEN("k"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
@@ -250,6 +272,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_l,
+        DqnInspectDeclType::int ******_,
         STR_AND_LEN("int ******"), STR_AND_LEN("l"),
         nullptr, 0, // template_expr and template_expr_len
         6, // array_dimensions
@@ -257,6 +280,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
     },
     {
         DqnInspectMemberType::SampleStruct_m,
+        DqnInspectDeclType::int *_,
         STR_AND_LEN("int *"), STR_AND_LEN("m"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions

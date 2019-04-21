@@ -62,8 +62,9 @@ struct DqnInspectMetadata
 struct DqnInspectMember
 {
     enum struct DqnInspectMemberType type_enum;
-    char const *                     type;
-    int                              type_len;
+    enum struct DqnInspectDeclType   decl_type;
+    char const *                     decl_type_str;
+    int                              decl_type_len;
     char const *                     name;
     int                              name_len;
     char const *                     template_expr;
@@ -2050,6 +2051,7 @@ int main(int argc, char *argv[])
                             indent_level++;
 
                             FprintfIndented(output_file, indent_level, "DqnInspectMemberType::%.*s_%.*s,\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                            FprintfIndented(output_file, indent_level, "DqnInspectDeclType::%.*s_,\n", decl->type.len, decl->type.str);
                             FprintfIndented(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
                             fprintf(output_file, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
 
