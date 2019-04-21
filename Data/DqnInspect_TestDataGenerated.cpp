@@ -95,193 +95,193 @@ DqnInspectMetadata const DqnInspectMetadata_SampleStruct_draw_color[] =
 DqnInspectMember const DqnInspect_SampleStruct_Members[] =
 {
     {
-        DqnInspectMemberType::SampleStruct_ebo,
-        DqnInspectDeclType::int_,
-        STR_AND_LEN("int"), STR_AND_LEN("ebo"),
+        DqnInspectMemberType::SampleStruct_ebo, STR_AND_LEN("ebo"),
+        offsetof(SampleStruct, ebo),
+        DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         DqnInspectMetadata_SampleStruct_ebo, ARRAY_COUNT(DqnInspectMetadata_SampleStruct_ebo), // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_vbo,
-        DqnInspectDeclType::int_,
-        STR_AND_LEN("int"), STR_AND_LEN("vbo"),
+        DqnInspectMemberType::SampleStruct_vbo, STR_AND_LEN("vbo"),
+        offsetof(SampleStruct, vbo),
+        DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_vao,
-        DqnInspectDeclType::int_,
-        STR_AND_LEN("int"), STR_AND_LEN("vao"),
+        DqnInspectMemberType::SampleStruct_vao, STR_AND_LEN("vao"),
+        offsetof(SampleStruct, vao),
+        DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         DqnInspectMetadata_SampleStruct_vao, ARRAY_COUNT(DqnInspectMetadata_SampleStruct_vao), // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_a,
-        DqnInspectDeclType::int *const_,
-        STR_AND_LEN("int *const"), STR_AND_LEN("a"),
+        DqnInspectMemberType::SampleStruct_a, STR_AND_LEN("a"),
+        offsetof(SampleStruct, a),
+        DqnInspectDeclType::int_Ptr_const_, STR_AND_LEN("int *const"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_b,
-        DqnInspectDeclType::int const *const_,
-        STR_AND_LEN("int const *const"), STR_AND_LEN("b"),
+        DqnInspectMemberType::SampleStruct_b, STR_AND_LEN("b"),
+        offsetof(SampleStruct, b),
+        DqnInspectDeclType::int_const_Ptr_const_, STR_AND_LEN("int const *const"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_c,
-        DqnInspectDeclType::int_,
-        STR_AND_LEN("int"), STR_AND_LEN("c"),
+        DqnInspectMemberType::SampleStruct_c, STR_AND_LEN("c"),
+        offsetof(SampleStruct, c),
+        DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_d,
-        DqnInspectDeclType::int *_,
-        STR_AND_LEN("int *"), STR_AND_LEN("d"),
+        DqnInspectMemberType::SampleStruct_d, STR_AND_LEN("d"),
+        offsetof(SampleStruct, d),
+        DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_e,
-        DqnInspectDeclType::int *_,
-        STR_AND_LEN("int *"), STR_AND_LEN("e"),
+        DqnInspectMemberType::SampleStruct_e, STR_AND_LEN("e"),
+        offsetof(SampleStruct, e),
+        DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_draw_color,
-        DqnInspectDeclType::V4_,
-        STR_AND_LEN("V4"), STR_AND_LEN("draw_color"),
+        DqnInspectMemberType::SampleStruct_draw_color, STR_AND_LEN("draw_color"),
+        offsetof(SampleStruct, draw_color),
+        DqnInspectDeclType::V4_, STR_AND_LEN("V4"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         DqnInspectMetadata_SampleStruct_draw_color, ARRAY_COUNT(DqnInspectMetadata_SampleStruct_draw_color), // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_lights,
-        DqnInspectDeclType::Array_,
-        STR_AND_LEN("Array"), STR_AND_LEN("lights"),
+        DqnInspectMemberType::SampleStruct_lights, STR_AND_LEN("lights"),
+        offsetof(SampleStruct, lights),
+        DqnInspectDeclType::Array_, STR_AND_LEN("Array"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_camera_matrixes,
-        DqnInspectDeclType::Array_,
-        STR_AND_LEN("Array"), STR_AND_LEN("camera_matrixes"),
+        DqnInspectMemberType::SampleStruct_camera_matrixes, STR_AND_LEN("camera_matrixes"),
+        offsetof(SampleStruct, camera_matrixes),
+        DqnInspectDeclType::Array_, STR_AND_LEN("Array"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_bitmaps,
-        DqnInspectDeclType::char **_,
-        STR_AND_LEN("char **"), STR_AND_LEN("bitmaps"),
+        DqnInspectMemberType::SampleStruct_bitmaps, STR_AND_LEN("bitmaps"),
+        offsetof(SampleStruct, bitmaps),
+        DqnInspectDeclType::char_Ptr_Ptr_, STR_AND_LEN("char **"),
         nullptr, 0, // template_expr and template_expr_len
         2, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_shaders,
-        DqnInspectDeclType::int_,
-        STR_AND_LEN("int"), STR_AND_LEN("shaders"),
+        DqnInspectMemberType::SampleStruct_shaders, STR_AND_LEN("shaders"),
+        offsetof(SampleStruct, shaders),
+        DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_win32_handle,
-        DqnInspectDeclType::void *_,
-        STR_AND_LEN("void *"), STR_AND_LEN("win32_handle"),
+        DqnInspectMemberType::SampleStruct_win32_handle, STR_AND_LEN("win32_handle"),
+        offsetof(SampleStruct, win32_handle),
+        DqnInspectDeclType::void_Ptr_, STR_AND_LEN("void *"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_lighting_ambient_coeff,
-        DqnInspectDeclType::V3_,
-        STR_AND_LEN("V3"), STR_AND_LEN("lighting_ambient_coeff"),
+        DqnInspectMemberType::SampleStruct_lighting_ambient_coeff, STR_AND_LEN("lighting_ambient_coeff"),
+        offsetof(SampleStruct, lighting_ambient_coeff),
+        DqnInspectDeclType::V3_, STR_AND_LEN("V3"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_draw_call_count,
-        DqnInspectDeclType::int_,
-        STR_AND_LEN("int"), STR_AND_LEN("draw_call_count"),
+        DqnInspectMemberType::SampleStruct_draw_call_count, STR_AND_LEN("draw_call_count"),
+        offsetof(SampleStruct, draw_call_count),
+        DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_f,
-        DqnInspectDeclType::int_,
-        STR_AND_LEN("int"), STR_AND_LEN("f"),
+        DqnInspectMemberType::SampleStruct_f, STR_AND_LEN("f"),
+        offsetof(SampleStruct, f),
+        DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_g,
-        DqnInspectDeclType::int const_,
-        STR_AND_LEN("int const"), STR_AND_LEN("g"),
+        DqnInspectMemberType::SampleStruct_g, STR_AND_LEN("g"),
+        offsetof(SampleStruct, g),
+        DqnInspectDeclType::int_const_, STR_AND_LEN("int const"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_h,
-        DqnInspectDeclType::int *const_,
-        STR_AND_LEN("int *const"), STR_AND_LEN("h"),
+        DqnInspectMemberType::SampleStruct_h, STR_AND_LEN("h"),
+        offsetof(SampleStruct, h),
+        DqnInspectDeclType::int_Ptr_const_, STR_AND_LEN("int *const"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_i,
-        DqnInspectDeclType::int const*_,
-        STR_AND_LEN("int const*"), STR_AND_LEN("i"),
+        DqnInspectMemberType::SampleStruct_i, STR_AND_LEN("i"),
+        offsetof(SampleStruct, i),
+        DqnInspectDeclType::int_const_Ptr_, STR_AND_LEN("int const*"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_j,
-        DqnInspectDeclType::int *********const_,
-        STR_AND_LEN("int *********const"), STR_AND_LEN("j"),
+        DqnInspectMemberType::SampleStruct_j, STR_AND_LEN("j"),
+        offsetof(SampleStruct, j),
+        DqnInspectDeclType::int_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_const_, STR_AND_LEN("int *********const"),
         nullptr, 0, // template_expr and template_expr_len
         9, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_k,
-        DqnInspectDeclType::int_,
-        STR_AND_LEN("int"), STR_AND_LEN("k"),
+        DqnInspectMemberType::SampleStruct_k, STR_AND_LEN("k"),
+        offsetof(SampleStruct, k),
+        DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_l,
-        DqnInspectDeclType::int ******_,
-        STR_AND_LEN("int ******"), STR_AND_LEN("l"),
+        DqnInspectMemberType::SampleStruct_l, STR_AND_LEN("l"),
+        offsetof(SampleStruct, l),
+        DqnInspectDeclType::int_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_, STR_AND_LEN("int ******"),
         nullptr, 0, // template_expr and template_expr_len
         6, // array_dimensions
         nullptr, 0, // metadata array
     },
     {
-        DqnInspectMemberType::SampleStruct_m,
-        DqnInspectDeclType::int *_,
-        STR_AND_LEN("int *"), STR_AND_LEN("m"),
+        DqnInspectMemberType::SampleStruct_m, STR_AND_LEN("m"),
+        offsetof(SampleStruct, m),
+        DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         nullptr, 0, // metadata array

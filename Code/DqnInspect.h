@@ -1,6 +1,9 @@
 #ifndef DQN_INSPECT_H
 #define DQN_INSPECT_H
 
+#define _CRT_SECURE_NO_WARNINGS // NOTE: Undefined at end of file
+#include <stddef.h>
+
 //
 // DqnInspect.h - Minimal Inspection System, Single Header, CRT Dependencies Only
 //                Public Domain or MIT License (see bottom of file)
@@ -61,12 +64,14 @@ struct DqnInspectMetadata
 
 struct DqnInspectMember
 {
-    enum struct DqnInspectMemberType type_enum;
+    enum struct DqnInspectMemberType name_type;
+    char const *                     name;
+    int                              name_len;
+    int                              pod_struct_offset;
+
     enum struct DqnInspectDeclType   decl_type;
     char const *                     decl_type_str;
     int                              decl_type_len;
-    char const *                     name;
-    int                              name_len;
     char const *                     template_expr;
     int                              template_expr_len;
     int                              array_dimensions; // > 0 means array
@@ -88,7 +93,6 @@ struct DqnInspectStruct
 // #include "../Data/DqnInspect_TestDataGenerated.cpp"
 
 #ifdef DQN_INSPECT_EXECUTABLE_IMPLEMENTATION
-#define _CRT_SECURE_NO_WARNINGS
 
 #include <assert.h>
 #include <stdio.h>
@@ -2050,10 +2054,12 @@ int main(int argc, char *argv[])
                             FprintfIndented(output_file, indent_level, "{\n");
                             indent_level++;
 
-                            FprintfIndented(output_file, indent_level, "DqnInspectMemberType::%.*s_%.*s,\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
-                            FprintfIndented(output_file, indent_level, "DqnInspectDeclType::%.*s_,\n", decl->type.len, decl->type.str);
-                            FprintfIndented(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), ", decl->type.len, decl->type.str);
+                            FprintfIndented(output_file, indent_level, "DqnInspectMemberType::%.*s_%.*s, ", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
                             fprintf(output_file, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
+                            FprintfIndented(output_file, indent_level, "offsetof(%.*s, %.*s),\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                            FprintfIndented(output_file, indent_level, "DqnInspectDeclType::");
+                            FprintDeclType(output_file, decl->type);
+                            fprintf(output_file, ", STR_AND_LEN(\"%.*s\"),\n", decl->type.len, decl->type.str);
 
                             if (decl->template_expr.len <= 0)
                                 FprintfIndented(output_file, indent_level, "nullptr, 0, // template_expr and template_expr_len\n");
@@ -2212,3 +2218,5 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
+
+#undef _CRT_SECURE_NO_WARNINGS
