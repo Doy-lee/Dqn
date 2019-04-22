@@ -29,7 +29,7 @@ DQN_INSPECT struct SampleStruct
     int const g;
     int *const h;
     int const* i;
-    int *********const j, k, ******l, *m;
+    int ****const j, k, **l, *m;
 
 };
 

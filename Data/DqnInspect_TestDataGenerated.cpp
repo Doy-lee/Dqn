@@ -43,19 +43,20 @@ enum struct DqnInspectDeclType
     V3_,
     V4_,
     int_,
-    Array_,
     int_Ptr_,
+    int_Ptr_Ptr_,
     void_Ptr_,
     char_Ptr_Ptr_,
     int_const_,
-    int_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_,
     int_Ptr_const_,
     int_const_Ptr_,
     SampleStruct_,
     char_const_Ptr_,
+    Array<V3,_32>_,
+    Array<V4,_32>_,
+    int_Ptr_Ptr_Ptr_Ptr_const_,
     EnumWithMetadata_,
     int_const_Ptr_const_,
-    int_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_const_,
 };
 
 enum struct DqnInspectMetaType
@@ -100,6 +101,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         DqnInspectMetadata_SampleStruct_ebo, ARRAY_COUNT(DqnInspectMetadata_SampleStruct_ebo), // metadata array
     },
     {
@@ -108,6 +110,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -116,6 +119,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         DqnInspectMetadata_SampleStruct_vao, ARRAY_COUNT(DqnInspectMetadata_SampleStruct_vao), // metadata array
     },
     {
@@ -124,6 +128,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_Ptr_const_, STR_AND_LEN("int *const"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -132,6 +137,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_const_Ptr_const_, STR_AND_LEN("int const *const"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -140,6 +146,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -148,6 +155,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -156,6 +164,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -164,22 +173,25 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::V4_, STR_AND_LEN("V4"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         DqnInspectMetadata_SampleStruct_draw_color, ARRAY_COUNT(DqnInspectMetadata_SampleStruct_draw_color), // metadata array
     },
     {
         DqnInspectMemberType::SampleStruct_lights, STR_AND_LEN("lights"),
         offsetof(SampleStruct, lights),
         DqnInspectDeclType::Array_, STR_AND_LEN("Array"),
-        nullptr, 0, // template_expr and template_expr_len
+        STR_AND_LEN("V3, 32"), // template_expr
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
         DqnInspectMemberType::SampleStruct_camera_matrixes, STR_AND_LEN("camera_matrixes"),
         offsetof(SampleStruct, camera_matrixes),
         DqnInspectDeclType::Array_, STR_AND_LEN("Array"),
-        nullptr, 0, // template_expr and template_expr_len
+        STR_AND_LEN("V4, 32"), // template_expr
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -188,6 +200,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::char_Ptr_Ptr_, STR_AND_LEN("char **"),
         nullptr, 0, // template_expr and template_expr_len
         2, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -196,6 +209,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {ARRAY_COUNT(((SampleStruct *)0)->shaders), 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -204,6 +218,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::void_Ptr_, STR_AND_LEN("void *"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -212,6 +227,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::V3_, STR_AND_LEN("V3"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -220,6 +236,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -228,6 +245,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -236,6 +254,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_const_, STR_AND_LEN("int const"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -244,6 +263,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_Ptr_const_, STR_AND_LEN("int *const"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -252,14 +272,16 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_const_Ptr_, STR_AND_LEN("int const*"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
         DqnInspectMemberType::SampleStruct_j, STR_AND_LEN("j"),
         offsetof(SampleStruct, j),
-        DqnInspectDeclType::int_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_const_, STR_AND_LEN("int *********const"),
+        DqnInspectDeclType::int_Ptr_Ptr_Ptr_Ptr_const_, STR_AND_LEN("int ****const"),
         nullptr, 0, // template_expr and template_expr_len
-        9, // array_dimensions
+        4, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -268,14 +290,16 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
         DqnInspectMemberType::SampleStruct_l, STR_AND_LEN("l"),
         offsetof(SampleStruct, l),
-        DqnInspectDeclType::int_Ptr_Ptr_Ptr_Ptr_Ptr_Ptr_, STR_AND_LEN("int ******"),
+        DqnInspectDeclType::int_Ptr_Ptr_, STR_AND_LEN("int **"),
         nullptr, 0, // template_expr and template_expr_len
-        6, // array_dimensions
+        2, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
     {
@@ -284,6 +308,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
+        {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
         nullptr, 0, // metadata array
     },
 };
@@ -328,8 +353,18 @@ bool DqnInspectMetadata_Coords(EnumWithMetadata val, V3 *value)
 
 void                               Function1(int a, float b = {}, char const * c = nullptr, bool e = false, int f = 1, char * g = "Hello world");
 void *                             Function2(V3 foo = V3(10, 20, 50), V3 bar = {120, 150, 20}, ...);
-Array<int const *, 3> const *const Function3(Array<int, 32> const * foobar);
+Array<int const *, 3> const *const Function3(Array<int, 32> const *<int, 32> foobar);
+
 #endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
+
+DqnInspectStruct const *DqnInspect_Struct(DqnInspectDeclType type)
+{
+#ifdef DQN_INSPECT_DQNINSPECT_TESTDATA_H
+    if (type == DqnInspectDeclType::SampleStruct_) return &DqnInspect_SampleStruct_Struct;
+#endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
+
+    return nullptr;
+}
 
 
 #undef ARRAY_COUNT

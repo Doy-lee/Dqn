@@ -690,6 +690,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
         Slice<char> variable_template_expr = {};
         if (CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::LessThan, &token))
         {
+            CPPToken template_start_token = token;
             int template_depth = 1;
             while (template_depth != 0 && token.type != CPPTokenType::EndOfStream)
             {
@@ -702,7 +703,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
 
             if (template_depth == 0)
             {
-                char *expr_start = token.str + 1;
+                char *expr_start = template_start_token.str + 1;
                 char *expr_end   = token.str;
                 int expr_len     = static_cast<int>(expr_end - expr_start);
 
