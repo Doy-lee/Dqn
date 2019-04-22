@@ -43,6 +43,7 @@ enum struct DqnInspectDeclType
     V3_,
     V4_,
     int_,
+    Array_,
     int_Ptr_,
     int_Ptr_Ptr_,
     void_Ptr_,
@@ -52,8 +53,6 @@ enum struct DqnInspectDeclType
     int_const_Ptr_,
     SampleStruct_,
     char_const_Ptr_,
-    Array<V3,_32>_,
-    Array<V4,_32>_,
     int_Ptr_Ptr_Ptr_Ptr_const_,
     EnumWithMetadata_,
     int_const_Ptr_const_,
@@ -99,6 +98,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_ebo, STR_AND_LEN("ebo"),
         offsetof(SampleStruct, ebo),
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
+        sizeof(((SampleStruct *)0)->ebo), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -108,6 +108,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_vbo, STR_AND_LEN("vbo"),
         offsetof(SampleStruct, vbo),
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
+        sizeof(((SampleStruct *)0)->vbo), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -117,6 +118,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_vao, STR_AND_LEN("vao"),
         offsetof(SampleStruct, vao),
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
+        sizeof(((SampleStruct *)0)->vao), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -126,6 +128,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_a, STR_AND_LEN("a"),
         offsetof(SampleStruct, a),
         DqnInspectDeclType::int_Ptr_const_, STR_AND_LEN("int *const"),
+        sizeof(((SampleStruct *)0)->a), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -135,6 +138,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_b, STR_AND_LEN("b"),
         offsetof(SampleStruct, b),
         DqnInspectDeclType::int_const_Ptr_const_, STR_AND_LEN("int const *const"),
+        sizeof(((SampleStruct *)0)->b), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -144,6 +148,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_c, STR_AND_LEN("c"),
         offsetof(SampleStruct, c),
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
+        sizeof(((SampleStruct *)0)->c), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -153,6 +158,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_d, STR_AND_LEN("d"),
         offsetof(SampleStruct, d),
         DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
+        sizeof(((SampleStruct *)0)->d), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -162,6 +168,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_e, STR_AND_LEN("e"),
         offsetof(SampleStruct, e),
         DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
+        sizeof(((SampleStruct *)0)->e), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -171,6 +178,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_draw_color, STR_AND_LEN("draw_color"),
         offsetof(SampleStruct, draw_color),
         DqnInspectDeclType::V4_, STR_AND_LEN("V4"),
+        sizeof(((SampleStruct *)0)->draw_color), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -180,6 +188,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_lights, STR_AND_LEN("lights"),
         offsetof(SampleStruct, lights),
         DqnInspectDeclType::Array_, STR_AND_LEN("Array"),
+        sizeof(((SampleStruct *)0)->lights), // decl_type_sizeof
         STR_AND_LEN("V3, 32"), // template_expr
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -189,6 +198,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_camera_matrixes, STR_AND_LEN("camera_matrixes"),
         offsetof(SampleStruct, camera_matrixes),
         DqnInspectDeclType::Array_, STR_AND_LEN("Array"),
+        sizeof(((SampleStruct *)0)->camera_matrixes), // decl_type_sizeof
         STR_AND_LEN("V4, 32"), // template_expr
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -198,6 +208,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_bitmaps, STR_AND_LEN("bitmaps"),
         offsetof(SampleStruct, bitmaps),
         DqnInspectDeclType::char_Ptr_Ptr_, STR_AND_LEN("char **"),
+        sizeof(((SampleStruct *)0)->bitmaps), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         2, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -207,6 +218,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_shaders, STR_AND_LEN("shaders"),
         offsetof(SampleStruct, shaders),
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
+        sizeof(((SampleStruct *)0)->shaders), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {ARRAY_COUNT(((SampleStruct *)0)->shaders), 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -216,6 +228,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_win32_handle, STR_AND_LEN("win32_handle"),
         offsetof(SampleStruct, win32_handle),
         DqnInspectDeclType::void_Ptr_, STR_AND_LEN("void *"),
+        sizeof(((SampleStruct *)0)->win32_handle), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -225,6 +238,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_lighting_ambient_coeff, STR_AND_LEN("lighting_ambient_coeff"),
         offsetof(SampleStruct, lighting_ambient_coeff),
         DqnInspectDeclType::V3_, STR_AND_LEN("V3"),
+        sizeof(((SampleStruct *)0)->lighting_ambient_coeff), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -234,6 +248,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_draw_call_count, STR_AND_LEN("draw_call_count"),
         offsetof(SampleStruct, draw_call_count),
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
+        sizeof(((SampleStruct *)0)->draw_call_count), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -243,6 +258,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_f, STR_AND_LEN("f"),
         offsetof(SampleStruct, f),
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
+        sizeof(((SampleStruct *)0)->f), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -252,6 +268,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_g, STR_AND_LEN("g"),
         offsetof(SampleStruct, g),
         DqnInspectDeclType::int_const_, STR_AND_LEN("int const"),
+        sizeof(((SampleStruct *)0)->g), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -261,6 +278,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_h, STR_AND_LEN("h"),
         offsetof(SampleStruct, h),
         DqnInspectDeclType::int_Ptr_const_, STR_AND_LEN("int *const"),
+        sizeof(((SampleStruct *)0)->h), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -270,6 +288,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_i, STR_AND_LEN("i"),
         offsetof(SampleStruct, i),
         DqnInspectDeclType::int_const_Ptr_, STR_AND_LEN("int const*"),
+        sizeof(((SampleStruct *)0)->i), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -279,6 +298,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_j, STR_AND_LEN("j"),
         offsetof(SampleStruct, j),
         DqnInspectDeclType::int_Ptr_Ptr_Ptr_Ptr_const_, STR_AND_LEN("int ****const"),
+        sizeof(((SampleStruct *)0)->j), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         4, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -288,6 +308,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_k, STR_AND_LEN("k"),
         offsetof(SampleStruct, k),
         DqnInspectDeclType::int_, STR_AND_LEN("int"),
+        sizeof(((SampleStruct *)0)->k), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         0, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -297,6 +318,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_l, STR_AND_LEN("l"),
         offsetof(SampleStruct, l),
         DqnInspectDeclType::int_Ptr_Ptr_, STR_AND_LEN("int **"),
+        sizeof(((SampleStruct *)0)->l), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         2, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -306,6 +328,7 @@ DqnInspectMember const DqnInspect_SampleStruct_Members[] =
         DqnInspectMemberType::SampleStruct_m, STR_AND_LEN("m"),
         offsetof(SampleStruct, m),
         DqnInspectDeclType::int_Ptr_, STR_AND_LEN("int *"),
+        sizeof(((SampleStruct *)0)->m), // decl_type_sizeof
         nullptr, 0, // template_expr and template_expr_len
         1, // array_dimensions
         {0, 0, 0, 0, 0, 0, 0, 0}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,
@@ -353,7 +376,7 @@ bool DqnInspectMetadata_Coords(EnumWithMetadata val, V3 *value)
 
 void                               Function1(int a, float b = {}, char const * c = nullptr, bool e = false, int f = 1, char * g = "Hello world");
 void *                             Function2(V3 foo = V3(10, 20, 50), V3 bar = {120, 150, 20}, ...);
-Array<int const *, 3> const *const Function3(Array<int, 32> const *<int, 32> foobar);
+Array<int const *, 3> const *const Function3(Array<int, 32> const * foobar);
 
 #endif // DQN_INSPECT_DQNINSPECT_TESTDATA_H
 

@@ -72,6 +72,7 @@ struct DqnInspectMember
     enum struct DqnInspectDeclType   decl_type;
     char const *                     decl_type_str;
     int                              decl_type_len;
+    int                              decl_type_sizeof;
     char const *                     template_expr;
     int                              template_expr_len;
     int                              array_dimensions; // > 0 means array
@@ -1704,8 +1705,13 @@ int main(int argc, char *argv[])
                             {
                                 CPPVariableDecl const *decl = &link->value;
                                 Slice<char> type_name       = {};
+#if 0
                                 if (decl->template_expr.len > 0) type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", decl->type.len, decl->type.str, decl->template_expr.len, decl->template_expr.str);
                                 else                             type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
+#else
+                                // TODO(doyle): Hmmm. Maybe we don't serialise the template expression since they can become arbitrarily complex
+                                type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
+#endif
                                 unique_decl_type_table.insert(type_name);
 
                                 for (CPPDeclLinkedList<CPPVariableDecl> const *meta_link = link->metadata_list;
@@ -2113,6 +2119,7 @@ int main(int argc, char *argv[])
                             FprintfIndented(output_file, indent_level, "DqnInspectDeclType::");
                             FprintDeclType(output_file, decl->type);
                             fprintf(output_file, ", STR_AND_LEN(\"%.*s\"),\n", decl->type.len, decl->type.str);
+                            FprintfIndented(output_file, indent_level, "sizeof(((%.*s *)0)->%.*s), // decl_type_sizeof\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
 
                             if (decl->template_expr.len <= 0)
                                 FprintfIndented(output_file, indent_level, "nullptr, 0, // template_expr and template_expr_len\n");
@@ -2213,8 +2220,6 @@ int main(int argc, char *argv[])
                     {
                         CPPVariableDecl *decl = &param_link->value;
                         fprintf(output_file, "%.*s", decl->type.len, decl->type.str);
-                        if (decl->template_expr.len > 0)
-                            fprintf(output_file, "<%.*s>", decl->template_expr.len, decl->template_expr.str);
 
                         if (decl->name.len > 0)
                             fprintf(output_file, " %.*s", decl->name.len, decl->name.str);
