@@ -76,6 +76,9 @@ struct DqnInspectMember
     int                              template_expr_len;
     int                              array_dimensions; // > 0 means array
 
+    // NOTE: Supports maximum of 8 dimensions. 0 if unknown (i.e. just a pointer)
+    int                              array_compile_time_size[8];
+
     DqnInspectMetadata const        *metadata;
     int                              metadata_len;
 };
@@ -87,6 +90,40 @@ struct DqnInspectStruct
     DqnInspectMember const *members;
     int                     members_len;
 };
+
+inline DqnInspectMetadata const *DqnInspectMember_FindMetadata(DqnInspectMember const *member,
+                                                               enum struct DqnInspectMetaType meta_type,
+                                                               enum struct DqnInspectDeclType *decl_types = nullptr,
+                                                               int num_decl_types                         = 0)
+{
+    for (size_t metadata_index = 0;
+         metadata_index < member->metadata_len;
+         ++metadata_index)
+    {
+        DqnInspectMetadata const *metadata = member->metadata + metadata_index;
+        if (metadata->meta_type == meta_type)
+        {
+            for (size_t decl_type_index = 0; decl_type_index < num_decl_types; ++decl_type_index)
+            {
+                DqnInspectDeclType const *decl_type = decl_types + decl_type_index;
+                if (metadata->decl_type == *decl_type)
+                {
+                    return metadata;
+                }
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+inline DqnInspectMetadata const *DqnInspectMember_FindMetadata(DqnInspectMember const *member,
+                                                               enum struct DqnInspectMetaType meta_type,
+                                                               enum struct DqnInspectDeclType decl_type)
+{
+    DqnInspectMetadata const *result = DqnInspectMember_FindMetadata(member, meta_type, &decl_type, 1);
+    return result;
+}
 
 // NOTE(doyle): For compiler testing
 // #include "../Data/DqnInspect_TestData.h"
@@ -137,7 +174,6 @@ struct DeferHelper
 
 #define KILOBYTE(val) (1024ULL * (val))
 #define MEGABYTE(val) (1024ULL * KILOBYTE(val))
-
 
 #define SLICE_LITERAL(str) Slice<char const>{str, CHAR_COUNT(str)}
 template <typename T>
@@ -429,8 +465,13 @@ struct CPPVariableDecl
     Slice<char> template_expr;
     b32         array_has_const;
     int         array_dimensions;
+    b32         array_dimensions_has_compile_time_size[8]; // TODO(doyle): Max of 8 dimensions, whotf needs more?
     Slice<char> default_value;
 };
+
+static_assert(ARRAY_COUNT(((DqnInspectMember *)0)->array_compile_time_size) ==
+                  ARRAY_COUNT(((CPPVariableDecl *)0)->array_dimensions_has_compile_time_size),
+              "Sizes must match otherwise overflow on writing our Inspection data");
 
 template <typename T>
 struct CPPDeclLinkedList
@@ -767,10 +808,21 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
              token = CPPTokeniser_NextToken(tokeniser))
         {
             // TODO(doyle): Parsing array size is difficult if it's an expression, so maybe don't do it at all
-            ++link->value.array_dimensions;
+            int token_count_after_left_sq_bracket = 0;
             while (token.type != CPPTokenType::RightSqBracket && token.type != CPPTokenType::EndOfStream)
+            {
+                token_count_after_left_sq_bracket++;
                 token = CPPTokeniser_NextToken(tokeniser);
+            }
+
+            if (token_count_after_left_sq_bracket > 0)
+            {
+                // NOTE(doyle): There is some sort of contents in the bracket, so, this array has a compile time size
+                link->value.array_dimensions_has_compile_time_size[link->value.array_dimensions] = true;
+            }
+            ++link->value.array_dimensions;
         }
+        assert(link->value.array_dimensions < ARRAY_COUNT(link->value.array_dimensions_has_compile_time_size));
 
         if (IsIdentifierToken(token, SLICE_LITERAL("DQN_INSPECT_META")))
         {
@@ -2068,6 +2120,26 @@ int main(int argc, char *argv[])
 
                             FprintfIndented(output_file, indent_level, "%d, // array_dimensions\n", decl->array_dimensions);
 
+                            FprintfIndented(output_file, indent_level, "{");
+                            for (int dimensions_index = 0;
+                                 dimensions_index < ARRAY_COUNT(decl->array_dimensions_has_compile_time_size);
+                                 ++dimensions_index)
+                            {
+                                bool has_compile_time_size = decl->array_dimensions_has_compile_time_size[dimensions_index];
+                                if (has_compile_time_size)
+                                {
+                                    fprintf(output_file, "ARRAY_COUNT(((%.*s *)0)->%.*s)", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                                }
+                                else
+                                {
+                                    fputc('0', output_file);
+                                }
+
+                                if (dimensions_index < ARRAY_COUNT(decl->array_dimensions_has_compile_time_size) - 1)
+                                    fputs(", ", output_file);
+                            }
+                            fprintf(output_file, "}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,\n");
+
                             if (member->metadata_list)
                             {
                                 FprintfIndented(output_file, indent_level, "DqnInspectMetadata_%.*s_%.*s, ", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
@@ -2115,7 +2187,6 @@ int main(int argc, char *argv[])
                         indent_level--;
                         FprintfIndented(output_file, indent_level, "}\n\n");
                     }
-
                 }
                 break;
 
@@ -2159,15 +2230,53 @@ int main(int argc, char *argv[])
             }
         }
 
-        fprintf(output_file, "#endif // DQN_INSPECT_%.*s\n\n",
+        fprintf(output_file, "\n#endif // DQN_INSPECT_%.*s\n\n",
             parsing_results.file_include_contents_hash_define_len,
             parsing_results.file_include_contents_hash_define);
     }
 
-    fprintf(output_file,
-            "\n#undef ARRAY_COUNT\n"
-            "#undef CHAR_COUNT\n"
-            "#undef STR_AND_LEN\n");
+    //
+    // NOTE: After all the definitions have been written, write the function
+    //       that maps the member_type to the DqnInspectStruct's declared above
+    //
+    if (mode == InspectMode::All || mode == InspectMode::Code)
+    {
+        FprintfIndented(output_file, indent_level, "DqnInspectStruct const *DqnInspect_Struct(DqnInspectDeclType type)\n{\n");
+        indent_level++;
+        for (ParsingResult &parsing_results : parsing_results_per_file)
+        {
+            fprintf(output_file,
+                    "#ifdef DQN_INSPECT_%.*s\n",
+                    parsing_results.file_include_contents_hash_define_len,
+                    parsing_results.file_include_contents_hash_define
+                    );
+
+            for (ParsedCode &code : parsing_results.code)
+            {
+                switch(code.type)
+                {
+                    case ParsedCodeType::Struct:
+                    {
+                        ParsedStruct const *parsed_struct = &code.parsed_struct;
+                        FprintfIndented(output_file, indent_level, "if (type == DqnInspectDeclType::%.*s_) return &DqnInspect_%.*s_Struct;\n", parsed_struct->name.len, parsed_struct->name.str, parsed_struct->name.len, parsed_struct->name.str);
+                    }
+                    break;
+                }
+            }
+
+            fprintf(output_file, "#endif // DQN_INSPECT_%.*s\n\n",
+                parsing_results.file_include_contents_hash_define_len,
+                parsing_results.file_include_contents_hash_define);
+        }
+        FprintfIndented(output_file, indent_level, "return nullptr;\n");
+        indent_level--;
+        FprintfIndented(output_file, indent_level, "}\n\n");
+
+        fprintf(output_file,
+                "\n#undef ARRAY_COUNT\n"
+                "#undef CHAR_COUNT\n"
+                "#undef STR_AND_LEN\n");
+    }
 
     fclose(output_file);
 
