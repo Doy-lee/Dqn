@@ -69,12 +69,20 @@ struct DqnInspectMember
     int                              name_len;
     int                              pod_struct_offset;
 
+    // Includes the template expression if there is any in declaration
     enum struct DqnInspectDeclType   decl_type;
     char const *                     decl_type_str;
     int                              decl_type_len;
     int                              decl_type_sizeof;
-    char const *                     template_expr;
-    int                              template_expr_len;
+
+    // If there's a template this will be the topmost of the declaration i.e. for vector<int>
+    // this will just be DqnInspectDeclType::vector_
+    enum struct DqnInspectDeclType   template_parent_decl_type;
+
+    enum struct DqnInspectDeclType   template_child_decl_type;
+    char const *                     template_child_expr;
+    int                              template_child_expr_len;
+
     int                              array_dimensions; // > 0 means array
 
     // NOTE: Supports maximum of 8 dimensions. 0 if unknown (i.e. just a pointer)
@@ -104,6 +112,9 @@ inline DqnInspectMetadata const *DqnInspectMember_FindMetadata(DqnInspectMember 
         DqnInspectMetadata const *metadata = member->metadata + metadata_index;
         if (metadata->meta_type == meta_type)
         {
+            if (!decl_types || num_decl_types == 0)
+                return metadata;
+
             for (size_t decl_type_index = 0; decl_type_index < num_decl_types; ++decl_type_index)
             {
                 DqnInspectDeclType const *decl_type = decl_types + decl_type_index;
@@ -463,7 +474,7 @@ struct CPPVariableDecl
     b32         type_has_const;
     Slice<char> type;
     Slice<char> name;
-    Slice<char> template_expr;
+    Slice<char> template_child_expr;
     b32         array_has_const;
     int         array_dimensions;
     b32         array_dimensions_has_compile_time_size[8]; // TODO(doyle): Max of 8 dimensions, whotf needs more?
@@ -688,7 +699,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
     CPPToken variable_type = token;
     for (int total_asterisks_count = 0;;)
     {
-        Slice<char> variable_template_expr = {};
+        Slice<char> variable_template_child_expr = {};
         if (CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::LessThan, &token))
         {
             CPPToken template_start_token = token;
@@ -708,8 +719,8 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
                 char *expr_end   = token.str;
                 int expr_len     = static_cast<int>(expr_end - expr_start);
 
-                variable_template_expr.str = expr_start;
-                variable_template_expr.len = expr_len;
+                variable_template_child_expr.str = expr_start;
+                variable_template_child_expr.len = expr_len;
             }
         }
 
@@ -801,7 +812,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
         link->value.type_has_const   = type_has_const;
         link->value.type             = variable_type_str_lit;
         link->value.name             = Slice<char>(variable_name.str, variable_name.len);
-        link->value.template_expr    = variable_template_expr;
+        link->value.template_child_expr    = variable_template_child_expr;
         link->value.array_has_const  = array_has_const;
         link->value.array_dimensions = total_asterisks_count;
 
@@ -998,7 +1009,7 @@ b32 ParseCPPVariableType(CPPTokeniser *tokeniser, Slice<char> *type)
     //
     // Parse Template If Any
     //
-    Slice<char> template_expr = {};
+    Slice<char> template_child_expr = {};
     {
         CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
         if (peek_token.type == CPPTokenType::LessThan)
@@ -1020,8 +1031,8 @@ b32 ParseCPPVariableType(CPPTokeniser *tokeniser, Slice<char> *type)
                 char *expr_end   = token.str;
                 int expr_len     = static_cast<int>(expr_end - expr_start);
 
-                template_expr.str = expr_start;
-                template_expr.len = expr_len;
+                template_child_expr.str = expr_start;
+                template_child_expr.len = expr_len;
             }
         }
     }
@@ -1404,26 +1415,43 @@ char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing
     return ptr;
 }
 
-void FprintDeclType(FILE *output_file, Slice<char> const type)
+void FprintDeclType(FILE *output_file, Slice<char> const type, Slice<char> const template_child_expr)
 {
-    for (int i = 0; i < type.len; ++i)
+    Slice<char> const array[] =
     {
-        char ch = type.str[i];
-        if (ch == '*')
-        {
-            char prev_ch = type.str[i - 1];
-            if (prev_ch != ' ' && prev_ch != '*') fputc('_', output_file);
+        type,
+        template_child_expr
+    };
 
-            fputs("Ptr", output_file);
-            if (i < (type.len - 1)) fputc('_', output_file);
-        }
-        else
+    for (int array_index = 0; array_index < ARRAY_COUNT(array); ++array_index)
+    {
+        Slice<char> const *slice = array + array_index;
+        if (array_index > 0 && slice->len > 0)
+            fputc('_', output_file);
+
+        for (int i = 0; i < slice->len; ++i)
         {
-            if (ch == ' ') ch = '_';
-            fputc(ch, output_file);
+            char ch = slice->str[i];
+            if (ch == '*')
+            {
+                char prev_ch = slice->str[i - 1];
+                if (prev_ch != ' ' && prev_ch != '*') fputc('_', output_file);
+
+                fputs("Ptr", output_file);
+                if (i < (slice->len - 1)) fputc('_', output_file);
+            }
+            else
+            {
+                if (ch != '>')
+                {
+                    if (ch == ' ' || ch == '<') ch = '_';
+                    fputc(ch, output_file);
+                }
+            }
         }
     }
-    fprintf(output_file, "_");
+
+    fputc('_', output_file);
 }
 
 int main(int argc, char *argv[])
@@ -1704,25 +1732,26 @@ int main(int argc, char *argv[])
                                  link = link->next)
                             {
                                 CPPVariableDecl const *decl = &link->value;
-                                Slice<char> type_name       = {};
-#if 0
-                                if (decl->template_expr.len > 0) type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", decl->type.len, decl->type.str, decl->template_expr.len, decl->template_expr.str);
-                                else                             type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
-#else
-                                // TODO(doyle): Hmmm. Maybe we don't serialise the template expression since they can become arbitrarily complex
-                                type_name = Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str);
-#endif
-                                unique_decl_type_table.insert(type_name);
+
+                                unique_decl_type_table.insert(Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str));
+                                if (decl->template_child_expr.len > 0)
+                                {
+                                    if (!CharIsDigit(decl->template_child_expr.str[0]))
+                                        unique_decl_type_table.insert(Asprintf(&global_main_arena, "%.*s", decl->template_child_expr.len, decl->template_child_expr.str));
+                                    unique_decl_type_table.insert(Asprintf(&global_main_arena, "%.*s<%.*s>", decl->type.len, decl->type.str, decl->template_child_expr.len, decl->template_child_expr.str));
+                                }
 
                                 for (CPPDeclLinkedList<CPPVariableDecl> const *meta_link = link->metadata_list;
                                      meta_link;
                                      meta_link = meta_link->next)
                                 {
                                     CPPVariableDecl const *meta_decl = &meta_link->value;
-                                    Slice<char> meta_type_name       = {};
-                                    if (meta_decl->template_expr.len > 0) meta_type_name = Asprintf(&global_main_arena, "%.*s<%.*s>", meta_decl->type.len, meta_decl->type.str, meta_decl->template_expr.len, meta_decl->template_expr.str);
-                                    else                                  meta_type_name = Asprintf(&global_main_arena, "%.*s",       meta_decl->type.len, meta_decl->type.str);
-                                    unique_decl_type_table.insert(meta_type_name);
+                                    unique_decl_type_table.insert(Asprintf(&global_main_arena, "%.*s", meta_decl->type.len, meta_decl->type.str));
+                                    if (meta_decl->template_child_expr.len > 0)
+                                    {
+                                        unique_decl_type_table.insert(Asprintf(&global_main_arena, "%.*s", meta_decl->template_child_expr.len, meta_decl->template_child_expr.str));
+                                        unique_decl_type_table.insert(Asprintf(&global_main_arena, "%.*s<%.*s>", meta_decl->type.len, meta_decl->type.str, meta_decl->template_child_expr.len, meta_decl->template_child_expr.str));
+                                    }
                                 }
                             }
                         }
@@ -1733,10 +1762,11 @@ int main(int argc, char *argv[])
 
             FprintfIndented(output_file, indent_level, "enum struct DqnInspectDeclType\n{\n");
             indent_level++;
+            FprintfIndented(output_file, indent_level, "NotAvailable_,\n");
             for (Slice<char> const &type : unique_decl_type_table)
             {
                 FprintfIndented(output_file, indent_level, "");
-                FprintDeclType(output_file, type);
+                FprintDeclType(output_file, type, {});
                 fprintf(output_file, ",\n");
             }
             indent_level--;
@@ -2084,7 +2114,7 @@ int main(int argc, char *argv[])
                         {
                             CPPVariableDecl const *metadata = &metadata_link->value;
                             FprintfIndented(output_file, indent_level, "{ DqnInspectDeclType::");
-                            FprintDeclType(output_file, metadata->type);
+                            FprintDeclType(output_file, metadata->type, metadata->template_child_expr);
                             fprintf(output_file,
                                     ", DqnInspectMetaType::%.*s, &DqnInspectMetadata_%.*s_%.*s_%.*s},\n",
                                     metadata->name.len, metadata->name.str,
@@ -2115,16 +2145,59 @@ int main(int argc, char *argv[])
 
                             FprintfIndented(output_file, indent_level, "DqnInspectMemberType::%.*s_%.*s, ", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
                             fprintf(output_file, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
-                            FprintfIndented(output_file, indent_level, "offsetof(%.*s, %.*s),\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
-                            FprintfIndented(output_file, indent_level, "DqnInspectDeclType::");
-                            FprintDeclType(output_file, decl->type);
-                            fprintf(output_file, ", STR_AND_LEN(\"%.*s\"),\n", decl->type.len, decl->type.str);
-                            FprintfIndented(output_file, indent_level, "sizeof(((%.*s *)0)->%.*s), // decl_type_sizeof\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
 
-                            if (decl->template_expr.len <= 0)
-                                FprintfIndented(output_file, indent_level, "nullptr, 0, // template_expr and template_expr_len\n");
-                            else
-                                FprintfIndented(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), // template_expr\n", decl->template_expr.len, decl->template_expr.str);
+                            // NOTE: Write pod_struct_offset
+                            {
+                                FprintfIndented(output_file, indent_level, "offsetof(%.*s, %.*s),\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                            }
+
+                            // NOTE: Write decl_type
+                            {
+                                FprintfIndented(output_file, indent_level, "DqnInspectDeclType::");
+                                FprintDeclType(output_file, decl->type, decl->template_child_expr);
+                            }
+
+                            // NOTE: Write decl_type_str, decl_type_len
+                            {
+                                if (decl->template_child_expr.len > 0)
+                                    fprintf(output_file, ", STR_AND_LEN(\"%.*s<%.*s>\"),\n", decl->type.len, decl->type.str, decl->template_child_expr.len, decl->template_child_expr.str);
+                                else
+                                    fprintf(output_file, ", STR_AND_LEN(\"%.*s\"),\n", decl->type.len, decl->type.str);
+                            }
+
+                            // NOTE: Write decl_type_sizeof
+                            {
+                                FprintfIndented(output_file, indent_level, "sizeof(((%.*s *)0)->%.*s), // full_decl_type_sizeof\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
+                            }
+
+                            // NOTE: Write template_parent_decl_type
+                            {
+                                FprintfIndented(output_file, indent_level, "DqnInspectDeclType::");
+                                FprintDeclType(output_file, decl->type, {});
+                                fprintf(output_file, ", ");
+                            }
+
+                            // NOTE: Write template_decl_type
+                            {
+                                if (decl->template_child_expr.len > 0 && !CharIsDigit(decl->template_child_expr.str[0]))
+                                {
+                                    fprintf(output_file, "DqnInspectDeclType::");
+                                    FprintDeclType(output_file, decl->template_child_expr, {});
+                                }
+                                else
+                                {
+                                    fprintf(output_file, "DqnInspectDeclType::NotAvailable_");
+                                }
+                                fprintf(output_file, ",\n");
+                            }
+
+                            // NOTE: Write template_child_expr, template_child_expr_len
+                            {
+                                if (decl->template_child_expr.len > 0)
+                                    FprintfIndented(output_file, indent_level, "STR_AND_LEN(\"%.*s\"), // template_child_expr\n", decl->template_child_expr.len, decl->template_child_expr.str);
+                                else
+                                    FprintfIndented(output_file, indent_level, "nullptr, 0, // template_child_expr and template_child_expr_len\n");
+                            }
 
                             FprintfIndented(output_file, indent_level, "%d, // array_dimensions\n", decl->array_dimensions);
 
