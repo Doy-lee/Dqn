@@ -443,6 +443,7 @@ Slice<char> Asprintf(MemArena *arena, char const *fmt, ...)
     X(Identifier, "Identifier") \
     X(Number, "[0-9]") \
     X(Asterisks, "*") \
+    X(Ampersand, "&") \
     X(VarArgs, "Variable Args (...)") \
     X(InspectCode, "DQN_INSPECT") \
     X(InspectGeneratePrototype, "DQN_INSPECT_GENERATE_PROTOTYPE") \
@@ -607,20 +608,26 @@ DQN_INSPECT enum struct EnumWithMetadata
 };
 #endif
 
-int ConsumeAsterisks(CPPTokeniser *tokeniser, CPPToken *token = nullptr)
+int ConsumeToken(CPPTokeniser *tokeniser, CPPTokenType type, CPPToken *token = nullptr)
 {
     int result = 0;
-    CPPToken last_asterisks_token = {};
+    CPPToken last_token = {};
     for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
-         peek_token.type == CPPTokenType::Asterisks;
+         peek_token.type == type;
          ++result)
     {
-        last_asterisks_token = peek_token;
+        last_token = peek_token;
         CPPTokeniser_NextToken(tokeniser);
         peek_token = CPPTokeniser_PeekToken(tokeniser);
     }
 
-    if (token && last_asterisks_token.type != CPPTokenType::EndOfStream) *token = last_asterisks_token;
+    if (token && last_token.type != CPPTokenType::EndOfStream) *token = last_token;
+    return result;
+}
+
+int ConsumeAsterisks(CPPTokeniser *tokeniser, CPPToken *token = nullptr)
+{
+    int result = ConsumeToken(tokeniser, CPPTokenType::Asterisks, token);
     return result;
 }
 
@@ -725,6 +732,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
         }
 
         CPPToken last_modifier_token = {};
+        ConsumeToken(tokeniser, CPPTokenType::Ampersand, &last_modifier_token);
         total_asterisks_count        = ConsumeAsterisks(tokeniser, &last_modifier_token);
         b32 array_has_const          = false;
         if (ConsumeConstIdentifier(tokeniser, &last_modifier_token))
@@ -737,6 +745,8 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
             total_asterisks_count += ConsumeAsterisks(tokeniser, &last_modifier_token);
             ConsumeConstIdentifier(tokeniser, &last_modifier_token);
         }
+
+        ConsumeToken(tokeniser, CPPTokenType::Ampersand, &last_modifier_token);
 
         CPPToken variable_name = {};
         if (variable_type.type == CPPTokenType::Identifier)
@@ -917,9 +927,11 @@ struct ParsedStruct
 
 struct ParsedFunctionPrototype
 {
-    Slice<char>                       return_type;
-    Slice<char>                       name;
+    Slice<char>                         return_type;
+    Slice<char>                         name;
     CPPDeclLinkedList<CPPVariableDecl> *members;
+    b32                                 has_comments;
+    LinkedList<Slice<char>>             comments;
 };
 
 struct ParsedCode
@@ -1188,6 +1200,23 @@ b32 ParseCPPInspectPrototype(CPPTokeniser *tokeniser, ParsedFunctionPrototype *p
         Slice<char> default_value;
     };
 
+    // Grab all following comments
+    {
+        LinkedList<Slice<char>> *comments = &parsed_func->comments;
+        while (CPPTokeniser_AcceptTokenIfType(tokeniser, CPPTokenType::Comment, &token))
+        {
+            parsed_func->has_comments = true;
+            if (comments->value.str > 0)
+            {
+                comments->next = MEM_ARENA_ALLOC_STRUCT(&global_main_arena, LinkedList<Slice<char>>);
+                comments       = comments->next;
+            }
+
+            comments->value = Slice<char>(token.str, token.len);
+        }
+    }
+
+
     // Grab return type token
     {
         token = CPPTokeniser_PeekToken(tokeniser);
@@ -1304,6 +1333,7 @@ char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing
                 case '>': { token->type = CPPTokenType::GreaterThan; } break;
                 case ':': { token->type = CPPTokenType::Colon;       } break;
                 case '*': { token->type = CPPTokenType::Asterisks;   } break;
+                case '&': { token->type = CPPTokenType::Ampersand;   } break;
 
                 case '.':
                 {
@@ -1328,6 +1358,7 @@ char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing
                         token->type = CPPTokenType::Comment;
                         if (ptr[0] == '/')
                         {
+                            ptr++;
                             while (ptr[0] == ' ' || ptr[0] == '\t') ptr++;
                             token->str = ptr;
                             while (ptr[0] != '\n') ptr++;
@@ -1344,6 +1375,8 @@ char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing
                         }
 
                         token->len = static_cast<int>(ptr - token->str);
+                        if (token->len >= 1)
+                            if (ptr[-1] == '\r') token->len--;
                     }
                 }
                 break;
@@ -1367,9 +1400,9 @@ char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing
                     }
                     else
                     {
-                        if (CharIsDigit(ptr[0]))
+                        if (CharIsDigit(ptr[0]) || ptr[0] == '-' || ptr[0] == '*')
                         {
-                            while (CharIsDigit(ptr[0]) || ptr[0] == 'x' || ptr[0] == 'b' || ptr[0] == 'e' || ptr[0] == '.' || ptr[0] == 'f')
+                            while (CharIsDigit(ptr[0]) || ptr[0] == 'x' || ptr[0] == 'b' || ptr[0] == 'e' || ptr[0] == '.' || ptr[0] == 'f' || ptr[0] == '-' || ptr[0] == '+')
                                 ptr++;
 
                             token->type = CPPTokenType::Number;
@@ -1391,7 +1424,7 @@ char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing
                 break;
             }
 
-            if (token->len == 0)
+            if (token->len == 0 && token->type != CPPTokenType::Comment)
             {
                 *token = {};
                 tokeniser->tokens_len--;
@@ -2024,7 +2057,7 @@ int main(int argc, char *argv[])
                             else
                             {
                                 FprintfIndented(output_file, indent_level,
-                                                           "bool DqnInspectMetadata_%.*s(%.*s val, %.*s *value)\n{\n",
+                                                           "bool DqnInspectMetadata_%.*s(%.*s val, %.*s *value = nullptr)\n{\n",
                                                            metadata.name.len, metadata.name.str,
                                                            parsed_enum->name.len, parsed_enum->name.str,
                                                            metadata.type.len, metadata.type.str
@@ -2274,6 +2307,18 @@ int main(int argc, char *argv[])
                 case ParsedCodeType::FunctionPrototype:
                 {
                     ParsedFunctionPrototype *parsed_func = &code.parsed_func_prototype;
+                    if (parsed_func->has_comments)
+                    {
+                        for (LinkedList<Slice<char>> const *comment_link = &parsed_func->comments;
+                             comment_link;
+                             comment_link                                = comment_link->next)
+                        {
+                            Slice<char> const comment = comment_link->value;
+                            if (comment.len == 0) fprintf(output_file, "//\n");
+                            else                  fprintf(output_file, "// %.*s\n", comment.len, comment.str);
+                        }
+                    }
+
                     {
                         Slice<char> return_type            = parsed_func->return_type;
                         Slice<char> func_name              = parsed_func->name;
@@ -2322,6 +2367,8 @@ int main(int argc, char *argv[])
     {
         FprintfIndented(output_file, indent_level, "DqnInspectStruct const *DqnInspect_Struct(DqnInspectDeclType type)\n{\n");
         indent_level++;
+        FprintfIndented(output_file, indent_level, "(void)type;\n");
+
         for (ParsingResult &parsing_results : parsing_results_per_file)
         {
             fprintf(output_file,
