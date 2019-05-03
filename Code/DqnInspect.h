@@ -176,10 +176,14 @@ struct DeferHelper
     Defer<Lambda> operator+(Lambda lambda) { return Defer<Lambda>(lambda); }
 };
 
+template <typename T, unsigned short N>
+unsigned short ArrayCount(T (&)[N]) { return N; }
+
+template <typename T, unsigned short N>
+unsigned short CharCount(T (&)[N]) { return N - 1; }
+
 #define INSPECT_MAX(a, b) ((a) > (b)) ? (a) : (b)
 #define INSPECT_MIN(a, b) ((a) < (b)) ? (a) : (b)
-#define ARRAY_COUNT(str) sizeof(str)/sizeof(str[0])
-#define CHAR_COUNT(str) (ARRAY_COUNT(str) - 1)
 #define TOKEN_COMBINE(x, y) x ## y
 #define TOKEN_COMBINE2(x, y) TOKEN_COMBINE(x, y)
 #define DEFER auto const TOKEN_COMBINE(defer_lambda_, __COUNTER__) = DeferHelper() + [&]()
@@ -187,7 +191,7 @@ struct DeferHelper
 #define KILOBYTE(val) (1024ULL * (val))
 #define MEGABYTE(val) (1024ULL * KILOBYTE(val))
 
-#define SLICE_LITERAL(str) Slice<char const>{str, CHAR_COUNT(str)}
+#define SLICE_LITERAL(str) Slice<char const>{str, CharCount(str)}
 template <typename T>
 struct Slice
 {
@@ -470,6 +474,7 @@ struct CPPToken
     int   len;
 };
 
+#define ARRAY_COUNT(array) sizeof(array)/sizeof(array[0])
 struct CPPVariableDecl
 {
     b32         type_has_const;
@@ -482,8 +487,7 @@ struct CPPVariableDecl
     Slice<char> default_value;
 };
 
-static_assert(ARRAY_COUNT(((DqnInspectMember *)0)->array_compile_time_size) ==
-                  ARRAY_COUNT(((CPPVariableDecl *)0)->array_dimensions_has_compile_time_size),
+static_assert(ARRAY_COUNT(((DqnInspectMember *)0)->array_compile_time_size) == ARRAY_COUNT(((CPPVariableDecl *)0)->array_dimensions_has_compile_time_size),
               "Sizes must match otherwise overflow on writing our Inspection data");
 
 template <typename T>
@@ -845,7 +849,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
             }
             ++link->value.array_dimensions;
         }
-        assert(link->value.array_dimensions < ARRAY_COUNT(link->value.array_dimensions_has_compile_time_size));
+        assert(link->value.array_dimensions < ArrayCount(link->value.array_dimensions_has_compile_time_size));
 
         if (IsIdentifierToken(token, SLICE_LITERAL("DQN_INSPECT_META")))
         {
@@ -1456,7 +1460,7 @@ void FprintDeclType(FILE *output_file, Slice<char> const type, Slice<char> const
         template_child_expr
     };
 
-    for (int array_index = 0; array_index < ARRAY_COUNT(array); ++array_index)
+    for (int array_index = 0; array_index < ArrayCount(array); ++array_index)
     {
         Slice<char> const *slice = array + array_index;
         if (array_index > 0 && slice->len > 0)
@@ -2017,7 +2021,22 @@ int main(int argc, char *argv[])
                         for (MetadataEntry const &metadata : metadata_entries)
                         {
                             Slice<char const> const char_type = SLICE_LITERAL("char");
-                            if (metadata.type.len >= char_type.len && strncmp(metadata.type.str, char_type.str, char_type.len) == 0)
+                            Slice<char const> const bool_types[] =
+                            {
+                                SLICE_LITERAL("bool"),
+                                SLICE_LITERAL("b32"),
+                            };
+
+                            b32 is_char_type                  = (metadata.type.len >= char_type.len && strncmp(metadata.type.str, char_type.str, char_type.len) == 0);
+                            b32 is_bool_type = false;
+                            for (size_t i = 0; i < ArrayCount(bool_types) && !is_char_type; i++)
+                            {
+                                Slice<char const> const *bool_type = bool_types + i;
+                                is_bool_type                       = (metadata.type.len >= bool_type->len && strncmp(metadata.type.str, bool_type->str, bool_type->len) == 0);
+                                if (is_bool_type) break;
+                            }
+
+                            if (is_char_type || is_bool_type)
                             {
                                 FprintfIndented(output_file, indent_level,
                                               "%.*s DqnInspectMetadata_%.*s(%.*s val)\n{\n",
@@ -2028,7 +2047,10 @@ int main(int argc, char *argv[])
                                 indent_level++;
                                 DEFER
                                 {
-                                    FprintfIndented(output_file, indent_level, "return nullptr;\n");
+                                    if (is_char_type)
+                                        FprintfIndented(output_file, indent_level, "return nullptr;\n");
+                                    else
+                                        FprintfIndented(output_file, indent_level, "return false;\n");
                                     indent_level--;
                                     FprintfIndented(output_file, indent_level, "}\n\n");
                                 };
@@ -2236,7 +2258,7 @@ int main(int argc, char *argv[])
 
                             FprintfIndented(output_file, indent_level, "{");
                             for (int dimensions_index = 0;
-                                 dimensions_index < ARRAY_COUNT(decl->array_dimensions_has_compile_time_size);
+                                 dimensions_index < ArrayCount(decl->array_dimensions_has_compile_time_size);
                                  ++dimensions_index)
                             {
                                 bool has_compile_time_size = decl->array_dimensions_has_compile_time_size[dimensions_index];
@@ -2249,7 +2271,7 @@ int main(int argc, char *argv[])
                                     fputc('0', output_file);
                                 }
 
-                                if (dimensions_index < ARRAY_COUNT(decl->array_dimensions_has_compile_time_size) - 1)
+                                if (dimensions_index < ArrayCount(decl->array_dimensions_has_compile_time_size) - 1)
                                     fputs(", ", output_file);
                             }
                             fprintf(output_file, "}, // array_compile_time_size 0, max 8 dimensions, 0 if unknown,\n");
