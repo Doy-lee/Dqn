@@ -53,7 +53,7 @@
 
 #define DQN_INSPECT
 #define DQN_INSPECT_META(...)
-#define DQN_INSPECT_GENERATE_PROTOTYPE(...)
+#define DQN_INSPECT_FUNCTION(...)
 
 struct DqnInspectMetadata
 {
@@ -446,7 +446,7 @@ Slice<char> Asprintf(MemArena *arena, char const *fmt, ...)
     X(Ampersand, "&") \
     X(VarArgs, "Variable Args (...)") \
     X(InspectCode, "DQN_INSPECT") \
-    X(InspectGeneratePrototype, "DQN_INSPECT_GENERATE_PROTOTYPE") \
+    X(InspectFunction, "DQN_INSPECT_FUNCTION") \
     X(Hash, "#")
 
 #define X(decl, str) decl,
@@ -908,7 +908,7 @@ enum struct ParsedCodeType
     Invalid,
     Struct,
     Enum,
-    FunctionPrototype,
+    Function,
 };
 
 struct ParsedEnum
@@ -925,7 +925,7 @@ struct ParsedStruct
 };
 
 
-struct ParsedFunctionPrototype
+struct ParsedFunction
 {
     Slice<char>                         return_type;
     Slice<char>                         name;
@@ -940,7 +940,7 @@ struct ParsedCode
     union
     {
         ParsedEnum              parsed_enum;
-        ParsedFunctionPrototype parsed_func_prototype;
+        ParsedFunction parsed_func;
         ParsedStruct            parsed_struct;
     };
 };
@@ -1122,11 +1122,11 @@ b32 ParseCPPStruct(CPPTokeniser *tokeniser, ParsedStruct *parsed_struct)
     return true;
 }
 
-b32 ParseCPPInspectPrototype(CPPTokeniser *tokeniser, ParsedFunctionPrototype *parsed_func)
+b32 ParseCPPInspectFunction(CPPTokeniser *tokeniser, ParsedFunction *parsed_func)
 {
     *parsed_func = {};
     CPPToken token = CPPTokeniser_NextToken(tokeniser);
-    if (!ExpectToken(token, CPPTokenType::InspectGeneratePrototype))
+    if (!ExpectToken(token, CPPTokenType::InspectFunction))
         return false;
 
     struct FunctionDefaultParam
@@ -1295,7 +1295,7 @@ enum struct InspectMode
 {
     All,
     Code,
-    GenerateProtypes
+    Function
 };
 
 char *EnumOrStructOrFunctionLexer(CPPTokeniser *tokeniser, char *ptr, b32 lexing_function)
@@ -1503,8 +1503,8 @@ int main(int argc, char *argv[])
     usize starting_arg_index = 1;
     char const *mode_str     = argv[1];
     InspectMode mode         = InspectMode::All;
-    if (strcmp(mode_str, "code") == 0)                     mode = InspectMode::Code;
-    else if (strcmp(mode_str, "generate_prototypes") == 0) mode = InspectMode::GenerateProtypes;
+    if (strcmp(mode_str, "code") == 0)           mode = InspectMode::Code;
+    else if (strcmp(mode_str, "function") == 0) mode = InspectMode::Function;
 
     if (mode != InspectMode::All)
         starting_arg_index++;
@@ -1582,10 +1582,10 @@ int main(int argc, char *argv[])
         tokeniser.tokens_max   = 16384;
         tokeniser.tokens       = MEM_ARENA_ALLOC_ARRAY(&global_main_arena, CPPToken, tokeniser.tokens_max);
 
-        Slice<char const> const INSPECT_PROTOTYPE = SLICE_LITERAL("DQN_INSPECT_GENERATE_PROTOTYPE");
-        Slice<char const> const INSPECT_PREFIX    = SLICE_LITERAL("DQN_INSPECT");
-        char *file_buf_end                        = file_buf + file_size;
-        Slice<char> buffer                        = Slice<char>(file_buf, static_cast<int>(file_size));
+        Slice<char const> const INSPECT_FUNCTION = SLICE_LITERAL("DQN_INSPECT_FUNCTION");
+        Slice<char const> const INSPECT_PREFIX   = SLICE_LITERAL("DQN_INSPECT");
+        char *file_buf_end                       = file_buf + file_size;
+        Slice<char> buffer                       = Slice<char>(file_buf, static_cast<int>(file_size));
 
         for (char *ptr = StrFind(buffer, INSPECT_PREFIX);
              ptr;
@@ -1601,19 +1601,19 @@ int main(int argc, char *argv[])
             };
 
             CPPTokenType inspect_type = CPPTokenType::InspectCode;
-            if (Slice_Cmp(Slice<char const>(ptr, INSPECT_PROTOTYPE.len), INSPECT_PROTOTYPE))
+            if (Slice_Cmp(Slice<char const>(ptr, INSPECT_FUNCTION.len), INSPECT_FUNCTION))
             {
-                inspect_type = CPPTokenType::InspectGeneratePrototype;
+                inspect_type = CPPTokenType::InspectFunction;
             }
 
             if (inspect_type == CPPTokenType::InspectCode)
             {
                 ptr += INSPECT_PREFIX.len;
-                if (mode == InspectMode::GenerateProtypes) continue;
+                if (mode == InspectMode::Function) continue;
             }
             else
             {
-                ptr += INSPECT_PROTOTYPE.len;
+                ptr += INSPECT_FUNCTION.len;
                 if (mode == InspectMode::Code) continue;
             }
 
@@ -1621,7 +1621,7 @@ int main(int argc, char *argv[])
             inspect_token->type     = inspect_type;
             inspect_token->str      = marker_str;
             inspect_token->len      = marker_len;
-            ptr = EnumOrStructOrFunctionLexer(&tokeniser, ptr, inspect_type == CPPTokenType::InspectGeneratePrototype);
+            ptr = EnumOrStructOrFunctionLexer(&tokeniser, ptr, inspect_type == CPPTokenType::InspectFunction);
 
         }
 
@@ -1633,7 +1633,7 @@ int main(int argc, char *argv[])
              token          = CPPTokeniser_PeekToken(&tokeniser))
         {
             ParsedCode parsed_code = {};
-            if (token.type == CPPTokenType::InspectCode || token.type == CPPTokenType::InspectGeneratePrototype)
+            if (token.type == CPPTokenType::InspectCode || token.type == CPPTokenType::InspectFunction)
             {
                 if (token.type == CPPTokenType::InspectCode)
                 {
@@ -1653,11 +1653,11 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    if (ParseCPPInspectPrototype(&tokeniser, &parsed_code.parsed_func_prototype))
+                    if (ParseCPPInspectFunction(&tokeniser, &parsed_code.parsed_func))
                     {
-                        parsed_code.type = ParsedCodeType::FunctionPrototype;
-                        parsing_results.max_func_return_type_decl_len = INSPECT_MAX(parsing_results.max_func_return_type_decl_len, parsed_code.parsed_func_prototype.return_type.len);
-                        parsing_results.max_func_name_decl_len        = INSPECT_MAX(parsing_results.max_func_name_decl_len, parsed_code.parsed_func_prototype.name.len);
+                        parsed_code.type = ParsedCodeType::Function;
+                        parsing_results.max_func_return_type_decl_len = INSPECT_MAX(parsing_results.max_func_return_type_decl_len, parsed_code.parsed_func.return_type.len);
+                        parsing_results.max_func_name_decl_len        = INSPECT_MAX(parsing_results.max_func_name_decl_len, parsed_code.parsed_func.name.len);
                     }
                 }
             }
@@ -2304,9 +2304,9 @@ int main(int argc, char *argv[])
                 }
                 break;
 
-                case ParsedCodeType::FunctionPrototype:
+                case ParsedCodeType::Function:
                 {
-                    ParsedFunctionPrototype *parsed_func = &code.parsed_func_prototype;
+                    ParsedFunction *parsed_func = &code.parsed_func;
                     if (parsed_func->has_comments)
                     {
                         for (LinkedList<Slice<char>> const *comment_link = &parsed_func->comments;

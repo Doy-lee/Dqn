@@ -40,14 +40,14 @@ DQN_INSPECT enum struct EnumWithMetadata
     Count,
 };
 
-DQN_INSPECT_GENERATE_PROTOTYPE(b = {}, c = nullptr, e = false, f = 1, g = "Hello world")
+DQN_INSPECT_FUNCTION(b = {}, c = nullptr, e = false, f = 1, g = "Hello world")
 void Function1(int a, float b, char const *c, bool e, int f, char *g)
 {
     (void)a; (void)b; (void)c; (void)e; (void)f; (void)g;
 }
 
-DQN_INSPECT_GENERATE_PROTOTYPE(foo = V3(10, 20, 50), bar = {120, 150, 20})
+DQN_INSPECT_FUNCTION(foo = V3(10, 20, 50), bar = {120, 150, 20})
 void *Function2(V3 foo, V3 bar, ...) { (void)foo; (void)bar; return nullptr; }
 
-DQN_INSPECT_GENERATE_PROTOTYPE()
+DQN_INSPECT_FUNCTION()
 Array<int const *, 3> const *const Function3(Array<int, 32> const *foobar) { (void)foobar; return {}; }
