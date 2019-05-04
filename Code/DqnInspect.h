@@ -733,6 +733,12 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
                 variable_template_child_expr.str = expr_start;
                 variable_template_child_expr.len = expr_len;
             }
+
+            for (int ch_index = 0; ch_index < variable_template_child_expr.len; ++ch_index)
+            {
+                if (variable_template_child_expr.str[ch_index] == ',')
+                    variable_template_child_expr.str[ch_index] = '_';
+            }
         }
 
         CPPToken last_modifier_token = {};
@@ -1858,11 +1864,13 @@ int main(int argc, char *argv[])
                 "// %.*s\n"
                 "//\n"
                 "\n"
-                "#ifndef DQN_INSPECT_%.*s\n"
+                "#if !defined(DQN_INSPECT_DISABLE_%.*s) && !defined(DQN_INSPECT_%.*s)\n"
                 "#define DQN_INSPECT_%.*s\n"
                 "\n",
                 parsing_results.file_name.len,
                 parsing_results.file_name.str,
+                parsing_results.file_include_contents_hash_define_len,
+                parsing_results.file_include_contents_hash_define,
                 parsing_results.file_include_contents_hash_define_len,
                 parsing_results.file_include_contents_hash_define,
                 parsing_results.file_include_contents_hash_define_len,
