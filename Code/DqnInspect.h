@@ -64,6 +64,7 @@ struct DqnInspectMetadata
 
 struct DqnInspectMember
 {
+    size_t                           id; // Unique ID, does not conflict with ID in InspectStruct either
     enum struct DqnInspectMemberType name_type;
     char const *                     name;
     int                              name_len;
@@ -94,6 +95,7 @@ struct DqnInspectMember
 
 struct DqnInspectStruct
 {
+    size_t                  id; // Same as InspectMember, they are in the same number space and do not conflict
     char const             *name;
     int                     name_len;
     DqnInspectMember const *members;
@@ -1857,6 +1859,7 @@ int main(int argc, char *argv[])
     }
 
     assert(indent_level == 0);
+    size_t unique_id = 0;
     for (ParsingResult &parsing_results : parsing_results_per_file)
     {
         fprintf(output_file,
@@ -2206,6 +2209,7 @@ int main(int argc, char *argv[])
                             FprintfIndented(output_file, indent_level, "{\n");
                             indent_level++;
 
+                            FprintfIndented(output_file, indent_level, "%zu, // id\n", unique_id++);
                             FprintfIndented(output_file, indent_level, "DqnInspectMemberType::%.*s_%.*s, ", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
                             fprintf(output_file, "STR_AND_LEN(\"%.*s\"),\n", decl->name.len, decl->name.str);
 
@@ -2310,6 +2314,7 @@ int main(int argc, char *argv[])
                         FprintfIndented(output_file, indent_level, "DqnInspectStruct const DqnInspect_%.*s_Struct =\n{\n", parsed_struct->name.len, parsed_struct->name.str);
                         indent_level++;
 
+                        FprintfIndented(output_file, indent_level, "%zu, // id\n", unique_id++);
                         FprintfIndented(output_file, indent_level, "STR_AND_LEN(\"%.*s\"),\n", parsed_struct->name.len, parsed_struct->name.str);
                         FprintfIndented(output_file, indent_level, "DqnInspect_%.*s_Members, // members\n", parsed_struct->name.len, parsed_struct->name.str);
                         FprintfIndented(output_file, indent_level, "ARRAY_COUNT(DqnInspect_%.*s_Members) // members_len\n", parsed_struct->name.len, parsed_struct->name.str);
