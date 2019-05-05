@@ -70,6 +70,11 @@ struct DqnInspectMember
     int                              name_len;
     int                              pod_struct_offset;
 
+    // The declaration type without any pointer or const modifiers, including template expressions
+    enum struct DqnInspectDeclType   base_decl_type;
+    char const *                     base_decl_type_str;
+    int                              base_decl_type_len;
+
     // Includes the template expression if there is any in declaration
     enum struct DqnInspectDeclType   decl_type;
     char const *                     decl_type_str;
@@ -480,6 +485,7 @@ struct CPPToken
 struct CPPVariableDecl
 {
     b32         type_has_const;
+    Slice<char> type_without_ptr_const_modifiers;
     Slice<char> type;
     Slice<char> name;
     Slice<char> template_child_expr;
@@ -614,6 +620,25 @@ DQN_INSPECT enum struct EnumWithMetadata
 };
 #endif
 
+int ConsumeIdentifier(CPPTokeniser *tokeniser, Slice<char const> identifier, CPPToken *token = nullptr)
+{
+    int result = 0;
+    CPPToken last_token = {};
+    for (CPPToken peek_token = CPPTokeniser_PeekToken(tokeniser);
+         peek_token.type == CPPTokenType::Identifier &&
+         Slice_Cmp(identifier, Slice<char const>(peek_token.str, peek_token.len));
+         ++result)
+    {
+        last_token = peek_token;
+        CPPTokeniser_NextToken(tokeniser);
+        peek_token = CPPTokeniser_PeekToken(tokeniser);
+    }
+
+    if (token && last_token.type != CPPTokenType::EndOfStream) *token = last_token;
+    return result;
+}
+
+
 int ConsumeToken(CPPTokeniser *tokeniser, CPPTokenType type, CPPToken *token = nullptr)
 {
     int result = 0;
@@ -705,6 +730,9 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
     CPPDeclLinkedList<CPPVariableDecl> *link_iterator = nullptr;
 
     b32 type_has_const = ConsumeConstIdentifier(tokeniser);
+    ConsumeIdentifier(tokeniser, SLICE_LITERAL("enum"));
+    ConsumeIdentifier(tokeniser, SLICE_LITERAL("struct"));
+    ConsumeIdentifier(tokeniser, SLICE_LITERAL("class"));
     CPPToken token     = CPPTokeniser_NextToken(tokeniser);
     if (token.type != CPPTokenType::Identifier && token.type != CPPTokenType::VarArgs)
         return result;
@@ -743,7 +771,8 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
             }
         }
 
-        CPPToken last_modifier_token = {};
+        CPPToken end_of_type_wo_modifiers = token;
+        CPPToken last_modifier_token      = {};
         ConsumeToken(tokeniser, CPPTokenType::Ampersand, &last_modifier_token);
         total_asterisks_count        = ConsumeAsterisks(tokeniser, &last_modifier_token);
         b32 array_has_const          = false;
@@ -763,7 +792,7 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
         CPPToken variable_name = {};
         if (variable_type.type == CPPTokenType::Identifier)
         {
-            token    = CPPTokeniser_PeekToken(tokeniser);
+            token         = CPPTokeniser_PeekToken(tokeniser);
             variable_name = token;
             if (variable_name.type != CPPTokenType::Identifier)
                 break;
@@ -831,12 +860,13 @@ CPPDeclLinkedList<CPPVariableDecl> *ParseCPPTypeAndVariableDecl(CPPTokeniser *to
         variable_type_str_lit = TrimSpaceAround(variable_type_str_lit);
         variable_type_str_lit = RemoveConsecutiveSpaces(variable_type_str_lit);
 
-        link->value.type_has_const   = type_has_const;
-        link->value.type             = variable_type_str_lit;
-        link->value.name             = Slice<char>(variable_name.str, variable_name.len);
-        link->value.template_child_expr    = variable_template_child_expr;
-        link->value.array_has_const  = array_has_const;
-        link->value.array_dimensions = total_asterisks_count;
+        link->value.type_has_const      = type_has_const;
+        link->value.type_without_ptr_const_modifiers = Slice<char>(variable_type.str, variable_type.len);
+        link->value.type                = variable_type_str_lit;
+        link->value.name                = Slice<char>(variable_name.str, variable_name.len);
+        link->value.template_child_expr = variable_template_child_expr;
+        link->value.array_has_const     = array_has_const;
+        link->value.array_dimensions    = total_asterisks_count;
 
         for (token = CPPTokeniser_PeekToken(tokeniser);
              token.type == CPPTokenType::LeftSqBracket && token.type != CPPTokenType::EndOfStream;
@@ -1779,6 +1809,7 @@ int main(int argc, char *argv[])
                                 CPPVariableDecl const *decl = &link->value;
 
                                 unique_decl_type_table.insert(Asprintf(&global_main_arena, "%.*s", decl->type.len, decl->type.str));
+                                unique_decl_type_table.insert(Asprintf(&global_main_arena, "%.*s", decl->type_without_ptr_const_modifiers.len, decl->type_without_ptr_const_modifiers.str));
                                 if (decl->template_child_expr.len > 0)
                                 {
                                     if (!CharIsDigit(decl->template_child_expr.str[0]))
@@ -2217,6 +2248,16 @@ int main(int argc, char *argv[])
                             {
                                 FprintfIndented(output_file, indent_level, "offsetof(%.*s, %.*s),\n", parsed_struct->name.len, parsed_struct->name.str, decl->name.len, decl->name.str);
                             }
+
+                            // NOTE: Write base_decl_type
+                            {
+                                FprintfIndented(output_file, indent_level, "DqnInspectDeclType::");
+                                FprintDeclType(output_file, decl->type_without_ptr_const_modifiers, {});
+
+                                // NOTE: Write base_decl_type_str, base_decl_type_len
+                                fprintf(output_file, ", STR_AND_LEN(\"%.*s\"),\n", decl->type_without_ptr_const_modifiers.len, decl->type_without_ptr_const_modifiers.str);
+                            }
+
 
                             // NOTE: Write decl_type
                             {
