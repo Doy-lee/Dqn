@@ -2006,7 +2006,7 @@ int main(int argc, char *argv[])
                     {
                         int count = 0;
                         for (CPPDeclLinkedList<Slice<char>> *link = parsed_enum->members; link; link = link->next) count++;
-                        FprintfIndented(output_file, indent_level, "int DqnInspectEnum_Count(%.*s) { return %d; }\n\n", parsed_enum->name.len, parsed_enum->name.str, count);
+                        FprintfIndented(output_file, indent_level, "constexpr int DqnInspectEnum_Count(%.*s) { return %d; }\n\n", parsed_enum->name.len, parsed_enum->name.str, count);
                     }
 
                     //
