@@ -103,23 +103,23 @@ void TestState_PrintResult(TestState const *result)
 
 FILE_SCOPE void UnitTests()
 {
-    // ---------------------------------------------------------------------------------------------
-    //
-    // NOTE: StringBuilder
-    //
-    // ---------------------------------------------------------------------------------------------
     TestingState testing_state = {};
+    // ---------------------------------------------------------------------------------------------
+    //
+    // NOTE: Dqn_StringBuilder
+    //
+    // ---------------------------------------------------------------------------------------------
     {
-        TEST_DECLARE_GROUP_SCOPED(testing_state, "StringBuilder");
-        // NOTE: StringBuilder_Append
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_StringBuilder");
+        // NOTE: Dqn_StringBuilder_Append
         {
             {
                 TEST_START_SCOPE(testing_state, "Append variable length strings and build using malloc");
-                StringBuilder builder = {};
-                StringBuilder_Append(&builder, "Abc", 1);
-                StringBuilder_Append(&builder, "cd");
+                Dqn_StringBuilder<> builder = {};
+                Dqn_StringBuilder_Append(&builder, "Abc", 1);
+                Dqn_StringBuilder_Append(&builder, "cd");
                 isize len    = 0;
-                char *result = StringBuilder_BuildFromMalloc(&builder, &len);
+                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "Acd";
@@ -129,11 +129,11 @@ FILE_SCOPE void UnitTests()
 
             {
                 TEST_START_SCOPE(testing_state, "Append empty string and build using malloc");
-                StringBuilder builder = {};
-                StringBuilder_Append(&builder, "");
-                StringBuilder_Append(&builder, "");
+                Dqn_StringBuilder<> builder = {};
+                Dqn_StringBuilder_Append(&builder, "");
+                Dqn_StringBuilder_Append(&builder, "");
                 isize len    = 0;
-                char *result = StringBuilder_BuildFromMalloc(&builder, &len);
+                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "";
@@ -143,11 +143,11 @@ FILE_SCOPE void UnitTests()
 
             {
                 TEST_START_SCOPE(testing_state, "Append empty string onto string and build using malloc");
-                StringBuilder builder = {};
-                StringBuilder_Append(&builder, "Acd");
-                StringBuilder_Append(&builder, "");
+                Dqn_StringBuilder<> builder = {};
+                Dqn_StringBuilder_Append(&builder, "Acd");
+                Dqn_StringBuilder_Append(&builder, "");
                 isize len    = 0;
-                char *result = StringBuilder_BuildFromMalloc(&builder, &len);
+                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "Acd";
@@ -157,27 +157,42 @@ FILE_SCOPE void UnitTests()
 
             {
                 TEST_START_SCOPE(testing_state, "Append nullptr and build using malloc");
-                StringBuilder builder = {};
-                StringBuilder_Append(&builder, nullptr, 5);
+                Dqn_StringBuilder<> builder = {};
+                Dqn_StringBuilder_Append(&builder, nullptr, 5);
                 isize len    = 0;
-                char *result = StringBuilder_BuildFromMalloc(&builder, &len);
+                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "";
                 TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
+
+            {
+                TEST_START_SCOPE(testing_state, "Append and require new linked buffer and build using malloc");
+                Dqn_StringBuilder<2> builder = {};
+                Dqn_StringBuilder_Append(&builder, "A");
+                Dqn_StringBuilder_Append(&builder, "z"); // Should force a new memory block
+                Dqn_StringBuilder_Append(&builder, "tec");
+                isize len    = 0;
+                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
+                DQN_DEFER { free(result); };
+
+                char constexpr EXPECT_STR[] = "Aztec";
+                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+            }
         }
 
 
-        // NOTE: StringBuilder_AppendChar
+        // NOTE: Dqn_StringBuilder_AppendChar
         {
             TEST_START_SCOPE(testing_state, "Append char and build using malloc");
-            StringBuilder builder = {};
-            StringBuilder_AppendChar(&builder, 'a');
-            StringBuilder_AppendChar(&builder, 'b');
+            Dqn_StringBuilder<> builder = {};
+            Dqn_StringBuilder_AppendChar(&builder, 'a');
+            Dqn_StringBuilder_AppendChar(&builder, 'b');
             isize len    = 0;
-            char *result = StringBuilder_BuildFromMalloc(&builder, &len);
+            char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
             DQN_DEFER { free(result); };
 
             char constexpr EXPECT_STR[] = "ab";
@@ -185,79 +200,94 @@ FILE_SCOPE void UnitTests()
             TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
         }
 
-        // NOTE: StringBuilder_FmtAppend
+        // NOTE: Dqn_StringBuilder_FmtAppend
         {
-            TEST_START_SCOPE(testing_state, "Append format string and build using malloc");
-            StringBuilder builder = {};
-            StringBuilder_FmtAppend(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
-            StringBuilder_FmtAppend(&builder, "Extra Stuff");
-            isize len    = 0;
-            char *result = StringBuilder_BuildFromMalloc(&builder, &len);
-            DQN_DEFER { free(result); };
+            {
+                TEST_START_SCOPE(testing_state, "Append format string and build using malloc");
+                Dqn_StringBuilder<> builder = {};
+                Dqn_StringBuilder_FmtAppend(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
+                Dqn_StringBuilder_FmtAppend(&builder, "Extra Stuff");
+                isize len    = 0;
+                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
+                DQN_DEFER { free(result); };
 
-            char constexpr EXPECT_STR[] = "Number: 4, String: Hello Sailor, Extra Stuff";
-            TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
-            TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+                char constexpr EXPECT_STR[] = "Number: 4, String: Hello Sailor, Extra Stuff";
+                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "Append nullptr format string and build using malloc");
+                Dqn_StringBuilder<> builder = {};
+                Dqn_StringBuilder_FmtAppend(&builder, nullptr);
+                isize len    = 0;
+                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
+                DQN_DEFER { free(result); };
+
+                char constexpr EXPECT_STR[] = "";
+                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+            }
         }
     }
 
     // ---------------------------------------------------------------------------------------------
     //
-    // NOTE: FixedArray
+    // NOTE: Dqn_FixedArray
     //
     // ---------------------------------------------------------------------------------------------
     {
-        TEST_DECLARE_GROUP_SCOPED(testing_state, "FixedArray");
-        // NOTE: FixedArray_Init
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_FixedArray");
+        // NOTE: Dqn_FixedArray_Init
         {
             TEST_START_SCOPE(testing_state, "Initialise from raw array");
             int raw_array[] = {1, 2};
-            auto array = FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
             TEST_EXPECT(testing_state, array.len == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
             TEST_EXPECT(testing_state, array[1] == 2);
         }
 
-        // NOTE: FixedArray_EraseStable
+        // NOTE: Dqn_FixedArray_EraseStable
         {
             TEST_START_SCOPE(testing_state, "Erase stable 1 element from array");
             int raw_array[] = {1, 2, 3};
-            auto array = FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
-            FixedArray_EraseStable(&array, 1);
+            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            Dqn_FixedArray_EraseStable(&array, 1);
             TEST_EXPECT(testing_state, array.len == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
             TEST_EXPECT(testing_state, array[1] == 3);
         }
 
-        // NOTE: FixedArray_EraseUnstable
+        // NOTE: Dqn_FixedArray_EraseUnstable
         {
             TEST_START_SCOPE(testing_state, "Erase unstable 1 element from array");
             int raw_array[] = {1, 2, 3};
-            auto array = FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
-            FixedArray_EraseUnstable(&array, 0);
+            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            Dqn_FixedArray_EraseUnstable(&array, 0);
             TEST_EXPECT(testing_state, array.len == 2);
             TEST_EXPECT(testing_state, array[0] == 3);
             TEST_EXPECT(testing_state, array[1] == 2);
         }
 
-        // NOTE: FixedArray_Add
+        // NOTE: Dqn_FixedArray_Add
         {
             TEST_START_SCOPE(testing_state, "Add 1 element to array");
             int const ITEM  = 2;
             int raw_array[] = {1};
-            auto array      = FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
-            FixedArray_Add(&array, ITEM);
+            auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            Dqn_FixedArray_Add(&array, ITEM);
             TEST_EXPECT(testing_state, array.len == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
             TEST_EXPECT(testing_state, array[1] == ITEM);
         }
 
-        // NOTE: FixedArray_Clear
+        // NOTE: Dqn_FixedArray_Clear
         {
             TEST_START_SCOPE(testing_state, "Clear array");
             int raw_array[] = {1};
-            auto array      = FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
-            FixedArray_Clear(&array);
+            auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            Dqn_FixedArray_Clear(&array);
             TEST_EXPECT(testing_state, array.len == 0);
         }
     }

@@ -196,8 +196,8 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 // -------------------------------------------------------------------------------------------------
 #define DQN_ABS(val) (((val) < 0) ? (-(val)) : (val))
 #define DQN_SQUARED(val) ((val) * (val))
-#define DQN_MIN(a, b) (a < b) ? (a) : (b)
-#define DQN_MAX(a, b) (a > b) ? (a) : (b)
+#define DQN_MIN(a, b) ((a < b) ? (a) : (b))
+#define DQN_MAX(a, b) ((a > b) ? (a) : (b))
 #define DQN_SWAP(a, b)                                                                                                 \
     do                                                                                                                 \
     {                                                                                                                  \
@@ -573,24 +573,26 @@ struct MemArenaScopedRegion
 // NOTE: String Builder
 //
 // -------------------------------------------------------------------------------------------------
-struct StringBuilderBuffer
+struct Dqn_StringBuilderBuffer
 {
-    char                *mem;
-    MemSize              size;
-    MemSize              used;
-    StringBuilderBuffer *next;
+    char                    *mem;
+    MemSize                  size;
+    MemSize                  used;
+    Dqn_StringBuilderBuffer *next;
 };
 
-struct StringBuilder
+usize constexpr DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE = DQN_KILOBYTES(4);
+template <size_t N = DQN_KILOBYTES(16)>
+struct Dqn_StringBuilder
 {
-    void *(*my_calloc)(size_t bytes);
-    void  (*my_free)  (void *ptr, size_t bytes_to_free);
+    void *(*my_malloc)(size_t bytes) = malloc; // Set to nullptr to disable heap allocation
+    void  (*my_free)  (void *ptr)    = free;   // Set to nullptr to disable heap allocation
 
-    char                 fixed_mem[DQN_KILOBYTES(16)];
-    MemSize              fixed_mem_used;
-    StringBuilderBuffer *next_mem_buf;
-    StringBuilderBuffer *last_mem_buf;
-    isize                string_len;
+    char                     fixed_mem[N];
+    MemSize                  fixed_mem_used;
+    Dqn_StringBuilderBuffer *next_mem_buf;
+    Dqn_StringBuilderBuffer *last_mem_buf;
+    isize                    string_len;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -702,7 +704,7 @@ char *Asprintf(T *arena, char const *fmt, ...)
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: FixedArray
+// NOTE: Dqn_FixedArray
 //
 // -------------------------------------------------------------------------------------------------
 template <typename T> void EraseStableFromCArray(T *array, isize len, isize max, isize index)
@@ -715,7 +717,7 @@ template <typename T> void EraseStableFromCArray(T *array, isize len, isize max,
 }
 
 #define FIXED_ARRAY_TEMPLATE_DECL template <typename T, int MAX_>
-FIXED_ARRAY_TEMPLATE_DECL struct FixedArray
+FIXED_ARRAY_TEMPLATE_DECL struct Dqn_FixedArray
 {
     T        data[MAX_];
     isize    len;
@@ -729,19 +731,19 @@ FIXED_ARRAY_TEMPLATE_DECL struct FixedArray
     T const *operator+  (isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
     T       *operator+  (isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
 };
-FIXED_ARRAY_TEMPLATE_DECL FixedArray<T, MAX_>  FixedArray_Init         (T const *item, int num)                            { FixedArray<T, MAX_> result = {}; FixedArray_Add(&result, item, num); return result; }
-FIXED_ARRAY_TEMPLATE_DECL T                   *FixedArray_Add          (FixedArray<T, MAX_> *a, T const *items, isize num) { DQN_ASSERT(a->len + num <= MAX_); T *result = static_cast<T *>(Dqn_MemCopy(a->data + a->len, items, sizeof(T) * num)); a->len += num; return result; }
-FIXED_ARRAY_TEMPLATE_DECL T                   *FixedArray_Add          (FixedArray<T, MAX_> *a, T const item)              { DQN_ASSERT(a->len < MAX_);        a->data[a->len++] = item; return &a->data[a->len - 1]; }
-FIXED_ARRAY_TEMPLATE_DECL T                   *FixedArray_Make         (FixedArray<T, MAX_> *a, isize num)                 { DQN_ASSERT(a->len + num <= MAX_); T *result = a->data + a->len; a->len += num; return result;}
-FIXED_ARRAY_TEMPLATE_DECL void                 FixedArray_Clear        (FixedArray<T, MAX_> *a)                            { a->len = 0; }
-FIXED_ARRAY_TEMPLATE_DECL void                 FixedArray_EraseStable  (FixedArray<T, MAX_> *a, isize index)               { EraseStableFromCArray<T>(a->data, a->len--, a->Max(), index); }
-FIXED_ARRAY_TEMPLATE_DECL void                 FixedArray_EraseUnstable(FixedArray<T, MAX_> *a, isize index)               { DQN_ASSERT(index >= 0 && index < a->len); if (--a->len == 0) return; a->data[index] = a->data[a->len]; }
-FIXED_ARRAY_TEMPLATE_DECL void                 FixedArray_Pop          (FixedArray<T, MAX_> *a, isize num)                 { DQN_ASSERT(a->len - num >= 0); a->len -= num; }
-FIXED_ARRAY_TEMPLATE_DECL T                   *FixedArray_Peek         (FixedArray<T, MAX_> *a)                            { T *result = (a->len == 0) ? nullptr : a->data + (a->len - 1); return result; }
-FIXED_ARRAY_TEMPLATE_DECL isize                FixedArray_GetIndex     (FixedArray<T, MAX_> *a, T const *entry)            { isize result = a->end() - entry; return result; }
+FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray<T, MAX_>  Dqn_FixedArray_Init         (T const *item, int num)                                { Dqn_FixedArray<T, MAX_> result = {}; Dqn_FixedArray_Add(&result, item, num); return result; }
+FIXED_ARRAY_TEMPLATE_DECL T                       *Dqn_FixedArray_Add          (Dqn_FixedArray<T, MAX_> *a, T const *items, isize num) { DQN_ASSERT(a->len + num <= MAX_); T *result = static_cast<T *>(Dqn_MemCopy(a->data + a->len, items, sizeof(T) * num)); a->len += num; return result; }
+FIXED_ARRAY_TEMPLATE_DECL T                       *Dqn_FixedArray_Add          (Dqn_FixedArray<T, MAX_> *a, T const item)              { DQN_ASSERT(a->len < MAX_);        a->data[a->len++] = item; return &a->data[a->len - 1]; }
+FIXED_ARRAY_TEMPLATE_DECL T                       *Dqn_FixedArray_Make         (Dqn_FixedArray<T, MAX_> *a, isize num)                 { DQN_ASSERT(a->len + num <= MAX_); T *result = a->data + a->len; a->len += num; return result;}
+FIXED_ARRAY_TEMPLATE_DECL void                     Dqn_FixedArray_Clear        (Dqn_FixedArray<T, MAX_> *a)                            { a->len = 0; }
+FIXED_ARRAY_TEMPLATE_DECL void                     Dqn_FixedArray_EraseStable  (Dqn_FixedArray<T, MAX_> *a, isize index)               { EraseStableFromCArray<T>(a->data, a->len--, a->Max(), index); }
+FIXED_ARRAY_TEMPLATE_DECL void                     Dqn_FixedArray_EraseUnstable(Dqn_FixedArray<T, MAX_> *a, isize index)               { DQN_ASSERT(index >= 0 && index < a->len); if (--a->len == 0) return; a->data[index] = a->data[a->len]; }
+FIXED_ARRAY_TEMPLATE_DECL void                     Dqn_FixedArray_Pop          (Dqn_FixedArray<T, MAX_> *a, isize num)                 { DQN_ASSERT(a->len - num >= 0); a->len -= num; }
+FIXED_ARRAY_TEMPLATE_DECL T                       *Dqn_FixedArray_Peek         (Dqn_FixedArray<T, MAX_> *a)                            { T *result = (a->len == 0) ? nullptr : a->data + (a->len - 1); return result; }
+FIXED_ARRAY_TEMPLATE_DECL isize                    Dqn_FixedArray_GetIndex     (Dqn_FixedArray<T, MAX_> *a, T const *entry)            { isize result = a->end() - entry; return result; }
 
 template <typename T, int MAX_, typename EqualityProc>
-T *FixedArray_Find(FixedArray<T, MAX_> *a, EqualityProc IsEqual)
+T *Dqn_FixedArray_Find(Dqn_FixedArray<T, MAX_> *a, EqualityProc IsEqual)
 {
     for (T &entry : (*a))
     {
@@ -751,7 +753,7 @@ T *FixedArray_Find(FixedArray<T, MAX_> *a, EqualityProc IsEqual)
     return nullptr;
 }
 
-FIXED_ARRAY_TEMPLATE_DECL T *FixedArray_Find(FixedArray<T, MAX_> *a, T *entry)
+FIXED_ARRAY_TEMPLATE_DECL T *Dqn_FixedArray_Find(Dqn_FixedArray<T, MAX_> *a, T *entry)
 {
     for (T &entry : (*a))
     {
@@ -766,11 +768,11 @@ FIXED_ARRAY_TEMPLATE_DECL T *FixedArray_Find(FixedArray<T, MAX_> *a, T *entry)
 // NOTE: FixedStack
 //
 // -------------------------------------------------------------------------------------------------
-template <typename T, int MAX_> using FixedStack = FixedArray<T, MAX_>;
-template <typename T, int MAX_> T    FixedStack_Pop  (FixedStack<T, MAX_> *array)         { T result = *FixedArray_Peek(array); FixedArray_Pop(array, 1); return result; }
-template <typename T, int MAX_> T   *FixedStack_Peek (FixedStack<T, MAX_> *array)         { return FixedArray_Peek(array); }
-template <typename T, int MAX_> T   *FixedStack_Push (FixedStack<T, MAX_> *array, T item) { return FixedArray_Add(array, item); }
-template <typename T, int MAX_> void FixedStack_Clear(FixedStack<T, MAX_> *array)         { FixedArray_Clear(array); }
+template <typename T, int MAX_> using FixedStack = Dqn_FixedArray<T, MAX_>;
+template <typename T, int MAX_> T    FixedStack_Pop  (FixedStack<T, MAX_> *array)         { T result = *Dqn_FixedArray_Peek(array); Dqn_FixedArray_Pop(array, 1); return result; }
+template <typename T, int MAX_> T   *FixedStack_Peek (FixedStack<T, MAX_> *array)         { return Dqn_FixedArray_Peek(array); }
+template <typename T, int MAX_> T   *FixedStack_Push (FixedStack<T, MAX_> *array, T item) { return Dqn_FixedArray_Add(array, item); }
+template <typename T, int MAX_> void FixedStack_Clear(FixedStack<T, MAX_> *array)         { Dqn_FixedArray_Clear(array); }
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1169,7 +1171,8 @@ MemArenaScopedRegion::~MemArenaScopedRegion()
     this->arena->curr_mem_block->used = this->curr_mem_block_used;
 }
 
-FILE_SCOPE char *StringBuilderGetWriteBufferAndIncrementUsage(StringBuilder *builder, usize size_required)
+template <size_t N>
+FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, usize size_required)
 {
     char *result = builder->fixed_mem + builder->fixed_mem_used;
     usize space  = ArrayCount(builder->fixed_mem) - builder->fixed_mem_used;
@@ -1177,7 +1180,7 @@ FILE_SCOPE char *StringBuilderGetWriteBufferAndIncrementUsage(StringBuilder *bui
 
     if (builder->last_mem_buf)
     {
-        StringBuilderBuffer *last_buf = builder->last_mem_buf;
+        Dqn_StringBuilderBuffer *last_buf = builder->last_mem_buf;
         result                        = last_buf->mem + last_buf->used;
         space                         = last_buf->size - last_buf->used;
         usage                         = &last_buf->used;
@@ -1185,10 +1188,15 @@ FILE_SCOPE char *StringBuilderGetWriteBufferAndIncrementUsage(StringBuilder *bui
 
     if (space < size_required)
     {
+        DQN_ASSERT(builder->my_malloc);
+        if (!builder->my_malloc)
+            return nullptr;
+
         // NOTE: Need to allocate new buf
-        usize allocation_size = sizeof(*builder->last_mem_buf) + DQN_MIN(size_required, ArrayCount(builder->fixed_mem));
-        void *memory          = builder->my_calloc(allocation_size);
-        auto *new_buf         = reinterpret_cast<StringBuilderBuffer *>(memory);
+        usize allocation_size = sizeof(*builder->last_mem_buf) + DQN_MAX(size_required, DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE);
+        void *memory          = builder->my_malloc(allocation_size);
+        auto *new_buf         = reinterpret_cast<Dqn_StringBuilderBuffer *>(memory);
+        *new_buf              = {};
         new_buf->mem          = static_cast<char *>(memory) + sizeof(*new_buf);
         new_buf->size         = allocation_size;
         result                = new_buf->mem;
@@ -1217,11 +1225,12 @@ FILE_SCOPE char *StringBuilderGetWriteBufferAndIncrementUsage(StringBuilder *bui
     return result;
 }
 
-FILE_SCOPE void StringBuilderBuildOutput(StringBuilder const *builder, char *dest, isize dest_size)
+template <usize N>
+FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_StringBuilder<N> const *builder, char *dest, isize dest_size)
 {
     // NOTE: No data appended to builder, just allocate am empty string. But
     // always allocate, so we avoid adding making nullptr part of the possible
-    // return values and makes using StringBuilder more complex.
+    // return values and makes using Dqn_StringBuilder more complex.
     if (dest_size == 1)
     {
         dest[0] = 0;
@@ -1237,12 +1246,12 @@ FILE_SCOPE void StringBuilderBuildOutput(StringBuilder const *builder, char *des
     isize remaining_space = end - buf_ptr;
     DQN_ASSERT(remaining_space >= 0);
 
-    for (StringBuilderBuffer *string_buf = builder->next_mem_buf;
+    for (Dqn_StringBuilderBuffer *string_buf = builder->next_mem_buf;
          string_buf && remaining_space > 0;
          string_buf = string_buf->next)
     {
-        usize bytes_to_copy = DQN_MIN(string_buf->used, (usize)remaining_space);
-        memcpy(buf_ptr, string_buf->mem, bytes_to_copy);
+        buf_ptr--; // We always copy the null terminator from the buffers, so if we know we have another buffer to copy from, remove the null terminator
+        memcpy(buf_ptr, string_buf->mem, string_buf->used);
         buf_ptr += string_buf->used;
 
         remaining_space = end - buf_ptr;
@@ -1258,68 +1267,75 @@ FILE_SCOPE void StringBuilderBuildOutput(StringBuilder const *builder, char *des
 //
 // -------------------------------------------------------------------------------------------------
 // The necessary length to build the string, it returns the length including the null-terminator
-isize StringBuilder_BuildLen(StringBuilder const *builder)
+template <usize N>
+isize Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder)
 {
     isize result = builder->string_len + 1;
     return result;
 }
 
-void StringBuilder_BuildInBuffer(StringBuilder const *builder, char *dest, usize dest_size)
+template <usize N>
+void Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest, usize dest_size)
 {
-    StringBuilderBuildOutput(builder, dest, dest_size);
+    Dqn_StringBuilder__BuildOutput(builder, dest, dest_size);
 }
 
 // len: Return the length of the allocated string including the null-terminator
-char *StringBuilder_BuildFromMalloc(StringBuilder *builder, isize *len = nullptr)
+template <usize N>
+char *Dqn_StringBuilder_BuildFromMalloc(Dqn_StringBuilder<N> *builder, isize *len = nullptr)
 {
-    isize len_w_null_terminator = StringBuilder_BuildLen(builder);
+    isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
     auto *result                = static_cast<char *>(malloc(len_w_null_terminator));
     if (len) *len               = len_w_null_terminator;
-    StringBuilderBuildOutput(builder, result, len_w_null_terminator);
+    Dqn_StringBuilder__BuildOutput(builder, result, len_w_null_terminator);
     return result;
 }
 
-char *StringBuilder_BuildFromArena(StringBuilder *builder, MemArena *arena, isize *len = nullptr)
+template <usize N>
+char *Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, MemArena *arena, isize *len = nullptr)
 {
-    isize len_w_null_terminator = StringBuilder_BuildLen(builder);
+    isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
     char *result  = MEM_ARENA_ALLOC_ARRAY(arena, char, len_w_null_terminator);
     if (len) *len = len_w_null_terminator;
-    StringBuilderBuildOutput(builder, result, len_w_null_terminator);
+    Dqn_StringBuilder__BuildOutput(builder, result, len_w_null_terminator);
     return result;
 }
 
-void StringBuilder_VFmtAppend(StringBuilder *builder, char const *fmt, va_list va)
+template <usize N>
+void Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va)
 {
     if (!fmt) return;
     isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
-    char *buf     = StringBuilderGetWriteBufferAndIncrementUsage(builder, require);
+    char *buf     = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, require);
     stbsp_vsnprintf(buf, static_cast<int>(require), fmt, va);
     builder->string_len += (require - 1); // -1 to exclude null terminator
 }
 
-void StringBuilder_FmtAppend(StringBuilder *builder, char const *fmt, ...)
+template <usize N>
+void Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    StringBuilder_VFmtAppend(builder, fmt, va);
+    Dqn_StringBuilder_VFmtAppend(builder, fmt, va);
     va_end(va);
 }
 
-void StringBuilder_Append(StringBuilder *builder, char const *str, isize len = -1)
+template <usize N>
+void Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, isize len = -1)
 {
     if (!str) return;
     if (len == -1) len = (isize)strlen(str);
     isize len_w_null_terminator = len + 1;
-    char *buf = StringBuilderGetWriteBufferAndIncrementUsage(builder, len_w_null_terminator);
+    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
     Dqn_MemCopy(buf, str, len);
     builder->string_len += len;
     buf[len] = 0;
 }
 
-
-void StringBuilder_AppendChar(StringBuilder *builder, char ch)
+template <usize N>
+void Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch)
 {
-    char *buf = StringBuilderGetWriteBufferAndIncrementUsage(builder, 1 + 1 /*null terminator*/);
+    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, 1 + 1 /*null terminator*/);
     *buf++    = ch;
     builder->string_len++;
     buf[1] = 0;
