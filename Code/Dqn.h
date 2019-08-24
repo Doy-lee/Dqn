@@ -1,6 +1,7 @@
 #if defined(DQN_IMPLEMENTATION)
     #define STB_SPRINTF_IMPLEMENTATION
 #endif
+
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: stb_sprintf
@@ -595,6 +596,179 @@ struct Dqn_StringBuilder
     isize                    string_len;
 };
 
+template <size_t N>
+FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, usize size_required)
+{
+    char *result = builder->fixed_mem + builder->fixed_mem_used;
+    usize space  = Dqn_ArrayCount(builder->fixed_mem) - builder->fixed_mem_used;
+    usize *usage = &builder->fixed_mem_used;
+
+    if (builder->last_mem_buf)
+    {
+        Dqn_StringBuilderBuffer *last_buf = builder->last_mem_buf;
+        result                        = last_buf->mem + last_buf->used;
+        space                         = last_buf->size - last_buf->used;
+        usage                         = &last_buf->used;
+    }
+
+    if (space < size_required)
+    {
+        DQN_ASSERT(builder->my_malloc);
+        if (!builder->my_malloc)
+            return nullptr;
+
+        // NOTE: Need to allocate new buf
+        usize allocation_size = sizeof(*builder->last_mem_buf) + DQN_MAX(size_required, DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE);
+        void *memory          = builder->my_malloc(allocation_size);
+        auto *new_buf         = reinterpret_cast<Dqn_StringBuilderBuffer *>(memory);
+        *new_buf              = {};
+        new_buf->mem          = static_cast<char *>(memory) + sizeof(*new_buf);
+        new_buf->size         = allocation_size;
+        result                = new_buf->mem;
+        usage                 = &new_buf->used;
+
+        if (builder->last_mem_buf)
+        {
+            builder->last_mem_buf->next = new_buf;
+        }
+        else
+        {
+            builder->next_mem_buf = new_buf;
+            builder->last_mem_buf = new_buf;
+        }
+    }
+
+    if (size_required > 0 && *usage > 0 && result[-1] == 0)
+    {
+        // NOTE: Not first time writing into buffer using sprintf, sprintf always writes a null terminator, so we must
+        // subtract one
+        (*usage)--;
+        result--;
+    }
+
+    *usage += size_required;
+    return result;
+}
+
+template <usize N>
+FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_StringBuilder<N> const *builder, char *dest, isize dest_size)
+{
+    // NOTE: No data appended to builder, just allocate am empty string. But
+    // always allocate, so we avoid adding making nullptr part of the possible
+    // return values and makes using Dqn_StringBuilder more complex.
+    if (dest_size == 1)
+    {
+        dest[0] = 0;
+        return;
+    }
+
+    char const *end = dest + dest_size;
+    char *buf_ptr   = dest;
+
+    memcpy(buf_ptr, builder->fixed_mem, builder->fixed_mem_used);
+    buf_ptr += builder->fixed_mem_used;
+
+    isize remaining_space = end - buf_ptr;
+    DQN_ASSERT(remaining_space >= 0);
+
+    for (Dqn_StringBuilderBuffer *string_buf = builder->next_mem_buf;
+         string_buf && remaining_space > 0;
+         string_buf = string_buf->next)
+    {
+        buf_ptr--; // We always copy the null terminator from the buffers, so if we know we have another buffer to copy from, remove the null terminator
+        memcpy(buf_ptr, string_buf->mem, string_buf->used);
+        buf_ptr += string_buf->used;
+
+        remaining_space = end - buf_ptr;
+        DQN_ASSERT(remaining_space >= 0);
+    }
+    DQN_ASSERT(buf_ptr == dest + dest_size);
+}
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: String Builder
+//
+// -------------------------------------------------------------------------------------------------
+DQN_HEADER_COPY_PROTOTYPE_AND_COMMENT(
+"The necessary length to build the string, it returns the length including the null-terminator",
+template <usize N> isize,
+Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder))
+{
+    isize result = builder->string_len + 1;
+    return result;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(
+template <usize N> void,
+Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest, usize dest_size))
+{
+    Dqn_StringBuilder__BuildOutput(builder, dest, dest_size);
+}
+
+// len: Return the length of the allocated string including the null-terminator
+template <usize N>
+char *Dqn_StringBuilder_BuildFromMalloc(Dqn_StringBuilder<N> *builder, isize *len = nullptr)
+{
+    isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
+    auto *result                = static_cast<char *>(malloc(len_w_null_terminator));
+    if (len) *len               = len_w_null_terminator;
+    Dqn_StringBuilder__BuildOutput(builder, result, len_w_null_terminator);
+    return result;
+}
+
+template <usize N>
+char *Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, Dqn_MemArena *arena, isize *len = nullptr)
+{
+    isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
+    char *result  = MEM_ARENA_ALLOC_ARRAY(arena, char, len_w_null_terminator);
+    if (len) *len = len_w_null_terminator;
+    Dqn_StringBuilder__BuildOutput(builder, result, len_w_null_terminator);
+    return result;
+}
+
+template <usize N>
+void Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va)
+{
+    if (!fmt) return;
+    isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
+    char *buf     = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, require);
+    stbsp_vsnprintf(buf, static_cast<int>(require), fmt, va);
+    builder->string_len += (require - 1); // -1 to exclude null terminator
+}
+
+template <usize N>
+void Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...)
+{
+    va_list va;
+    va_start(va, fmt);
+    Dqn_StringBuilder_VFmtAppend(builder, fmt, va);
+    va_end(va);
+}
+
+template <usize N>
+void Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, isize len = -1)
+{
+    if (!str) return;
+    if (len == -1) len = (isize)strlen(str);
+    isize len_w_null_terminator = len + 1;
+    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
+    Dqn_MemCopy(buf, str, len);
+    builder->string_len += len;
+    buf[len] = 0;
+}
+
+template <usize N>
+void Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch)
+{
+    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, 1 + 1 /*null terminator*/);
+    *buf++    = ch;
+    builder->string_len++;
+    buf[1] = 0;
+}
+
+
+
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: (Memory) Slices
@@ -1170,177 +1344,6 @@ Dqn_MemArenaScopedRegion::~Dqn_MemArenaScopedRegion()
 
     this->arena->curr_mem_block->used = this->curr_mem_block_used;
 }
-
-template <size_t N>
-FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, usize size_required)
-{
-    char *result = builder->fixed_mem + builder->fixed_mem_used;
-    usize space  = Dqn_ArrayCount(builder->fixed_mem) - builder->fixed_mem_used;
-    usize *usage = &builder->fixed_mem_used;
-
-    if (builder->last_mem_buf)
-    {
-        Dqn_StringBuilderBuffer *last_buf = builder->last_mem_buf;
-        result                        = last_buf->mem + last_buf->used;
-        space                         = last_buf->size - last_buf->used;
-        usage                         = &last_buf->used;
-    }
-
-    if (space < size_required)
-    {
-        DQN_ASSERT(builder->my_malloc);
-        if (!builder->my_malloc)
-            return nullptr;
-
-        // NOTE: Need to allocate new buf
-        usize allocation_size = sizeof(*builder->last_mem_buf) + DQN_MAX(size_required, DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE);
-        void *memory          = builder->my_malloc(allocation_size);
-        auto *new_buf         = reinterpret_cast<Dqn_StringBuilderBuffer *>(memory);
-        *new_buf              = {};
-        new_buf->mem          = static_cast<char *>(memory) + sizeof(*new_buf);
-        new_buf->size         = allocation_size;
-        result                = new_buf->mem;
-        usage                 = &new_buf->used;
-
-        if (builder->last_mem_buf)
-        {
-            builder->last_mem_buf->next = new_buf;
-        }
-        else
-        {
-            builder->next_mem_buf = new_buf;
-            builder->last_mem_buf = new_buf;
-        }
-    }
-
-    if (size_required > 0 && *usage > 0 && result[-1] == 0)
-    {
-        // NOTE: Not first time writing into buffer using sprintf, sprintf always writes a null terminator, so we must
-        // subtract one
-        (*usage)--;
-        result--;
-    }
-
-    *usage += size_required;
-    return result;
-}
-
-template <usize N>
-FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_StringBuilder<N> const *builder, char *dest, isize dest_size)
-{
-    // NOTE: No data appended to builder, just allocate am empty string. But
-    // always allocate, so we avoid adding making nullptr part of the possible
-    // return values and makes using Dqn_StringBuilder more complex.
-    if (dest_size == 1)
-    {
-        dest[0] = 0;
-        return;
-    }
-
-    char const *end = dest + dest_size;
-    char *buf_ptr   = dest;
-
-    memcpy(buf_ptr, builder->fixed_mem, builder->fixed_mem_used);
-    buf_ptr += builder->fixed_mem_used;
-
-    isize remaining_space = end - buf_ptr;
-    DQN_ASSERT(remaining_space >= 0);
-
-    for (Dqn_StringBuilderBuffer *string_buf = builder->next_mem_buf;
-         string_buf && remaining_space > 0;
-         string_buf = string_buf->next)
-    {
-        buf_ptr--; // We always copy the null terminator from the buffers, so if we know we have another buffer to copy from, remove the null terminator
-        memcpy(buf_ptr, string_buf->mem, string_buf->used);
-        buf_ptr += string_buf->used;
-
-        remaining_space = end - buf_ptr;
-        DQN_ASSERT(remaining_space >= 0);
-    }
-    DQN_ASSERT(buf_ptr == dest + dest_size);
-}
-
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: String Builder
-//
-// -------------------------------------------------------------------------------------------------
-// The necessary length to build the string, it returns the length including the null-terminator
-template <usize N>
-isize Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder)
-{
-    isize result = builder->string_len + 1;
-    return result;
-}
-
-template <usize N>
-void Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest, usize dest_size)
-{
-    Dqn_StringBuilder__BuildOutput(builder, dest, dest_size);
-}
-
-// len: Return the length of the allocated string including the null-terminator
-template <usize N>
-char *Dqn_StringBuilder_BuildFromMalloc(Dqn_StringBuilder<N> *builder, isize *len = nullptr)
-{
-    isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
-    auto *result                = static_cast<char *>(malloc(len_w_null_terminator));
-    if (len) *len               = len_w_null_terminator;
-    Dqn_StringBuilder__BuildOutput(builder, result, len_w_null_terminator);
-    return result;
-}
-
-template <usize N>
-char *Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, Dqn_MemArena *arena, isize *len = nullptr)
-{
-    isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
-    char *result  = MEM_ARENA_ALLOC_ARRAY(arena, char, len_w_null_terminator);
-    if (len) *len = len_w_null_terminator;
-    Dqn_StringBuilder__BuildOutput(builder, result, len_w_null_terminator);
-    return result;
-}
-
-template <usize N>
-void Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va)
-{
-    if (!fmt) return;
-    isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
-    char *buf     = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, require);
-    stbsp_vsnprintf(buf, static_cast<int>(require), fmt, va);
-    builder->string_len += (require - 1); // -1 to exclude null terminator
-}
-
-template <usize N>
-void Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...)
-{
-    va_list va;
-    va_start(va, fmt);
-    Dqn_StringBuilder_VFmtAppend(builder, fmt, va);
-    va_end(va);
-}
-
-template <usize N>
-void Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, isize len = -1)
-{
-    if (!str) return;
-    if (len == -1) len = (isize)strlen(str);
-    isize len_w_null_terminator = len + 1;
-    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
-    Dqn_MemCopy(buf, str, len);
-    builder->string_len += len;
-    buf[len] = 0;
-}
-
-template <usize N>
-void Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch)
-{
-    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, 1 + 1 /*null terminator*/);
-    *buf++    = ch;
-    builder->string_len++;
-    buf[1] = 0;
-}
-
 
 // -------------------------------------------------------------------------------------------------
 //
