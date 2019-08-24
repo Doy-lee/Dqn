@@ -14,4 +14,5 @@ REM Tp     Treat header file as CPP source file
 cl /MT /EHa /GR- /Od /Oi /Z7 /W4 /WX /D DQN_INSPECT_EXECUTABLE_IMPLEMENTATION /Tp ../Code/DqnInspect.h /link /nologo
 DqnInspect.exe ..\Data\DqnInspect_TestData.h > ..\Data\DqnInspect_TestDataGenerated.cpp
 
+cl /MT /EHa /GR- /Od /Oi /Z7 /W4 /WX /wd4201 /D DQN_IMPLEMENTATION ../Code/Dqn_UnitTests.cpp /link /nologo
 popd
