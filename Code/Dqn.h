@@ -206,9 +206,9 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
         b        = tmp;                                                                                                \
     } while (0)
 
-#define DQN_LEN_AND_STR(string)        CharCount(str), string
-#define DQN_STR_AND_LEN(string)        string, CharCount(string)
-#define DQN_STR_AND_LEN_I(string)      string, (int)CharCount(string)
+#define DQN_LEN_AND_STR(string)        Dqn_CharCount(str), string
+#define DQN_STR_AND_LEN(string)        string, Dqn_CharCount(string)
+#define DQN_STR_AND_LEN_I(string)      string, (int)Dqn_CharCount(string)
 #define DQN_FOR_EACH(i, limit)         for (isize (i) = 0; (i) < (isize)(limit); ++(i))
 #define DQN_FOR_EACH_REVERSE(i, limit) for (isize (i) = (isize)(limit-1); (i) >= 0; --(i))
 
@@ -263,10 +263,10 @@ const f32 F32_MAX     = FLT_MAX;
 const isize ISIZE_MAX = PTRDIFF_MAX;
 const usize USIZE_MAX = SIZE_MAX;
 
-template <typename T, usize N> constexpr usize ArrayCount (T const (&)[N])    { return N; }
-template <typename T, usize N> constexpr isize ArrayCountI(T const (&)[N])    { return N; }
-template <usize N>             constexpr usize CharCount  (char const (&)[N]) { return N - 1; }
-template <usize N>             constexpr isize CharCountI (char const (&)[N]) { return N - 1; }
+template <typename T, usize N> constexpr usize Dqn_ArrayCount (T const (&)[N])    { return N; }
+template <typename T, usize N> constexpr isize Dqn_ArrayCountI(T const (&)[N])    { return N; }
+template <usize N>             constexpr usize Dqn_CharCount  (char const (&)[N]) { return N - 1; }
+template <usize N>             constexpr isize Dqn_CharCountI (char const (&)[N]) { return N - 1; }
 
 template <typename Procedure>
 struct DqnDefer
@@ -502,7 +502,7 @@ T *Dqn_MemZero(T *src)
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: MemArena
+// NOTE: Dqn_MemArena
 //
 // -------------------------------------------------------------------------------------------------
 using MemSize = usize;
@@ -517,20 +517,20 @@ struct MemBlock
     MemBlock *next;
 };
 
-enum MemArenaFlag
+enum Dqn_MemArenaFlag
 {
-    MemArenaFlag_NoCRTAllocation = (1 << 0), // If my_calloc/my_free aren't null, it defaults to calloc and free, setting this flag disables that
+    Dqn_MemArenaFlag_NoCRTAllocation = (1 << 0), // If my_calloc/my_free aren't null, it defaults to calloc and free, setting this flag disables that
 };
 
 // TODO(doyle): We should try support function pointer syntax (maybe) for inspection
-typedef void *(MemArenaCallocFunction)(size_t bytes);
-typedef void  (MemArenaFreeFunction)  (void *ptr, size_t bytes_to_free);
-struct MemArena
+typedef void *(Dqn_MemArenaCallocFunction)(size_t bytes);
+typedef void  (Dqn_MemArenaFreeFunction)  (void *ptr, size_t bytes_to_free);
+struct Dqn_MemArena
 {
     // NOTE: Configuration (fill once)
-    MemArenaCallocFunction *my_calloc; // If nullptr, use CRT calloc unless disabled in flags
-    MemArenaFreeFunction   *my_free;   // If nullptr, use CRT free unless disabled in flags
-    u32                     flags;
+    Dqn_MemArenaCallocFunction *my_calloc; // If nullptr, use CRT calloc unless disabled in flags
+    Dqn_MemArenaFreeFunction   *my_free;   // If nullptr, use CRT free unless disabled in flags
+    u32                         flags;
 
     // NOTE: Read Only
     u8        fixed_mem[DQN_KILOBYTES(16)];
@@ -541,11 +541,11 @@ struct MemArena
     int       total_allocated_mem_blocks;
 };
 
-struct MemArenaScopedRegion
+struct Dqn_MemArenaScopedRegion
 {
-    MemArenaScopedRegion(MemArena *arena);
-    ~MemArenaScopedRegion();
-    MemArena *arena;
+    Dqn_MemArenaScopedRegion(Dqn_MemArena *arena);
+    ~Dqn_MemArenaScopedRegion();
+    Dqn_MemArena *arena;
     MemBlock *curr_mem_block;
     usize     curr_mem_block_used;
     MemBlock *top_mem_block;
@@ -560,13 +560,13 @@ struct MemArenaScopedRegion
     #define DQN_DEBUG_PARAMS
 #endif
 
-#define MEM_ARENA_ALLOC(arena, size)             MemArena_Alloc(arena, size DQN_DEBUG_PARAMS);
-#define MEM_ARENA_ALLOC_ARRAY(arena, T, num)     (T *)MemArena_Alloc(arena, sizeof(T) * num DQN_DEBUG_PARAMS);
-#define MEM_ARENA_ALLOC_STRUCT(arena, T)         (T *)MemArena_Alloc(arena, sizeof(T) DQN_DEBUG_PARAMS);
-#define MEM_ARENA_RESERVE(arena, size)           MemArena_Reserve(arena, size DQN_DEBUG_PARAMS);
-#define MEM_ARENA_RESERVE_FROM(arena, src, size) MemArena_ReserveFrom(arena, src, size DQN_DEBUG_PARAMS);
-#define MEM_ARENA_CLEAR_USED(arena)              MemArena_ClearUsed(arena DQN_DEBUG_PARAMS);
-#define MEM_ARENA_FREE(arena)                    MemArena_Free
+#define MEM_ARENA_ALLOC(arena, size)             Dqn_MemArena_Alloc(arena, size DQN_DEBUG_PARAMS);
+#define MEM_ARENA_ALLOC_ARRAY(arena, T, num)     (T *)Dqn_MemArena_Alloc(arena, sizeof(T) * num DQN_DEBUG_PARAMS);
+#define MEM_ARENA_ALLOC_STRUCT(arena, T)         (T *)Dqn_MemArena_Alloc(arena, sizeof(T) DQN_DEBUG_PARAMS);
+#define MEM_ARENA_RESERVE(arena, size)           Dqn_MemArena_Reserve(arena, size DQN_DEBUG_PARAMS);
+#define MEM_ARENA_RESERVE_FROM(arena, src, size) Dqn_MemArena_ReserveFrom(arena, src, size DQN_DEBUG_PARAMS);
+#define MEM_ARENA_CLEAR_USED(arena)              Dqn_MemArena_ClearUsed(arena DQN_DEBUG_PARAMS);
+#define MEM_ARENA_FREE(arena)                    Dqn_MemArena_Free
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -621,7 +621,7 @@ struct Slice
 #define SLICE_LITERAL(string) Slice<char const>(DQN_STR_AND_LEN(string))
 
 template <typename T>
-inline Slice<T> Slice_CopyNullTerminated(MemArena *arena, T const *src, isize len)
+inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, T const *src, isize len)
 {
     Slice<T> result = {};
     result.len      = len;
@@ -632,14 +632,14 @@ inline Slice<T> Slice_CopyNullTerminated(MemArena *arena, T const *src, isize le
 }
 
 template <typename T>
-inline Slice<T> Slice_CopyNullTerminated(MemArena *arena, Slice<T> const src)
+inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, Slice<T> const src)
 {
     Slice<T> result = Slice_CopyNullTerminated(arena, src.buf, src.len);
     return result;
 }
 
 template <typename T>
-inline Slice<T> Slice_Copy(MemArena *arena, T const *src, isize len)
+inline Slice<T> Slice_Copy(Dqn_MemArena *arena, T const *src, isize len)
 {
     Slice<T> result = {};
     result.len      = len;
@@ -649,7 +649,7 @@ inline Slice<T> Slice_Copy(MemArena *arena, T const *src, isize len)
 }
 
 template <typename T>
-inline Slice<T> Slice_Copy(MemArena *arena, Slice<T> const src)
+inline Slice<T> Slice_Copy(Dqn_MemArena *arena, Slice<T> const src)
 {
     Slice<T> result = Slice_Copy(arena, src.buf, src.len);
     return result;
@@ -765,21 +765,21 @@ FIXED_ARRAY_TEMPLATE_DECL T *Dqn_FixedArray_Find(Dqn_FixedArray<T, MAX_> *a, T *
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: FixedStack
+// NOTE: Dqn_FixedStack
 //
 // -------------------------------------------------------------------------------------------------
-template <typename T, int MAX_> using FixedStack = Dqn_FixedArray<T, MAX_>;
-template <typename T, int MAX_> T    FixedStack_Pop  (FixedStack<T, MAX_> *array)         { T result = *Dqn_FixedArray_Peek(array); Dqn_FixedArray_Pop(array, 1); return result; }
-template <typename T, int MAX_> T   *FixedStack_Peek (FixedStack<T, MAX_> *array)         { return Dqn_FixedArray_Peek(array); }
-template <typename T, int MAX_> T   *FixedStack_Push (FixedStack<T, MAX_> *array, T item) { return Dqn_FixedArray_Add(array, item); }
-template <typename T, int MAX_> void FixedStack_Clear(FixedStack<T, MAX_> *array)         { Dqn_FixedArray_Clear(array); }
+template <typename T, int MAX_> using Dqn_FixedStack = Dqn_FixedArray<T, MAX_>;
+template <typename T, int MAX_> T    Dqn_FixedStack_Pop  (Dqn_FixedStack<T, MAX_> *array)         { T result = *Dqn_FixedArray_Peek(array); Dqn_FixedArray_Pop(array, 1); return result; }
+template <typename T, int MAX_> T   *Dqn_FixedStack_Peek (Dqn_FixedStack<T, MAX_> *array)         { return Dqn_FixedArray_Peek(array); }
+template <typename T, int MAX_> T   *Dqn_FixedStack_Push (Dqn_FixedStack<T, MAX_> *array, T item) { return Dqn_FixedArray_Add(array, item); }
+template <typename T, int MAX_> void Dqn_FixedStack_Clear(Dqn_FixedStack<T, MAX_> *array)         { Dqn_FixedArray_Clear(array); }
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: StaticArray
+// NOTE: Dqn_StaticArray
 //
 // -------------------------------------------------------------------------------------------------
-template <typename T> struct StaticArray
+template <typename T> struct Dqn_StaticArray
 {
     T       *data;
     isize    len;
@@ -793,30 +793,30 @@ template <typename T> struct StaticArray
     T const *operator+(isize i) const  { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
     T       *operator+(isize i)        { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
 };
-template <typename T> StaticArray<T> StaticArray_InitMemory   (T *memory, isize max, isize len = 0)          { StaticArray<T> result = {}; result.data = memory; result.len = len; result.max = max; return result; }
-template <typename T> T             *StaticArray_Add          (StaticArray<T> *a, T const *items, isize num) { DQN_ASSERT(a->len + num <= a->max); T *result = static_cast<T *>(Dqn_MemCopy(a->data + a->len, items, sizeof(T) * num)); a->len += num; return result; }
-template <typename T> T             *StaticArray_Add          (StaticArray<T> *a, T const item)              { DQN_ASSERT(a->len < a->max);        a->data[a->len++] = item; return &a->data[a->len - 1]; }
-template <typename T> T             *StaticArray_Make         (StaticArray<T> *a, isize num)                 { DQN_ASSERT(a->len + num <= a->max); T *result = a->data + a->len; a->len += num; return result;}
-template <typename T> void           StaticArray_Clear        (StaticArray<T> *a)                            { a->len = 0; }
-template <typename T> void           StaticArray_EraseStable  (StaticArray<T> *a, isize index)               { EraseStableFromCArray<T>(a->data, a->len--, a->max, index); }
-template <typename T> void           StaticArray_EraseUnstable(StaticArray<T> *a, isize index)               { DQN_ASSERT(index >= 0 && index < a->len); if (--a->len == 0) return; a->data[index] = a->data[a->len]; }
-template <typename T> void           StaticArray_Pop          (StaticArray<T> *a, isize num)                 { DQN_ASSERT(a->len - num >= 0); a->len -= num; }
-template <typename T> T             *StaticArray_Peek         (StaticArray<T> *a)                            { T *result = (a->len == 0) ? nullptr : a->data + (a->len - 1); return result; }
+template <typename T> Dqn_StaticArray<T> Dqn_StaticArray_InitMemory   (T *memory, isize max, isize len = 0)          { Dqn_StaticArray<T> result = {}; result.data = memory; result.len = len; result.max = max; return result; }
+template <typename T> T                 *Dqn_StaticArray_Add          (Dqn_StaticArray<T> *a, T const *items, isize num) { DQN_ASSERT(a->len + num <= a->max); T *result = static_cast<T *>(Dqn_MemCopy(a->data + a->len, items, sizeof(T) * num)); a->len += num; return result; }
+template <typename T> T                 *Dqn_StaticArray_Add          (Dqn_StaticArray<T> *a, T const item)              { DQN_ASSERT(a->len < a->max);        a->data[a->len++] = item; return &a->data[a->len - 1]; }
+template <typename T> T                 *Dqn_StaticArray_Make         (Dqn_StaticArray<T> *a, isize num)                 { DQN_ASSERT(a->len + num <= a->max); T *result = a->data + a->len; a->len += num; return result;}
+template <typename T> void               Dqn_StaticArray_Clear        (Dqn_StaticArray<T> *a)                            { a->len = 0; }
+template <typename T> void               Dqn_StaticArray_EraseStable  (Dqn_StaticArray<T> *a, isize index)               { EraseStableFromCArray<T>(a->data, a->len--, a->max, index); }
+template <typename T> void               Dqn_StaticArray_EraseUnstable(Dqn_StaticArray<T> *a, isize index)               { DQN_ASSERT(index >= 0 && index < a->len); if (--a->len == 0) return; a->data[index] = a->data[a->len]; }
+template <typename T> void               Dqn_StaticArray_Pop          (Dqn_StaticArray<T> *a, isize num)                 { DQN_ASSERT(a->len - num >= 0); a->len -= num; }
+template <typename T> T                 *Dqn_StaticArray_Peek         (Dqn_StaticArray<T> *a)                            { T *result = (a->len == 0) ? nullptr : a->data + (a->len - 1); return result; }
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: FixedString
+// NOTE: Dqn_FixedString
 //
 // -------------------------------------------------------------------------------------------------
 template <isize MAX_>
-struct FixedString
+struct Dqn_FixedString
 {
     union { char data[MAX_]; char str[MAX_]; char buf[MAX_]; };
     isize       len;
     isize       Max()                  const { return MAX_; }
 
-    FixedString()                            { data[0] = 0; len = 0; }
-    FixedString(char const *fmt, ...);
+    Dqn_FixedString()                            { data[0] = 0; len = 0; }
+    Dqn_FixedString(char const *fmt, ...);
 
     char const &operator[]   (isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data[i]; }
     char       &operator[]   (isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data[i]; }
@@ -826,8 +826,8 @@ struct FixedString
     char       *end          ()              { return data + len; }
 };
 
-template <isize MAX_> void FixedString_Clear     (FixedString<MAX_> *str)                       { *str = {}; }
-template <isize MAX_> void FixedString_AppendVFmt(FixedString<MAX_> *str, char const *fmt, va_list va)
+template <isize MAX_> void Dqn_FixedString_Clear     (Dqn_FixedString<MAX_> *str)                       { *str = {}; }
+template <isize MAX_> void Dqn_FixedString_AppendVFmt(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va)
 {
     isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
     isize space   = MAX_ - str->len;
@@ -835,15 +835,15 @@ template <isize MAX_> void FixedString_AppendVFmt(FixedString<MAX_> *str, char c
     str->len += stbsp_vsnprintf(str->data + str->len, static_cast<int>(space), fmt, va);
 }
 
-template <isize MAX_> void FixedString_AppendFmt(FixedString<MAX_> *str, char const *fmt, ...)
+template <isize MAX_> void Dqn_FixedString_AppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    FixedString_AppendVFmt(str, fmt, va);
+    Dqn_FixedString_AppendVFmt(str, fmt, va);
     va_end(va);
 }
 
-template <isize MAX_> void FixedString_Append(FixedString<MAX_> *str, char const *src, isize len = -1)
+template <isize MAX_> void Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *src, isize len = -1)
 {
     if (len == -1) len = (isize)strlen(src);
     isize space = MAX_ - str->len;
@@ -853,12 +853,12 @@ template <isize MAX_> void FixedString_Append(FixedString<MAX_> *str, char const
     str->str[str->len] = 0;
 }
 
-template <isize MAX_> FixedString<MAX_>::FixedString(char const *fmt, ...)
+template <isize MAX_> Dqn_FixedString<MAX_>::Dqn_FixedString(char const *fmt, ...)
 {
     *this = {};
     va_list va;
     va_start(va, fmt);
-    FixedString_AppendVFmt(this, fmt, va);
+    Dqn_FixedString_AppendVFmt(this, fmt, va);
     va_end(va);
 }
 
@@ -957,12 +957,12 @@ void Dqn_Log(Dqn_LogType type, char const *file, usize file_len, char const *fun
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: MemArena Internal
+// NOTE: Dqn_MemArena Internal
 //
 // -------------------------------------------------------------------------------------------------
-FILE_SCOPE MemBlock *MemArena__AllocateBlock(MemArena *arena, usize requested_size)
+FILE_SCOPE MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, usize requested_size)
 {
-    usize mem_block_size      = DQN_MAX(ArrayCount(arena->fixed_mem), requested_size);
+    usize mem_block_size      = DQN_MAX(Dqn_ArrayCount(arena->fixed_mem), requested_size);
     usize const allocate_size = sizeof(*arena->curr_mem_block) + mem_block_size;
     MemBlock *result          = nullptr;
 
@@ -973,7 +973,7 @@ FILE_SCOPE MemBlock *MemArena__AllocateBlock(MemArena *arena, usize requested_si
     }
     else
     {
-        if (!(arena->flags & MemArenaFlag_NoCRTAllocation))
+        if (!(arena->flags & Dqn_MemArenaFlag_NoCRTAllocation))
             result = static_cast<MemBlock *>(calloc(1, allocate_size));
     }
 
@@ -987,7 +987,7 @@ FILE_SCOPE MemBlock *MemArena__AllocateBlock(MemArena *arena, usize requested_si
     return result;
 }
 
-FILE_SCOPE void MemArena__FreeBlock(MemArena *arena, MemBlock *block)
+FILE_SCOPE void Dqn_MemArena__FreeBlock(Dqn_MemArena *arena, MemBlock *block)
 {
     if (!block)
         return;
@@ -1007,13 +1007,13 @@ FILE_SCOPE void MemArena__FreeBlock(MemArena *arena, MemBlock *block)
         }
         else
         {
-            if (!(arena->flags & MemArenaFlag_NoCRTAllocation))
+            if (!(arena->flags & Dqn_MemArenaFlag_NoCRTAllocation))
                 free(block);
         }
     }
 }
 
-FILE_SCOPE void MemArena__AttachBlock(MemArena *arena, MemBlock *new_block)
+FILE_SCOPE void Dqn_MemArena__AttachBlock(Dqn_MemArena *arena, MemBlock *new_block)
 {
     DQN_ASSERT(arena->curr_mem_block);
     DQN_ASSERT(arena->top_mem_block->next == nullptr);
@@ -1022,7 +1022,7 @@ FILE_SCOPE void MemArena__AttachBlock(MemArena *arena, MemBlock *new_block)
     arena->top_mem_block       = new_block;
 }
 
-FILE_SCOPE void MemArena__LazyInit(MemArena *arena)
+FILE_SCOPE void Dqn_MemArena__LazyInit(Dqn_MemArena *arena)
 {
     if (!arena->curr_mem_block)
     {
@@ -1030,7 +1030,7 @@ FILE_SCOPE void MemArena__LazyInit(MemArena *arena)
         arena->fixed_mem_block                                = {};
         arena->fixed_mem_block.allocated_by_user_or_fixed_mem = true;
         arena->fixed_mem_block.memory                         = arena->fixed_mem;
-        arena->fixed_mem_block.size                           = ArrayCount(arena->fixed_mem);
+        arena->fixed_mem_block.size                           = Dqn_ArrayCount(arena->fixed_mem);
         arena->curr_mem_block                                 = &arena->fixed_mem_block;
         arena->top_mem_block                                  = arena->curr_mem_block;
     }
@@ -1039,15 +1039,15 @@ FILE_SCOPE void MemArena__LazyInit(MemArena *arena)
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: MemArena
+// NOTE: Dqn_MemArena
 //
 // -------------------------------------------------------------------------------------------------
-void *MemArena_Alloc(MemArena *arena, usize size DQN_DEBUG_ARGS)
+void *Dqn_MemArena_Alloc(Dqn_MemArena *arena, usize size DQN_DEBUG_ARGS)
 {
 #if defined(DQN_DEBUG_MEM_ARENA_LOGGING)
     (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
 #endif
-    MemArena__LazyInit(arena);
+    Dqn_MemArena__LazyInit(arena);
     b32 need_new_mem_block = true;
 
     for (MemBlock *mem_block = arena->curr_mem_block; mem_block; mem_block = mem_block->next)
@@ -1063,9 +1063,9 @@ void *MemArena_Alloc(MemArena *arena, usize size DQN_DEBUG_ARGS)
 
     if (need_new_mem_block)
     {
-        MemBlock *new_block = MemArena__AllocateBlock(arena, size);
+        MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, size);
         if (!new_block) return nullptr;
-        MemArena__AttachBlock(arena, new_block);
+        Dqn_MemArena__AttachBlock(arena, new_block);
         arena->curr_mem_block = arena->top_mem_block;
     }
 
@@ -1076,7 +1076,7 @@ void *MemArena_Alloc(MemArena *arena, usize size DQN_DEBUG_ARGS)
 }
 
 
-void MemArena_Free(MemArena *arena DQN_DEBUG_ARGS)
+void Dqn_MemArena_Free(Dqn_MemArena *arena DQN_DEBUG_ARGS)
 {
 #if defined(DQN_DEBUG_MEM_ARENA_LOGGING)
     (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
@@ -1085,7 +1085,7 @@ void MemArena_Free(MemArena *arena DQN_DEBUG_ARGS)
     {
         MemBlock *block_to_free = mem_block;
         mem_block               = block_to_free->prev;
-        MemArena__FreeBlock(arena, block_to_free);
+        Dqn_MemArena__FreeBlock(arena, block_to_free);
     }
 
     auto my_calloc           = arena->my_calloc;
@@ -1098,41 +1098,41 @@ void MemArena_Free(MemArena *arena DQN_DEBUG_ARGS)
 }
 
 
-b32 MemArena_Reserve(MemArena *arena, usize size DQN_DEBUG_ARGS)
+b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, usize size DQN_DEBUG_ARGS)
 {
 #if defined(DQN_DEBUG_MEM_ARENA_LOGGING)
     (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
 #endif
-    MemArena__LazyInit(arena);
+    Dqn_MemArena__LazyInit(arena);
     MemSize remaining_space = arena->top_mem_block->size - arena->top_mem_block->used;
     if (remaining_space >= size) return true;
 
-    MemBlock *new_block = MemArena__AllocateBlock(arena, size);
+    MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, size);
     if (!new_block) return false;
-    MemArena__AttachBlock(arena, new_block);
+    Dqn_MemArena__AttachBlock(arena, new_block);
     return true;
 }
 
 
-void MemArena_ReserveFrom(MemArena *arena, void *memory, usize size DQN_DEBUG_ARGS)
+void Dqn_MemArena_ReserveFrom(Dqn_MemArena *arena, void *memory, usize size DQN_DEBUG_ARGS)
 {
 #if defined(DQN_DEBUG_MEM_ARENA_LOGGING)
     (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
 #endif
     DQN_ASSERT_MSG(size >= sizeof(*arena->curr_mem_block),
                   "(%zu >= %zu) There needs to be enough space to encode the MemBlock struct into the memory buffer", size, sizeof(*arena->curr_mem_block));
-    MemArena__LazyInit(arena);
+    Dqn_MemArena__LazyInit(arena);
     auto *mem_block                           = static_cast<MemBlock *>(memory);
     *mem_block                                = {};
     mem_block->memory                         = static_cast<u8 *>(memory) + sizeof(*mem_block);
     mem_block->size                           = size - sizeof(*mem_block);
     mem_block->allocated_by_user_or_fixed_mem = true;
-    MemArena__AttachBlock(arena, mem_block);
+    Dqn_MemArena__AttachBlock(arena, mem_block);
 }
 
 
 
-void MemArena_ClearUsed(MemArena *arena DQN_DEBUG_ARGS)
+void Dqn_MemArena_ClearUsed(Dqn_MemArena *arena DQN_DEBUG_ARGS)
 {
 #if defined(DQN_DEBUG_MEM_ARENA_LOGGING)
     (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
@@ -1143,12 +1143,12 @@ void MemArena_ClearUsed(MemArena *arena DQN_DEBUG_ARGS)
 }
 
 
-MemArenaScopedRegion MemArena_MakeScopedRegion(MemArena *arena)
+Dqn_MemArenaScopedRegion Dqn_MemArena_MakeScopedRegion(Dqn_MemArena *arena)
 {
-    return MemArenaScopedRegion(arena);
+    return Dqn_MemArenaScopedRegion(arena);
 }
 
-MemArenaScopedRegion::MemArenaScopedRegion(MemArena *arena)
+Dqn_MemArenaScopedRegion::Dqn_MemArenaScopedRegion(Dqn_MemArena *arena)
 {
     this->arena               = arena;
     this->curr_mem_block      = arena->curr_mem_block;
@@ -1156,13 +1156,13 @@ MemArenaScopedRegion::MemArenaScopedRegion(MemArena *arena)
     this->top_mem_block       = arena->top_mem_block;
 }
 
-MemArenaScopedRegion::~MemArenaScopedRegion()
+Dqn_MemArenaScopedRegion::~Dqn_MemArenaScopedRegion()
 {
     while (this->top_mem_block != this->arena->top_mem_block)
     {
         MemBlock *block_to_free    = this->arena->top_mem_block;
         this->arena->top_mem_block = block_to_free->prev;
-        MemArena__FreeBlock(this->arena, block_to_free);
+        Dqn_MemArena__FreeBlock(this->arena, block_to_free);
     }
 
     for (MemBlock *mem_block = this->arena->top_mem_block; mem_block != this->curr_mem_block; mem_block = mem_block->prev)
@@ -1175,7 +1175,7 @@ template <size_t N>
 FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, usize size_required)
 {
     char *result = builder->fixed_mem + builder->fixed_mem_used;
-    usize space  = ArrayCount(builder->fixed_mem) - builder->fixed_mem_used;
+    usize space  = Dqn_ArrayCount(builder->fixed_mem) - builder->fixed_mem_used;
     usize *usage = &builder->fixed_mem_used;
 
     if (builder->last_mem_buf)
@@ -1292,7 +1292,7 @@ char *Dqn_StringBuilder_BuildFromMalloc(Dqn_StringBuilder<N> *builder, isize *le
 }
 
 template <usize N>
-char *Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, MemArena *arena, isize *len = nullptr)
+char *Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, Dqn_MemArena *arena, isize *len = nullptr)
 {
     isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
     char *result  = MEM_ARENA_ALLOC_ARRAY(arena, char, len_w_null_terminator);

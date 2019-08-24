@@ -2,12 +2,12 @@
 
 struct TestState
 {
-    MemArena    arena;
-    int         indent_level;
-    Slice<char> name;
-    Slice<char> fail_expr;
-    Slice<char> fail_msg;
-    bool        scope_started;
+    Dqn_MemArena arena;
+    int          indent_level;
+    Slice<char>  name;
+    Slice<char>  fail_expr;
+    Slice<char>  fail_msg;
+    bool         scope_started;
 };
 
 struct TestingState
@@ -63,9 +63,9 @@ void TestingState_PrintGroupResult(TestingState const *result)
 
     bool all_tests_passed = (result->num_tests_ok_in_group == result->num_tests_in_group);
     char buf[256] = {};
-    int len = snprintf(buf, ArrayCount(buf), "%02d/%02d Tests Passed ", result->num_tests_ok_in_group, result->num_tests_in_group);
+    int len = snprintf(buf, Dqn_ArrayCount(buf), "%02d/%02d Tests Passed ", result->num_tests_ok_in_group, result->num_tests_in_group);
     isize remaining_len = DESIRED_LEN - len - 1;
-    remaining_len       = (all_tests_passed) ? remaining_len - CharCount(STATUS_OK) : remaining_len - CharCount(STATUS_FAIL);
+    remaining_len       = (all_tests_passed) ? remaining_len - Dqn_CharCount(STATUS_OK) : remaining_len - Dqn_CharCount(STATUS_FAIL);
     remaining_len       = DQN_MAX(remaining_len, 0);
     DQN_FOR_EACH(i, remaining_len) fprintf(stdout, " ");
 
@@ -85,8 +85,8 @@ void TestState_PrintResult(TestState const *result)
     char const STATUS_OK[]   = "OK";
     char const STATUS_FAIL[] = "FAIL";
 
-    isize remaining_len = DESIRED_LEN - result->name.len - CharCount(INDENT);
-    remaining_len       = (result->fail_expr.str) ? remaining_len - CharCount(STATUS_FAIL) : remaining_len - CharCount(STATUS_OK);
+    isize remaining_len = DESIRED_LEN - result->name.len - Dqn_CharCount(INDENT);
+    remaining_len       = (result->fail_expr.str) ? remaining_len - Dqn_CharCount(STATUS_FAIL) : remaining_len - Dqn_CharCount(STATUS_OK);
     remaining_len       = DQN_MAX(remaining_len, 0);
 
     DQN_FOR_EACH(i, remaining_len) fprintf(stdout, ".");
@@ -123,7 +123,7 @@ FILE_SCOPE void UnitTests()
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "Acd";
-                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
@@ -137,7 +137,7 @@ FILE_SCOPE void UnitTests()
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
@@ -151,7 +151,7 @@ FILE_SCOPE void UnitTests()
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "Acd";
-                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
@@ -164,7 +164,7 @@ FILE_SCOPE void UnitTests()
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
@@ -179,7 +179,7 @@ FILE_SCOPE void UnitTests()
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "Aztec";
-                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
         }
@@ -196,7 +196,7 @@ FILE_SCOPE void UnitTests()
             DQN_DEFER { free(result); };
 
             char constexpr EXPECT_STR[] = "ab";
-            TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+            TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
             TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
         }
 
@@ -212,7 +212,7 @@ FILE_SCOPE void UnitTests()
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "Number: 4, String: Hello Sailor, Extra Stuff";
-                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
@@ -225,7 +225,7 @@ FILE_SCOPE void UnitTests()
                 DQN_DEFER { free(result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
         }
@@ -242,7 +242,7 @@ FILE_SCOPE void UnitTests()
         {
             TEST_START_SCOPE(testing_state, "Initialise from raw array");
             int raw_array[] = {1, 2};
-            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             TEST_EXPECT(testing_state, array.len == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
             TEST_EXPECT(testing_state, array[1] == 2);
@@ -252,7 +252,7 @@ FILE_SCOPE void UnitTests()
         {
             TEST_START_SCOPE(testing_state, "Erase stable 1 element from array");
             int raw_array[] = {1, 2, 3};
-            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             Dqn_FixedArray_EraseStable(&array, 1);
             TEST_EXPECT(testing_state, array.len == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
@@ -263,7 +263,7 @@ FILE_SCOPE void UnitTests()
         {
             TEST_START_SCOPE(testing_state, "Erase unstable 1 element from array");
             int raw_array[] = {1, 2, 3};
-            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             Dqn_FixedArray_EraseUnstable(&array, 0);
             TEST_EXPECT(testing_state, array.len == 2);
             TEST_EXPECT(testing_state, array[0] == 3);
@@ -275,7 +275,7 @@ FILE_SCOPE void UnitTests()
             TEST_START_SCOPE(testing_state, "Add 1 element to array");
             int const ITEM  = 2;
             int raw_array[] = {1};
-            auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             Dqn_FixedArray_Add(&array, ITEM);
             TEST_EXPECT(testing_state, array.len == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
@@ -286,7 +286,7 @@ FILE_SCOPE void UnitTests()
         {
             TEST_START_SCOPE(testing_state, "Clear array");
             int raw_array[] = {1};
-            auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)ArrayCount(raw_array));
+            auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             Dqn_FixedArray_Clear(&array);
             TEST_EXPECT(testing_state, array.len == 0);
         }
