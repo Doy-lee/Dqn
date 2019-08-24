@@ -473,7 +473,7 @@ char *Dqn_StrSkipWhitespace(char *buf)
 
 char *ParseFunctionReturnType(char *ptr, isize *len)
 {
-    char *result     = ptr;
+    char *result     = Dqn_StrSkipWhitespace(ptr);
     isize result_len = 0;
     for (int scope = 0; ptr; ptr++) // NOTE: Parse the function return type
     {
@@ -552,6 +552,7 @@ int main(char *argv[], int argc)
     char constexpr HEADER_COPY_PROTOTYPE[]             = "DQN_HEADER_COPY_PROTOTYPE";
     char constexpr HEADER_COPY_PROTOTYPE_AND_COMMENT[] = "DQN_HEADER_COPY_PROTOTYPE_AND_COMMENT";
 
+    fprintf(stdout, "\n");
     char *ptr     = buf;
     char *ptr_end = buf + buf_size;
     isize ptr_len = buf_size;
@@ -571,7 +572,7 @@ int main(char *argv[], int argc)
             while (ptr[0] != ',') ptr++;
             ptr++;
 
-            fprintf(stdout, "%.*s", (int)comment_len, comment);
+            fprintf(stdout, "%.*s\n", (int)comment_len, comment);
         }
         else
         {
@@ -587,7 +588,7 @@ int main(char *argv[], int argc)
         char *func_name     = ParseFunctionNameAndParameters(ptr, &func_name_len);
 
         ptr = func_name + func_name_len + 1; // Ptr is at macro closing paren, skip the paren
-        fprintf(stdout, "%.*s %.*s", (int)func_type_len, func_type, (int)func_name_len, func_name);
+        fprintf(stdout, "%.*s %.*s\n", (int)func_type_len, func_type, (int)func_name_len, func_name);
     }
 
     return 0;

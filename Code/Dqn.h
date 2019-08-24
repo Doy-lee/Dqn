@@ -596,8 +596,9 @@ struct Dqn_StringBuilder
     isize                    string_len;
 };
 
-template <size_t N>
-FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, usize size_required)
+DQN_HEADER_COPY_PROTOTYPE(
+template <size_t N> FILE_SCOPE char *,
+Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, usize size_required))
 {
     char *result = builder->fixed_mem + builder->fixed_mem_used;
     usize space  = Dqn_ArrayCount(builder->fixed_mem) - builder->fixed_mem_used;
@@ -650,8 +651,9 @@ FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuild
     return result;
 }
 
-template <usize N>
-FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_StringBuilder<N> const *builder, char *dest, isize dest_size)
+DQN_HEADER_COPY_PROTOTYPE(
+template <usize N> FILE_SCOPE void,
+Dqn_StringBuilder__BuildOutput(Dqn_StringBuilder<N> const *builder, char *dest, isize dest_size))
 {
     // NOTE: No data appended to builder, just allocate am empty string. But
     // always allocate, so we avoid adding making nullptr part of the possible
@@ -706,9 +708,10 @@ Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest,
     Dqn_StringBuilder__BuildOutput(builder, dest, dest_size);
 }
 
-// len: Return the length of the allocated string including the null-terminator
-template <usize N>
-char *Dqn_StringBuilder_BuildFromMalloc(Dqn_StringBuilder<N> *builder, isize *len = nullptr)
+DQN_HEADER_COPY_PROTOTYPE_AND_COMMENT(
+"len: Return the length of the allocated string including the null-terminator",
+template <usize N>,
+char *Dqn_StringBuilder_BuildFromMalloc(Dqn_StringBuilder<N> *builder, isize *len = nullptr))
 {
     isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
     auto *result                = static_cast<char *>(malloc(len_w_null_terminator));
@@ -717,8 +720,9 @@ char *Dqn_StringBuilder_BuildFromMalloc(Dqn_StringBuilder<N> *builder, isize *le
     return result;
 }
 
-template <usize N>
-char *Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, Dqn_MemArena *arena, isize *len = nullptr)
+DQN_HEADER_COPY_PROTOTYPE(
+template <usize N>,
+char *Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, Dqn_MemArena *arena, isize *len = nullptr))
 {
     isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
     char *result  = MEM_ARENA_ALLOC_ARRAY(arena, char, len_w_null_terminator);
@@ -727,8 +731,9 @@ char *Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, Dqn_MemAre
     return result;
 }
 
-template <usize N>
-void Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va)
+DQN_HEADER_COPY_PROTOTYPE(
+template <usize N>,
+void Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va))
 {
     if (!fmt) return;
     isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
@@ -737,8 +742,9 @@ void Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt
     builder->string_len += (require - 1); // -1 to exclude null terminator
 }
 
-template <usize N>
-void Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...)
+DQN_HEADER_COPY_PROTOTYPE(
+template <usize N>,
+void Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...))
 {
     va_list va;
     va_start(va, fmt);
@@ -746,8 +752,9 @@ void Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt,
     va_end(va);
 }
 
-template <usize N>
-void Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, isize len = -1)
+DQN_HEADER_COPY_PROTOTYPE(
+template <usize N>,
+void Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, isize len = -1))
 {
     if (!str) return;
     if (len == -1) len = (isize)strlen(str);
@@ -758,16 +765,15 @@ void Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, is
     buf[len] = 0;
 }
 
-template <usize N>
-void Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch)
+DQN_HEADER_COPY_PROTOTYPE(
+template <usize N>,
+void Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch))
 {
     char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, 1 + 1 /*null terminator*/);
     *buf++    = ch;
     builder->string_len++;
     buf[1] = 0;
 }
-
-
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -794,8 +800,9 @@ struct Slice
 };
 #define SLICE_LITERAL(string) Slice<char const>(DQN_STR_AND_LEN(string))
 
-template <typename T>
-inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, T const *src, isize len)
+DQN_HEADER_COPY_PROTOTYPE(
+template <typename T>,
+inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, T const *src, isize len))
 {
     Slice<T> result = {};
     result.len      = len;
@@ -805,15 +812,17 @@ inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, T const *src, isiz
     return result;
 }
 
-template <typename T>
-inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, Slice<T> const src)
+DQN_HEADER_COPY_PROTOTYPE(
+template <typename T>,
+inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, Slice<T> const src))
 {
     Slice<T> result = Slice_CopyNullTerminated(arena, src.buf, src.len);
     return result;
 }
 
-template <typename T>
-inline Slice<T> Slice_Copy(Dqn_MemArena *arena, T const *src, isize len)
+DQN_HEADER_COPY_PROTOTYPE(
+template <typename T>,
+inline Slice<T> Slice_Copy(Dqn_MemArena *arena, T const *src, isize len))
 {
     Slice<T> result = {};
     result.len      = len;
@@ -822,8 +831,9 @@ inline Slice<T> Slice_Copy(Dqn_MemArena *arena, T const *src, isize len)
     return result;
 }
 
-template <typename T>
-inline Slice<T> Slice_Copy(Dqn_MemArena *arena, Slice<T> const src)
+DQN_HEADER_COPY_PROTOTYPE(
+template <typename T>,
+inline Slice<T> Slice_Copy(Dqn_MemArena *arena, Slice<T> const src))
 {
     Slice<T> result = Slice_Copy(arena, src.buf, src.len);
     return result;
@@ -834,8 +844,9 @@ inline Slice<T> Slice_Copy(Dqn_MemArena *arena, Slice<T> const src)
 // NOTE: Asprintf (Allocate Sprintf)
 //
 // -------------------------------------------------------------------------------------------------
-template <typename T>
-Slice<char> AsprintfSlice(T *arena, char const *fmt, va_list va)
+DQN_HEADER_COPY_PROTOTYPE(
+template <typename T> Slice<char>,
+AsprintfSlice(T *arena, char const *fmt, va_list va))
 {
     Slice<char> result = {};
     result.len         = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
@@ -845,8 +856,9 @@ Slice<char> AsprintfSlice(T *arena, char const *fmt, va_list va)
     return result;
 }
 
-template <typename T>
-Slice<char> AsprintfSlice(T *arena, char const *fmt, ...)
+DQN_HEADER_COPY_PROTOTYPE(
+template <typename T> Slice<char>,
+AsprintfSlice(T *arena, char const *fmt, ...))
 {
     va_list va;
     va_start(va, fmt);
@@ -855,8 +867,9 @@ Slice<char> AsprintfSlice(T *arena, char const *fmt, ...)
     return result;
 }
 
-template <typename T>
-char *Asprintf(T *arena, int *len, char const *fmt, ...)
+DQN_HEADER_COPY_PROTOTYPE(
+template <typename T> char *,
+Asprintf(T *arena, int *len, char const *fmt, ...))
 {
     va_list va;
     va_start(va, fmt);
@@ -866,8 +879,9 @@ char *Asprintf(T *arena, int *len, char const *fmt, ...)
     return result.str;
 }
 
-template <typename T>
-char *Asprintf(T *arena, char const *fmt, ...)
+DQN_HEADER_COPY_PROTOTYPE(
+template <typename T> char *,
+Asprintf(T *arena, char const *fmt, ...))
 {
     va_list va;
     va_start(va, fmt);
