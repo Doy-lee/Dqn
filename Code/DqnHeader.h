@@ -1,6 +1,8 @@
 #ifndef DQN_HEADER_H
 #define DQN_HEADER_H
 #define DQN_HEADER_COPY_PROTOTYPE(func_return, func_name_and_types) func_return func_name_and_types
+#define DQN_HEADER_COPY_BEGIN
+#define DQN_HEADER_COPY_END
 #endif /* DQN_HEADER_H */
 
 #ifdef DQN_HEADER_IMPLEMENTATION
@@ -100,18 +102,22 @@ int main(int argc, char *argv[])
 
         char constexpr HEADER_COPY_PROTOTYPE[] = "DQN_HEADER_COPY_PROTOTYPE";
         char constexpr HEADER_COMMENT[]        = "// @";
+        char constexpr HEADER_COPY_BEGIN[]     = "DQN_HEADER_COPY_BEGIN";
+        char constexpr HEADER_COPY_END[]       = "DQN_HEADER_COPY_END";
 
         enum struct FindString
         {
             HeaderPrototype,
             HeaderComment,
+            HeaderCopyBegin,
             Count
         };
 
-        char const *find_list[]            = {HEADER_COPY_PROTOTYPE, HEADER_COMMENT};
+        char const *find_list[]            = {HEADER_COPY_PROTOTYPE, HEADER_COMMENT, HEADER_COPY_BEGIN};
         isize constexpr find_string_lens[] = {
             Dqn_CharCountI(HEADER_COPY_PROTOTYPE),
             Dqn_CharCountI(HEADER_COMMENT),
+            Dqn_CharCountI(HEADER_COPY_BEGIN),
         };
 
         char const *ptr          = buf;
@@ -146,6 +152,32 @@ int main(int argc, char *argv[])
                 isize comment_len = ptr - comment_start;
                 fprintf(stdout, "%.*s\n", (int)comment_len, comment_start);
                 ptr = comment_start + comment_len;
+            }
+            else if (matched_find_index == (isize)FindString::HeaderCopyBegin)
+            {
+                ptr                    = token + find_string_lens[matched_find_index];
+                ptr                    = Dqn_StrSkipWhitespace(ptr);
+                char const *copy_start = ptr;
+                char const *copy_end   = Dqn_StrFind(ptr, HEADER_COPY_END, ptr_len, Dqn_CharCountI(HEADER_COPY_END));
+                if (!copy_end)
+                {
+                    fprintf(stderr, "Header copy begin macro: %s not matched with a copy end macro: %s", HEADER_COPY_BEGIN, HEADER_COPY_END);
+                    return -1;
+                }
+
+                isize copy_len = copy_end - copy_start;
+                auto mem_scope = Dqn_MemArenaScopedRegion(&arena);
+                char *sanitised_copy  = (char *)MEM_ARENA_ALLOC(&arena, copy_len);
+                isize sanitised_len = 0;
+                DQN_FOR_EACH(copy_index, copy_len)
+                {
+                    char ch = copy_start[copy_index];
+                    if (ch == '\r') continue;
+                    sanitised_copy[sanitised_len++] = ch;
+                }
+
+                ptr = copy_end;
+                fprintf(stdout, "%.*s\n", (int)sanitised_len, sanitised_copy);
             }
 
             ptr_len = ptr_end - ptr;

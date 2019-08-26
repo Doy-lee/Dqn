@@ -307,6 +307,11 @@ enum struct Dqn_LogType
   Memory,
 };
 
+// @ -------------------------------------------------------------------------------------------------
+// @
+// @ NOTE: Logging
+// @
+// @ -------------------------------------------------------------------------------------------------
 DQN_HEADER_COPY_PROTOTYPE(constexpr inline char const *, Dqn_LogTypeTag(Dqn_LogType type))
 {
     if      (type == Dqn_LogType::Debug)   return " DBG";
@@ -317,6 +322,7 @@ DQN_HEADER_COPY_PROTOTYPE(constexpr inline char const *, Dqn_LogTypeTag(Dqn_LogT
     return " XXX";
 }
 
+DQN_HEADER_COPY_BEGIN
 // NOTE: Set the callback to get called whenever a log message has been printed
 #define DQN_LOG_CALLBACK(name) void name(Dqn_LogType type, char const *file, usize file_len, char const *func, usize func_len, usize line, char const *log_str)
 typedef DQN_LOG_CALLBACK(Dqn_LogCallback);
@@ -328,11 +334,13 @@ Dqn_LogCallback *Dqn_log_callback;
 #define DQN_LOG_I(fmt, ...) Dqn_Log(Dqn_LogType::Info,    DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG_M(fmt, ...) Dqn_Log(Dqn_LogType::Info,    DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG(log_type, fmt, ...) Dqn_Log(log_type,    DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+DQN_HEADER_COPY_END
 // @ -------------------------------------------------------------------------------------------------
 // @
 // @ NOTE: Math
 // @
 // @ -------------------------------------------------------------------------------------------------
+DQN_HEADER_COPY_BEGIN
 union Dqn_V2I
 {
   struct { i32 x, y; };
@@ -496,6 +504,7 @@ union Dqn_Mat4
     f32 row_major[4][4];
     f32 operator[](usize i) const { return e[i]; }
 };
+DQN_HEADER_COPY_END
 
 template <typename T>
 DQN_HEADER_COPY_PROTOTYPE(int, Dqn_MemCmpType(T const *ptr1, T const *ptr2))
@@ -562,6 +571,7 @@ struct Dqn_MemArenaScopedRegion
     MemBlock *top_mem_block;
 };
 
+DQN_HEADER_COPY_BEGIN
 #define DQN_DEBUG_MEM_ARENA_LOGGING
 #if defined(DQN_DEBUG_MEM_ARENA_LOGGING)
     #define DQN_DEBUG_ARGS , char const *file, isize file_len, char const *func, isize func_len, isize line
@@ -578,6 +588,7 @@ struct Dqn_MemArenaScopedRegion
 #define MEM_ARENA_RESERVE_FROM(arena, src, size) Dqn_MemArena_ReserveFrom(arena, src, size DQN_DEBUG_PARAMS);
 #define MEM_ARENA_CLEAR_USED(arena)              Dqn_MemArena_ClearUsed(arena DQN_DEBUG_PARAMS);
 #define MEM_ARENA_FREE(arena)                    Dqn_MemArena_Free
+DQN_HEADER_COPY_END
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -789,9 +800,7 @@ struct Slice
 };
 #define SLICE_LITERAL(string) Slice<char const>(DQN_STR_AND_LEN(string))
 
-DQN_HEADER_COPY_PROTOTYPE(
-template <typename T>,
-inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, T const *src, isize len))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T>, inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, T const *src, isize len))
 {
     Slice<T> result = {};
     result.len      = len;
@@ -801,17 +810,13 @@ inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, T const *src, isiz
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(
-template <typename T>,
-inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, Slice<T> const src))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T>, inline Slice<T> Slice_CopyNullTerminated(Dqn_MemArena *arena, Slice<T> const src))
 {
     Slice<T> result = Slice_CopyNullTerminated(arena, src.buf, src.len);
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(
-template <typename T>,
-inline Slice<T> Slice_Copy(Dqn_MemArena *arena, T const *src, isize len))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T>, inline Slice<T> Slice_Copy(Dqn_MemArena *arena, T const *src, isize len))
 {
     Slice<T> result = {};
     result.len      = len;
@@ -820,9 +825,7 @@ inline Slice<T> Slice_Copy(Dqn_MemArena *arena, T const *src, isize len))
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(
-template <typename T>,
-inline Slice<T> Slice_Copy(Dqn_MemArena *arena, Slice<T> const src))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T>, inline Slice<T> Slice_Copy(Dqn_MemArena *arena, Slice<T> const src))
 {
     Slice<T> result = Slice_Copy(arena, src.buf, src.len);
     return result;
@@ -833,9 +836,7 @@ inline Slice<T> Slice_Copy(Dqn_MemArena *arena, Slice<T> const src))
 // @ NOTE: Asprintf (Allocate Sprintf)
 // @
 // @ -------------------------------------------------------------------------------------------------
-DQN_HEADER_COPY_PROTOTYPE(
-template <typename T> Slice<char>,
-AsprintfSlice(T *arena, char const *fmt, va_list va))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> Slice<char>, AsprintfSlice(T *arena, char const *fmt, va_list va))
 {
     Slice<char> result = {};
     result.len         = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
@@ -845,9 +846,7 @@ AsprintfSlice(T *arena, char const *fmt, va_list va))
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(
-template <typename T> Slice<char>,
-AsprintfSlice(T *arena, char const *fmt, ...))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> Slice<char>, AsprintfSlice(T *arena, char const *fmt, ...))
 {
     va_list va;
     va_start(va, fmt);
@@ -856,9 +855,7 @@ AsprintfSlice(T *arena, char const *fmt, ...))
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(
-template <typename T> char *,
-Asprintf(T *arena, int *len, char const *fmt, ...))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> char *, Asprintf(T *arena, int *len, char const *fmt, ...))
 {
     va_list va;
     va_start(va, fmt);
@@ -868,9 +865,7 @@ Asprintf(T *arena, int *len, char const *fmt, ...))
     return result.str;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(
-template <typename T> char *,
-Asprintf(T *arena, char const *fmt, ...))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> char *, Asprintf(T *arena, char const *fmt, ...))
 {
     va_list va;
     va_start(va, fmt);
@@ -1397,7 +1392,9 @@ Dqn_MemArenaScopedRegion::~Dqn_MemArenaScopedRegion()
 {
     while (this->top_mem_block != this->arena->top_mem_block)
     {
-        MemBlock *block_to_free    = this->arena->top_mem_block;
+        MemBlock *block_to_free = this->arena->top_mem_block;
+        if (this->arena->curr_mem_block == block_to_free)
+            this->arena->curr_mem_block = block_to_free->prev;
         this->arena->top_mem_block = block_to_free->prev;
         Dqn_MemArena__FreeBlock(this->arena, block_to_free);
     }
