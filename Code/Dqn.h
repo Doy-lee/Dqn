@@ -235,13 +235,13 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #define DQN_MATH_PI 3.14159265359f
 #define DQN_DEGREE_TO_RADIAN(val) (val) * (DQN_MATH_PI / 180.0f)
 
-#define FILE_SCOPE    static
-#define LOCAL_PERSIST static
-
 #include <stdint.h>
 #include <float.h>
 
 #if defined(DQN_USE_PRIMITIVE_TYPEDEFS)
+#define FILE_SCOPE    static
+#define LOCAL_PERSIST static
+
 using usize = size_t;
 using isize = ptrdiff_t;
 
@@ -268,6 +268,9 @@ const f32 F32_MAX     = FLT_MAX;
 const isize ISIZE_MAX = PTRDIFF_MAX;
 const usize USIZE_MAX = SIZE_MAX;
 #endif
+
+#define DQN_FILE_SCOPE    static
+#define DQN_LOCAL_PERSIST static
 
 using Dqn_usize = size_t;
 using Dqn_isize = ptrdiff_t;
@@ -641,7 +644,7 @@ struct Dqn_StringBuilder
     Dqn_isize                    string_len;
 };
 
-template <Dqn_usize N> FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, Dqn_usize size_required)
+template <Dqn_usize N> DQN_FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, Dqn_usize size_required)
 {
     char *result = builder->fixed_mem + builder->fixed_mem_used;
     Dqn_usize space  = Dqn_ArrayCount(builder->fixed_mem) - builder->fixed_mem_used;
@@ -694,7 +697,7 @@ template <Dqn_usize N> FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpda
     return result;
 }
 
-template <Dqn_usize N> FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_isize dest_size)
+template <Dqn_usize N> DQN_FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_isize dest_size)
 {
     // NOTE: No data appended to builder, just allocate am empty string. But
     // always allocate, so we avoid adding making nullptr part of the possible
@@ -1248,7 +1251,7 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Log(Dqn_LogType type, char const *file, Dqn_
 // @ NOTE: Dqn_MemArena
 // @
 // @ -------------------------------------------------------------------------------------------------
-FILE_SCOPE Dqn_MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, Dqn_usize requested_size)
+DQN_FILE_SCOPE Dqn_MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, Dqn_usize requested_size)
 {
     Dqn_usize mem_block_size      = DQN_MAX(Dqn_ArrayCount(arena->fixed_mem), requested_size);
     Dqn_usize const allocate_size = sizeof(*arena->curr_mem_block) + mem_block_size;
@@ -1275,7 +1278,7 @@ FILE_SCOPE Dqn_MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, Dqn_us
     return result;
 }
 
-FILE_SCOPE void Dqn_MemArena__FreeBlock(Dqn_MemArena *arena, Dqn_MemBlock *block)
+DQN_FILE_SCOPE void Dqn_MemArena__FreeBlock(Dqn_MemArena *arena, Dqn_MemBlock *block)
 {
     if (!block)
         return;
@@ -1301,7 +1304,7 @@ FILE_SCOPE void Dqn_MemArena__FreeBlock(Dqn_MemArena *arena, Dqn_MemBlock *block
     }
 }
 
-FILE_SCOPE void Dqn_MemArena__AttachBlock(Dqn_MemArena *arena, Dqn_MemBlock *new_block)
+DQN_FILE_SCOPE void Dqn_MemArena__AttachBlock(Dqn_MemArena *arena, Dqn_MemBlock *new_block)
 {
     DQN_ASSERT(arena->curr_mem_block);
     DQN_ASSERT(arena->top_mem_block->next == nullptr);
@@ -1310,7 +1313,7 @@ FILE_SCOPE void Dqn_MemArena__AttachBlock(Dqn_MemArena *arena, Dqn_MemBlock *new
     arena->top_mem_block       = new_block;
 }
 
-FILE_SCOPE void Dqn_MemArena__LazyInit(Dqn_MemArena *arena)
+DQN_FILE_SCOPE void Dqn_MemArena__LazyInit(Dqn_MemArena *arena)
 {
     if (!arena->curr_mem_block)
     {
