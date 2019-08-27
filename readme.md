@@ -1,43 +1,53 @@
 # Dqn
 Personal utility library.
 
-## DqnInspect
-A simple C++ introspection metaprogram designed as a prebuild step and generates type information for the inspected types. It is a minimal single header file licensed in the public domain with only CRT dependencies. It is only able to parse C-like C++, i.e. Plain Old Data types only.
+## DqnHeader
+A simple C++ introspection metaprogram designed as a prebuild step and generates a summary of function prototypes and comments in a header file based on annotations. It is not designed to be used as a header file for compilation and will most likely fail syntax rules if tried.
 
 The generated file is written to stdout.
 
+### Build
+Build DqnHeader by defining `DQN_HEADER_IMPLEMENTATION` before compiling and execute it as follows
+
+`DqnHeader.exe SourceCode.h > GeneratedFile.h`
+
 ### Usage
-Annotate the C++ code using `DQN_INSPECT`, i.e.
+Include `DqnHeader.h` in a file and use the macros, annotations as described.
+  * Extract function prototypes using the `DQN_HEADER_COPY_PROTOTYPE` macro
+  * Copy comments by writing comments with `// @` as the prefix
+  * Copy many lines of code by enclosing it in `DQN_HEADER_COPY_BEGIN` and `DQN_HEADER_COPY_END` macros
 
 ```
-DQN_INSPECT struct Entity
+#include "DqnHeader.h"
+
+// @ ptr1: Pointer to the first block of memory
+// @ ptr2: Pointer to the second block of memory
+// @ num_bytes: The number of bytes to compare in both blocks of memory
+DQN_HEADER_COPY_PROTOTYPE(int, Dqn_MemCmp(void const *ptr1, void const *ptr2, size_t num_bytes))
 {
-    V2 pos;
-    V2 size;
+    int result = memcmp(ptr1, ptr2, num_bytes);
+    return result;
 }
 
-DQN_INSPECT enum struct SomeEnum
+DQN_HEADER_COPY_BEGIN
+struct HelloWorld
 {
-    Hello,
-    Foo
-}
-```
-
-And then build DqnInspect by defining `DQN_INSPECT_EXECUTABLE_IMPLEMENTATION` before compiling and execute it as follows
-
-`DqnInspect.exe SourceCode.h > SourceCodeInspected.h`
-
-Include and use the file in code
+    int foo, bar;
+};
+DQN_HEADER_COPY_END
 
 ```
-#include "DqnReflect.h"
-#include "SourceCode.h"
-#include "SourceCodeInspected.h"
-SomeEnum enum = SomeEnum::Hello;
-printf("%s\n", DqnInspect_EnumString(enum)); // prints Hello
 
-Entity entity = {};
-DqnInspect_Struct const *inspector = DqnInspect_GetStruct(&entity);
-for (int i = 0; i < inspector->members_len; ++i)
-    printf("%s\n", inspector->members[i].name);
+Which generates the following output
+
 ```
+// @ ptr1: Pointer to the first block of memory
+// @ ptr2: Pointer to the second block of memory
+// @ num_bytes: The number of bytes to compare in both blocks of memory
+int Dqn_MemCmp(void const *ptr1, void const *ptr2, size_t num_bytes);
+struct HelloWorld
+{
+    int foo, bar;
+};
+```
+
