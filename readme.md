@@ -41,9 +41,9 @@ DQN_HEADER_COPY_END
 Which generates the following output
 
 ```
-// @ ptr1: Pointer to the first block of memory
-// @ ptr2: Pointer to the second block of memory
-// @ num_bytes: The number of bytes to compare in both blocks of memory
+// ptr1: Pointer to the first block of memory
+// ptr2: Pointer to the second block of memory
+// num_bytes: The number of bytes to compare in both blocks of memory
 int Dqn_MemCmp(void const *ptr1, void const *ptr2, size_t num_bytes);
 struct HelloWorld
 {
