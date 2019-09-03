@@ -989,9 +989,8 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_FixedArray_Clear(DQN_FIXED_ARRAY_TEMPLATE_DE
 DQN_FIXED_ARRAY_TEMPLATE
 DQN_HEADER_COPY_PROTOTYPE(void, Dqn_FixedArray_EraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index))
 {
-    Dqn_EraseStableFromCArray<T>(a->data, a->len--, a->Max(), index);
+    Dqn__EraseStableFromCArray<T>(a->data, a->len--, a->Max(), index);
 }
-
 
 DQN_FIXED_ARRAY_TEMPLATE
 DQN_HEADER_COPY_PROTOTYPE(void, Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index))
@@ -1008,7 +1007,6 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL
     DQN_ASSERT(a->len - num >= 0);
     a->len -= num;
 }
-
 
 DQN_FIXED_ARRAY_TEMPLATE
 DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Peek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a))
@@ -1083,13 +1081,13 @@ DQN_HEADER_COPY_END
 
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_StaticArray<T> , Dqn_StaticArray_InitMemory   (T *memory, Dqn_isize max, Dqn_isize len = 0))          { Dqn_StaticArray<T> result = {}; result.data = memory; result.len = len; result.max = max; return result; }
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> T                 *, Dqn_StaticArray_Add          (Dqn_StaticArray<T> *a, T const *items, Dqn_isize num)) { DQN_ASSERT(a->len + num <= a->max); T *result = static_cast<T *>(Dqn_MemCopy(a->data + a->len, items, sizeof(T) * num)); a->len += num; return result; }
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> T                 *, Dqn_StaticArray_Add          (Dqn_StaticArray<T> *a, T const item))              { DQN_ASSERT(a->len < a->max);        a->data[a->len++] = item; return &a->data[a->len - 1]; }
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> T                 *, Dqn_StaticArray_Add          (Dqn_StaticArray<T> *a, T const item))                  { DQN_ASSERT(a->len < a->max);        a->data[a->len++] = item; return &a->data[a->len - 1]; }
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> T                 *, Dqn_StaticArray_Make         (Dqn_StaticArray<T> *a, Dqn_isize num))                 { DQN_ASSERT(a->len + num <= a->max); T *result = a->data + a->len; a->len += num; return result;}
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> void               , Dqn_StaticArray_Clear        (Dqn_StaticArray<T> *a))                            { a->len = 0; }
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> void               , Dqn_StaticArray_EraseStable  (Dqn_StaticArray<T> *a, Dqn_isize index))               { Dqn_EraseStableFromCArray<T>(a->data, a->len--, a->max, index); }
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> void               , Dqn_StaticArray_Clear        (Dqn_StaticArray<T> *a))                                { a->len = 0; }
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> void               , Dqn_StaticArray_EraseStable  (Dqn_StaticArray<T> *a, Dqn_isize index))               { Dqn__EraseStableFromCArray<T>(a->data, a->len--, a->max, index); }
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> void               , Dqn_StaticArray_EraseUnstable(Dqn_StaticArray<T> *a, Dqn_isize index))               { DQN_ASSERT(index >= 0 && index < a->len); if (--a->len == 0) return; a->data[index] = a->data[a->len]; }
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> void               , Dqn_StaticArray_Pop          (Dqn_StaticArray<T> *a, Dqn_isize num))                 { DQN_ASSERT(a->len - num >= 0); a->len -= num; }
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> T                 *, Dqn_StaticArray_Peek         (Dqn_StaticArray<T> *a))                            { T *result = (a->len == 0) ? nullptr : a->data + (a->len - 1); return result; }
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> T                 *, Dqn_StaticArray_Peek         (Dqn_StaticArray<T> *a))                                { T *result = (a->len == 0) ? nullptr : a->data + (a->len - 1); return result; }
 
 // @ -------------------------------------------------------------------------------------------------
 // @

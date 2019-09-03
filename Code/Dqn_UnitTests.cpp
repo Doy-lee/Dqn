@@ -1,14 +1,15 @@
+#define DQN_USE_PRIMITIVE_TYPEDEFS
 #define _CRT_SECURE_NO_WARNINGS
 #include "Dqn.h"
 
 struct TestState
 {
-    Dqn_MemArena arena;
-    int          indent_level;
-    Slice<char>  name;
-    Slice<char>  fail_expr;
-    Slice<char>  fail_msg;
-    bool         scope_started;
+    Dqn_MemArena    arena;
+    int             indent_level;
+    Dqn_Slice<char> name;
+    Dqn_Slice<char> fail_expr;
+    Dqn_Slice<char> fail_msg;
+    bool            scope_started;
 };
 
 struct TestingState
@@ -33,7 +34,7 @@ struct TestingState
         TestState_PrintResult(&testing_state.test);                                                                    \
         testing_state.test = {};                                                                                       \
     };                                                                                                                 \
-    testing_state.test.name          = AsprintfSlice(&testing_state.test.arena, test_name);                            \
+    testing_state.test.name          = Dqn_AsprintfSlice(&testing_state.test.arena, test_name);                            \
     testing_state.test.scope_started = true;                                                                           \
     testing_state.num_tests_in_group++
 
@@ -49,8 +50,8 @@ struct TestingState
     DQN_ASSERT(testing_state.test.scope_started);                                                                      \
     if (!(expr))                                                                                                       \
     {                                                                                                                  \
-        testing_state.test.fail_expr = AsprintfSlice(&testing_state.test.arena, #expr);                                \
-        testing_state.test.fail_msg  = AsprintfSlice(&testing_state.test.arena, msg, ##__VA_ARGS__);                   \
+        testing_state.test.fail_expr = Dqn_AsprintfSlice(&testing_state.test.arena, #expr);                                \
+        testing_state.test.fail_msg  = Dqn_AsprintfSlice(&testing_state.test.arena, msg, ##__VA_ARGS__);                   \
     }
 
 #define TEST_EXPECT(testing_state, expr) TEST_EXPECT_MSG(testing_state, expr, "")
@@ -185,7 +186,6 @@ FILE_SCOPE void UnitTests()
             }
         }
 
-
         // NOTE: Dqn_StringBuilder_AppendChar
         {
             TEST_START_SCOPE(testing_state, "Append char and build using malloc");
@@ -295,124 +295,124 @@ FILE_SCOPE void UnitTests()
 
     // ---------------------------------------------------------------------------------------------
     //
-    // NOTE: Dqn_StrToI64
+    // NOTE: Dqn_Str_ToI64
     //
     // ---------------------------------------------------------------------------------------------
     {
-        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_StrToI64");
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str_ToI64");
         {
             TEST_START_SCOPE(testing_state, "Convert nullptr");
-            i64 result = Dqn_StrToI64(nullptr);
+            i64 result = Dqn_Str_ToI64(nullptr);
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert empty string");
-            i64 result = Dqn_StrToI64("");
+            i64 result = Dqn_Str_ToI64("");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1\"");
-            i64 result = Dqn_StrToI64("1");
+            i64 result = Dqn_Str_ToI64("1");
             TEST_EXPECT(testing_state, result == 1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-0\"");
-            i64 result = Dqn_StrToI64("-0");
+            i64 result = Dqn_Str_ToI64("-0");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-1\"");
-            i64 result = Dqn_StrToI64("-1");
+            i64 result = Dqn_Str_ToI64("-1");
             TEST_EXPECT(testing_state, result == -1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1.2\"");
-            i64 result = Dqn_StrToI64("1.2");
+            i64 result = Dqn_Str_ToI64("1.2");
             TEST_EXPECT(testing_state, result == 1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,234\"");
-            i64 result = Dqn_StrToI64("1,234");
+            i64 result = Dqn_Str_ToI64("1,234");
             TEST_EXPECT(testing_state, result == 1234);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,2\"");
-            i64 result = Dqn_StrToI64("1,2");
+            i64 result = Dqn_Str_ToI64("1,2");
             TEST_EXPECT(testing_state, result == 12);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"12a3\"");
-            i64 result = Dqn_StrToI64("12a3");
+            i64 result = Dqn_Str_ToI64("12a3");
             TEST_EXPECT(testing_state, result == 12);
         }
     }
 
     // ---------------------------------------------------------------------------------------------
     //
-    // NOTE: Dqn_StrToU64
+    // NOTE: Dqn_Str_ToU64
     //
     // ---------------------------------------------------------------------------------------------
     {
-        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_StrToU64");
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str_ToU64");
         {
             TEST_START_SCOPE(testing_state, "Convert nullptr");
-            u64 result = Dqn_StrToU64(nullptr);
+            u64 result = Dqn_Str_ToU64(nullptr);
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert empty string");
-            u64 result = Dqn_StrToU64("");
+            u64 result = Dqn_Str_ToU64("");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1\"");
-            u64 result = Dqn_StrToU64("1");
+            u64 result = Dqn_Str_ToU64("1");
             TEST_EXPECT(testing_state, result == 1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-0\"");
-            u64 result = Dqn_StrToU64("-0");
+            u64 result = Dqn_Str_ToU64("-0");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-1\"");
-            u64 result = Dqn_StrToU64("-1");
+            u64 result = Dqn_Str_ToU64("-1");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1.2\"");
-            u64 result = Dqn_StrToU64("1.2");
+            u64 result = Dqn_Str_ToU64("1.2");
             TEST_EXPECT(testing_state, result == 1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,234\"");
-            u64 result = Dqn_StrToU64("1,234");
+            u64 result = Dqn_Str_ToU64("1,234");
             TEST_EXPECT(testing_state, result == 1234);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,2\"");
-            u64 result = Dqn_StrToU64("1,2");
+            u64 result = Dqn_Str_ToU64("1,2");
             TEST_EXPECT(testing_state, result == 12);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"12a3\"");
-            u64 result = Dqn_StrToU64("12a3");
+            u64 result = Dqn_Str_ToU64("12a3");
             TEST_EXPECT(testing_state, result == 12);
         }
     }
@@ -422,7 +422,6 @@ int main(char *argv[], int argc)
 {
     (void)argv; (void)argc;
     UnitTests();
-
     return 0;
 }
 
