@@ -218,14 +218,12 @@ enum Dqn_MemArenaFlag
     Dqn_MemArenaFlag_NoCRTAllocation = (1 << 0), // If my_calloc/my_free aren't null, it defaults to calloc and free, setting this flag disables that
 };
 
-typedef void *(Dqn_MemArenaCallocFunction)(size_t bytes);
-typedef void  (Dqn_MemArenaFreeFunction)  (void *ptr, size_t bytes_to_free);
 struct Dqn_MemArena
 {
     // NOTE: Configuration (fill once)
-    Dqn_MemArenaCallocFunction *my_calloc; // If nullptr, use CRT calloc unless disabled in flags
-    Dqn_MemArenaFreeFunction   *my_free;   // If nullptr, use CRT free unless disabled in flags
-    Dqn_u32                     flags;
+    void *(*my_calloc)(Dqn_usize bytes);                    // If nullptr, use CRT calloc unless disabled in flags
+    void  (*my_free)  (void *ptr, Dqn_usize bytes_to_free); // If nullptr, use CRT free unless disabled in flags
+    Dqn_u32 flags;
 
     // NOTE: Read Only
     Dqn_u8        fixed_mem[DQN_KILOBYTES(16)];
@@ -242,7 +240,7 @@ struct Dqn_MemArenaScopedRegion
     ~Dqn_MemArenaScopedRegion();
     Dqn_MemArena *arena;
     Dqn_MemBlock *curr_mem_block;
-    Dqn_usize         curr_mem_block_used;
+    Dqn_usize     curr_mem_block_used;
     Dqn_MemBlock *top_mem_block;
 };
 
@@ -262,11 +260,33 @@ struct Dqn_MemArenaScopedRegion
 #define DQN_MEM_ARENA_CLEAR_USED(arena)              Dqn_MemArena_ClearUsed(arena DQN_DEBUG_PARAMS);
 #define DQN_MEM_ARENA_FREE(arena)                    Dqn_MemArena_Free
 
-// -----------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 //
 // NOTE: String Builder
 //
-// -----------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+struct Dqn_StringBuilderBuffer
+{
+    char                    *mem;
+    Dqn_MemSize              size;
+    Dqn_MemSize              used;
+    Dqn_StringBuilderBuffer *next;
+};
+
+Dqn_usize constexpr DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE = DQN_KILOBYTES(4);
+template <Dqn_usize N = DQN_KILOBYTES(16)>
+struct Dqn_StringBuilder
+{
+    void *(*my_malloc)(size_t bytes) = malloc; // Set to nullptr to disable heap allocation
+    void  (*my_free)  (void *ptr)    = free;   // Set to nullptr to disable heap allocation
+
+    char                     fixed_mem[N];
+    Dqn_MemSize              fixed_mem_used;
+    Dqn_StringBuilderBuffer *next_mem_buf;
+    Dqn_StringBuilderBuffer *last_mem_buf;
+    Dqn_isize                string_len;
+};
+
 // The necessary length to build the string, it returns the length including the null-terminator
 template <Dqn_usize N> Dqn_isize          Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder);
 template <Dqn_usize N> void               Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size);

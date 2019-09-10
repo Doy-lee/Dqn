@@ -572,14 +572,12 @@ enum Dqn_MemArenaFlag
     Dqn_MemArenaFlag_NoCRTAllocation = (1 << 0), // If my_calloc/my_free aren't null, it defaults to calloc and free, setting this flag disables that
 };
 
-typedef void *(Dqn_MemArenaCallocFunction)(size_t bytes);
-typedef void  (Dqn_MemArenaFreeFunction)  (void *ptr, size_t bytes_to_free);
 struct Dqn_MemArena
 {
     // NOTE: Configuration (fill once)
-    Dqn_MemArenaCallocFunction *my_calloc; // If nullptr, use CRT calloc unless disabled in flags
-    Dqn_MemArenaFreeFunction   *my_free;   // If nullptr, use CRT free unless disabled in flags
-    Dqn_u32                     flags;
+    void *(*my_calloc)(Dqn_usize bytes);                    // If nullptr, use CRT calloc unless disabled in flags
+    void  (*my_free)  (void *ptr, Dqn_usize bytes_to_free); // If nullptr, use CRT free unless disabled in flags
+    Dqn_u32 flags;
 
     // NOTE: Read Only
     Dqn_u8        fixed_mem[DQN_KILOBYTES(16)];
@@ -596,7 +594,7 @@ struct Dqn_MemArenaScopedRegion
     ~Dqn_MemArenaScopedRegion();
     Dqn_MemArena *arena;
     Dqn_MemBlock *curr_mem_block;
-    Dqn_usize         curr_mem_block_used;
+    Dqn_usize     curr_mem_block_used;
     Dqn_MemBlock *top_mem_block;
 };
 
@@ -617,16 +615,17 @@ struct Dqn_MemArenaScopedRegion
 #define DQN_MEM_ARENA_FREE(arena)                    Dqn_MemArena_Free
 DQN_HEADER_COPY_END
 
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: String Builder
-//
-// -------------------------------------------------------------------------------------------------
+// @ -------------------------------------------------------------------------------------------------
+// @
+// @ NOTE: String Builder
+// @
+// @ -------------------------------------------------------------------------------------------------
+DQN_HEADER_COPY_BEGIN
 struct Dqn_StringBuilderBuffer
 {
     char                    *mem;
-    Dqn_MemSize                  size;
-    Dqn_MemSize                  used;
+    Dqn_MemSize              size;
+    Dqn_MemSize              used;
     Dqn_StringBuilderBuffer *next;
 };
 
@@ -638,11 +637,12 @@ struct Dqn_StringBuilder
     void  (*my_free)  (void *ptr)    = free;   // Set to nullptr to disable heap allocation
 
     char                     fixed_mem[N];
-    Dqn_MemSize                  fixed_mem_used;
+    Dqn_MemSize              fixed_mem_used;
     Dqn_StringBuilderBuffer *next_mem_buf;
     Dqn_StringBuilderBuffer *last_mem_buf;
-    Dqn_isize                    string_len;
+    Dqn_isize                string_len;
 };
+DQN_HEADER_COPY_END
 
 template <Dqn_usize N> DQN_FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, Dqn_usize size_required)
 {
@@ -731,11 +731,11 @@ template <Dqn_usize N> DQN_FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_St
     DQN_ASSERT(buf_ptr == dest + dest_size);
 }
 
-// @ -----------------------------------------------------------------------------------------------
-// @
-// @ NOTE: String Builder
-// @
-// @ -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+//
+// NOTE: String Builder
+//
+// -----------------------------------------------------------------------------------------------
 // @ The necessary length to build the string, it returns the length including the null-terminator
 DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> Dqn_isize, Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder))
 {
