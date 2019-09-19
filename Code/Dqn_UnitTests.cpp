@@ -1,5 +1,5 @@
 #define DQN_USE_PRIMITIVE_TYPEDEFS
-#define _CRT_SECURE_NO_WARNINGS
+#define DQN_IMPLEMENTATION
 #include "Dqn.h"
 
 struct TestState
@@ -106,6 +106,173 @@ void TestState_PrintResult(TestState const *result)
 FILE_SCOPE void UnitTests()
 {
     TestingState testing_state = {};
+    // ---------------------------------------------------------------------------------------------
+    //
+    // NOTE: Dqn_Allocator
+    //
+    // ---------------------------------------------------------------------------------------------
+    {
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Allocator");
+        {
+            TEST_START_SCOPE(testing_state, "HeapAllocator - Allocate Small");
+            Dqn_Allocator allocator = Dqn_Allocator_HeapAllocator();
+            char constexpr EXPECT[] = "hello_world";
+            char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT));
+            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
+            memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
+            TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
+        }
+
+        {
+            TEST_START_SCOPE(testing_state, "XHeapAllocator - Allocate Small");
+            Dqn_Allocator allocator = Dqn_Allocator_XHeapAllocator();
+            char constexpr EXPECT[] = "hello_world";
+            char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT));
+            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
+            memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
+            TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
+        }
+
+        {
+            TEST_START_SCOPE(testing_state, "ArenaAllocator - Allocate Small");
+            Dqn_MemArena arena      = {};
+            Dqn_Allocator allocator = Dqn_Allocator_ArenaAllocator(&arena);
+            char constexpr EXPECT[] = "hello_world";
+            char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT));
+            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
+            memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
+            TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //
+    // NOTE: Dqn_Array
+    //
+    // ---------------------------------------------------------------------------------------------
+    {
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Array");
+        // NOTE: Dqn_Array_InitMemory
+        {
+            {
+                TEST_START_SCOPE(testing_state, "Fixed Memory: Test add single item and can't allocate more");
+                int memory[4]        = {};
+                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array_Add(&array, 1);
+                Dqn_Array_Add(&array, 2);
+                Dqn_Array_Add(&array, 3);
+                Dqn_Array_Add(&array, 4);
+                TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
+                TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data %d", array.data[1]);
+                TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data %d", array.data[2]);
+                TEST_EXPECT_MSG(testing_state, array.data[3] == 4, "array.data %d", array.data[3]);
+                TEST_EXPECT_MSG(testing_state, array.len == 4, "array.len: %d", array.len);
+
+                int *added_item = Dqn_Array_Add(&array, 5);
+                TEST_EXPECT(testing_state, added_item == nullptr);
+                TEST_EXPECT_MSG(testing_state, array.len == 4, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "Fixed Memory: Test add array of items");
+                int memory[4]        = {};
+                int DATA[]           = {1, 2, 3};
+                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
+                TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data %d", array.data[1]);
+                TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data %d", array.data[2]);
+                TEST_EXPECT_MSG(testing_state, array.len == 3, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "Fixed Memory: Test clear and clear with memory zeroed");
+                int memory[4]        = {};
+                int DATA[]           = {1, 2, 3};
+                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                Dqn_Array_Clear(&array, false /*zero_mem*/);
+                TEST_EXPECT_MSG(testing_state, array.len == 0, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
+                TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d. Clear but don't zero memory so old values should still remain", array.data[0]);
+
+                Dqn_Array_Clear(&array, true /*zero_mem*/);
+                TEST_EXPECT_MSG(testing_state, array.data[0] == 0, "array.data %d. Clear but zero memory old values should not remain", array.data[0]);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "Fixed Memory: Test erase stable and erase unstable");
+                int memory[4]        = {};
+                int DATA[]           = {1, 2, 3, 4};
+                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                Dqn_Array_EraseUnstable(&array, 1);
+                TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
+                TEST_EXPECT_MSG(testing_state, array.data[1] == 4, "array.data %d", array.data[1]);
+                TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data %d", array.data[2]);
+                TEST_EXPECT_MSG(testing_state, array.len == 3, "array.len: %d", array.len);
+
+                Dqn_Array_EraseStable(&array, 0);
+                TEST_EXPECT_MSG(testing_state, array.data[0] == 4, "array.data: %d", array.data[0]);
+                TEST_EXPECT_MSG(testing_state, array.data[1] == 3, "array.data: %d", array.data[1]);
+                TEST_EXPECT_MSG(testing_state, array.len == 2, "array.len: %d", array.len);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "Fixed Memory: Test array pop and peek");
+                int memory[4]        = {};
+                int DATA[]           = {1, 2, 3};
+                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                Dqn_Array_Pop(&array, 2);
+                TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
+                TEST_EXPECT_MSG(testing_state, array.len == 1, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
+
+                int *peek_item = Dqn_Array_Peek(&array);
+                TEST_EXPECT_MSG(testing_state, *peek_item == 1, "peek: %d", *peek_item);
+                TEST_EXPECT_MSG(testing_state, array.len == 1, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "Fixed Memory: Test free on fixed memory array does nothing");
+                int memory[4]        = {};
+                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                DQN_DEFER { Dqn_Array_Free(&array); };
+            }
+        }
+
+        // NOTE: Dynamic Memory: Dqn_Array
+        {
+            {
+                TEST_START_SCOPE(testing_state, "Dynamic Memory: Test reserve and over commit reallocates");
+                Dqn_Array<int> array = {};
+                DQN_DEFER { Dqn_Array_Free(&array); };
+
+                Dqn_Array_Reserve(&array, 4);
+                TEST_EXPECT_MSG(testing_state, array.len == 0, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
+
+                int DATA[] = {1, 2, 3, 4};
+                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
+                TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data: %d", array.data[1]);
+                TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data: %d", array.data[2]);
+                TEST_EXPECT_MSG(testing_state, array.data[3] == 4, "array.data: %d", array.data[3]);
+                TEST_EXPECT_MSG(testing_state, array.len == 4, "array.len: %d", array.len);
+
+                int *added_item = Dqn_Array_Add(&array, 5);
+                TEST_EXPECT_MSG(testing_state, *added_item == 5, "added_item: %d", *added_item);
+                TEST_EXPECT_MSG(testing_state, array.data[4] == 5, "array.data: %d", array.data[4]);
+                TEST_EXPECT_MSG(testing_state, array.len == 5, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.max >= 5, "array.max: %d", array.max);
+            }
+        }
+    }
+
     // ---------------------------------------------------------------------------------------------
     //
     // NOTE: Dqn_StringBuilder

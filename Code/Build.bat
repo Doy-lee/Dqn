@@ -14,5 +14,5 @@ REM Tp     Treat header file as CPP source file
 cl /MT /EHa /GR- /Od /Oi /Z7 /W4 /WX /wd4201 /D DQN_HEADER_IMPLEMENTATION /Tp ../Code/DqnHeader.h /link /nologo
 DqnHeader.exe ..\Code\Dqn.h > ..\Code\DqnHeader_Generated.h
 
-cl /MT /EHa /GR- /Od /Oi /Z7 /W4 /WX /wd4201 /D DQN_IMPLEMENTATION ../Code/Dqn_UnitTests.cpp /link /nologo
+cl /MT /EHa /GR- /Od /Oi /Z7 /W4 /WX /wd4201 ../Code/Dqn_UnitTests.cpp /link /nologo
 popd

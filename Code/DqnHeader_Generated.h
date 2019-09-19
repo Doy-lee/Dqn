@@ -252,12 +252,12 @@ struct Dqn_MemArenaScopedRegion
     #define DQN_DEBUG_PARAMS
 #endif
 
-#define DQN_MEM_ARENA_ALLOC(arena, size)             Dqn_MemArena_Alloc(arena, size DQN_DEBUG_PARAMS);
-#define DQN_MEM_ARENA_ALLOC_ARRAY(arena, T, num)     (T *)Dqn_MemArena_Alloc(arena, sizeof(T) * num DQN_DEBUG_PARAMS);
-#define DQN_MEM_ARENA_ALLOC_STRUCT(arena, T)         (T *)Dqn_MemArena_Alloc(arena, sizeof(T) DQN_DEBUG_PARAMS);
-#define DQN_MEM_ARENA_RESERVE(arena, size)           Dqn_MemArena_Reserve(arena, size DQN_DEBUG_PARAMS);
-#define DQN_MEM_ARENA_RESERVE_FROM(arena, src, size) Dqn_MemArena_ReserveFrom(arena, src, size DQN_DEBUG_PARAMS);
-#define DQN_MEM_ARENA_CLEAR_USED(arena)              Dqn_MemArena_ClearUsed(arena DQN_DEBUG_PARAMS);
+#define DQN_MEM_ARENA_ALLOC(arena, size)             Dqn_MemArena_Alloc(arena, size DQN_DEBUG_PARAMS)
+#define DQN_MEM_ARENA_ALLOC_ARRAY(arena, T, num)     (T *)Dqn_MemArena_Alloc(arena, sizeof(T) * num DQN_DEBUG_PARAMS)
+#define DQN_MEM_ARENA_ALLOC_STRUCT(arena, T)         (T *)Dqn_MemArena_Alloc(arena, sizeof(T) DQN_DEBUG_PARAMS)
+#define DQN_MEM_ARENA_RESERVE(arena, size)           Dqn_MemArena_Reserve(arena, size DQN_DEBUG_PARAMS)
+#define DQN_MEM_ARENA_RESERVE_FROM(arena, src, size) Dqn_MemArena_ReserveFrom(arena, src, size DQN_DEBUG_PARAMS)
+#define DQN_MEM_ARENA_CLEAR_USED(arena)              Dqn_MemArena_ClearUsed(arena DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_FREE(arena)                    Dqn_MemArena_Free
 
 // -------------------------------------------------------------------------------------------------
@@ -362,35 +362,54 @@ template <typename T, int MAX_> T   *Dqn_FixedStack_Peek (Dqn_FixedStack<T, MAX_
 template <typename T, int MAX_> T   *Dqn_FixedStack_Push (Dqn_FixedStack<T, MAX_> *array, T item) { return Dqn_FixedArray_Add(array, item); }
 template <typename T, int MAX_> void Dqn_FixedStack_Clear(Dqn_FixedStack<T, MAX_> *array)         { Dqn_FixedArray_Clear(array); }
 
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_StaticArray
-//
-// -------------------------------------------------------------------------------------------------
-template <typename T> struct Dqn_StaticArray
+enum struct Dqn_Allocator_Type
 {
-    T       *data;
-    Dqn_isize    len;
-    Dqn_isize    max;
-    T const  operator[](Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
-    T        operator[](Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
-    T const *begin    ()         const { return data; }
-    T const *end      ()         const { return data + len; }
-    T       *begin    ()               { return data; }
-    T       *end      ()               { return data + len; }
-    T const *operator+(Dqn_isize i) const  { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
-    T       *operator+(Dqn_isize i)        { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
+    Heap,          // Malloc, realloc, free
+    XHeap,         // Malloc realloc, free, crash on failure
+    Arena,
+    NullAllocator,
 };
 
-template <typename T> Dqn_StaticArray<T>  Dqn_StaticArray_InitMemory   (T *memory, Dqn_isize max, Dqn_isize len = 0);
-template <typename T> T                 * Dqn_StaticArray_Add          (Dqn_StaticArray<T> *a, T const *items, Dqn_isize num);
-template <typename T> T                 * Dqn_StaticArray_Add          (Dqn_StaticArray<T> *a, T const item);
-template <typename T> T                 * Dqn_StaticArray_Make         (Dqn_StaticArray<T> *a, Dqn_isize num);
-template <typename T> void                Dqn_StaticArray_Clear        (Dqn_StaticArray<T> *a);
-template <typename T> void                Dqn_StaticArray_EraseStable  (Dqn_StaticArray<T> *a, Dqn_isize index);
-template <typename T> void                Dqn_StaticArray_EraseUnstable(Dqn_StaticArray<T> *a, Dqn_isize index);
-template <typename T> void                Dqn_StaticArray_Pop          (Dqn_StaticArray<T> *a, Dqn_isize num);
-template <typename T> T                 * Dqn_StaticArray_Peek         (Dqn_StaticArray<T> *a);
+struct Dqn_Allocator
+{
+    Dqn_Allocator_Type type;
+    void              *data;
+};
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Array
+//
+// -------------------------------------------------------------------------------------------------
+// TODO(doyle): Make this either initialised from memory or dynamically allocating
+template <typename T> struct Dqn_Array
+{
+    Dqn_Allocator allocator;
+    T            *data;
+    Dqn_isize     len;
+    Dqn_isize     max;
+
+    T const    operator[](Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
+    T          operator[](Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
+    T const   *begin    ()             const { return data; }
+    T const   *end      ()             const { return data + len; }
+    T         *begin    ()                   { return data; }
+    T         *end      ()                   { return data + len; }
+    T const   *operator+(Dqn_isize i)  const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
+    T         *operator+(Dqn_isize i)        { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
+};
+
+template <typename T> Dqn_Array<T>        Dqn_Array_InitMemory(T *memory, Dqn_isize max, Dqn_isize len = 0);
+template <typename T> bool                Dqn_Array_Reserve(Dqn_Array<T> *a, Dqn_isize size);
+template <typename T> void                Dqn_Array_Free(Dqn_Array<T> *a);
+template <typename T> T *                 Dqn_Array_Add(Dqn_Array<T> *a, T const *items, Dqn_isize num);
+template <typename T> T *                 Dqn_Array_Add(Dqn_Array<T> *a, T const item);
+template <typename T> T *                 Dqn_Array_Make(Dqn_Array<T> *a, Dqn_isize num);
+template <typename T> void                Dqn_Array_Clear(Dqn_Array<T> *a, bool zero_mem = false);
+template <typename T> void                Dqn_Array_EraseStable(Dqn_Array<T> *a, Dqn_isize index);
+template <typename T> void                Dqn_Array_EraseUnstable(Dqn_Array<T> *a, Dqn_isize index);
+template <typename T> void                Dqn_Array_Pop(Dqn_Array<T> *a, Dqn_isize num);
+template <typename T> T *                 Dqn_Array_Peek(Dqn_Array<T> *a);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_FixedString
@@ -466,6 +485,18 @@ Dqn_b32                                   Dqn_MemArena_Reserve(Dqn_MemArena *are
 void                                      Dqn_MemArena_ReserveFrom(Dqn_MemArena *arena, void *memory, Dqn_usize size DQN_DEBUG_ARGS);
 void                                      Dqn_MemArena_ClearUsed(Dqn_MemArena *arena DQN_DEBUG_ARGS);
 Dqn_MemArenaScopedRegion                  Dqn_MemArena_MakeScopedRegion(Dqn_MemArena *arena);
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Allocator
+//
+// -------------------------------------------------------------------------------------------------
+Dqn_Allocator                             Dqn_Allocator_NullAllocator();
+Dqn_Allocator                             Dqn_Allocator_HeapAllocator();
+Dqn_Allocator                             Dqn_Allocator_XHeapAllocator();
+Dqn_Allocator                             Dqn_Allocator_ArenaAllocator(Dqn_MemArena *arena);
+void *                                    Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_usize size);
+void *                                    Dqn_Allocator_Realloc(Dqn_Allocator *allocator, void *old_ptr, Dqn_isize old_size, Dqn_isize new_size);
+void                                      Dqn_Allocator_Free(Dqn_Allocator *allocator, void *ptr);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Vectors
@@ -549,7 +580,7 @@ Dqn_b32                                   Dqn_Char_IsWhitespace(char ch);
 // NOTE: String Helpers
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_b32                                   Dqn_Str_Equals(char const *a, Dqn_isize a_len, char const *b, Dqn_isize b_len = -1);
+Dqn_b32                                   Dqn_Str_Equals(char const *a, char const *b, Dqn_isize a_len = -1, Dqn_isize b_len = -1);
 char const *                              Dqn_Str_FindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_lens, Dqn_isize find_len, Dqn_isize *match_index, Dqn_isize buf_len = -1);
 char const *                              Dqn_Str_Find(char const *buf, char const *find, Dqn_isize buf_len = -1, Dqn_isize find_len = -1);
 Dqn_b32                                   Dqn_Str_Match(char const *src, char const *find, int find_len);
