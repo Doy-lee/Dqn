@@ -226,13 +226,20 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #define DQN_MEGABYTES(val) (1024ULL * DQN_KILOBYTES(val))
 #define DQN_GIGABYTES(val) (1024ULL * DQN_MEGABYTES(val))
 
+#ifdef _MSC_VER
+    #define DEBUG_BREAK __debug_break()
+#else
+    #include <signal.h>
+    #define DEBUG_BREAK raise(SIGTRAP)
+#endif
+
 #define DQN_INVALID_CODE_PATH 0
 #define DQN_ASSERT(expr) DQN_ASSERT_MSG(expr, "")
 #define DQN_ASSERT_MSG(expr, fmt, ...)                                                                                 \
     if (!(expr))                                                                                                       \
     {                                                                                                                  \
         DQN_LOG_E("Assert: [" #expr "] " fmt, ##__VA_ARGS__);                                                          \
-        __debugbreak();                                                                                                \
+        DEBUG_BREAK;                                                                                                   \
     }
 
 #define DQN_SECONDS_TO_MS(val) ((val) * 1000.0f)
@@ -240,8 +247,11 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #define DQN_MATH_PI 3.14159265359f
 #define DQN_DEGREE_TO_RADIAN(val) (val) * (DQN_MATH_PI / 180.0f)
 
-#include <stdint.h>
 #include <float.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #if defined(DQN_USE_PRIMITIVE_TYPEDEFS)
 #define FILE_SCOPE    static
@@ -384,7 +394,7 @@ union Dqn_V2I
   struct { Dqn_i32 min, max; };
   Dqn_i32 e[2];
 
-  constexpr Dqn_V2I() = default;
+  Dqn_V2I() = default;
   constexpr Dqn_V2I(Dqn_f32 x_, Dqn_f32 y_): x((Dqn_i32)x_), y((Dqn_i32)y_) {}
   constexpr Dqn_V2I(Dqn_i32 x_, Dqn_i32 y_): x(x_), y(y_) {}
   constexpr Dqn_V2I(Dqn_i32 xy):         x(xy), y(xy) {}
@@ -417,7 +427,7 @@ union Dqn_V2
   struct { Dqn_f32 min, max; };
   Dqn_f32 e[2];
 
-  constexpr Dqn_V2() = default;
+  Dqn_V2() = default;
   constexpr Dqn_V2(Dqn_f32 a)         : x(a),        y(a)        {}
   constexpr Dqn_V2(Dqn_i32 a)         : x((Dqn_f32)a),   y((Dqn_f32)a)   {}
   constexpr Dqn_V2(Dqn_f32 x_, Dqn_f32 y_): x(x_),       y(y_)       {}
@@ -455,7 +465,7 @@ union Dqn_V3
   Dqn_V2  xy;
   Dqn_f32 e[3];
 
-  constexpr Dqn_V3() = default;
+  Dqn_V3() = default;
   constexpr Dqn_V3(Dqn_f32 a)                 : x(a),        y(a),       z(a)        {}
   constexpr Dqn_V3(Dqn_i32 a)                 : x((Dqn_f32)a),   y((Dqn_f32)a),  z((Dqn_f32)a)   {}
   constexpr Dqn_V3(Dqn_f32 x_, Dqn_f32 y_, Dqn_f32 z_): x(x_),       y(y_),      z(z_)       {}
@@ -493,7 +503,7 @@ union Dqn_V4
   Dqn_V3 rgb;
   Dqn_f32 e[4];
 
-  constexpr Dqn_V4() = default;
+  Dqn_V4() = default;
   constexpr Dqn_V4(Dqn_f32 xyzw)                      : x(xyzw),    y(xyzw),    z(xyzw),    w(xyzw)    {}
   constexpr Dqn_V4(Dqn_f32 x_, Dqn_f32 y_, Dqn_f32 z_, Dqn_f32 w_): x(x_),      y(y_),      z(z_),      w(w_)      {}
   constexpr Dqn_V4(Dqn_i32 x_, Dqn_i32 y_, Dqn_i32 z_, Dqn_i32 w_): x((Dqn_f32)x_), y((Dqn_f32)y_), z((Dqn_f32)z_), w((Dqn_f32)w_) {}
@@ -794,7 +804,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Append(
     if (len == -1) len = (Dqn_isize)strlen(str);
     Dqn_isize len_w_null_terminator = len + 1;
     char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
-    Dqn_MemCopy(buf, str, len);
+    memcpy(buf, str, len);
     builder->string_len += len;
     buf[len] = 0;
 }
@@ -837,7 +847,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_C
     Dqn_Slice<T> result = {};
     result.len      = len;
     result.buf      = DQN_MEM_ARENA_ALLOC_ARRAY(arena, T, len + 1);
-    Dqn_MemCopy(result.buf, src, len * sizeof(T));
+    memcpy(result.buf, src, len * sizeof(T));
     result.buf[len] = 0;
     return result;
 }
@@ -927,7 +937,7 @@ template <typename T> void Dqn__EraseStableFromCArray(T *array, Dqn_isize len, D
     DQN_ASSERT(len <= max);
     Dqn_isize next_index    = DQN_MIN(index + 1, len);
     Dqn_usize bytes_to_copy = (len - next_index) * sizeof(T);
-    Dqn_MemMove(array + index, array + next_index, bytes_to_copy);
+    memmove(array + index, array + next_index, bytes_to_copy);
 }
 
 DQN_HEADER_COPY_BEGIN
@@ -963,7 +973,7 @@ DQN_FIXED_ARRAY_TEMPLATE
 DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num))
 {
     DQN_ASSERT(a->len + num <= MAX_);
-    T *result = static_cast<T *>(Dqn_MemCopy(a->data + a->len, items, sizeof(T) * num));
+    T *result = static_cast<T *>(memcpy(a->data + a->len, items, sizeof(T) * num));
     a->len += num;
     return result;
 }
@@ -1039,12 +1049,12 @@ DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *entry))
+DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find))
 {
     for (T &entry : (*a))
     {
-        if (T *result == entry)
-            return result;
+        if (*find == entry)
+            return entry;
     }
     return nullptr;
 }
@@ -1148,7 +1158,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_Array_Add(Dqn_Array<T> 
 {
     if (!Dqn_Array__GrowIfNeeded(a, num))
         return nullptr;
-    T *result = static_cast<T *>(Dqn_MemCopy(a->data + a->len, items, sizeof(T) * num));
+    T *result = static_cast<T *>(memcpy(a->data + a->len, items, sizeof(T) * num));
     a->len += num;
     return result;
 }
@@ -1278,41 +1288,10 @@ DQN_HEADER_COPY_END
 
 #ifdef DQN_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
+#include <limits.h>
 #include <math.h>
 #include <memory.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-// @ -------------------------------------------------------------------------------------------------
-// @
-// @ NOTE: Helpers
-// @
-// @ -------------------------------------------------------------------------------------------------
-DQN_HEADER_COPY_PROTOTYPE(int, Dqn_MemCmp(void const *ptr1, void const *ptr2, size_t num_bytes))
-{
-    int result = memcmp(ptr1, ptr2, num_bytes);
-    return result;
-}
-
-
-DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_MemCopy(void *dest, void const *src, size_t num_bytes))
-{
-    void *result = memcpy(dest, src, num_bytes);
-    return result;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_MemMove(void *dest, void const *src, size_t num_bytes))
-{
-    void *result = memmove(dest, src, num_bytes);
-    return result;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_MemSet(void *src, char ch, Dqn_usize num_bytes))
-{
-    void *result = memset(src, ch, num_bytes);
-    return result;
-}
 
 // @ -------------------------------------------------------------------------------------------------
 // @

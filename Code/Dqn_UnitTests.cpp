@@ -585,7 +585,7 @@ FILE_SCOPE void UnitTests()
     }
 }
 
-int main(char *argv[], int argc)
+int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;
     UnitTests();
