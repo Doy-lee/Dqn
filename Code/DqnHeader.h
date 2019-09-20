@@ -157,6 +157,7 @@ int main(int argc, char *argv[])
     }
 
     Dqn_MemArena arena = {};
+    DQN_MEM_ARENA_RESERVE(&arena, DQN_MEGABYTES(16));
     for (isize arg_index = 1; arg_index < argc; ++arg_index)
     {
         char const *file = argv[arg_index];

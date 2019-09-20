@@ -566,40 +566,51 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_MemZero(T *src))
 
 // @ -------------------------------------------------------------------------------------------------
 // @
+// @ NOTE: Dqn_Allocator
+// @
+// @ -------------------------------------------------------------------------------------------------
+DQN_HEADER_COPY_BEGIN
+// NOTE: The default allocator is the heap allocator
+enum struct Dqn_Allocator_Type
+{
+    Heap,          // Malloc, realloc, free
+    XHeap,         // Malloc realloc, free, crash on failure
+    Arena,
+    NullAllocator,
+};
+
+struct Dqn_Allocator
+{
+    Dqn_Allocator_Type type;
+    void              *data;
+};
+DQN_HEADER_COPY_END
+
+// @ -------------------------------------------------------------------------------------------------
+// @
 // @ NOTE: Dqn_MemArena
 // @
 // @ -------------------------------------------------------------------------------------------------
 DQN_HEADER_COPY_BEGIN
-using Dqn_MemSize = Dqn_usize;
 struct Dqn_MemBlock
 {
-    // NOTE: Read only state
-    Dqn_b32       allocated_by_user_or_fixed_mem;
     void         *memory;
-    Dqn_MemSize   size;
-    Dqn_MemSize   used;
+    Dqn_usize     size;
+    Dqn_usize     used;
     Dqn_MemBlock *prev;
     Dqn_MemBlock *next;
 };
 
-enum Dqn_MemArenaFlag
-{
-    Dqn_MemArenaFlag_NoCRTAllocation = (1 << 0), // If my_calloc/my_free aren't null, it defaults to calloc and free, setting this flag disables that
-};
-
 struct Dqn_MemArena
 {
-    // NOTE: Configuration (fill once)
-    void *(*my_calloc)(Dqn_usize bytes);                    // If nullptr, use CRT calloc unless disabled in flags
-    void  (*my_free)  (void *ptr, Dqn_usize bytes_to_free); // If nullptr, use CRT free unless disabled in flags
-    Dqn_u32 flags;
+    // NOTE: Configuration (fill once after "Zero Initialisation {}")
+    int           min_block_size = DQN_KILOBYTES(4);
+    Dqn_Allocator allocator;
 
     // NOTE: Read Only
-    Dqn_u8        fixed_mem[DQN_KILOBYTES(16)];
-    Dqn_MemBlock  fixed_mem_block;
     Dqn_MemBlock *curr_mem_block;
     Dqn_MemBlock *top_mem_block;
-    Dqn_MemSize   highest_used_mark;
+    Dqn_usize     highest_used_mark;
     int           total_allocated_mem_blocks;
 };
 
@@ -621,12 +632,11 @@ struct Dqn_MemArenaScopedRegion
     #define DQN_DEBUG_PARAMS
 #endif
 
+#define DQN_MEM_ARENA_INIT_MEMORY(arena, src, size)  Dqn_MemArena_InitMemory(arena, src, size DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_ALLOC(arena, size)             Dqn_MemArena_Alloc(arena, size DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_ALLOC_ARRAY(arena, T, num)     (T *)Dqn_MemArena_Alloc(arena, sizeof(T) * num DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_ALLOC_STRUCT(arena, T)         (T *)Dqn_MemArena_Alloc(arena, sizeof(T) DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_RESERVE(arena, size)           Dqn_MemArena_Reserve(arena, size DQN_DEBUG_PARAMS)
-#define DQN_MEM_ARENA_RESERVE_FROM(arena, src, size) Dqn_MemArena_ReserveFrom(arena, src, size DQN_DEBUG_PARAMS)
-#define DQN_MEM_ARENA_CLEAR_USED(arena)              Dqn_MemArena_ClearUsed(arena DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_FREE(arena)                    Dqn_MemArena_Free
 DQN_HEADER_COPY_END
 
@@ -639,8 +649,8 @@ DQN_HEADER_COPY_BEGIN
 struct Dqn_StringBuilderBuffer
 {
     char                    *mem;
-    Dqn_MemSize              size;
-    Dqn_MemSize              used;
+    Dqn_usize                size;
+    usize                    used;
     Dqn_StringBuilderBuffer *next;
 };
 
@@ -648,11 +658,9 @@ Dqn_usize constexpr DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE = DQN_KILOBYTES(4)
 template <Dqn_usize N = DQN_KILOBYTES(16)>
 struct Dqn_StringBuilder
 {
-    void *(*my_malloc)(size_t bytes) = malloc; // Set to nullptr to disable heap allocation
-    void  (*my_free)  (void *ptr)    = free;   // Set to nullptr to disable heap allocation
-
+    Dqn_Allocator            allocator;
     char                     fixed_mem[N];
-    Dqn_MemSize              fixed_mem_used;
+    Dqn_usize                fixed_mem_used;
     Dqn_StringBuilderBuffer *next_mem_buf;
     Dqn_StringBuilderBuffer *last_mem_buf;
     Dqn_isize                string_len;
@@ -668,23 +676,20 @@ template <Dqn_usize N> DQN_FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAnd
     if (builder->last_mem_buf)
     {
         Dqn_StringBuilderBuffer *last_buf = builder->last_mem_buf;
-        result                        = last_buf->mem + last_buf->used;
-        space                         = last_buf->size - last_buf->used;
-        usage                         = &last_buf->used;
+        result                            = last_buf->mem + last_buf->used;
+        space                             = last_buf->size - last_buf->used;
+        usage                             = &last_buf->used;
     }
 
     if (space < size_required)
     {
-        DQN_ASSERT(builder->my_malloc);
-        if (!builder->my_malloc)
-            return nullptr;
-
         // NOTE: Need to allocate new buf
         Dqn_usize allocation_size = sizeof(*builder->last_mem_buf) + DQN_MAX(size_required, DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE);
-        void *memory          = builder->my_malloc(allocation_size);
-        auto *new_buf         = reinterpret_cast<Dqn_StringBuilderBuffer *>(memory);
+        void *memory          = Dqn_Allocator_Allocate(&builder->allocator, allocation_size);
+        if (!memory) return nullptr;
+        auto *new_buf         = DQN_CAST(Dqn_StringBuilderBuffer *)memory;
         *new_buf              = {};
-        new_buf->mem          = static_cast<char *>(memory) + sizeof(*new_buf);
+        new_buf->mem          = DQN_CAST(char *)memory + sizeof(*new_buf);
         new_buf->size         = allocation_size;
         result                = new_buf->mem;
         usage                 = &new_buf->used;
@@ -746,11 +751,6 @@ template <Dqn_usize N> DQN_FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_St
     DQN_ASSERT(buf_ptr == dest + dest_size);
 }
 
-// -----------------------------------------------------------------------------------------------
-//
-// NOTE: String Builder
-//
-// -----------------------------------------------------------------------------------------------
 // @ The necessary length to build the string, it returns the length including the null-terminator
 DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> Dqn_isize, Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder))
 {
@@ -815,6 +815,22 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_AppendC
     *buf++    = ch;
     builder->string_len++;
     buf[1] = 0;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder))
+{
+    for (Dqn_StringBuilderBuffer *buffer = builder->next_mem_buf;
+         buffer;
+         )
+    {
+        Dqn_StringBuilderBuffer buffer_to_free = buffer;
+        buffer                                 = buffer->next;
+        Dqn_Allocator_Free(&builder->allocator, buffer_to_free);
+    }
+
+    builder->next_mem_buf = builder->last_mem_buf = nullptr;
+    builder->fixed_mem_used                       = 0;
+    builder->string_len                           = 0;
 }
 
 // @ -------------------------------------------------------------------------------------------------
@@ -1072,22 +1088,6 @@ template <typename T, int MAX_> T   *Dqn_FixedStack_Push (Dqn_FixedStack<T, MAX_
 template <typename T, int MAX_> void Dqn_FixedStack_Clear(Dqn_FixedStack<T, MAX_> *array)         { Dqn_FixedArray_Clear(array); }
 DQN_HEADER_COPY_END
 
-DQN_HEADER_COPY_BEGIN
-enum struct Dqn_Allocator_Type
-{
-    Heap,          // Malloc, realloc, free
-    XHeap,         // Malloc realloc, free, crash on failure
-    Arena,
-    NullAllocator,
-};
-
-struct Dqn_Allocator
-{
-    Dqn_Allocator_Type type;
-    void              *data;
-};
-DQN_HEADER_COPY_END
-
 // @ -------------------------------------------------------------------------------------------------
 // @
 // @ NOTE: Dqn_Array
@@ -1335,213 +1335,8 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Log(Dqn_LogType type, char const *file, Dqn_
     va_end(va);
 }
 
-// @ -------------------------------------------------------------------------------------------------
-// @
-// @ NOTE: Dqn_MemArena
-// @
-// @ -------------------------------------------------------------------------------------------------
-DQN_FILE_SCOPE Dqn_MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, Dqn_usize requested_size)
-{
-    Dqn_usize mem_block_size      = DQN_MAX(Dqn_ArrayCount(arena->fixed_mem), requested_size);
-    Dqn_usize const allocate_size = sizeof(*arena->curr_mem_block) + mem_block_size;
-    Dqn_MemBlock *result          = nullptr;
-
-    if (arena->my_calloc)
-    {
-        DQN_ASSERT(arena->my_free);
-        result = static_cast<Dqn_MemBlock *>(arena->my_calloc(allocate_size));
-    }
-    else
-    {
-        if (!(arena->flags & Dqn_MemArenaFlag_NoCRTAllocation))
-            result = static_cast<Dqn_MemBlock *>(calloc(1, allocate_size));
-    }
-
-    if (!result)
-        return result;
-
-    *result        = {};
-    result->size   = mem_block_size;
-    result->memory = reinterpret_cast<Dqn_u8 *>(result) + sizeof(*result);
-    arena->total_allocated_mem_blocks++;
-    return result;
-}
-
-DQN_FILE_SCOPE void Dqn_MemArena__FreeBlock(Dqn_MemArena *arena, Dqn_MemBlock *block)
-{
-    if (!block)
-        return;
-
-    if (block->next)
-        block->next->prev = block->prev;
-
-    if (block->prev)
-        block->prev->next = block->next;
-
-    if (!block->allocated_by_user_or_fixed_mem)
-    {
-        if (arena->my_free)
-        {
-            DQN_ASSERT(arena->my_calloc);
-            arena->my_free(block, sizeof(*block) + block->size);
-        }
-        else
-        {
-            if (!(arena->flags & Dqn_MemArenaFlag_NoCRTAllocation))
-                free(block);
-        }
-    }
-}
-
-DQN_FILE_SCOPE void Dqn_MemArena__AttachBlock(Dqn_MemArena *arena, Dqn_MemBlock *new_block)
-{
-    DQN_ASSERT(arena->curr_mem_block);
-    DQN_ASSERT(arena->top_mem_block->next == nullptr);
-    arena->top_mem_block->next = new_block;
-    new_block->prev            = arena->top_mem_block;
-    arena->top_mem_block       = new_block;
-}
-
-DQN_FILE_SCOPE void Dqn_MemArena__LazyInit(Dqn_MemArena *arena)
-{
-    if (!arena->curr_mem_block)
-    {
-        DQN_ASSERT(!arena->top_mem_block);
-        arena->fixed_mem_block                                = {};
-        arena->fixed_mem_block.allocated_by_user_or_fixed_mem = true;
-        arena->fixed_mem_block.memory                         = arena->fixed_mem;
-        arena->fixed_mem_block.size                           = Dqn_ArrayCount(arena->fixed_mem);
-        arena->curr_mem_block                                 = &arena->fixed_mem_block;
-        arena->top_mem_block                                  = arena->curr_mem_block;
-    }
-}
-
-
-DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_MemArena_Alloc(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS))
-{
-#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
-    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
-#endif
-    Dqn_MemArena__LazyInit(arena);
-    Dqn_b32 need_new_mem_block = true;
-
-    for (Dqn_MemBlock *mem_block = arena->curr_mem_block; mem_block; mem_block = mem_block->next)
-    {
-        Dqn_b32 can_fit_in_block = (mem_block->used + size) <= mem_block->size;
-        if (can_fit_in_block)
-        {
-            arena->curr_mem_block = mem_block;
-            need_new_mem_block    = false;
-            break;
-        }
-    }
-
-    if (need_new_mem_block)
-    {
-        Dqn_MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, size);
-        if (!new_block) return nullptr;
-        Dqn_MemArena__AttachBlock(arena, new_block);
-        arena->curr_mem_block = arena->top_mem_block;
-    }
-
-    void *result = static_cast<Dqn_u8 *>(arena->curr_mem_block->memory) + arena->curr_mem_block->used;
-    arena->curr_mem_block->used += size;
-    DQN_ASSERT(arena->curr_mem_block->used <= arena->curr_mem_block->size);
-    return result;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_Free(Dqn_MemArena *arena DQN_DEBUG_ARGS))
-{
-#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
-    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
-#endif
-    for (Dqn_MemBlock *mem_block = arena->top_mem_block; mem_block;)
-    {
-        Dqn_MemBlock *block_to_free = mem_block;
-        mem_block               = block_to_free->prev;
-        Dqn_MemArena__FreeBlock(arena, block_to_free);
-    }
-
-    auto my_calloc           = arena->my_calloc;
-    auto my_free             = arena->my_free;
-    auto highest_used_mark   = arena->highest_used_mark;
-    *arena                   = {};
-    arena->highest_used_mark = highest_used_mark;
-    arena->my_calloc         = my_calloc;
-    arena->my_free           = my_free;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS))
-{
-#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
-    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
-#endif
-    Dqn_MemArena__LazyInit(arena);
-    Dqn_MemSize remaining_space = arena->top_mem_block->size - arena->top_mem_block->used;
-    if (remaining_space >= size) return true;
-
-    Dqn_MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, size);
-    if (!new_block) return false;
-    Dqn_MemArena__AttachBlock(arena, new_block);
-    return true;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_ReserveFrom(Dqn_MemArena *arena, void *memory, Dqn_usize size DQN_DEBUG_ARGS))
-{
-#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
-    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
-#endif
-    DQN_ASSERT_MSG(size >= sizeof(*arena->curr_mem_block),
-                  "(%zu >= %zu) There needs to be enough space to encode the Dqn_MemBlock struct into the memory buffer", size, sizeof(*arena->curr_mem_block));
-    Dqn_MemArena__LazyInit(arena);
-    auto *mem_block                           = static_cast<Dqn_MemBlock *>(memory);
-    *mem_block                                = {};
-    mem_block->memory                         = static_cast<Dqn_u8 *>(memory) + sizeof(*mem_block);
-    mem_block->size                           = size - sizeof(*mem_block);
-    mem_block->allocated_by_user_or_fixed_mem = true;
-    Dqn_MemArena__AttachBlock(arena, mem_block);
-}
-
-DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_ClearUsed(Dqn_MemArena *arena DQN_DEBUG_ARGS))
-{
-#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
-    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
-#endif
-    for (Dqn_MemBlock *mem_block = arena->top_mem_block; mem_block; mem_block = mem_block->prev)
-        mem_block->used = 0;
-    arena->curr_mem_block = &arena->fixed_mem_block;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(Dqn_MemArenaScopedRegion, Dqn_MemArena_MakeScopedRegion(Dqn_MemArena *arena))
-{
-    return Dqn_MemArenaScopedRegion(arena);
-}
-
-Dqn_MemArenaScopedRegion::Dqn_MemArenaScopedRegion(Dqn_MemArena *arena)
-{
-    this->arena               = arena;
-    this->curr_mem_block      = arena->curr_mem_block;
-    this->curr_mem_block_used = (arena->curr_mem_block) ? arena->curr_mem_block->used : 0;
-    this->top_mem_block       = arena->top_mem_block;
-}
-
-Dqn_MemArenaScopedRegion::~Dqn_MemArenaScopedRegion()
-{
-    while (this->top_mem_block != this->arena->top_mem_block)
-    {
-        Dqn_MemBlock *block_to_free = this->arena->top_mem_block;
-        if (this->arena->curr_mem_block == block_to_free)
-            this->arena->curr_mem_block = block_to_free->prev;
-        this->arena->top_mem_block = block_to_free->prev;
-        Dqn_MemArena__FreeBlock(this->arena, block_to_free);
-    }
-
-    for (Dqn_MemBlock *mem_block = this->arena->top_mem_block; mem_block != this->curr_mem_block; mem_block = mem_block->prev)
-        mem_block->used = 0;
-
-    this->arena->curr_mem_block->used = this->curr_mem_block_used;
-}
-
+void *Dqn_MemArena_Alloc(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
+Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
 // @ -------------------------------------------------------------------------------------------------
 // @
 // @ NOTE: Dqn_Allocator
@@ -1649,6 +1444,163 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Allocator_Free(Dqn_Allocator *allocator, voi
     }
 }
 
+// @ -------------------------------------------------------------------------------------------------
+// @
+// @ NOTE: Dqn_MemArena
+// @
+// @ -------------------------------------------------------------------------------------------------
+DQN_FILE_SCOPE Dqn_MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, Dqn_usize requested_size)
+{
+    Dqn_usize mem_block_size      = DQN_MAX(arena->min_block_size, requested_size);
+    Dqn_usize const allocate_size = sizeof(*arena->curr_mem_block) + mem_block_size;
+    Dqn_MemBlock *result          = DQN_CAST(Dqn_MemBlock *) Dqn_Allocator_Allocate(&arena->allocator, allocate_size);
+    if (!result) return result;
+
+    *result        = {};
+    result->size   = mem_block_size;
+    result->memory = DQN_CAST(Dqn_u8 *)result + sizeof(*result);
+    arena->total_allocated_mem_blocks++;
+    return result;
+}
+
+DQN_FILE_SCOPE void Dqn_MemArena__FreeBlock(Dqn_MemArena *arena, Dqn_MemBlock *block)
+{
+    if (!block)
+        return;
+
+    if (block->next)
+        block->next->prev = block->prev;
+
+    if (block->prev)
+        block->prev->next = block->next;
+
+    Dqn_Allocator_Free(&arena->allocator, block);
+}
+
+DQN_FILE_SCOPE void Dqn_MemArena__AttachBlock(Dqn_MemArena *arena, Dqn_MemBlock *new_block)
+{
+    if (arena->top_mem_block)
+    {
+        DQN_ASSERT(arena->top_mem_block->next == nullptr);
+        arena->top_mem_block->next = new_block;
+        new_block->prev            = arena->top_mem_block;
+        arena->top_mem_block       = new_block;
+    }
+    else
+    {
+        arena->top_mem_block  = new_block;
+        arena->curr_mem_block = new_block;
+    }
+}
+
+DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_MemArena_Alloc(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS))
+{
+#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
+    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
+#endif
+    Dqn_b32 need_new_mem_block = true;
+    for (Dqn_MemBlock *mem_block = arena->curr_mem_block; mem_block; mem_block = mem_block->next)
+    {
+        Dqn_b32 can_fit_in_block = (mem_block->used + size) <= mem_block->size;
+        if (can_fit_in_block)
+        {
+            arena->curr_mem_block = mem_block;
+            need_new_mem_block    = false;
+            break;
+        }
+    }
+
+    if (need_new_mem_block)
+    {
+        Dqn_MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, size);
+        if (!new_block) return nullptr;
+        Dqn_MemArena__AttachBlock(arena, new_block);
+        arena->curr_mem_block = arena->top_mem_block;
+    }
+
+    void *result = static_cast<Dqn_u8 *>(arena->curr_mem_block->memory) + arena->curr_mem_block->used;
+    arena->curr_mem_block->used += size;
+    DQN_ASSERT(arena->curr_mem_block->used <= arena->curr_mem_block->size);
+    return result;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_Free(Dqn_MemArena *arena DQN_DEBUG_ARGS))
+{
+#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
+    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
+#endif
+    for (Dqn_MemBlock *mem_block = arena->top_mem_block; mem_block;)
+    {
+        Dqn_MemBlock *block_to_free = mem_block;
+        mem_block                   = block_to_free->prev;
+        Dqn_MemArena__FreeBlock(arena, block_to_free);
+    }
+
+    auto allocator           = arena->allocator;
+    auto highest_used_mark   = arena->highest_used_mark;
+    *arena                   = {};
+    arena->highest_used_mark = highest_used_mark;
+    arena->allocator         = allocator;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS))
+{
+#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
+    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
+#endif
+    Dqn_usize remaining_space = arena->top_mem_block->size - arena->top_mem_block->used;
+    if (remaining_space >= size) return true;
+
+    Dqn_MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, size);
+    if (!new_block) return false;
+    Dqn_MemArena__AttachBlock(arena, new_block);
+    return true;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_InitMemory(Dqn_MemArena *arena, void *memory, Dqn_usize size DQN_DEBUG_ARGS))
+{
+#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
+    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
+#endif
+    DQN_ASSERT_MSG(size >= sizeof(*arena->curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_MemBlock struct into the memory buffer", size, sizeof(*arena->curr_mem_block));
+    *arena                                    = {};
+    arena->allocator                          = Dqn_Allocator_NullAllocator();
+    auto *mem_block                           = DQN_CAST(Dqn_MemBlock *)memory;
+    *mem_block                                = {};
+    mem_block->memory                         = DQN_CAST(Dqn_u8 *)memory + sizeof(*mem_block);
+    mem_block->size                           = size - sizeof(*mem_block);
+    Dqn_MemArena__AttachBlock(arena, mem_block);
+}
+
+DQN_HEADER_COPY_PROTOTYPE(Dqn_MemArenaScopedRegion, Dqn_MemArena_MakeScopedRegion(Dqn_MemArena *arena))
+{
+    return Dqn_MemArenaScopedRegion(arena);
+}
+
+Dqn_MemArenaScopedRegion::Dqn_MemArenaScopedRegion(Dqn_MemArena *arena)
+{
+    this->arena               = arena;
+    this->curr_mem_block      = arena->curr_mem_block;
+    this->curr_mem_block_used = (arena->curr_mem_block) ? arena->curr_mem_block->used : 0;
+    this->top_mem_block       = arena->top_mem_block;
+}
+
+Dqn_MemArenaScopedRegion::~Dqn_MemArenaScopedRegion()
+{
+    while (this->top_mem_block != this->arena->top_mem_block)
+    {
+        Dqn_MemBlock *block_to_free = this->arena->top_mem_block;
+        if (this->arena->curr_mem_block == block_to_free)
+            this->arena->curr_mem_block = block_to_free->prev;
+        this->arena->top_mem_block = block_to_free->prev;
+        Dqn_MemArena__FreeBlock(this->arena, block_to_free);
+    }
+
+    for (Dqn_MemBlock *mem_block = this->arena->top_mem_block; mem_block != this->curr_mem_block; mem_block = mem_block->prev)
+        mem_block->used = 0;
+
+    this->arena->curr_mem_block->used = this->curr_mem_block_used;
+}
 
 // @ -------------------------------------------------------------------------------------------------
 // @
