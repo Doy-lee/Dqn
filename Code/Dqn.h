@@ -227,7 +227,7 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #define DQN_GIGABYTES(val) (1024ULL * DQN_MEGABYTES(val))
 
 #ifdef _MSC_VER
-    #define DEBUG_BREAK __debug_break()
+    #define DEBUG_BREAK __debugbreak()
 #else
     #include <signal.h>
     #define DEBUG_BREAK raise(SIGTRAP)
@@ -560,7 +560,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> int, Dqn_MemCmpType(T const *ptr
 
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_MemZero(T *src))
 {
-    T *result = static_cast<T *>(Dqn_MemSet(src, 0, sizeof(T)));
+    T *result = DQN_CAST(T *)memset(src, 0, sizeof(T));
     return result;
 }
 
