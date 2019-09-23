@@ -462,6 +462,29 @@ FILE_SCOPE void UnitTests()
 
     // ---------------------------------------------------------------------------------------------
     //
+    // NOTE: Dqn_FixedString
+    //
+    // ---------------------------------------------------------------------------------------------
+    {
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_FixedString");
+
+        // NOTE: Dqn_FixedString_Append
+        {
+            TEST_START_SCOPE(testing_state, "Append too much fails");
+            Dqn_FixedString<4> str = {};
+            TEST_EXPECT_MSG(testing_state, Dqn_FixedString_Append(&str, "abcd") == false, "We need space for the null-terminator");
+        }
+
+        // NOTE: Dqn_FixedString_AppendFmt
+        {
+            TEST_START_SCOPE(testing_state, "Append format string too much fails");
+            Dqn_FixedString<4> str = {};
+            TEST_EXPECT_MSG(testing_state, Dqn_FixedString_AppendFmt(&str, "abcd") == false, "We need space for the null-terminator");
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //
     // NOTE: Dqn_Str_ToI64
     //
     // ---------------------------------------------------------------------------------------------
