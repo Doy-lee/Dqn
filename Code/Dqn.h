@@ -656,6 +656,40 @@ DQN_HEADER_COPY_END
 
 // @ -------------------------------------------------------------------------------------------------
 // @
+// @ NOTE: Dqn_Allocator
+// @
+// @ -------------------------------------------------------------------------------------------------
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_NullAllocator())
+{
+    Dqn_Allocator result = {};
+    result.type          = Dqn_Allocator_Type::NullAllocator;
+    return result;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_HeapAllocator())
+{
+    Dqn_Allocator result = {};
+    result.type          = Dqn_Allocator_Type::Heap;
+    return result;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_XHeapAllocator())
+{
+    Dqn_Allocator result = {};
+    result.type          = Dqn_Allocator_Type::XHeap;
+    return result;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_ArenaAllocator(Dqn_MemArena *arena))
+{
+    Dqn_Allocator result = {};
+    result.type          = Dqn_Allocator_Type::Arena;
+    result.data          = arena;
+    return result;
+}
+
+// @ -------------------------------------------------------------------------------------------------
+// @
 // @ NOTE: String Builder
 // @
 // @ -------------------------------------------------------------------------------------------------
@@ -786,6 +820,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> char *, Dqn_StringBuilder_Build
     return result;
 }
 
+void *Dqn_MemArena_Alloc(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
 DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> char *, Dqn_StringBuilder_BuildFromArena(Dqn_StringBuilder<N> *builder, Dqn_MemArena *arena, Dqn_isize *len = nullptr))
 {
     Dqn_isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
@@ -917,6 +952,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline bool, Dqn_Slice_Equals(Dq
 // @ NOTE: Dqn_Asprintf (Allocate Sprintf)
 // @
 // @ -------------------------------------------------------------------------------------------------
+int Dqn_Safe_TruncateISizeToInt(Dqn_isize val);
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Slice<char>, Dqn_AsprintfSlice(T *arena, char const *fmt, va_list va))
 {
     Dqn_Slice<char> result = {};
@@ -1160,7 +1196,6 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> void, Dqn_Array_Free(Dqn_Array<T
     Dqn_Allocator_Free(&a->allocator, a->data);
 }
 
-
 template <typename T> bool Dqn_Array__GrowIfNeeded(Dqn_Array<T> *a, Dqn_isize num_to_add)
 {
     Dqn_isize new_len = a->len + num_to_add;
@@ -1382,42 +1417,6 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Log(Dqn_LogType type, char const *file, D
     return true;
 }
 
-void *Dqn_MemArena_Alloc(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
-Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
-// @ -------------------------------------------------------------------------------------------------
-// @
-// @ NOTE: Dqn_Allocator
-// @
-// @ -------------------------------------------------------------------------------------------------
-DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, Dqn_Allocator_NullAllocator())
-{
-    Dqn_Allocator result = {};
-    result.type          = Dqn_Allocator_Type::NullAllocator;
-    return result;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, Dqn_Allocator_HeapAllocator())
-{
-    Dqn_Allocator result = {};
-    result.type          = Dqn_Allocator_Type::Heap;
-    return result;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, Dqn_Allocator_XHeapAllocator())
-{
-    Dqn_Allocator result = {};
-    result.type          = Dqn_Allocator_Type::XHeap;
-    return result;
-}
-
-DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, Dqn_Allocator_ArenaAllocator(Dqn_MemArena *arena))
-{
-    Dqn_Allocator result = {};
-    result.type          = Dqn_Allocator_Type::Arena;
-    result.data          = arena;
-    return result;
-}
-
 DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_usize size))
 {
     void *result = nullptr;
@@ -1446,6 +1445,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
     return result;
 }
 
+Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
 DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator, void *old_ptr, Dqn_isize old_size, Dqn_isize new_size))
 {
     void *result = nullptr;
@@ -1921,7 +1921,6 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsNotSet(Dqn_u32 flags, Dqn_u32 bitfi
     Dqn_b32 result = !(flags & bitfield);
     return result;
 }
-
 
 // @ -------------------------------------------------------------------------------------------------
 // @
