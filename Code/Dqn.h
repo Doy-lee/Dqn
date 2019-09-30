@@ -3,9 +3,6 @@
 // #define DQN_IMPLEMENTATION         in one and only one C++ file to enable the header file
 
 #define _CRT_SECURE_NO_WARNINGS // NOTE: Undefined at end of header file
-#if defined(DQN_IMPLEMENTATION)
-    #define STB_SPRINTF_IMPLEMENTATION
-#endif
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -872,8 +869,8 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Free(Dq
          buffer;
          )
     {
-        Dqn_StringBuilderBuffer buffer_to_free = buffer;
-        buffer                                 = buffer->next;
+        Dqn_StringBuilderBuffer *buffer_to_free = buffer;
+        buffer                                  = buffer->next;
         Dqn_Allocator_Free(&builder->allocator, buffer_to_free);
     }
 
@@ -1358,7 +1355,7 @@ struct Dqn_U64Str
 {
     // Points to the start of the str in the buffer, not necessarily buf since
     // we write into the buffer in reverse
-    char *start;
+    char *str;
     char buf[27]; // NOTE(doyle): 27 is the maximum size of Dqn_u64 including commas
     int len;
 };
@@ -1368,6 +1365,7 @@ DQN_HEADER_COPY_END
 
 #ifdef DQN_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
+#define STB_SPRINTF_IMPLEMENTATION
 #include <limits.h>
 #include <math.h>
 #include <memory.h>
