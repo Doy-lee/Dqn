@@ -213,16 +213,19 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
         b        = tmp;                                                                                                \
     } while (0)
 
-#define DQN_LEN_AND_STR(string)        Dqn_CharCount(str), string
-#define DQN_STR_AND_LEN(string)        string, Dqn_CharCount(string)
-#define DQN_STR_AND_LEN_I(string)      string, (int)Dqn_CharCount(string)
-#define DQN_FOR_EACH(i, limit)         for (Dqn_isize (i) = 0; (i) < (Dqn_isize)(limit); ++(i))
-#define DQN_FOR_EACH_REVERSE(i, limit) for (Dqn_isize (i) = (Dqn_isize)(limit-1); (i) >= 0; --(i))
+#define DQN_LEN_AND_STR(string)                    Dqn_CharCount(str), string
+#define DQN_STR_AND_LEN(string)                    string, Dqn_CharCount(string)
+#define DQN_STR_AND_LEN_I(string)                  string, (int)Dqn_CharCount(string)
+#define DQN_FOR_EACH(i, limit)                     for (Dqn_isize (i) = 0; (i) < (Dqn_isize)(limit); ++(i))
+#define DQN_FOR_EACH_REVERSE(i, limit)             for (Dqn_isize (i) = (Dqn_isize)(limit-1); (i) >= 0; --(i))
+#define DQN_FOR_EACH_ITERATOR(it_name, array, num) for (auto it_name = array; it_name != (array + num); it_name++)
 
 #define DQN_BYTES(val)     (val)
 #define DQN_KILOBYTES(val) (1024ULL * DQN_BYTES(val))
 #define DQN_MEGABYTES(val) (1024ULL * DQN_KILOBYTES(val))
 #define DQN_GIGABYTES(val) (1024ULL * DQN_MEGABYTES(val))
+
+#define DQN_ARRAY_COUNT(array) (sizeof(array)/sizeof(array[0]))
 
 #ifdef _MSC_VER
     #define DEBUG_BREAK __debugbreak()
@@ -355,6 +358,8 @@ struct DqnDeferHelper
 #define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __COUNTER__)
 #define DQN_DEFER const auto DQN_UNIQUE_NAME(defer_lambda_) = DqnDeferHelper() + [&]()
 
+enum struct Dqn_ZeroMem { No, Yes };
+
 enum struct Dqn_LogType
 {
   Debug,
@@ -389,7 +394,7 @@ Dqn_LogCallback *Dqn_log_callback;
 #define DQN_LOG_D(fmt, ...) Dqn_Log(Dqn_LogType::Debug,   DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG_W(fmt, ...) Dqn_Log(Dqn_LogType::Warning, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG_I(fmt, ...) Dqn_Log(Dqn_LogType::Info,    DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_M(fmt, ...) Dqn_Log(Dqn_LogType::Info,    DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_M(fmt, ...) Dqn_Log(Dqn_LogType::Memory, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG(log_type, fmt, ...) Dqn_Log(log_type,    DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 DQN_HEADER_COPY_END
 // @ -------------------------------------------------------------------------------------------------
@@ -587,14 +592,27 @@ enum struct Dqn_Allocator_Type
     Heap,          // Malloc, realloc, free
     XHeap,         // Malloc realloc, free, crash on failure
     Arena,
+    Custom,
     NullAllocator,
 };
 
+#define DQN_ALLOCATOR_ALLOCATE_PROC(name) void *name(Dqn_usize size)
+#define DQN_ALLOCATOR_REALLOC_PROC(name) void *name(void *old_ptr, Dqn_usize old_size, Dqn_usize new_size)
+#define DQN_ALLOCATOR_FREE_PROC(name) void name(void *ptr)
+typedef DQN_ALLOCATOR_ALLOCATE_PROC(Dqn_Allocator_AllocateProc);
+typedef DQN_ALLOCATOR_REALLOC_PROC(Dqn_Allocator_ReallocProc);
+typedef DQN_ALLOCATOR_FREE_PROC(Dqn_Allocator_FreeProc);
 struct Dqn_Allocator
 {
     Dqn_Allocator_Type type;
     void              *data;
+
+    // NOTE: Only required if type == Dqn_Allocator_Type::Custom
+    Dqn_Allocator_AllocateProc *allocate;
+    Dqn_Allocator_ReallocProc  *realloc;
+    Dqn_Allocator_FreeProc     *free;
 };
+
 DQN_HEADER_COPY_END
 
 // @ -------------------------------------------------------------------------------------------------
@@ -643,6 +661,7 @@ struct Dqn_MemArenaScopedRegion
     #define DQN_DEBUG_PARAMS
 #endif
 
+#define DQN_MEM_ARENA_INIT_WITH_ALLOCATOR(arena, allocator, size) Dqn_MemArena_InitWithAllocator(arena, allocator, size DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_INIT_MEMORY(arena, src, size)  Dqn_MemArena_InitMemory(arena, src, size DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_ALLOC(arena, size)             Dqn_MemArena_Alloc(arena, size DQN_DEBUG_PARAMS)
 #define DQN_MEM_ARENA_ALLOC_ARRAY(arena, T, num)     (T *)Dqn_MemArena_Alloc(arena, sizeof(T) * num DQN_DEBUG_PARAMS)
@@ -887,11 +906,12 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Free(Dq
 template <typename T>
 struct Dqn_Slice
 {
-    union { T *data; T *buf; T *str; };
+    union { T *data; T *buf; T *str; T const *const_str; };
     union { Dqn_isize size; Dqn_isize len; };
 
     Dqn_Slice() = default;
-    Dqn_Slice(T *str, Dqn_isize len) { this->str = str; this->len = len; }
+    Dqn_Slice(T       *str, Dqn_isize len) { this->str       = str; this->len = len; }
+    Dqn_Slice(T const *str, Dqn_isize len) { this->const_str = str; this->len = len; }
 
     T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
     T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
@@ -1438,6 +1458,13 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
             result      = DQN_MEM_ARENA_ALLOC(arena, size);
         }
         break;
+
+        case Dqn_Allocator_Type::Custom:
+        {
+            if (allocator->allocate)
+                result = allocator->allocate(size);
+        }
+        break;
     }
 
     return result;
@@ -1471,6 +1498,13 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
             }
         }
         break;
+
+        case Dqn_Allocator_Type::Custom:
+        {
+            if (allocator->realloc)
+                result = allocator->realloc(old_ptr, old_size, new_size);
+        }
+        break;
     }
 
     return result;
@@ -1485,6 +1519,12 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Allocator_Free(Dqn_Allocator *allocator, voi
         case Dqn_Allocator_Type::XHeap:
         {
             free(ptr);
+        }
+        break;
+
+        case Dqn_Allocator_Type::Custom:
+        {
+            allocator->free(ptr);
         }
         break;
 
@@ -1597,13 +1637,28 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn
 #if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
     (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
 #endif
-    Dqn_usize remaining_space = arena->top_mem_block->size - arena->top_mem_block->used;
-    if (remaining_space >= size) return true;
+    if (arena->top_mem_block)
+    {
+        Dqn_usize remaining_space = arena->top_mem_block->size - arena->top_mem_block->used;
+        if (remaining_space >= size) return true;
+    }
 
     Dqn_MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, size);
     if (!new_block) return false;
     Dqn_MemArena__AttachBlock(arena, new_block);
     return true;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_InitWithAllocator(Dqn_MemArena *arena, Dqn_Allocator allocator, Dqn_usize size DQN_DEBUG_ARGS))
+{
+#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
+    (void)file; (void)file_len; (void)func; (void)func_len; (void)line;
+#endif
+    DQN_ASSERT_MSG(size >= sizeof(*arena->curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_MemBlock struct into the memory buffer", size, sizeof(*arena->curr_mem_block));
+    *arena                                    = {};
+    arena->allocator                          = allocator;
+    Dqn_MemBlock *mem_block                   = Dqn_MemArena__AllocateBlock(arena, size);
+    Dqn_MemArena__AttachBlock(arena, mem_block);
 }
 
 DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_InitMemory(Dqn_MemArena *arena, void *memory, Dqn_usize size DQN_DEBUG_ARGS))
@@ -1619,6 +1674,17 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_InitMemory(Dqn_MemArena *arena, voi
     mem_block->memory                         = DQN_CAST(Dqn_u8 *)memory + sizeof(*mem_block);
     mem_block->size                           = size - sizeof(*mem_block);
     Dqn_MemArena__AttachBlock(arena, mem_block);
+}
+
+DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_ResetUsage(Dqn_MemArena *arena, Dqn_ZeroMem zero_mem))
+{
+    for (Dqn_MemBlock *block = arena->top_mem_block; block; block = block->prev)
+    {
+        if (zero_mem == Dqn_ZeroMem::Yes)
+            memset(block->memory, 0, block->used);
+        block->used = 0;
+        if (!block->prev) arena->curr_mem_block = block;
+    }
 }
 
 DQN_HEADER_COPY_PROTOTYPE(Dqn_MemArenaScopedRegion, Dqn_MemArena_MakeScopedRegion(Dqn_MemArena *arena))
@@ -2280,6 +2346,20 @@ DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_File_ReadWithArena(Dqn_MemArena *arena, ch
 
     if (file_size) *file_size = file_size_;
     return result;
+}
+
+// @ -------------------------------------------------------------------------------------------------
+// @
+// @ NOTE: Utils
+// @
+// @ -------------------------------------------------------------------------------------------------
+#include <time.h>
+DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_EpochTimeToDate(i64 timestamp, char *buf, isize buf_len))
+{
+    time_t time   = DQN_CAST(time_t)timestamp;
+    tm *date_time = localtime(&time);
+    strftime(buf, buf_len, "%c", date_time);
+    return buf;
 }
 #undef _CRT_SECURE_NO_WARNINGS
 #endif // DQN_IMPLEMENTATION
