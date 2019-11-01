@@ -225,6 +225,11 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #define DQN_MEGABYTES(val) (1024ULL * DQN_KILOBYTES(val))
 #define DQN_GIGABYTES(val) (1024ULL * DQN_MEGABYTES(val))
 
+#define DQN_MINS_TO_S(val)  ((val) * 60ULL)
+#define DQN_HOURS_TO_S(val) (DQN_MINS_TO_S(val) * 60ULL)
+#define DQN_DAYS_TO_S(val)  (DQN_HOURS_TO_S(val) * 24ULL)
+#define DQN_YEARS_TO_S(val)  (DQN_DAYS_TO_S(val) * 365ULL)
+
 #define DQN_ARRAY_COUNT(array) (sizeof(array)/sizeof(array[0]))
 
 #ifdef _MSC_VER
@@ -1390,6 +1395,36 @@ DQN_HEADER_COPY_END
 #include <math.h>
 #include <memory.h>
 #include <stdio.h>
+
+DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_U64Str_ToStr(u64 val, Dqn_U64Str *result, b32 comma_sep))
+{
+    int buf_index            = (int)(Dqn_ArrayCount(result->buf) - 1);
+    result->buf[buf_index--] = 0;
+
+    if (val == 0)
+    {
+        result->buf[buf_index--] = '0';
+        result->len              = 1;
+    }
+    else
+    {
+        for (int digit_count = 0; val > 0; result->len++, digit_count++)
+        {
+            if (comma_sep && (digit_count != 0) && (digit_count % 3 == 0))
+            {
+                result->buf[buf_index--] = ',';
+                result->len++;
+            }
+
+            char digit               = val % 10;
+            result->buf[buf_index--] = '0' + digit;
+            val /= 10;
+        }
+    }
+
+    result->str = result->buf + (buf_index + 1);
+    return result->str;
+}
 
 // @ -------------------------------------------------------------------------------------------------
 // @
