@@ -275,6 +275,138 @@ FILE_SCOPE void UnitTests()
 
     // ---------------------------------------------------------------------------------------------
     //
+    // NOTE: Dqn_Rect
+    //
+    // ---------------------------------------------------------------------------------------------
+    {
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Rect");
+        // NOTE: Dqn_Rect_Intersection
+        {
+            {
+                TEST_START_SCOPE(testing_state, "No intersection");
+                Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(0, 0), Dqn_V2(100, 100));
+                Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(200, 0), Dqn_V2(200, 200));
+                Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
+
+                TEST_EXPECT_MSG(testing_state,
+                                ab.min.x == 0 && ab.min.y == 0 && ab.max.x == 0 && ab.max.y == 0,
+                                "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                                ab.min.x,
+                                ab.min.y,
+                                ab.max.x,
+                                ab.max.y);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "A's min intersects B");
+                Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(50, 50), Dqn_V2(100, 100));
+                Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2( 0,  0), Dqn_V2(100, 100));
+                Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
+
+                TEST_EXPECT_MSG(testing_state,
+                                ab.min.x == 50 && ab.min.y == 50 && ab.max.x == 100 && ab.max.y == 100,
+                                "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                                ab.min.x,
+                                ab.min.y,
+                                ab.max.x,
+                                ab.max.y);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "B's min intersects A");
+                Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2( 0,  0), Dqn_V2(100, 100));
+                Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(50, 50), Dqn_V2(100, 100));
+                Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
+
+                TEST_EXPECT_MSG(testing_state,
+                                ab.min.x == 50 && ab.min.y == 50 && ab.max.x == 100 && ab.max.y == 100,
+                                "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                                ab.min.x,
+                                ab.min.y,
+                                ab.max.x,
+                                ab.max.y);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "A's max intersects B");
+                Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(-50, -50), Dqn_V2(100, 100));
+                Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(  0,   0), Dqn_V2(100, 100));
+                Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
+
+                TEST_EXPECT_MSG(testing_state,
+                                ab.min.x == 0 && ab.min.y == 0 && ab.max.x == 50 && ab.max.y == 50,
+                                "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                                ab.min.x,
+                                ab.min.y,
+                                ab.max.x,
+                                ab.max.y);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "B's max intersects A");
+                Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(  0,   0), Dqn_V2(100, 100));
+                Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(-50, -50), Dqn_V2(100, 100));
+                Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
+
+                TEST_EXPECT_MSG(testing_state,
+                                ab.min.x == 0 && ab.min.y == 0 && ab.max.x == 50 && ab.max.y == 50,
+                                "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                                ab.min.x,
+                                ab.min.y,
+                                ab.max.x,
+                                ab.max.y);
+            }
+
+
+            {
+                TEST_START_SCOPE(testing_state, "B contains A");
+                Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(25, 25), Dqn_V2( 25,  25));
+                Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2( 0,  0), Dqn_V2(100, 100));
+                Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
+
+                TEST_EXPECT_MSG(testing_state,
+                                ab.min.x == 25 && ab.min.y == 25 && ab.max.x == 50 && ab.max.y == 50,
+                                "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                                ab.min.x,
+                                ab.min.y,
+                                ab.max.x,
+                                ab.max.y);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "A contains B");
+                Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2( 0,  0), Dqn_V2(100, 100));
+                Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(25, 25), Dqn_V2( 25,  25));
+                Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
+
+                TEST_EXPECT_MSG(testing_state,
+                                ab.min.x == 25 && ab.min.y == 25 && ab.max.x == 50 && ab.max.y == 50,
+                                "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                                ab.min.x,
+                                ab.min.y,
+                                ab.max.x,
+                                ab.max.y);
+            }
+
+            {
+                TEST_START_SCOPE(testing_state, "A equals B");
+                Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(0, 0), Dqn_V2(100, 100));
+                Dqn_Rect b  = a;
+                Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
+
+                TEST_EXPECT_MSG(testing_state,
+                                ab.min.x == 0 && ab.min.y == 0 && ab.max.x == 100 && ab.max.y == 100,
+                                "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                                ab.min.x,
+                                ab.min.y,
+                                ab.max.x,
+                                ab.max.y);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //
     // NOTE: Dqn_StringBuilder
     //
     // ---------------------------------------------------------------------------------------------
@@ -604,6 +736,31 @@ FILE_SCOPE void UnitTests()
             TEST_START_SCOPE(testing_state, "Convert \"12a3\"");
             u64 result = Dqn_Str_ToU64("12a3");
             TEST_EXPECT(testing_state, result == 12);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //
+    // NOTE: Dqn_Str_Find
+    //
+    // ---------------------------------------------------------------------------------------------
+    {
+        TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str_Find");
+        {
+            TEST_START_SCOPE(testing_state, "String (char) is not in buffer");
+            char const buf[]  = "836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55";
+            char const find[] = "2";
+            char const *result = Dqn_Str_Find(buf, find, Dqn_CharCountI(buf), Dqn_CharCountI(find));
+            TEST_EXPECT(testing_state, result == nullptr);
+        }
+
+        {
+            TEST_START_SCOPE(testing_state, "String (char) is in buffer");
+            char const buf[]  = "836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55";
+            char const find[] = "6";
+            char const *result = Dqn_Str_Find(buf, find, Dqn_CharCountI(buf), Dqn_CharCountI(find));
+            TEST_EXPECT(testing_state, result != nullptr);
+            TEST_EXPECT(testing_state, result[0] == '6' && result[1] == 'a');
         }
     }
 }

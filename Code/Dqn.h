@@ -233,10 +233,10 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #define DQN_ARRAY_COUNT(array) (sizeof(array)/sizeof(array[0]))
 
 #ifdef _MSC_VER
-    #define DEBUG_BREAK __debugbreak()
+    #define DQN_DEBUG_BREAK __debugbreak()
 #else
     #include <signal.h>
-    #define DEBUG_BREAK raise(SIGTRAP)
+    #define DQN_DEBUG_BREAK raise(SIGTRAP)
 #endif
 
 #define DQN_INVALID_CODE_PATH 0
@@ -246,7 +246,7 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
         if (!(expr))                                                                                                       \
         {                                                                                                                  \
             DQN_LOG_E("Assert: [" #expr "] " fmt, ##__VA_ARGS__);                                                          \
-            DEBUG_BREAK;                                                                                                   \
+            DQN_DEBUG_BREAK;                                                                                                   \
         }
 
     #define DQN_IF_ASSERT(expr) DQN_IF_ASSERT_MSG(expr, "")
@@ -295,6 +295,7 @@ using u16   = uint16_t;
 using u8    = uint8_t;
 
 using b32  = int32_t;
+using b8   = int8_t;
 
 const i32 I32_MAX     = INT32_MAX;
 const u32 U32_MAX     = UINT32_MAX;
@@ -911,12 +912,11 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Free(Dq
 template <typename T>
 struct Dqn_Slice
 {
-    union { T *data; T *buf; T *str; T const *const_str; };
+    union { T *data; T *buf; T *str; };
     union { Dqn_isize size; Dqn_isize len; };
 
     Dqn_Slice() = default;
-    Dqn_Slice(T       *str, Dqn_isize len) { this->str       = str; this->len = len; }
-    Dqn_Slice(T const *str, Dqn_isize len) { this->const_str = str; this->len = len; }
+    Dqn_Slice(T *str, Dqn_isize len) { this->str = str; this->len = len; }
 
     T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
     T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
@@ -1111,7 +1111,7 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEM
 
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_HEADER_COPY_PROTOTYPE(void, Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num))
+DQN_HEADER_COPY_PROTOTYPE(void, Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1))
 {
     DQN_ASSERT(a->len - num >= 0);
     a->len -= num;
@@ -1152,19 +1152,6 @@ DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL
     }
     return nullptr;
 }
-
-// @ -------------------------------------------------------------------------------------------------
-// @
-// @ NOTE: Dqn_FixedStack
-// @
-// @ -------------------------------------------------------------------------------------------------
-DQN_HEADER_COPY_BEGIN
-template <typename T, int MAX_> using Dqn_FixedStack = DQN_FIXED_ARRAY_TEMPLATE_DECL;
-template <typename T, int MAX_> T    Dqn_FixedStack_Pop  (Dqn_FixedStack<T, MAX_> *array)         { T result = *Dqn_FixedArray_Peek(array); Dqn_FixedArray_Pop(array, 1); return result; }
-template <typename T, int MAX_> T   *Dqn_FixedStack_Peek (Dqn_FixedStack<T, MAX_> *array)         { return Dqn_FixedArray_Peek(array); }
-template <typename T, int MAX_> T   *Dqn_FixedStack_Push (Dqn_FixedStack<T, MAX_> *array, T item) { return Dqn_FixedArray_Add(array, item); }
-template <typename T, int MAX_> void Dqn_FixedStack_Clear(Dqn_FixedStack<T, MAX_> *array)         { Dqn_FixedArray_Clear(array); }
-DQN_HEADER_COPY_END
 
 // @ -------------------------------------------------------------------------------------------------
 // @
@@ -1865,6 +1852,27 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_Rect, Dqn_Rect_Move(Dqn_Rect src, Dqn_V2 move_amou
     return result;
 }
 
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Rect, Dqn_Rect_Intersection(Dqn_Rect a, Dqn_Rect b))
+{
+    Dqn_Rect result  = {};
+    if      (a.min.x >= b.min.x && a.min.x <= b.max.x) result.min.x = a.min.x;
+    else if (b.min.x >= a.min.x && b.min.x <= a.max.x) result.min.x = b.min.x;
+    else
+    {
+        return result;
+    }
+
+    if      (a.max.x >= b.min.x && a.max.x <= b.max.x) result.max.x = a.max.x;
+    else if (b.max.x >= a.min.x && b.max.x <= a.max.x) result.max.x = b.max.x;
+
+    if      (a.min.y >= b.min.y && a.min.y <= b.max.y) result.min.y = a.min.y;
+    else if (b.min.y >= a.min.y && b.min.y <= a.max.y) result.min.y = b.min.y;
+
+    if      (a.max.y >= b.min.y && a.max.y <= b.max.y) result.max.y = a.max.y;
+    else if (b.max.y >= a.min.y && b.max.y <= a.max.y) result.max.y = b.max.y;
+    return result;
+}
+
 DQN_HEADER_COPY_PROTOTYPE(Dqn_Rect, Dqn_Rect_Union(Dqn_Rect a, Dqn_Rect b))
 {
     Dqn_Rect result  = {};
@@ -2157,7 +2165,7 @@ DQN_HEADER_COPY_PROTOTYPE(char const *, Dqn_Str_FindMulti(char const *buf, char 
     if (buf_len < 0) buf_len = (Dqn_isize)strlen(buf);
 
     char const *buf_end = buf + buf_len;
-    for (; *buf; ++buf)
+    for (; buf != buf_end; ++buf)
     {
         Dqn_isize remaining = static_cast<Dqn_isize>(buf_end - buf);
         DQN_FOR_EACH(find_index, find_len)
@@ -2186,7 +2194,7 @@ DQN_HEADER_COPY_PROTOTYPE(char const *, Dqn_Str_Find(char const *buf, char const
 
     char const *buf_end = buf + buf_len;
     char const *result = nullptr;
-    for (; *buf; ++buf)
+    for (; buf != buf_end; ++buf)
     {
         Dqn_isize remaining = static_cast<Dqn_isize>(buf_end - buf);
         if (remaining < find_len) break;
