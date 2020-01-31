@@ -1,6 +1,13 @@
 #ifndef DQN_HEADER_H
 #define DQN_HEADER_H
 
+// Compile & Run
+/*
+   MSVC
+   cl /O2 /MT /W4 /EHsc /FC /wd4201 /D DQN_HEADER_IMPLEMENTATION /Tp DqnHeader.h /link /nologo
+   DqnHeader.exe Dqn.h > Dqn_Generated.h
+*/
+
 // NOTE: Copy the function prototype, all functions will be whitespaced aligned to the longest return type of the file
 // NOTE: If you function contains a comma NOT in the argument list (i.e. multiple template parameters), this macro does NOT work.
 //       Please use the DQN_HEADER_COPY_BEGIN and DQN_HEADER_COPY_END unfortunately.

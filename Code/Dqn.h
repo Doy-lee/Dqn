@@ -720,7 +720,7 @@ struct Dqn_StringBuilderBuffer
 {
     char                    *mem;
     Dqn_usize                size;
-    usize                    used;
+    Dqn_usize                used;
     Dqn_StringBuilderBuffer *next;
 };
 
@@ -872,7 +872,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_FmtAppe
 DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1))
 {
     if (!str) return;
-    if (len == -1) len = (Dqn_isize)strlen(str);
+    if (len == -1) len = DQN_CAST(Dqn_isize)strlen(str);
     Dqn_isize len_w_null_terminator = len + 1;
     char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
     memcpy(buf, str, len);
@@ -1341,7 +1341,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize MAX_> Dqn_b32, Dqn_FixedString_App
 
 DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize MAX_> Dqn_b32, Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize len = -1))
 {
-    if (len == -1) len = (Dqn_isize)strlen(src);
+    if (len == -1) len = DQN_CAST(Dqn_isize)strlen(src);
     Dqn_isize space = MAX_ - str->len;
 
     Dqn_b32 result = true;
@@ -1368,8 +1368,8 @@ struct Dqn_U64Str
     // Points to the start of the str in the buffer, not necessarily buf since
     // we write into the buffer in reverse
     char *str;
-    char buf[27]; // NOTE(doyle): 27 is the maximum size of Dqn_u64 including commas
-    int len;
+    char  buf[27]; // NOTE(doyle): 27 is the maximum size of Dqn_u64 including commas
+    int   len;
 };
 DQN_HEADER_COPY_END
 #undef _CRT_SECURE_NO_WARNINGS
@@ -1383,7 +1383,7 @@ DQN_HEADER_COPY_END
 #include <memory.h>
 #include <stdio.h>
 
-DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_U64Str_ToStr(u64 val, Dqn_U64Str *result, b32 comma_sep))
+DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_U64Str_ToStr(Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep))
 {
     int buf_index            = (int)(Dqn_ArrayCount(result->buf) - 1);
     result->buf[buf_index--] = 0;
@@ -1403,7 +1403,7 @@ DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_U64Str_ToStr(u64 val, Dqn_U64Str *result, 
                 result->len++;
             }
 
-            char digit               = val % 10;
+            auto digit               = DQN_CAST(char)(val % 10);
             result->buf[buf_index--] = '0' + digit;
             val /= 10;
         }
@@ -1421,8 +1421,8 @@ DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_U64Str_ToStr(u64 val, Dqn_U64Str *result, 
 DQN_HEADER_COPY_PROTOTYPE(void, Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va))
 {
     char const *file_ptr = file;
-    Dqn_usize file_ptr_len   = file_len;
-    for (Dqn_usize i = (file_ptr_len - 1); i >= 0; --i)
+    auto file_ptr_len    = DQN_CAST(Dqn_isize)file_len;
+    for (Dqn_isize i = (file_ptr_len - 1); i >= 0; --i)
     {
         if (file_ptr[i] == '\\' || file_ptr[i] == '/')
         {
@@ -1462,7 +1462,9 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
     void *result = nullptr;
     switch (allocator->type)
     {
+        case Dqn_Allocator_Type::NullAllocator:
         default: break;
+
         case Dqn_Allocator_Type::Heap:
         case Dqn_Allocator_Type::XHeap:
         {
@@ -1495,14 +1497,19 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
 Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
 DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator, void *old_ptr, Dqn_isize old_size, Dqn_isize new_size))
 {
+    DQN_IF_ASSERT(old_size >= 0) old_size = 0;
+    DQN_IF_ASSERT(new_size >= 0) new_size = 0;
+
     void *result = nullptr;
     switch (allocator->type)
     {
+        case Dqn_Allocator_Type::NullAllocator:
         default: break;
+
         case Dqn_Allocator_Type::Heap:
         case Dqn_Allocator_Type::XHeap:
         {
-            result = realloc(old_ptr, new_size);
+            result = realloc(old_ptr, DQN_CAST(size_t)new_size);
             if (!result && allocator->type == Dqn_Allocator_Type::XHeap)
             {
                 DQN_ASSERT(result);
@@ -1513,10 +1520,10 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
         case Dqn_Allocator_Type::Arena:
         {
             auto *arena = static_cast<Dqn_MemArena *>(allocator->data);
-            if (DQN_MEM_ARENA_RESERVE(arena, new_size))
+            if (DQN_MEM_ARENA_RESERVE(arena, DQN_CAST(size_t)new_size))
             {
-                result = DQN_MEM_ARENA_ALLOC(arena, new_size);
-                if (result) memcpy(result, old_ptr, old_size);
+                result = DQN_MEM_ARENA_ALLOC(arena, DQN_CAST(size_t)new_size);
+                if (result) memcpy(result, old_ptr, DQN_CAST(size_t)old_size);
             }
         }
         break;
@@ -1524,7 +1531,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
         case Dqn_Allocator_Type::Custom:
         {
             if (allocator->realloc)
-                result = allocator->realloc(old_ptr, old_size, new_size);
+                result = allocator->realloc(old_ptr, DQN_CAST(size_t)old_size, DQN_CAST(size_t)new_size);
         }
         break;
     }
@@ -1536,7 +1543,9 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Allocator_Free(Dqn_Allocator *allocator, voi
 {
     switch (allocator->type)
     {
+        case Dqn_Allocator_Type::NullAllocator:
         default: break;
+
         case Dqn_Allocator_Type::Heap:
         case Dqn_Allocator_Type::XHeap:
         {
@@ -1562,7 +1571,8 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Allocator_Free(Dqn_Allocator *allocator, voi
 // @ -------------------------------------------------------------------------------------------------
 DQN_FILE_SCOPE Dqn_MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, Dqn_usize requested_size)
 {
-    Dqn_usize mem_block_size      = DQN_MAX(arena->min_block_size, requested_size);
+    DQN_ASSERT(arena->min_block_size > 0);
+    Dqn_usize mem_block_size      = DQN_MAX(DQN_CAST(Dqn_usize)arena->min_block_size, requested_size);
     Dqn_usize const allocate_size = sizeof(*arena->curr_mem_block) + mem_block_size;
     Dqn_MemBlock *result          = DQN_CAST(Dqn_MemBlock *) Dqn_Allocator_Allocate(&arena->allocator, allocate_size);
     if (!result) return result;
@@ -2018,14 +2028,14 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Bit_SetInplace(Dqn_u32 *flags, Dqn_u32 bitfi
 
 DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsSet(Dqn_u32 flags, Dqn_u32 bitfield))
 {
-    Dqn_b32 result = (flags & bitfield);
+    auto result = DQN_CAST(Dqn_b32)((flags & bitfield) == 0);
     return result;
 }
 
 
 DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsNotSet(Dqn_u32 flags, Dqn_u32 bitfield))
 {
-    Dqn_b32 result = !(flags & bitfield);
+    auto result = Dqn_Bit_IsSet(flags, bitfield);
     return result;
 }
 
@@ -2076,7 +2086,7 @@ DQN_HEADER_COPY_PROTOTYPE(int, Dqn_Safe_TruncateISizeToInt(Dqn_isize val))
 DQN_HEADER_COPY_PROTOTYPE(Dqn_i32, Dqn_Safe_TruncateISizeToI32(Dqn_isize val))
 {
     DQN_ASSERT_MSG(val >= INT32_MIN && val <= INT32_MAX, "%zd >= %zd && %zd <= %zd", val, INT32_MIN, val, INT32_MAX);
-    auto result = (Dqn_i32)val;
+    auto result = DQN_CAST(Dqn_i32)val;
     return result;
 }
 
@@ -2084,7 +2094,7 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_i32, Dqn_Safe_TruncateISizeToI32(Dqn_isize val))
 DQN_HEADER_COPY_PROTOTYPE(Dqn_i8, Dqn_Safe_TruncateISizeToI8(Dqn_isize val))
 {
     DQN_ASSERT_MSG(val >= INT8_MIN && val <= INT8_MAX, "%zd >= %zd && %zd <= %zd", val, INT8_MIN, val, INT8_MAX);
-    auto result = (Dqn_i8)val;
+    auto result = DQN_CAST(Dqn_i8)val;
     return result;
 }
 
@@ -2092,7 +2102,7 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_i8, Dqn_Safe_TruncateISizeToI8(Dqn_isize val))
 DQN_HEADER_COPY_PROTOTYPE(Dqn_u32, Dqn_Safe_TruncateUSizeToU32(Dqn_u64 val))
 {
     DQN_ASSERT_MSG(val <= UINT32_MAX, "%zu <= %zu", val, UINT32_MAX);
-    auto result = (Dqn_u32)val;
+    auto result = DQN_CAST(Dqn_u32)val;
     return result;
 }
 
@@ -2100,7 +2110,7 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_u32, Dqn_Safe_TruncateUSizeToU32(Dqn_u64 val))
 DQN_HEADER_COPY_PROTOTYPE(int, Dqn_Safe_TruncateUSizeToI32(Dqn_usize val))
 {
     DQN_ASSERT_MSG(val <= INT32_MAX, "%zu <= %zd", val, INT32_MAX);
-    auto result = (int)val;
+    auto result = DQN_CAST(int)val;
     return result;
 }
 
@@ -2108,7 +2118,14 @@ DQN_HEADER_COPY_PROTOTYPE(int, Dqn_Safe_TruncateUSizeToI32(Dqn_usize val))
 DQN_HEADER_COPY_PROTOTYPE(int, Dqn_Safe_TruncateUSizeToInt(Dqn_usize val))
 {
     DQN_ASSERT_MSG(val <= INT_MAX, "%zu <= %zd", val, INT_MAX);
-    auto result = (int)val;
+    auto result = DQN_CAST(int)val;
+    return result;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(Dqn_isize, Dqn_Safe_TruncateUSizeToISize(Dqn_usize val))
+{
+    DQN_ASSERT_MSG(val <= CAST(Dqn_usize)ISIZE_MAX, "%zu <= %zu", val, CAST(Dqn_usize)ISIZE_MAX);
+    auto result = DQN_CAST(Dqn_isize)val;
     return result;
 }
 
@@ -2152,17 +2169,17 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Char_IsWhitespace(char ch))
 // @ -------------------------------------------------------------------------------------------------
 DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Str_Equals(char const *a, char const *b, Dqn_isize a_len = -1, Dqn_isize b_len = -1))
 {
-    if (a_len == -1) a_len = strlen(a);
-    if (b_len == -1) b_len = strlen(b);
+    if (a_len == -1) a_len = DQN_CAST(Dqn_isize)strlen(a);
+    if (b_len == -1) b_len = DQN_CAST(Dqn_isize)strlen(b);
     if (a_len != b_len) return false;
-    return (strncmp(a, b, a_len) == 0);
+    return (strncmp(a, b, DQN_CAST(size_t)a_len) == 0);
 }
 
 DQN_HEADER_COPY_PROTOTYPE(char const *, Dqn_Str_FindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_lens, Dqn_isize find_len, Dqn_isize *match_index, Dqn_isize buf_len = -1))
 {
     char const *result = nullptr;
     if (find_len == 0) return result;
-    if (buf_len < 0) buf_len = (Dqn_isize)strlen(buf);
+    if (buf_len < 0) buf_len = DQN_CAST(Dqn_isize)strlen(buf);
 
     char const *buf_end = buf + buf_len;
     for (; buf != buf_end; ++buf)
@@ -2174,7 +2191,7 @@ DQN_HEADER_COPY_PROTOTYPE(char const *, Dqn_Str_FindMulti(char const *buf, char 
             Dqn_isize find_str_len = find_string_lens[find_index];
             if (remaining < find_str_len) continue;
 
-            if (strncmp(buf, find, find_str_len) == 0)
+            if (strncmp(buf, find, DQN_CAST(size_t)find_str_len) == 0)
             {
                 result       = buf;
                 *match_index = find_index;
@@ -2189,8 +2206,8 @@ DQN_HEADER_COPY_PROTOTYPE(char const *, Dqn_Str_FindMulti(char const *buf, char 
 DQN_HEADER_COPY_PROTOTYPE(char const *, Dqn_Str_Find(char const *buf, char const *find, Dqn_isize buf_len = -1, Dqn_isize find_len = -1))
 {
     if (find_len == 0) return nullptr;
-    if (buf_len < 0) buf_len = (Dqn_isize)strlen(buf);
-    if (find_len < 0) find_len = (Dqn_isize)strlen(find);
+    if (buf_len < 0) buf_len = DQN_CAST(Dqn_isize)strlen(buf);
+    if (find_len < 0) find_len = DQN_CAST(Dqn_isize)strlen(find);
 
     char const *buf_end = buf + buf_len;
     char const *result = nullptr;
@@ -2199,7 +2216,7 @@ DQN_HEADER_COPY_PROTOTYPE(char const *, Dqn_Str_Find(char const *buf, char const
         Dqn_isize remaining = static_cast<Dqn_isize>(buf_end - buf);
         if (remaining < find_len) break;
 
-        if (strncmp(buf, find, find_len) == 0)
+        if (strncmp(buf, find, DQN_CAST(size_t)find_len) == 0)
         {
             result = buf;
             break;
@@ -2211,7 +2228,7 @@ DQN_HEADER_COPY_PROTOTYPE(char const *, Dqn_Str_Find(char const *buf, char const
 DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Str_Match(char const *src, char const *find, int find_len))
 {
   if (find_len == -1) find_len = Dqn_Safe_TruncateUSizeToInt(strlen(find));
-  Dqn_b32 result = (strncmp(src, find, find_len) == 0);
+  auto result = DQN_CAST(Dqn_b32)(strncmp(src, find, DQN_CAST(size_t)find_len) == 0);
   return result;
 }
 
@@ -2323,7 +2340,7 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_u64, Dqn_Str_ToU64(char const *buf, int len = -1))
         if (ch == ',') continue;
         if (ch < '0' || ch > '9') break;
 
-        Dqn_u64 val = ch - '0';
+        Dqn_u64 val = DQN_CAST(Dqn_u64)(ch - '0');
         result  = Dqn_Safe_AddU64(result, val);
         result  = Dqn_Safe_MulU64(result, 10);
     }
@@ -2374,16 +2391,22 @@ DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_File_ReadWithArena(Dqn_MemArena *arena, ch
 {
     FILE *file_handle = fopen(file, "rb");
     fseek(file_handle, 0, SEEK_END);
-    Dqn_usize file_size_ = ftell(file_handle);
+    Dqn_isize file_size_ = ftell(file_handle);
+    if (DQN_CAST(long)file_size_ == -1L)
+    {
+        DQN_ASSERT(DQN_CAST(long)file_size_ != -1L);
+        file_size_ = 0;
+    }
+
     rewind(file_handle);
 
-    auto *result = (char *)DQN_MEM_ARENA_ALLOC(arena, file_size_ + 1);
+    auto *result = (char *)DQN_MEM_ARENA_ALLOC(arena, DQN_CAST(Dqn_usize)(file_size_ + 1));
     DQN_ASSERT(result);
     result[file_size_] = 0;
 
-    if (fread(result, file_size_, 1, file_handle) != 1)
+    if (fread(result, DQN_CAST(size_t)file_size_, 1, file_handle) != 1)
     {
-        fprintf(stderr, "Failed to fread: %zu bytes into buffer from file: %s\n", file_size_, file);
+        fprintf(stderr, "Failed to fread: %zd bytes into buffer from file: %s\n", file_size_, file);
         return nullptr;
     }
 
@@ -2397,11 +2420,12 @@ DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_File_ReadWithArena(Dqn_MemArena *arena, ch
 // @
 // @ -------------------------------------------------------------------------------------------------
 #include <time.h>
-DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_EpochTimeToDate(i64 timestamp, char *buf, isize buf_len))
+DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_EpochTimeToDate(Dqn_i64 timestamp, char *buf, Dqn_isize buf_len))
 {
+    DQN_ASSERT(buf_len >= 0);
     time_t time   = DQN_CAST(time_t)timestamp;
     tm *date_time = localtime(&time);
-    strftime(buf, buf_len, "%c", date_time);
+    strftime(buf, DQN_CAST(Dqn_usize)buf_len, "%c", date_time);
     return buf;
 }
 #undef _CRT_SECURE_NO_WARNINGS
