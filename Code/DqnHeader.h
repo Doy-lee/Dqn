@@ -146,12 +146,12 @@ struct HeaderEntry
     {
         struct
         {
-            Dqn_Slice<char> return_val;
-            Dqn_Slice<char> name_and_args;
+            Dqn_String return_val;
+            Dqn_String name_and_args;
         } function_decl;
 
-        Dqn_Slice<char> comment;
-        Dqn_Slice<char> copy_range;
+        Dqn_String comment;
+        Dqn_String copy_range;
     };
 };
 
@@ -229,8 +229,9 @@ int main(int argc, char *argv[])
                 isize func_name_len   = 0;
                 char const *func_name = ParseFunctionNameAndParameters(ptr, &func_name_len);
 
-                entry->function_decl.return_val  = Dqn_AsprintfSlice(&arena, "%.*s", func_type_len, func_type);
-                entry->function_decl.name_and_args = Dqn_AsprintfSlice(&arena, "%.*s", func_name_len, func_name);
+                Dqn_Allocator allocator = Dqn_Allocator_Arena(&arena);
+                entry->function_decl.return_val  = Dqn_Asprintf(&allocator, "%.*s", func_type_len, func_type);
+                entry->function_decl.name_and_args = Dqn_Asprintf(&allocator, "%.*s", func_name_len, func_name);
                 ptr = func_name + func_name_len + 1; // Ptr is at macro closing paren, skip the paren
 
                 max_prototype_return_val = DQN_MAX(max_prototype_return_val, func_type_len);
@@ -243,7 +244,7 @@ int main(int argc, char *argv[])
                     ptr++;
                 isize comment_len = ptr - comment_start;
 
-                entry->comment.buf = DQN_MEM_ARENA_ALLOC_ARRAY(&arena, char, comment_len);
+                entry->comment.str = DQN_MEM_ARENA_ALLOC_ARRAY(&arena, char, comment_len);
                 DQN_FOR_EACH(comment_index, comment_len)
                 {
                     // NOTE: We capture "// @", and we want to skip the @ symbol, its ugly which is at the index 3
@@ -251,10 +252,10 @@ int main(int argc, char *argv[])
                     char ch = comment_start[comment_index];
                     if (comment_index == 3 && ch == '@') continue;
                     if (comment_index == 4 && ch == ' ') continue;
-                    entry->comment.buf[entry->comment.len++] = ch;
+                    entry->comment.str[entry->comment.len++] = ch;
                 }
 
-                while (entry->comment.len > 0 && Dqn_Char_IsWhitespace(entry->comment.buf[entry->comment.len - 1]))
+                while (entry->comment.len > 0 && Dqn_Char_IsWhitespace(entry->comment.str[entry->comment.len - 1]))
                     entry->comment.len--;
                 ptr = comment_start + comment_len;
             }
@@ -271,12 +272,12 @@ int main(int argc, char *argv[])
                 }
 
                 isize copy_len        = copy_end - copy_start;
-                entry->copy_range.buf = (char *)DQN_MEM_ARENA_ALLOC(&arena, copy_len);
+                entry->copy_range.str = (char *)DQN_MEM_ARENA_ALLOC(&arena, copy_len);
                 DQN_FOR_EACH(copy_index, copy_len)
                 {
                     char ch = copy_start[copy_index];
                     if (ch == '\r') continue;
-                    entry->copy_range.buf[entry->copy_range.len++] = ch;
+                    entry->copy_range.str[entry->copy_range.len++] = ch;
                 }
                 ptr = copy_end;
             }
@@ -301,13 +302,13 @@ int main(int argc, char *argv[])
 
                 case HeaderEntryType::Comment:
                 {
-                    fprintf(stdout, "%.*s\n", (int)entry->comment.len, entry->comment.buf);
+                    fprintf(stdout, "%.*s\n", (int)entry->comment.len, entry->comment.str);
                 }
                 break;
 
                 case HeaderEntryType::CopyBegin:
                 {
-                    fprintf(stdout, "%.*s\n", (int)entry->copy_range.len, entry->copy_range.buf);
+                    fprintf(stdout, "%.*s\n", (int)entry->copy_range.len, entry->copy_range.str);
                 }
                 break;
             }
