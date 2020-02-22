@@ -613,6 +613,12 @@ struct Dqn_Allocator
     Dqn_Allocator_Type type;
     void              *data;
 
+    isize              bytes_allocated;
+    isize              total_bytes_allocated;
+
+    isize              allocations;
+    isize              total_allocations;
+
     // NOTE: Only required if type == Dqn_Allocator_Type::Custom
     Dqn_Allocator_AllocateProc *allocate;
     Dqn_Allocator_ReallocProc  *realloc;
@@ -718,7 +724,13 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_Arena(Dqn_MemArena
 DQN_HEADER_COPY_BEGIN
 struct Dqn_String
 {
-    char       *str;
+    union {
+        // NOTE: To appease GCC, Clang can't assign C string literal to char *
+        //       Only UB if you try modify a string originally declared const
+        char const *str_;
+        char *str;
+    };
+
     Dqn_isize   len;
     char const *begin() const { return str; }
     char const *end  () const { return str + len; }
@@ -855,7 +867,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> char *, Dqn_StringBuilder_Build
 {
     Dqn_isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
     auto *result  = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, sizeof(char) * len_w_null_terminator);
-    if (len) *len = len_w_null_terminator;
+    if (len) *len = (len_w_null_terminator - 1);
     Dqn_StringBuilder__BuildOutput(builder, result, len_w_null_terminator);
     return result;
 }
@@ -863,7 +875,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> char *, Dqn_StringBuilder_Build
 DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> Dqn_String, Dqn_StringBuilder_BuildString(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator))
 {
     Dqn_String result = {};
-    result.str = Dqn_StringBuilder_Build(builder, allocator, &result.len);
+    result.str        = Dqn_StringBuilder_Build(builder, allocator, &result.len);
     return result;
 }
 
@@ -888,11 +900,23 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Append(
 {
     if (!str) return;
     if (len == -1) len = DQN_CAST(Dqn_isize)strlen(str);
+    if (len == 0) return;
+
     Dqn_isize len_w_null_terminator = len + 1;
     char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
     memcpy(buf, str, len);
     builder->string_len += len;
     buf[len] = 0;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_AppendString(Dqn_StringBuilder<N> *builder, Dqn_String const string))
+{
+    if (!string.str || string.len == 0) return;
+    Dqn_isize len_w_null_terminator = string.len + 1;
+    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
+    memcpy(buf, string.str, string.len);
+    builder->string_len += string.len;
+    buf[string.len] = 0;
 }
 
 DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch))
@@ -1459,6 +1483,11 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
         break;
     }
 
+    if (result)
+    {
+        allocator->allocations++;
+        allocator->total_bytes_allocated += size;
+    }
     return result;
 }
 
@@ -1466,6 +1495,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
 {
     DQN_IF_ASSERT(old_size >= 0) old_size = 0;
     DQN_IF_ASSERT(new_size >= 0) new_size = 0;
+    DQN_ASSERT(new_size > old_size);
 
     void *result = nullptr;
     switch (allocator->type)
@@ -1503,6 +1533,11 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
         break;
     }
 
+    if (result)
+    {
+        allocator->total_bytes_allocated += new_size;
+        allocator->total_allocations++;
+    }
     return result;
 }
 
@@ -1528,6 +1563,13 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Allocator_Free(Dqn_Allocator *allocator, voi
 
         case Dqn_Allocator_Type::Arena:
             break;
+    }
+
+    if (ptr)
+    {
+        allocator->total_allocations++;
+        allocator->allocations--;
+        DQN_ASSERT(allocator->allocations >= 0);
     }
 }
 

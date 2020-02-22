@@ -4,19 +4,20 @@
 
 struct TestState
 {
-    Dqn_MemArena    arena;
-    int             indent_level;
-    Dqn_Slice<char> name;
-    Dqn_Slice<char> fail_expr;
-    Dqn_Slice<char> fail_msg;
-    bool            scope_started;
+    int           indent_level;
+    Dqn_String    name;
+    Dqn_String    fail_expr;
+    Dqn_String    fail_msg;
+    bool          scope_started;
 };
 
 struct TestingState
 {
-    int       num_tests_in_group;
-    int       num_tests_ok_in_group;
-    TestState test;
+    int           num_tests_in_group;
+    int           num_tests_ok_in_group;
+    TestState     test;
+    Dqn_MemArena  arena_;
+    Dqn_Allocator allocator;
 };
 
 #define ANSI_COLOR_RED "\x1b[31m"
@@ -32,9 +33,11 @@ struct TestingState
     {                                                                                                                  \
         if (testing_state.test.fail_expr.len == 0) testing_state.num_tests_ok_in_group++;                              \
         TestState_PrintResult(&testing_state.test);                                                                    \
-        testing_state.test = {};                                                                                       \
+        Dqn_MemArena_ResetUsage(&testing_state.arena_, Dqn_ZeroMem::No);                                               \
+        testing_state.allocator = Dqn_Allocator_Arena(&testing_state.arena_);                                          \
+        testing_state.test      = {};                                                                                  \
     };                                                                                                                 \
-    testing_state.test.name          = Dqn_AsprintfSlice(&testing_state.test.arena, test_name);                            \
+    testing_state.test.name          = Dqn_Asprintf(&testing_state.allocator, test_name);                              \
     testing_state.test.scope_started = true;                                                                           \
     testing_state.num_tests_in_group++
 
@@ -50,8 +53,8 @@ struct TestingState
     DQN_ASSERT(testing_state.test.scope_started);                                                                      \
     if (!(expr))                                                                                                       \
     {                                                                                                                  \
-        testing_state.test.fail_expr = Dqn_AsprintfSlice(&testing_state.test.arena, #expr);                                \
-        testing_state.test.fail_msg  = Dqn_AsprintfSlice(&testing_state.test.arena, msg, ##__VA_ARGS__);                   \
+        testing_state.test.fail_expr = Dqn_Asprintf(&testing_state.allocator, #expr);                                \
+        testing_state.test.fail_msg  = Dqn_Asprintf(&testing_state.allocator, msg, ##__VA_ARGS__);                   \
     }
 
 #define TEST_EXPECT(testing_state, expr) TEST_EXPECT_MSG(testing_state, expr, "")
@@ -115,7 +118,7 @@ FILE_SCOPE void UnitTests()
         TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Allocator");
         {
             TEST_START_SCOPE(testing_state, "HeapAllocator - Allocate Small");
-            Dqn_Allocator allocator = Dqn_Allocator_HeapAllocator();
+            Dqn_Allocator allocator = Dqn_Allocator_Heap();
             char constexpr EXPECT[] = "hello_world";
             char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT));
             DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
@@ -125,7 +128,7 @@ FILE_SCOPE void UnitTests()
 
         {
             TEST_START_SCOPE(testing_state, "XHeapAllocator - Allocate Small");
-            Dqn_Allocator allocator = Dqn_Allocator_XHeapAllocator();
+            Dqn_Allocator allocator = Dqn_Allocator_XHeap();
             char constexpr EXPECT[] = "hello_world";
             char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT));
             DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
@@ -136,7 +139,7 @@ FILE_SCOPE void UnitTests()
         {
             TEST_START_SCOPE(testing_state, "ArenaAllocator - Allocate Small");
             Dqn_MemArena arena      = {};
-            Dqn_Allocator allocator = Dqn_Allocator_ArenaAllocator(&arena);
+            Dqn_Allocator allocator = Dqn_Allocator_Arena(&arena);
             char constexpr EXPECT[] = "hello_world";
             char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT));
             DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
@@ -412,120 +415,121 @@ FILE_SCOPE void UnitTests()
     // ---------------------------------------------------------------------------------------------
     {
         TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_StringBuilder");
+        Dqn_Allocator allocator = Dqn_Allocator_Heap();
         // NOTE: Dqn_StringBuilder_Append
         {
             {
-                TEST_START_SCOPE(testing_state, "Append variable length strings and build using malloc");
+                TEST_START_SCOPE(testing_state, "Append variable length strings and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "Abc", 1);
                 Dqn_StringBuilder_Append(&builder, "cd");
                 isize len    = 0;
-                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
-                DQN_DEFER { free(result); };
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "Acd";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
             {
-                TEST_START_SCOPE(testing_state, "Append empty string and build using malloc");
+                TEST_START_SCOPE(testing_state, "Append empty string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "");
                 Dqn_StringBuilder_Append(&builder, "");
                 isize len    = 0;
-                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
-                DQN_DEFER { free(result); };
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
             {
-                TEST_START_SCOPE(testing_state, "Append empty string onto string and build using malloc");
+                TEST_START_SCOPE(testing_state, "Append empty string onto string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "Acd");
                 Dqn_StringBuilder_Append(&builder, "");
                 isize len    = 0;
-                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
-                DQN_DEFER { free(result); };
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "Acd";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
             {
-                TEST_START_SCOPE(testing_state, "Append nullptr and build using malloc");
+                TEST_START_SCOPE(testing_state, "Append nullptr and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, nullptr, 5);
                 isize len    = 0;
-                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
-                DQN_DEFER { free(result); };
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
             {
-                TEST_START_SCOPE(testing_state, "Append and require new linked buffer and build using malloc");
+                TEST_START_SCOPE(testing_state, "Append and require new linked buffer and build using heap allocator");
                 Dqn_StringBuilder<2> builder = {};
                 Dqn_StringBuilder_Append(&builder, "A");
                 Dqn_StringBuilder_Append(&builder, "z"); // Should force a new memory block
                 Dqn_StringBuilder_Append(&builder, "tec");
                 isize len    = 0;
-                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
-                DQN_DEFER { free(result); };
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "Aztec";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
         }
 
         // NOTE: Dqn_StringBuilder_AppendChar
         {
-            TEST_START_SCOPE(testing_state, "Append char and build using malloc");
+            TEST_START_SCOPE(testing_state, "Append char and build using heap allocator");
             Dqn_StringBuilder<> builder = {};
             Dqn_StringBuilder_AppendChar(&builder, 'a');
             Dqn_StringBuilder_AppendChar(&builder, 'b');
             isize len    = 0;
-            char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
-            DQN_DEFER { free(result); };
+            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+            DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
             char constexpr EXPECT_STR[] = "ab";
-            TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+            TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
             TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
         }
 
         // NOTE: Dqn_StringBuilder_FmtAppend
         {
             {
-                TEST_START_SCOPE(testing_state, "Append format string and build using malloc");
+                TEST_START_SCOPE(testing_state, "Append format string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_FmtAppend(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
                 Dqn_StringBuilder_FmtAppend(&builder, "Extra Stuff");
                 isize len    = 0;
-                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
-                DQN_DEFER { free(result); };
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "Number: 4, String: Hello Sailor, Extra Stuff";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
 
             {
-                TEST_START_SCOPE(testing_state, "Append nullptr format string and build using malloc");
+                TEST_START_SCOPE(testing_state, "Append nullptr format string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_FmtAppend(&builder, nullptr);
                 isize len    = 0;
-                char *result = Dqn_StringBuilder_BuildFromMalloc(&builder, &len);
-                DQN_DEFER { free(result); };
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR) + 1 /*null terminator*/, "len: %zd", len);
+                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
                 TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
             }
         }
