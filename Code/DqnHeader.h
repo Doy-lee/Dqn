@@ -163,13 +163,14 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    Dqn_MemArena arena = {};
+    Dqn_MemArena arena      = {};
+    Dqn_Allocator allocator = Dqn_Allocator_Arena(&arena);
     DQN_MEM_ARENA_RESERVE(&arena, DQN_MEGABYTES(16));
     for (isize arg_index = 1; arg_index < argc; ++arg_index)
     {
         char const *file = argv[arg_index];
         isize buf_size   = 0;
-        char *buf        = Dqn_File_ReadWithArena(&arena, file, &buf_size);
+        char *buf        = Dqn_File_ReadAll(&allocator, file, &buf_size);
         if (!buf)
         {
             fprintf(stderr, "Failed to read file: %s\n", file);
@@ -229,7 +230,6 @@ int main(int argc, char *argv[])
                 isize func_name_len   = 0;
                 char const *func_name = ParseFunctionNameAndParameters(ptr, &func_name_len);
 
-                Dqn_Allocator allocator = Dqn_Allocator_Arena(&arena);
                 entry->function_decl.return_val  = Dqn_Asprintf(&allocator, "%.*s", func_type_len, func_type);
                 entry->function_decl.name_and_args = Dqn_Asprintf(&allocator, "%.*s", func_name_len, func_name);
                 ptr = func_name + func_name_len + 1; // Ptr is at macro closing paren, skip the paren

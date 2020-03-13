@@ -611,7 +611,7 @@ typedef DQN_ALLOCATOR_FREE_PROC(Dqn_Allocator_FreeProc);
 struct Dqn_Allocator
 {
     Dqn_Allocator_Type type;
-    void              *data;
+    void              *user_context;
 
     isize              bytes_allocated;
     isize              total_bytes_allocated;
@@ -712,7 +712,7 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_Arena(Dqn_MemArena
 {
     Dqn_Allocator result = {};
     result.type          = Dqn_Allocator_Type::Arena;
-    result.data          = arena;
+    result.user_context  = arena;
     return result;
 }
 
@@ -862,6 +862,10 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_BuildIn
 {
     Dqn_StringBuilder__BuildOutput(builder, dest, dest_size);
 }
+
+void *Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_usize size);
+void * Dqn_MemArena_Alloc(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
+Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
 
 DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> char *, Dqn_StringBuilder_Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len = nullptr))
 {
@@ -1347,6 +1351,12 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize MAX_> Dqn_b32, Dqn_FixedString_App
     return result;
 }
 
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize MAX_> Dqn_String, Dqn_FixedString_ToString(Dqn_FixedString<MAX_> const *str))
+{
+    Dqn_String result = { str->str, str->len };
+    return result;
+}
+
 // @ -------------------------------------------------------------------------------------------------
 // @
 // @ NOTE: Dqn_U64Str
@@ -1447,8 +1457,6 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Log(Dqn_LogType type, char const *file, D
     return true;
 }
 
-void * Dqn_MemArena_Alloc(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
-Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
 DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_usize size))
 {
     void *result = nullptr;
@@ -1470,7 +1478,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
 
         case Dqn_Allocator_Type::Arena:
         {
-            auto *arena = static_cast<Dqn_MemArena *>(allocator->data);
+            auto *arena = static_cast<Dqn_MemArena *>(allocator->user_context);
             result      = DQN_MEM_ARENA_ALLOC(arena, size);
         }
         break;
@@ -1516,7 +1524,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
 
         case Dqn_Allocator_Type::Arena:
         {
-            auto *arena = static_cast<Dqn_MemArena *>(allocator->data);
+            auto *arena = static_cast<Dqn_MemArena *>(allocator->user_context);
             if (DQN_MEM_ARENA_RESERVE(arena, DQN_CAST(size_t)new_size))
             {
                 result = DQN_MEM_ARENA_ALLOC(arena, DQN_CAST(size_t)new_size);
@@ -2463,9 +2471,10 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_String, Dqn_String_Copy(Dqn_Allocator *allocator, 
 // @ NOTE: File
 // @
 // @ -------------------------------------------------------------------------------------------------
-DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_File_ReadWithArena(Dqn_MemArena *arena, char const *file, Dqn_isize *file_size))
+DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_File_ReadAll(Dqn_Allocator *allocator, char const *file, Dqn_isize *file_size))
 {
     FILE *file_handle = fopen(file, "rb");
+    if (!file_handle) return nullptr;
     fseek(file_handle, 0, SEEK_END);
     Dqn_isize file_size_ = ftell(file_handle);
     if (DQN_CAST(long)file_size_ == -1L)
@@ -2476,7 +2485,7 @@ DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_File_ReadWithArena(Dqn_MemArena *arena, ch
 
     rewind(file_handle);
 
-    auto *result = (char *)DQN_MEM_ARENA_ALLOC(arena, DQN_CAST(Dqn_usize)(file_size_ + 1));
+    auto *result = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, DQN_CAST(Dqn_usize)(file_size_ + 1));
     DQN_ASSERT(result);
     result[file_size_] = 0;
 
