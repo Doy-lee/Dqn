@@ -201,18 +201,19 @@ template <typename T> T *                 Dqn_MemZero(T *src);
 // NOTE: Dqn_Allocator
 //
 // -------------------------------------------------------------------------------------------------
+// Custom allocations must include Dqn_AllocateMetadata before the aligned_ptr, see Dqn_AllocateMetadata for more information
 // NOTE: The default allocator is the heap allocator
 enum struct Dqn_Allocator_Type
 {
-    Heap,          // Malloc, realloc, free
-    XHeap,         // Malloc realloc, free, crash on failure
+    Heap,   // Malloc, realloc, free
+    XHeap,  // Malloc realloc, free, crash on failure
     Arena,
     Custom,
     Null,
 };
 
-#define DQN_ALLOCATOR_ALLOCATE_PROC(name) void *name(Dqn_usize size)
-#define DQN_ALLOCATOR_REALLOC_PROC(name) void *name(void *old_ptr, Dqn_usize old_size, Dqn_usize new_size)
+#define DQN_ALLOCATOR_ALLOCATE_PROC(name) void *name(Dqn_isize size, Dqn_u8 alignment)
+#define DQN_ALLOCATOR_REALLOC_PROC(name) void *name(void *old_ptr, Dqn_isize old_size, Dqn_isize new_size)
 #define DQN_ALLOCATOR_FREE_PROC(name) void name(void *ptr)
 typedef DQN_ALLOCATOR_ALLOCATE_PROC(Dqn_Allocator_AllocateProc);
 typedef DQN_ALLOCATOR_REALLOC_PROC(Dqn_Allocator_ReallocProc);
@@ -220,7 +221,11 @@ typedef DQN_ALLOCATOR_FREE_PROC(Dqn_Allocator_FreeProc);
 struct Dqn_Allocator
 {
     Dqn_Allocator_Type type;
-    void              *user_context;
+    union
+    {
+        void                *user;
+        struct Dqn_MemArena *arena;
+    } context;
 
     isize              bytes_allocated;
     isize              total_bytes_allocated;
@@ -234,6 +239,18 @@ struct Dqn_Allocator
     Dqn_Allocator_FreeProc     *free;
 };
 
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_AllocatorMetadata
+//
+// -------------------------------------------------------------------------------------------------
+// Custom Dqn_Allocator implementations must include allocation metadata exactly (aligned_ptr - sizeof(Dqn_AllocatorMetadata)) bytes from the aligned ptr.
+struct Dqn_AllocateMetadata
+{
+    Dqn_u8 alignment;
+    Dqn_u8 offset; // Subtract offset from aligned ptr to return to the allocation ptr
+};
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -272,21 +289,14 @@ struct Dqn_MemArenaScopedRegion
     Dqn_MemBlock *top_mem_block;
 };
 
-#if defined(DQN_DEBUG_DQN_MEM_ARENA_LOGGING)
-    #define DQN_DEBUG_ARGS , char const *file, Dqn_isize file_len, char const *func, Dqn_isize func_len, Dqn_isize line
-    #define DQN_DEBUG_PARAMS , DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__
-#else
-    #define DQN_DEBUG_ARGS
-    #define DQN_DEBUG_PARAMS
-#endif
+void * Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_usize size, Dqn_u8 alignment);
+Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size);
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_MemArena_AllocateType(Dqn_MemArena *arena, Dqn_isize num))
+{
+    auto *result = DQN_CAST(T *)Dqn_MemArena_Allocate(arena, sizeof(T) * num, alignof(T));
+    return result;
+}
 
-#define DQN_MEM_ARENA_INIT_WITH_ALLOCATOR(allocator, size) Dqn_MemArena_InitWithAllocator(allocator, size DQN_DEBUG_PARAMS)
-#define DQN_MEM_ARENA_INIT_MEMORY(src, size)         Dqn_MemArena_InitMemory(src, size DQN_DEBUG_PARAMS)
-#define DQN_MEM_ARENA_ALLOC(arena, size)             Dqn_MemArena_Alloc(arena, size DQN_DEBUG_PARAMS)
-#define DQN_MEM_ARENA_ALLOC_ARRAY(arena, T, num)     (T *)Dqn_MemArena_Alloc(arena, sizeof(T) * num DQN_DEBUG_PARAMS)
-#define DQN_MEM_ARENA_ALLOC_STRUCT(arena, T)         (T *)Dqn_MemArena_Alloc(arena, sizeof(T) DQN_DEBUG_PARAMS)
-#define DQN_MEM_ARENA_RESERVE(arena, size)           Dqn_MemArena_Reserve(arena, size DQN_DEBUG_PARAMS)
-#define DQN_MEM_ARENA_FREE(arena)                    Dqn_MemArena_Free(arena)
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -297,6 +307,7 @@ Dqn_Allocator                             inline Dqn_Allocator_Null();
 Dqn_Allocator                             inline Dqn_Allocator_Heap();
 Dqn_Allocator                             inline Dqn_Allocator_XHeap();
 Dqn_Allocator                             inline Dqn_Allocator_Arena(Dqn_MemArena *arena);
+template <typename T> T *                 Dqn_Allocator_AllocateType(Dqn_Allocator *allocator, Dqn_isize num);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: String
@@ -360,10 +371,10 @@ template <Dqn_usize N> void               Dqn_StringBuilder_Free(Dqn_StringBuild
 // NOTE: Dqn_Slices
 //
 // -------------------------------------------------------------------------------------------------
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_MemArena *arena, T const *src, Dqn_isize len);
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_MemArena *arena, Dqn_Slice<T> const src);
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_MemArena *arena, T const *src, Dqn_isize len);
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_MemArena *arena, Dqn_Slice<T> const src);
+template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize len);
+template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
+template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize len);
+template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
 template <typename T> inline bool         Dqn_Slice_Equals(Dqn_Slice<T> const a, Dqn_Slice<T> const b);
 // -------------------------------------------------------------------------------------------------
 //
@@ -406,7 +417,6 @@ T *                                       Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TE
 // NOTE: Dqn_Array
 //
 // -------------------------------------------------------------------------------------------------
-// TODO(doyle): Make this either initialised from memory or dynamically allocating
 template <typename T> struct Dqn_Array
 {
     Dqn_Allocator allocator;
@@ -502,7 +512,21 @@ char *                                    Dqn_U64Str_ToStr(Dqn_u64 val, Dqn_U64S
 void                                      Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
 // return: This returns a boolean as a hack so you can combine it in if expressions. I use it for my IF_ASSERT macro
 Dqn_b32                                   Dqn_Log(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
-void *                                    Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_usize size);
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_AllocateMetadata
+//
+// -------------------------------------------------------------------------------------------------
+char *                                    Dqn_AllocateMetadata_Init(void *ptr, Dqn_u8 alignment);
+Dqn_AllocateMetadata                      Dqn_AllocateMetadata_Get(void *ptr);
+char *                                    Dqn_AllocateMetadata_GetRawPointer(void *ptr);
+Dqn_isize                                 Dqn_AllocateMetadata_SizeRequired(Dqn_isize size, Dqn_u8 alignment);
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Allocator
+//
+// -------------------------------------------------------------------------------------------------
+void *                                    Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment);
 void *                                    Dqn_Allocator_Realloc(Dqn_Allocator *allocator, void *old_ptr, Dqn_isize old_size, Dqn_isize new_size);
 void                                      Dqn_Allocator_Free(Dqn_Allocator *allocator, void *ptr);
 // -------------------------------------------------------------------------------------------------
@@ -510,11 +534,11 @@ void                                      Dqn_Allocator_Free(Dqn_Allocator *allo
 // NOTE: Dqn_MemArena
 //
 // -------------------------------------------------------------------------------------------------
-void *                                    Dqn_MemArena_Alloc(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
-void                                      Dqn_MemArena_Free(Dqn_MemArena *arena DQN_DEBUG_ARGS);
-Dqn_b32                                   Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size DQN_DEBUG_ARGS);
-Dqn_MemArena                              Dqn_MemArena_InitWithAllocator(Dqn_Allocator allocator, Dqn_usize size DQN_DEBUG_ARGS);
-Dqn_MemArena                              Dqn_MemArena_InitMemory(void *memory, Dqn_usize size DQN_DEBUG_ARGS);
+void *                                    Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_usize size, u8 alignment);
+void                                      Dqn_MemArena_Free(Dqn_MemArena *arena);
+Dqn_b32                                   Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size);
+Dqn_MemArena                              Dqn_MemArena_InitWithAllocator(Dqn_Allocator allocator, Dqn_usize size);
+Dqn_MemArena                              Dqn_MemArena_InitMemory(void *memory, Dqn_usize size);
 void                                      Dqn_MemArena_ResetUsage(Dqn_MemArena *arena, Dqn_ZeroMem zero_mem);
 Dqn_MemArenaScopedRegion                  Dqn_MemArena_MakeScopedRegion(Dqn_MemArena *arena);
 // -------------------------------------------------------------------------------------------------
