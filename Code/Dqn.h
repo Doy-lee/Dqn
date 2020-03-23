@@ -989,7 +989,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_C
 {
     Dqn_Slice<T> result = {};
     result.len      = len;
-    result.buf      = DQN_CAST(T *)Dqn_Allocator_Allocate(arena, (sizeof(T) * len) + 1, alignof(T));
+    result.buf      = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, (sizeof(T) * len) + 1, alignof(T));
     memcpy(result.buf, src, len * sizeof(T));
     result.buf[len] = 0;
     return result;
@@ -997,7 +997,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_C
 
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src))
 {
-    Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(arena, src.buf, src.len);
+    Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(allocator, src.buf, src.len);
     return result;
 }
 
@@ -1005,7 +1005,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_C
 {
     Dqn_Slice<T> result = {};
     result.len      = len;
-    result.buf      = DQN_CAST(T *)Dqn_Allocator_Allocate(arena, sizeof(T) * len, alignof(T));
+    result.buf      = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, sizeof(T) * len, alignof(T));
     memcpy(result.buf, src, len * sizeof(T));
     return result;
 }
@@ -2033,6 +2033,12 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_V2, Dqn_LerpV2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b))
     Dqn_V2 result = {};
     result.x  = a.x + ((b.x - a.x) * t);
     result.y  = a.y + ((b.y - a.y) * t);
+    return result;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(f32, Dqn_LerpF32(f32 a, f32 t, f32 b))
+{
+    f32 result = a + ((b - a) * t);
     return result;
 }
 
