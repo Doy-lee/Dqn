@@ -985,19 +985,27 @@ struct Dqn_Slice
     T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
 };
 
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize len))
+{
+    Dqn_Slice<T> result = {};
+    result.len          = len;
+    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * len), alignof(T));
+    return result;
+}
+
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize len))
 {
     Dqn_Slice<T> result = {};
-    result.len      = len;
-    result.buf      = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, (sizeof(T) * len) + 1, alignof(T));
-    memcpy(result.buf, src, len * sizeof(T));
+    result.len          = len;
+    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * len) + 1, alignof(T));
+    memcpy(result.data, src, len * sizeof(T));
     result.buf[len] = 0;
     return result;
 }
 
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src))
 {
-    Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(allocator, src.buf, src.len);
+    Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(allocator, src.data, src.len);
     return result;
 }
 
@@ -1005,14 +1013,14 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_C
 {
     Dqn_Slice<T> result = {};
     result.len      = len;
-    result.buf      = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, sizeof(T) * len, alignof(T));
-    memcpy(result.buf, src, len * sizeof(T));
+    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, sizeof(T) * len, alignof(T));
+    memcpy(result.dat, src, len * sizeof(T));
     return result;
 }
 
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src))
 {
-    Dqn_Slice<T> result = Dqn_Slice_Copy(allocator, src.buf, src.len);
+    Dqn_Slice<T> result = Dqn_Slice_Copy(allocator, src.data, src.len);
     return result;
 }
 
@@ -1020,7 +1028,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline bool, Dqn_Slice_Equals(Dq
 {
     bool result = false;
     if (a.len != b.len) return result;
-    result = (memcmp(a.buf, b.buf, a.len) == 0);
+    result = (memcmp(a.data, b.data, a.len) == 0);
     return result;
 }
 
@@ -1162,6 +1170,13 @@ DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL
             return entry;
     }
     return nullptr;
+}
+
+DQN_FIXED_ARRAY_TEMPLATE
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Slice<T>, Dqn_FixedArray_Slice(DQN_FIXED_ARRAY_TEMPLATE_DECL *a))
+{
+    Dqn_Slice<T> result = {a->data, a->len};
+    return result;
 }
 
 // @ -------------------------------------------------------------------------------------------------
