@@ -228,12 +228,12 @@ FILE_SCOPE void UnitTests()
     // ---------------------------------------------------------------------------------------------
     {
         TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Array");
-        // NOTE: Dqn_Array_InitMemory
+        // NOTE: Dqn_Array_InitWithMemory
         {
             {
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test add single item and can't allocate more");
                 int memory[4]        = {};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, 1);
                 Dqn_Array_Add(&array, 2);
                 Dqn_Array_Add(&array, 3);
@@ -254,7 +254,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test add array of items");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data %d", array.data[1]);
@@ -267,7 +267,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test clear and clear with memory zeroed");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_Clear(&array, false /*zero_mem*/);
                 TEST_EXPECT_MSG(testing_state, array.len == 0, "array.len: %d", array.len);
@@ -282,7 +282,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test erase stable and erase unstable");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3, 4};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_EraseUnstable(&array, 1);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
@@ -300,7 +300,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test array pop and peek");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_Pop(&array, 2);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
@@ -316,7 +316,7 @@ FILE_SCOPE void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test free on fixed memory array does nothing");
                 int memory[4]        = {};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 DQN_DEFER { Dqn_Array_Free(&array); };
             }
         }

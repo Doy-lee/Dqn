@@ -985,6 +985,16 @@ struct Dqn_Slice
     T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
 };
 
+template <typename T, isize N>
+DQN_HEADER_COPY_PROTOTYPE(inline Dqn_Slice<T>, Dqn_Slice_InitWithArray(T (&array)[N]))
+{
+    Dqn_Slice<T> result = {};
+    result.len          = N;
+    result.data         = array;
+    return result;
+}
+
+
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize len))
 {
     Dqn_Slice<T> result = {};
@@ -1203,7 +1213,7 @@ template <typename T> struct Dqn_Array
 };
 DQN_HEADER_COPY_END
 
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Array<T>, Dqn_Array_InitMemory(T *memory, Dqn_isize max, Dqn_isize len = 0))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Array<T>, Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize len = 0))
 {
     Dqn_Array<T> result = {};
     result.allocator    = Dqn_Allocator_Null();
@@ -1212,6 +1222,14 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Array<T>, Dqn_Array_InitMemo
     result.max          = max;
     return result;
 }
+
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Array<T>, Dqn_Array_InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize len = 0))
+{
+    T *memory           = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, sizeof(T) * max, alignof(T));
+    Dqn_Array<T> result = Dqn_Array_InitWithMemory(memory, max, len);
+    return result;
+}
+
 
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> bool, Dqn_Array_Reserve(Dqn_Array<T> *a, Dqn_isize size))
 {
@@ -2560,6 +2578,20 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_String, Dqn_String_Copy(Dqn_Allocator *allocator, 
     return result;
 }
 
+DQN_HEADER_COPY_PROTOTYPE(Dqn_String, Dqn_String_TrimWhitespaceAround(Dqn_String src))
+{
+    Dqn_String result = src;
+    if (src.len <= 0) return result;
+
+    char *start = src.str;
+    char *end   = start + (src.len - 1);
+    while (Dqn_Char_IsWhitespace(start[0])) start++;
+    while (end != start && Dqn_Char_IsWhitespace(end[0])) end--;
+
+    result.str = start;
+    result.len = (end - start) + 1;
+    return result;
+}
 
 // @ -------------------------------------------------------------------------------------------------
 // @

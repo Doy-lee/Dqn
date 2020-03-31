@@ -371,6 +371,8 @@ template <Dqn_usize N> void               Dqn_StringBuilder_Free(Dqn_StringBuild
 // NOTE: Dqn_Slices
 //
 // -------------------------------------------------------------------------------------------------
+inline Dqn_Slice<T>                       Dqn_Slice_InitWithArray(T (&array)[N]);
+template <typename T> inline Dqn_Slice<T> Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize len);
 template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize len);
 template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
 template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize len);
@@ -412,6 +414,7 @@ T *                                       Dqn_FixedArray_Peek(DQN_FIXED_ARRAY_TE
 Dqn_isize                                 Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *entry);
 T *                                       Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, EqualityProc IsEqual);
 T *                                       Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
+Dqn_Slice<T>                              Dqn_FixedArray_Slice(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Array
@@ -434,7 +437,8 @@ template <typename T> struct Dqn_Array
     T         *operator+(Dqn_isize i)        { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
 };
 
-template <typename T> Dqn_Array<T>        Dqn_Array_InitMemory(T *memory, Dqn_isize max, Dqn_isize len = 0);
+template <typename T> Dqn_Array<T>        Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize len = 0);
+template <typename T> Dqn_Array<T>        Dqn_Array_InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize len = 0);
 template <typename T> bool                Dqn_Array_Reserve(Dqn_Array<T> *a, Dqn_isize size);
 template <typename T> void                Dqn_Array_Free(Dqn_Array<T> *a);
 template <typename T> T *                 Dqn_Array_Add(Dqn_Array<T> *a, T const *items, Dqn_isize num);
@@ -582,6 +586,7 @@ Dqn_V2I                                   Dqn_RectI32_Size(Dqn_RectI32 rect);
 //
 // -------------------------------------------------------------------------------------------------
 Dqn_V2                                    Dqn_LerpV2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
+f32                                       Dqn_LerpF32(f32 a, f32 t, f32 b);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Mat4
@@ -661,6 +666,7 @@ Dqn_i64                                   Dqn_Str_ToI64(char const *buf, int len
 Dqn_b32                                   Dqn_String_Compare(Dqn_String const lhs, Dqn_String const rhs);
 Dqn_b32                                   Dqn_String_CompareCaseInsensitive(Dqn_String const lhs, Dqn_String const rhs);
 Dqn_String                                Dqn_String_Copy(Dqn_Allocator *allocator, Dqn_String const src);
+Dqn_String                                Dqn_String_TrimWhitespaceAround(Dqn_String src);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: File
