@@ -164,6 +164,7 @@ int main(int argc, char *argv[])
     }
 
     Dqn_MemArena arena      = {};
+    arena.allocator         = Dqn_Allocator_XHeap();
     Dqn_Allocator allocator = Dqn_Allocator_Arena(&arena);
     Dqn_MemArena_Reserve(&arena, DQN_MEGABYTES(16));
     for (isize arg_index = 1; arg_index < argc; ++arg_index)
