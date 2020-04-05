@@ -2204,14 +2204,14 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Bit_SetInplace(Dqn_u32 *flags, Dqn_u32 bitfi
 
 DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsSet(Dqn_u32 flags, Dqn_u32 bitfield))
 {
-    auto result = DQN_CAST(Dqn_b32)((flags & bitfield) == 0);
+    auto result = (flags & bitfield);
     return result;
 }
 
 
 DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsNotSet(Dqn_u32 flags, Dqn_u32 bitfield))
 {
-    auto result = Dqn_Bit_IsSet(flags, bitfield);
+    auto result = !Dqn_Bit_IsSet(flags, bitfield);
     return result;
 }
 
