@@ -3,16 +3,16 @@
 // NOTE: Typedefs, Macros, Utils
 //
 // -------------------------------------------------------------------------------------------------
-constexpr Dqn_usize                       Dqn_ArrayCount(T const (&)[N]);
-constexpr Dqn_isize                       Dqn_ArrayCountI(T const (&)[N]);
-constexpr Dqn_usize                       Dqn_CharCount(char const (&)[N]);
-constexpr Dqn_isize                       Dqn_CharCountI(char const (&)[N]);
+constexpr Dqn_usize                        Dqn_ArrayCount(T const (&)[N]);
+constexpr Dqn_isize                        Dqn_ArrayCountI(T const (&)[N]);
+constexpr Dqn_usize                        Dqn_CharCount(char const (&)[N]);
+constexpr Dqn_isize                        Dqn_CharCountI(char const (&)[N]);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Logging
 //
 // -------------------------------------------------------------------------------------------------
-constexpr inline char const *             Dqn_LogTypeTag(Dqn_LogType type);
+constexpr inline char const *              Dqn_LogTypeTag(Dqn_LogType type);
 // NOTE: Set the callback to get called whenever a log message has been printed
 #define DQN_LOG_CALLBACK(name) void name(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *log_str)
 typedef DQN_LOG_CALLBACK(Dqn_LogCallback);
@@ -40,7 +40,7 @@ union Dqn_V2I
   Dqn_V2I() = default;
   constexpr Dqn_V2I(Dqn_f32 x_, Dqn_f32 y_): x((Dqn_i32)x_), y((Dqn_i32)y_) {}
   constexpr Dqn_V2I(Dqn_i32 x_, Dqn_i32 y_): x(x_), y(y_) {}
-  constexpr Dqn_V2I(Dqn_i32 xy):         x(xy), y(xy) {}
+  constexpr Dqn_V2I(Dqn_i32 xy):             x(xy), y(xy) {}
 
   constexpr bool     operator!=(Dqn_V2I other) const { return !(*this == other);                }
   constexpr bool     operator==(Dqn_V2I other) const { return (x == other.x) && (y == other.y); }
@@ -194,22 +194,27 @@ union Dqn_Mat4
     Dqn_f32 operator[](Dqn_usize i) const { return e[i]; }
 };
 
-template <typename T> int                 Dqn_MemCmpType(T const *ptr1, T const *ptr2);
-template <typename T> T *                 Dqn_MemZero(T *src);
+template <typename T> int                  Dqn_MemCmpType(T const *ptr1, T const *ptr2);
+template <typename T> T *                  Dqn_MemZero(T *src);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Allocator
 //
 // -------------------------------------------------------------------------------------------------
 // Custom allocations must include Dqn_AllocateMetadata before the aligned_ptr, see Dqn_AllocateMetadata for more information
-// NOTE: The default allocator is the heap allocator
 enum struct Dqn_Allocator_Type
 {
+#if defined(DQN_ALLOCATOR_DEFAULT_TO_NULL)
+    Null,
     Heap,   // Malloc, realloc, free
+#else
+    Heap,   // Malloc, realloc, free
+    Null,
+#endif
+
     XHeap,  // Malloc realloc, free, crash on failure
     Arena,
     Custom,
-    Null,
 };
 
 #define DQN_ALLOCATOR_ALLOCATE_PROC(name) void *name(Dqn_isize size, Dqn_u8 alignment)
@@ -227,11 +232,11 @@ struct Dqn_Allocator
         struct Dqn_MemArena *arena;
     } context;
 
-    isize              bytes_allocated;
-    isize              total_bytes_allocated;
+    Dqn_isize bytes_allocated;
+    Dqn_isize total_bytes_allocated;
 
-    isize              allocations;
-    isize              total_allocations;
+    Dqn_isize allocations;
+    Dqn_isize total_allocations;
 
     // NOTE: Only required if type == Dqn_Allocator_Type::Custom
     Dqn_Allocator_AllocateProc *allocate;
@@ -239,7 +244,11 @@ struct Dqn_Allocator
     Dqn_Allocator_FreeProc     *free;
 };
 
-
+Dqn_Allocator                              inline Dqn_Allocator_Null();
+Dqn_Allocator                              inline Dqn_Allocator_Heap();
+Dqn_Allocator                              inline Dqn_Allocator_XHeap();
+Dqn_Allocator                              inline Dqn_Allocator_Arena(Dqn_MemArena *arena);
+template <typename T> T *                  Dqn_Allocator_AllocateType(Dqn_Allocator *allocator, Dqn_isize num);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_AllocatorMetadata
@@ -260,37 +269,43 @@ struct Dqn_AllocateMetadata
 struct Dqn_MemBlock
 {
     void         *memory;
-    Dqn_usize     size;
-    Dqn_usize     used;
+    Dqn_isize     size;
+    Dqn_isize     used;
     Dqn_MemBlock *prev;
     Dqn_MemBlock *next;
 };
 
+Dqn_usize const DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
 struct Dqn_MemArena
 {
     // NOTE: Configuration (fill once after "Zero Initialisation {}")
-    int           min_block_size = DQN_KILOBYTES(4);
+    Dqn_isize     min_block_size;
     Dqn_Allocator allocator;
 
     // NOTE: Read Only
     Dqn_MemBlock *curr_mem_block;
     Dqn_MemBlock *top_mem_block;
-    Dqn_usize     highest_used_mark;
+    Dqn_isize     highest_used_mark;
     int           total_allocated_mem_blocks;
+};
+
+struct Dqn_MemArenaRegion
+{
+    Dqn_MemArena *arena;
+    Dqn_MemBlock *curr_mem_block;
+    Dqn_isize     curr_mem_block_used;
+    Dqn_MemBlock *top_mem_block;
 };
 
 struct Dqn_MemArenaScopedRegion
 {
     Dqn_MemArenaScopedRegion(Dqn_MemArena *arena);
     ~Dqn_MemArenaScopedRegion();
-    Dqn_MemArena *arena;
-    Dqn_MemBlock *curr_mem_block;
-    Dqn_usize     curr_mem_block_used;
-    Dqn_MemBlock *top_mem_block;
+    Dqn_MemArenaRegion region;
 };
 
-void * Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_usize size, Dqn_u8 alignment);
-Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size);
+void * Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_isize size, Dqn_u8 alignment);
+Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_isize size);
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_MemArena_AllocateType(Dqn_MemArena *arena, Dqn_isize num))
 {
     auto *result = DQN_CAST(T *)Dqn_MemArena_Allocate(arena, sizeof(T) * num, alignof(T));
@@ -298,16 +313,6 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_MemArena_AllocateType(D
 }
 
 
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_Allocator
-//
-// -------------------------------------------------------------------------------------------------
-Dqn_Allocator                             inline Dqn_Allocator_Null();
-Dqn_Allocator                             inline Dqn_Allocator_Heap();
-Dqn_Allocator                             inline Dqn_Allocator_XHeap();
-Dqn_Allocator                             inline Dqn_Allocator_Arena(Dqn_MemArena *arena);
-template <typename T> T *                 Dqn_Allocator_AllocateType(Dqn_Allocator *allocator, Dqn_isize num);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: String
@@ -338,46 +343,46 @@ struct Dqn_String
 struct Dqn_StringBuilderBuffer
 {
     char                    *mem;
-    Dqn_usize                size;
-    Dqn_usize                used;
+    Dqn_isize                size;
+    Dqn_isize                used;
     Dqn_StringBuilderBuffer *next;
 };
 
-Dqn_usize constexpr DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE = DQN_KILOBYTES(4);
+Dqn_isize constexpr DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE = DQN_KILOBYTES(4);
 template <Dqn_usize N = DQN_KILOBYTES(16)>
 struct Dqn_StringBuilder
 {
     Dqn_Allocator            allocator;
     char                     fixed_mem[N];
-    Dqn_usize                fixed_mem_used;
+    Dqn_isize                fixed_mem_used;
     Dqn_StringBuilderBuffer *next_mem_buf;
     Dqn_StringBuilderBuffer *last_mem_buf;
     Dqn_isize                string_len;
 };
 
 // The necessary length to build the string, it returns the length including the null-terminator
-template <Dqn_usize N> Dqn_isize          Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder);
-template <Dqn_usize N> void               Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size);
-template <Dqn_usize N> char *             Dqn_StringBuilder_Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len = nullptr);
-template <Dqn_usize N> Dqn_String         Dqn_StringBuilder_BuildString(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator);
-template <Dqn_usize N> void               Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va);
-template <Dqn_usize N> void               Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...);
-template <Dqn_usize N> void               Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1);
-template <Dqn_usize N> void               Dqn_StringBuilder_AppendString(Dqn_StringBuilder<N> *builder, Dqn_String const string);
-template <Dqn_usize N> void               Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch);
-template <Dqn_usize N> void               Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder);
+template <Dqn_usize N> Dqn_isize           Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder);
+template <Dqn_usize N> void                Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size);
+template <Dqn_usize N> char *              Dqn_StringBuilder_Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len = nullptr);
+template <Dqn_usize N> Dqn_String          Dqn_StringBuilder_BuildString(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator);
+template <Dqn_usize N> void                Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va);
+template <Dqn_usize N> void                Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...);
+template <Dqn_usize N> void                Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1);
+template <Dqn_usize N> void                Dqn_StringBuilder_AppendString(Dqn_StringBuilder<N> *builder, Dqn_String const string);
+template <Dqn_usize N> void                Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch);
+template <Dqn_usize N> void                Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Slices
 //
 // -------------------------------------------------------------------------------------------------
-inline Dqn_Slice<T>                       Dqn_Slice_InitWithArray(T (&array)[N]);
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize len);
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize len);
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize len);
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
-template <typename T> inline bool         Dqn_Slice_Equals(Dqn_Slice<T> const a, Dqn_Slice<T> const b);
+inline Dqn_Slice<T>                        Dqn_Slice_InitWithArray(T (&array)[N]);
+template <typename T> inline Dqn_Slice<T>  Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize len);
+template <typename T> inline Dqn_Slice<T>  Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize len);
+template <typename T> inline Dqn_Slice<T>  Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
+template <typename T> inline Dqn_Slice<T>  Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize len);
+template <typename T> inline Dqn_Slice<T>  Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
+template <typename T> inline bool          Dqn_Slice_Equals(Dqn_Slice<T> const a, Dqn_Slice<T> const b);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_FixedArray
@@ -388,6 +393,7 @@ template <typename T> inline bool         Dqn_Slice_Equals(Dqn_Slice<T> const a,
 DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
 {
     T               data[MAX_];
+    Dqn_isize       max = MAX_;
     Dqn_isize       len;
 
     T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= len, "%jd >= 0 && %jd < %jd", i, len); return  data[i]; }
@@ -401,20 +407,20 @@ DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
     T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= len, "%jd >= 0 && %jd < %jd", i, len); return data + i; }
 };
 
-int                                       Dqn_FixedArray_Capacity(DQN_FIXED_ARRAY_TEMPLATE_DECL *);
-DQN_FIXED_ARRAY_TEMPLATE_DECL             Dqn_FixedArray_Init(T const *item, int num);
-T *                                       Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num);
-T *                                       Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const item);
-T *                                       Dqn_FixedArray_Make(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num);
-void                                      Dqn_FixedArray_Clear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
-void                                      Dqn_FixedArray_EraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
-void                                      Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
-void                                      Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1);
-T *                                       Dqn_FixedArray_Peek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
-Dqn_isize                                 Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *entry);
-T *                                       Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, EqualityProc IsEqual);
-T *                                       Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
-Dqn_Slice<T>                              Dqn_FixedArray_Slice(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
+int                                        Dqn_FixedArray_Capacity(DQN_FIXED_ARRAY_TEMPLATE_DECL *);
+DQN_FIXED_ARRAY_TEMPLATE_DECL              Dqn_FixedArray_Init(T const *item, int num);
+T *                                        Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num);
+T *                                        Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const item);
+T *                                        Dqn_FixedArray_Make(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num);
+void                                       Dqn_FixedArray_Clear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
+void                                       Dqn_FixedArray_EraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
+void                                       Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
+void                                       Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1);
+T *                                        Dqn_FixedArray_Peek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
+Dqn_isize                                  Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *entry);
+T *                                        Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, EqualityProc IsEqual);
+T *                                        Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
+Dqn_Slice<T>                               Dqn_FixedArray_Slice(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Array
@@ -437,18 +443,18 @@ template <typename T> struct Dqn_Array
     T         *operator+(Dqn_isize i)        { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
 };
 
-template <typename T> Dqn_Array<T>        Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize len = 0);
-template <typename T> Dqn_Array<T>        Dqn_Array_InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize len = 0);
-template <typename T> bool                Dqn_Array_Reserve(Dqn_Array<T> *a, Dqn_isize size);
-template <typename T> void                Dqn_Array_Free(Dqn_Array<T> *a);
-template <typename T> T *                 Dqn_Array_Add(Dqn_Array<T> *a, T const *items, Dqn_isize num);
-template <typename T> T *                 Dqn_Array_Add(Dqn_Array<T> *a, T const item);
-template <typename T> T *                 Dqn_Array_Make(Dqn_Array<T> *a, Dqn_isize num);
-template <typename T> void                Dqn_Array_Clear(Dqn_Array<T> *a, bool zero_mem = false);
-template <typename T> void                Dqn_Array_EraseStable(Dqn_Array<T> *a, Dqn_isize index);
-template <typename T> void                Dqn_Array_EraseUnstable(Dqn_Array<T> *a, Dqn_isize index);
-template <typename T> void                Dqn_Array_Pop(Dqn_Array<T> *a, Dqn_isize num);
-template <typename T> T *                 Dqn_Array_Peek(Dqn_Array<T> *a);
+template <typename T> Dqn_Array<T>         Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize len = 0);
+template <typename T> Dqn_Array<T>         Dqn_Array_InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize len = 0);
+template <typename T> bool                 Dqn_Array_Reserve(Dqn_Array<T> *a, Dqn_isize size);
+template <typename T> void                 Dqn_Array_Free(Dqn_Array<T> *a);
+template <typename T> T *                  Dqn_Array_Add(Dqn_Array<T> *a, T const *items, Dqn_isize num);
+template <typename T> T *                  Dqn_Array_Add(Dqn_Array<T> *a, T const item);
+template <typename T> T *                  Dqn_Array_Make(Dqn_Array<T> *a, Dqn_isize num);
+template <typename T> void                 Dqn_Array_Clear(Dqn_Array<T> *a, bool zero_mem = false);
+template <typename T> void                 Dqn_Array_EraseStable(Dqn_Array<T> *a, Dqn_isize index);
+template <typename T> void                 Dqn_Array_EraseUnstable(Dqn_Array<T> *a, Dqn_isize index);
+template <typename T> void                 Dqn_Array_Pop(Dqn_Array<T> *a, Dqn_isize num);
+template <typename T> T *                  Dqn_Array_Peek(Dqn_Array<T> *a);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_FixedString
@@ -487,12 +493,12 @@ struct Dqn_FixedString
     char       *end          ()              { return data + len; }
 };
 
-template <Dqn_isize MAX_> int             Dqn_FixedString_Capacity(Dqn_FixedString<MAX_> *);
-template <Dqn_isize MAX_> void            Dqn_FixedString_Clear(Dqn_FixedString<MAX_> *str);
-template <Dqn_isize MAX_> Dqn_b32         Dqn_FixedString_AppendVFmt(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va);
-template <Dqn_isize MAX_> Dqn_b32         Dqn_FixedString_AppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...);
-template <Dqn_isize MAX_> Dqn_b32         Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize len = -1);
-template <Dqn_isize MAX_> Dqn_String      Dqn_FixedString_ToString(Dqn_FixedString<MAX_> const *str);
+template <Dqn_isize MAX_> int              Dqn_FixedString_Capacity(Dqn_FixedString<MAX_> *);
+template <Dqn_isize MAX_> void             Dqn_FixedString_Clear(Dqn_FixedString<MAX_> *str);
+template <Dqn_isize MAX_> Dqn_b32          Dqn_FixedString_AppendVFmt(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va);
+template <Dqn_isize MAX_> Dqn_b32          Dqn_FixedString_AppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...);
+template <Dqn_isize MAX_> Dqn_b32          Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize len = -1);
+template <Dqn_isize MAX_> Dqn_String       Dqn_FixedString_ToString(Dqn_FixedString<MAX_> const *str);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_U64Str
@@ -507,175 +513,178 @@ struct Dqn_U64Str
     int   len;
 };
 
-char *                                    Dqn_U64Str_ToStr(Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep);
+char *                                     Dqn_U64Str_ToStr(Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Logging
 //
 // -------------------------------------------------------------------------------------------------
-void                                      Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
+void                                       Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
 // return: This returns a boolean as a hack so you can combine it in if expressions. I use it for my IF_ASSERT macro
-Dqn_b32                                   Dqn_Log(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
+Dqn_b32                                    Dqn_Log(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_AllocateMetadata
 //
 // -------------------------------------------------------------------------------------------------
-char *                                    Dqn_AllocateMetadata_Init(void *ptr, Dqn_u8 alignment);
-Dqn_AllocateMetadata                      Dqn_AllocateMetadata_Get(void *ptr);
-char *                                    Dqn_AllocateMetadata_GetRawPointer(void *ptr);
-Dqn_isize                                 Dqn_AllocateMetadata_SizeRequired(Dqn_isize size, Dqn_u8 alignment);
+char *                                     Dqn_AllocateMetadata_Init(void *ptr, Dqn_u8 alignment);
+// TODO(doyle): Use bit masks and only support POT. That approach reflects how computers work better.
+Dqn_AllocateMetadata                       Dqn_AllocateMetadata_Get(void *ptr);
+char *                                     Dqn_AllocateMetadata_GetRawPointer(void *ptr);
+Dqn_isize                                  Dqn_AllocateMetadata_SizeRequired(Dqn_isize size, Dqn_u8 alignment);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Allocator
 //
 // -------------------------------------------------------------------------------------------------
-void *                                    Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment);
-void *                                    Dqn_Allocator_Realloc(Dqn_Allocator *allocator, void *old_ptr, Dqn_isize old_size, Dqn_isize new_size);
-void                                      Dqn_Allocator_Free(Dqn_Allocator *allocator, void *ptr);
+void *                                     Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment);
+void *                                     Dqn_Allocator_Realloc(Dqn_Allocator *allocator, void *old_ptr, Dqn_isize old_size, Dqn_isize new_size);
+void                                       Dqn_Allocator_Free(Dqn_Allocator *allocator, void *ptr);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_MemArena
 //
 // -------------------------------------------------------------------------------------------------
-void *                                    Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_usize size, u8 alignment);
-void                                      Dqn_MemArena_Free(Dqn_MemArena *arena);
-Dqn_b32                                   Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_usize size);
-Dqn_MemArena                              Dqn_MemArena_InitWithAllocator(Dqn_Allocator allocator, Dqn_usize size);
-Dqn_MemArena                              Dqn_MemArena_InitMemory(void *memory, Dqn_usize size);
-void                                      Dqn_MemArena_ResetUsage(Dqn_MemArena *arena, Dqn_ZeroMem zero_mem);
-Dqn_MemArenaScopedRegion                  Dqn_MemArena_MakeScopedRegion(Dqn_MemArena *arena);
+void *                                     Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_isize size, Dqn_u8 alignment);
+void                                       Dqn_MemArena_Free(Dqn_MemArena *arena);
+Dqn_b32                                    Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_isize size);
+Dqn_MemArena                               Dqn_MemArena_InitWithAllocator(Dqn_Allocator allocator, Dqn_isize size);
+Dqn_MemArena                               Dqn_MemArena_InitMemory(void *memory, Dqn_isize size);
+void                                       Dqn_MemArena_ResetUsage(Dqn_MemArena *arena, Dqn_ZeroMem zero_mem);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Asprintf (Allocate Sprintf)
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_String                                Dqn_Asprintf(Dqn_Allocator *allocator, char const *fmt, va_list va);
-Dqn_String                                Dqn_Asprintf(Dqn_Allocator *allocator, char const *fmt, ...);
+// return: The allocated string. If allocation fails, the str ptr returned is nullptr and length is set o the size required, NOT INCLUDING the null terminator.
+Dqn_String                                 Dqn_Asprintf(Dqn_Allocator *allocator, char const *fmt, va_list va);
+Dqn_String                                 Dqn_Asprintf(Dqn_Allocator *allocator, char const *fmt, ...);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Vectors
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_V2I                                   Dqn_V2_ToV2I(Dqn_V2 a);
-Dqn_V2                                    Dqn_V2_Max(Dqn_V2 a, Dqn_V2 b);
-Dqn_V2                                    Dqn_V2_Abs(Dqn_V2 a);
-Dqn_f32                                   Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b);
-Dqn_f32                                   Dqn_V2_LengthSq(Dqn_V2 a, Dqn_V2 b);
-Dqn_V2                                    Dqn_V2_Normalise(Dqn_V2 a);
-Dqn_V2                                    Dqn_V2_Perpendicular(Dqn_V2 a);
-Dqn_f32                                   Dqn_V4_Dot(Dqn_V4 const *a, Dqn_V4 const *b);
+Dqn_V2I                                    Dqn_V2_ToV2I(Dqn_V2 a);
+Dqn_V2                                     Dqn_V2_Max(Dqn_V2 a, Dqn_V2 b);
+Dqn_V2                                     Dqn_V2_Abs(Dqn_V2 a);
+Dqn_f32                                    Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b);
+Dqn_f32                                    Dqn_V2_LengthSq(Dqn_V2 a, Dqn_V2 b);
+Dqn_V2                                     Dqn_V2_Normalise(Dqn_V2 a);
+Dqn_V2                                     Dqn_V2_Perpendicular(Dqn_V2 a);
+Dqn_f32                                    Dqn_V4_Dot(Dqn_V4 const *a, Dqn_V4 const *b);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Rect
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_Rect                                  Dqn_Rect_InitFromPosAndSize(Dqn_V2 pos, Dqn_V2 size);
-Dqn_V2                                    Dqn_Rect_Center(Dqn_Rect rect);
-Dqn_b32                                   Dqn_Rect_ContainsPoint(Dqn_Rect rect, Dqn_V2 p);
-Dqn_b32                                   Dqn_Rect_ContainsRect(Dqn_Rect a, Dqn_Rect b);
-Dqn_V2                                    Dqn_Rect_Size(Dqn_Rect rect);
-Dqn_Rect                                  Dqn_Rect_Move(Dqn_Rect src, Dqn_V2 move_amount);
-Dqn_Rect                                  Dqn_Rect_Intersection(Dqn_Rect a, Dqn_Rect b);
-Dqn_Rect                                  Dqn_Rect_Union(Dqn_Rect a, Dqn_Rect b);
-Dqn_Rect                                  Dqn_Rect_FromRectI32(Dqn_RectI32 a);
-Dqn_V2I                                   Dqn_RectI32_Size(Dqn_RectI32 rect);
+Dqn_Rect                                   Dqn_Rect_InitFromPosAndSize(Dqn_V2 pos, Dqn_V2 size);
+Dqn_V2                                     Dqn_Rect_Center(Dqn_Rect rect);
+Dqn_b32                                    Dqn_Rect_ContainsPoint(Dqn_Rect rect, Dqn_V2 p);
+Dqn_b32                                    Dqn_Rect_ContainsRect(Dqn_Rect a, Dqn_Rect b);
+Dqn_V2                                     Dqn_Rect_Size(Dqn_Rect rect);
+Dqn_Rect                                   Dqn_Rect_Move(Dqn_Rect src, Dqn_V2 move_amount);
+Dqn_Rect                                   Dqn_Rect_Intersection(Dqn_Rect a, Dqn_Rect b);
+Dqn_Rect                                   Dqn_Rect_Union(Dqn_Rect a, Dqn_Rect b);
+Dqn_Rect                                   Dqn_Rect_FromRectI32(Dqn_RectI32 a);
+Dqn_V2I                                    Dqn_RectI32_Size(Dqn_RectI32 rect);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Math Utils
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_V2                                    Dqn_LerpV2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
-f32                                       Dqn_LerpF32(f32 a, f32 t, f32 b);
+Dqn_V2                                     Dqn_LerpV2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
+Dqn_f32                                    Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Mat4
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_Mat4                                  Dqn_Mat4_Identity();
-Dqn_Mat4                                  Dqn_Mat4_Scale3f(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z);
-Dqn_Mat4                                  Dqn_Mat4_ScaleV3(Dqn_V3 vec);
-Dqn_Mat4                                  Dqn_Mat4_Translate3f(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z);
-Dqn_Mat4                                  Dqn_Mat4_TranslateV3(Dqn_V3 vec);
-Dqn_Mat4                                  operator*(Dqn_Mat4 const &a, Dqn_Mat4 const &b);
-Dqn_V4                                    operator*(Dqn_Mat4 const &mat, Dqn_V4 const &vec);
+Dqn_Mat4                                   Dqn_Mat4_Identity();
+Dqn_Mat4                                   Dqn_Mat4_Scale3f(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z);
+Dqn_Mat4                                   Dqn_Mat4_ScaleV3(Dqn_V3 vec);
+Dqn_Mat4                                   Dqn_Mat4_Translate3f(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z);
+Dqn_Mat4                                   Dqn_Mat4_TranslateV3(Dqn_V3 vec);
+Dqn_Mat4                                   operator*(Dqn_Mat4 const &a, Dqn_Mat4 const &b);
+Dqn_V4                                     operator*(Dqn_Mat4 const &mat, Dqn_V4 const &vec);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Helper Functions
 //
 // -------------------------------------------------------------------------------------------------
-void                                      Dqn_Bit_UnsetInplace(Dqn_u32 *flags, Dqn_u32 bitfield);
-void                                      Dqn_Bit_SetInplace(Dqn_u32 *flags, Dqn_u32 bitfield);
-Dqn_b32                                   Dqn_Bit_IsSet(Dqn_u32 flags, Dqn_u32 bitfield);
-Dqn_b32                                   Dqn_Bit_IsNotSet(Dqn_u32 flags, Dqn_u32 bitfield);
+void                                       Dqn_Bit_UnsetInplace(Dqn_u32 *flags, Dqn_u32 bitfield);
+void                                       Dqn_Bit_SetInplace(Dqn_u32 *flags, Dqn_u32 bitfield);
+Dqn_b32                                    Dqn_Bit_IsSet(Dqn_u32 flags, Dqn_u32 bitfield);
+Dqn_b32                                    Dqn_Bit_IsNotSet(Dqn_u32 flags, Dqn_u32 bitfield);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Safe Arithmetic
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_i64                                   Dqn_Safe_AddI64(Dqn_i64 a, Dqn_i64 b);
-Dqn_i64                                   Dqn_Safe_MulI64(Dqn_i64 a, Dqn_i64 b);
-Dqn_u64                                   Dqn_Safe_AddU64(Dqn_u64 a, Dqn_u64 b);
-Dqn_u64                                   Dqn_Safe_MulU64(Dqn_u64 a, Dqn_u64 b);
-int                                       Dqn_Safe_TruncateISizeToInt(Dqn_isize val);
-Dqn_i32                                   Dqn_Safe_TruncateISizeToI32(Dqn_isize val);
-Dqn_i8                                    Dqn_Safe_TruncateISizeToI8(Dqn_isize val);
-Dqn_u32                                   Dqn_Safe_TruncateUSizeToU32(Dqn_u64 val);
-int                                       Dqn_Safe_TruncateUSizeToI32(Dqn_usize val);
-int                                       Dqn_Safe_TruncateUSizeToInt(Dqn_usize val);
-Dqn_isize                                 Dqn_Safe_TruncateUSizeToISize(Dqn_usize val);
+Dqn_i64                                    Dqn_Safe_AddI64(Dqn_i64 a, Dqn_i64 b);
+Dqn_i64                                    Dqn_Safe_MulI64(Dqn_i64 a, Dqn_i64 b);
+Dqn_u64                                    Dqn_Safe_AddU64(Dqn_u64 a, Dqn_u64 b);
+Dqn_u64                                    Dqn_Safe_SubU64(Dqn_u64 a, Dqn_u64 b);
+Dqn_u32                                    Dqn_Safe_SubU32(Dqn_u32 a, Dqn_u32 b);
+Dqn_u64                                    Dqn_Safe_MulU64(Dqn_u64 a, Dqn_u64 b);
+int                                        Dqn_Safe_TruncateISizeToInt(Dqn_isize val);
+Dqn_i32                                    Dqn_Safe_TruncateISizeToI32(Dqn_isize val);
+Dqn_i8                                     Dqn_Safe_TruncateISizeToI8(Dqn_isize val);
+Dqn_u32                                    Dqn_Safe_TruncateUSizeToU32(Dqn_u64 val);
+int                                        Dqn_Safe_TruncateUSizeToI32(Dqn_usize val);
+int                                        Dqn_Safe_TruncateUSizeToInt(Dqn_usize val);
+Dqn_isize                                  Dqn_Safe_TruncateUSizeToISize(Dqn_usize val);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Char Helpers
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_b32                                   Dqn_Char_IsAlpha(char ch);
-Dqn_b32                                   Dqn_Char_IsDigit(char ch);
-Dqn_b32                                   Dqn_Char_IsAlphaNum(char ch);
-Dqn_b32                                   Dqn_Char_IsWhitespace(char ch);
-char                                      Dqn_Char_ToLower(char ch);
+Dqn_b32                                    Dqn_Char_IsAlpha(char ch);
+Dqn_b32                                    Dqn_Char_IsDigit(char ch);
+Dqn_b32                                    Dqn_Char_IsAlphaNum(char ch);
+Dqn_b32                                    Dqn_Char_IsWhitespace(char ch);
+char                                       Dqn_Char_ToLower(char ch);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: String Helpers
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_b32                                   Dqn_Str_Equals(char const *a, char const *b, Dqn_isize a_len = -1, Dqn_isize b_len = -1);
-char const *                              Dqn_Str_FindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_lens, Dqn_isize find_len, Dqn_isize *match_index, Dqn_isize buf_len = -1);
-char const *                              Dqn_Str_Find(char const *buf, char const *find, Dqn_isize buf_len = -1, Dqn_isize find_len = -1);
-Dqn_b32                                   Dqn_Str_Match(char const *src, char const *find, int find_len);
-char const *                              Dqn_Str_SkipToChar(char const *src, char ch);
-char const *                              Dqn_Str_SkipToNextAlphaNum(char const *src);
-char const *                              Dqn_Str_SkipToNextDigit(char const *src);
-char const *                              Dqn_Str_SkipToNextChar(char const *src);
-char const *                              Dqn_Str_SkipToNextWord(char const *src);
-char const *                              Dqn_Str_SkipToNextWhitespace(char const *src);
-char const *                              Dqn_Str_SkipWhitespace(char const *src);
-char const *                              Dqn_Str_SkipToCharInPlace(char const **src, char ch);
-char const *                              Dqn_Str_SkipToNextAlphaNumInPlace(char const **src);
-char const *                              Dqn_Str_SkipToNextCharInPlace(char const **src);
-char const *                              Dqn_Str_SkipToNextWhitespaceInPlace(char const **src);
-char const *                              Dqn_Str_SkipToNextWordInPlace(char const **src);
-char const *                              Dqn_Str_SkipWhitespaceInPlace(char const **src);
-Dqn_u64                                   Dqn_Str_ToU64(char const *buf, int len = -1);
-Dqn_i64                                   Dqn_Str_ToI64(char const *buf, int len = -1);
+Dqn_b32                                    Dqn_Str_Equals(char const *a, char const *b, Dqn_isize a_len = -1, Dqn_isize b_len = -1);
+char const *                               Dqn_Str_FindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_lens, Dqn_isize find_len, Dqn_isize *match_index, Dqn_isize buf_len = -1);
+char const *                               Dqn_Str_Find(char const *buf, char const *find, Dqn_isize buf_len = -1, Dqn_isize find_len = -1);
+Dqn_b32                                    Dqn_Str_Match(char const *src, char const *find, int find_len);
+char const *                               Dqn_Str_SkipToChar(char const *src, char ch);
+char const *                               Dqn_Str_SkipToNextAlphaNum(char const *src);
+char const *                               Dqn_Str_SkipToNextDigit(char const *src);
+char const *                               Dqn_Str_SkipToNextChar(char const *src);
+char const *                               Dqn_Str_SkipToNextWord(char const *src);
+char const *                               Dqn_Str_SkipToNextWhitespace(char const *src);
+char const *                               Dqn_Str_SkipWhitespace(char const *src);
+char const *                               Dqn_Str_SkipToCharInPlace(char const **src, char ch);
+char const *                               Dqn_Str_SkipToNextAlphaNumInPlace(char const **src);
+char const *                               Dqn_Str_SkipToNextCharInPlace(char const **src);
+char const *                               Dqn_Str_SkipToNextWhitespaceInPlace(char const **src);
+char const *                               Dqn_Str_SkipToNextWordInPlace(char const **src);
+char const *                               Dqn_Str_SkipWhitespaceInPlace(char const **src);
+Dqn_u64                                    Dqn_Str_ToU64(char const *buf, int len = -1);
+Dqn_i64                                    Dqn_Str_ToI64(char const *buf, int len = -1);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_String
 //
 // -------------------------------------------------------------------------------------------------
-Dqn_b32                                   Dqn_String_Compare(Dqn_String const lhs, Dqn_String const rhs);
-Dqn_b32                                   Dqn_String_CompareCaseInsensitive(Dqn_String const lhs, Dqn_String const rhs);
-Dqn_String                                Dqn_String_Copy(Dqn_Allocator *allocator, Dqn_String const src);
-Dqn_String                                Dqn_String_TrimWhitespaceAround(Dqn_String src);
+Dqn_b32                                    Dqn_String_Compare(Dqn_String const lhs, Dqn_String const rhs);
+Dqn_b32                                    Dqn_String_CompareCaseInsensitive(Dqn_String const lhs, Dqn_String const rhs);
+Dqn_String                                 Dqn_String_Copy(Dqn_Allocator *allocator, Dqn_String const src);
+Dqn_String                                 Dqn_String_TrimWhitespaceAround(Dqn_String src);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: File
 //
 // -------------------------------------------------------------------------------------------------
-char *                                    Dqn_File_ReadAll(Dqn_Allocator *allocator, char const *file, Dqn_isize *file_size);
+char *                                     Dqn_File_ReadAll(Dqn_Allocator *allocator, char const *file, Dqn_isize *file_size);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Utils
 //
 // -------------------------------------------------------------------------------------------------
-char *                                    Dqn_EpochTimeToDate(Dqn_i64 timestamp, char *buf, Dqn_isize buf_len);
+char *                                     Dqn_EpochTimeToDate(Dqn_i64 timestamp, char *buf, Dqn_isize buf_len);

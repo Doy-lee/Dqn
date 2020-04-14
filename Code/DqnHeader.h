@@ -64,10 +64,10 @@
 #define DQN_IMPLEMENTATION
 #include "Dqn.h"
 
-char const *ParseFunctionReturnType(char const *ptr, isize *len)
+char const *ParseFunctionReturnType(char const *ptr, Dqn_isize *len)
 {
     char const *result = Dqn_Str_SkipWhitespace(ptr);
-    isize result_len   = 0;
+    Dqn_isize result_len   = 0;
     for (int scope = 0; ptr; ptr++) // NOTE: Parse the function return type
     {
         if (ptr[0] == '<' || ptr[0] == '>')
@@ -88,7 +88,7 @@ char const *ParseFunctionReturnType(char const *ptr, isize *len)
     return result;
 }
 
-char const *ParseFunctionNameAndParameters(char const *ptr, isize *len)
+char const *ParseFunctionNameAndParameters(char const *ptr, Dqn_isize *len)
 {
     char const *result = ptr;
     int result_len = 0;
@@ -107,13 +107,13 @@ char const *ParseFunctionNameAndParameters(char const *ptr, isize *len)
     return result;
 }
 
-char const *ParseFunctionComment(char const *ptr, isize *len)
+char const *ParseFunctionComment(char const *ptr, Dqn_isize *len)
 {
     while (ptr[0] != '"') ptr++;
     ptr++;
 
     char const *result = ptr;
-    isize result_len = 0;
+    Dqn_isize result_len = 0;
     for (;;)
     {
         while (ptr[0] != '"')
@@ -167,11 +167,11 @@ int main(int argc, char *argv[])
     arena.allocator         = Dqn_Allocator_XHeap();
     Dqn_Allocator allocator = Dqn_Allocator_Arena(&arena);
     Dqn_MemArena_Reserve(&arena, DQN_MEGABYTES(16));
-    for (isize arg_index = 1; arg_index < argc; ++arg_index)
+    for (Dqn_isize arg_index = 1; arg_index < argc; ++arg_index)
     {
-        char const *file = argv[arg_index];
-        isize buf_size   = 0;
-        char *buf        = Dqn_File_ReadAll(&allocator, file, &buf_size);
+        char const *file   = argv[arg_index];
+        Dqn_isize buf_size = 0;
+        char *buf          = Dqn_File_ReadAll(&allocator, file, &buf_size);
         if (!buf)
         {
             fprintf(stderr, "Failed to read file: %s\n", file);
@@ -184,18 +184,18 @@ int main(int argc, char *argv[])
         char constexpr HEADER_COPY_END[]       = "DQN_HEADER_COPY_END";
 
         char const *find_list[]            = {HEADER_COPY_PROTOTYPE, HEADER_COMMENT, HEADER_COPY_BEGIN};
-        isize constexpr find_string_lens[] = {
+        Dqn_isize constexpr find_string_lens[] = {
             Dqn_CharCountI(HEADER_COPY_PROTOTYPE),
             Dqn_CharCountI(HEADER_COMMENT),
             Dqn_CharCountI(HEADER_COPY_BEGIN),
         };
 
-        isize num_header_entries = 0;
+        Dqn_isize num_header_entries = 0;
         {
             char const *ptr          = buf;
             char const *ptr_end      = buf + buf_size;
-            isize ptr_len            = buf_size;
-            isize matched_find_index = -1;
+            Dqn_isize ptr_len            = buf_size;
+            Dqn_isize matched_find_index = -1;
             for (char const *token = Dqn_Str_FindMulti(ptr, find_list, find_string_lens, Dqn_ArrayCountI(find_list), &matched_find_index, ptr_len);
                  token;
                  token = Dqn_Str_FindMulti(ptr, find_list, find_string_lens, Dqn_ArrayCountI(find_list), &matched_find_index, ptr_len))
@@ -207,28 +207,28 @@ int main(int argc, char *argv[])
         }
 
         auto *header_entries           = Dqn_MemArena_AllocateType<HeaderEntry>(&arena, num_header_entries);
-        isize header_entries_index     = 0;
-        isize max_prototype_return_val = 0;
+        Dqn_isize header_entries_index     = 0;
+        Dqn_isize max_prototype_return_val = 0;
 
         char const *ptr          = buf;
         char const *ptr_end      = buf + buf_size;
-        isize ptr_len            = buf_size;
-        isize matched_find_index = -1;
+        Dqn_isize ptr_len            = buf_size;
+        Dqn_isize matched_find_index = -1;
         for (char const *token = Dqn_Str_FindMulti(ptr, find_list, find_string_lens, Dqn_ArrayCountI(find_list), &matched_find_index, ptr_len);
              token;
              token = Dqn_Str_FindMulti(ptr, find_list, find_string_lens, Dqn_ArrayCountI(find_list), &matched_find_index, ptr_len))
         {
             HeaderEntry *entry = header_entries + header_entries_index++;
             entry->type           = static_cast<HeaderEntryType>(matched_find_index);
-            if (matched_find_index == (isize)HeaderEntryType::Prototype)
+            if (matched_find_index == (Dqn_isize)HeaderEntryType::Prototype)
             {
                 ptr                   = token + find_string_lens[matched_find_index] + 1 /*macro start parenthesis*/;
-                isize func_type_len   = 0;
+                Dqn_isize func_type_len   = 0;
                 char const *func_type = ParseFunctionReturnType(ptr, &func_type_len);
 
                 ptr                   = func_type + func_type_len + 1; // Ptr is at macro comma, skip the comma
                 ptr                   = Dqn_Str_SkipWhitespace(ptr);
-                isize func_name_len   = 0;
+                Dqn_isize func_name_len   = 0;
                 char const *func_name = ParseFunctionNameAndParameters(ptr, &func_name_len);
 
                 entry->function_decl.return_val  = Dqn_Asprintf(&allocator, "%.*s", func_type_len, func_type);
@@ -237,13 +237,13 @@ int main(int argc, char *argv[])
 
                 max_prototype_return_val = DQN_MAX(max_prototype_return_val, func_type_len);
             }
-            else if (matched_find_index == (isize)HeaderEntryType::Comment)
+            else if (matched_find_index == (Dqn_isize)HeaderEntryType::Comment)
             {
                 char const *comment_start = token;
                 ptr                       = token;
                 while (ptr[0] != '\n' && ptr[0] != '\r')
                     ptr++;
-                isize comment_len = ptr - comment_start;
+                Dqn_isize comment_len = ptr - comment_start;
 
                 entry->comment.str = Dqn_MemArena_AllocateType<char>(&arena, comment_len);
                 DQN_FOR_EACH(comment_index, comment_len)
@@ -260,7 +260,7 @@ int main(int argc, char *argv[])
                     entry->comment.len--;
                 ptr = comment_start + comment_len;
             }
-            else if (matched_find_index == (isize)HeaderEntryType::CopyBegin)
+            else if (matched_find_index == (Dqn_isize)HeaderEntryType::CopyBegin)
             {
                 ptr                    = token + find_string_lens[matched_find_index];
                 ptr                    = Dqn_Str_SkipWhitespace(ptr);
@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
                     return -1;
                 }
 
-                isize copy_len        = copy_end - copy_start;
+                Dqn_isize copy_len        = copy_end - copy_start;
                 entry->copy_range.str = Dqn_MemArena_AllocateType<char>(&arena, copy_len);
                 DQN_FOR_EACH(copy_index, copy_len)
                 {
@@ -294,7 +294,7 @@ int main(int argc, char *argv[])
             {
                 case HeaderEntryType::Prototype:
                 {
-                    isize remaining_space = max_prototype_return_val - entry->function_decl.return_val.len + 1;
+                    Dqn_isize remaining_space = max_prototype_return_val - entry->function_decl.return_val.len + 1;
                     fprintf(stdout, "%.*s", (int)entry->function_decl.return_val.len, entry->function_decl.return_val.str);
                     DQN_FOR_EACH(space, remaining_space) fputs(" ", stdout);
                     fprintf(stdout, " %.*s;\n", (int)entry->function_decl.name_and_args.len, entry->function_decl.name_and_args.str);

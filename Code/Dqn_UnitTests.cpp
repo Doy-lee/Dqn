@@ -69,7 +69,7 @@ void TestingState_PrintGroupResult(TestingState const *result)
     bool all_tests_passed = (result->num_tests_ok_in_group == result->num_tests_in_group);
     char buf[256] = {};
     int len = snprintf(buf, Dqn_ArrayCount(buf), "%02d/%02d Tests Passed ", result->num_tests_ok_in_group, result->num_tests_in_group);
-    isize remaining_len = DESIRED_LEN - len - 1;
+    Dqn_isize remaining_len = DESIRED_LEN - len - 1;
     remaining_len       = (all_tests_passed) ? remaining_len - Dqn_CharCount(STATUS_OK) : remaining_len - Dqn_CharCount(STATUS_FAIL);
     remaining_len       = DQN_MAX(remaining_len, 0);
     DQN_FOR_EACH(i, remaining_len) fprintf(stdout, " ");
@@ -90,7 +90,7 @@ void TestState_PrintResult(TestState const *result)
     char const STATUS_OK[]   = "OK";
     char const STATUS_FAIL[] = "FAIL";
 
-    isize remaining_len = DESIRED_LEN - result->name.len - Dqn_CharCount(INDENT);
+    Dqn_isize remaining_len = DESIRED_LEN - result->name.len - Dqn_CharCount(INDENT);
     remaining_len       = (result->fail_expr.str) ? remaining_len - Dqn_CharCount(STATUS_FAIL) : remaining_len - Dqn_CharCount(STATUS_OK);
     remaining_len       = DQN_MAX(remaining_len, 0);
 
@@ -106,7 +106,7 @@ void TestState_PrintResult(TestState const *result)
     }
 }
 
-FILE_SCOPE void UnitTests()
+DQN_FILE_SCOPE void UnitTests()
 {
     TestingState testing_state = {};
     // ---------------------------------------------------------------------------------------------
@@ -142,6 +142,7 @@ FILE_SCOPE void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "ArenaAllocator - Allocate Small");
                 Dqn_MemArena arena      = {};
+                arena.allocator         = Dqn_Allocator_Heap();
                 Dqn_Allocator allocator = Dqn_Allocator_Arena(&arena);
                 char constexpr EXPECT[] = "hello_world";
                 char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char));
@@ -228,12 +229,12 @@ FILE_SCOPE void UnitTests()
     // ---------------------------------------------------------------------------------------------
     {
         TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Array");
-        // NOTE: Dqn_Array_InitMemory
+        // NOTE: Dqn_Array_InitWithMemory
         {
             {
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test add single item and can't allocate more");
                 int memory[4]        = {};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, 1);
                 Dqn_Array_Add(&array, 2);
                 Dqn_Array_Add(&array, 3);
@@ -254,7 +255,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test add array of items");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data %d", array.data[1]);
@@ -267,7 +268,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test clear and clear with memory zeroed");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_Clear(&array, false /*zero_mem*/);
                 TEST_EXPECT_MSG(testing_state, array.len == 0, "array.len: %d", array.len);
@@ -282,7 +283,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test erase stable and erase unstable");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3, 4};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_EraseUnstable(&array, 1);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
@@ -300,7 +301,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test array pop and peek");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_Pop(&array, 2);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
@@ -316,7 +317,7 @@ FILE_SCOPE void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test free on fixed memory array does nothing");
                 int memory[4]        = {};
-                Dqn_Array<int> array = Dqn_Array_InitMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
                 DQN_DEFER { Dqn_Array_Free(&array); };
             }
         }
@@ -496,7 +497,7 @@ FILE_SCOPE void UnitTests()
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "Abc", 1);
                 Dqn_StringBuilder_Append(&builder, "cd");
-                isize len    = 0;
+                Dqn_isize len    = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
@@ -510,7 +511,7 @@ FILE_SCOPE void UnitTests()
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "");
                 Dqn_StringBuilder_Append(&builder, "");
-                isize len    = 0;
+                Dqn_isize len    = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
@@ -524,7 +525,7 @@ FILE_SCOPE void UnitTests()
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "Acd");
                 Dqn_StringBuilder_Append(&builder, "");
-                isize len    = 0;
+                Dqn_isize len    = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
@@ -537,7 +538,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Append nullptr and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, nullptr, 5);
-                isize len    = 0;
+                Dqn_isize len    = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
@@ -552,7 +553,7 @@ FILE_SCOPE void UnitTests()
                 Dqn_StringBuilder_Append(&builder, "A");
                 Dqn_StringBuilder_Append(&builder, "z"); // Should force a new memory block
                 Dqn_StringBuilder_Append(&builder, "tec");
-                isize len    = 0;
+                Dqn_isize len    = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
@@ -568,7 +569,7 @@ FILE_SCOPE void UnitTests()
             Dqn_StringBuilder<> builder = {};
             Dqn_StringBuilder_AppendChar(&builder, 'a');
             Dqn_StringBuilder_AppendChar(&builder, 'b');
-            isize len    = 0;
+            Dqn_isize len    = 0;
             char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
             DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
@@ -584,7 +585,7 @@ FILE_SCOPE void UnitTests()
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_FmtAppend(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
                 Dqn_StringBuilder_FmtAppend(&builder, "Extra Stuff");
-                isize len    = 0;
+                Dqn_isize len    = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
@@ -597,7 +598,7 @@ FILE_SCOPE void UnitTests()
                 TEST_START_SCOPE(testing_state, "Append nullptr format string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_FmtAppend(&builder, nullptr);
-                isize len    = 0;
+                Dqn_isize len = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
@@ -701,55 +702,55 @@ FILE_SCOPE void UnitTests()
         TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str_ToI64");
         {
             TEST_START_SCOPE(testing_state, "Convert nullptr");
-            i64 result = Dqn_Str_ToI64(nullptr);
+            Dqn_i64 result = Dqn_Str_ToI64(nullptr);
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert empty string");
-            i64 result = Dqn_Str_ToI64("");
+            Dqn_i64 result = Dqn_Str_ToI64("");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1\"");
-            i64 result = Dqn_Str_ToI64("1");
+            Dqn_i64 result = Dqn_Str_ToI64("1");
             TEST_EXPECT(testing_state, result == 1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-0\"");
-            i64 result = Dqn_Str_ToI64("-0");
+            Dqn_i64 result = Dqn_Str_ToI64("-0");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-1\"");
-            i64 result = Dqn_Str_ToI64("-1");
+            Dqn_i64 result = Dqn_Str_ToI64("-1");
             TEST_EXPECT(testing_state, result == -1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1.2\"");
-            i64 result = Dqn_Str_ToI64("1.2");
+            Dqn_i64 result = Dqn_Str_ToI64("1.2");
             TEST_EXPECT(testing_state, result == 1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,234\"");
-            i64 result = Dqn_Str_ToI64("1,234");
+            Dqn_i64 result = Dqn_Str_ToI64("1,234");
             TEST_EXPECT(testing_state, result == 1234);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,2\"");
-            i64 result = Dqn_Str_ToI64("1,2");
+            Dqn_i64 result = Dqn_Str_ToI64("1,2");
             TEST_EXPECT(testing_state, result == 12);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"12a3\"");
-            i64 result = Dqn_Str_ToI64("12a3");
+            Dqn_i64 result = Dqn_Str_ToI64("12a3");
             TEST_EXPECT(testing_state, result == 12);
         }
     }
@@ -763,55 +764,55 @@ FILE_SCOPE void UnitTests()
         TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str_ToU64");
         {
             TEST_START_SCOPE(testing_state, "Convert nullptr");
-            u64 result = Dqn_Str_ToU64(nullptr);
+            Dqn_u64 result = Dqn_Str_ToU64(nullptr);
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert empty string");
-            u64 result = Dqn_Str_ToU64("");
+            Dqn_u64 result = Dqn_Str_ToU64("");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1\"");
-            u64 result = Dqn_Str_ToU64("1");
+            Dqn_u64 result = Dqn_Str_ToU64("1");
             TEST_EXPECT(testing_state, result == 1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-0\"");
-            u64 result = Dqn_Str_ToU64("-0");
+            Dqn_u64 result = Dqn_Str_ToU64("-0");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-1\"");
-            u64 result = Dqn_Str_ToU64("-1");
+            Dqn_u64 result = Dqn_Str_ToU64("-1");
             TEST_EXPECT(testing_state, result == 0);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1.2\"");
-            u64 result = Dqn_Str_ToU64("1.2");
+            Dqn_u64 result = Dqn_Str_ToU64("1.2");
             TEST_EXPECT(testing_state, result == 1);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,234\"");
-            u64 result = Dqn_Str_ToU64("1,234");
+            Dqn_u64 result = Dqn_Str_ToU64("1,234");
             TEST_EXPECT(testing_state, result == 1234);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,2\"");
-            u64 result = Dqn_Str_ToU64("1,2");
+            Dqn_u64 result = Dqn_Str_ToU64("1,2");
             TEST_EXPECT(testing_state, result == 12);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"12a3\"");
-            u64 result = Dqn_Str_ToU64("12a3");
+            Dqn_u64 result = Dqn_Str_ToU64("12a3");
             TEST_EXPECT(testing_state, result == 12);
         }
     }
