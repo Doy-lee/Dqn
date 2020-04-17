@@ -19,17 +19,214 @@
 
 // Otherwise if not defined, Dqn_Allocator allocator = {}; will by default use malloc, realloc, free
 
+#if defined(_MSC_VER)
+    #if defined(_CRT_SECURE_NO_WARNINGS)
+        #define DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED
+    #else
+        #define _CRT_SECURE_NO_WARNINGS
+    #endif
+#endif
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: stb_sprintf
+//
+// -------------------------------------------------------------------------------------------------
+// stb_sprintf - v1.05 - public domain snprintf() implementation
+// originally by Jeff Roberts / RAD Game Tools, 2015/10/20
+// http://github.com/nothings/stb
+//
+// allowed types:  sc uidBboXx p AaGgEef n
+// lengths      :  h ll j z t I64 I32 I
+//
+// Contributors:
+//    Fabian "ryg" Giesen (reformatting)
+//
+// Contributors (bugfixes):
+//    github:d26435
+//    github:trex78
+//    Jari Komppa (SI suffixes)
+//    Rohit Nirmal
+//    Marcin Wojdyr
+//    Leonard Ritter
+//
+// LICENSE:
+//
+//   See end of file for license information.
+
+#ifndef STB_SPRINTF_H_INCLUDE
+#define STB_SPRINTF_H_INCLUDE
+
+/*
+Single file sprintf replacement.
+
+Originally written by Jeff Roberts at RAD Game Tools - 2015/10/20.
+Hereby placed in public domain.
+
+This is a full sprintf replacement that supports everything that
+the C runtime sprintfs support, including float/double, 64-bit integers,
+hex floats, field parameters (%*.*d stuff), length reads backs, etc.
+
+Why would you need this if sprintf already exists?  Well, first off,
+it's *much* faster (see below). It's also much smaller than the CRT
+versions code-space-wise. We've also added some simple improvements
+that are super handy (commas in thousands, callbacks at buffer full,
+for example). Finally, the format strings for MSVC and GCC differ
+for 64-bit integers (among other small things), so this lets you use
+the same format strings in cross platform code.
+
+It uses the standard single file trick of being both the header file
+and the source itself. If you just include it normally, you just get
+the header file function definitions. To get the code, you include
+it from a C or C++ file and define STB_SPRINTF_IMPLEMENTATION first.
+
+It only uses va_args macros from the C runtime to do it's work. It
+does cast doubles to S64s and shifts and divides U64s, which does
+drag in CRT code on most platforms.
+
+It compiles to roughly 8K with float support, and 4K without.
+As a comparison, when using MSVC static libs, calling sprintf drags
+in 16K.
+
+API:
+====
+int stbsp_sprintf( char * buf, char const * fmt, ... )
+int stbsp_snprintf( char * buf, int count, char const * fmt, ... )
+  Convert an arg list into a buffer.  stbsp_snprintf always returns
+  a zero-terminated string (unlike regular snprintf).
+
+int stbsp_vsprintf( char * buf, char const * fmt, va_list va )
+int stbsp_vsnprintf( char * buf, int count, char const * fmt, va_list va )
+  Convert a va_list arg list into a buffer.  stbsp_vsnprintf always returns
+  a zero-terminated string (unlike regular snprintf).
+
+int stbsp_vsprintfcb( STBSP_SPRINTFCB * callback, void * user, char * buf, char const * fmt, va_list va )
+    typedef char * STBSP_SPRINTFCB( char const * buf, void * user, int len );
+  Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
+  Your callback can then copy the chars out, print them or whatever.
+  This function is actually the workhorse for everything else.
+  The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
+    // you return the next buffer to use or 0 to stop converting
+
+void stbsp_set_separators( char comma, char period )
+  Set the comma and period characters to use.
+
+FLOATS/DOUBLES:
+===============
+This code uses a internal float->ascii conversion method that uses
+doubles with error correction (double-doubles, for ~105 bits of
+precision).  This conversion is round-trip perfect - that is, an atof
+of the values output here will give you the bit-exact double back.
+
+One difference is that our insignificant digits will be different than
+with MSVC or GCC (but they don't match each other either).  We also
+don't attempt to find the minimum length matching float (pre-MSVC15
+doesn't either).
+
+If you don't need float or doubles at all, define STB_SPRINTF_NOFLOAT
+and you'll save 4K of code space.
+
+64-BIT INTS:
+============
+This library also supports 64-bit integers and you can use MSVC style or
+GCC style indicators (%I64d or %lld).  It supports the C99 specifiers
+for size_t and ptr_diff_t (%jd %zd) as well.
+
+EXTRAS:
+=======
+Like some GCCs, for integers and floats, you can use a ' (single quote)
+specifier and commas will be inserted on the thousands: "%'d" on 12345
+would print 12,345.
+
+For integers and floats, you can use a "$" specifier and the number
+will be converted to float and then divided to get kilo, mega, giga or
+tera and then printed, so "%$d" 1000 is "1.0 k", "%$.2d" 2536000 is
+"2.53 M", etc. For byte values, use two $:s, like "%$$d" to turn
+2536000 to "2.42 Mi". If you prefer JEDEC suffixes to SI ones, use three
+$:s: "%$$$d" -> "2.42 M". To remove the space between the number and the
+suffix, add "_" specifier: "%_$d" -> "2.53M".
+
+In addition to octal and hexadecimal conversions, you can print
+integers in binary: "%b" for 256 would print 100.
+
+PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
+===================================================================
+"%d" across all 32-bit ints (4.8x/4.0x faster than 32-/64-bit MSVC)
+"%24d" across all 32-bit ints (4.5x/4.2x faster)
+"%x" across all 32-bit ints (4.5x/3.8x faster)
+"%08x" across all 32-bit ints (4.3x/3.8x faster)
+"%f" across e-10 to e+10 floats (7.3x/6.0x faster)
+"%e" across e-10 to e+10 floats (8.1x/6.0x faster)
+"%g" across e-10 to e+10 floats (10.0x/7.1x faster)
+"%f" for values near e-300 (7.9x/6.5x faster)
+"%f" for values near e+300 (10.0x/9.1x faster)
+"%e" for values near e-300 (10.1x/7.0x faster)
+"%e" for values near e+300 (9.2x/6.0x faster)
+"%.320f" for values near e-300 (12.6x/11.2x faster)
+"%a" for random values (8.6x/4.3x faster)
+"%I64d" for 64-bits with 32-bit values (4.8x/3.4x faster)
+"%I64d" for 64-bits > 32-bit values (4.9x/5.5x faster)
+"%s%s%s" for 64 char strings (7.1x/7.3x faster)
+"...512 char string..." ( 35.0x/32.5x faster!)
+*/
+
+#if defined(__has_feature)
+   #if __has_feature(address_sanitizer)
+      #define STBI__ASAN __attribute__((no_sanitize("address")))
+   #endif
+#endif
+#ifndef STBI__ASAN
+#define STBI__ASAN
+#endif
+
+#ifdef STB_SPRINTF_STATIC
+#define STBSP__PUBLICDEC static
+#define STBSP__PUBLICDEF static STBI__ASAN
+#else
+#ifdef __cplusplus
+#define STBSP__PUBLICDEC extern "C"
+#define STBSP__PUBLICDEF extern "C" STBI__ASAN
+#else
+#define STBSP__PUBLICDEC extern
+#define STBSP__PUBLICDEF STBI__ASAN
+#endif
+#endif
+
+#include <stdarg.h> // for va_list()
+
+#ifndef STB_SPRINTF_MIN
+#define STB_SPRINTF_MIN 512 // how many characters per callback
+#endif
+typedef char *STBSP_SPRINTFCB(char *buf, void *user, int len);
+
+#ifndef STB_SPRINTF_DECORATE
+#define STB_SPRINTF_DECORATE(name) stbsp_##name // define this before including if you want to change the names
+#endif
+
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf)(char *buf, char const *fmt, va_list va);
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsnprintf)(char *buf, int count, char const *fmt, va_list va);
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf)(char *buf, char const *fmt, ...);
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char const *fmt, ...);
+
+STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va);
+STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
+
+#endif // STB_SPRINTF_H_INCLUDE
+
+// -------------------------------------------------------------------------------------------------
+//
+// DQN
+//
+// -------------------------------------------------------------------------------------------------
 #ifndef DQN_H
 #define DQN_H
-
-#if defined(_MSC_VER)
-    #define _CRT_SECURE_NO_WARNINGS
-#endif
 
 #include <float.h> // FLT_MAX
 #include <stdint.h> // uint/int typedefs
 #include <string.h> // memset, memcmp, strlen, strcmp
 #include <stdarg.h> // va_list
+#include <limits.h> // INT_MIN/MAX etc
+#include <stddef.h> // ptrdiff_t
 
 #undef DQN_HEADER_IMPLEMENTATION
 #include "DqnHeader.h"
@@ -165,16 +362,16 @@ const Dqn_f32 DQN_F32_MAX     = FLT_MAX;
 const Dqn_isize DQN_ISIZE_MAX = PTRDIFF_MAX;
 const Dqn_usize DQN_USIZE_MAX = SIZE_MAX;
 
-template <typename T, Dqn_usize N>
+template <typename T, Dqn_isize N>
 DQN_HEADER_COPY_PROTOTYPE(constexpr Dqn_usize, Dqn_ArrayCount(T const (&)[N])) { return N; }
 
-template <typename T, Dqn_usize N>
+template <typename T, Dqn_isize N>
 DQN_HEADER_COPY_PROTOTYPE(constexpr Dqn_isize, Dqn_ArrayCountI(T const (&)[N])) { return N; }
 
-template <Dqn_usize N>
+template <Dqn_isize N>
 DQN_HEADER_COPY_PROTOTYPE(constexpr Dqn_usize, Dqn_CharCount(char const (&)[N])) { return N - 1; }
 
-template <Dqn_usize N>
+template <Dqn_isize N>
 DQN_HEADER_COPY_PROTOTYPE(constexpr Dqn_isize, Dqn_CharCountI(char const (&)[N])) { return N - 1; }
 
 template <typename Procedure>
@@ -602,158 +799,132 @@ DQN_HEADER_COPY_END
 // @
 // @ -------------------------------------------------------------------------------------------------
 DQN_HEADER_COPY_BEGIN
-struct Dqn_StringBuilderBuffer
+struct Dqn_StringBuilderBlock
 {
-    char                    *mem;
-    Dqn_isize                size;
-    Dqn_isize                used;
-    Dqn_StringBuilderBuffer *next;
+    char                   *mem;
+    Dqn_isize               size;
+    Dqn_isize               used;
+    Dqn_StringBuilderBlock *next;
 };
 
-Dqn_isize constexpr DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE = DQN_KILOBYTES(4);
-template <Dqn_usize N = DQN_KILOBYTES(16)>
+Dqn_isize constexpr DQN_STRING_BUILDER_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
+template <Dqn_isize N = DQN_KILOBYTES(16)>
 struct Dqn_StringBuilder
 {
-    Dqn_Allocator            allocator;
-    char                     fixed_mem[N];
-    Dqn_isize                fixed_mem_used;
-    Dqn_StringBuilderBuffer *next_mem_buf;
-    Dqn_StringBuilderBuffer *last_mem_buf;
-    Dqn_isize                string_len;
+    Dqn_Allocator           allocator;
+    char                    fixed_mem[N];
+    Dqn_StringBuilderBlock  fixed_mem_block;
+    Dqn_StringBuilderBlock *last_mem_block;
 };
 DQN_HEADER_COPY_END
 
-template <Dqn_usize N> DQN_FILE_SCOPE char *Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(Dqn_StringBuilder<N> *builder, Dqn_isize size_required)
+template <Dqn_isize N>
+void Dqn_StringBuilder__LazyInitialise(Dqn_StringBuilder<N> *builder)
 {
-    char *result = builder->fixed_mem + builder->fixed_mem_used;
-    Dqn_isize space  = Dqn_ArrayCountI(builder->fixed_mem) - builder->fixed_mem_used;
-    Dqn_isize *usage = &builder->fixed_mem_used;
+    builder->fixed_mem_block.mem  = builder->fixed_mem;
+    builder->fixed_mem_block.size = Dqn_ArrayCount(builder->fixed_mem);
+    builder->fixed_mem_block.used = 0;
+    builder->fixed_mem_block.next = nullptr;
+    builder->last_mem_block       = &builder->fixed_mem_block;
+}
 
-    if (builder->last_mem_buf)
+// @ size_required: The length of the string not including the null terminator.
+template <Dqn_isize N> DQN_FILE_SCOPE char *Dqn_StringBuilder_AllocateWriteBuffer(Dqn_StringBuilder<N> *builder, Dqn_isize size_required)
+{
+    if (!builder->fixed_mem_block.mem)
     {
-        Dqn_StringBuilderBuffer *last_buf = builder->last_mem_buf;
-        result                            = last_buf->mem + last_buf->used;
-        space                             = last_buf->size - last_buf->used;
-        usage                             = &last_buf->used;
+        DQN_ASSERT(!builder->last_mem_block);
+        Dqn_StringBuilder__LazyInitialise(builder);
     }
 
-    if (space < size_required)
+    Dqn_StringBuilderBlock *block = builder->last_mem_block;
+    Dqn_b32 new_block_needed = (block->size - block->used) < size_required;
+    if (new_block_needed)
     {
-        // NOTE: Need to allocate new buf
-        Dqn_isize allocation_size = DQN_ISIZEOF(*builder->last_mem_buf) + DQN_MAX(size_required, DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE);
-        void *memory          = Dqn_Allocator_Allocate(&builder->allocator, allocation_size, alignof(Dqn_StringBuilderBuffer));
-        if (!memory) return nullptr;
-        auto *new_buf         = DQN_CAST(Dqn_StringBuilderBuffer *)memory;
-        *new_buf              = {};
-        new_buf->mem          = DQN_CAST(char *)memory + sizeof(*new_buf);
-        new_buf->size         = allocation_size;
-        result                = new_buf->mem;
-        usage                 = &new_buf->used;
+        Dqn_isize allocation_size = DQN_MAX(size_required, DQN_STRING_BUILDER_MIN_BLOCK_SIZE);
+        block                     = Dqn_Allocator_AllocateType<Dqn_StringBuilderBlock>(&builder->allocator, 1);
+        if (!block) return nullptr;
 
-        if (builder->last_mem_buf)
-        {
-            builder->last_mem_buf->next = new_buf;
-        }
-        else
-        {
-            builder->next_mem_buf = new_buf;
-            builder->last_mem_buf = new_buf;
-        }
+        *block                        = {};
+        block->mem                    = DQN_CAST(char *)Dqn_Allocator_Allocate(&builder->allocator, allocation_size, alignof(char));
+        block->size                   = allocation_size;
+        builder->last_mem_block->next = block;
+        builder->last_mem_block       = builder->last_mem_block->next;
     }
 
-    if (size_required > 0 && *usage > 0 && result[-1] == 0)
-    {
-        // NOTE: Not first time writing into buffer using sprintf, sprintf always writes a null terminator, so we must
-        // subtract one
-        (*usage)--;
-        result--;
-    }
-
-    *usage += size_required;
+    char *result = block->mem + block->used;
+    block->used += size_required;
     return result;
 }
 
-template <Dqn_usize N> DQN_FILE_SCOPE void Dqn_StringBuilder__BuildOutput(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_isize dest_size)
+// @ The necessary length to build the string, it returns the length not including the null-terminator
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> Dqn_isize, Dqn_StringBuilder_BuildLength(Dqn_StringBuilder<N> const *builder))
 {
-    // NOTE: No data appended to builder, just allocate am empty string. But
-    // always allocate, so we avoid adding making nullptr part of the possible
-    // return values and makes using Dqn_StringBuilder more complex.
-    if (dest_size == 1)
+    Dqn_isize result = 0;
+    for (Dqn_StringBuilderBlock const *block = &builder->fixed_mem_block;
+         block;
+         block = block->next)
     {
-        dest[0] = 0;
-        return;
+        result += block->used;
     }
 
-    if (!dest)
-    {
-        DQN_ASSERT(dest);
-        return;
-    }
-
-    char const *end = dest + dest_size;
-    char *buf_ptr   = dest;
-
-    DQN_MEMCOPY(buf_ptr, builder->fixed_mem, builder->fixed_mem_used);
-    buf_ptr += builder->fixed_mem_used;
-
-    Dqn_isize remaining_space = end - buf_ptr;
-    DQN_ASSERT(remaining_space >= 0);
-
-    for (Dqn_StringBuilderBuffer *string_buf = builder->next_mem_buf;
-         string_buf && remaining_space > 0;
-         string_buf = string_buf->next)
-    {
-        buf_ptr--; // We always copy the null terminator from the buffers, so if we know we have another buffer to copy from, remove the null terminator
-        DQN_MEMCOPY(buf_ptr, string_buf->mem, string_buf->used);
-        buf_ptr += string_buf->used;
-
-        remaining_space = end - buf_ptr;
-        DQN_ASSERT(remaining_space >= 0);
-    }
-    DQN_ASSERT(buf_ptr == dest + dest_size);
-}
-
-// @ The necessary length to build the string, it returns the length including the null-terminator
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> Dqn_isize, Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder))
-{
-    Dqn_isize result = builder->string_len + 1;
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> void, Dqn_StringBuilder_BuildToDest(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size))
 {
-    Dqn_StringBuilder__BuildOutput(builder, dest, dest_size);
+    if (!dest) return;
+    if (dest_size == 1) { dest[0] = 0; return; }
+
+    char *ptr                 = dest;
+    char const *end           = dest + dest_size;
+    Dqn_isize remaining_space = end - ptr;
+    for (Dqn_StringBuilderBlock const *block = &builder->fixed_mem_block;
+         block && remaining_space > 0;
+         block = block->next, remaining_space = end - ptr)
+    {
+        Dqn_isize num_bytes     = block->used;
+        Dqn_isize bytes_to_copy = DQN_MIN(num_bytes, remaining_space);
+        DQN_MEMCOPY(ptr, block->mem, bytes_to_copy);
+        ptr += bytes_to_copy;
+    }
+
+    if (remaining_space > 0) ptr[ 0] = 0; // Append null terminator
+    else                     ptr[-1] = 0; // Oops ran out of space. Terminate the output prematurely.
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> char *, Dqn_StringBuilder_Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len = nullptr))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> char *, Dqn_StringBuilder_Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len = nullptr))
 {
-    Dqn_isize len_w_null_terminator = Dqn_StringBuilder_BuildLen(builder);
-    auto *result  = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, len_w_null_terminator, alignof(char));
-    if (len) *len = (len_w_null_terminator - 1);
-    Dqn_StringBuilder__BuildOutput(builder, result, len_w_null_terminator);
+    Dqn_isize len_ = 0;
+    if (!len) len = &len_;
+    *len = Dqn_StringBuilder_BuildLength(builder);
+    auto *result  = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, *len + 1, alignof(char));
+    Dqn_StringBuilder_BuildToDest(builder, result, *len + 1);
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> Dqn_String, Dqn_StringBuilder_BuildString(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> Dqn_String, Dqn_StringBuilder_BuildString(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator))
 {
     Dqn_String result = {};
     result.str        = Dqn_StringBuilder_Build(builder, allocator, &result.len);
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> void, Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va))
 {
     if (!fmt) return;
     va_list va2;
     va_copy(va2, va);
-    Dqn_isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
-    char *buf     = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, require);
-    stbsp_vsnprintf(buf, static_cast<int>(require), fmt, va2);
+    Dqn_isize len     = stbsp_vsnprintf(nullptr, 0, fmt, va);
+    char *buf         = Dqn_StringBuilder_AllocateWriteBuffer(builder, len + 1);
+    stbsp_vsnprintf(buf, static_cast<int>(len + 1), fmt, va2);
     va_end(va2);
-    builder->string_len += (require - 1); // -1 to exclude null terminator
+
+    DQN_ASSERT(builder->last_mem_block->used >= 0);
+    builder->last_mem_block->used--; // stbsp_vsnprintf null terminates, back out the null-terminator from the mem block
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> void, Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...))
 {
     va_list va;
     va_start(va, fmt);
@@ -761,51 +932,39 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_FmtAppe
     va_end(va);
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> void, Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1))
 {
     if (!str) return;
     if (len == -1) len = DQN_CAST(Dqn_isize)strlen(str);
     if (len == 0) return;
-
-    Dqn_isize len_w_null_terminator = len + 1;
-    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
+    char *buf = Dqn_StringBuilder_AllocateWriteBuffer(builder, len);
     DQN_MEMCOPY(buf, str, len);
-    builder->string_len += len;
-    buf[len] = 0;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_AppendString(Dqn_StringBuilder<N> *builder, Dqn_String const string))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> void, Dqn_StringBuilder_AppendString(Dqn_StringBuilder<N> *builder, Dqn_String const string))
 {
     if (!string.str || string.len == 0) return;
-    Dqn_isize len_w_null_terminator = string.len + 1;
-    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, len_w_null_terminator);
+    char *buf = Dqn_StringBuilder_AllocateWriteBuffer(builder, string.len);
     DQN_MEMCOPY(buf, string.str, string.len);
-    builder->string_len += string.len;
-    buf[string.len] = 0;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> void, Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch))
 {
-    char *buf = Dqn_StringBuilder__GetWriteBufferAndUpdateUsage(builder, 1 + 1 /*null terminator*/);
+    char *buf = Dqn_StringBuilder_AllocateWriteBuffer(builder, 1);
     *buf++    = ch;
-    builder->string_len++;
-    buf[1] = 0;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <Dqn_usize N> void, Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder))
+DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> void, Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder))
 {
-    for (Dqn_StringBuilderBuffer *buffer = builder->next_mem_buf;
-         buffer;
-         )
+    for (Dqn_StringBuilderBlock *block = builder->fixed_mem_block.next;
+         block;
+         block = block->next)
     {
-        Dqn_StringBuilderBuffer *buffer_to_free = buffer;
-        buffer                                  = buffer->next;
-        Dqn_Allocator_Free(&builder->allocator, buffer_to_free);
+        Dqn_StringBuilderBlock *block_to_free = block;
+        Dqn_Allocator_Free(&builder->allocator, block_to_free->mem);
+        Dqn_Allocator_Free(&builder->allocator, block_to_free);
     }
-
-    builder->next_mem_buf = builder->last_mem_buf = nullptr;
-    builder->fixed_mem_used                       = 0;
-    builder->string_len                           = 0;
+    Dqn_StringBuilder__LazyInitialise(builder);
 }
 
 // @ -------------------------------------------------------------------------------------------------
@@ -1172,6 +1331,7 @@ struct Dqn_FixedString
 {
     union { char data[MAX_]; char str[MAX_]; char buf[MAX_]; };
     Dqn_isize len;
+    Dqn_isize max = MAX_;
 
     Dqn_FixedString()                            { data[0] = 0; len = 0; }
     Dqn_FixedString(char const *fmt, ...)
@@ -1269,196 +1429,7 @@ struct Dqn_U64Str
     int   len;
 };
 DQN_HEADER_COPY_END
-#if defined(_MSC_VER)
-    #undef _CRT_SECURE_NO_WARNINGS
-#endif
 #endif // DQN_H
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: stb_sprintf
-//
-// -------------------------------------------------------------------------------------------------
-// stb_sprintf - v1.05 - public domain snprintf() implementation
-// originally by Jeff Roberts / RAD Game Tools, 2015/10/20
-// http://github.com/nothings/stb
-//
-// allowed types:  sc uidBboXx p AaGgEef n
-// lengths      :  h ll j z t I64 I32 I
-//
-// Contributors:
-//    Fabian "ryg" Giesen (reformatting)
-//
-// Contributors (bugfixes):
-//    github:d26435
-//    github:trex78
-//    Jari Komppa (SI suffixes)
-//    Rohit Nirmal
-//    Marcin Wojdyr
-//    Leonard Ritter
-//
-// LICENSE:
-//
-//   See end of file for license information.
-
-#ifndef STB_SPRINTF_H_INCLUDE
-#define STB_SPRINTF_H_INCLUDE
-
-/*
-Single file sprintf replacement.
-
-Originally written by Jeff Roberts at RAD Game Tools - 2015/10/20.
-Hereby placed in public domain.
-
-This is a full sprintf replacement that supports everything that
-the C runtime sprintfs support, including float/double, 64-bit integers,
-hex floats, field parameters (%*.*d stuff), length reads backs, etc.
-
-Why would you need this if sprintf already exists?  Well, first off,
-it's *much* faster (see below). It's also much smaller than the CRT
-versions code-space-wise. We've also added some simple improvements
-that are super handy (commas in thousands, callbacks at buffer full,
-for example). Finally, the format strings for MSVC and GCC differ
-for 64-bit integers (among other small things), so this lets you use
-the same format strings in cross platform code.
-
-It uses the standard single file trick of being both the header file
-and the source itself. If you just include it normally, you just get
-the header file function definitions. To get the code, you include
-it from a C or C++ file and define STB_SPRINTF_IMPLEMENTATION first.
-
-It only uses va_args macros from the C runtime to do it's work. It
-does cast doubles to S64s and shifts and divides U64s, which does
-drag in CRT code on most platforms.
-
-It compiles to roughly 8K with float support, and 4K without.
-As a comparison, when using MSVC static libs, calling sprintf drags
-in 16K.
-
-API:
-====
-int stbsp_sprintf( char * buf, char const * fmt, ... )
-int stbsp_snprintf( char * buf, int count, char const * fmt, ... )
-  Convert an arg list into a buffer.  stbsp_snprintf always returns
-  a zero-terminated string (unlike regular snprintf).
-
-int stbsp_vsprintf( char * buf, char const * fmt, va_list va )
-int stbsp_vsnprintf( char * buf, int count, char const * fmt, va_list va )
-  Convert a va_list arg list into a buffer.  stbsp_vsnprintf always returns
-  a zero-terminated string (unlike regular snprintf).
-
-int stbsp_vsprintfcb( STBSP_SPRINTFCB * callback, void * user, char * buf, char const * fmt, va_list va )
-    typedef char * STBSP_SPRINTFCB( char const * buf, void * user, int len );
-  Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
-  Your callback can then copy the chars out, print them or whatever.
-  This function is actually the workhorse for everything else.
-  The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
-    // you return the next buffer to use or 0 to stop converting
-
-void stbsp_set_separators( char comma, char period )
-  Set the comma and period characters to use.
-
-FLOATS/DOUBLES:
-===============
-This code uses a internal float->ascii conversion method that uses
-doubles with error correction (double-doubles, for ~105 bits of
-precision).  This conversion is round-trip perfect - that is, an atof
-of the values output here will give you the bit-exact double back.
-
-One difference is that our insignificant digits will be different than
-with MSVC or GCC (but they don't match each other either).  We also
-don't attempt to find the minimum length matching float (pre-MSVC15
-doesn't either).
-
-If you don't need float or doubles at all, define STB_SPRINTF_NOFLOAT
-and you'll save 4K of code space.
-
-64-BIT INTS:
-============
-This library also supports 64-bit integers and you can use MSVC style or
-GCC style indicators (%I64d or %lld).  It supports the C99 specifiers
-for size_t and ptr_diff_t (%jd %zd) as well.
-
-EXTRAS:
-=======
-Like some GCCs, for integers and floats, you can use a ' (single quote)
-specifier and commas will be inserted on the thousands: "%'d" on 12345
-would print 12,345.
-
-For integers and floats, you can use a "$" specifier and the number
-will be converted to float and then divided to get kilo, mega, giga or
-tera and then printed, so "%$d" 1000 is "1.0 k", "%$.2d" 2536000 is
-"2.53 M", etc. For byte values, use two $:s, like "%$$d" to turn
-2536000 to "2.42 Mi". If you prefer JEDEC suffixes to SI ones, use three
-$:s: "%$$$d" -> "2.42 M". To remove the space between the number and the
-suffix, add "_" specifier: "%_$d" -> "2.53M".
-
-In addition to octal and hexadecimal conversions, you can print
-integers in binary: "%b" for 256 would print 100.
-
-PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
-===================================================================
-"%d" across all 32-bit ints (4.8x/4.0x faster than 32-/64-bit MSVC)
-"%24d" across all 32-bit ints (4.5x/4.2x faster)
-"%x" across all 32-bit ints (4.5x/3.8x faster)
-"%08x" across all 32-bit ints (4.3x/3.8x faster)
-"%f" across e-10 to e+10 floats (7.3x/6.0x faster)
-"%e" across e-10 to e+10 floats (8.1x/6.0x faster)
-"%g" across e-10 to e+10 floats (10.0x/7.1x faster)
-"%f" for values near e-300 (7.9x/6.5x faster)
-"%f" for values near e+300 (10.0x/9.1x faster)
-"%e" for values near e-300 (10.1x/7.0x faster)
-"%e" for values near e+300 (9.2x/6.0x faster)
-"%.320f" for values near e-300 (12.6x/11.2x faster)
-"%a" for random values (8.6x/4.3x faster)
-"%I64d" for 64-bits with 32-bit values (4.8x/3.4x faster)
-"%I64d" for 64-bits > 32-bit values (4.9x/5.5x faster)
-"%s%s%s" for 64 char strings (7.1x/7.3x faster)
-"...512 char string..." ( 35.0x/32.5x faster!)
-*/
-
-#if defined(__has_feature)
-   #if __has_feature(address_sanitizer)
-      #define STBI__ASAN __attribute__((no_sanitize("address")))
-   #endif
-#endif
-#ifndef STBI__ASAN
-#define STBI__ASAN
-#endif
-
-#ifdef STB_SPRINTF_STATIC
-#define STBSP__PUBLICDEC static
-#define STBSP__PUBLICDEF static STBI__ASAN
-#else
-#ifdef __cplusplus
-#define STBSP__PUBLICDEC extern "C"
-#define STBSP__PUBLICDEF extern "C" STBI__ASAN
-#else
-#define STBSP__PUBLICDEC extern
-#define STBSP__PUBLICDEF STBI__ASAN
-#endif
-#endif
-
-#include <stdarg.h> // for va_list()
-
-#ifndef STB_SPRINTF_MIN
-#define STB_SPRINTF_MIN 512 // how many characters per callback
-#endif
-typedef char *STBSP_SPRINTFCB(char *buf, void *user, int len);
-
-#ifndef STB_SPRINTF_DECORATE
-#define STB_SPRINTF_DECORATE(name) stbsp_##name // define this before including if you want to change the names
-#endif
-
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf)(char *buf, char const *fmt, va_list va);
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsnprintf)(char *buf, int count, char const *fmt, va_list va);
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf)(char *buf, char const *fmt, ...);
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char const *fmt, ...);
-
-STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va);
-STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
-
-#endif // STB_SPRINTF_H_INCLUDE
 
 #ifdef DQN_IMPLEMENTATION
 #define STB_SPRINTF_IMPLEMENTATION
@@ -1493,6 +1464,7 @@ DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_U64Str_ToStr(Dqn_u64 val, Dqn_U64Str *resu
     result->str = result->buf + (buf_index + 1);
     return result->str;
 }
+
 
 // @ -------------------------------------------------------------------------------------------------
 // @
@@ -1616,7 +1588,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
     char *result              = nullptr;
     switch (allocator->type)
     {
-        case Dqn_Allocator_Type::Null: DQN_ASSERT(DQN_INVALID_CODE_PATH);
+        case Dqn_Allocator_Type::Null:
         default: break;
 
         case Dqn_Allocator_Type::Heap:
@@ -4369,3 +4341,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
 
+#if defined(_MSC_VER)
+    #if !defined(DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED)
+        #undef _CRT_SECURE_NO_WARNINGS
+    #endif
+#endif
