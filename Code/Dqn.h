@@ -2218,16 +2218,15 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Bit_SetInplace(Dqn_u32 *flags, Dqn_u32 bitfi
 }
 
 
-DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsSet(Dqn_u32 flags, Dqn_u32 bitfield))
+DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsSet(Dqn_u32 bits, Dqn_u32 bits_to_set))
 {
-    auto result = DQN_CAST(Dqn_b32)(flags & bitfield);
+    auto result = DQN_CAST(Dqn_b32)((bits & bits_to_set) == bits_to_set);
     return result;
 }
 
-
-DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsNotSet(Dqn_u32 flags, Dqn_u32 bitfield))
+DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Bit_IsNotSet(Dqn_u32 bits, Dqn_u32 bits_to_check))
 {
-    auto result = !Dqn_Bit_IsSet(flags, bitfield);
+    auto result = !Dqn_Bit_IsSet(bits, bits_to_check);
     return result;
 }
 
