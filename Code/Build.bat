@@ -1,7 +1,7 @@
 @echo OFF
 
-if not exist ..\Bin mkdir ..\Bin
-pushd ..\Bin
+if not exist ..\Build mkdir ..\Build
+pushd ..\Build
 
 REM MT     Static CRT
 REM EHa-   Disable exception handling

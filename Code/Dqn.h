@@ -637,9 +637,9 @@ enum struct Dqn_Allocator_Type
     Custom,
 };
 
-#define DQN_ALLOCATOR_ALLOCATE_PROC(name) void *name(Dqn_isize size, Dqn_u8 alignment)
-#define DQN_ALLOCATOR_REALLOC_PROC(name) void *name(void *old_ptr, Dqn_isize old_size, Dqn_isize new_size)
-#define DQN_ALLOCATOR_FREE_PROC(name) void name(void *ptr)
+#define DQN_ALLOCATOR_ALLOCATE_PROC(name) void *name(Dqn_isize size, Dqn_u8 alignment, void *user_context)
+#define DQN_ALLOCATOR_REALLOC_PROC(name) void *name(void *old_ptr, Dqn_isize old_size, Dqn_isize new_size, void *user_context)
+#define DQN_ALLOCATOR_FREE_PROC(name) void name(void *ptr, void *user_context)
 typedef DQN_ALLOCATOR_ALLOCATE_PROC(Dqn_Allocator_AllocateProc);
 typedef DQN_ALLOCATOR_REALLOC_PROC(Dqn_Allocator_ReallocProc);
 typedef DQN_ALLOCATOR_FREE_PROC(Dqn_Allocator_FreeProc);
@@ -648,8 +648,8 @@ struct Dqn_Allocator
     Dqn_Allocator_Type type;
     union
     {
-        void                *user;
-        struct Dqn_MemArena *arena;
+        void                      *user;
+        struct Dqn_ArenaAllocator *arena;
     } context;
 
     Dqn_isize bytes_allocated;
@@ -665,28 +665,28 @@ struct Dqn_Allocator
 };
 DQN_HEADER_COPY_END
 
-DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_Null())
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_InitWithNull())
 {
     Dqn_Allocator result = {};
     result.type          = Dqn_Allocator_Type::Null;
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_Heap())
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_InitWithHeap())
 {
     Dqn_Allocator result = {};
     result.type          = Dqn_Allocator_Type::Heap;
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_XHeap())
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_InitWithXHeap())
 {
     Dqn_Allocator result = {};
     result.type          = Dqn_Allocator_Type::XHeap;
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_Arena(Dqn_MemArena *arena))
+DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_InitWithArena(Dqn_ArenaAllocator *arena))
 {
     Dqn_Allocator result = {};
     result.type          = Dqn_Allocator_Type::Arena;
@@ -718,53 +718,53 @@ DQN_HEADER_COPY_END
 
 // @ -------------------------------------------------------------------------------------------------
 // @
-// @ NOTE: Dqn_MemArena
+// @ NOTE: Dqn_ArenaAllocator
 // @
 // @ -------------------------------------------------------------------------------------------------
 DQN_HEADER_COPY_BEGIN
-struct Dqn_MemBlock
+struct Dqn_ArenaAllocatorBlock
 {
     void         *memory;
     Dqn_isize     size;
     Dqn_isize     used;
-    Dqn_MemBlock *prev;
-    Dqn_MemBlock *next;
+    Dqn_ArenaAllocatorBlock *prev;
+    Dqn_ArenaAllocatorBlock *next;
 };
 
 Dqn_usize const DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
-struct Dqn_MemArena
+struct Dqn_ArenaAllocator
 {
     // NOTE: Configuration (fill once after "Zero Initialisation {}")
     Dqn_isize     min_block_size;
     Dqn_Allocator allocator;
 
     // NOTE: Read Only
-    Dqn_MemBlock *curr_mem_block;
-    Dqn_MemBlock *top_mem_block;
+    Dqn_ArenaAllocatorBlock *curr_mem_block;
+    Dqn_ArenaAllocatorBlock *top_mem_block;
     Dqn_isize     highest_used_mark;
     int           total_allocated_mem_blocks;
 };
 
-struct Dqn_MemArenaRegion
+struct Dqn_ArenaAllocatorRegion
 {
-    Dqn_MemArena *arena;
-    Dqn_MemBlock *curr_mem_block;
+    Dqn_ArenaAllocator *arena;
+    Dqn_ArenaAllocatorBlock *curr_mem_block;
     Dqn_isize     curr_mem_block_used;
-    Dqn_MemBlock *top_mem_block;
+    Dqn_ArenaAllocatorBlock *top_mem_block;
 };
 
-struct Dqn_MemArenaScopedRegion
+struct Dqn_ArenaAllocatorScopedRegion
 {
-    Dqn_MemArenaScopedRegion(Dqn_MemArena *arena);
-    ~Dqn_MemArenaScopedRegion();
-    Dqn_MemArenaRegion region;
+    Dqn_ArenaAllocatorScopedRegion(Dqn_ArenaAllocator *arena);
+    ~Dqn_ArenaAllocatorScopedRegion();
+    Dqn_ArenaAllocatorRegion region;
 };
 
-void * Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_isize size, Dqn_u8 alignment);
-Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_isize size);
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_MemArena_AllocateType(Dqn_MemArena *arena, Dqn_isize num))
+void * Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment);
+Dqn_b32 Dqn_ArenaAllocator_Reserve(Dqn_ArenaAllocator *arena, Dqn_isize size);
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_ArenaAllocator_AllocateType(Dqn_ArenaAllocator *arena, Dqn_isize num))
 {
-    auto *result = DQN_CAST(T *)Dqn_MemArena_Allocate(arena, sizeof(T) * num, alignof(T));
+    auto *result = DQN_CAST(T *)Dqn_ArenaAllocator_Allocate(arena, sizeof(T) * num, alignof(T));
     return result;
 }
 
@@ -1220,7 +1220,7 @@ DQN_HEADER_COPY_END
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Array<T>, Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize len = 0))
 {
     Dqn_Array<T> result = {};
-    result.allocator    = Dqn_Allocator_Null();
+    result.allocator    = Dqn_Allocator_InitWithNull();
     result.data         = memory;
     result.len          = len;
     result.max          = max;
@@ -1605,14 +1605,14 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
 
         case Dqn_Allocator_Type::Arena:
         {
-            result = DQN_CAST(char *)Dqn_MemArena_Allocate(allocator->context.arena, size, alignment);
+            result = DQN_CAST(char *)Dqn_ArenaAllocator_Allocate(allocator->context.arena, size, alignment);
         }
         break;
 
         case Dqn_Allocator_Type::Custom:
         {
             if (allocator->allocate)
-                result = DQN_CAST(char *)allocator->allocate(size, alignment);
+                result = DQN_CAST(char *)allocator->allocate(size, alignment, allocator->context.user);
         }
         break;
     }
@@ -1657,8 +1657,8 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
 
         case Dqn_Allocator_Type::Arena:
         {
-            Dqn_MemArena *arena = allocator->context.arena;
-            result              = Dqn_MemArena_Allocate(arena, new_size, metadata.alignment);
+            Dqn_ArenaAllocator *arena = allocator->context.arena;
+            result                    = Dqn_ArenaAllocator_Allocate(arena, new_size, metadata.alignment);
             if (result) DQN_MEMCOPY(result, old_ptr, DQN_CAST(size_t) old_size);
         }
         break;
@@ -1666,7 +1666,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
         case Dqn_Allocator_Type::Custom:
         {
             if (allocator->realloc)
-                result = allocator->realloc(old_ptr, old_size, new_size);
+                result = allocator->realloc(old_ptr, old_size, new_size, allocator->context.user);
         }
         break;
     }
@@ -1696,7 +1696,7 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Allocator_Free(Dqn_Allocator *allocator, voi
 
         case Dqn_Allocator_Type::Custom:
         {
-            allocator->free(ptr);
+            if (allocator->free) allocator->free(ptr, allocator->context.user);
         }
         break;
 
@@ -1714,17 +1714,17 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_Allocator_Free(Dqn_Allocator *allocator, voi
 
 // @ -------------------------------------------------------------------------------------------------
 // @
-// @ NOTE: Dqn_MemArena
+// @ NOTE: Dqn_ArenaAllocator
 // @
 // @ -------------------------------------------------------------------------------------------------
-DQN_FILE_SCOPE Dqn_MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, Dqn_isize requested_size)
+DQN_FILE_SCOPE Dqn_ArenaAllocatorBlock *Dqn_ArenaAllocator__AllocateBlock(Dqn_ArenaAllocator *arena, Dqn_isize requested_size)
 {
     Dqn_isize min_block_size = arena->min_block_size;
     if (min_block_size == 0) min_block_size = DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE;
 
     Dqn_isize mem_block_size = DQN_MAX(min_block_size, requested_size);
     auto const allocate_size = DQN_CAST(Dqn_isize)(sizeof(*arena->curr_mem_block) + mem_block_size);
-    auto *result             = DQN_CAST(Dqn_MemBlock *)Dqn_Allocator_Allocate(&arena->allocator, allocate_size, alignof(Dqn_MemBlock));
+    auto *result             = DQN_CAST(Dqn_ArenaAllocatorBlock *)Dqn_Allocator_Allocate(&arena->allocator, allocate_size, alignof(Dqn_ArenaAllocatorBlock));
     if (!result) return result;
 
     *result        = {};
@@ -1734,7 +1734,7 @@ DQN_FILE_SCOPE Dqn_MemBlock *Dqn_MemArena__AllocateBlock(Dqn_MemArena *arena, Dq
     return result;
 }
 
-DQN_FILE_SCOPE void Dqn_MemArena__FreeBlock(Dqn_MemArena *arena, Dqn_MemBlock *block)
+DQN_FILE_SCOPE void Dqn_ArenaAllocator__FreeBlock(Dqn_ArenaAllocator *arena, Dqn_ArenaAllocatorBlock *block)
 {
     if (!block)
         return;
@@ -1748,7 +1748,7 @@ DQN_FILE_SCOPE void Dqn_MemArena__FreeBlock(Dqn_MemArena *arena, Dqn_MemBlock *b
     Dqn_Allocator_Free(&arena->allocator, block);
 }
 
-DQN_FILE_SCOPE void Dqn_MemArena__AttachBlock(Dqn_MemArena *arena, Dqn_MemBlock *new_block)
+DQN_FILE_SCOPE void Dqn_ArenaAllocator__AttachBlock(Dqn_ArenaAllocator *arena, Dqn_ArenaAllocatorBlock *new_block)
 {
     if (arena->top_mem_block)
     {
@@ -1764,11 +1764,11 @@ DQN_FILE_SCOPE void Dqn_MemArena__AttachBlock(Dqn_MemArena *arena, Dqn_MemBlock 
     }
 }
 
-DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_isize size, Dqn_u8 alignment))
+DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment))
 {
     Dqn_isize allocation_size = Dqn_AllocateMetadata_SizeRequired(size, alignment);
     Dqn_b32 need_new_mem_block = true;
-    for (Dqn_MemBlock *mem_block = arena->curr_mem_block; mem_block; mem_block = mem_block->next)
+    for (Dqn_ArenaAllocatorBlock *mem_block = arena->curr_mem_block; mem_block; mem_block = mem_block->next)
     {
         Dqn_b32 can_fit_in_block = (mem_block->used + allocation_size) <= mem_block->size;
         if (can_fit_in_block)
@@ -1781,9 +1781,9 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn
 
     if (need_new_mem_block)
     {
-        Dqn_MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, allocation_size);
+        Dqn_ArenaAllocatorBlock *new_block = Dqn_ArenaAllocator__AllocateBlock(arena, allocation_size);
         if (!new_block) return nullptr;
-        Dqn_MemArena__AttachBlock(arena, new_block);
+        Dqn_ArenaAllocator__AttachBlock(arena, new_block);
         arena->curr_mem_block = arena->top_mem_block;
     }
 
@@ -1795,13 +1795,13 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_Free(Dqn_MemArena *arena))
+DQN_HEADER_COPY_PROTOTYPE(void, Dqn_ArenaAllocator_Free(Dqn_ArenaAllocator *arena))
 {
-    for (Dqn_MemBlock *mem_block = arena->top_mem_block; mem_block;)
+    for (Dqn_ArenaAllocatorBlock *mem_block = arena->top_mem_block; mem_block;)
     {
-        Dqn_MemBlock *block_to_free = mem_block;
+        Dqn_ArenaAllocatorBlock *block_to_free = mem_block;
         mem_block                   = block_to_free->prev;
-        Dqn_MemArena__FreeBlock(arena, block_to_free);
+        Dqn_ArenaAllocator__FreeBlock(arena, block_to_free);
     }
 
     auto allocator           = arena->allocator;
@@ -1811,7 +1811,7 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_Free(Dqn_MemArena *arena))
     arena->allocator         = allocator;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_isize size))
+DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_ArenaAllocator_Reserve(Dqn_ArenaAllocator *arena, Dqn_isize size))
 {
     if (arena->top_mem_block)
     {
@@ -1819,38 +1819,38 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn
         if (remaining_space >= size) return true;
     }
 
-    Dqn_MemBlock *new_block = Dqn_MemArena__AllocateBlock(arena, size);
+    Dqn_ArenaAllocatorBlock *new_block = Dqn_ArenaAllocator__AllocateBlock(arena, size);
     if (!new_block) return false;
-    Dqn_MemArena__AttachBlock(arena, new_block);
+    Dqn_ArenaAllocator__AttachBlock(arena, new_block);
     return true;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(Dqn_MemArena, Dqn_MemArena_InitWithAllocator(Dqn_Allocator allocator, Dqn_isize size))
+DQN_HEADER_COPY_PROTOTYPE(Dqn_ArenaAllocator, Dqn_ArenaAllocator_InitWithAllocator(Dqn_Allocator allocator, Dqn_isize size))
 {
-    Dqn_MemArena result = {};
-    DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_MemBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
+    Dqn_ArenaAllocator result = {};
+    DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_ArenaAllocatorBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
     result.allocator                          = allocator;
-    Dqn_MemBlock *mem_block                   = Dqn_MemArena__AllocateBlock(&result, size);
-    Dqn_MemArena__AttachBlock(&result, mem_block);
+    Dqn_ArenaAllocatorBlock *mem_block                   = Dqn_ArenaAllocator__AllocateBlock(&result, size);
+    Dqn_ArenaAllocator__AttachBlock(&result, mem_block);
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(Dqn_MemArena, Dqn_MemArena_InitMemory(void *memory, Dqn_isize size))
+DQN_HEADER_COPY_PROTOTYPE(Dqn_ArenaAllocator, Dqn_ArenaAllocator_InitWithMemory(void *memory, Dqn_isize size))
 {
-    Dqn_MemArena result = {};
-    DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_MemBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
-    result.allocator    = Dqn_Allocator_Null();
-    auto *mem_block     = DQN_CAST(Dqn_MemBlock *) memory;
+    Dqn_ArenaAllocator result = {};
+    DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_ArenaAllocatorBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
+    result.allocator    = Dqn_Allocator_InitWithNull();
+    auto *mem_block     = DQN_CAST(Dqn_ArenaAllocatorBlock *) memory;
     *mem_block          = {};
     mem_block->memory   = DQN_CAST(Dqn_u8 *) memory + sizeof(*mem_block);
     mem_block->size     = size - DQN_CAST(Dqn_isize)sizeof(*mem_block);
-    Dqn_MemArena__AttachBlock(&result, mem_block);
+    Dqn_ArenaAllocator__AttachBlock(&result, mem_block);
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_ResetUsage(Dqn_MemArena *arena, Dqn_ZeroMem zero_mem))
+DQN_HEADER_COPY_PROTOTYPE(void, Dqn_ArenaAllocator_ResetUsage(Dqn_ArenaAllocator *arena, Dqn_ZeroMem zero_mem))
 {
-    for (Dqn_MemBlock *block = arena->top_mem_block; block; block = block->prev)
+    for (Dqn_ArenaAllocatorBlock *block = arena->top_mem_block; block; block = block->prev)
     {
         if (zero_mem == Dqn_ZeroMem::Yes)
             DQN_MEMSET(block->memory, 0, DQN_CAST(size_t)block->used);
@@ -1859,9 +1859,9 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_MemArena_ResetUsage(Dqn_MemArena *arena, Dqn
     }
 }
 
-Dqn_MemArenaRegion Dqn_MemArena_BeginRegion(Dqn_MemArena *arena)
+Dqn_ArenaAllocatorRegion Dqn_ArenaAllocator_BeginRegion(Dqn_ArenaAllocator *arena)
 {
-    Dqn_MemArenaRegion result  = {};
+    Dqn_ArenaAllocatorRegion result  = {};
     result.arena               = arena;
     result.curr_mem_block      = arena->curr_mem_block;
     result.curr_mem_block_used = (arena->curr_mem_block) ? arena->curr_mem_block->used : 0;
@@ -1869,18 +1869,18 @@ Dqn_MemArenaRegion Dqn_MemArena_BeginRegion(Dqn_MemArena *arena)
     return result;
 }
 
-void Dqn_MemArena_EndRegion(Dqn_MemArenaRegion region)
+void Dqn_ArenaAllocator_EndRegion(Dqn_ArenaAllocatorRegion region)
 {
     while (region.top_mem_block != region.arena->top_mem_block)
     {
-        Dqn_MemBlock *block_to_free = region.arena->top_mem_block;
+        Dqn_ArenaAllocatorBlock *block_to_free = region.arena->top_mem_block;
         if (region.arena->curr_mem_block == block_to_free)
             region.arena->curr_mem_block = block_to_free->prev;
         region.arena->top_mem_block = block_to_free->prev;
-        Dqn_MemArena__FreeBlock(region.arena, block_to_free);
+        Dqn_ArenaAllocator__FreeBlock(region.arena, block_to_free);
     }
 
-    for (Dqn_MemBlock *mem_block = region.arena->top_mem_block; mem_block != region.curr_mem_block; mem_block = mem_block->prev)
+    for (Dqn_ArenaAllocatorBlock *mem_block = region.arena->top_mem_block; mem_block != region.curr_mem_block; mem_block = mem_block->prev)
         mem_block->used = 0;
 
     if (region.arena->curr_mem_block)
@@ -1888,19 +1888,19 @@ void Dqn_MemArena_EndRegion(Dqn_MemArenaRegion region)
     region = {};
 }
 
-Dqn_MemArenaScopedRegion::Dqn_MemArenaScopedRegion(Dqn_MemArena *arena)
+Dqn_ArenaAllocatorScopedRegion::Dqn_ArenaAllocatorScopedRegion(Dqn_ArenaAllocator *arena)
 {
-    this->region = Dqn_MemArena_BeginRegion(arena);
+    this->region = Dqn_ArenaAllocator_BeginRegion(arena);
 }
 
-Dqn_MemArenaScopedRegion::~Dqn_MemArenaScopedRegion()
+Dqn_ArenaAllocatorScopedRegion::~Dqn_ArenaAllocatorScopedRegion()
 {
-    Dqn_MemArena_EndRegion(this->region);
+    Dqn_ArenaAllocator_EndRegion(this->region);
 }
 
-Dqn_MemArenaScopedRegion Dqn_MemArena_MakeScopedRegion(Dqn_MemArena *arena)
+Dqn_ArenaAllocatorScopedRegion Dqn_ArenaAllocator_MakeScopedRegion(Dqn_ArenaAllocator *arena)
 {
-    return Dqn_MemArenaScopedRegion(arena);
+    return Dqn_ArenaAllocatorScopedRegion(arena);
 }
 
 // @ -------------------------------------------------------------------------------------------------

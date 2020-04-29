@@ -163,10 +163,10 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    Dqn_MemArena arena      = {};
-    arena.allocator         = Dqn_Allocator_XHeap();
-    Dqn_Allocator allocator = Dqn_Allocator_Arena(&arena);
-    Dqn_MemArena_Reserve(&arena, DQN_MEGABYTES(16));
+    Dqn_ArenaAllocator arena      = {};
+    arena.allocator         = Dqn_Allocator_InitWithXHeap();
+    Dqn_Allocator allocator = Dqn_Allocator_InitWithArena(&arena);
+    Dqn_ArenaAllocator_Reserve(&arena, DQN_MEGABYTES(16));
     for (Dqn_isize arg_index = 1; arg_index < argc; ++arg_index)
     {
         char const *file   = argv[arg_index];
@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        auto *header_entries           = Dqn_MemArena_AllocateType<HeaderEntry>(&arena, num_header_entries);
+        auto *header_entries           = Dqn_ArenaAllocator_AllocateType<HeaderEntry>(&arena, num_header_entries);
         Dqn_isize header_entries_index     = 0;
         Dqn_isize max_prototype_return_val = 0;
 
@@ -245,7 +245,7 @@ int main(int argc, char *argv[])
                     ptr++;
                 Dqn_isize comment_len = ptr - comment_start;
 
-                entry->comment.str = Dqn_MemArena_AllocateType<char>(&arena, comment_len);
+                entry->comment.str = Dqn_ArenaAllocator_AllocateType<char>(&arena, comment_len);
                 DQN_FOR_EACH(comment_index, comment_len)
                 {
                     // NOTE: We capture "// @", and we want to skip the @ symbol, its ugly which is at the index 3
@@ -272,8 +272,8 @@ int main(int argc, char *argv[])
                     return -1;
                 }
 
-                Dqn_isize copy_len        = copy_end - copy_start;
-                entry->copy_range.str = Dqn_MemArena_AllocateType<char>(&arena, copy_len);
+                Dqn_isize copy_len    = copy_end - copy_start;
+                entry->copy_range.str = Dqn_ArenaAllocator_AllocateType<char>(&arena, copy_len);
                 DQN_FOR_EACH(copy_index, copy_len)
                 {
                     char ch = copy_start[copy_index];

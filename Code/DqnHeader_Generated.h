@@ -217,9 +217,9 @@ enum struct Dqn_Allocator_Type
     Custom,
 };
 
-#define DQN_ALLOCATOR_ALLOCATE_PROC(name) void *name(Dqn_isize size, Dqn_u8 alignment)
-#define DQN_ALLOCATOR_REALLOC_PROC(name) void *name(void *old_ptr, Dqn_isize old_size, Dqn_isize new_size)
-#define DQN_ALLOCATOR_FREE_PROC(name) void name(void *ptr)
+#define DQN_ALLOCATOR_ALLOCATE_PROC(name) void *name(Dqn_isize size, Dqn_u8 alignment, void *user_context)
+#define DQN_ALLOCATOR_REALLOC_PROC(name) void *name(void *old_ptr, Dqn_isize old_size, Dqn_isize new_size, void *user_context)
+#define DQN_ALLOCATOR_FREE_PROC(name) void name(void *ptr, void *user_context)
 typedef DQN_ALLOCATOR_ALLOCATE_PROC(Dqn_Allocator_AllocateProc);
 typedef DQN_ALLOCATOR_REALLOC_PROC(Dqn_Allocator_ReallocProc);
 typedef DQN_ALLOCATOR_FREE_PROC(Dqn_Allocator_FreeProc);
@@ -228,8 +228,8 @@ struct Dqn_Allocator
     Dqn_Allocator_Type type;
     union
     {
-        void                *user;
-        struct Dqn_MemArena *arena;
+        void                      *user;
+        struct Dqn_ArenaAllocator *arena;
     } context;
 
     Dqn_isize bytes_allocated;
@@ -244,10 +244,10 @@ struct Dqn_Allocator
     Dqn_Allocator_FreeProc     *free;
 };
 
-Dqn_Allocator                              inline Dqn_Allocator_Null();
-Dqn_Allocator                              inline Dqn_Allocator_Heap();
-Dqn_Allocator                              inline Dqn_Allocator_XHeap();
-Dqn_Allocator                              inline Dqn_Allocator_Arena(Dqn_MemArena *arena);
+Dqn_Allocator                              inline Dqn_Allocator_InitWithNull();
+Dqn_Allocator                              inline Dqn_Allocator_InitWithHeap();
+Dqn_Allocator                              inline Dqn_Allocator_InitWithXHeap();
+Dqn_Allocator                              inline Dqn_Allocator_InitWithArena(Dqn_ArenaAllocator *arena);
 template <typename T> T *                  Dqn_Allocator_AllocateType(Dqn_Allocator *allocator, Dqn_isize num);
 // -------------------------------------------------------------------------------------------------
 //
@@ -263,52 +263,52 @@ struct Dqn_AllocateMetadata
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_MemArena
+// NOTE: Dqn_ArenaAllocator
 //
 // -------------------------------------------------------------------------------------------------
-struct Dqn_MemBlock
+struct Dqn_ArenaAllocatorBlock
 {
     void         *memory;
     Dqn_isize     size;
     Dqn_isize     used;
-    Dqn_MemBlock *prev;
-    Dqn_MemBlock *next;
+    Dqn_ArenaAllocatorBlock *prev;
+    Dqn_ArenaAllocatorBlock *next;
 };
 
 Dqn_usize const DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
-struct Dqn_MemArena
+struct Dqn_ArenaAllocator
 {
     // NOTE: Configuration (fill once after "Zero Initialisation {}")
     Dqn_isize     min_block_size;
     Dqn_Allocator allocator;
 
     // NOTE: Read Only
-    Dqn_MemBlock *curr_mem_block;
-    Dqn_MemBlock *top_mem_block;
+    Dqn_ArenaAllocatorBlock *curr_mem_block;
+    Dqn_ArenaAllocatorBlock *top_mem_block;
     Dqn_isize     highest_used_mark;
     int           total_allocated_mem_blocks;
 };
 
-struct Dqn_MemArenaRegion
+struct Dqn_ArenaAllocatorRegion
 {
-    Dqn_MemArena *arena;
-    Dqn_MemBlock *curr_mem_block;
+    Dqn_ArenaAllocator *arena;
+    Dqn_ArenaAllocatorBlock *curr_mem_block;
     Dqn_isize     curr_mem_block_used;
-    Dqn_MemBlock *top_mem_block;
+    Dqn_ArenaAllocatorBlock *top_mem_block;
 };
 
-struct Dqn_MemArenaScopedRegion
+struct Dqn_ArenaAllocatorScopedRegion
 {
-    Dqn_MemArenaScopedRegion(Dqn_MemArena *arena);
-    ~Dqn_MemArenaScopedRegion();
-    Dqn_MemArenaRegion region;
+    Dqn_ArenaAllocatorScopedRegion(Dqn_ArenaAllocator *arena);
+    ~Dqn_ArenaAllocatorScopedRegion();
+    Dqn_ArenaAllocatorRegion region;
 };
 
-void * Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_isize size, Dqn_u8 alignment);
-Dqn_b32 Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_isize size);
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_MemArena_AllocateType(Dqn_MemArena *arena, Dqn_isize num))
+void * Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment);
+Dqn_b32 Dqn_ArenaAllocator_Reserve(Dqn_ArenaAllocator *arena, Dqn_isize size);
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_ArenaAllocator_AllocateType(Dqn_ArenaAllocator *arena, Dqn_isize num))
 {
-    auto *result = DQN_CAST(T *)Dqn_MemArena_Allocate(arena, sizeof(T) * num, alignof(T));
+    auto *result = DQN_CAST(T *)Dqn_ArenaAllocator_Allocate(arena, sizeof(T) * num, alignof(T));
     return result;
 }
 
@@ -340,37 +340,36 @@ struct Dqn_String
 // NOTE: String Builder
 //
 // -------------------------------------------------------------------------------------------------
-struct Dqn_StringBuilderBuffer
+struct Dqn_StringBuilderBlock
 {
-    char                    *mem;
-    Dqn_isize                size;
-    Dqn_isize                used;
-    Dqn_StringBuilderBuffer *next;
+    char                   *mem;
+    Dqn_isize               size;
+    Dqn_isize               used;
+    Dqn_StringBuilderBlock *next;
 };
 
-Dqn_isize constexpr DQN_STRING_BUILDER_MIN_MEM_BUF_ALLOC_SIZE = DQN_KILOBYTES(4);
-template <Dqn_usize N = DQN_KILOBYTES(16)>
+Dqn_isize constexpr DQN_STRING_BUILDER_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
+template <Dqn_isize N = DQN_KILOBYTES(16)>
 struct Dqn_StringBuilder
 {
-    Dqn_Allocator            allocator;
-    char                     fixed_mem[N];
-    Dqn_isize                fixed_mem_used;
-    Dqn_StringBuilderBuffer *next_mem_buf;
-    Dqn_StringBuilderBuffer *last_mem_buf;
-    Dqn_isize                string_len;
+    Dqn_Allocator           allocator;
+    char                    fixed_mem[N];
+    Dqn_StringBuilderBlock  fixed_mem_block;
+    Dqn_StringBuilderBlock *last_mem_block;
 };
 
-// The necessary length to build the string, it returns the length including the null-terminator
-template <Dqn_usize N> Dqn_isize           Dqn_StringBuilder_BuildLen(Dqn_StringBuilder<N> const *builder);
-template <Dqn_usize N> void                Dqn_StringBuilder_BuildInBuffer(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size);
-template <Dqn_usize N> char *              Dqn_StringBuilder_Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len = nullptr);
-template <Dqn_usize N> Dqn_String          Dqn_StringBuilder_BuildString(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator);
-template <Dqn_usize N> void                Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va);
-template <Dqn_usize N> void                Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...);
-template <Dqn_usize N> void                Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1);
-template <Dqn_usize N> void                Dqn_StringBuilder_AppendString(Dqn_StringBuilder<N> *builder, Dqn_String const string);
-template <Dqn_usize N> void                Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch);
-template <Dqn_usize N> void                Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder);
+// size_required: The length of the string not including the null terminator.
+// The necessary length to build the string, it returns the length not including the null-terminator
+template <Dqn_isize N> Dqn_isize           Dqn_StringBuilder_BuildLength(Dqn_StringBuilder<N> const *builder);
+template <Dqn_isize N> void                Dqn_StringBuilder_BuildToDest(Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size);
+template <Dqn_isize N> char *              Dqn_StringBuilder_Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len = nullptr);
+template <Dqn_isize N> Dqn_String          Dqn_StringBuilder_BuildString(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator);
+template <Dqn_isize N> void                Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va);
+template <Dqn_isize N> void                Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...);
+template <Dqn_isize N> void                Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1);
+template <Dqn_isize N> void                Dqn_StringBuilder_AppendString(Dqn_StringBuilder<N> *builder, Dqn_String const string);
+template <Dqn_isize N> void                Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch);
+template <Dqn_isize N> void                Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Slices
@@ -465,6 +464,7 @@ struct Dqn_FixedString
 {
     union { char data[MAX_]; char str[MAX_]; char buf[MAX_]; };
     Dqn_isize len;
+    Dqn_isize max = MAX_;
 
     Dqn_FixedString()                            { data[0] = 0; len = 0; }
     Dqn_FixedString(char const *fmt, ...)
@@ -542,15 +542,15 @@ void *                                     Dqn_Allocator_Realloc(Dqn_Allocator *
 void                                       Dqn_Allocator_Free(Dqn_Allocator *allocator, void *ptr);
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_MemArena
+// NOTE: Dqn_ArenaAllocator
 //
 // -------------------------------------------------------------------------------------------------
-void *                                     Dqn_MemArena_Allocate(Dqn_MemArena *arena, Dqn_isize size, Dqn_u8 alignment);
-void                                       Dqn_MemArena_Free(Dqn_MemArena *arena);
-Dqn_b32                                    Dqn_MemArena_Reserve(Dqn_MemArena *arena, Dqn_isize size);
-Dqn_MemArena                               Dqn_MemArena_InitWithAllocator(Dqn_Allocator allocator, Dqn_isize size);
-Dqn_MemArena                               Dqn_MemArena_InitMemory(void *memory, Dqn_isize size);
-void                                       Dqn_MemArena_ResetUsage(Dqn_MemArena *arena, Dqn_ZeroMem zero_mem);
+void *                                     Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment);
+void                                       Dqn_ArenaAllocator_Free(Dqn_ArenaAllocator *arena);
+Dqn_b32                                    Dqn_ArenaAllocator_Reserve(Dqn_ArenaAllocator *arena, Dqn_isize size);
+Dqn_ArenaAllocator                         Dqn_ArenaAllocator_InitWithAllocator(Dqn_Allocator allocator, Dqn_isize size);
+Dqn_ArenaAllocator                         Dqn_ArenaAllocator_InitWithMemory(void *memory, Dqn_isize size);
+void                                       Dqn_ArenaAllocator_ResetUsage(Dqn_ArenaAllocator *arena, Dqn_ZeroMem zero_mem);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Asprintf (Allocate Sprintf)
@@ -613,8 +613,8 @@ Dqn_V4                                     operator*(Dqn_Mat4 const &mat, Dqn_V4
 // -------------------------------------------------------------------------------------------------
 void                                       Dqn_Bit_UnsetInplace(Dqn_u32 *flags, Dqn_u32 bitfield);
 void                                       Dqn_Bit_SetInplace(Dqn_u32 *flags, Dqn_u32 bitfield);
-Dqn_b32                                    Dqn_Bit_IsSet(Dqn_u32 flags, Dqn_u32 bitfield);
-Dqn_b32                                    Dqn_Bit_IsNotSet(Dqn_u32 flags, Dqn_u32 bitfield);
+Dqn_b32                                    Dqn_Bit_IsSet(Dqn_u32 bits, Dqn_u32 bits_to_set);
+Dqn_b32                                    Dqn_Bit_IsNotSet(Dqn_u32 bits, Dqn_u32 bits_to_check);
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Safe Arithmetic
