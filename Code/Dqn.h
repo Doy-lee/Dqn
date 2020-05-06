@@ -316,16 +316,16 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
             DQN_DEBUG_BREAK;                                                                                                   \
         }
 
-    #define DQN_IF_ASSERT(expr) DQN_IF_ASSERT_MSG(expr, "")
-    #define DQN_IF_ASSERT_MSG(expr, fmt, ...) \
-        DQN_ASSERT_MSG(expr, fmt, ## __VA_ARGS__); \
+    #define DQN_ASSERT_IF(expr) DQN_ASSERT_MSG_IF(expr, "")
+    #define DQN_ASSERT_MSG_IF(expr, fmt, ...) \
+        DQN_ASSERT_MSG(!(expr), fmt, ## __VA_ARGS__); \
         if (0)
 #else
     #define DQN_ASSERT(expr)
     #define DQN_ASSERT_MSG(expr, fmt, ...)
-    #define DQN_IF_ASSERT(expr) DQN_IF_ASSERT_MSG(expr, "")
-    #define DQN_IF_ASSERT_MSG(expr, fmt, ...) \
-        if (!(expr) && DQN_LOG_E("Soft assert: [" #expr "] " fmt, ## __VA_ARGS__))
+    #define DQN_ASSERT_IF(expr) DQN_ASSERT_MSG_IF(expr, "")
+    #define DQN_ASSERT_MSG_IF(expr, fmt, ...) \
+        if (expr && DQN_LOG_E("Assert if failure: [!" #expr "] " fmt, ## __VA_ARGS__))
 #endif
 
 #define DQN_SECONDS_TO_MS(val) ((val) * 1000.0f)
@@ -760,11 +760,11 @@ struct Dqn_ArenaAllocatorScopedRegion
     Dqn_ArenaAllocatorRegion region;
 };
 
-void * Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment);
+void * Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes);
 Dqn_b32 Dqn_ArenaAllocator_Reserve(Dqn_ArenaAllocator *arena, Dqn_isize size);
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_ArenaAllocator_AllocateType(Dqn_ArenaAllocator *arena, Dqn_isize num))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_ArenaAllocator_AllocateType(Dqn_ArenaAllocator *arena, Dqn_isize num, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
-    auto *result = DQN_CAST(T *)Dqn_ArenaAllocator_Allocate(arena, sizeof(T) * num, alignof(T));
+    auto *result = DQN_CAST(T *)Dqn_ArenaAllocator_Allocate(arena, sizeof(T) * num, alignof(T), zero_mem);
     return result;
 }
 
@@ -987,6 +987,13 @@ struct Dqn_Slice
     T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
     T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
 };
+
+template <typename T>
+Dqn_b32 operator==(Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs)
+{
+    Dqn_b32 result = lhs.len == rhs.len && lhs.data == rhs.data;
+    return result;
+}
 
 template <typename T, Dqn_isize N>
 DQN_HEADER_COPY_PROTOTYPE(inline Dqn_Slice<T>, Dqn_Slice_InitWithArray(T (&array)[N]))
@@ -1396,7 +1403,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize MAX_> Dqn_b32, Dqn_FixedString_App
     Dqn_isize space = MAX_ - str->len;
 
     Dqn_b32 result = true;
-    DQN_IF_ASSERT_MSG(len < space, "len: %jd, space: %jd", len, space)
+    DQN_ASSERT_MSG_IF(len >= space, "len: %jd, space: %jd", len, space)
     {
         len    = space;
         result = false;
@@ -1500,7 +1507,7 @@ DQN_HEADER_COPY_PROTOTYPE(void, Dqn_LogV(Dqn_LogType type, char const *file, Dqn
     fprintf(handle, "\n");
 }
 
-// @ return: This returns a boolean as a hack so you can combine it in if expressions. I use it for my IF_ASSERT macro
+// @ return: This returns a boolean as a hack so you can combine it in if expressions. I use it for my DQN_ASSERT_IF macro
 DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Log(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...))
 {
     va_list va;
@@ -1627,8 +1634,8 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
 
 DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator, void *old_ptr, Dqn_isize old_size, Dqn_isize new_size))
 {
-    DQN_IF_ASSERT(old_size >= 0) old_size = 0;
-    DQN_IF_ASSERT(new_size >= 0) new_size = 0;
+    DQN_ASSERT_IF(old_size < 0) old_size = 0;
+    DQN_ASSERT_IF(new_size < 0) new_size = 0;
     DQN_ASSERT(new_size > old_size);
 
     auto metadata             = Dqn_AllocateMetadata_Get(old_ptr);
@@ -1658,7 +1665,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Realloc(Dqn_Allocator *allocator
         case Dqn_Allocator_Type::Arena:
         {
             Dqn_ArenaAllocator *arena = allocator->context.arena;
-            result                    = Dqn_ArenaAllocator_Allocate(arena, new_size, metadata.alignment);
+            result                    = Dqn_ArenaAllocator_Allocate(arena, new_size, metadata.alignment, Dqn_ZeroMem::No);
             if (result) DQN_MEMCOPY(result, old_ptr, DQN_CAST(size_t) old_size);
         }
         break;
@@ -1764,7 +1771,7 @@ DQN_FILE_SCOPE void Dqn_ArenaAllocator__AttachBlock(Dqn_ArenaAllocator *arena, D
     }
 }
 
-DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment))
+DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem))
 {
     Dqn_isize allocation_size = Dqn_AllocateMetadata_SizeRequired(size, alignment);
     Dqn_b32 need_new_mem_block = true;
@@ -1792,6 +1799,8 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator
 
     arena->curr_mem_block->used += allocation_size;
     DQN_ASSERT(arena->curr_mem_block->used <= arena->curr_mem_block->size);
+
+    if (zero_mem == Dqn_ZeroMem::Yes) DQN_MEMSET(result, 0, size);
     return result;
 }
 
@@ -2649,6 +2658,8 @@ DQN_HEADER_COPY_PROTOTYPE(char *, Dqn_File_ReadAll(Dqn_Allocator *allocator, cha
 
     FILE *file_handle = fopen(file, "rb");
     if (!file_handle) return nullptr;
+    DQN_DEFER { fclose(file_handle); };
+
     fseek(file_handle, 0, SEEK_END);
     *file_size = ftell(file_handle);
     if (DQN_CAST(long)(*file_size) == -1L)
