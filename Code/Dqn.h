@@ -236,6 +236,11 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
     #define DQN_CALLOC(count, size) calloc(count, size)
 #endif
 
+#ifndef DQN_MALLOC
+    #include <stdlib.h>
+    #define DQN_MALLOC(size) malloc(size)
+#endif
+
 #ifndef DQN_REALLOC
     #include <stdlib.h>
     #define DQN_REALLOC(ptr, new_size) realloc(ptr, new_size)
@@ -259,6 +264,11 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #ifndef DQN_MEMSET
     #include <string.h>
     #define DQN_MEMSET(dest, value, count) memset(dest, value, count)
+#endif
+
+#ifndef DQN_MEMCMP
+    #include <string.h>
+    #define DQN_MEMCMP(ptr1, ptr2, num) memcmp(ptr1, ptr2, num)
 #endif
 
 // @ -------------------------------------------------------------------------------------------------
@@ -583,8 +593,10 @@ struct Dqn_Rect
 {
     Dqn_V2 min, max;
     Dqn_Rect() = default;
-    Dqn_Rect(Dqn_V2  min, Dqn_V2 max) : min(min), max(max) {}
+    Dqn_Rect(Dqn_V2  min, Dqn_V2 max)  : min(min), max(max) {}
     Dqn_Rect(Dqn_V2I min, Dqn_V2I max) : min(min), max(max) {}
+    Dqn_Rect(Dqn_f32 x, Dqn_f32 y, Dqn_f32 max_x, Dqn_f32 max_y) : min(x, y), max(max_x, max_y) {}
+    constexpr Dqn_b32 operator==(Dqn_Rect other) const { return (min == other.min) && (max == other.max); }
 };
 
 struct Dqn_RectI32
@@ -605,7 +617,7 @@ DQN_HEADER_COPY_END
 
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> int, Dqn_MemCmpType(T const *ptr1, T const *ptr2))
 {
-    int result = memcmp(ptr1, ptr2, sizeof(T));
+    int result = DQN_MEMCMP(ptr1, ptr2, sizeof(T));
     return result;
 }
 
@@ -694,10 +706,10 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_Allocator, inline Dqn_Allocator_InitWithArena(Dqn_
     return result;
 }
 
-void *Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment);
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_Allocator_AllocateType(Dqn_Allocator *allocator, Dqn_isize num))
+void *Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem);
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_Allocator_AllocateType(Dqn_Allocator *allocator, Dqn_isize num, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
-    auto *result = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, sizeof(T) * num, alignof(T));
+    auto *result = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, sizeof(T) * num, alignof(T), zero_mem);
     return result;
 }
 
@@ -760,7 +772,7 @@ struct Dqn_ArenaAllocatorScopedRegion
     Dqn_ArenaAllocatorRegion region;
 };
 
-void * Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes);
+void * Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem);
 Dqn_b32 Dqn_ArenaAllocator_Reserve(Dqn_ArenaAllocator *arena, Dqn_isize size);
 DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_ArenaAllocator_AllocateType(Dqn_ArenaAllocator *arena, Dqn_isize num, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
@@ -790,6 +802,13 @@ struct Dqn_String
     char       *begin()       { return str; }
     char       *end  ()       { return str + len; }
 };
+
+inline Dqn_b32 operator==(Dqn_String const &lhs, Dqn_String const &rhs)
+{
+    Dqn_b32 result = lhs.len == rhs.len && (DQN_MEMCMP(lhs.str, rhs.str, lhs.len) == 0);
+    return result;
+}
+
 #define DQN_STRING_LITERAL(string) {string, Dqn_CharCountI(string)}
 DQN_HEADER_COPY_END
 
@@ -1005,11 +1024,11 @@ DQN_HEADER_COPY_PROTOTYPE(inline Dqn_Slice<T>, Dqn_Slice_InitWithArray(T (&array
 }
 
 
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize len))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize len, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
     Dqn_Slice<T> result = {};
     result.len          = len;
-    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * len), alignof(T));
+    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * len), alignof(T), zero_mem);
     return result;
 }
 
@@ -1017,7 +1036,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_C
 {
     Dqn_Slice<T> result = {};
     result.len          = len;
-    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * len) + 1, alignof(T));
+    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * len) + 1, alignof(T), Dqn_ZeroMem::No);
     DQN_MEMCOPY(result.data, src, len * sizeof(T));
     result.buf[len] = 0;
     return result;
@@ -1033,7 +1052,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> inline Dqn_Slice<T>, Dqn_Slice_C
 {
     Dqn_Slice<T> result = {};
     result.len      = len;
-    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, sizeof(T) * len, alignof(T));
+    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, sizeof(T) * len, alignof(T), Dqn_ZeroMem::No);
     DQN_MEMCOPY(result.dat, src, len * sizeof(T));
     return result;
 }
@@ -1165,6 +1184,14 @@ DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Peek(DQN_FIXED_ARRAY_TEMPLATE_DECL
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
+DQN_HEADER_COPY_PROTOTYPE(T , Dqn_FixedArray_PeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a))
+{
+    DQN_ASSERT(a->len > 0);
+    T const *result = a->data + (a->len - 1);
+    return *result;
+}
+
+DQN_FIXED_ARRAY_TEMPLATE
 DQN_HEADER_COPY_PROTOTYPE(Dqn_isize, Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *entry))
 {
     Dqn_isize result = a->end() - entry;
@@ -1176,10 +1203,26 @@ DQN_HEADER_COPY_PROTOTYPE(T *, Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL
 {
     for (T &entry : (*a))
     {
-        if (IsEqual(&entry))
+        if (IsEqual(entry))
             return &entry;
     }
     return nullptr;
+}
+
+// @ return: True if the entry was found, false if not- the entry is made using Dqn_FixedArray_Make() in this case
+template <typename T, int MAX_, typename EqualityProc>
+DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_FixedArray_FindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, EqualityProc IsEqual))
+{
+    Dqn_b32 result = true;
+    T *search  = Dqn_FixedArray_Find(a, IsEqual);
+    if (!search)
+    {
+        result = false;
+        search = Dqn_FixedArray_Make(a, 1);
+    }
+
+    *entry = search;
+    return result;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
@@ -1234,9 +1277,9 @@ DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Array<T>, Dqn_Array_InitWith
     return result;
 }
 
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Array<T>, Dqn_Array_InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize len = 0))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> Dqn_Array<T>, Dqn_Array_InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize len = 0, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
-    T *memory           = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, sizeof(T) * max, alignof(T));
+    T *memory           = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, sizeof(T) * max, alignof(T), zero_mem);
     Dqn_Array<T> result = Dqn_Array_InitWithMemory(memory, max, len);
     return result;
 }
@@ -1589,7 +1632,7 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_isize, Dqn_AllocateMetadata_SizeRequired(Dqn_isize
 // @ NOTE: Dqn_Allocator
 // @
 // @ -------------------------------------------------------------------------------------------------
-DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment))
+DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
     Dqn_isize allocation_size = Dqn_AllocateMetadata_SizeRequired(size, alignment);
     char *result              = nullptr;
@@ -1601,7 +1644,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
         case Dqn_Allocator_Type::Heap:
         case Dqn_Allocator_Type::XHeap:
         {
-            void *ptr = DQN_CALLOC(1, DQN_CAST(size_t)allocation_size);
+            void *ptr = zero_mem == Dqn_ZeroMem::Yes ? DQN_CALLOC(1, DQN_CAST(size_t)allocation_size) : DQN_MALLOC(allocation_size);
             result    = Dqn_AllocateMetadata_Init(ptr, alignment);
             if (!result && allocator->type == Dqn_Allocator_Type::XHeap)
             {
@@ -1612,7 +1655,7 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_Allocator_Allocate(Dqn_Allocator *allocato
 
         case Dqn_Allocator_Type::Arena:
         {
-            result = DQN_CAST(char *)Dqn_ArenaAllocator_Allocate(allocator->context.arena, size, alignment);
+            result = DQN_CAST(char *)Dqn_ArenaAllocator_Allocate(allocator->context.arena, size, alignment, zero_mem);
         }
         break;
 
@@ -1731,7 +1774,7 @@ DQN_FILE_SCOPE Dqn_ArenaAllocatorBlock *Dqn_ArenaAllocator__AllocateBlock(Dqn_Ar
 
     Dqn_isize mem_block_size = DQN_MAX(min_block_size, requested_size);
     auto const allocate_size = DQN_CAST(Dqn_isize)(sizeof(*arena->curr_mem_block) + mem_block_size);
-    auto *result             = DQN_CAST(Dqn_ArenaAllocatorBlock *)Dqn_Allocator_Allocate(&arena->allocator, allocate_size, alignof(Dqn_ArenaAllocatorBlock));
+    auto *result             = DQN_CAST(Dqn_ArenaAllocatorBlock *)Dqn_Allocator_Allocate(&arena->allocator, allocate_size, alignof(Dqn_ArenaAllocatorBlock), Dqn_ZeroMem::No);
     if (!result) return result;
 
     *result        = {};
@@ -1771,7 +1814,7 @@ DQN_FILE_SCOPE void Dqn_ArenaAllocator__AttachBlock(Dqn_ArenaAllocator *arena, D
     }
 }
 
-DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem))
+DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
     Dqn_isize allocation_size = Dqn_AllocateMetadata_SizeRequired(size, alignment);
     Dqn_b32 need_new_mem_block = true;
@@ -1952,6 +1995,12 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_String, Dqn_Asprintf(Dqn_Allocator *allocator, cha
 DQN_HEADER_COPY_PROTOTYPE(Dqn_V2I, Dqn_V2_ToV2I(Dqn_V2 a))
 {
     Dqn_V2I result(static_cast<Dqn_i32>(a.x), static_cast<Dqn_i32>(a.y));
+    return result;
+}
+
+DQN_HEADER_COPY_PROTOTYPE(Dqn_V2, Dqn_V2_Min(Dqn_V2 a, Dqn_V2 b))
+{
+    Dqn_V2 result = Dqn_V2(DQN_MIN(a.x, b.x), DQN_MIN(a.y, b.y));
     return result;
 }
 
