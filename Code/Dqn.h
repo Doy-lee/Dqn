@@ -316,38 +316,32 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
     #define DQN_DEBUG_BREAK raise(SIGTRAP)
 #endif
 
-#define DQN_INVALID_CODE_PATH 0
-#if defined(DQN_ENABLE_ASSERTS)
-    #define DQN_ASSERT(expr) DQN_ASSERT_MSG(expr, "")
+#ifndef DQN_ASSERT_MSG
     #define DQN_ASSERT_MSG(expr, fmt, ...)                                                                                 \
         if (!(expr))                                                                                                       \
         {                                                                                                                  \
-            DQN_LOG_E("Assert: [" #expr "] " fmt, ##__VA_ARGS__);                                                          \
-            DQN_DEBUG_BREAK;                                                                                                   \
+            DQN_LOG_E("Assert: [" #expr "] " fmt, ##__VA_ARGS__);                                                 \
+            DQN_DEBUG_BREAK;                                                                                               \
         }
-
-    #define DQN_ASSERT_IF(expr) DQN_ASSERT_MSG_IF(expr, "")
-    #define DQN_ASSERT_MSG_IF(expr, fmt, ...) \
-        DQN_ASSERT_MSG(!(expr), fmt, ## __VA_ARGS__); \
-        if (0)
-#else
-    #define DQN_ASSERT(expr)
-    #define DQN_ASSERT_MSG(expr, fmt, ...)
-    #define DQN_ASSERT_IF(expr) DQN_ASSERT_MSG_IF(expr, "")
-    #define DQN_ASSERT_MSG_IF(expr, fmt, ...) \
-        if (expr && DQN_LOG_E("Assert if failure: [!" #expr "] " fmt, ## __VA_ARGS__))
 #endif
 
-#define DQN_SECONDS_TO_MS(val) ((val) * 1000.0f)
+#define DQN_ASSERT(expr) DQN_ASSERT_MSG(expr, "")
+#define DQN_ASSERT_IF(expr) DQN_ASSERT_MSG_IF(expr, "")
+#define DQN_ASSERT_MSG_IF(expr, fmt, ...) \
+    DQN_ASSERT_MSG(!(expr), fmt, ## __VA_ARGS__); \
+    if (0)
 
+#define DQN_INVALID_CODE_PATH 0
+#define DQN_SECONDS_TO_MS(val) ((val) * 1000.0f)
 #define DQN_MATH_PI 3.14159265359f
 #define DQN_DEGREE_TO_RADIAN(val) (val) * (DQN_MATH_PI / 180.0f)
 
 #define DQN_FILE_SCOPE    static
 #define DQN_LOCAL_PERSIST static
 
-using Dqn_usize = size_t;
-using Dqn_isize = ptrdiff_t;
+using Dqn_uintptr = uintptr_t;
+using Dqn_usize   = size_t;
+using Dqn_isize   = ptrdiff_t;
 
 using Dqn_f64  = double;
 using Dqn_f32  = float;
@@ -371,6 +365,7 @@ const Dqn_u32 DQN_U32_MAX     = UINT32_MAX;
 const Dqn_f32 DQN_F32_MAX     = FLT_MAX;
 const Dqn_isize DQN_ISIZE_MAX = PTRDIFF_MAX;
 const Dqn_usize DQN_USIZE_MAX = SIZE_MAX;
+
 
 template <typename T, Dqn_isize N>
 DQN_HEADER_COPY_PROTOTYPE(constexpr Dqn_usize, Dqn_ArrayCount(T const (&)[N])) { return N; }
@@ -400,7 +395,7 @@ struct DqnDeferHelper
 
 #define DQN_TOKEN_COMBINE2(x, y) x ## y
 #define DQN_TOKEN_COMBINE(x, y) DQN_TOKEN_COMBINE2(x, y)
-#define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __COUNTER__)
+#define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
 #define DQN_DEFER const auto DQN_UNIQUE_NAME(defer_lambda_) = DqnDeferHelper() + [&]()
 
 enum struct Dqn_ZeroMem { No, Yes };
@@ -774,7 +769,7 @@ struct Dqn_ArenaAllocatorScopedRegion
 
 void * Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem);
 Dqn_b32 Dqn_ArenaAllocator_Reserve(Dqn_ArenaAllocator *arena, Dqn_isize size);
-DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_ArenaAllocator_AllocateType(Dqn_ArenaAllocator *arena, Dqn_isize num, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
+DQN_HEADER_COPY_PROTOTYPE(template <typename T> T *, Dqn_ArenaAllocator_AllocateType(Dqn_ArenaAllocator *arena, Dqn_isize num = 1, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
     auto *result = DQN_CAST(T *)Dqn_ArenaAllocator_Allocate(arena, sizeof(T) * num, alignof(T), zero_mem);
     return result;
@@ -865,7 +860,7 @@ template <Dqn_isize N> DQN_FILE_SCOPE char *Dqn_StringBuilder_AllocateWriteBuffe
         if (!block) return nullptr;
 
         *block                        = {};
-        block->mem                    = DQN_CAST(char *)Dqn_Allocator_Allocate(&builder->allocator, allocation_size, alignof(char));
+        block->mem                    = DQN_CAST(char *)Dqn_Allocator_Allocate(&builder->allocator, allocation_size, alignof(char), Dqn_ZeroMem::No);
         block->size                   = allocation_size;
         builder->last_mem_block->next = block;
         builder->last_mem_block       = builder->last_mem_block->next;
@@ -917,7 +912,7 @@ DQN_HEADER_COPY_PROTOTYPE(template <Dqn_isize N> char *, Dqn_StringBuilder_Build
     Dqn_isize len_ = 0;
     if (!len) len = &len_;
     *len = Dqn_StringBuilder_BuildLength(builder);
-    auto *result  = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, *len + 1, alignof(char));
+    auto *result  = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, *len + 1, alignof(char), Dqn_ZeroMem::No);
     Dqn_StringBuilder_BuildToDest(builder, result, *len + 1);
     return result;
 }
@@ -1383,7 +1378,7 @@ struct Dqn_FixedString
     Dqn_isize len;
     Dqn_isize max = MAX_;
 
-    Dqn_FixedString()                            { data[0] = 0; len = 0; }
+    Dqn_FixedString() { data[0] = 0; len = 0; }
     Dqn_FixedString(char const *fmt, ...)
     {
         *this = {};
@@ -1559,6 +1554,42 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Log(Dqn_LogType type, char const *file, D
     va_end(va);
     return true;
 }
+
+// @ -------------------------------------------------------------------------------------------------
+// @
+// @ NOTE: Dqn_Align*
+// @
+// @ -------------------------------------------------------------------------------------------------
+DQN_HEADER_COPY_PROTOTYPE(Dqn_uintptr, Dqn_AlignAddress(Dqn_uintptr address, Dqn_u8 alignment))
+{
+    Dqn_uintptr result = address;
+    if (alignment > 0)
+    {
+        Dqn_uintptr remainder = result % alignment;
+        if (remainder > 0)
+        {
+            Dqn_uintptr offset_to_align = alignment - remainder;
+            result += offset_to_align;
+        }
+    }
+    return result;
+}
+
+// @ NOTE: Even if pointer is aligned, align it again, ensuring there's at minimum
+// @ 1 byte and at most alignment bytes of space between the aligned pointer and
+// @ raw pointer. We do this to keep metadata exactly 1 byte behind the aligned
+// @ pointer.
+DQN_HEADER_COPY_PROTOTYPE(Dqn_uintptr, Dqn_AlignAddressEnsuringSpace(Dqn_uintptr address, Dqn_u8 alignment))
+{
+    Dqn_uintptr remainder       = address % alignment;
+    Dqn_uintptr offset_to_align = alignment - remainder;
+    Dqn_uintptr result          = address + offset_to_align;
+    DQN_ASSERT(result % alignment == 0);
+    DQN_ASSERT(result >= address);
+    DQN_ASSERT(offset_to_align >= 1 && offset_to_align <= alignment);
+    return result;
+}
+
 
 // @ -------------------------------------------------------------------------------------------------
 // @
@@ -1816,7 +1847,7 @@ DQN_FILE_SCOPE void Dqn_ArenaAllocator__AttachBlock(Dqn_ArenaAllocator *arena, D
 
 DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes))
 {
-    Dqn_isize allocation_size = Dqn_AllocateMetadata_SizeRequired(size, alignment);
+    Dqn_isize allocation_size  = size + (alignment - 1);
     Dqn_b32 need_new_mem_block = true;
     for (Dqn_ArenaAllocatorBlock *mem_block = arena->curr_mem_block; mem_block; mem_block = mem_block->next)
     {
@@ -1837,13 +1868,12 @@ DQN_HEADER_COPY_PROTOTYPE(void *, Dqn_ArenaAllocator_Allocate(Dqn_ArenaAllocator
         arena->curr_mem_block = arena->top_mem_block;
     }
 
-    char *ptr    = DQN_CAST(char *) arena->curr_mem_block->memory + arena->curr_mem_block->used;
-    char *result = Dqn_AllocateMetadata_Init(ptr, alignment);
+    Dqn_uintptr address = DQN_CAST(Dqn_uintptr) arena->curr_mem_block->memory + arena->curr_mem_block->used;
+    void *result        = DQN_CAST(void *) Dqn_AlignAddress(address, alignment);
 
     arena->curr_mem_block->used += allocation_size;
     DQN_ASSERT(arena->curr_mem_block->used <= arena->curr_mem_block->size);
-
-    if (zero_mem == Dqn_ZeroMem::Yes) DQN_MEMSET(result, 0, size);
+    if (zero_mem == Dqn_ZeroMem::Yes) DQN_MEMSET(DQN_CAST(void *)address, 0, allocation_size);
     return result;
 }
 
@@ -2106,24 +2136,24 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_Rect, Dqn_Rect_Move(Dqn_Rect src, Dqn_V2 move_amou
     return result;
 }
 
+DQN_HEADER_COPY_PROTOTYPE(Dqn_b32, Dqn_Rect_Intersects(Dqn_Rect a, Dqn_Rect b))
+{
+    Dqn_b32 result = (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+                     (a.min.y <= b.max.y && a.max.y >= b.min.y);
+    return result;
+}
+
 DQN_HEADER_COPY_PROTOTYPE(Dqn_Rect, Dqn_Rect_Intersection(Dqn_Rect a, Dqn_Rect b))
 {
     Dqn_Rect result  = {};
-    if      (a.min.x >= b.min.x && a.min.x <= b.max.x) result.min.x = a.min.x;
-    else if (b.min.x >= a.min.x && b.min.x <= a.max.x) result.min.x = b.min.x;
-    else
+    if (Dqn_Rect_Intersects(a, b))
     {
-        return result;
+        result.min.x = DQN_MAX(a.min.x, b.min.x);
+        result.min.y = DQN_MAX(a.min.y, b.min.y);
+        result.max.x = DQN_MIN(a.max.x, b.max.x);
+        result.max.y = DQN_MIN(a.max.y, b.max.y);
     }
 
-    if      (a.max.x >= b.min.x && a.max.x <= b.max.x) result.max.x = a.max.x;
-    else if (b.max.x >= a.min.x && b.max.x <= a.max.x) result.max.x = b.max.x;
-
-    if      (a.min.y >= b.min.y && a.min.y <= b.max.y) result.min.y = a.min.y;
-    else if (b.min.y >= a.min.y && b.min.y <= a.max.y) result.min.y = b.min.y;
-
-    if      (a.max.y >= b.min.y && a.max.y <= b.max.y) result.max.y = a.max.y;
-    else if (b.max.y >= a.min.y && b.max.y <= a.max.y) result.max.y = b.max.y;
     return result;
 }
 
