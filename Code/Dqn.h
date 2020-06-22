@@ -748,8 +748,10 @@ struct Dqn_ArenaAllocator
     // NOTE: Read Only
     Dqn_ArenaAllocatorBlock *curr_mem_block;
     Dqn_ArenaAllocatorBlock *top_mem_block;
-    Dqn_isize     highest_used_mark;
-    int           total_allocated_mem_blocks;
+    Dqn_isize                highest_used_mark;
+    int                      total_allocated_mem_blocks;
+    Dqn_isize                usage_before_last_reset;
+    Dqn_isize                wastage_before_last_reset;
 };
 
 struct Dqn_ArenaAllocatorRegion
@@ -1087,7 +1089,6 @@ DQN_HEADER_COPY_BEGIN
 DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
 {
     T               data[MAX_];
-    Dqn_isize       max = MAX_;
     Dqn_isize       len;
 
     T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= len, "%jd >= 0 && %jd < %jd", i, len); return  data[i]; }
@@ -1103,9 +1104,9 @@ DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
 DQN_HEADER_COPY_END
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_HEADER_COPY_PROTOTYPE(int, Dqn_FixedArray_Capacity(DQN_FIXED_ARRAY_TEMPLATE_DECL *))
+DQN_HEADER_COPY_PROTOTYPE(Dqn_isize, Dqn_FixedArray_Max(DQN_FIXED_ARRAY_TEMPLATE_DECL const *))
 {
-    int result = MAX_;
+    Dqn_isize result = MAX_;
     return result;
 }
 
@@ -1932,12 +1933,19 @@ DQN_HEADER_COPY_PROTOTYPE(Dqn_ArenaAllocator, Dqn_ArenaAllocator_InitWithMemory(
 
 DQN_HEADER_COPY_PROTOTYPE(void, Dqn_ArenaAllocator_ResetUsage(Dqn_ArenaAllocator *arena, Dqn_ZeroMem zero_mem))
 {
+    arena->usage_before_last_reset   = 0;
+    arena->wastage_before_last_reset = 0;
     for (Dqn_ArenaAllocatorBlock *block = arena->top_mem_block; block; block = block->prev)
     {
+        arena->usage_before_last_reset += block->used;
+        if (block->prev)
+            arena->wastage_before_last_reset += (block->size - block->used);
+        else
+            arena->curr_mem_block = block;
+
         if (zero_mem == Dqn_ZeroMem::Yes)
             DQN_MEMSET(block->memory, 0, DQN_CAST(size_t)block->used);
         block->used = 0;
-        if (!block->prev) arena->curr_mem_block = block;
     }
 }
 
