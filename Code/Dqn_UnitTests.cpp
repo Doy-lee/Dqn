@@ -1,4 +1,5 @@
 #define DQN_USE_PRIMITIVE_TYPEDEFS
+#define DQN_NO_ASSERT
 #define DQN_IMPLEMENTATION
 #include "Dqn.h"
 
@@ -13,11 +14,11 @@ struct TestState
 
 struct TestingState
 {
-    int           num_tests_in_group;
-    int           num_tests_ok_in_group;
-    TestState     test;
-    Dqn_ArenaAllocator  arena_;
-    Dqn_Allocator allocator;
+    int                num_tests_in_group;
+    int                num_tests_ok_in_group;
+    TestState          test;
+    Dqn_ArenaAllocator arena_;
+    Dqn_Allocator      allocator;
 };
 
 #define ANSI_COLOR_RED "\x1b[31m"
@@ -106,7 +107,7 @@ void TestState_PrintResult(TestState const *result)
     }
 }
 
-DQN_FILE_SCOPE void UnitTests()
+static void UnitTests()
 {
     TestingState testing_state = {};
     // ---------------------------------------------------------------------------------------------
@@ -141,7 +142,7 @@ DQN_FILE_SCOPE void UnitTests()
 
             {
                 TEST_START_SCOPE(testing_state, "ArenaAllocator - Allocate Small");
-                Dqn_ArenaAllocator arena      = {};
+                Dqn_ArenaAllocator arena = {};
                 arena.allocator         = Dqn_Allocator_InitWithHeap();
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithArena(&arena);
                 char constexpr EXPECT[] = "hello_world";
@@ -154,10 +155,10 @@ DQN_FILE_SCOPE void UnitTests()
 
         // NOTE: Alignment Test
         {
-            Dqn_u8 const ALIGNMENT3 = 3;
+            Dqn_u8 const ALIGNMENT3 = 4;
             Dqn_u8 const NUM_BYTES  = sizeof(Dqn_u32);
             {
-                TEST_START_SCOPE(testing_state, "HeapAllocator - Align to 3 bytes");
+                TEST_START_SCOPE(testing_state, "HeapAllocator - Align to 32 bytes");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
                 auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
@@ -166,7 +167,7 @@ DQN_FILE_SCOPE void UnitTests()
             }
 
             {
-                TEST_START_SCOPE(testing_state, "XHeapAllocator - Align to 3 bytes");
+                TEST_START_SCOPE(testing_state, "XHeapAllocator - Align to 32 bytes");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithXHeap();
                 auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
@@ -175,7 +176,7 @@ DQN_FILE_SCOPE void UnitTests()
             }
 
             {
-                TEST_START_SCOPE(testing_state, "ArenaAllocator - Align to 3 bytes");
+                TEST_START_SCOPE(testing_state, "ArenaAllocator - Align to 32 bytes");
                 Dqn_ArenaAllocator arena      = {};
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithArena(&arena);
                 auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
@@ -184,17 +185,17 @@ DQN_FILE_SCOPE void UnitTests()
             }
         }
 
-        // NOTE: Dqn_AllocateMetadata tests
+        // NOTE: Dqn_PointerMetadata tests
         {
-            Dqn_u8 const ALIGNMENT3 = 3;
+            Dqn_u8 const ALIGNMENT3 = 4;
             Dqn_u8 const NUM_BYTES  = 4;
-            Dqn_u8 const MAX_OFFSET = (ALIGNMENT3 - 1) + sizeof(Dqn_AllocateMetadata);
+            Dqn_u8 const MAX_OFFSET = (ALIGNMENT3 - 1) + sizeof(Dqn_PointerMetadata);
             {
                 TEST_START_SCOPE(testing_state, "HeapAllocator - Allocation metadata initialised");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
                 char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-                Dqn_AllocateMetadata metadata = Dqn_AllocateMetadata_Get(buf);
+                Dqn_PointerMetadata metadata = Dqn_PointerMetadata_Get(buf);
                 TEST_EXPECT_MSG(testing_state, metadata.alignment == ALIGNMENT3, "metadata.alignment: %u, ALIGNMENT3: %u", metadata.alignment, ALIGNMENT3);
                 TEST_EXPECT_MSG(testing_state, metadata.offset <= MAX_OFFSET, "metadata.offset: %u, MAX_OFFSET: %u", metadata.offset, MAX_OFFSET);
             }
@@ -204,18 +205,7 @@ DQN_FILE_SCOPE void UnitTests()
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithXHeap();
                 char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-                Dqn_AllocateMetadata metadata = Dqn_AllocateMetadata_Get(buf);
-                TEST_EXPECT_MSG(testing_state, metadata.alignment == ALIGNMENT3, "metadata.alignment: %u, ALIGNMENT3: %u", metadata.alignment, ALIGNMENT3);
-                TEST_EXPECT_MSG(testing_state, metadata.offset <= MAX_OFFSET, "metadata.offset: %u, MAX_OFFSET: %u", metadata.offset, MAX_OFFSET);
-            }
-
-            {
-                TEST_START_SCOPE(testing_state, "ArenaAllocator - Allocation metadata initialised");
-                Dqn_ArenaAllocator arena      = {};
-                Dqn_Allocator allocator = Dqn_Allocator_InitWithArena(&arena);
-                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
-                DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-                Dqn_AllocateMetadata metadata = Dqn_AllocateMetadata_Get(buf);
+                Dqn_PointerMetadata metadata = Dqn_PointerMetadata_Get(buf);
                 TEST_EXPECT_MSG(testing_state, metadata.alignment == ALIGNMENT3, "metadata.alignment: %u, ALIGNMENT3: %u", metadata.alignment, ALIGNMENT3);
                 TEST_EXPECT_MSG(testing_state, metadata.offset <= MAX_OFFSET, "metadata.offset: %u, MAX_OFFSET: %u", metadata.offset, MAX_OFFSET);
             }
