@@ -10,8 +10,8 @@
 // #define DQN_ALLOCATOR_DEFAULT_TO_NULL
 //
 // If defined, 0 initialising an allocator uses the null allocator (i.e. crashes
-// when allocating). It forces the user to specify explicitly which allocator
-// to use, for example.
+// when allocating). It forces the user to specify explicitly which allocator to
+// use, for example.
 //
 // Dqn_Allocator allocator = {};
 // allocator.type = Dqn_AllocatorType::Heap;
@@ -20,13 +20,40 @@
 //
 // Dqn_Allocator allocator = Dqn_AllocatorHeap()
 //
-// Otherwise if not defined, Dqn_Allocator allocator = {}; will by default use malloc, realloc, free
+// Otherwise if not defined, Dqn_Allocator allocator = {}; will by default use
+// malloc, realloc, free
 //
+// -------------------------------------------------------------------------------------------------
+//
+// Library Config
+//
+// -------------------------------------------------------------------------------------------------
+// Dqn library logs errors and outputs through Dqn_Log(...). This is
+// customisable by updating the function ptr the logging routine is called
+// through. Currently it is set in the global variable `dqn_log`, i.e.
+//
+// Dqn_LogProc *dqn_log = Dqn_Log;
+//
+// Set dqn_log to your own routine to override the default library logging
+// routine.
 
 #if !defined(DQN_H)
 #define DQN_H
 
+// -------------------------------------------------------------------------------------------------
+//
+// Compiler
+//
+// -------------------------------------------------------------------------------------------------
 #if defined(_MSC_VER)
+    #define DQN_COMPILER_MSVC
+#elif defined(__clang__)
+    #define DQN_COMPILER_CLANG
+#elif defined(__GNUC__)
+    #define DQN_COMPILER_GCC
+#endif
+
+#if defined(DQN_COMPILER_MSVC)
     #if defined(_CRT_SECURE_NO_WARNINGS)
         #define DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED
     #else
@@ -80,18 +107,9 @@
     #define DQN_SQRTF(val) sqrtf(val)
 #endif
 
-
-// -------------------------------------------------------------------------------------------------
-//
-// Compiler
-//
-// -------------------------------------------------------------------------------------------------
-#if defined(_MSC_VER)
-    #define DQN_COMPILER_MSVC
-#elif defined(__clang__)
-    #define DQN_COMPILER_CLANG
-#elif defined(__GNUC__)
-    #define DQN_COMPILER_GCC
+#if !defined(DQN_STRLEN)
+    #include <string.h>
+    #define DQN_STRLEN(str) strlen(str)
 #endif
 
 // -------------------------------------------------------------------------------------------------
@@ -474,31 +492,20 @@ enum struct Dqn_LogType { X_MACRO };
 
 #define X_ENTRY(enum_val, string) string,
 char const *Dqn_LogTypeString[] = { X_MACRO };
+#undef X_ENTRY
 #undef X_MACRO
 
-#define DQN_LOG_E(fmt, ...) dqn_core.Log(Dqn_LogType::Error,   DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_D(fmt, ...) dqn_core.Log(Dqn_LogType::Debug,   DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_W(fmt, ...) dqn_core.Log(Dqn_LogType::Warning, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_I(fmt, ...) dqn_core.Log(Dqn_LogType::Info,    DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_M(fmt, ...) dqn_core.Log(Dqn_LogType::Memory,  DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG(log_type, fmt, ...) dqn_core.Log(log_type,     DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_E(fmt, ...) dqn_log(Dqn_LogType::Error,   DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_D(fmt, ...) dqn_log(Dqn_LogType::Debug,   DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_W(fmt, ...) dqn_log(Dqn_LogType::Warning, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_I(fmt, ...) dqn_log(Dqn_LogType::Info,    DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_M(fmt, ...) dqn_log(Dqn_LogType::Memory,  DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG(log_type, fmt, ...) dqn_log(log_type,     DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 
-#define DQN_LOG_PROC(name) void name(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...)
-typedef DQN_LOG_PROC(Dqn_LogProc);
-
-DQN_API void Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
-DQN_API DQN_LOG_PROC(Dqn_Log);
-
-// -------------------------------------------------------------------------------------------------
-//
-// Core Config
-//
-// -------------------------------------------------------------------------------------------------
-struct Dqn_Core
-{
-    Dqn_LogProc *Log;
-};
-extern Dqn_Core dqn_core;
+DQN_API void Dqn_LogV   (Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
+DQN_API void Dqn_Log    (Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
+typedef void Dqn_LogProc(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
+extern Dqn_LogProc *dqn_log;
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -904,6 +911,7 @@ DQN_API char    Dqn_Char_ToLower     (char ch);
 // NOTE: String
 //
 // -------------------------------------------------------------------------------------------------
+#define DQN_STRING_LITERAL(string) {string, Dqn_CharCountI(string)}
 struct Dqn_String
 {
     union {
@@ -913,28 +921,29 @@ struct Dqn_String
         char *str;
     };
 
-    Dqn_isize   len;
+    Dqn_isize   size;
     char const *begin() const { return str; }
-    char const *end  () const { return str + len; }
+    char const *end  () const { return str + size; }
     char       *begin()       { return str; }
-    char       *end  ()       { return str + len; }
+    char       *end  ()       { return str + size; }
 };
 
 DQN_API Dqn_b32    Dqn_String_Compare               (Dqn_String const lhs, Dqn_String const rhs);
 DQN_API Dqn_b32    Dqn_String_CompareCaseInsensitive(Dqn_String const lhs, Dqn_String const rhs);
-DQN_API Dqn_String Dqn_String_Copy                  (Dqn_Allocator *allocator, Dqn_String const src);
+
+// allocator: (Optional) When null, the string is allocated with DQN_MALLOC, result should be freed with DQN_FREE.
+DQN_API Dqn_String Dqn_String_Copy                  (Dqn_String const src, Dqn_Allocator *allocator);
 DQN_API Dqn_String Dqn_String_TrimWhitespaceAround  (Dqn_String src);
 DQN_API Dqn_b32    operator==                       (Dqn_String const &lhs, Dqn_String const &rhs);
-#define DQN_STRING_LITERAL(string) {string, Dqn_CharCountI(string)}
 
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_Asprintf (Allocate Sprintf)
-//
-// -------------------------------------------------------------------------------------------------
-// return: The allocated string. If allocation fails, the str returned is nullptr and length is set o the size required, NOT INCLUDING the null terminator.
-DQN_API Dqn_String Dqn_Asprintf(Dqn_Allocator *allocator, char const *fmt, va_list va);
-DQN_API Dqn_String Dqn_Asprintf(Dqn_Allocator *allocator, char const *fmt, ...);
+// return: The allocated string. When allocation fails, str returned is nullptr, size is set to the length required NOT INCLUDING the null terminator.
+//         i.e. the required buffer length for generating the string is (result.size + 1).
+DQN_API Dqn_String Dqn_String_FmtV                  (Dqn_Allocator *allocator, char const *fmt, va_list va);
+DQN_API Dqn_String Dqn_String_FmtF                  (Dqn_Allocator *allocator, char const *fmt, ...);
+
+// Free a string allocated with `Dqn_String_Copy`, `Dqn_String_FmtV` `Dqn_String_FmtF`
+// allocator: The same allocator specified when `Dqn_String_Copy` was called.
+DQN_API void       Dqn_String_Free                  (Dqn_String *string, Dqn_Allocator *allocator);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -966,7 +975,11 @@ DQN_API Dqn_i64     Dqn_Str_ToI64                      (char const *buf, int len
 // NOTE: Dqn_File
 //
 // -------------------------------------------------------------------------------------------------
-DQN_API char *Dqn_File_ReadAll(Dqn_Allocator *allocator, char const *file, Dqn_isize *file_size);
+// file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
+// allocator: (Optional) When null, the buffer is allocated with DQN_MALLOC, result should be freed with DQN_FREE.
+// return: nullptr if allocation failed.
+DQN_API char   *Dqn_File_ReadEntireFile (char const *file, Dqn_isize *file_size, Dqn_Allocator *allocator);
+DQN_API Dqn_b32 Dqn_File_WriteEntireFile(char const *file, char const *buffer, Dqn_isize buffer_size);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1100,12 +1113,12 @@ template <Dqn_isize N>
 Dqn_String Dqn_StringBuilder_BuildString(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator)
 {
     Dqn_String result = {};
-    result.str        = Dqn_StringBuilder_Build(builder, allocator, &result.len);
+    result.str        = Dqn_StringBuilder_Build(builder, allocator, &result.size);
     return result;
 }
 
 template <Dqn_isize N>
-void Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va)
+void Dqn_StringBuilder_AppendFmtV(Dqn_StringBuilder<N> *builder, char const *fmt, va_list va)
 {
     if (!fmt) return;
     va_list va2;
@@ -1120,11 +1133,11 @@ void Dqn_StringBuilder_VFmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt
 }
 
 template <Dqn_isize N>
-void Dqn_StringBuilder_FmtAppend(Dqn_StringBuilder<N> *builder, char const *fmt, ...)
+void Dqn_StringBuilder_AppendFmtF(Dqn_StringBuilder<N> *builder, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    Dqn_StringBuilder_VFmtAppend(builder, fmt, va);
+    Dqn_StringBuilder_AppendFmtV(builder, fmt, va);
     va_end(va);
 }
 
@@ -1176,22 +1189,22 @@ template <typename T>
 struct Dqn_Slice
 {
     T        *data;
-    Dqn_isize len;
+    Dqn_isize size;
 
-    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
-    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
+    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
+    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
     T const *begin      ()            const { return data; }
-    T const *end        ()            const { return data + len; }
+    T const *end        ()            const { return data + size; }
     T       *begin      ()                  { return data; }
-    T       *end        ()                  { return data + len; }
-    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
-    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
+    T       *end        ()                  { return data + size; }
+    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
+    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
 };
 
 template <typename T>
 Dqn_b32 operator==(Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs)
 {
-    Dqn_b32 result = lhs.len == rhs.len && lhs.data == rhs.data;
+    Dqn_b32 result = lhs.size == rhs.size && lhs.data == rhs.data;
     return result;
 }
 
@@ -1199,56 +1212,55 @@ template <typename T, Dqn_isize N>
 inline Dqn_Slice<T> Dqn_Slice_InitWithArray(T (&array)[N])
 {
     Dqn_Slice<T> result = {};
-    result.len          = N;
+    result.size         = N;
     result.data         = array;
     return result;
 }
 
-
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize len, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes)
+template <typename T> inline Dqn_Slice<T> Dqn_Slice_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes)
 {
     Dqn_Slice<T> result = {};
-    result.len          = len;
-    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * len), alignof(T), zero_mem);
+    result.size         = size;
+    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * size), alignof(T), zero_mem);
     return result;
 }
 
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize len)
+template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
 {
     Dqn_Slice<T> result = {};
-    result.len          = len;
-    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * len) + 1, alignof(T), Dqn_ZeroMem::No);
-    DQN_MEMCOPY(result.data, src, len * sizeof(T));
-    result.buf[len] = 0;
+    result.size         = size;
+    result.data = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * size) + 1, alignof(T), Dqn_ZeroMem::No);
+    DQN_MEMCOPY(result.data, src, size * sizeof(T));
+    result.buf[size] = 0;
     return result;
 }
 
 template <typename T> inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
 {
-    Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(allocator, src.data, src.len);
+    Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(allocator, src.data, src.size);
     return result;
 }
 
-template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize len)
+template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
 {
     Dqn_Slice<T> result = {};
-    result.len      = len;
-    result.data         = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, sizeof(T) * len, alignof(T), Dqn_ZeroMem::No);
-    DQN_MEMCOPY(result.dat, src, len * sizeof(T));
+    result.size         = size;
+    result.data = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, sizeof(T) * size, alignof(T), Dqn_ZeroMem::No);
+    DQN_MEMCOPY(result.dat, src, size * sizeof(T));
     return result;
 }
 
 template <typename T> inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
 {
-    Dqn_Slice<T> result = Dqn_Slice_Copy(allocator, src.data, src.len);
+    Dqn_Slice<T> result = Dqn_Slice_Copy(allocator, src.data, src.size);
     return result;
 }
 
 template <typename T> inline bool Dqn_Slice_Equals(Dqn_Slice<T> const a, Dqn_Slice<T> const b)
 {
     bool result = false;
-    if (a.len != b.len) return result;
-    result = (memcmp(a.data, b.data, a.len) == 0);
+    if (a.size != b.size) return result;
+    result = (memcmp(a.data, b.data, a.size) == 0);
     return result;
 }
 
@@ -1258,32 +1270,31 @@ template <typename T> inline bool Dqn_Slice_Equals(Dqn_Slice<T> const a, Dqn_Sli
 //
 // -------------------------------------------------------------------------------------------------
 
-template <typename T> void Dqn__EraseStableFromCArray(T *array, Dqn_isize len, Dqn_isize max, Dqn_isize index)
+template <typename T> void Dqn__EraseStableFromCArray(T *array, Dqn_isize size, Dqn_isize max, Dqn_isize index)
 {
-    DQN_ASSERT(index >= 0 && index < len);
-    DQN_ASSERT(len <= max); (void)max;
-    Dqn_isize next_index    = DQN_MIN(index + 1, len);
-    Dqn_usize bytes_to_copy = (len - next_index) * sizeof(T);
+    DQN_ASSERT(index >= 0 && index < size);
+    DQN_ASSERT(size <= max); (void)max;
+    Dqn_isize next_index    = DQN_MIN(index + 1, size);
+    Dqn_usize bytes_to_copy = (size - next_index) * sizeof(T);
     memmove(array + index, array + next_index, bytes_to_copy);
 }
-
 
 #define DQN_FIXED_ARRAY_TEMPLATE template <typename T, int MAX_>
 #define DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray<T, MAX_>
 DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
 {
     T               data[MAX_];
-    Dqn_isize       len;
+    Dqn_isize       size;
 
-    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= len, "%jd >= 0 && %jd < %jd", i, len); return  data[i]; }
+    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return  data[i]; }
     T       *begin      ()                  { return data; }
-    T       *end        ()                  { return data + len; }
-    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= len, "%jd >= 0 && %jd < %jd", i, len); return data + i; }
+    T       *end        ()                  { return data + size; }
+    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
 
-    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= len, "%jd >= 0 && %jd < %jd", i, i, len); return  data[i]; }
+    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, i, size); return  data[i]; }
     T const *begin      ()            const { return data; }
-    T const *end        ()            const { return data + len; }
-    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= len, "%jd >= 0 && %jd < %jd", i, len); return data + i; }
+    T const *end        ()            const { return data + size; }
+    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
 };
 
 DQN_FIXED_ARRAY_TEMPLATE
@@ -1304,69 +1315,69 @@ DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray_Init(T const *item, int num)
 DQN_FIXED_ARRAY_TEMPLATE
 T * Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num)
 {
-    DQN_ASSERT(a->len + num <= MAX_);
-    T *result = static_cast<T *>(DQN_MEMCOPY(a->data + a->len, items, sizeof(T) * num));
-    a->len += num;
+    DQN_ASSERT(a->size + num <= MAX_);
+    T *result = static_cast<T *>(DQN_MEMCOPY(a->data + a->size, items, sizeof(T) * num));
+    a->size += num;
     return result;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
 T * Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const item)
 {
-    DQN_ASSERT(a->len < MAX_);
-    a->data[a->len++] = item;
-    return &a->data[a->len - 1];
+    DQN_ASSERT(a->size < MAX_);
+    a->data[a->size++] = item;
+    return &a->data[a->size - 1];
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
 T * Dqn_FixedArray_Make(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num)
 {
-    DQN_ASSERT(a->len + num <= MAX_);
-    T *result = a->data + a->len;
-    a->len += num;
+    DQN_ASSERT(a->size + num <= MAX_);
+    T *result = a->data + a->size;
+    a->size += num;
     return result;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
 void Dqn_FixedArray_Clear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a)
 {
-    a->len = 0;
+    a->size = 0;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
 void Dqn_FixedArray_EraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index)
 {
-    Dqn__EraseStableFromCArray<T>(a->data, a->len--, MAX_, index);
+    Dqn__EraseStableFromCArray<T>(a->data, a->size--, MAX_, index);
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
 void Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index)
 {
-    DQN_ASSERT(index >= 0 && index < a->len);
-    if (--a->len == 0) return;
-    a->data[index] = a->data[a->len];
+    DQN_ASSERT(index >= 0 && index < a->size);
+    if (--a->size == 0) return;
+    a->data[index] = a->data[a->size];
 }
 
 
 DQN_FIXED_ARRAY_TEMPLATE
 void Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1)
 {
-    DQN_ASSERT(a->len - num >= 0);
-    a->len -= num;
+    DQN_ASSERT(a->size - num >= 0);
+    a->size -= num;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
 T * Dqn_FixedArray_Peek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a)
 {
-    T *result = (a->len == 0) ? nullptr : a->data + (a->len - 1);
+    T *result = (a->size == 0) ? nullptr : a->data + (a->size - 1);
     return result;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
 T Dqn_FixedArray_PeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a)
 {
-    DQN_ASSERT(a->len > 0);
-    T const *result = a->data + (a->len - 1);
+    DQN_ASSERT(a->size > 0);
+    T const *result = a->data + (a->size - 1);
     return *result;
 }
 
@@ -1418,7 +1429,7 @@ T *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find)
 DQN_FIXED_ARRAY_TEMPLATE
 Dqn_Slice<T> Dqn_FixedArray_Slice(DQN_FIXED_ARRAY_TEMPLATE_DECL *a)
 {
-    Dqn_Slice<T> result = {a->data, a->len};
+    Dqn_Slice<T> result = {a->data, a->size};
     return result;
 }
 
@@ -1431,47 +1442,47 @@ template <typename T> struct Dqn_Array
 {
     Dqn_Allocator allocator;
     T            *data;
-    Dqn_isize     len;
+    Dqn_isize     size;
     Dqn_isize     max;
 
-    T const    operator[](Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
-    T          operator[](Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return  data[i]; }
+    T const    operator[](Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
+    T          operator[](Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
     T const   *begin    ()             const { return data; }
-    T const   *end      ()             const { return data + len; }
+    T const   *end      ()             const { return data + size; }
     T         *begin    ()                   { return data; }
-    T         *end      ()                   { return data + len; }
-    T const   *operator+(Dqn_isize i)  const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
-    T         *operator+(Dqn_isize i)        { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data + i; }
+    T         *end      ()                   { return data + size; }
+    T const   *operator+(Dqn_isize i)  const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
+    T         *operator+(Dqn_isize i)        { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
 };
 
-template <typename T> Dqn_Array<T> Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize len = 0)
+template <typename T> Dqn_Array<T> Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize size = 0)
 {
     Dqn_Array<T> result = {};
     result.allocator    = Dqn_Allocator_InitWithNull();
     result.data         = memory;
-    result.len          = len;
+    result.size         = size;
     result.max          = max;
     return result;
 }
 
-template <typename T> Dqn_Array<T> Dqn_Array_InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize len = 0, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes)
+template <typename T> Dqn_Array<T> Dqn_Array_InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize size = 0, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::Yes)
 {
     T *memory           = DQN_CAST(T *)Dqn_Allocator_Allocate(allocator, sizeof(T) * max, alignof(T), zero_mem);
-    Dqn_Array<T> result = Dqn_Array_InitWithMemory(memory, max, len);
+    Dqn_Array<T> result = Dqn_Array_InitWithMemory(memory, max, size);
     return result;
 }
 
 
 template <typename T> bool Dqn_Array_Reserve(Dqn_Array<T> *a, Dqn_isize size)
 {
-    if (size <= a->len) return true;
+    if (size <= a->size) return true;
     T *new_ptr = DQN_CAST(T *)Dqn_Allocator_Allocate(&a->allocator, sizeof(T) * size, alignof(T));
     if (!new_ptr) return false;
 
     if (a->data) 
     {
         // NOTE(doyle): Realloc, I don't like and don't support. Use virtual arrays
-        DQN_MEMCOPY(new_ptr, a->data, a->len * sizeof(T));
+        DQN_MEMCOPY(new_ptr, a->data, a->size * sizeof(T));
         Dqn_Allocator_Free(&a->allocator, a->data);
     }
 
@@ -1487,11 +1498,11 @@ template <typename T> void Dqn_Array_Free(Dqn_Array<T> *a)
 
 template <typename T> bool Dqn_Array__GrowIfNeeded(Dqn_Array<T> *a, Dqn_isize num_to_add)
 {
-    Dqn_isize new_len = a->len + num_to_add;
-    bool result       = true;
-    if (new_len > a->max)
+    Dqn_isize new_size = a->size + num_to_add;
+    bool result        = true;
+    if (new_size > a->max)
     {
-        Dqn_isize num_items = DQN_MAX(4, DQN_MAX(new_len, (a->max * 2)));
+        Dqn_isize num_items = DQN_MAX(4, DQN_MAX(new_size, (a->max * 2)));
         result              = Dqn_Array_Reserve(a, num_items);
     }
 
@@ -1502,8 +1513,8 @@ template <typename T> T * Dqn_Array_Add(Dqn_Array<T> *a, T const *items, Dqn_isi
 {
     if (!Dqn_Array__GrowIfNeeded(a, num))
         return nullptr;
-    T *result = static_cast<T *>(DQN_MEMCOPY(a->data + a->len, items, sizeof(T) * num));
-    a->len += num;
+    T *result = static_cast<T *>(DQN_MEMCOPY(a->data + a->size, items, sizeof(T) * num));
+    a->size += num;
     return result;
 }
 
@@ -1511,45 +1522,45 @@ template <typename T> T * Dqn_Array_Add(Dqn_Array<T> *a, T const item)
 {
     if (!Dqn_Array__GrowIfNeeded(a, 1))
         return nullptr;
-    a->data[a->len++] = item;
-    return &a->data[a->len - 1];
+    a->data[a->size++] = item;
+    return &a->data[a->size - 1];
 }
 template <typename T> T * Dqn_Array_Make(Dqn_Array<T> *a, Dqn_isize num)
 {
     if (!Dqn_Array__GrowIfNeeded(a, num))
         return nullptr;
-    T *result = a->data + a->len;
-    a->len += num;
+    T *result = a->data + a->size;
+    a->size += num;
     return result;
 }
 
 template <typename T> void Dqn_Array_Clear(Dqn_Array<T> *a, bool zero_mem = false)
 {
-    a->len = 0;
+    a->size = 0;
     if (zero_mem) DQN_MEMSET(a->data, 0, sizeof(T) * a->max);
 }
 
 template <typename T> void Dqn_Array_EraseStable(Dqn_Array<T> *a, Dqn_isize index)
 {
-    Dqn__EraseStableFromCArray<T>(a->data, a->len--, a->max, index);
+    Dqn__EraseStableFromCArray<T>(a->data, a->size--, a->max, index);
 }
 
 template <typename T> void Dqn_Array_EraseUnstable(Dqn_Array<T> *a, Dqn_isize index)
 {
-    DQN_ASSERT(index >= 0 && index < a->len);
-    if (--a->len == 0) return;
-    a->data[index] = a->data[a->len];
+    DQN_ASSERT(index >= 0 && index < a->size);
+    if (--a->size == 0) return;
+    a->data[index] = a->data[a->size];
 }
 
 template <typename T> void Dqn_Array_Pop(Dqn_Array<T> *a, Dqn_isize num)
 {
-    DQN_ASSERT(a->len - num >= 0);
-    a->len -= num;
+    DQN_ASSERT(a->size - num >= 0);
+    a->size -= num;
 }
 
 template <typename T> T * Dqn_Array_Peek(Dqn_Array<T> *a)
 {
-    T *result = (a->len == 0) ? nullptr : a->data + (a->len - 1);
+    T *result = (a->size == 0) ? nullptr : a->data + (a->size - 1);
     return result;
 }
 
@@ -1562,34 +1573,34 @@ template <Dqn_isize MAX_>
 struct Dqn_FixedString
 {
     union { char data[MAX_]; char str[MAX_]; char buf[MAX_]; };
-    Dqn_isize len;
+    Dqn_isize size;
     Dqn_isize max = MAX_;
 
-    Dqn_FixedString() { data[0] = 0; len = 0; }
+    Dqn_FixedString() { data[0] = 0; size = 0; }
     Dqn_FixedString(char const *fmt, ...)
     {
         *this = {};
         va_list va;
         va_start(va, fmt);
-        Dqn_FixedString_AppendVFmt(this, fmt, va);
+        Dqn_FixedString_AppendFmtV(this, fmt, va);
         va_end(va);
     }
 
     Dqn_b32 operator==(Dqn_FixedString const &other) const
     {
-        if (len != other.len) return false;
-        bool result = memcmp(data, other.data, len);
+        if (size != other.size) return false;
+        bool result = memcmp(data, other.data, size);
         return result;
     }
 
     Dqn_b32 operator!=(Dqn_FixedString const &other) const { return !(*this == other); }
 
-    char const &operator[]   (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data[i]; }
-    char       &operator[]   (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < len, "%d >= 0 && %d < %d", i, len); return data[i]; }
+    char const &operator[]   (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data[i]; }
+    char       &operator[]   (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data[i]; }
     char const *begin        ()        const { return data; }
-    char const *end          ()        const { return data + len; }
+    char const *end          ()        const { return data + size; }
     char       *begin        ()              { return data; }
-    char       *end          ()              { return data + len; }
+    char       *end          ()              { return data + size; }
 };
 
 template <Dqn_isize MAX_> int Dqn_FixedString_Capacity(Dqn_FixedString<MAX_> *)
@@ -1599,46 +1610,46 @@ template <Dqn_isize MAX_> int Dqn_FixedString_Capacity(Dqn_FixedString<MAX_> *)
 }
 
 template <Dqn_isize MAX_> void Dqn_FixedString_Clear(Dqn_FixedString<MAX_> *str) { *str = {}; }
-template <Dqn_isize MAX_> Dqn_b32 Dqn_FixedString_AppendVFmt(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va)
+template <Dqn_isize MAX_> Dqn_b32 Dqn_FixedString_AppendFmtV(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va)
 {
     va_list va2;
     va_copy(va2, va);
     Dqn_isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
-    Dqn_isize space   = MAX_ - str->len;
+    Dqn_isize space   = MAX_ - str->size;
     Dqn_b32 result    = require <= space;
     DQN_ASSERT(require <= space);
-    str->len += stbsp_vsnprintf(str->data + str->len, static_cast<int>(space), fmt, va2);
+    str->size += stbsp_vsnprintf(str->data + str->size, static_cast<int>(space), fmt, va2);
     va_end(va2);
     return result;
 }
 
-template <Dqn_isize MAX_> Dqn_b32 Dqn_FixedString_AppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...)
+template <Dqn_isize MAX_> Dqn_b32 Dqn_FixedString_AppendFmtF(Dqn_FixedString<MAX_> *str, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    Dqn_b32 result = Dqn_FixedString_AppendVFmt(str, fmt, va);
+    Dqn_b32 result = Dqn_FixedString_AppendFmtV(str, fmt, va);
     va_end(va);
     return result;
 }
 
-template <Dqn_isize MAX_> Dqn_b32 Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize len = -1)
+template <Dqn_isize MAX_> Dqn_b32 Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size = -1)
 {
-    if (len == -1) len = DQN_CAST(Dqn_isize)strlen(src);
-    Dqn_isize space = MAX_ - str->len;
+    if (size == -1) size = DQN_CAST(Dqn_isize)DQN_STRLEN(src);
+    Dqn_isize space = MAX_ - str->size;
 
     Dqn_b32 result = true;
-    DQN_ASSERT_MSG_IF(len >= space, "len: %jd, space: %jd", len, space)
+    DQN_ASSERT_MSG_IF(size >= space, "size: %jd, space: %jd", size, space)
         return false;
 
-    DQN_MEMCOPY(str->data + str->len, src, len);
-    str->len += len;
-    str->str[str->len] = 0;
+    DQN_MEMCOPY(str->data + str->size, src, size);
+    str->size += size;
+    str->str[str->size] = 0;
     return result;
 }
 
 template <Dqn_isize MAX_> Dqn_String Dqn_FixedString_ToString(Dqn_FixedString<MAX_> const *str)
 {
-    Dqn_String result = { str->str, str->len };
+    Dqn_String result = { str->str, str->size };
     return result;
 }
 #endif // DQN_H
@@ -1655,7 +1666,7 @@ template <Dqn_isize MAX_> Dqn_String Dqn_FixedString_ToString(Dqn_FixedString<MA
 
 // -------------------------------------------------------------------------------------------------
 //
-// Logging
+// NOTE: Dqn_Log
 //
 // -------------------------------------------------------------------------------------------------
 DQN_API void Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va)
@@ -1675,13 +1686,14 @@ DQN_API void Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, ch
 
     FILE *handle = (type == Dqn_LogType::Error) ? stderr : stdout;
     fprintf(handle,
-            "%.*s %05zu %.*s %s  ",
+            "%s %.*s %05zu %.*s ",
+            Dqn_LogTypeString[DQN_CAST(int) type],
             (int)file_ptr_len,
             file_ptr,
             line,
             (int)func_len,
-            func,
-            Dqn_LogTypeString[DQN_CAST(int)type]);
+            func
+            );
 
     vfprintf(handle, fmt, va);
     fputc('\n', handle);
@@ -1695,18 +1707,7 @@ DQN_API void Dqn_Log(Dqn_LogType type, char const *file, Dqn_usize file_len, cha
     va_end(va);
 }
 
-// -------------------------------------------------------------------------------------------------
-//
-// Core Config
-//
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_Core Dqn__CoreDefault()
-{
-    Dqn_Core result = {};
-    result.Log      = Dqn_Log;
-    return result;
-}
-Dqn_Core dqn_core = Dqn__CoreDefault();
+Dqn_LogProc *dqn_log = Dqn_Log;
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -2076,7 +2077,7 @@ DQN_API Dqn_f32 Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b)
 
 // -------------------------------------------------------------------------------------------------
 //
-// Dqn_Allocator
+// NOTE: Dqn_Allocator
 //
 // -------------------------------------------------------------------------------------------------
 DQN_API Dqn_Allocator Dqn_Allocator_InitWithNull()
@@ -2108,11 +2109,6 @@ DQN_API Dqn_Allocator Dqn_Allocator_InitWithArena(Dqn_ArenaAllocator *arena)
     return result;
 }
 
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_Allocator
-//
-// -------------------------------------------------------------------------------------------------
 DQN_API void *Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem)
 {
     char *result = nullptr;
@@ -2151,6 +2147,7 @@ DQN_API void *Dqn_Allocator_Allocate(Dqn_Allocator *allocator, Dqn_isize size, D
     if (result)
     {
         allocator->allocations++;
+        allocator->total_allocations++;
         allocator->total_bytes_allocated += size;
     }
     return result;
@@ -2183,7 +2180,6 @@ void Dqn_Allocator_Free(Dqn_Allocator *allocator, void *ptr)
 
     if (ptr)
     {
-        allocator->total_allocations++;
         allocator->allocations--;
         DQN_ASSERT(allocator->allocations >= 0);
     }
@@ -2563,79 +2559,80 @@ DQN_API char Dqn_Char_ToLower(char ch)
 DQN_API Dqn_b32 Dqn_String_Compare(Dqn_String const lhs, Dqn_String const rhs)
 {
     Dqn_b32 result = false;
-    if (lhs.len == rhs.len)
-        result = (memcmp(lhs.str, rhs.str, DQN_CAST(size_t)lhs.len) == 0);
+    if (lhs.size == rhs.size)
+        result = (memcmp(lhs.str, rhs.str, DQN_CAST(size_t)lhs.size) == 0);
     return result;
 }
 
 DQN_API Dqn_b32 Dqn_String_CompareCaseInsensitive(Dqn_String const lhs, Dqn_String const rhs)
 {
-    Dqn_b32 result = (lhs.len == rhs.len);
-    if (result)
-    {
-        for (Dqn_isize index = 0; index < lhs.len && result; index++)
-            result = (Dqn_Char_ToLower(lhs.str[index]) == Dqn_Char_ToLower(rhs.str[index]));
-    }
+    Dqn_b32 result = (lhs.size == rhs.size);
+    for (Dqn_isize index = 0; index < lhs.size && result; index++)
+        result = (Dqn_Char_ToLower(lhs.str[index]) == Dqn_Char_ToLower(rhs.str[index]));
     return result;
 }
 
-DQN_API Dqn_String Dqn_String_Copy(Dqn_Allocator *allocator, Dqn_String const src)
+DQN_API Dqn_String Dqn_String_Copy(Dqn_String const src, Dqn_Allocator *allocator)
 {
     Dqn_String result = src;
-    result.str        = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, result.len, alignof(char));
-    DQN_MEMCOPY(result.str, src.str, DQN_CAST(size_t)result.len);
+    result.str        = allocator ? DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, result.size, alignof(char)) :
+                                    DQN_CAST(char *)DQN_MALLOC(result.size);
+    DQN_MEMCOPY(result.str, src.str, DQN_CAST(size_t)result.size);
     return result;
 }
 
 DQN_API Dqn_String Dqn_String_TrimWhitespaceAround(Dqn_String src)
 {
     Dqn_String result = src;
-    if (src.len <= 0) return result;
+    if (src.size <= 0) return result;
 
     char *start = src.str;
-    char *end   = start + (src.len - 1);
+    char *end   = start + (src.size - 1);
     while (Dqn_Char_IsWhitespace(start[0])) start++;
     while (end != start && Dqn_Char_IsWhitespace(end[0])) end--;
 
-    result.str = start;
-    result.len = (end - start) + 1;
+    result.str  = start;
+    result.size = (end - start) + 1;
     return result;
 }
 
 DQN_API Dqn_b32 operator==(Dqn_String const &lhs, Dqn_String const &rhs)
 {
-    Dqn_b32 result = lhs.len == rhs.len && (DQN_MEMCMP(lhs.str, rhs.str, lhs.len) == 0);
+    Dqn_b32 result = lhs.size == rhs.size && (DQN_MEMCMP(lhs.str, rhs.str, lhs.size) == 0);
     return result;
 }
 
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_Asprintf (Allocate Sprintf)
-//
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_String Dqn_Asprintf(Dqn_Allocator *allocator, char const *fmt, va_list va)
+DQN_API Dqn_String Dqn_String_FmtV(Dqn_Allocator *allocator, char const *fmt, va_list va)
 {
     Dqn_String result = {};
     va_list va2;
     va_copy(va2, va);
-    result.len = stbsp_vsnprintf(nullptr, 0, fmt, va);
-    result.str = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, result.len + 1, alignof(char));
+    result.size = stbsp_vsnprintf(nullptr, 0, fmt, va);
+    result.str  = allocator ? DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, result.size + 1, alignof(char))
+                            : DQN_CAST(char *)DQN_MALLOC(result.size + 1);
     if (result.str)
     {
-        stbsp_vsnprintf(result.str, Dqn_Safe_TruncateISizeToInt(result.len + 1), fmt, va2);
-        result.str[result.len] = 0;
+        stbsp_vsnprintf(result.str, Dqn_Safe_TruncateISizeToInt(result.size + 1), fmt, va2);
+        result.str[result.size] = 0;
     }
     va_end(va2);
     return result;
 }
 
-DQN_API Dqn_String Dqn_Asprintf(Dqn_Allocator *allocator, char const *fmt, ...)
+DQN_API Dqn_String Dqn_String_FmtF(Dqn_Allocator *allocator, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    Dqn_String result = Dqn_Asprintf(allocator, fmt, va);
+    Dqn_String result = Dqn_String_FmtV(allocator, fmt, va);
     va_end(va);
     return result;
+}
+
+DQN_API void Dqn_String_Free(Dqn_String *string, Dqn_Allocator *allocator)
+{
+    if (allocator) Dqn_Allocator_Free(allocator, string->str);
+    else           DQN_FREE(string->str);
+    *string = {};
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -2856,17 +2853,23 @@ DQN_API Dqn_i64 Dqn_Str_ToI64(char const *buf, int len)
 // NOTE: Dqn_File
 //
 // -------------------------------------------------------------------------------------------------
-DQN_API char *Dqn_File_ReadAll(Dqn_Allocator *allocator, char const *file, Dqn_isize *file_size)
+DQN_API char *Dqn_File_ReadEntireFile(char const *file, Dqn_isize *file_size, Dqn_Allocator *allocator)
 {
     Dqn_isize file_size_ = 0;
-    if (!file_size) file_size = &file_size_;
+    if (!file_size)
+        file_size = &file_size_;
 
     FILE *file_handle = fopen(file, "rb");
-    if (!file_handle) return nullptr;
-    DQN_DEFER { fclose(file_handle); };
+    if (!file_handle)
+    {
+        DQN_LOG_E("Failed to open file '%s' using fopen\n", file);
+        return nullptr;
+    }
 
+    DQN_DEFER { fclose(file_handle); };
     fseek(file_handle, 0, SEEK_END);
     *file_size = ftell(file_handle);
+
     if (DQN_CAST(long)(*file_size) == -1L)
     {
         DQN_LOG_E("Failed to determine '%s' file size using ftell\n", file);
@@ -2874,16 +2877,20 @@ DQN_API char *Dqn_File_ReadAll(Dqn_Allocator *allocator, char const *file, Dqn_i
     }
 
     rewind(file_handle);
-    auto *result = DQN_CAST(char *)Dqn_Allocator_Allocate(allocator, *file_size + 1, alignof(char));
+    auto *result = allocator ? DQN_CAST(char *) Dqn_Allocator_Allocate(allocator, *file_size + 1, alignof(char))
+                             : DQN_CAST(char *) DQN_MALLOC(*file_size + 1);
     if (!result)
     {
-        DQN_LOG_M("Failed to allocate %td bytes to read file '%s'\n", file_size + 1, file);
+        DQN_LOG_M("Failed to allocate %td bytes to read file '%s'\n", *file_size + 1, file);
         return nullptr;
     }
 
     result[*file_size] = 0;
     if (fread(result, DQN_CAST(size_t)(*file_size), 1, file_handle) != 1)
     {
+        if (allocator) Dqn_Allocator_Free(allocator, result);
+        else           DQN_FREE(result);
+
         DQN_LOG_E("Failed to read %td bytes into buffer from '%s'\n", *file_size, file);
         return nullptr;
     }
@@ -2891,6 +2898,26 @@ DQN_API char *Dqn_File_ReadAll(Dqn_Allocator *allocator, char const *file, Dqn_i
     return result;
 }
 
+DQN_API Dqn_b32 Dqn_File_WriteEntireFile(char const *file, char const *buffer, Dqn_isize buffer_size)
+{
+    FILE *file_handle = fopen(file, "w+b");
+    if (!file_handle)
+    {
+        DQN_LOG_E("Failed to open file '%s' using fopen\n", file);
+        return false;
+    }
+
+    DQN_DEFER { fclose(file_handle); };
+    Dqn_usize write_count = fwrite(buffer, buffer_size, 1 /*count*/, file_handle);
+
+    if (write_count != 1)
+    {
+        DQN_LOG_E("Failed to write to file '%s' using fwrite\n", file);
+        return false;
+    }
+
+    return true;
+}
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Utilities

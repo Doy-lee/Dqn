@@ -32,13 +32,13 @@ struct TestingState
 #define TEST_START_SCOPE(testing_state, test_name)                                                                     \
     DQN_DEFER                                                                                                          \
     {                                                                                                                  \
-        if (testing_state.test.fail_expr.len == 0) testing_state.num_tests_ok_in_group++;                              \
+        if (testing_state.test.fail_expr.size == 0) testing_state.num_tests_ok_in_group++;                             \
         TestState_PrintResult(&testing_state.test);                                                                    \
-        Dqn_ArenaAllocator_ResetUsage(&testing_state.arena_, Dqn_ZeroMem::No);                                               \
-        testing_state.allocator = Dqn_Allocator_InitWithArena(&testing_state.arena_);                                          \
+        Dqn_ArenaAllocator_ResetUsage(&testing_state.arena_, Dqn_ZeroMem::No);                                         \
+        testing_state.allocator = Dqn_Allocator_InitWithArena(&testing_state.arena_);                                  \
         testing_state.test      = {};                                                                                  \
     };                                                                                                                 \
-    testing_state.test.name          = Dqn_Asprintf(&testing_state.allocator, test_name);                              \
+    testing_state.test.name          = Dqn_String_FmtF(&testing_state.allocator, test_name);                           \
     testing_state.test.scope_started = true;                                                                           \
     testing_state.num_tests_in_group++
 
@@ -54,8 +54,8 @@ struct TestingState
     DQN_ASSERT(testing_state.test.scope_started);                                                                      \
     if (!(expr))                                                                                                       \
     {                                                                                                                  \
-        testing_state.test.fail_expr = Dqn_Asprintf(&testing_state.allocator, #expr);                                  \
-        testing_state.test.fail_msg  = Dqn_Asprintf(&testing_state.allocator, msg, ##__VA_ARGS__);                     \
+        testing_state.test.fail_expr = Dqn_String_FmtF(&testing_state.allocator, #expr);                               \
+        testing_state.test.fail_msg  = Dqn_String_FmtF(&testing_state.allocator, msg, ##__VA_ARGS__);                  \
     }
 
 #define TEST_EXPECT(testing_state, expr) TEST_EXPECT_MSG(testing_state, expr, "")
@@ -69,11 +69,11 @@ void TestingState_PrintGroupResult(TestingState const *result)
 
     bool all_tests_passed = (result->num_tests_ok_in_group == result->num_tests_in_group);
     char buf[256] = {};
-    int len = snprintf(buf, Dqn_ArrayCount(buf), "%02d/%02d Tests Passed ", result->num_tests_ok_in_group, result->num_tests_in_group);
-    Dqn_isize remaining_len = DESIRED_LEN - len - 1;
-    remaining_len       = (all_tests_passed) ? remaining_len - Dqn_CharCount(STATUS_OK) : remaining_len - Dqn_CharCount(STATUS_FAIL);
-    remaining_len       = DQN_MAX(remaining_len, 0);
-    DQN_FOR_EACH(i, remaining_len) fprintf(stdout, " ");
+    int size = snprintf(buf, Dqn_ArrayCount(buf), "%02d/%02d Tests Passed ", result->num_tests_ok_in_group, result->num_tests_in_group);
+    Dqn_isize remaining_size = DESIRED_LEN - size - 1;
+    remaining_size       = (all_tests_passed) ? remaining_size - Dqn_CharCount(STATUS_OK) : remaining_size - Dqn_CharCount(STATUS_FAIL);
+    remaining_size       = DQN_MAX(remaining_size, 0);
+    DQN_FOR_EACH(i, remaining_size) fprintf(stdout, " ");
 
     fprintf(stdout, "%s", buf);
     if (result->num_tests_ok_in_group == result->num_tests_in_group)
@@ -91,11 +91,11 @@ void TestState_PrintResult(TestState const *result)
     char const STATUS_OK[]   = "OK";
     char const STATUS_FAIL[] = "FAIL";
 
-    Dqn_isize remaining_len = DESIRED_LEN - result->name.len - Dqn_CharCount(INDENT);
-    remaining_len       = (result->fail_expr.str) ? remaining_len - Dqn_CharCount(STATUS_FAIL) : remaining_len - Dqn_CharCount(STATUS_OK);
-    remaining_len       = DQN_MAX(remaining_len, 0);
+    Dqn_isize remaining_size = DESIRED_LEN - result->name.size - Dqn_CharCount(INDENT);
+    remaining_size       = (result->fail_expr.str) ? remaining_size - Dqn_CharCount(STATUS_FAIL) : remaining_size - Dqn_CharCount(STATUS_OK);
+    remaining_size       = DQN_MAX(remaining_size, 0);
 
-    DQN_FOR_EACH(i, remaining_len) fprintf(stdout, ".");
+    DQN_FOR_EACH(i, remaining_size) fprintf(stdout, ".");
     if (result->fail_expr.str)
     {
         fprintf(stdout, ANSI_COLOR_RED "%s" ANSI_COLOR_RESET "\n", STATUS_FAIL);
@@ -224,7 +224,7 @@ static void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test add single item and can't allocate more");
                 int memory[4]        = {};
-                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
                 Dqn_Array_Add(&array, 1);
                 Dqn_Array_Add(&array, 2);
                 Dqn_Array_Add(&array, 3);
@@ -233,11 +233,11 @@ static void UnitTests()
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data %d", array.data[1]);
                 TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data %d", array.data[2]);
                 TEST_EXPECT_MSG(testing_state, array.data[3] == 4, "array.data %d", array.data[3]);
-                TEST_EXPECT_MSG(testing_state, array.len == 4, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 4, "array.size: %d", array.size);
 
                 int *added_item = Dqn_Array_Add(&array, 5);
                 TEST_EXPECT(testing_state, added_item == nullptr);
-                TEST_EXPECT_MSG(testing_state, array.len == 4, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 4, "array.size: %d", array.size);
                 TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
             }
 
@@ -245,12 +245,12 @@ static void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test add array of items");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data %d", array.data[1]);
                 TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data %d", array.data[2]);
-                TEST_EXPECT_MSG(testing_state, array.len == 3, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 3, "array.size: %d", array.size);
                 TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
             }
 
@@ -258,10 +258,10 @@ static void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test clear and clear with memory zeroed");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_Clear(&array, false /*zero_mem*/);
-                TEST_EXPECT_MSG(testing_state, array.len == 0, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 0, "array.size: %d", array.size);
                 TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d. Clear but don't zero memory so old values should still remain", array.data[0]);
 
@@ -273,41 +273,41 @@ static void UnitTests()
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test erase stable and erase unstable");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3, 4};
-                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_EraseUnstable(&array, 1);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 4, "array.data %d", array.data[1]);
                 TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data %d", array.data[2]);
-                TEST_EXPECT_MSG(testing_state, array.len == 3, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 3, "array.size: %d", array.size);
 
                 Dqn_Array_EraseStable(&array, 0);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 4, "array.data: %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 3, "array.data: %d", array.data[1]);
-                TEST_EXPECT_MSG(testing_state, array.len == 2, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 2, "array.size: %d", array.size);
             }
 
             {
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test array pop and peek");
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
-                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
                 Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_Pop(&array, 2);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
-                TEST_EXPECT_MSG(testing_state, array.len == 1, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 1, "array.size: %d", array.size);
                 TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
 
                 int *peek_item = Dqn_Array_Peek(&array);
                 TEST_EXPECT_MSG(testing_state, *peek_item == 1, "peek: %d", *peek_item);
-                TEST_EXPECT_MSG(testing_state, array.len == 1, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 1, "array.size: %d", array.size);
                 TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
             }
 
             {
                 TEST_START_SCOPE(testing_state, "Fixed Memory: Test free on fixed memory array does nothing");
                 int memory[4]        = {};
-                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*len*/);
+                Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
                 DQN_DEFER { Dqn_Array_Free(&array); };
             }
         }
@@ -320,7 +320,7 @@ static void UnitTests()
                 DQN_DEFER { Dqn_Array_Free(&array); };
 
                 Dqn_Array_Reserve(&array, 4);
-                TEST_EXPECT_MSG(testing_state, array.len == 0, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 0, "array.size: %d", array.size);
                 TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
 
                 int DATA[] = {1, 2, 3, 4};
@@ -329,12 +329,12 @@ static void UnitTests()
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data: %d", array.data[1]);
                 TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data: %d", array.data[2]);
                 TEST_EXPECT_MSG(testing_state, array.data[3] == 4, "array.data: %d", array.data[3]);
-                TEST_EXPECT_MSG(testing_state, array.len == 4, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 4, "array.size: %d", array.size);
 
                 int *added_item = Dqn_Array_Add(&array, 5);
                 TEST_EXPECT_MSG(testing_state, *added_item == 5, "added_item: %d", *added_item);
                 TEST_EXPECT_MSG(testing_state, array.data[4] == 5, "array.data: %d", array.data[4]);
-                TEST_EXPECT_MSG(testing_state, array.len == 5, "array.len: %d", array.len);
+                TEST_EXPECT_MSG(testing_state, array.size == 5, "array.size: %d", array.size);
                 TEST_EXPECT_MSG(testing_state, array.max >= 5, "array.max: %d", array.max);
             }
         }
@@ -483,17 +483,17 @@ static void UnitTests()
         // NOTE: Dqn_StringBuilder_Append
         {
             {
-                TEST_START_SCOPE(testing_state, "Append variable length strings and build using heap allocator");
+                TEST_START_SCOPE(testing_state, "Append variable size strings and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "Abc", 1);
                 Dqn_StringBuilder_Append(&builder, "cd");
-                Dqn_isize len    = 0;
-                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                Dqn_isize size    = 0;
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "Acd";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
-                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+                TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
             }
 
             {
@@ -501,13 +501,13 @@ static void UnitTests()
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "");
                 Dqn_StringBuilder_Append(&builder, "");
-                Dqn_isize len    = 0;
-                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                Dqn_isize size    = 0;
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
-                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+                TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
             }
 
             {
@@ -515,26 +515,26 @@ static void UnitTests()
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, "Acd");
                 Dqn_StringBuilder_Append(&builder, "");
-                Dqn_isize len    = 0;
-                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                Dqn_isize size    = 0;
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "Acd";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
-                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+                TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
             }
 
             {
                 TEST_START_SCOPE(testing_state, "Append nullptr and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
                 Dqn_StringBuilder_Append(&builder, nullptr, 5);
-                Dqn_isize len    = 0;
-                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                Dqn_isize size    = 0;
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
-                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+                TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
             }
 
             {
@@ -543,13 +543,13 @@ static void UnitTests()
                 Dqn_StringBuilder_Append(&builder, "A");
                 Dqn_StringBuilder_Append(&builder, "z"); // Should force a new memory block
                 Dqn_StringBuilder_Append(&builder, "tec");
-                Dqn_isize len    = 0;
-                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                Dqn_isize size    = 0;
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "Aztec";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
-                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+                TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
             }
         }
 
@@ -559,42 +559,42 @@ static void UnitTests()
             Dqn_StringBuilder<> builder = {};
             Dqn_StringBuilder_AppendChar(&builder, 'a');
             Dqn_StringBuilder_AppendChar(&builder, 'b');
-            Dqn_isize len    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+            Dqn_isize size    = 0;
+            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
             DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
             char constexpr EXPECT_STR[] = "ab";
-            TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
-            TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+            TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
+            TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
         }
 
-        // NOTE: Dqn_StringBuilder_FmtAppend
+        // NOTE: Dqn_StringBuilder_AppendFmtF
         {
             {
                 TEST_START_SCOPE(testing_state, "Append format string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
-                Dqn_StringBuilder_FmtAppend(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
-                Dqn_StringBuilder_FmtAppend(&builder, "Extra Stuff");
-                Dqn_isize len    = 0;
-                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                Dqn_StringBuilder_AppendFmtF(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
+                Dqn_StringBuilder_AppendFmtF(&builder, "Extra Stuff");
+                Dqn_isize size    = 0;
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "Number: 4, String: Hello Sailor, Extra Stuff";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
-                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+                TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
             }
 
             {
                 TEST_START_SCOPE(testing_state, "Append nullptr format string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
-                Dqn_StringBuilder_FmtAppend(&builder, nullptr);
-                Dqn_isize len = 0;
-                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &len);
+                Dqn_StringBuilder_AppendFmtF(&builder, nullptr);
+                Dqn_isize size = 0;
+                char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
 
                 char constexpr EXPECT_STR[] = "";
-                TEST_EXPECT_MSG(testing_state, len == Dqn_CharCountI(EXPECT_STR), "len: %zd", len);
-                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, len) == 0, "result: %s", result);
+                TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
+                TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
             }
         }
     }
@@ -611,7 +611,7 @@ static void UnitTests()
             TEST_START_SCOPE(testing_state, "Initialise from raw array");
             int raw_array[] = {1, 2};
             auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
-            TEST_EXPECT(testing_state, array.len == 2);
+            TEST_EXPECT(testing_state, array.size == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
             TEST_EXPECT(testing_state, array[1] == 2);
         }
@@ -622,7 +622,7 @@ static void UnitTests()
             int raw_array[] = {1, 2, 3};
             auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             Dqn_FixedArray_EraseStable(&array, 1);
-            TEST_EXPECT(testing_state, array.len == 2);
+            TEST_EXPECT(testing_state, array.size == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
             TEST_EXPECT(testing_state, array[1] == 3);
         }
@@ -633,7 +633,7 @@ static void UnitTests()
             int raw_array[] = {1, 2, 3};
             auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             Dqn_FixedArray_EraseUnstable(&array, 0);
-            TEST_EXPECT(testing_state, array.len == 2);
+            TEST_EXPECT(testing_state, array.size == 2);
             TEST_EXPECT(testing_state, array[0] == 3);
             TEST_EXPECT(testing_state, array[1] == 2);
         }
@@ -645,7 +645,7 @@ static void UnitTests()
             int raw_array[] = {1};
             auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             Dqn_FixedArray_Add(&array, ITEM);
-            TEST_EXPECT(testing_state, array.len == 2);
+            TEST_EXPECT(testing_state, array.size == 2);
             TEST_EXPECT(testing_state, array[0] == 1);
             TEST_EXPECT(testing_state, array[1] == ITEM);
         }
@@ -656,7 +656,7 @@ static void UnitTests()
             int raw_array[] = {1};
             auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
             Dqn_FixedArray_Clear(&array);
-            TEST_EXPECT(testing_state, array.len == 0);
+            TEST_EXPECT(testing_state, array.size == 0);
         }
     }
 
@@ -675,11 +675,11 @@ static void UnitTests()
             TEST_EXPECT_MSG(testing_state, Dqn_FixedString_Append(&str, "abcd") == false, "We need space for the null-terminator");
         }
 
-        // NOTE: Dqn_FixedString_AppendFmt
+        // NOTE: Dqn_FixedString_AppendFmtF
         {
             TEST_START_SCOPE(testing_state, "Append format string too much fails");
             Dqn_FixedString<4> str = {};
-            TEST_EXPECT_MSG(testing_state, Dqn_FixedString_AppendFmt(&str, "abcd") == false, "We need space for the null-terminator");
+            TEST_EXPECT_MSG(testing_state, Dqn_FixedString_AppendFmtF(&str, "abcd") == false, "We need space for the null-terminator");
         }
     }
 
