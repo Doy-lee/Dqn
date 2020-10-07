@@ -805,14 +805,16 @@ union Dqn_V4
 {
   struct { Dqn_f32 x, y, z, w; };
   struct { Dqn_f32 r, g, b, a; };
+  struct { Dqn_V2 min; Dqn_V2 max; } v2;
   Dqn_V3 rgb;
   Dqn_f32 e[4];
 
   Dqn_V4() = default;
-  constexpr Dqn_V4(Dqn_f32 xyzw)                      : x(xyzw),    y(xyzw),    z(xyzw),    w(xyzw)    {}
-  constexpr Dqn_V4(Dqn_f32 x_, Dqn_f32 y_, Dqn_f32 z_, Dqn_f32 w_): x(x_),      y(y_),      z(z_),      w(w_)      {}
+  constexpr Dqn_V4(Dqn_f32 xyzw)                                  : x(xyzw), y(xyzw), z(xyzw), w(xyzw) {}
+  constexpr Dqn_V4(Dqn_f32 x_, Dqn_f32 y_, Dqn_f32 z_, Dqn_f32 w_): x(x_), y(y_), z(z_), w(w_) {}
   constexpr Dqn_V4(Dqn_i32 x_, Dqn_i32 y_, Dqn_i32 z_, Dqn_i32 w_): x((Dqn_f32)x_), y((Dqn_f32)y_), z((Dqn_f32)z_), w((Dqn_f32)w_) {}
-  constexpr Dqn_V4(Dqn_V3 xyz, Dqn_f32 w_)                : x(xyz.x),  y(xyz.y),   z(xyz.z),   w(w_)       {}
+  constexpr Dqn_V4(Dqn_V3 xyz, Dqn_f32 w_)                        : x(xyz.x), y(xyz.y), z(xyz.z), w(w_) {}
+  constexpr Dqn_V4(Dqn_V2 v2)                                     : x(v2.x), y(v2.y), z(v2.x), w(v2.y) {}
 
   constexpr bool    operator!=(Dqn_V4  other) const { return !(*this == other);            }
   constexpr bool    operator==(Dqn_V4  other) const { return (x == other.x) && (y == other.y) && (z == other.z) && (w == other.w); }
@@ -1053,12 +1055,10 @@ Dqn_b32 Dqn_HashTable_Erase(Dqn_HashTable<T> *table, Dqn_u64 key)
 #if DQN_ALLOCATION_TRACER
     #define DQN_CALL_SITE(msg) , __FILE__, __func__, __LINE__, msg
     #define DQN_CALL_SITE_ARGS , char const *file_, char const *func_, int line_, char const *msg_
-    #define DQN_CALL_SITE_ARGS_DEFAULT , char const *file_ = nullptr, char const *func_ = nullptr, int line_ = -1, char const *msg_ = nullptr
     #define DQN_CALL_SITE_ARGS_INPUT , file_, func_, line_, msg_
 #else
     #define DQN_CALL_SITE(msg)
     #define DQN_CALL_SITE_ARGS
-    #define DQN_CALL_SITE_ARGS_DEFAULT
     #define DQN_CALL_SITE_ARGS_INPUT
 #endif
 
@@ -1083,47 +1083,59 @@ void Dqn_AllocationTracer_Remove(Dqn_AllocationTracer *tracer, void *ptr);
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_CStyleAllocator
+// NOTE: Dqn_CRTAllocator
 //
 // -------------------------------------------------------------------------------------------------
 //
-// C Style allocators unrelated to Dqn_Allocator that are simply for interfacing
-// with foreign libraries that allow you to override malloc, realloc and free.
+// CRT Style allocators unrelated to Dqn_Allocator that are simply for
+// interfacing with foreign libraries that allow you to override malloc, realloc
+// and free.
 //
-// Dqn_Allocator itself does not implement realloc to discourage its use. (Use
-// virtual memory for that).
-
-#define DQN_CSTYLE_ALLOCATOR_MALLOC(name) void *name(size_t size)
-#define DQN_CSTYLE_ALLOCATOR_CALLOC(name) void *name(size_t n, size_t size)
-#define DQN_CSTYLE_ALLOCATOR_REALLOC(name) void *name(void *ptr, size_t new_size)
-#define DQN_CSTYLE_ALLOCATOR_FREE(name) void name(void *ptr)
-typedef DQN_CSTYLE_ALLOCATOR_MALLOC(Dqn_CStyleAllocator_MallocProc);
-typedef DQN_CSTYLE_ALLOCATOR_CALLOC(Dqn_CStyleAllocator_CallocProc);
-typedef DQN_CSTYLE_ALLOCATOR_REALLOC(Dqn_CStyleAllocator_ReallocProc);
-typedef DQN_CSTYLE_ALLOCATOR_FREE(Dqn_CStyleAllocator_FreeProc);
-struct Dqn_CStyleAllocator
+// Dqn_Allocator and friends (Dqn_ArenaAllocator, ... etc) are not designed to
+// be used for replacing library allocation stubs that expect to use CRT style
+// allocation, i.e.  malloc and friends. This is by design, C libraries designed
+// around that paradigm should not be shoe-horned into another allocation scheme
+// as the library you're interfacing with has been designed with the liberal
+// allocating and freeing style encouraged by the CRT.
+//
+// In response, Dqn_Allocator itself does not implement realloc to discourage
+// its use. (Use virtual memory tricks to avoid reallocation altogether).
+//
+#define DQN_CRT_ALLOCATOR_MALLOC(name) void *name(size_t size)
+#define DQN_CRT_ALLOCATOR_REALLOC(name) void *name(void *ptr, size_t new_size)
+#define DQN_CRT_ALLOCATOR_FREE(name) void name(void *ptr)
+typedef DQN_CRT_ALLOCATOR_MALLOC(Dqn_CRTAllocator_MallocProc);
+typedef DQN_CRT_ALLOCATOR_REALLOC(Dqn_CRTAllocator_ReallocProc);
+typedef DQN_CRT_ALLOCATOR_FREE(Dqn_CRTAllocator_FreeProc);
+struct Dqn_CRTAllocator
 {
-    Dqn_CStyleAllocator_MallocProc *malloc;
-    Dqn_CStyleAllocator_CallocProc *calloc;
-    Dqn_CStyleAllocator_ReallocProc *realloc;
-    Dqn_CStyleAllocator_FreeProc *free;
+    // NOTE: Configurable Fields: Set after zero initialization or initialization.
+    Dqn_AllocationTracer         *tracer;  // (Optional) Initialize with Dqn_AllocationTracer_InitWithMemory() to enable allocation tracing.
+    Dqn_CRTAllocator_MallocProc  *malloc;  // (Optional) When nullptr, DQN_MALLOC is called
+    Dqn_CRTAllocator_ReallocProc *realloc; // (Optional) When nullptr, DQN_REALLOC is called
+    Dqn_CRTAllocator_FreeProc    *free;    // (Optional) When nullptr, DQN_FREE is called
 
+    // NOTE: Read Only Fields
     Dqn_isize malloc_bytes;
-    Dqn_isize calloc_bytes;
     Dqn_isize realloc_bytes;
 
     Dqn_isize malloc_count;
-    Dqn_isize calloc_count;
     Dqn_isize realloc_count;
     Dqn_isize free_count;
 };
 
-DQN_API Dqn_CStyleAllocator  Dqn_CStyleAllocator_Init();
-DQN_API Dqn_CStyleAllocator  Dqn_CStyleAllocator_InitWithProcs(Dqn_CStyleAllocator_MallocProc *allocate_proc, Dqn_CStyleAllocator_CallocProc *calloc_proc, Dqn_CStyleAllocator_ReallocProc *realloc_proc, Dqn_CStyleAllocator_FreeProc *free_proc);
-DQN_API void                *Dqn_CStyleAllocator_Malloc(Dqn_CStyleAllocator *allocator, Dqn_usize size);
-DQN_API void                *Dqn_CStyleAllocator_Calloc(Dqn_CStyleAllocator *allocator, Dqn_usize n, Dqn_usize size);
-DQN_API void                *Dqn_CStyleAllocator_Realloc(Dqn_CStyleAllocator *allocator, void *ptr, Dqn_usize size);
-DQN_API void                 Dqn_CStyleAllocator_Free(Dqn_CStyleAllocator *allocator, void *ptr);
+
+DQN_API Dqn_CRTAllocator  Dqn_CRTAllocator_InitWithProcs(Dqn_CRTAllocator_MallocProc *allocate_proc, Dqn_CRTAllocator_ReallocProc *realloc_proc, Dqn_CRTAllocator_FreeProc *free_proc);
+DQN_API void              Dqn_CRTAllocator_Free         (Dqn_CRTAllocator *allocator, void *ptr);
+
+#define                   Dqn_CRTAllocator_TaggedMalloc( allocator, size, tag)       Dqn_CRTAllocator__Malloc(allocator, size, DQN_CALL_SITE(tag))
+#define                   Dqn_CRTAllocator_Malloc(       allocator, size)            Dqn_CRTAllocator__Malloc(allocator, size, DQN_CALL_SITE(""))
+
+#define                   Dqn_CRTAllocator_TaggedRealloc( allocator, ptr, size, tag) Dqn_CRTAllocator__Realloc(allocator, ptr, size, DQN_CALL_SITE(tag))
+#define                   Dqn_CRTAllocator_Realloc(       allocator, ptr, size)      Dqn_CRTAllocator__Realloc(allocator, ptr, size, DQN_CALL_SITE(""))
+
+DQN_API void             *Dqn_CRTAllocator__Malloc      (Dqn_CRTAllocator *allocator, Dqn_usize size DQN_CALL_SITE_ARGS);
+DQN_API void             *Dqn_CRTAllocator__Realloc     (Dqn_CRTAllocator *allocator, void *ptr, Dqn_usize size DQN_CALL_SITE_ARGS);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1156,7 +1168,6 @@ struct Dqn_Allocator
     {
         void                       *user;
         struct Dqn_ArenaAllocator  *arena;
-        struct Dqn_CStyleAllocator *cstyle;
     } context;
 
     Dqn_AllocationTracer *tracer;
@@ -1190,7 +1201,6 @@ DQN_API void          Dqn_Allocator_Free          (Dqn_Allocator *allocator, voi
 #define               Dqn_Allocator_NewArray(      allocator, Type, count, zero_mem)      (Type *)Dqn_Allocator__Allocate(allocator, sizeof(Type) * count, alignof(Type), zero_mem DQN_CALL_SITE(""))
 
 DQN_API void         *Dqn_Allocator__Allocate     (Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS);
-
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -2800,57 +2810,52 @@ void Dqn_AllocationTracer_Remove(Dqn_AllocationTracer *tracer, void *ptr)
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_CStyleAllocator
+// NOTE: Dqn_CRTAllocator
 //
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_CStyleAllocator Dqn_CStyleAllocator_InitWithProcs(Dqn_CStyleAllocator_MallocProc *malloc_proc, Dqn_CStyleAllocator_ReallocProc *realloc_proc, Dqn_CStyleAllocator_FreeProc *free_proc)
+DQN_API Dqn_CRTAllocator Dqn_CRTAllocator_InitWithProcs(Dqn_CRTAllocator_MallocProc *malloc_proc, Dqn_CRTAllocator_ReallocProc *realloc_proc, Dqn_CRTAllocator_FreeProc *free_proc)
 {
-    Dqn_CStyleAllocator result = {};
-    result.malloc              = malloc_proc;
-    result.realloc             = realloc_proc;
-    result.free                = free_proc;
+    Dqn_CRTAllocator result = {};
+    result.malloc           = malloc_proc;
+    result.realloc          = realloc_proc;
+    result.free             = free_proc;
     return result;
 }
 
-DQN_API void *Dqn_CStyleAllocator_Malloc(Dqn_CStyleAllocator *allocator, Dqn_usize size)
+DQN_API void *Dqn_CRTAllocator__Malloc(Dqn_CRTAllocator *allocator, Dqn_usize size DQN_CALL_SITE_ARGS)
 {
     void *result = allocator->malloc ? allocator->malloc(size) : DQN_MALLOC(size);
     if (result)
     {
         allocator->malloc_bytes += size;
         allocator->malloc_count++;
+        Dqn_AllocationTracer_Add(allocator->tracer, result, size DQN_CALL_SITE_ARGS_INPUT);
     }
 
     return result;
 }
 
-DQN_API void *Dqn_CStyleAllocator_Calloc(Dqn_CStyleAllocator *allocator, Dqn_usize n, Dqn_usize size)
-{
-    void *result = allocator->calloc ? allocator->calloc(n, size) : DQN_CALLOC(n, size);
-    if (result)
-    {
-        allocator->calloc_bytes += size;
-        allocator->calloc_count++;
-    }
-
-    return result;
-}
-
-DQN_API void *Dqn_CStyleAllocator_Realloc(Dqn_CStyleAllocator *allocator, void *ptr, Dqn_usize size)
+DQN_API void *Dqn_CRTAllocator__Realloc(Dqn_CRTAllocator *allocator, void *ptr, Dqn_usize size DQN_CALL_SITE_ARGS)
 {
     void *result = allocator->realloc ? allocator->realloc(ptr, size) : DQN_REALLOC(ptr, size);
     if (result)
     {
         allocator->realloc_bytes += size;
         allocator->realloc_count++;
+        Dqn_AllocationTracer_Add(allocator->tracer, result, size DQN_CALL_SITE_ARGS_INPUT);
+        if (result != ptr) Dqn_AllocationTracer_Remove(allocator->tracer, ptr);
     }
 
     return result;
 }
 
-DQN_API void Dqn_CStyleAllocator_Free(Dqn_CStyleAllocator *allocator, void *ptr)
+DQN_API void Dqn_CRTAllocator__Free(Dqn_CRTAllocator *allocator, void *ptr)
 {
-    if (ptr) allocator->free_count++;
+    if (ptr)
+    {
+        allocator->free_count++;
+        Dqn_AllocationTracer_Remove(allocator->tracer, ptr);
+    }
     allocator->free ? allocator->free(ptr) : DQN_FREE(ptr);
 }
 
