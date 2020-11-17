@@ -7,7 +7,6 @@
 #define DQN_IMPLEMENTATION    In one and only one C++ file to enable the header file
 #define DQN_NO_ASSERT         Disable assertions
 #define DQN_STATIC_API        Apply static to all function definitions and disable external linkage to other TU's.
-#define DQN_ALLOCATION_TRACER
 
 #define DQN_MEM_SANITISE 1
 #define DQN_MEM_SANITISE_BYTE 0xDA
@@ -17,10 +16,10 @@
     by defining 'DQN_MEM_SANITISE_BYTE'. By default, if 'DQN_MEM_SANITISE' is
     defined and 'DQN_MEM_SANITISE_BYTE' is not defined, we use 0xDA.
 
-#define DQN_ALLOCATION_TRACER 1
-    When set to 0 all tracing code is compiled out.
+#define DQN_ALLOCATION_TRACING 1
+    When defined to 0 all tracing code is compiled out.
 
-    When set to 1, some allocating calls in the library will automatically get
+    When defined to 1, some allocating calls in the library will automatically get
     passed in the file name, function name, line number and an optional tag.
 
     For data structures that have a 'Dqn_AllocationTracer' member, the caller
@@ -1052,7 +1051,7 @@ Dqn_b32 Dqn_HashTable_Erase(Dqn_HashTable<T> *table, Dqn_u64 key)
 // NOTE: Dqn_AllocationTracer
 //
 // -------------------------------------------------------------------------------------------------
-#if DQN_ALLOCATION_TRACER
+#if DQN_ALLOCATION_TRACING
     #define DQN_CALL_SITE(msg) , __FILE__, __func__, __LINE__, msg
     #define DQN_CALL_SITE_ARGS , char const *file_, char const *func_, int line_, char const *msg_
     #define DQN_CALL_SITE_ARGS_INPUT , file_, func_, line_, msg_
@@ -1074,6 +1073,7 @@ struct Dqn_AllocationTrace
 
 struct Dqn_AllocationTracer
 {
+    // NOTE: Read Only Fields
     Dqn_TicketMutex                    mutex;
     Dqn_HashTable<Dqn_AllocationTrace> table;
 };
@@ -1116,12 +1116,12 @@ struct Dqn_CRTAllocator
     Dqn_CRTAllocator_FreeProc    *free;    // (Optional) When nullptr, DQN_FREE is called
 
     // NOTE: Read Only Fields
-    Dqn_isize malloc_bytes;
-    Dqn_isize realloc_bytes;
+    Dqn_u64 malloc_bytes;
+    Dqn_u64 realloc_bytes;
 
-    Dqn_isize malloc_count;
-    Dqn_isize realloc_count;
-    Dqn_isize free_count;
+    Dqn_u64 malloc_count;
+    Dqn_u64 realloc_count;
+    Dqn_u64 free_count;
 };
 
 
@@ -2178,9 +2178,9 @@ DQN_API Dqn_String Dqn_FixedString_ToString(Dqn_FixedString<MAX_> const *str)
 template <typename T>
 struct Dqn_ListChunk
 {
-    T               *data;
-    Dqn_isize        size;
-    Dqn_isize        count;
+    T                *data;
+    Dqn_isize         size;
+    Dqn_isize         count;
     Dqn_ListChunk<T> *next;
 };
 
@@ -2770,7 +2770,7 @@ Dqn_AllocationTracer Dqn_AllocationTracer_InitWithMemory(void *mem, Dqn_usize me
 
 void Dqn_AllocationTracer_Add(Dqn_AllocationTracer *tracer, void *ptr, Dqn_usize size DQN_CALL_SITE_ARGS)
 {
-#if DQN_ALLOCATION_TRACER
+#if DQN_ALLOCATION_TRACING
     if (!tracer) return;
     Dqn_AllocationTrace trace = {};
     trace.ptr                 = ptr;
@@ -2795,7 +2795,7 @@ void Dqn_AllocationTracer_Add(Dqn_AllocationTracer *tracer, void *ptr, Dqn_usize
 
 void Dqn_AllocationTracer_Remove(Dqn_AllocationTracer *tracer, void *ptr)
 {
-#if DQN_ALLOCATION_TRACER
+#if DQN_ALLOCATION_TRACING
     if (!tracer) return;
     Dqn_TicketMutex_Begin(&tracer->mutex);
     Dqn_AllocationTrace *trace = Dqn_HashTable_Get(&tracer->table, DQN_CAST(Dqn_u64) ptr);
@@ -2827,8 +2827,8 @@ DQN_API void *Dqn_CRTAllocator__Malloc(Dqn_CRTAllocator *allocator, Dqn_usize si
     void *result = allocator->malloc ? allocator->malloc(size) : DQN_MALLOC(size);
     if (result)
     {
-        allocator->malloc_bytes += size;
-        allocator->malloc_count++;
+        Dqn_AtomicAddU64(&allocator->malloc_bytes, size);
+        Dqn_AtomicAddU64(&allocator->malloc_count, 1ULL);
         Dqn_AllocationTracer_Add(allocator->tracer, result, size DQN_CALL_SITE_ARGS_INPUT);
     }
 
@@ -2840,8 +2840,8 @@ DQN_API void *Dqn_CRTAllocator__Realloc(Dqn_CRTAllocator *allocator, void *ptr, 
     void *result = allocator->realloc ? allocator->realloc(ptr, size) : DQN_REALLOC(ptr, size);
     if (result)
     {
-        allocator->realloc_bytes += size;
-        allocator->realloc_count++;
+        Dqn_AtomicAddU64(&allocator->realloc_bytes, size);
+        Dqn_AtomicAddU64(&allocator->realloc_count, 1ULL);
         Dqn_AllocationTracer_Add(allocator->tracer, result, size DQN_CALL_SITE_ARGS_INPUT);
         if (result != ptr) Dqn_AllocationTracer_Remove(allocator->tracer, ptr);
     }
@@ -2853,7 +2853,7 @@ DQN_API void Dqn_CRTAllocator__Free(Dqn_CRTAllocator *allocator, void *ptr)
 {
     if (ptr)
     {
-        allocator->free_count++;
+        Dqn_AtomicAddU64(&allocator->free_count, 1ULL);
         Dqn_AllocationTracer_Remove(allocator->tracer, ptr);
     }
     allocator->free ? allocator->free(ptr) : DQN_FREE(ptr);
@@ -2933,7 +2933,7 @@ void Dqn_Allocator_Free(Dqn_Allocator *allocator, void *ptr)
         allocator->allocations--;
         DQN_ASSERT(allocator->allocations >= 0);
 
-#if DQN_ALLOCATION_TRACER
+#if DQN_ALLOCATION_TRACING
         Dqn_AllocationTracer_Remove(allocator->tracer, ptr);
 #endif
     }
@@ -2984,7 +2984,7 @@ DQN_API void *Dqn_Allocator__Allocate(Dqn_Allocator *allocator, Dqn_isize size, 
         allocator->total_allocations++;
         allocator->total_bytes_allocated += size;
 
-#if DQN_ALLOCATION_TRACER
+#if DQN_ALLOCATION_TRACING
         Dqn_AllocationTracer_Add(allocator->tracer, result, size DQN_CALL_SITE_ARGS_INPUT);
 #endif
     }
