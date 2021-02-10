@@ -859,27 +859,12 @@ DQN_API Dqn_b32  Dqn_Rect_ContainsPoint     (Dqn_Rect const &rect, Dqn_V2 const 
 DQN_API Dqn_b32  Dqn_Rect_ContainsRect      (Dqn_Rect const &a, Dqn_Rect const &b);
 DQN_API Dqn_V2   Dqn_Rect_Size              (Dqn_Rect const &rect);
 DQN_API Dqn_Rect Dqn_Rect_Move              (Dqn_Rect const &src, Dqn_V2 const &move_amount);
+DQN_API Dqn_Rect Dqn_Rect_MoveTo            (Dqn_Rect const &src, Dqn_V2 const &dest);
 DQN_API Dqn_b32  Dqn_Rect_Intersects        (Dqn_Rect const &a, Dqn_Rect const &b);
 DQN_API Dqn_Rect Dqn_Rect_Intersection      (Dqn_Rect const &a, Dqn_Rect const &b);
 DQN_API Dqn_Rect Dqn_Rect_Union             (Dqn_Rect const &a, Dqn_Rect const &b);
 DQN_API Dqn_Rect Dqn_Rect_FromRectI32       (Dqn_RectI32 const &a);
 DQN_API Dqn_V2I  Dqn_RectI32_Size           (Dqn_RectI32 const &rect);
-
-union Dqn_Mat4
-{
-    Dqn_f32 e[16];
-    Dqn_V4  row[4];
-    Dqn_f32 row_major[4][4];
-    Dqn_f32 operator[](Dqn_usize i) const { return e[i]; }
-};
-
-DQN_API Dqn_Mat4 Dqn_Mat4_Identity   ();
-DQN_API Dqn_Mat4 Dqn_Mat4_Scale3f    (Dqn_f32 x, Dqn_f32 y, Dqn_f32 z);
-DQN_API Dqn_Mat4 Dqn_Mat4_ScaleV3    (Dqn_V3 vec);
-DQN_API Dqn_Mat4 Dqn_Mat4_Translate3f(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z);
-DQN_API Dqn_Mat4 Dqn_Mat4_TranslateV3(Dqn_V3 vec);
-DQN_API Dqn_Mat4 operator*           (Dqn_Mat4 const &a, Dqn_Mat4 const &b);
-DQN_API Dqn_V4   operator*           (Dqn_Mat4 const &mat, Dqn_V4 const &vec);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1317,7 +1302,8 @@ DQN_API char    Dqn_Char_ToLower     (char ch);
 // NOTE: String
 //
 // -------------------------------------------------------------------------------------------------
-#define DQN_STRING_LITERAL(string) Dqn_String_Init(string, Dqn_CharCountI(string))
+#define DQN_STRING(string) Dqn_String_Init(string, Dqn_CharCountI(string))
+#define DQN_STRING_FMT(string) (string).size, (string).str
 struct Dqn_String
 {
     union {
@@ -2158,7 +2144,7 @@ DQN_API Dqn_b32 Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, Dqn_String sr
 template <Dqn_isize MAX_>
 DQN_API Dqn_String Dqn_FixedString_ToString(Dqn_FixedString<MAX_> const *str)
 {
-    Dqn_String result = { str->str, str->size };
+    auto result = Dqn_String_Init(str->str, str->size);
     return result;
 }
 
@@ -2276,10 +2262,30 @@ DQN_API T *Dqn_List__Make(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
     #define DQN_FNV1A64_SEED 14695981039346656037ULL
 #endif
 
-DQN_API Dqn_u32 Dqn_FNV1A32_Hash   (void const *bytes, Dqn_isize size);
-DQN_API Dqn_u64 Dqn_FNV1A64_Hash   (void const *bytes, Dqn_isize size);
-DQN_API Dqn_u32 Dqn_FNV1A32_Iterate(void const *bytes, Dqn_isize size, Dqn_u32 hash);
-DQN_API Dqn_u64 Dqn_FNV1A64_Iterate(void const *bytes, Dqn_isize size, Dqn_u64 hash);
+DQN_API Dqn_u32 Dqn_FNV1A32_Hash       (void const *bytes, Dqn_isize size);
+DQN_API Dqn_u64 Dqn_FNV1A64_Hash       (void const *bytes, Dqn_isize size);
+DQN_API Dqn_u32 Dqn_FNV1A32_Iterate    (void const *bytes, Dqn_isize size, Dqn_u32 hash);
+DQN_API Dqn_u64 Dqn_FNV1A64_Iterate    (void const *bytes, Dqn_isize size, Dqn_u64 hash);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Hashing - Dqn_MurmurHash3
+//
+// -------------------------------------------------------------------------------------------------
+//
+// MurmurHash3 was written by Austin Appleby, and is placed in the public
+// domain. The author hereby disclaims copyright to this source code.
+//
+// Note - The x86 and x64 versions do _not_ produce the same results, as the
+// algorithms are optimized for their respective platforms. You can still
+// compile and run any of them on any platform, but your performance with the
+// non-native version will be less than optimal.
+
+struct Dqn_MurmurHash3_128 { Dqn_u64 e[2]; };
+
+DQN_API Dqn_u32             Dqn_MurmurHash3_x86_32 (void const *key, int len, Dqn_u32 seed);
+DQN_API Dqn_MurmurHash3_128 Dqn_MurmurHash3_x64_128(void const *key, int len, Dqn_u32 seed);
+#define DQN_MURMUR_HASH3_U128_AS_U64(key, len, seed) (Dqn_MurmurHash3_x64_128(key, len, seed).e[0])
 
 #endif // DQN_H
 
@@ -2607,6 +2613,15 @@ DQN_API Dqn_Rect Dqn_Rect_Move(Dqn_Rect const &src, Dqn_V2 const &move_amount)
     return result;
 }
 
+DQN_API Dqn_Rect Dqn_Rect_MoveTo(Dqn_Rect const &src, Dqn_V2 const &dest)
+{
+    Dqn_V2 move_amount = dest - src.min;
+    Dqn_Rect result    = src;
+    result.min += move_amount;
+    result.max += move_amount;
+    return result;
+}
+
 DQN_API Dqn_b32 Dqn_Rect_Intersects(Dqn_Rect const &a, Dqn_Rect const &b)
 {
     Dqn_b32 result = (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
@@ -2647,93 +2662,6 @@ DQN_API Dqn_Rect Dqn_Rect_FromRectI32(Dqn_RectI32 const &a)
 DQN_API Dqn_V2I Dqn_RectI32_Size(Dqn_RectI32 const &rect)
 {
     Dqn_V2I result = rect.max - rect.min;
-    return result;
-}
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_Mat4
-//
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_Mat4 Dqn_Mat4_Identity()
-{
-    Dqn_Mat4 result =
-    {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1,
-    };
-    return result;
-}
-
-DQN_API Dqn_Mat4 Dqn_Mat4_Scale3f(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z)
-{
-    Dqn_Mat4 result =
-    {
-        x, 0, 0, 0,
-        0, y, 0, 0,
-        0, 0, z, 0,
-        0, 0, 0, 1,
-    };
-    return result;
-}
-
-DQN_API Dqn_Mat4 Dqn_Mat4_ScaleV3(Dqn_V3 vec)
-{
-    Dqn_Mat4 result = Dqn_Mat4_Scale3f(vec.x, vec.y, vec.z);
-    return result;
-}
-
-DQN_API Dqn_Mat4 Dqn_Mat4_Translate3f(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z)
-{
-    Dqn_Mat4 result =
-    {
-        1, 0, 0, x,
-        0, 1, 0, y,
-        0, 0, 1, z,
-        0, 0, 0, 1,
-    };
-    return result;
-}
-
-DQN_API Dqn_Mat4 Dqn_Mat4_TranslateV3(Dqn_V3 vec)
-{
-    Dqn_Mat4 result = Dqn_Mat4_Translate3f(vec.x, vec.y, vec.z);
-    return result;
-}
-
-DQN_API Dqn_Mat4 operator*(Dqn_Mat4 const &a, Dqn_Mat4 const &b)
-{
-    Dqn_V4 const *row1 = a.row + 0;
-    Dqn_V4 const *row2 = a.row + 1;
-    Dqn_V4 const *row3 = a.row + 2;
-    Dqn_V4 const *row4 = a.row + 3;
-    Dqn_V4 const col1  = Dqn_V4(b.row_major[0][0], b.row_major[1][0], b.row_major[2][0], b.row_major[3][0]);
-    Dqn_V4 const col2  = Dqn_V4(b.row_major[0][1], b.row_major[1][1], b.row_major[2][1], b.row_major[3][1]);
-    Dqn_V4 const col3  = Dqn_V4(b.row_major[0][2], b.row_major[1][2], b.row_major[2][2], b.row_major[3][3]);
-    Dqn_V4 const col4  = Dqn_V4(b.row_major[0][3], b.row_major[1][3], b.row_major[2][3], b.row_major[3][3]);
-
-    Dqn_Mat4 result =
-    {
-        Dqn_V4_Dot(row1, &col1), Dqn_V4_Dot(row1, &col2), Dqn_V4_Dot(row1, &col3), Dqn_V4_Dot(row1, &col4),
-        Dqn_V4_Dot(row2, &col1), Dqn_V4_Dot(row2, &col2), Dqn_V4_Dot(row2, &col3), Dqn_V4_Dot(row2, &col4),
-        Dqn_V4_Dot(row3, &col1), Dqn_V4_Dot(row3, &col2), Dqn_V4_Dot(row3, &col3), Dqn_V4_Dot(row3, &col4),
-        Dqn_V4_Dot(row4, &col1), Dqn_V4_Dot(row4, &col2), Dqn_V4_Dot(row4, &col3), Dqn_V4_Dot(row4, &col4),
-    };
-    return result;
-}
-
-DQN_API Dqn_V4 operator*(Dqn_Mat4 const &mat, Dqn_V4 const &vec)
-{
-    Dqn_f32 x = vec.x, y = vec.y, z = vec.z, w = vec.w;
-    Dqn_V4 result =
-    {
-        (mat[0]  * x) + (mat[1]  * y) + (mat[2]  * z) + (mat[3]  * w),
-        (mat[4]  * x) + (mat[5]  * y) + (mat[6]  * z) + (mat[7]  * w),
-        (mat[8]  * x) + (mat[9]  * y) + (mat[10] * z) + (mat[11] * w),
-        (mat[12] * x) + (mat[13] * y) + (mat[14] * z) + (mat[15] * w),
-    };
     return result;
 }
 
@@ -3388,9 +3316,12 @@ DQN_API char Dqn_Char_ToLower(char ch)
 // -------------------------------------------------------------------------------------------------
 DQN_API Dqn_String Dqn_String_Init(char const *str, Dqn_isize size)
 {
-  Dqn_String result = {str, size};
-  return result;
+    Dqn_String result = {};
+    result.str_       = str;
+    result.size       = size;
+    return result;
 }
+
 DQN_API Dqn_b32 Dqn_String_Compare(Dqn_String const lhs, Dqn_String const rhs)
 {
     Dqn_b32 result = false;
@@ -3871,6 +3802,232 @@ DQN_API Dqn_u64 Dqn_FNV1A64_Hash(void const *bytes, Dqn_isize size)
     Dqn_u64 result = Dqn_FNV1A64_Iterate(bytes, size, DQN_FNV1A64_SEED);
     return result;
 }
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Hashing - Dqn_MurmurHash3
+//
+// -------------------------------------------------------------------------------------------------
+
+#if defined(DQN_COMPILER_MSVC)
+    #define DQN_MMH3_FORCE_INLINE __forceinline
+    #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
+    #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)
+#else
+    #define DQN_MMH3_FORCE_INLINE inline __attribute__((always_inline))
+    #define DQN_MMH3_ROTL32(x, y) ((x) << (y)) | ((x) >> (32 - (y)))
+    #define DQN_MMH3_ROTL64(x, y) ((x) << (y)) | ((x) >> (64 - (y)))
+#endif
+
+//-----------------------------------------------------------------------------
+// Block read - if your platform needs to do endian-swapping or can only
+// handle aligned reads, do the conversion here
+
+DQN_MMH3_FORCE_INLINE Dqn_u32 Dqn_MurmurHash3__GetBlock32(Dqn_u32 const *p, int i)
+{
+    return p[i];
+}
+
+DQN_MMH3_FORCE_INLINE Dqn_u64 Dqn_MurmurHash3__GetBlock64(Dqn_u64 const *p, int i)
+{
+    return p[i];
+}
+
+//-----------------------------------------------------------------------------
+// Finalization mix - force all bits of a hash block to avalanche
+
+DQN_MMH3_FORCE_INLINE Dqn_u32 Dqn_MurmurHash3__FMix32(Dqn_u32 h)
+{
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    return h;
+}
+
+DQN_MMH3_FORCE_INLINE Dqn_u64 Dqn_MurmurHash3__FMix64(Dqn_u64 k)
+{
+    k ^= k >> 33;
+    k *= 0xff51afd7ed558ccd;
+    k ^= k >> 33;
+    k *= 0xc4ceb9fe1a85ec53;
+    k ^= k >> 33;
+    return k;
+}
+
+DQN_API Dqn_u32 Dqn_MurmurHash3_x86_32(void const *key, int len, Dqn_u32 seed)
+{
+    const Dqn_u8 *data = (const Dqn_u8 *)key;
+    const int nblocks   = len / 4;
+
+    Dqn_u32 h1 = seed;
+
+    const Dqn_u32 c1 = 0xcc9e2d51;
+    const Dqn_u32 c2 = 0x1b873593;
+
+    //----------
+    // body
+
+    const Dqn_u32 *blocks = (const Dqn_u32 *)(data + nblocks * 4);
+
+    for (int i = -nblocks; i; i++)
+    {
+        Dqn_u32 k1 = Dqn_MurmurHash3__GetBlock32(blocks, i);
+
+        k1 *= c1;
+        k1 = DQN_MMH3_ROTL32(k1, 15);
+        k1 *= c2;
+
+        h1 ^= k1;
+        h1 = DQN_MMH3_ROTL32(h1, 13);
+        h1 = h1 * 5 + 0xe6546b64;
+    }
+
+    //----------
+    // tail
+
+    const Dqn_u8 *tail = (const Dqn_u8 *)(data + nblocks * 4);
+
+    Dqn_u32 k1 = 0;
+
+    switch (len & 3)
+    {
+        case 3:
+            k1 ^= tail[2] << 16;
+        case 2:
+            k1 ^= tail[1] << 8;
+        case 1:
+            k1 ^= tail[0];
+            k1 *= c1;
+            k1 = DQN_MMH3_ROTL32(k1, 15);
+            k1 *= c2;
+            h1 ^= k1;
+    };
+
+    //----------
+    // finalization
+
+    h1 ^= len;
+
+    h1 = Dqn_MurmurHash3__FMix32(h1);
+
+    return h1;
+}
+
+DQN_API Dqn_MurmurHash3_128 Dqn_MurmurHash3_x64_128(void const *key, int len, Dqn_u32 seed)
+{
+    const Dqn_u8 *data = (const Dqn_u8 *)key;
+    const int nblocks   = len / 16;
+
+    Dqn_u64 h1 = seed;
+    Dqn_u64 h2 = seed;
+
+    const Dqn_u64 c1 = 0x87c37b91114253d5;
+    const Dqn_u64 c2 = 0x4cf5ad432745937f;
+
+    //----------
+    // body
+
+    const Dqn_u64 *blocks = (const Dqn_u64 *)(data);
+
+    for (int i = 0; i < nblocks; i++)
+    {
+        Dqn_u64 k1 = Dqn_MurmurHash3__GetBlock64(blocks, i * 2 + 0);
+        Dqn_u64 k2 = Dqn_MurmurHash3__GetBlock64(blocks, i * 2 + 1);
+
+        k1 *= c1;
+        k1 = DQN_MMH3_ROTL64(k1, 31);
+        k1 *= c2;
+        h1 ^= k1;
+
+        h1 = DQN_MMH3_ROTL64(h1, 27);
+        h1 += h2;
+        h1 = h1 * 5 + 0x52dce729;
+
+        k2 *= c2;
+        k2 = DQN_MMH3_ROTL64(k2, 33);
+        k2 *= c1;
+        h2 ^= k2;
+
+        h2 = DQN_MMH3_ROTL64(h2, 31);
+        h2 += h1;
+        h2 = h2 * 5 + 0x38495ab5;
+    }
+
+    //----------
+    // tail
+
+    const Dqn_u8 *tail = (const Dqn_u8 *)(data + nblocks * 16);
+
+    Dqn_u64 k1 = 0;
+    Dqn_u64 k2 = 0;
+
+    switch (len & 15)
+    {
+        case 15:
+            k2 ^= ((Dqn_u64)tail[14]) << 48;
+        case 14:
+            k2 ^= ((Dqn_u64)tail[13]) << 40;
+        case 13:
+            k2 ^= ((Dqn_u64)tail[12]) << 32;
+        case 12:
+            k2 ^= ((Dqn_u64)tail[11]) << 24;
+        case 11:
+            k2 ^= ((Dqn_u64)tail[10]) << 16;
+        case 10:
+            k2 ^= ((Dqn_u64)tail[9]) << 8;
+        case 9:
+            k2 ^= ((Dqn_u64)tail[8]) << 0;
+            k2 *= c2;
+            k2 = DQN_MMH3_ROTL64(k2, 33);
+            k2 *= c1;
+            h2 ^= k2;
+
+        case 8:
+            k1 ^= ((Dqn_u64)tail[7]) << 56;
+        case 7:
+            k1 ^= ((Dqn_u64)tail[6]) << 48;
+        case 6:
+            k1 ^= ((Dqn_u64)tail[5]) << 40;
+        case 5:
+            k1 ^= ((Dqn_u64)tail[4]) << 32;
+        case 4:
+            k1 ^= ((Dqn_u64)tail[3]) << 24;
+        case 3:
+            k1 ^= ((Dqn_u64)tail[2]) << 16;
+        case 2:
+            k1 ^= ((Dqn_u64)tail[1]) << 8;
+        case 1:
+            k1 ^= ((Dqn_u64)tail[0]) << 0;
+            k1 *= c1;
+            k1 = DQN_MMH3_ROTL64(k1, 31);
+            k1 *= c2;
+            h1 ^= k1;
+    };
+
+    //----------
+    // finalization
+
+    h1 ^= len;
+    h2 ^= len;
+
+    h1 += h2;
+    h2 += h1;
+
+    h1 = Dqn_MurmurHash3__FMix64(h1);
+    h2 = Dqn_MurmurHash3__FMix64(h2);
+
+    h1 += h2;
+    h2 += h1;
+
+    Dqn_MurmurHash3_128 result = {};
+    result.e[0]                = h1;
+    result.e[1]                = h2;
+    return result;
+}
+
+//-----------------------------------------------------------------------------
 #endif // DQN_IMPLEMENTATION
 
 #ifdef STB_SPRINTF_IMPLEMENTATION
