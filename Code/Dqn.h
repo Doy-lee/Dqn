@@ -108,6 +108,8 @@
 // -------------------------------------------------------------------------------------------------
 #if defined(_MSC_VER)
     #define DQN_COMPILER_MSVC
+    #pragma warning(push)
+    #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
 #elif defined(__clang__)
     #define DQN_COMPILER_CLANG
 #elif defined(__GNUC__)
@@ -405,13 +407,13 @@ enum struct Dqn_ZeroMem
 union Dqn_CPUIDRegisters
 {
     unsigned int array[4];
-    struct
+    struct Register
     {
         unsigned int eax;
         unsigned int ebx;
         unsigned int ecx;
         unsigned int edx;
-    };
+    } reg;
 };
 
 struct Dqn_TicketMutex
@@ -1176,15 +1178,23 @@ DQN_API Dqn_Allocator Dqn_Allocator_InitWithArena (Dqn_ArenaAllocator *arena);
 DQN_API Dqn_Allocator Dqn_Allocator_InitWithProcs (Dqn_Allocator_CustomAllocateProc *allocate_proc, Dqn_Allocator_CustomFreeProc *free_proc);
 DQN_API void          Dqn_Allocator_Free          (Dqn_Allocator *allocator, void *ptr);
 
+// A tagged allocation is annotated with a defined string (the tag) which will be associated with
+// the allocation if the allocator was initialised with a MemoryTracer and DQN_ALLOCATION_TRACING is
+// defined. It is compiled out otherwise leaving no impact on the binary.
+
+// Allocate some bytes aligned to a custom alignment.
 #define               Dqn_Allocator_TaggedAllocate(allocator, size, alignment, zero_mem, tag)     Dqn_Allocator__Allocate(allocator, size, alignment, zero_mem DQN_CALL_SITE(tag))
 #define               Dqn_Allocator_Allocate(      allocator, size, alignment, zero_mem)          Dqn_Allocator__Allocate(allocator, size, alignment, zero_mem DQN_CALL_SITE(""))
 
+// Allocate a 'type' aligned to a custom alignment.
 #define               Dqn_Allocator_TaggedNew(     allocator, Type, zero_mem, tag)        (Type *)Dqn_Allocator__Allocate(allocator, sizeof(Type), alignof(Type), zero_mem DQN_CALL_SITE(tag))
 #define               Dqn_Allocator_New(           allocator, Type, zero_mem)             (Type *)Dqn_Allocator__Allocate(allocator, sizeof(Type), alignof(Type), zero_mem DQN_CALL_SITE(""))
 
+// Allocate an array of 'type' aligned to the type's natural alignment using alignof
 #define               Dqn_Allocator_TaggedNewArray(allocator, Type, count, zero_mem, tag) (Type *)Dqn_Allocator__Allocate(allocator, sizeof(Type) * count, alignof(Type), zero_mem DQN_CALL_SITE(tag))
 #define               Dqn_Allocator_NewArray(      allocator, Type, count, zero_mem)      (Type *)Dqn_Allocator__Allocate(allocator, sizeof(Type) * count, alignof(Type), zero_mem DQN_CALL_SITE(""))
 
+// Internal API. Avoid using, and prefer the macros above.
 DQN_API void         *Dqn_Allocator__Allocate     (Dqn_Allocator *allocator, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS);
 
 // -------------------------------------------------------------------------------------------------
@@ -1291,11 +1301,15 @@ DQN_API Dqn_isize Dqn_Safe_TruncateUSizeToISize(Dqn_usize val);
 // NOTE: Dqn_Char
 //
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32 Dqn_Char_IsAlpha     (char ch);
-DQN_API Dqn_b32 Dqn_Char_IsDigit     (char ch);
-DQN_API Dqn_b32 Dqn_Char_IsAlphaNum  (char ch);
-DQN_API Dqn_b32 Dqn_Char_IsWhitespace(char ch);
-DQN_API char    Dqn_Char_ToLower     (char ch);
+DQN_API Dqn_b32 Dqn_Char_IsAlpha       (char ch);
+DQN_API Dqn_b32 Dqn_Char_IsDigit       (char ch);
+DQN_API Dqn_b32 Dqn_Char_IsAlphaNum    (char ch);
+DQN_API Dqn_b32 Dqn_Char_IsWhitespace  (char ch);
+DQN_API Dqn_b32 Dqn_Char_IsHex         (char ch);
+DQN_API Dqn_u8  Dqn_Char_HexToU8       (char ch);
+DQN_API char    Dqn_Char_ToHex         (char ch);
+DQN_API char    Dqn_Char_ToHexUnchecked(char ch);
+DQN_API char    Dqn_Char_ToLower       (char ch);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1303,7 +1317,7 @@ DQN_API char    Dqn_Char_ToLower     (char ch);
 //
 // -------------------------------------------------------------------------------------------------
 #define DQN_STRING(string) Dqn_String_Init(string, Dqn_CharCountI(string))
-#define DQN_STRING_FMT(string) (string).size, (string).str
+#define DQN_STRING_FMT(string) (int)((string).size), (string).str
 struct Dqn_String
 {
     union {
@@ -1321,6 +1335,7 @@ struct Dqn_String
 };
 
 DQN_API Dqn_String Dqn_String_Init                  (char const *str, Dqn_isize size);
+DQN_API Dqn_String Dqn_String_Allocate              (Dqn_Allocator *allocator, Dqn_isize size, Dqn_ZeroMem zero_mem);
 DQN_API Dqn_b32    Dqn_String_Compare               (Dqn_String const lhs, Dqn_String const rhs);
 DQN_API Dqn_b32    Dqn_String_CompareCaseInsensitive(Dqn_String const lhs, Dqn_String const rhs);
 
@@ -1366,6 +1381,8 @@ DQN_API char const *Dqn_Str_SkipToNextCharInPlace      (char const **src);
 DQN_API char const *Dqn_Str_SkipToNextWhitespaceInPlace(char const **src);
 DQN_API char const *Dqn_Str_SkipToNextWordInPlace      (char const **src);
 DQN_API char const *Dqn_Str_SkipWhitespaceInPlace      (char const **src);
+DQN_API char const *Dqn_Str_TrimWhitespaceAround       (char const *src, Dqn_isize size, Dqn_isize *new_size);
+DQN_API char const *Dqn_Str_TrimPrefix                 (char const *src, Dqn_isize size, char const *prefix, Dqn_isize prefix_size, Dqn_isize *trimmed_size);
 DQN_API Dqn_u64     Dqn_Str_ToU64                      (char const *buf, int len = -1);
 DQN_API Dqn_i64     Dqn_Str_ToI64                      (char const *buf, int len = -1);
 
@@ -1623,6 +1640,7 @@ DQN_API void Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder)
 // NOTE: Dqn_Slices
 //
 // -------------------------------------------------------------------------------------------------
+#define DQN_SLICE_FMT(slice) (slice).size, (slice).data
 template <typename T>
 struct Dqn_Slice
 {
@@ -1645,6 +1663,16 @@ DQN_API Dqn_b32 operator==(Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs)
     Dqn_b32 result = lhs.size == rhs.size && lhs.data == rhs.data;
     return result;
 }
+
+template <typename T>
+DQN_API inline Dqn_Slice<T> Dqn_Slice_Init(T *data, Dqn_isize size)
+{
+    Dqn_Slice<T> result = {};
+    result.data         = data;
+    result.size         = size;
+    return result;
+}
+
 
 template <typename T, Dqn_isize N>
 DQN_API inline Dqn_Slice<T> Dqn_Slice_InitWithArray(T (&array)[N])
@@ -2287,6 +2315,9 @@ DQN_API Dqn_u32             Dqn_MurmurHash3_x86_32 (void const *key, int len, Dq
 DQN_API Dqn_MurmurHash3_128 Dqn_MurmurHash3_x64_128(void const *key, int len, Dqn_u32 seed);
 #define DQN_MURMUR_HASH3_U128_AS_U64(key, len, seed) (Dqn_MurmurHash3_x64_128(key, len, seed).e[0])
 
+#if defined(DQN_COMPILER_MSVC)
+    #pragma warning(pop)
+#endif
 #endif // DQN_H
 
 // -------------------------------------------------------------------------------------------------
@@ -3299,6 +3330,40 @@ DQN_API Dqn_b32 Dqn_Char_IsWhitespace(char ch)
     return result;
 }
 
+DQN_API Dqn_b32 Dqn_Char_IsHex(char ch)
+{
+    Dqn_b32 result = ((ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') || (ch >= '0' || ch <= '9'));
+    return result;
+}
+
+DQN_API Dqn_u8 Dqn_Char_HexToU8(char ch)
+{
+    DQN_ASSERT_MSG(Dqn_Char_IsHex(ch), "Hex character not valid '%c'", ch);
+
+    Dqn_u8 result = 0;
+    if (ch >= 'a' && ch <= 'f')
+        result = ch - 'a' + 10;
+    else if (ch >= 'A' && ch <= 'F')
+        result = ch - 'A' + 10;
+    else
+        result = ch - '0';
+    return result;
+}
+
+char constexpr DQN_HEX_LUT[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+DQN_API char Dqn_Char_ToHex(char ch)
+{
+    char result = DQN_CAST(char)-1;
+    if (ch <= 16) result = DQN_HEX_LUT[ch];
+    return result;
+}
+
+DQN_API char Dqn_Char_ToHexUnchecked(char ch)
+{
+    char result = DQN_HEX_LUT[ch];
+    return result;
+}
+
 DQN_API char Dqn_Char_ToLower(char ch)
 {
     char result = ch;
@@ -3318,6 +3383,14 @@ DQN_API Dqn_String Dqn_String_Init(char const *str, Dqn_isize size)
 {
     Dqn_String result = {};
     result.str_       = str;
+    result.size       = size;
+    return result;
+}
+
+DQN_API Dqn_String Dqn_String_Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_ZeroMem zero_mem)
+{
+    Dqn_String result = {};
+    result.str        = Dqn_Allocator_NewArray(allocator, char, size, zero_mem);
     result.size       = size;
     return result;
 }
@@ -3348,18 +3421,10 @@ DQN_API Dqn_String Dqn_String__Copy(Dqn_String const src, Dqn_Allocator *allocat
     return result;
 }
 
-DQN_API Dqn_String Dqn_String_TrimWhitespaceAround(Dqn_String src)
+DQN_API Dqn_String Dqn_String_TrimWhitespaceAround(Dqn_String const src)
 {
-    Dqn_String result = src;
-    if (src.size <= 0) return result;
-
-    char *start = src.str;
-    char *end   = start + (src.size - 1);
-    while (Dqn_Char_IsWhitespace(start[0])) start++;
-    while (end != start && Dqn_Char_IsWhitespace(end[0])) end--;
-
-    result.str  = start;
-    result.size = (end - start) + 1;
+    Dqn_String result = {};
+    result.str_       = Dqn_Str_TrimWhitespaceAround(src.str, src.size, &result.size);
     return result;
 }
 
@@ -3567,6 +3632,48 @@ DQN_API char const *Dqn_Str_SkipWhitespaceInPlace(char const **src)
     *src = Dqn_Str_SkipWhitespace(*src);
     return *src;
 }
+
+DQN_API char const *Dqn_Str_TrimWhitespaceAround(char const *src, Dqn_isize size, Dqn_isize *new_size)
+{
+    char const *result = src;
+    if (new_size) *new_size = 0;
+    if (size <= 0) return result;
+
+    char const *start = result;
+    char const *end   = start + (size - 1);
+    while (Dqn_Char_IsWhitespace(start[0])) start++;
+    while (end != start && Dqn_Char_IsWhitespace(end[0])) end--;
+
+    result = start;
+    if (new_size) *new_size = ((end - start) + 1);
+    return result;
+}
+
+DQN_API char const *Dqn_Str_TrimPrefix(char const *src, Dqn_isize size, char const *prefix, Dqn_isize prefix_size, Dqn_isize *trimmed_size)
+{
+    char const *result = src;
+    if (size >= prefix_size)
+    {
+        Dqn_b32 prefix_matched = true;
+        for (Dqn_isize prefix_index = 0;
+             prefix_index < prefix_size && prefix_matched;
+             prefix_index++)
+        {
+            char prefix_ch = prefix[prefix_index];
+            char src_ch    = src[prefix_index];
+            prefix_matched = src_ch == prefix_ch;
+        }
+
+        if (prefix_matched)
+        {
+            result += prefix_size;
+            *trimmed_size = size - prefix_size;
+        }
+    }
+
+    return result;
+}
+
 
 DQN_API Dqn_u64 Dqn_Str_ToU64(char const *buf, int len)
 {
