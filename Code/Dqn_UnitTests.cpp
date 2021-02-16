@@ -38,7 +38,7 @@ struct TestingState
         testing_state.allocator = Dqn_Allocator_InitWithArena(&testing_state.arena_);                                  \
         testing_state.test      = {};                                                                                  \
     };                                                                                                                 \
-    testing_state.test.name          = Dqn_String_FmtF(&testing_state.allocator, test_name);                           \
+    testing_state.test.name          = Dqn_String_Fmt(&testing_state.allocator, test_name);                           \
     testing_state.test.scope_started = true;                                                                           \
     testing_state.num_tests_in_group++
 
@@ -54,8 +54,8 @@ struct TestingState
     DQN_ASSERT(testing_state.test.scope_started);                                                                      \
     if (!(expr))                                                                                                       \
     {                                                                                                                  \
-        testing_state.test.fail_expr = Dqn_String_FmtF(&testing_state.allocator, #expr);                               \
-        testing_state.test.fail_msg  = Dqn_String_FmtF(&testing_state.allocator, msg, ##__VA_ARGS__);                  \
+        testing_state.test.fail_expr = Dqn_String_Fmt(&testing_state.allocator, #expr);                               \
+        testing_state.test.fail_msg  = Dqn_String_Fmt(&testing_state.allocator, msg, ##__VA_ARGS__);                  \
     }
 
 #define TEST_EXPECT(testing_state, expr) TEST_EXPECT_MSG(testing_state, expr, "")
@@ -124,7 +124,7 @@ static void UnitTests()
                 TEST_START_SCOPE(testing_state, "HeapAllocator - Allocate Small");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
                 char constexpr EXPECT[] = "hello_world";
-                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char));
+                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char), Dqn_ZeroMem::Yes);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
                 memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
                 TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
@@ -134,7 +134,7 @@ static void UnitTests()
                 TEST_START_SCOPE(testing_state, "XHeapAllocator - Allocate Small");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithXHeap();
                 char constexpr EXPECT[] = "hello_world";
-                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char));
+                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char), Dqn_ZeroMem::Yes);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
                 memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
                 TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
@@ -142,11 +142,10 @@ static void UnitTests()
 
             {
                 TEST_START_SCOPE(testing_state, "ArenaAllocator - Allocate Small");
-                Dqn_ArenaAllocator arena = {};
-                arena.allocator         = Dqn_Allocator_InitWithHeap();
-                Dqn_Allocator allocator = Dqn_Allocator_InitWithArena(&arena);
+                Dqn_ArenaAllocator arena = Dqn_ArenaAllocator_InitWithNewAllocator(Dqn_Allocator_InitWithHeap(), 0, nullptr);
+                Dqn_Allocator allocator  = Dqn_Allocator_InitWithArena(&arena);
                 char constexpr EXPECT[] = "hello_world";
-                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char));
+                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char), Dqn_ZeroMem::Yes);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
                 memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
                 TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
@@ -160,7 +159,7 @@ static void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "HeapAllocator - Align to 32 bytes");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
-                auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
+                auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
                 int buf_mod_alignment = DQN_CAST(int)(DQN_CAST(uintptr_t)buf % ALIGNMENT3);
                 TEST_EXPECT_MSG(testing_state, buf_mod_alignment == 0, "buf_mod_alignment: %d", buf_mod_alignment);
@@ -169,7 +168,7 @@ static void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "XHeapAllocator - Align to 32 bytes");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithXHeap();
-                auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
+                auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
                 int buf_mod_alignment = DQN_CAST(int)(DQN_CAST(uintptr_t)buf % ALIGNMENT3);
                 TEST_EXPECT_MSG(testing_state, buf_mod_alignment == 0, "buf_mod_alignment: %d", buf_mod_alignment);
@@ -179,7 +178,7 @@ static void UnitTests()
                 TEST_START_SCOPE(testing_state, "ArenaAllocator - Align to 32 bytes");
                 Dqn_ArenaAllocator arena      = {};
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithArena(&arena);
-                auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
+                auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
                 int buf_mod_alignment = DQN_CAST(int)(DQN_CAST(uintptr_t)buf % ALIGNMENT3);
                 TEST_EXPECT_MSG(testing_state, buf_mod_alignment == 0, "buf_mod_alignment: %d", buf_mod_alignment);
             }
@@ -193,7 +192,7 @@ static void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "HeapAllocator - Allocation metadata initialised");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
-                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
+                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
                 Dqn_PointerMetadata metadata = Dqn_PointerMetadata_Get(buf);
                 TEST_EXPECT_MSG(testing_state, metadata.alignment == ALIGNMENT3, "metadata.alignment: %u, ALIGNMENT3: %u", metadata.alignment, ALIGNMENT3);
@@ -203,7 +202,7 @@ static void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "XHeapAllocator - Allocation metadata initialised");
                 Dqn_Allocator allocator = Dqn_Allocator_InitWithXHeap();
-                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3);
+                char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
                 Dqn_PointerMetadata metadata = Dqn_PointerMetadata_Get(buf);
                 TEST_EXPECT_MSG(testing_state, metadata.alignment == ALIGNMENT3, "metadata.alignment: %u, ALIGNMENT3: %u", metadata.alignment, ALIGNMENT3);
@@ -246,7 +245,7 @@ static void UnitTests()
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
                 Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
-                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                Dqn_Array_AddArray(&array, DATA, Dqn_ArrayCount(DATA));
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data %d", array.data[1]);
                 TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data %d", array.data[2]);
@@ -259,13 +258,13 @@ static void UnitTests()
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
                 Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
-                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
-                Dqn_Array_Clear(&array, false /*zero_mem*/);
+                Dqn_Array_AddArray(&array, DATA, Dqn_ArrayCount(DATA));
+                Dqn_Array_Clear(&array, Dqn_ZeroMem::No);
                 TEST_EXPECT_MSG(testing_state, array.size == 0, "array.size: %d", array.size);
                 TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d. Clear but don't zero memory so old values should still remain", array.data[0]);
 
-                Dqn_Array_Clear(&array, true /*zero_mem*/);
+                Dqn_Array_Clear(&array, Dqn_ZeroMem::Yes);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 0, "array.data %d. Clear but zero memory old values should not remain", array.data[0]);
             }
 
@@ -274,7 +273,7 @@ static void UnitTests()
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3, 4};
                 Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
-                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                Dqn_Array_AddArray(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_EraseUnstable(&array, 1);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 4, "array.data %d", array.data[1]);
@@ -292,7 +291,7 @@ static void UnitTests()
                 int memory[4]        = {};
                 int DATA[]           = {1, 2, 3};
                 Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
-                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                Dqn_Array_AddArray(&array, DATA, Dqn_ArrayCount(DATA));
                 Dqn_Array_Pop(&array, 2);
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.size == 1, "array.size: %d", array.size);
@@ -324,7 +323,7 @@ static void UnitTests()
                 TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
 
                 int DATA[] = {1, 2, 3, 4};
-                Dqn_Array_Add(&array, DATA, Dqn_ArrayCount(DATA));
+                Dqn_Array_AddArray(&array, DATA, Dqn_ArrayCount(DATA));
                 TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
                 TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data: %d", array.data[1]);
                 TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data: %d", array.data[2]);
@@ -568,13 +567,13 @@ static void UnitTests()
             TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
         }
 
-        // NOTE: Dqn_StringBuilder_AppendFmtF
+        // NOTE: Dqn_StringBuilder_AppendFmt
         {
             {
                 TEST_START_SCOPE(testing_state, "Append format string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
-                Dqn_StringBuilder_AppendFmtF(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
-                Dqn_StringBuilder_AppendFmtF(&builder, "Extra Stuff");
+                Dqn_StringBuilder_AppendFmt(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
+                Dqn_StringBuilder_AppendFmt(&builder, "Extra Stuff");
                 Dqn_isize size    = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
@@ -587,7 +586,7 @@ static void UnitTests()
             {
                 TEST_START_SCOPE(testing_state, "Append nullptr format string and build using heap allocator");
                 Dqn_StringBuilder<> builder = {};
-                Dqn_StringBuilder_AppendFmtF(&builder, nullptr);
+                Dqn_StringBuilder_AppendFmt(&builder, nullptr);
                 Dqn_isize size = 0;
                 char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
                 DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
@@ -675,11 +674,11 @@ static void UnitTests()
             TEST_EXPECT_MSG(testing_state, Dqn_FixedString_Append(&str, "abcd") == false, "We need space for the null-terminator");
         }
 
-        // NOTE: Dqn_FixedString_AppendFmtF
+        // NOTE: Dqn_FixedString_AppendFmt
         {
             TEST_START_SCOPE(testing_state, "Append format string too much fails");
             Dqn_FixedString<4> str = {};
-            TEST_EXPECT_MSG(testing_state, Dqn_FixedString_AppendFmtF(&str, "abcd") == false, "We need space for the null-terminator");
+            TEST_EXPECT_MSG(testing_state, Dqn_FixedString_AppendFmt(&str, "abcd") == false, "We need space for the null-terminator");
         }
     }
 

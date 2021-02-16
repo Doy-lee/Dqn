@@ -948,6 +948,7 @@ Dqn_HashTable<T> Dqn_HashTable_InitWithMemory(void *mem, Dqn_isize mem_size)
     // NOTE: Generate the table
     //
     Dqn_isize bytes_required = bytes_for_values + bytes_for_usage_bitset;
+    (void)bytes_required;
     DQN_ASSERT_MSG(bytes_required <= mem_size,
                    "(bytes_for_values = %Id, bytes_for_usage_bitset = %Id, mem_size = %Id)",
                    bytes_for_values, bytes_for_usage_bitset, mem_size);
