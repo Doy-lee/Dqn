@@ -315,35 +315,31 @@ const Dqn_usize DQN_USIZE_MAX = SIZE_MAX;
 // NOTE: Compile Time Utilities
 //
 // ------------------------------------------------------------------------------------------------
-template <typename T, Dqn_isize N>
-constexpr Dqn_usize Dqn_ArrayCount(T const (&)[N])
-{
-    return N;
-}
-
-template <typename T, Dqn_isize N>
-constexpr Dqn_isize Dqn_ArrayCountI(T const (&)[N])
-{
-    return N;
-}
-
-template <Dqn_isize N>
-constexpr Dqn_usize Dqn_CharCount(char const (&)[N])
-{
-    return N - 1;
-}
-
-template <Dqn_isize N>
-constexpr Dqn_isize Dqn_CharCountI(char const (&)[N])
-{
-    return N - 1;
-}
+template <typename T, Dqn_isize N> constexpr Dqn_usize Dqn_ArrayCount (T    const (&)[N]) { return N; }
+template <typename T, Dqn_isize N> constexpr Dqn_isize Dqn_ArrayCountI(T    const (&)[N]) { return N; }
+template <Dqn_isize N>             constexpr Dqn_usize Dqn_CharCount  (char const (&)[N]) { return N - 1; }
+template <Dqn_isize N>             constexpr Dqn_isize Dqn_CharCountI (char const (&)[N]) { return N - 1; }
 
 // ------------------------------------------------------------------------------------------------
 //
 // NOTE: Defer Macro
 //
 // ------------------------------------------------------------------------------------------------
+/*
+    #include <stdio.h>
+    int main()
+    {
+        DQN_DEFER { printf("Three ..\n"); };
+        printf("One ..\n");
+        printf("Two ..\n");
+
+        // One ..
+        // Two ..
+        // Three ..
+
+        return 0;
+    }
+*/
 template <typename Procedure>
 struct Dqn_Defer
 {
@@ -368,11 +364,7 @@ struct Dqn_DeferHelper
 // NOTE: Utility Enums
 //
 // ------------------------------------------------------------------------------------------------
-enum struct Dqn_ZeroMem
-{
-    No,
-    Yes
-};
+enum struct Dqn_ZeroMem { No, Yes };
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -413,15 +405,16 @@ union Dqn_CPUIDRegisters
         unsigned int ebx;
         unsigned int ecx;
         unsigned int edx;
-    } reg;
+    };
 };
 
 struct Dqn_TicketMutex
 {
-    unsigned int volatile ticket;
-    unsigned int volatile serving;
+    unsigned int volatile ticket;  // The next ticket ID to give out to the thread taking the mutex
+    unsigned int volatile serving; // The ticket ID that the mutex will block until it receives
 };
 
+// Query the CPU's CPUID function and return the data in the registers
 Dqn_CPUIDRegisters Dqn_CPUID            (int function_id);
 void               Dqn_TicketMutex_Begin(Dqn_TicketMutex *mutex);
 void               Dqn_TicketMutex_End  (Dqn_TicketMutex *mutex);
@@ -625,19 +618,19 @@ STBSP__PUBLICDEF void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 
 enum struct Dqn_LogType
 {
-#define X_ENTRY(enum_val, string) enum_val,
+    #define X_ENTRY(enum_val, string) enum_val,
     X_MACRO
-#undef X_ENTRY
+    #undef X_ENTRY
 };
 
 char const *Dqn_LogTypeString[] = {
-#define X_ENTRY(enum_val, string) string,
+    #define X_ENTRY(enum_val, string) string,
     X_MACRO
-#undef X_ENTRY
+    #undef X_ENTRY
 };
-
 #undef X_MACRO
 
+// Logging functions
 #define DQN_LOG_E(fmt, ...) dqn_log(Dqn_LogType::Error,   DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG_D(fmt, ...) dqn_log(Dqn_LogType::Debug,   DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG_W(fmt, ...) dqn_log(Dqn_LogType::Warning, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
@@ -645,19 +638,21 @@ char const *Dqn_LogTypeString[] = {
 #define DQN_LOG_M(fmt, ...) dqn_log(Dqn_LogType::Memory,  DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG(log_type, fmt, ...) dqn_log(log_type,     DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 
+// Internal logging functions, prefer the logging macros above
 DQN_API void Dqn_LogV   (Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
 DQN_API void Dqn_Log    (Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
 typedef void Dqn_LogProc(Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
 extern Dqn_LogProc *dqn_log;
+
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Align
 //
 // -------------------------------------------------------------------------------------------------
-// NOTE: Even if pointer is aligned, align it again, ensuring there's at minimum
-// 1 byte and at most alignment bytes of space between the aligned pointer and
-// raw pointer. We do this to keep metadata exactly 1 byte behind the aligned
-// pointer.
+// 'AlignAddressEnsuringSpace" aligns even if pointer is aligned, align it again, ensuring there's
+// at minimum 1 byte and at most 'alignment' bytes of space between the aligned pointer and raw
+// pointer. We do this to keep metadata exactly 1 byte behind the aligned pointer.
+// 'AlignAddress' is the same as above except it's a no-op if the address is already aligned.
 DQN_API Dqn_uintptr Dqn_AlignAddressEnsuringSpace(Dqn_uintptr address, Dqn_u8 alignment);
 DQN_API Dqn_uintptr Dqn_AlignAddress             (Dqn_uintptr address, Dqn_u8 alignment);
 
@@ -669,14 +664,21 @@ DQN_API Dqn_uintptr Dqn_AlignAddress             (Dqn_uintptr address, Dqn_u8 al
 // Store data about a memory allocated pointer. Only used for the generic heap allocator.
 struct Dqn_PointerMetadata
 {
-    Dqn_u64 size;
-    Dqn_u8  alignment;
-    Dqn_u8  offset; // Subtract offset from aligned ptr to return to the allocation ptr
+    Dqn_u64 size;      // The size of the user allocation not including the metadata
+    Dqn_u8  alignment; // The alignment of the user allocation
+    Dqn_u8  offset;    // Subtract offset from aligned ptr to return to the allocation ptr
 };
 
-DQN_API Dqn_isize           Dqn_PointerMetadata_SizeRequired(Dqn_isize size, Dqn_u8 alignment);
-DQN_API char               *Dqn_PointerMetadata_Init(void *ptr, Dqn_isize size, Dqn_u8 alignment);
-DQN_API Dqn_PointerMetadata Dqn_PointerMetadata_Get(void *ptr);
+// Given an user allocation, compute the total space required which includes space for the metadata
+// size: The size requested by the user
+// alignment: The alignment requested by the user
+DQN_API Dqn_isize           Dqn_PointerMetadata_SizeRequired (Dqn_isize size, Dqn_u8 alignment);
+
+// ptr: The pointer to write the metadata into
+// size: The size as calculated from 'PointerMetadata_SizeRequired'
+// alignment: The alignment requested by the user
+DQN_API char               *Dqn_PointerMetadata_Init         (void *ptr, Dqn_isize size, Dqn_u8 alignment);
+DQN_API Dqn_PointerMetadata Dqn_PointerMetadata_Get          (void *ptr);
 DQN_API char               *Dqn_PointerMetadata_GetRawPointer(void *ptr);
 
 // -------------------------------------------------------------------------------------------------
@@ -890,78 +892,10 @@ struct Dqn_HashTable
     Dqn_isize                 size;               // Total 'values' the hash table can store
     T                        *values;             // Storage of the 'values' a key maps to
     Dqn_HashTableUsageBitset *usage_bitsets;      // Array of numbers where each bit represents if the hash table slot in 'data' is occupied or not.
-    Dqn_isize                 usage_bitsets_size; //
+    Dqn_isize                 usage_bitsets_size; // The number of usage bitsets
 };
 
-template <typename T>
-Dqn_isize Dqn_HashTable_MemoryRequired(Dqn_isize num_values)
-{
-    Dqn_isize const BITS_PER_BITSET = sizeof(Dqn_HashTableUsageBitset) * 8;
-
-    Dqn_isize bitsets_required      = (num_values / BITS_PER_BITSET);
-    if (num_values % BITS_PER_BITSET != 0)
-        bitsets_required += 1;
-
-    Dqn_isize bytes_for_values = sizeof(T) * num_values;
-    Dqn_isize bytes_for_bitset = bitsets_required * sizeof(Dqn_HashTableUsageBitset);
-    Dqn_isize result           = bytes_for_values + bytes_for_bitset;
-    return result;
-}
-
-template <typename T>
-Dqn_HashTable<T> Dqn_HashTable_InitWithMemory(void *mem, Dqn_isize mem_size)
-{
-    //
-    // NOTE: Calculate how to split up the memory for maximal usage
-    //
-    Dqn_isize bytes_for_values       = 0;
-    Dqn_isize bytes_for_usage_bitset = 0;
-    Dqn_isize values_count           = 0;
-    Dqn_isize usage_bitsets_count    = 0;
-    {
-        Dqn_isize max_values    = mem_size / sizeof(T);
-        Dqn_isize mem_remaining = mem_size - (max_values * sizeof(T));
-
-        Dqn_isize const BITS_PER_BITSET = sizeof(Dqn_HashTableUsageBitset) * 8;
-        Dqn_isize bitsets_required      = (max_values / BITS_PER_BITSET);
-        if (max_values % BITS_PER_BITSET != 0)
-            bitsets_required += 1;
-
-        bytes_for_usage_bitset = (bitsets_required * sizeof(Dqn_HashTableUsageBitset));
-        if (mem_remaining < bytes_for_usage_bitset)
-        {
-            Dqn_isize extra_bytes_needed = bytes_for_usage_bitset - mem_remaining;
-            Dqn_isize excess_items       = extra_bytes_needed / sizeof(T);
-            if (extra_bytes_needed % sizeof(T) != 0)
-                excess_items += 1;
-            max_values -= excess_items;
-        }
-
-        bytes_for_values    = max_values * sizeof(T);
-        values_count        = max_values;
-        usage_bitsets_count = bitsets_required;
-
-        DQN_ASSERT(bytes_for_values > 0);
-    }
-
-    //
-    // NOTE: Generate the table
-    //
-    Dqn_isize bytes_required = bytes_for_values + bytes_for_usage_bitset;
-    (void)bytes_required;
-    DQN_ASSERT_MSG(bytes_required <= mem_size,
-                   "(bytes_for_values = %Id, bytes_for_usage_bitset = %Id, mem_size = %Id)",
-                   bytes_for_values, bytes_for_usage_bitset, mem_size);
-    DQN_ASSERT_MSG(bytes_required >= 0, "(bytes_required = %Iu)", bytes_required);
-
-    Dqn_HashTable<T> result   = {};
-    result.values             = DQN_CAST(T *) mem;
-    result.usage_bitsets      = DQN_CAST(Dqn_HashTableUsageBitset *)(DQN_CAST(Dqn_uintptr) mem + bytes_for_values);
-    result.size               = values_count;
-    result.usage_bitsets_size = usage_bitsets_count;
-    return result;
-}
-
+// Internal structure for finding a key in the hash-table
 struct Dqn__HashTableKeyLookup
 {
     Dqn_isize index;        // Index into the 'values' array containing the value for the 'key'
@@ -970,69 +904,13 @@ struct Dqn__HashTableKeyLookup
     Dqn_usize bitset_bit;   // The N'th bit, bit-shifted into bitset position
 };
 
-template <typename T>
-Dqn__HashTableKeyLookup Dqn_HashTable__GetKeyLookup(Dqn_HashTable<T> const *table, Dqn_u64 key)
-{
-    Dqn_isize const BITS_PER_BITSET = sizeof(Dqn_HashTableUsageBitset) * 8;
-
-    Dqn__HashTableKeyLookup result = {};
-    result.index                   = key % table->size;
-    result.bitset_index            = result.index / BITS_PER_BITSET;
-    result.bit_index               = result.index % BITS_PER_BITSET;
-    result.bitset_bit              = 1ULL << result.bit_index;
-    return result;
-}
-
-template <typename T>
-T *Dqn_HashTable_FindOrMake(Dqn_HashTable<T> *table, Dqn_u64 key, Dqn_b32 *found = nullptr)
-{
-    Dqn__HashTableKeyLookup lookup = Dqn_HashTable__GetKeyLookup(table, key);
-    T *result                      = &table->values[lookup.index];
-    Dqn_b32 found_                 = true;
-    if ((table->usage_bitsets[lookup.bitset_index] & lookup.bitset_bit) == 0)
-    {
-        found_ = false;
-        table->count++;
-        table->usage_bitsets[lookup.bitset_index] |= lookup.bitset_bit;
-    }
-
-    if (found) *found = found_;
-    return result;
-}
-
-template <typename T>
-Dqn_b32 Dqn_HashTable_Add(Dqn_HashTable<T> *table, Dqn_u64 key, T const &value)
-{
-    Dqn_b32 found = false;
-    T *entry      = Dqn_HashTable_FindOrMake(table, key, &found);
-    if (!found) *entry = value;
-    Dqn_b32 result = (found == false);
-    return result;
-}
-
-template <typename T>
-T *Dqn_HashTable_Get(Dqn_HashTable<T> *table, Dqn_u64 key)
-{
-    Dqn__HashTableKeyLookup lookup = Dqn_HashTable__GetKeyLookup(table, key);
-    T *result = (table->usage_bitsets[lookup.bitset_index] & lookup.bitset_bit) ? &table->values[lookup.index] : nullptr;
-    return result;
-}
-
-template <typename T>
-Dqn_b32 Dqn_HashTable_Erase(Dqn_HashTable<T> *table, Dqn_u64 key)
-{
-    Dqn_b32 result                 = false;
-    Dqn__HashTableKeyLookup lookup = Dqn_HashTable__GetKeyLookup(table, key);
-    if (table->usage_bitsets[lookup.bitset_index] & lookup.bitset_bit)
-    {
-        result = true;
-        table->usage_bitsets[lookup.bitset_index] &= ~lookup.bitset_bit;
-        table->count--;
-    }
-
-    DQN_ASSERT_MSG(table->count >= 0, "(count = %Id)");
-    return result;
-}
+template <typename T> Dqn_isize                Dqn_HashTable_MemoryRequired(Dqn_isize num_values);
+template <typename T> Dqn_HashTable<T>         Dqn_HashTable_InitWithMemory(void *mem, Dqn_isize mem_size);
+template <typename T> Dqn__HashTableKeyLookup  Dqn_HashTable__GetKeyLookup (Dqn_HashTable<T> const *table, Dqn_u64 key);
+template <typename T> T                       *Dqn_HashTable_FindOrMake    (Dqn_HashTable<T> *table, Dqn_u64 key, Dqn_b32 *found = nullptr);
+template <typename T> Dqn_b32                  Dqn_HashTable_Add           (Dqn_HashTable<T> *table, Dqn_u64 key, T const &value);
+template <typename T> T                       *Dqn_HashTable_Get           (Dqn_HashTable<T> *table, Dqn_u64 key);
+template <typename T> Dqn_b32                  Dqn_HashTable_Erase         (Dqn_HashTable<T> *table, Dqn_u64 key);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1427,7 +1305,7 @@ DQN_API char *Dqn_U64ToStr            (Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: String Builder
+// NOTE: Dqn_StringBuilder
 //
 // -------------------------------------------------------------------------------------------------
 struct Dqn_StringBuilderBlock
@@ -1449,6 +1327,426 @@ struct Dqn_StringBuilder
     Dqn_StringBuilderBlock *last_mem_block;
 };
 
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_InitWithArena                (Dqn_StringBuilder<N> *builder, Dqn_ArenaAllocator *arena);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_InitWithAllocator            (Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator);
+
+// Get the size required to build the string, it returns the length not including the null-terminator.
+template <Dqn_isize N> DQN_API Dqn_isize   Dqn_StringBuilder_GetSize                      (Dqn_StringBuilder<N> const *builder);
+
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_BuildToDest                  (Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size);
+template <Dqn_isize N> DQN_API Dqn_String  Dqn_StringBuilder_BuildStringWithAllocator     (Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator);
+template <Dqn_isize N> DQN_API Dqn_String  Dqn_StringBuilder_BuildStringWithArenaAllocator(Dqn_StringBuilder<N> *builder, Dqn_ArenaAllocator *arena);
+#define                                    Dqn_StringBuilder_Build(                        builder, allocator, len) Dqn_StringBuilder__Build(builder, allocator, len DQN_CALL_SITE(""))
+
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendFmtV                   (Dqn_StringBuilder<N> *builder, char const *fmt, va_list va);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendFmt                    (Dqn_StringBuilder<N> *builder, char const *fmt, ...);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_Append                       (Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendString                 (Dqn_StringBuilder<N> *builder, Dqn_String const string);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendChar                   (Dqn_StringBuilder<N> *builder, char ch);
+
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_Free                         (Dqn_StringBuilder<N> *builder);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Slices
+//
+// -------------------------------------------------------------------------------------------------
+#define DQN_SLICE_FMT(slice) (slice).size, (slice).data
+template <typename T>
+struct Dqn_Slice
+{
+    T        *data;
+    Dqn_isize size;
+
+    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
+    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
+    T const *begin      ()            const { return data; }
+    T const *end        ()            const { return data + size; }
+    T       *begin      ()                  { return data; }
+    T       *end        ()                  { return data + size; }
+    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
+    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
+};
+
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Init              (T *data, Dqn_isize size);
+template <typename T, Dqn_isize N> DQN_API Dqn_Slice<T> Dqn_Slice_InitWithArray     (T (&array)[N]);
+
+#define                                                 Dqn_Slice_TaggedAllocate(    allocator, Type, size, zero_mem, tag) Dqn_Slice__Allocate<Type>(allocator, size, zero_mem DQN_CALL_SITE(tag))
+#define                                                 Dqn_Slice_Allocate(          allocator, Type, size, zero_mem)      Dqn_Slice__Allocate<Type>(allocator, size, zero_mem DQN_CALL_SITE(""))
+
+// Allocate and copy the bytes/slice into a new slice. The null terminated variants are for byte
+// arrays and allocate an extra byte to ensure that the last byte is 0.
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize size);
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Copy              (Dqn_Allocator *allocator, T const *src, Dqn_isize size);
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Copy              (Dqn_Allocator *allocator, Dqn_Slice<T> const src);
+
+// Check equality of two slices using memcmp, operator== checks slice equality if size and pointers are the same
+template <typename T>              DQN_API Dqn_b32      Dqn_Slice_Memcmp            (Dqn_Slice<T> const a, Dqn_Slice<T> const b);
+template <typename T>              DQN_API Dqn_b32      operator==                  (Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_FixedArray
+//
+// -------------------------------------------------------------------------------------------------
+
+#define DQN_FIXED_ARRAY_TEMPLATE template <typename T, int MAX_>
+#define DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray<T, MAX_>
+DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
+{
+    T               data[MAX_];
+    Dqn_isize       size;
+
+    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data[i]; }
+    T       *begin      ()                  { return data; }
+    T       *end        ()                  { return data + size; }
+    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
+
+    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, i, size); return data[i]; }
+    T const *begin      ()            const { return data; }
+    T const *end        ()            const { return data + size; }
+    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
+};
+
+DQN_FIXED_ARRAY_TEMPLATE DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL     Dqn_FixedArray_Init         (T const *item, int num);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_Slice<T>                      Dqn_FixedArray_Slice        (DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArray_Max          (DQN_FIXED_ARRAY_TEMPLATE_DECL const *);
+
+// Calculate the index of a item from the its pointer
+DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArray_GetIndex     (DQN_FIXED_ARRAY_TEMPLATE_DECL const *a, T const *entry);
+
+// return: The newly added item, nullptr if failed
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Add          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Add          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const &item);
+
+// Bump the size of the array and return a pointer to 'num' uninitialised elements
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Make         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num);
+
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_Clear        (DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_EraseStable  (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
+
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_Pop          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Peek         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                 Dqn_FixedArray_PeekCopy     (DQN_FIXED_ARRAY_TEMPLATE_DECL const *a);
+
+template <typename T, int MAX_, typename IsEqual> DQN_API T       *Dqn_FixedArray_Find         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc);
+template <typename T, int MAX_, typename IsEqual> DQN_API Dqn_b32  Dqn_FixedArray_FindElseMake (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Find         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Array
+//
+// -------------------------------------------------------------------------------------------------
+template <typename T> struct Dqn_Array
+{
+    Dqn_Allocator allocator;
+    T            *data;
+    Dqn_isize     size;
+    Dqn_isize     max;
+
+    T const    operator[](Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
+    T          operator[](Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
+    T const   *begin    ()             const { return data; }
+    T const   *end      ()             const { return data + size; }
+    T         *begin    ()                   { return data; }
+    T         *end      ()                   { return data + size; }
+    T const   *operator+(Dqn_isize i)  const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
+    T         *operator+(Dqn_isize i)        { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
+};
+
+template <typename T> DQN_API Dqn_Array<T> Dqn_Array_InitWithMemory         (T *memory, Dqn_isize max, Dqn_isize size = 0);
+#define                                    Dqn_Array_InitWithAllocatorNoGrow(allocator, Type, max, size, zero_mem) Dqn_Array__InitWithAllocatorNoGrow<Type>(allocator, max, size, zero_mem DQN_CALL_SITE(""))
+
+#define                                    Dqn_Array_Reserve(                array, size) Dqn_Array__Reserve(array, size DQN_CALL_SITE(""))
+template <typename T> DQN_API void         Dqn_Array_Free                   (Dqn_Array<T> *a);
+
+#define                                    Dqn_Array_AddArray(               array, items, num) Dqn_Array__AddArray(array, items, num DQN_CALL_SITE(""))
+#define                                    Dqn_Array_Add(                    array, item) Dqn_Array__Add(array, item DQN_CALL_SITE(""))
+#define                                    Dqn_Array_Make(                   array, num) Dqn_Array__Make(array, num DQN_CALL_SITE(""))
+template <typename T> DQN_API void         Dqn_Array_Clear                  (Dqn_Array<T> *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
+
+template <typename T> DQN_API void         Dqn_Array_EraseStable            (Dqn_Array<T> *a, Dqn_isize index);
+template <typename T> DQN_API void         Dqn_Array_EraseUnstable          (Dqn_Array<T> *a, Dqn_isize index);
+
+template <typename T> DQN_API void         Dqn_Array_Pop                    (Dqn_Array<T> *a, Dqn_isize num);
+template <typename T> DQN_API T *          Dqn_Array_Peek                   (Dqn_Array<T> *a);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_FixedString
+//
+// -------------------------------------------------------------------------------------------------
+template <Dqn_isize MAX_>
+struct Dqn_FixedString
+{
+    union { char data[MAX_]; char str[MAX_]; char buf[MAX_]; };
+    Dqn_isize size;
+
+    Dqn_b32 operator==(Dqn_FixedString const &other) const
+    {
+        if (size != other.size) return false;
+        bool result = memcmp(data, other.data, size);
+        return result;
+    }
+
+    Dqn_b32 operator!=(Dqn_FixedString const &other) const { return !(*this == other); }
+
+    char const &operator[]   (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data[i]; }
+    char       &operator[]   (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data[i]; }
+    char const *begin        ()        const { return data; }
+    char const *end          ()        const { return data + size; }
+    char       *begin        ()              { return data; }
+    char       *end          ()              { return data + size; }
+};
+
+template <Dqn_isize MAX_> DQN_API Dqn_FixedString<MAX_> Dqn_FixedString_InitFmt   (char const *fmt, ...);
+template <Dqn_isize MAX_> DQN_API Dqn_isize             Dqn_FixedString_Max       (Dqn_FixedString<MAX_> *);
+template <Dqn_isize MAX_> DQN_API void                  Dqn_FixedString_Clear     (Dqn_FixedString<MAX_> *str);
+template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_AppendFmtV(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va);
+template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_AppendFmt (Dqn_FixedString<MAX_> *str, char const *fmt, ...);
+template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_Append    (Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size = -1);
+template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_Append    (Dqn_FixedString<MAX_> *str, Dqn_String src);
+template <Dqn_isize MAX_> DQN_API Dqn_String            Dqn_FixedString_ToString  (Dqn_FixedString<MAX_> const *str);
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_List - Chunked Linked Lists
+//
+// -------------------------------------------------------------------------------------------------
+/*
+  Dqn_List<int> list     = {};  // Zero initialise to use default heap allocator (via Dqn_Allocator).
+  list.chunk_size = 128; // When out of space, allocate a chunk with atleast for 128 items, or the amount the user requested, whichever is greater.
+  int *array             = Dqn_List_Make<int>(list, 5, Dqn_ZeroMem::Yes); // First time, allocate chunk (128 items), then bump chunk pointer to allocate 5 ints.
+
+  // TODO(doyle): Freeing step, I only use these with arenas, so normally I just free the arena.
+*/
+
+template <typename T>
+struct Dqn_ListChunk
+{
+    T                *data;
+    Dqn_isize         size;
+    Dqn_isize         count;
+    Dqn_ListChunk<T> *next;
+};
+
+template <typename T>
+struct Dqn_List
+{
+    // When 'allocator' is null, 'backup_allocator' will be used. This allows
+    // zero initialization usage of Dqn_List to work without configuration.
+    Dqn_Allocator    backup_allocator;
+    Dqn_Allocator   *allocator;
+
+    Dqn_isize        chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
+    Dqn_ListChunk<T> *head;
+    Dqn_ListChunk<T> *tail;
+};
+
+template <typename T> DQN_API Dqn_List<T>  Dqn_List_InitWithArena    (Dqn_ArenaAllocator *arena, Dqn_isize chunk_size = 128);
+template <typename T> DQN_API Dqn_List<T>  Dqn_List_InitWithAllocator(Dqn_Allocator *allocator, Dqn_isize chunk_size = 128);
+#define                                    Dqn_List_TaggedMake(       list, count, tag) Dqn_List__Make(list, count DQN_CALL_SITE(tag))
+#define                                    Dqn_List_Make(             list, count)      Dqn_List__Make(list, count DQN_CALL_SITE(""))
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Hashing - Dqn_FNV1A[32|64]
+//
+// -------------------------------------------------------------------------------------------------
+//
+// Usage
+//
+// char buffer1[128] = {random bytes};
+// char buffer2[128] = {random bytes};
+// Dqn_u64 hash      = Dqn_FNV1A64_Hash(buffer1, sizeof(buffer1));
+// hash              = Dqn_FNV1A64_Iterate(buffer2, sizeof(buffer2), hash); // subsequent hashing
+//
+#ifndef DQN_FNV1A32_SEED
+    #define DQN_FNV1A32_SEED 2166136261U
+#endif
+
+#ifndef DQN_FNV1A64_SEED
+    #define DQN_FNV1A64_SEED 14695981039346656037ULL
+#endif
+
+DQN_API Dqn_u32 Dqn_FNV1A32_Hash       (void const *bytes, Dqn_isize size);
+DQN_API Dqn_u64 Dqn_FNV1A64_Hash       (void const *bytes, Dqn_isize size);
+DQN_API Dqn_u32 Dqn_FNV1A32_Iterate    (void const *bytes, Dqn_isize size, Dqn_u32 hash);
+DQN_API Dqn_u64 Dqn_FNV1A64_Iterate    (void const *bytes, Dqn_isize size, Dqn_u64 hash);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Hashing - Dqn_MurmurHash3
+//
+// -------------------------------------------------------------------------------------------------
+//
+// MurmurHash3 was written by Austin Appleby, and is placed in the public
+// domain. The author hereby disclaims copyright to this source code.
+//
+// Note - The x86 and x64 versions do _not_ produce the same results, as the
+// algorithms are optimized for their respective platforms. You can still
+// compile and run any of them on any platform, but your performance with the
+// non-native version will be less than optimal.
+
+struct Dqn_MurmurHash3_128 { Dqn_u64 e[2]; };
+
+DQN_API Dqn_u32             Dqn_MurmurHash3_x86_32 (void const *key, int len, Dqn_u32 seed);
+DQN_API Dqn_MurmurHash3_128 Dqn_MurmurHash3_x64_128(void const *key, int len, Dqn_u32 seed);
+#define DQN_MURMUR_HASH3_U128_AS_U64(key, len, seed) (Dqn_MurmurHash3_x64_128(key, len, seed).e[0])
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Template Implementation
+//
+// -------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_HashTable Template Implementation
+//
+// -------------------------------------------------------------------------------------------------
+template <typename T>
+Dqn_isize Dqn_HashTable_MemoryRequired(Dqn_isize num_values)
+{
+    Dqn_isize const BITS_PER_BITSET = sizeof(Dqn_HashTableUsageBitset) * 8;
+
+    Dqn_isize bitsets_required      = (num_values / BITS_PER_BITSET);
+    if (num_values % BITS_PER_BITSET != 0)
+        bitsets_required += 1;
+
+    Dqn_isize bytes_for_values = sizeof(T) * num_values;
+    Dqn_isize bytes_for_bitset = bitsets_required * sizeof(Dqn_HashTableUsageBitset);
+    Dqn_isize result           = bytes_for_values + bytes_for_bitset;
+    return result;
+}
+
+template <typename T>
+Dqn_HashTable<T> Dqn_HashTable_InitWithMemory(void *mem, Dqn_isize mem_size)
+{
+    //
+    // NOTE: Calculate how to split up the memory for maximal usage
+    //
+    Dqn_isize bytes_for_values       = 0;
+    Dqn_isize bytes_for_usage_bitset = 0;
+    Dqn_isize values_count           = 0;
+    Dqn_isize usage_bitsets_count    = 0;
+    {
+        Dqn_isize max_values    = mem_size / sizeof(T);
+        Dqn_isize mem_remaining = mem_size - (max_values * sizeof(T));
+
+        Dqn_isize const BITS_PER_BITSET = sizeof(Dqn_HashTableUsageBitset) * 8;
+        Dqn_isize bitsets_required      = (max_values / BITS_PER_BITSET);
+        if (max_values % BITS_PER_BITSET != 0)
+            bitsets_required += 1;
+
+        bytes_for_usage_bitset = (bitsets_required * sizeof(Dqn_HashTableUsageBitset));
+        if (mem_remaining < bytes_for_usage_bitset)
+        {
+            Dqn_isize extra_bytes_needed = bytes_for_usage_bitset - mem_remaining;
+            Dqn_isize excess_items       = extra_bytes_needed / sizeof(T);
+            if (extra_bytes_needed % sizeof(T) != 0)
+                excess_items += 1;
+            max_values -= excess_items;
+        }
+
+        bytes_for_values    = max_values * sizeof(T);
+        values_count        = max_values;
+        usage_bitsets_count = bitsets_required;
+
+        DQN_ASSERT(bytes_for_values > 0);
+    }
+
+    //
+    // NOTE: Generate the table
+    //
+    Dqn_isize bytes_required = bytes_for_values + bytes_for_usage_bitset;
+    (void)bytes_required;
+    DQN_ASSERT_MSG(bytes_required <= mem_size,
+                   "(bytes_for_values = %Id, bytes_for_usage_bitset = %Id, mem_size = %Id)",
+                   bytes_for_values, bytes_for_usage_bitset, mem_size);
+    DQN_ASSERT_MSG(bytes_required >= 0, "(bytes_required = %Iu)", bytes_required);
+
+    Dqn_HashTable<T> result   = {};
+    result.values             = DQN_CAST(T *) mem;
+    result.usage_bitsets      = DQN_CAST(Dqn_HashTableUsageBitset *)(DQN_CAST(Dqn_uintptr) mem + bytes_for_values);
+    result.size               = values_count;
+    result.usage_bitsets_size = usage_bitsets_count;
+    return result;
+}
+
+template <typename T>
+Dqn__HashTableKeyLookup Dqn_HashTable__GetKeyLookup(Dqn_HashTable<T> const *table, Dqn_u64 key)
+{
+    Dqn_isize const BITS_PER_BITSET = sizeof(Dqn_HashTableUsageBitset) * 8;
+
+    Dqn__HashTableKeyLookup result = {};
+    result.index                   = key % table->size;
+    result.bitset_index            = result.index / BITS_PER_BITSET;
+    result.bit_index               = result.index % BITS_PER_BITSET;
+    result.bitset_bit              = 1ULL << result.bit_index;
+    return result;
+}
+
+template <typename T>
+T *Dqn_HashTable_FindOrMake(Dqn_HashTable<T> *table, Dqn_u64 key, Dqn_b32 *found)
+{
+    Dqn__HashTableKeyLookup lookup = Dqn_HashTable__GetKeyLookup(table, key);
+    T *result                      = &table->values[lookup.index];
+    Dqn_b32 found_                 = true;
+    if ((table->usage_bitsets[lookup.bitset_index] & lookup.bitset_bit) == 0)
+    {
+        found_ = false;
+        table->count++;
+        table->usage_bitsets[lookup.bitset_index] |= lookup.bitset_bit;
+    }
+
+    if (found) *found = found_;
+    return result;
+}
+
+template <typename T>
+Dqn_b32 Dqn_HashTable_Add(Dqn_HashTable<T> *table, Dqn_u64 key, T const &value)
+{
+    Dqn_b32 found = false;
+    T *entry      = Dqn_HashTable_FindOrMake(table, key, &found);
+    if (!found) *entry = value;
+    Dqn_b32 result = (found == false);
+    return result;
+}
+
+template <typename T>
+T *Dqn_HashTable_Get(Dqn_HashTable<T> *table, Dqn_u64 key)
+{
+    Dqn__HashTableKeyLookup lookup = Dqn_HashTable__GetKeyLookup(table, key);
+    T *result = (table->usage_bitsets[lookup.bitset_index] & lookup.bitset_bit) ? &table->values[lookup.index] : nullptr;
+    return result;
+}
+
+template <typename T>
+Dqn_b32 Dqn_HashTable_Erase(Dqn_HashTable<T> *table, Dqn_u64 key)
+{
+    Dqn_b32 result                 = false;
+    Dqn__HashTableKeyLookup lookup = Dqn_HashTable__GetKeyLookup(table, key);
+    if (table->usage_bitsets[lookup.bitset_index] & lookup.bitset_bit)
+    {
+        result = true;
+        table->usage_bitsets[lookup.bitset_index] &= ~lookup.bitset_bit;
+        table->count--;
+    }
+
+    DQN_ASSERT_MSG(table->count >= 0, "(count = %Id)");
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_StringBuilder Template Implementation
+//
+// -------------------------------------------------------------------------------------------------
+
+//
+// NOTE: Dqn_StringBuilder Internal Functions
+//
 template <Dqn_isize N>
 DQN_API void Dqn_StringBuilder__LazyInitialise(Dqn_StringBuilder<N> *builder)
 {
@@ -1460,24 +1758,7 @@ DQN_API void Dqn_StringBuilder__LazyInitialise(Dqn_StringBuilder<N> *builder)
 }
 
 template <Dqn_isize N>
-void Dqn_StringBuilder_InitWithArena(Dqn_StringBuilder<N> *builder, Dqn_ArenaAllocator *arena)
-{
-    *builder                  = {};
-    builder->backup_allocator = Dqn_Allocator_InitWithArena(arena);
-    Dqn_StringBuilder__LazyInitialise(builder);
-}
-
-template <Dqn_isize N>
-void Dqn_StringBuilder_InitWithAllocator(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator)
-{
-    *builder           = {};
-    builder->allocator = allocator;
-    Dqn_StringBuilder__LazyInitialise(builder);
-}
-
-// size_required: The length of the string not including the null terminator.
-template <Dqn_isize N>
-DQN_API char *Dqn_StringBuilder_AllocateWriteBuffer(Dqn_StringBuilder<N> *builder, Dqn_isize size_required)
+DQN_API char *Dqn_StringBuilder__AllocateWriteBuffer(Dqn_StringBuilder<N> *builder, Dqn_isize size_required)
 {
     if (!builder->fixed_mem_block.mem)
     {
@@ -1506,9 +1787,38 @@ DQN_API char *Dqn_StringBuilder_AllocateWriteBuffer(Dqn_StringBuilder<N> *builde
     return result;
 }
 
-// The necessary length to build the string, it returns the length not including the null-terminator
 template <Dqn_isize N>
-DQN_API Dqn_isize Dqn_StringBuilder_BuildLength(Dqn_StringBuilder<N> const *builder)
+DQN_API char *Dqn_StringBuilder__Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len DQN_CALL_SITE_ARGS)
+{
+    Dqn_isize len_ = 0;
+    if (!len) len = &len_;
+    *len = Dqn_StringBuilder_GetSize(builder);
+    auto *result  = DQN_CAST(char *)Dqn_Allocator__Allocate(allocator, *len + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+    Dqn_StringBuilder_BuildToDest(builder, result, *len + 1);
+    return result;
+}
+
+//
+// NOTE: Dqn_StringBuilder Functions
+//
+template <Dqn_isize N>
+DQN_API void Dqn_StringBuilder_InitWithArena(Dqn_StringBuilder<N> *builder, Dqn_ArenaAllocator *arena)
+{
+    *builder                  = {};
+    builder->backup_allocator = Dqn_Allocator_InitWithArena(arena);
+    Dqn_StringBuilder__LazyInitialise(builder);
+}
+
+template <Dqn_isize N>
+DQN_API void Dqn_StringBuilder_InitWithAllocator(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator)
+{
+    *builder           = {};
+    builder->allocator = allocator;
+    Dqn_StringBuilder__LazyInitialise(builder);
+}
+
+template <Dqn_isize N>
+DQN_API Dqn_isize Dqn_StringBuilder_GetSize(Dqn_StringBuilder<N> const *builder)
 {
     Dqn_isize result = 0;
     for (Dqn_StringBuilderBlock const *block = &builder->fixed_mem_block;
@@ -1544,19 +1854,6 @@ DQN_API void Dqn_StringBuilder_BuildToDest(Dqn_StringBuilder<N> const *builder, 
     else                     ptr[-1] = 0; // Oops ran out of space. Terminate the output prematurely.
 }
 
-#define Dqn_StringBuilder_Build(builder, allocator, len) Dqn_StringBuilder__Build(builder, allocator, len DQN_CALL_SITE(""))
-
-template <Dqn_isize N>
-DQN_API char *Dqn_StringBuilder__Build(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator, Dqn_isize *len DQN_CALL_SITE_ARGS)
-{
-    Dqn_isize len_ = 0;
-    if (!len) len = &len_;
-    *len = Dqn_StringBuilder_BuildLength(builder);
-    auto *result  = DQN_CAST(char *)Dqn_Allocator__Allocate(allocator, *len + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
-    Dqn_StringBuilder_BuildToDest(builder, result, *len + 1);
-    return result;
-}
-
 template <Dqn_isize N>
 DQN_API Dqn_String Dqn_StringBuilder_BuildStringWithAllocator(Dqn_StringBuilder<N> *builder, Dqn_Allocator *allocator)
 {
@@ -1580,7 +1877,7 @@ DQN_API void Dqn_StringBuilder_AppendFmtV(Dqn_StringBuilder<N> *builder, char co
     va_list va2;
     va_copy(va2, va);
     Dqn_isize len     = stbsp_vsnprintf(nullptr, 0, fmt, va);
-    char *buf         = Dqn_StringBuilder_AllocateWriteBuffer(builder, len + 1);
+    char *buf         = Dqn_StringBuilder__AllocateWriteBuffer(builder, len + 1);
     stbsp_vsnprintf(buf, static_cast<int>(len + 1), fmt, va2);
     va_end(va2);
 
@@ -1598,12 +1895,12 @@ DQN_API void Dqn_StringBuilder_AppendFmt(Dqn_StringBuilder<N> *builder, char con
 }
 
 template <Dqn_isize N>
-DQN_API void Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1)
+DQN_API void Dqn_StringBuilder_Append(Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len)
 {
     if (!str) return;
     if (len == -1) len = DQN_CAST(Dqn_isize)strlen(str);
     if (len == 0) return;
-    char *buf = Dqn_StringBuilder_AllocateWriteBuffer(builder, len);
+    char *buf = Dqn_StringBuilder__AllocateWriteBuffer(builder, len);
     DQN_MEMCOPY(buf, str, len);
 }
 
@@ -1611,14 +1908,14 @@ template <Dqn_isize N>
 DQN_API void Dqn_StringBuilder_AppendString(Dqn_StringBuilder<N> *builder, Dqn_String const string)
 {
     if (!string.str || string.size == 0) return;
-    char *buf = Dqn_StringBuilder_AllocateWriteBuffer(builder, string.size);
+    char *buf = Dqn_StringBuilder__AllocateWriteBuffer(builder, string.size);
     DQN_MEMCOPY(buf, string.str, string.size);
 }
 
 template <Dqn_isize N>
 DQN_API void Dqn_StringBuilder_AppendChar(Dqn_StringBuilder<N> *builder, char ch)
 {
-    char *buf = Dqn_StringBuilder_AllocateWriteBuffer(builder, 1);
+    char *buf = Dqn_StringBuilder__AllocateWriteBuffer(builder, 1);
     *buf++    = ch;
 }
 
@@ -1638,35 +1935,11 @@ DQN_API void Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder)
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_Slices
+// NOTE: Dqn_Slice Template Implementation
 //
 // -------------------------------------------------------------------------------------------------
-#define DQN_SLICE_FMT(slice) (slice).size, (slice).data
 template <typename T>
-struct Dqn_Slice
-{
-    T        *data;
-    Dqn_isize size;
-
-    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
-    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
-    T const *begin      ()            const { return data; }
-    T const *end        ()            const { return data + size; }
-    T       *begin      ()                  { return data; }
-    T       *end        ()                  { return data + size; }
-    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
-    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
-};
-
-template <typename T>
-DQN_API Dqn_b32 operator==(Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs)
-{
-    Dqn_b32 result = lhs.size == rhs.size && lhs.data == rhs.data;
-    return result;
-}
-
-template <typename T>
-DQN_API inline Dqn_Slice<T> Dqn_Slice_Init(T *data, Dqn_isize size)
+DQN_API Dqn_Slice<T> Dqn_Slice_Init(T *data, Dqn_isize size)
 {
     Dqn_Slice<T> result = {};
     result.data         = data;
@@ -1674,9 +1947,8 @@ DQN_API inline Dqn_Slice<T> Dqn_Slice_Init(T *data, Dqn_isize size)
     return result;
 }
 
-
 template <typename T, Dqn_isize N>
-DQN_API inline Dqn_Slice<T> Dqn_Slice_InitWithArray(T (&array)[N])
+DQN_API Dqn_Slice<T> Dqn_Slice_InitWithArray(T (&array)[N])
 {
     Dqn_Slice<T> result = {};
     result.size         = N;
@@ -1685,7 +1957,7 @@ DQN_API inline Dqn_Slice<T> Dqn_Slice_InitWithArray(T (&array)[N])
 }
 
 template <typename T>
-DQN_API inline Dqn_Slice<T> Dqn_Slice__Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
+DQN_API Dqn_Slice<T> Dqn_Slice__Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
 {
     Dqn_Slice<T> result = {};
     result.size         = size;
@@ -1693,11 +1965,8 @@ DQN_API inline Dqn_Slice<T> Dqn_Slice__Allocate(Dqn_Allocator *allocator, Dqn_is
     return result;
 }
 
-#define Dqn_Slice_TaggedAllocate(allocator, Type, size, zero_mem, tag) Dqn_Slice__Allocate<Type>(allocator, size, zero_mem DQN_CALL_SITE(tag))
-#define Dqn_Slice_Allocate(      allocator, Type, size, zero_mem)      Dqn_Slice__Allocate<Type>(allocator, size, zero_mem DQN_CALL_SITE(""))
-
 template <typename T>
-DQN_API inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
+DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
 {
     Dqn_Slice<T> result = {};
     result.size         = size;
@@ -1708,14 +1977,14 @@ DQN_API inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocato
 }
 
 template <typename T>
-DQN_API inline Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
+DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
 {
     Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(allocator, src.data, src.size);
     return result;
 }
 
 template <typename T>
-DQN_API inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
+DQN_API Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
 {
     Dqn_Slice<T> result = {};
     result.size         = size;
@@ -1725,24 +1994,31 @@ DQN_API inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *sr
 }
 
 template <typename T>
-DQN_API inline Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
+DQN_API Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
 {
     Dqn_Slice<T> result = Dqn_Slice_Copy(allocator, src.data, src.size);
     return result;
 }
 
 template <typename T>
-DQN_API inline bool Dqn_Slice_Equals(Dqn_Slice<T> const a, Dqn_Slice<T> const b)
+DQN_API Dqn_b32 Dqn_Slice_Memcmp(Dqn_Slice<T> const a, Dqn_Slice<T> const b)
 {
-    bool result = false;
+    Dqn_b32 result = false;
     if (a.size != b.size) return result;
     result = (memcmp(a.data, b.data, a.size) == 0);
     return result;
 }
 
+template <typename T>
+DQN_API Dqn_b32 operator==(Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs)
+{
+    Dqn_b32 result = lhs.size == rhs.size && lhs.data == rhs.data;
+    return result;
+}
+
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_FixedArray
+// NOTE: Dqn_FixedArray Template Implementation
 //
 // -------------------------------------------------------------------------------------------------
 
@@ -1755,23 +2031,21 @@ template <typename T> void Dqn__EraseStableFromCArray(T *array, Dqn_isize size, 
     memmove(array + index, array + next_index, bytes_to_copy);
 }
 
-#define DQN_FIXED_ARRAY_TEMPLATE template <typename T, int MAX_>
-#define DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray<T, MAX_>
-DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
+DQN_FIXED_ARRAY_TEMPLATE
+DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray_Init(T const *item, int num)
 {
-    T               data[MAX_];
-    Dqn_isize       size;
+    DQN_FIXED_ARRAY_TEMPLATE_DECL result = {};
+    Dqn_FixedArray_Add(&result, item, num);
+    return result;
+}
 
-    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return  data[i]; }
-    T       *begin      ()                  { return data; }
-    T       *end        ()                  { return data + size; }
-    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
+DQN_FIXED_ARRAY_TEMPLATE
+DQN_API Dqn_Slice<T> Dqn_FixedArray_Slice(DQN_FIXED_ARRAY_TEMPLATE_DECL *a)
+{
+    Dqn_Slice<T> result = {a->data, a->size};
+    return result;
+}
 
-    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, i, size); return  data[i]; }
-    T const *begin      ()            const { return data; }
-    T const *end        ()            const { return data + size; }
-    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
-};
 
 DQN_FIXED_ARRAY_TEMPLATE
 DQN_API Dqn_isize Dqn_FixedArray_Max(DQN_FIXED_ARRAY_TEMPLATE_DECL const *)
@@ -1781,10 +2055,10 @@ DQN_API Dqn_isize Dqn_FixedArray_Max(DQN_FIXED_ARRAY_TEMPLATE_DECL const *)
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray_Init(T const *item, int num)
+DQN_API Dqn_isize Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a, T const *entry)
 {
-    DQN_FIXED_ARRAY_TEMPLATE_DECL result = {};
-    Dqn_FixedArray_Add(&result, item, num);
+    DQN_ASSERT(entry >= a->begin() && entry <= a->end());
+    Dqn_isize result = a->end() - entry;
     return result;
 }
 
@@ -1834,9 +2108,8 @@ DQN_API void Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_
     a->data[index] = a->data[a->size];
 }
 
-
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API void Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1)
+DQN_API void Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num)
 {
     DQN_ASSERT(a->size - num >= 0);
     a->size -= num;
@@ -1864,30 +2137,23 @@ DQN_API T Dqn_FixedArray_PeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a)
     return *result;
 }
 
-DQN_FIXED_ARRAY_TEMPLATE
-DQN_API Dqn_isize Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *entry)
-{
-    Dqn_isize result = a->end() - entry;
-    return result;
-}
-
-template <typename T, int MAX_, typename EqualityProc>
-DQN_API T *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, EqualityProc IsEqual)
+template <typename T, int MAX_, typename IsEqual>
+DQN_API T *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc)
 {
     for (T &entry : (*a))
     {
-        if (IsEqual(entry))
+        if (IsEqualProc(entry))
             return &entry;
     }
     return nullptr;
 }
 
 // return: True if the entry was found, false if not- the entry is made using Dqn_FixedArray_Make() in this case
-template <typename T, int MAX_, typename EqualityProc>
-DQN_API Dqn_b32 Dqn_FixedArray_FindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, EqualityProc IsEqual)
+template <typename T, int MAX_, typename IsEqual>
+DQN_API Dqn_b32 Dqn_FixedArray_FindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc)
 {
     Dqn_b32 result = true;
-    T *search  = Dqn_FixedArray_Find(a, IsEqual);
+    T *search  = Dqn_FixedArray_Find(a, IsEqualProc);
     if (!search)
     {
         result = false;
@@ -1909,37 +2175,13 @@ DQN_API T *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find)
     return nullptr;
 }
 
-DQN_FIXED_ARRAY_TEMPLATE
-DQN_API Dqn_Slice<T> Dqn_FixedArray_Slice(DQN_FIXED_ARRAY_TEMPLATE_DECL *a)
-{
-    Dqn_Slice<T> result = {a->data, a->size};
-    return result;
-}
-
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_Array
+// NOTE: Dqn_Array Template Implementation
 //
 // -------------------------------------------------------------------------------------------------
-template <typename T> struct Dqn_Array
-{
-    Dqn_Allocator allocator;
-    T            *data;
-    Dqn_isize     size;
-    Dqn_isize     max;
-
-    T const    operator[](Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
-    T          operator[](Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
-    T const   *begin    ()             const { return data; }
-    T const   *end      ()             const { return data + size; }
-    T         *begin    ()                   { return data; }
-    T         *end      ()                   { return data + size; }
-    T const   *operator+(Dqn_isize i)  const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
-    T         *operator+(Dqn_isize i)        { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
-};
-
 template <typename T>
-DQN_API Dqn_Array<T> Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize size = 0)
+DQN_API Dqn_Array<T> Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isize size)
 {
     Dqn_Array<T> result = {};
     result.allocator    = Dqn_Allocator_InitWithNull();
@@ -1948,12 +2190,6 @@ DQN_API Dqn_Array<T> Dqn_Array_InitWithMemory(T *memory, Dqn_isize max, Dqn_isiz
     result.max          = max;
     return result;
 }
-
-#define Dqn_Array_InitWithAllocatorNoGrow(allocator, Type, max, size, zero_mem) Dqn_Array__InitWithAllocatorNoGrow<Type>(allocator, max, size, zero_mem DQN_CALL_SITE(""))
-#define Dqn_Array_Reserve(array, size) Dqn_Array__Reserve(array, size DQN_CALL_SITE(""))
-#define Dqn_Array_AddArray(array, items, num) Dqn_Array__AddArray(array, items, num DQN_CALL_SITE(""))
-#define Dqn_Array_Add(array, item) Dqn_Array__Add(array, item DQN_CALL_SITE(""))
-#define Dqn_Array_Make(array, num) Dqn_Array__Make(array, num DQN_CALL_SITE(""))
 
 template <typename T>
 DQN_API Dqn_Array<T> Dqn_Array__InitWithAllocatorNoGrow(Dqn_Allocator *allocator, Dqn_isize max, Dqn_isize size, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
@@ -2031,7 +2267,7 @@ DQN_API T *Dqn_Array__Make(Dqn_Array<T> *a, Dqn_isize num DQN_CALL_SITE_ARGS)
 }
 
 template <typename T>
-DQN_API void Dqn_Array_Clear(Dqn_Array<T> *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No)
+DQN_API void Dqn_Array_Clear(Dqn_Array<T> *a, Dqn_ZeroMem zero_mem)
 {
     a->size = 0;
     if (zero_mem == Dqn_ZeroMem::Yes)
@@ -2076,32 +2312,9 @@ DQN_API T *Dqn_Array_Peek(Dqn_Array<T> *a)
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_FixedString
+// NOTE: Dqn_FixedString Template Implementation
 //
 // -------------------------------------------------------------------------------------------------
-template <Dqn_isize MAX_>
-struct Dqn_FixedString
-{
-    union { char data[MAX_]; char str[MAX_]; char buf[MAX_]; };
-    Dqn_isize size;
-
-    Dqn_b32 operator==(Dqn_FixedString const &other) const
-    {
-        if (size != other.size) return false;
-        bool result = memcmp(data, other.data, size);
-        return result;
-    }
-
-    Dqn_b32 operator!=(Dqn_FixedString const &other) const { return !(*this == other); }
-
-    char const &operator[]   (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data[i]; }
-    char       &operator[]   (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data[i]; }
-    char const *begin        ()        const { return data; }
-    char const *end          ()        const { return data + size; }
-    char       *begin        ()              { return data; }
-    char       *end          ()              { return data + size; }
-};
-
 template <Dqn_isize MAX_>
 DQN_API Dqn_FixedString<MAX_> Dqn_FixedString_InitFmt(char const *fmt, ...)
 {
@@ -2148,7 +2361,7 @@ DQN_API Dqn_b32 Dqn_FixedString_AppendFmt(Dqn_FixedString<MAX_> *str, char const
 }
 
 template <Dqn_isize MAX_>
-DQN_API Dqn_b32 Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size = -1)
+DQN_API Dqn_b32 Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size)
 {
     if (size == -1) size = DQN_CAST(Dqn_isize)DQN_STRLEN(src);
     Dqn_isize space = MAX_ - str->size;
@@ -2179,41 +2392,11 @@ DQN_API Dqn_String Dqn_FixedString_ToString(Dqn_FixedString<MAX_> const *str)
 
 // -------------------------------------------------------------------------------------------------
 //
-// NOTE: Dqn_List - Chunked Linked Lists
+// NOTE: Dqn_List Template Implementation
 //
 // -------------------------------------------------------------------------------------------------
-/*
-  Dqn_List<int> list     = {};  // Zero initialise to use default heap allocator (via Dqn_Allocator).
-  list.chunk_size = 128; // When out of space, allocate a chunk with atleast for 128 items, or the amount the user requested, whichever is greater.
-  int *array             = Dqn_List_Make<int>(list, 5, Dqn_ZeroMem::Yes); // First time, allocate chunk (128 items), then bump chunk pointer to allocate 5 ints.
-
-  // TODO(doyle): Freeing step, I only use these with arenas, so normally I just free the arena.
-*/
-
 template <typename T>
-struct Dqn_ListChunk
-{
-    T                *data;
-    Dqn_isize         size;
-    Dqn_isize         count;
-    Dqn_ListChunk<T> *next;
-};
-
-template <typename T>
-struct Dqn_List
-{
-    // When 'allocator' is null, 'backup_allocator' will be used. This allows
-    // zero initialization usage of Dqn_List to work without configuration.
-    Dqn_Allocator    backup_allocator;
-    Dqn_Allocator   *allocator;
-
-    Dqn_isize        chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
-    Dqn_ListChunk<T> *head;
-    Dqn_ListChunk<T> *tail;
-};
-
-template <typename T>
-DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_ArenaAllocator *arena, Dqn_isize chunk_size = 128)
+DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_ArenaAllocator *arena, Dqn_isize chunk_size)
 {
     Dqn_List<T> result      = {};
     result.backup_allocator = Dqn_Allocator_InitWithArena(arena);
@@ -2222,7 +2405,7 @@ DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_ArenaAllocator *arena, Dqn_isize 
 }
 
 template <typename T>
-DQN_API Dqn_List<T> Dqn_List_InitWithAllocator(Dqn_Allocator *allocator, Dqn_isize chunk_size = 128)
+DQN_API Dqn_List<T> Dqn_List_InitWithAllocator(Dqn_Allocator *allocator, Dqn_isize chunk_size)
 {
     Dqn_List<T> result = {};
     result.chunk_size  = chunk_size;
@@ -2270,51 +2453,7 @@ DQN_API T *Dqn_List__Make(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
     return result;
 }
 
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Hashing - Dqn_FNV1A[32|64]
-//
-// -------------------------------------------------------------------------------------------------
-//
-// Usage
-//
-// char buffer1[128] = {random bytes};
-// char buffer2[128] = {random bytes};
-// Dqn_u64 hash      = Dqn_FNV1A64_Hash(buffer1, sizeof(buffer1));
-// hash              = Dqn_FNV1A64_Iterate(buffer2, sizeof(buffer2), hash); // subsequent hashing
-//
-#ifndef DQN_FNV1A32_SEED
-    #define DQN_FNV1A32_SEED 2166136261U
-#endif
 
-#ifndef DQN_FNV1A64_SEED
-    #define DQN_FNV1A64_SEED 14695981039346656037ULL
-#endif
-
-DQN_API Dqn_u32 Dqn_FNV1A32_Hash       (void const *bytes, Dqn_isize size);
-DQN_API Dqn_u64 Dqn_FNV1A64_Hash       (void const *bytes, Dqn_isize size);
-DQN_API Dqn_u32 Dqn_FNV1A32_Iterate    (void const *bytes, Dqn_isize size, Dqn_u32 hash);
-DQN_API Dqn_u64 Dqn_FNV1A64_Iterate    (void const *bytes, Dqn_isize size, Dqn_u64 hash);
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Hashing - Dqn_MurmurHash3
-//
-// -------------------------------------------------------------------------------------------------
-//
-// MurmurHash3 was written by Austin Appleby, and is placed in the public
-// domain. The author hereby disclaims copyright to this source code.
-//
-// Note - The x86 and x64 versions do _not_ produce the same results, as the
-// algorithms are optimized for their respective platforms. You can still
-// compile and run any of them on any platform, but your performance with the
-// non-native version will be less than optimal.
-
-struct Dqn_MurmurHash3_128 { Dqn_u64 e[2]; };
-
-DQN_API Dqn_u32             Dqn_MurmurHash3_x86_32 (void const *key, int len, Dqn_u32 seed);
-DQN_API Dqn_MurmurHash3_128 Dqn_MurmurHash3_x64_128(void const *key, int len, Dqn_u32 seed);
-#define DQN_MURMUR_HASH3_U128_AS_U64(key, len, seed) (Dqn_MurmurHash3_x64_128(key, len, seed).e[0])
 
 #if defined(DQN_COMPILER_MSVC)
     #pragma warning(pop)
@@ -2724,7 +2863,7 @@ DQN_API Dqn_f32 Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b)
 Dqn_AllocationTracer Dqn_AllocationTracer_InitWithMemory(void *mem, Dqn_usize mem_size)
 {
     Dqn_AllocationTracer result = {};
-    result.table = Dqn_HashTable_InitWithMemory<Dqn_AllocationTrace>(mem, mem_size);
+    result.table                = Dqn_HashTable_InitWithMemory<Dqn_AllocationTrace>(mem, mem_size);
     return result;
 }
 
