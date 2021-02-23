@@ -1104,7 +1104,7 @@ struct Dqn_ArenaAllocator
     // NOTE: Read Only
     Dqn_ArenaAllocatorBlock *curr_mem_block;
     Dqn_ArenaAllocatorBlock *top_mem_block;
-    Dqn_isize                highest_used_mark;
+    Dqn_isize                highest_used_mark; // TODO(doyle): This is not implemented yet
     int                      total_allocated_mem_blocks;
     Dqn_isize                usage_before_last_reset;
     Dqn_isize                wastage_before_last_reset;
@@ -1145,6 +1145,45 @@ DQN_API Dqn_ArenaAllocatorScopedRegion Dqn_ArenaAllocator_MakeScopedRegion    (D
 #define                                Dqn_ArenaAllocator_NewArray(            arena, Type, count, zero_mem)          (Type *)Dqn_ArenaAllocator__Allocate(arena, sizeof(Type) * count, alignof(Type), zero_mem DQN_CALL_SITE(""))
 
 DQN_API void                          *Dqn_ArenaAllocator__Allocate           (Dqn_ArenaAllocator *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS);
+DQN_API void                           Dqn_ArenaAllocator_DumpStatsToLog      (Dqn_ArenaAllocator const *arena, char const *label);
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Slices
+//
+// -------------------------------------------------------------------------------------------------
+#define DQN_SLICE_FMT(slice) (slice).size, (slice).data
+template <typename T>
+struct Dqn_Slice
+{
+    T        *data;
+    Dqn_isize size;
+
+    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
+    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
+    T const *begin      ()            const { return data; }
+    T const *end        ()            const { return data + size; }
+    T       *begin      ()                  { return data; }
+    T       *end        ()                  { return data + size; }
+    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
+    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
+};
+
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Init              (T *data, Dqn_isize size);
+template <typename T, Dqn_isize N> DQN_API Dqn_Slice<T> Dqn_Slice_InitWithArray     (T (&array)[N]);
+
+#define                                                 Dqn_Slice_TaggedAllocate(    allocator, Type, size, zero_mem, tag) Dqn_Slice__Allocate<Type>(allocator, size, zero_mem DQN_CALL_SITE(tag))
+#define                                                 Dqn_Slice_Allocate(          allocator, Type, size, zero_mem)      Dqn_Slice__Allocate<Type>(allocator, size, zero_mem DQN_CALL_SITE(""))
+
+// Allocate and copy the bytes/slice into a new slice. The null terminated variants are for byte
+// arrays and allocate an extra byte to ensure that the last byte is 0.
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize size);
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Copy              (Dqn_Allocator *allocator, T const *src, Dqn_isize size);
+template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Copy              (Dqn_Allocator *allocator, Dqn_Slice<T> const src);
+
+// Check equality of two slices using memcmp, operator== checks slice equality if size and pointers are the same
+template <typename T>              DQN_API Dqn_b32      Dqn_Slice_Memcmp            (Dqn_Slice<T> const a, Dqn_Slice<T> const b);
+template <typename T>              DQN_API Dqn_b32      operator==                  (Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1235,8 +1274,9 @@ DQN_API Dqn_String Dqn_String__Fmt                  (Dqn_Allocator *allocator DQ
 
 // Free a string allocated with `Dqn_String_Copy`, `Dqn_String_FmtV` `Dqn_String_Fmt`
 // allocator: The same allocator specified when `Dqn_String_Copy` was called.
-DQN_API void       Dqn_String_Free                  (Dqn_String *string, Dqn_Allocator *allocator);
-DQN_API Dqn_b32    Dqn_String_StartsWith            (Dqn_String string, Dqn_String prefix);
+DQN_API void                  Dqn_String_Free      (Dqn_String *string, Dqn_Allocator *allocator);
+DQN_API Dqn_b32               Dqn_String_StartsWith(Dqn_String string, Dqn_String prefix);
+DQN_API Dqn_Slice<Dqn_String> Dqn_String_Split     (Dqn_String src, Dqn_Allocator *allocator);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1343,47 +1383,7 @@ template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendFmt          
 template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_Append                       (Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1);
 template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendString                 (Dqn_StringBuilder<N> *builder, Dqn_String const string);
 template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendChar                   (Dqn_StringBuilder<N> *builder, char ch);
-
 template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_Free                         (Dqn_StringBuilder<N> *builder);
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_Slices
-//
-// -------------------------------------------------------------------------------------------------
-#define DQN_SLICE_FMT(slice) (slice).size, (slice).data
-template <typename T>
-struct Dqn_Slice
-{
-    T        *data;
-    Dqn_isize size;
-
-    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
-    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return  data[i]; }
-    T const *begin      ()            const { return data; }
-    T const *end        ()            const { return data + size; }
-    T       *begin      ()                  { return data; }
-    T       *end        ()                  { return data + size; }
-    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
-    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data + i; }
-};
-
-template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Init              (T *data, Dqn_isize size);
-template <typename T, Dqn_isize N> DQN_API Dqn_Slice<T> Dqn_Slice_InitWithArray     (T (&array)[N]);
-
-#define                                                 Dqn_Slice_TaggedAllocate(    allocator, Type, size, zero_mem, tag) Dqn_Slice__Allocate<Type>(allocator, size, zero_mem DQN_CALL_SITE(tag))
-#define                                                 Dqn_Slice_Allocate(          allocator, Type, size, zero_mem)      Dqn_Slice__Allocate<Type>(allocator, size, zero_mem DQN_CALL_SITE(""))
-
-// Allocate and copy the bytes/slice into a new slice. The null terminated variants are for byte
-// arrays and allocate an extra byte to ensure that the last byte is 0.
-template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize size);
-template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src);
-template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Copy              (Dqn_Allocator *allocator, T const *src, Dqn_isize size);
-template <typename T>              DQN_API Dqn_Slice<T> Dqn_Slice_Copy              (Dqn_Allocator *allocator, Dqn_Slice<T> const src);
-
-// Check equality of two slices using memcmp, operator== checks slice equality if size and pointers are the same
-template <typename T>              DQN_API Dqn_b32      Dqn_Slice_Memcmp            (Dqn_Slice<T> const a, Dqn_Slice<T> const b);
-template <typename T>              DQN_API Dqn_b32      operator==                  (Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1602,6 +1602,89 @@ DQN_API Dqn_MurmurHash3_128 Dqn_MurmurHash3_x64_128(void const *key, int len, Dq
 // -------------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------------
 //
+// NOTE: Dqn_Slice Template Implementation
+//
+// -------------------------------------------------------------------------------------------------
+template <typename T>
+DQN_API Dqn_Slice<T> Dqn_Slice_Init(T *data, Dqn_isize size)
+{
+    Dqn_Slice<T> result = {};
+    result.data         = data;
+    result.size         = size;
+    return result;
+}
+
+template <typename T, Dqn_isize N>
+DQN_API Dqn_Slice<T> Dqn_Slice_InitWithArray(T (&array)[N])
+{
+    Dqn_Slice<T> result = {};
+    result.size         = N;
+    result.data         = array;
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_Slice<T> Dqn_Slice__Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
+{
+    Dqn_Slice<T> result = {};
+    result.size         = size;
+    result.data         = DQN_CAST(T *) Dqn_Allocator__Allocate(allocator, (sizeof(T) * size), alignof(T), zero_mem DQN_CALL_SITE_ARGS_INPUT);
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
+{
+    Dqn_Slice<T> result = {};
+    result.size         = size;
+    result.data = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * size) + 1, alignof(T), Dqn_ZeroMem::No);
+    DQN_MEMCOPY(result.data, src, size * sizeof(T));
+    result.buf[size] = 0;
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
+{
+    Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(allocator, src.data, src.size);
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
+{
+    Dqn_Slice<T> result = {};
+    result.size         = size;
+    result.data = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, sizeof(T) * size, alignof(T), Dqn_ZeroMem::No);
+    DQN_MEMCOPY(result.dat, src, size * sizeof(T));
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
+{
+    Dqn_Slice<T> result = Dqn_Slice_Copy(allocator, src.data, src.size);
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_b32 Dqn_Slice_Memcmp(Dqn_Slice<T> const a, Dqn_Slice<T> const b)
+{
+    Dqn_b32 result = false;
+    if (a.size != b.size) return result;
+    result = (memcmp(a.data, b.data, a.size) == 0);
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_b32 operator==(Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs)
+{
+    Dqn_b32 result = lhs.size == rhs.size && lhs.data == rhs.data;
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
+//
 // NOTE: Dqn_HashTable Template Implementation
 //
 // -------------------------------------------------------------------------------------------------
@@ -1660,7 +1743,6 @@ Dqn_HashTable<T> Dqn_HashTable_InitWithMemory(void *mem, Dqn_isize mem_size)
     // NOTE: Generate the table
     //
     Dqn_isize bytes_required = bytes_for_values + bytes_for_usage_bitset;
-    (void)bytes_required;
     DQN_ASSERT_MSG(bytes_required <= mem_size,
                    "(bytes_for_values = %Id, bytes_for_usage_bitset = %Id, mem_size = %Id)",
                    bytes_for_values, bytes_for_usage_bitset, mem_size);
@@ -1931,89 +2013,6 @@ DQN_API void Dqn_StringBuilder_Free(Dqn_StringBuilder<N> *builder)
         Dqn_Allocator_Free(&builder->allocator, block_to_free);
     }
     Dqn_StringBuilder__LazyInitialise(builder);
-}
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_Slice Template Implementation
-//
-// -------------------------------------------------------------------------------------------------
-template <typename T>
-DQN_API Dqn_Slice<T> Dqn_Slice_Init(T *data, Dqn_isize size)
-{
-    Dqn_Slice<T> result = {};
-    result.data         = data;
-    result.size         = size;
-    return result;
-}
-
-template <typename T, Dqn_isize N>
-DQN_API Dqn_Slice<T> Dqn_Slice_InitWithArray(T (&array)[N])
-{
-    Dqn_Slice<T> result = {};
-    result.size         = N;
-    result.data         = array;
-    return result;
-}
-
-template <typename T>
-DQN_API Dqn_Slice<T> Dqn_Slice__Allocate(Dqn_Allocator *allocator, Dqn_isize size, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
-{
-    Dqn_Slice<T> result = {};
-    result.size         = size;
-    result.data         = DQN_CAST(T *) Dqn_Allocator__Allocate(allocator, (sizeof(T) * size), alignof(T), zero_mem DQN_CALL_SITE_ARGS_INPUT);
-    return result;
-}
-
-template <typename T>
-DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
-{
-    Dqn_Slice<T> result = {};
-    result.size         = size;
-    result.data = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, (sizeof(T) * size) + 1, alignof(T), Dqn_ZeroMem::No);
-    DQN_MEMCOPY(result.data, src, size * sizeof(T));
-    result.buf[size] = 0;
-    return result;
-}
-
-template <typename T>
-DQN_API Dqn_Slice<T> Dqn_Slice_CopyNullTerminated(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
-{
-    Dqn_Slice<T> result = Dqn_Slice_CopyNullTerminated(allocator, src.data, src.size);
-    return result;
-}
-
-template <typename T>
-DQN_API Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, T const *src, Dqn_isize size)
-{
-    Dqn_Slice<T> result = {};
-    result.size         = size;
-    result.data = DQN_CAST(T *) Dqn_Allocator_Allocate(allocator, sizeof(T) * size, alignof(T), Dqn_ZeroMem::No);
-    DQN_MEMCOPY(result.dat, src, size * sizeof(T));
-    return result;
-}
-
-template <typename T>
-DQN_API Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Allocator *allocator, Dqn_Slice<T> const src)
-{
-    Dqn_Slice<T> result = Dqn_Slice_Copy(allocator, src.data, src.size);
-    return result;
-}
-
-template <typename T>
-DQN_API Dqn_b32 Dqn_Slice_Memcmp(Dqn_Slice<T> const a, Dqn_Slice<T> const b)
-{
-    Dqn_b32 result = false;
-    if (a.size != b.size) return result;
-    result = (memcmp(a.data, b.data, a.size) == 0);
-    return result;
-}
-
-template <typename T>
-DQN_API Dqn_b32 operator==(Dqn_Slice<T> const &lhs, Dqn_Slice<T> const &rhs)
-{
-    Dqn_b32 result = lhs.size == rhs.size && lhs.data == rhs.data;
-    return result;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -2543,16 +2542,23 @@ DQN_API void Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, ch
 
     FILE *handle = (type == Dqn_LogType::Error) ? stderr : stdout;
     fprintf(handle,
-            "%s %.*s %05zu %.*s ",
+            "[%s:%.*s:%05zu:%.*s] ",
             Dqn_LogTypeString[DQN_CAST(int) type],
             (int)file_ptr_len,
             file_ptr,
             line,
             (int)func_len,
-            func
-            );
+            func);
 
-    vfprintf(handle, fmt, va);
+    // NOTE: Use the callback version of stb_sprintf to allow us to chunk logs and print arbitrary
+    // sized format strings without needing to size it up first.
+    auto stb_vsprintf_callback = [](char *buf, void *user, int len) -> char * {
+        fprintf(DQN_CAST(FILE *)user, "%.*s", len, buf);
+        return buf;
+    };
+
+    char stb_buffer[STB_SPRINTF_MIN * 2] = {};
+    stbsp_vsprintfcb(stb_vsprintf_callback, handle, stb_buffer, fmt, va);
     fputc('\n', handle);
 }
 
@@ -2863,7 +2869,7 @@ DQN_API Dqn_f32 Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b)
 Dqn_AllocationTracer Dqn_AllocationTracer_InitWithMemory(void *mem, Dqn_usize mem_size)
 {
     Dqn_AllocationTracer result = {};
-    result.table                = Dqn_HashTable_InitWithMemory<Dqn_AllocationTrace>(mem, mem_size);
+    result.table = Dqn_HashTable_InitWithMemory<Dqn_AllocationTrace>(mem, mem_size);
     return result;
 }
 
@@ -3314,6 +3320,27 @@ DQN_API void *Dqn_ArenaAllocator__Allocate(Dqn_ArenaAllocator *arena, Dqn_isize 
     return result;
 }
 
+DQN_API void Dqn_ArenaAllocator_DumpStatsToLog(Dqn_ArenaAllocator const *arena, char const *label)
+{
+    Dqn_isize total_used      = 0;
+    Dqn_isize total_allocated = 0;
+    Dqn_isize total_wasted    = 0;
+    for (Dqn_ArenaAllocatorBlock const *block = arena->top_mem_block; block; block = block->prev)
+    {
+        total_allocated += block->size;
+        total_used += block->used;
+        if (block != arena->top_mem_block)
+            total_wasted += block->size - block->used;
+    }
+
+    DQN_LOG_M("%s: %$$.3d/%$$.3d (wasted %$$.3d - %d blks)",
+              label,
+              total_used,
+              total_allocated,
+              total_wasted,
+              arena->total_allocated_mem_blocks);
+}
+
 // -------------------------------------------------------------------------------------------------
 //
 // NOTE: Dqn_Bit
@@ -3494,13 +3521,13 @@ char constexpr DQN_HEX_LUT[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
 DQN_API char Dqn_Char_ToHex(char ch)
 {
     char result = DQN_CAST(char)-1;
-    if (ch <= 16) result = DQN_HEX_LUT[ch];
+    if (ch <= 16) result = DQN_HEX_LUT[DQN_CAST(unsigned)ch];
     return result;
 }
 
 DQN_API char Dqn_Char_ToHexUnchecked(char ch)
 {
-    char result = DQN_HEX_LUT[ch];
+    char result = DQN_HEX_LUT[DQN_CAST(unsigned)ch];
     return result;
 }
 
@@ -3508,9 +3535,7 @@ DQN_API char Dqn_Char_ToLower(char ch)
 {
     char result = ch;
     if (result >= 'A' && result <= 'Z')
-    {
         result += 'a' - 'A';
-    }
     return result;
 }
 
@@ -3616,6 +3641,56 @@ DQN_API Dqn_b32 Dqn_String_StartsWith(Dqn_String string, Dqn_String prefix)
     result = DQN_MEMCMP(string.str, prefix.str, prefix.size) == 0;
     return result;
 }
+
+DQN_API Dqn_Slice<Dqn_String> Dqn_String_Split(Dqn_String src, Dqn_Allocator *allocator)
+{
+    enum StringSplitStage
+    {
+        StringSplitStage_Enumerate,
+        StringSplitStage_Write,
+        StringSplitStage_Count,
+    };
+
+    Dqn_Slice<Dqn_String> result      = {};
+    int                   split_index = 0;
+    int                   split_count = 0;
+
+    for (int stage = StringSplitStage_Enumerate;
+         stage < StringSplitStage_Count;
+         stage++)
+    {
+        char const *begin = src.str;
+        char const *end   = src.str;
+
+        if (stage == StringSplitStage_Write)
+            result = Dqn_Slice_Allocate(allocator, Dqn_String, split_count, Dqn_ZeroMem::No);
+
+        for (;;)
+        {
+            while (end[0] != '\r' && end[0] != '\n' && end[0] != 0)
+                end++;
+
+            if (end[0] == 0)
+                break;
+
+            auto split = Dqn_String_Init(begin, end - begin);
+            begin      = end + 1;
+            end        = begin;
+
+            if (split.size == 0)
+                continue;
+            else
+            {
+                if (stage == StringSplitStage_Enumerate) split_count++;
+                else result[split_index++] = split;
+            }
+        }
+    }
+
+    DQN_ASSERT(split_count == split_index);
+    return result;
+}
+
 
 // -------------------------------------------------------------------------------------------------
 //
