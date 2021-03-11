@@ -96,7 +96,7 @@
         // Print
         FILE *handle = (type == Dqn_LogType::Error) ? stderr : stdout;
         fprintf(handle,
-                "%s %.*s %05zu %.*s ",
+                "%s %.*s %05I64u %.*s ",
                 Dqn_LogTypeString[DQN_CAST(int) type],
                 (int)file_ptr_len,
                 file_ptr,
@@ -1718,7 +1718,7 @@ DQN_API Dqn_b32 Dqn_FixedString_AppendFmtV(Dqn_FixedString<MAX_> *str, char cons
     Dqn_isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
     Dqn_isize space   = MAX_ - str->size;
     Dqn_b32 result    = require <= space;
-    DQN_ASSERT_MSG(require <= space, "(require=%Id, space=%Id)", require, space);
+    DQN_ASSERT_MSG(require <= space, "(require=%I64d, space=%I64d)", require, space);
     str->size += stbsp_vsnprintf(str->data + str->size, static_cast<int>(space), fmt, va2);
     va_end(va2);
     return result;
@@ -1917,9 +1917,9 @@ Dqn_HashTable<T> Dqn_HashTable_InitWithMemory(void *mem, Dqn_isize mem_size)
     //
     Dqn_isize bytes_required = bytes_for_values + bytes_for_usage_bitset;
     DQN_ASSERT_MSG(bytes_required <= mem_size,
-                   "(bytes_for_values = %Id, bytes_for_usage_bitset = %Id, mem_size = %Id)",
+                   "(bytes_for_values = %I64d, bytes_for_usage_bitset = %I64d, mem_size = %I64d)",
                    bytes_for_values, bytes_for_usage_bitset, mem_size);
-    DQN_ASSERT_MSG(bytes_required >= 0, "(bytes_required = %Iu)", bytes_required);
+    DQN_ASSERT_MSG(bytes_required >= 0, "(bytes_required = %I64u)", bytes_required);
 
     Dqn_HashTable<T> result   = {};
     result.values             = DQN_CAST(T *) mem;
@@ -1989,7 +1989,7 @@ Dqn_b32 Dqn_HashTable_Erase(Dqn_HashTable<T> *table, Dqn_u64 key)
         table->count--;
     }
 
-    DQN_ASSERT_MSG(table->count >= 0, "(count = %Id)");
+    DQN_ASSERT_MSG(table->count >= 0, "(count = %I64d)");
     return result;
 }
 
@@ -2769,7 +2769,7 @@ DQN_API void Dqn_LogV(Dqn_LogType type, char const *file, Dqn_usize file_len, ch
 
     FILE *handle = (type == Dqn_LogType::Error) ? stderr : stdout;
     fprintf(handle,
-            "[%s:%.*s:%05zu:%.*s] ",
+            "[%s:%.*s:%05I64u:%.*s] ",
             Dqn_LogTypeString[DQN_CAST(int) type],
             (int)file_ptr_len,
             file_ptr,
@@ -3445,7 +3445,7 @@ DQN_API Dqn_b32 Dqn_String_AppendFmtV(Dqn_String *str, char const *fmt, va_list 
     Dqn_isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
     Dqn_isize space   = str->cap - str->size;
     Dqn_b32 result    = require <= space;
-    DQN_ASSERT_MSG(require <= space, "(require=%Id, space=%Id)", require, space);
+    DQN_ASSERT_MSG(require <= space, "(require=%I64d, space=%I64d)", require, space);
     str->size += stbsp_vsnprintf(str->str + str->size, static_cast<int>(space), fmt, va2);
     va_end(va2);
     return result;
@@ -3587,7 +3587,7 @@ DQN_API Dqn_ArenaAllocator Dqn_ArenaAllocator_InitWithNewAllocator(Dqn_Allocator
     result.tracer             = tracer;
     if (size > 0)
     {
-        DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_ArenaAllocatorBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
+        DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%I64u >= %I64u) There needs to be enough space to encode the Dqn_ArenaAllocatorBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
         Dqn_ArenaAllocatorBlock *mem_block = Dqn_ArenaAllocator__AllocateBlock(&result, size DQN_CALL_SITE_ARGS_INPUT);
         Dqn_ArenaAllocator__AttachBlock(&result, mem_block);
     }
@@ -3602,7 +3602,7 @@ DQN_API Dqn_ArenaAllocator Dqn_ArenaAllocator_InitWithAllocator(Dqn_Allocator *a
     result.tracer             = tracer;
     if (size > 0)
     {
-        DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_ArenaAllocatorBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
+        DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%I64u >= %I64u) There needs to be enough space to encode the Dqn_ArenaAllocatorBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
         Dqn_ArenaAllocatorBlock *mem_block = Dqn_ArenaAllocator__AllocateBlock(&result, size DQN_CALL_SITE_ARGS_INPUT);
         Dqn_ArenaAllocator__AttachBlock(&result, mem_block);
     }
@@ -3614,7 +3614,7 @@ DQN_API Dqn_ArenaAllocator Dqn_ArenaAllocator_InitWithMemory(void *memory, Dqn_i
     Dqn_ArenaAllocator result = {};
     result.tracer             = tracer;
 
-    DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%zu >= %zu) There needs to be enough space to encode the Dqn_ArenaAllocatorBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
+    DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%I64u >= %I64u) There needs to be enough space to encode the Dqn_ArenaAllocatorBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
     result.backup_allocator = Dqn_Allocator_InitWithNull();
     auto *mem_block     = DQN_CAST(Dqn_ArenaAllocatorBlock *) memory;
     *mem_block          = {};
@@ -3821,96 +3821,86 @@ DQN_API Dqn_b32 Dqn_Bit_IsNotSet(Dqn_u64 bits, Dqn_u64 bits_to_check)
 // -------------------------------------------------------------------------------------------------
 DQN_API Dqn_i64 Dqn_Safe_AddI64(Dqn_i64 a, Dqn_i64 b)
 {
-    DQN_ASSERT_MSG(a <= DQN_I64_MAX - b, "%zu <= %zu", a, DQN_I64_MAX - b);
-    Dqn_i64 result = a + b;
+    DQN_ASSERT_MSG(a <= DQN_I64_MAX - b, "%I64u <= %I64u", a, DQN_I64_MAX - b);
+    Dqn_i64 result = (a <= DQN_I64_MAX - b) ? (a + b) : DQN_I64_MAX;
     return result;
 }
 
 DQN_API Dqn_i64 Dqn_Safe_MulI64(Dqn_i64 a, Dqn_i64 b)
 {
-    DQN_ASSERT_MSG(a <= DQN_I64_MAX / b , "%zu <= %zu", a, DQN_I64_MAX / b);
-    Dqn_i64 result = a * b;
+    DQN_ASSERT_MSG(a <= DQN_I64_MAX / b , "%I64u <= %I64u", a, DQN_I64_MAX / b);
+    Dqn_i64 result = (a <= DQN_I64_MAX / b) ? (a * b) : DQN_I64_MAX;
     return result;
 }
 
 DQN_API Dqn_u64 Dqn_Safe_AddU64(Dqn_u64 a, Dqn_u64 b)
 {
-    DQN_ASSERT_MSG(a <= DQN_U64_MAX - b, "%zu <= %zu", a, DQN_U64_MAX - b);
-    Dqn_u64 result = a + b;
+    DQN_ASSERT_MSG(a <= DQN_U64_MAX - b, "%I64u <= %I64u", a, DQN_U64_MAX - b);
+    Dqn_u64 result = (a <= DQN_U64_MAX / b) ? (a * b) : DQN_U64_MAX;
     return result;
 }
 
 DQN_API Dqn_u64 Dqn_Safe_SubU64(Dqn_u64 a, Dqn_u64 b)
 {
-    DQN_ASSERT_MSG(a >= b, "%zu >= %zu", a, b);
-    Dqn_u64 result = a - b;
+    DQN_ASSERT_MSG(a >= b, "%I64u >= %I64u", a, b);
+    Dqn_u64 result = (a >= b) ? (a - b) : 0;
     return result;
 }
 
 DQN_API Dqn_u32 Dqn_Safe_SubU32(Dqn_u32 a, Dqn_u32 b)
 {
-    DQN_ASSERT_MSG(a >= b, "%zu >= %zu", a, b);
-    Dqn_u32 result = a - b;
+    DQN_ASSERT_MSG(a >= b, "%I64u >= %I64u", a, b);
+    Dqn_u32 result = (a >= b) ? (a - b) : 0;
     return result;
 }
 
 DQN_API Dqn_u64 Dqn_Safe_MulU64(Dqn_u64 a, Dqn_u64 b)
 {
-    DQN_ASSERT_MSG(a <= DQN_U64_MAX / b , "%zu <= %zu", a, DQN_U64_MAX / b);
-    Dqn_u64 result = a * b;
+    DQN_ASSERT_MSG(a <= DQN_U64_MAX / b , "%I64u <= %I64u", a, DQN_U64_MAX / b);
+    Dqn_u64 result = (a <= DQN_U64_MAX / b) ? (a * b) : DQN_U64_MAX;
     return result;
 }
 
 DQN_API int Dqn_Safe_TruncateISizeToInt(Dqn_isize val)
 {
-    DQN_ASSERT_MSG(val >= DQN_I32_MAX && val <= DQN_I32_MAX, "%zd >= %zd && %zd <= %zd", val, DQN_I32_MAX, val, DQN_I32_MAX);
-    auto result = (int)val;
+    DQN_ASSERT_MSG(val >= DQN_I32_MIN && val <= DQN_I32_MAX, "%I64d >= %I64d && %I64d <= %I64d", val, DQN_I32_MAX, val, DQN_I32_MAX);
+    auto result = (val >= DQN_I32_MIN && val <= DQN_I32_MAX) ? DQN_CAST(int)val : 0;
     return result;
 }
 
 DQN_API Dqn_i32 Dqn_Safe_TruncateISizeToI32(Dqn_isize val)
 {
-    DQN_ASSERT_MSG(val >= DQN_I32_MIN && val <= DQN_I32_MAX, "%zd >= %zd && %zd <= %zd", val, DQN_I32_MIN, val, DQN_I32_MAX);
-    auto result = DQN_CAST(Dqn_i32)val;
+    DQN_ASSERT_MSG(val >= DQN_I32_MIN && val <= DQN_I32_MAX, "%I64d >= %I64d && %I64d <= %I64d", val, DQN_I32_MIN, val, DQN_I32_MAX);
+    auto result = (val >= DQN_I32_MIN && val <= DQN_I32_MAX) ? DQN_CAST(Dqn_i32)val : 0;
     return result;
 }
-
-
-DQN_API Dqn_i8 Dqn_Safe_TruncateISizeToI8(Dqn_isize val)
-{
-    DQN_ASSERT_MSG(val >= DQN_I8_MIN && val <= DQN_I8_MAX, "%zd >= %zd && %zd <= %zd", val, DQN_I8_MIN, val, DQN_I8_MAX);
-    auto result = DQN_CAST(Dqn_i8)val;
-    return result;
-}
-
 
 DQN_API Dqn_u32 Dqn_Safe_TruncateUSizeToU32(Dqn_u64 val)
 {
-    DQN_ASSERT_MSG(val <= DQN_U32_MAX, "%zu <= %zu", val, DQN_U32_MAX);
-    auto result = DQN_CAST(Dqn_u32)val;
+    DQN_ASSERT_MSG(val <= DQN_U32_MAX, "%I64u <= %I64u", val, DQN_U32_MAX);
+    auto result = (val <= DQN_U32_MAX) ? DQN_CAST(Dqn_u32)val : DQN_U32_MAX;
     return result;
 }
 
 
-DQN_API int Dqn_Safe_TruncateUSizeToI32(Dqn_usize val)
+DQN_API Dqn_i32 Dqn_Safe_TruncateUSizeToI32(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= DQN_I32_MAX, "%zu <= %zd", val, DQN_I32_MAX);
-    auto result = DQN_CAST(int)val;
+    DQN_ASSERT_MSG(val <= DQN_I32_MAX, "%I64u <= %I64d", val, DQN_I32_MAX);
+    auto result = (val <= DQN_I32_MAX) ? DQN_CAST(int)val : DQN_I32_MAX;
     return result;
 }
-
 
 DQN_API int Dqn_Safe_TruncateUSizeToInt(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= DQN_I32_MAX, "%zu <= %zd", val, DQN_I32_MAX);
-    auto result = DQN_CAST(int)val;
+    DQN_ASSERT_MSG(val <= DQN_I32_MAX, "%I64u <= %I64d", val, DQN_I32_MAX);
+    auto result = (val <= DQN_I32_MAX) ? DQN_CAST(int)val : DQN_I32_MAX;
     return result;
 }
 
 DQN_API Dqn_isize Dqn_Safe_TruncateUSizeToISize(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= DQN_CAST(Dqn_usize)DQN_ISIZE_MAX, "%zu <= %zu", val, DQN_CAST(Dqn_usize)DQN_ISIZE_MAX);
-    auto result = DQN_CAST(Dqn_isize)val;
+    DQN_ASSERT_MSG(val <= DQN_ISIZE_MAX, "%I64u <= %I64u", val, DQN_CAST(Dqn_usize)DQN_ISIZE_MAX);
+    auto result = (val <= DQN_ISIZE_MAX) ? DQN_CAST(Dqn_isize)val : DQN_ISIZE_MAX;
     return result;
 }
 
