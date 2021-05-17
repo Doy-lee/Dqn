@@ -14,7 +14,7 @@
                                     stopping redefinition of symbols if another library includes
                                     "Windows.h"
 
-#define DQN_NO_WIN32_SHLWAPI_H      See DQN_NO_WINDOWS_H. Useful if another library includes
+#define DQN_NO_WIN32_SHLWAPI_H      See DQN_NO_WIN32_WINDOWS_H. Useful if another library includes
                                     "shlwapi.h"
 
 #define DQN_STATIC_API              Apply static to all function definitions and disable external
@@ -1742,10 +1742,10 @@ struct Dqn_ListChunk
 template <typename T>
 struct Dqn_ListIterator
 {
-    Dqn_b32           init;
-    Dqn_ListChunk<T> *chunk;
-    Dqn_isize         chunk_data_index;
-    T                *data;
+    Dqn_b32           init;             // (Internal): True if Dqn_List_Iterate has been called at-least once on this iterator
+    Dqn_ListChunk<T> *chunk;            // (Internal): The chunk that the iterator is reading from
+    Dqn_isize         chunk_data_index; // (Internal): The index in the chunk the iterator is referencing
+    T                *data;             // (Read):     Pointer to the data the iterator is referencing. Nullptr if invalid.
 };
 
 template <typename T>
@@ -2830,6 +2830,8 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
 
         // Taken from Windows.h
         typedef int BOOL;
+        typedef void * HWND;
+        typedef void * HMODULE;
 
         typedef union {
             struct {
