@@ -249,6 +249,7 @@
     #define DQN_API
 #endif
 #define DQN_LOCAL_PERSIST static
+#define DQN_FILE_SCOPE static
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -343,6 +344,31 @@ Dqn_usize const DQN_USIZE_MAX = DQN_U32_MAX;
 static_assert(sizeof(int) == sizeof(Dqn_i32),      "Sanity check int typedef is correct");
 static_assert(sizeof(Dqn_u64) == 8,                "Sanity check Dqn_u64 typedef is correct");
 static_assert(sizeof(void *) == sizeof(Dqn_usize), "Require: Pointer can be held in usize (size_t)");
+
+// ------------------------------------------------------------------------------------------------
+//
+// NOTE: Win32 Minimal Header
+//
+// ------------------------------------------------------------------------------------------------
+#if defined(DQN_OS_WIN32)
+    #if !defined(DQN_NO_WIN32_WINDOWS_H)
+        // Taken from Windows.h
+        typedef unsigned long DWORD;
+        typedef unsigned short WORD;
+
+        typedef union {
+            struct {
+                DWORD LowPart;
+                long HighPart;
+            };
+            struct {
+                DWORD LowPart;
+                long  HighPart;
+            } u;
+            Dqn_i64 QuadPart;
+        } LARGE_INTEGER;
+    #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
+#endif // !defined(DQN_OS_WIN32)
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -685,28 +711,43 @@ char const *Dqn_LogTypeString[] = {
 
 // Internal global variables for tracking the current logging function
 typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
-extern Dqn_LogProc *Dqn__LogCallback;
-extern void *       dqn__log_user_data;
 
+// ------------------------------------------------------------------------------------------------
+//
+// NOTE: Logging Macros
+//
+// ------------------------------------------------------------------------------------------------
 // Macro logging functions, prefer this is you want to log messages
-#define DQN_LOG_E(fmt, ...) Dqn__LogCallback(Dqn_LogType::Error,   dqn__log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_D(fmt, ...) Dqn__LogCallback(Dqn_LogType::Debug,   dqn__log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_W(fmt, ...) Dqn__LogCallback(Dqn_LogType::Warning, dqn__log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_I(fmt, ...) Dqn__LogCallback(Dqn_LogType::Info,    dqn__log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_M(fmt, ...) Dqn__LogCallback(Dqn_LogType::Memory,  dqn__log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG(log_type, fmt, ...) Dqn__LogCallback(log_type,     dqn__log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_E(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Error,   dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_D(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Debug,   dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_W(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Warning, dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_I(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Info,    dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_M(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Memory,  dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG(log_type, fmt, ...) dqn__lib.LogCallback(log_type,     dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 
 // Update the default logging function, all logging functions will run through this callback
-// proc: The new logging function
+// proc: The new logging function, set to nullptr to revert back to the default logger.
 // user_data: A user defined parameter to pass to the callback
 DQN_API void Dqn_Log_SetCallback       (Dqn_LogProc *proc, void *user_data);
-
-// Revert the logger callback to Dqn_Log with a nullptr user_data
-DQN_API void Dqn_Log_SetDefaultCallback();
 
 // Internal logging functions, prefer the logging macros above
 DQN_API void Dqn_LogV           (Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
 DQN_API void Dqn_Log            (Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
+
+// ------------------------------------------------------------------------------------------------
+//
+// NOTE: Library variables
+//
+// ------------------------------------------------------------------------------------------------
+struct Dqn_Lib
+{
+    Dqn_LogProc *LogCallback;
+    void *       log_user_data;
+#if defined(DQN_OS_WIN32)
+    LARGE_INTEGER win32_qpc_frequency;
+#endif
+};
+extern Dqn_Lib dqn__lib;
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1526,6 +1567,22 @@ enum struct Dqn_EpochTimeFormat
 // Produces a string representing the date in local machine time.
 // timestamp: Unix epoch timestamp
 DQN_API char *Dqn_EpochTimeToLocalDate(Dqn_i64 timestamp, char *buf, Dqn_isize buf_len);
+
+struct Dqn_Timer
+{
+#if defined(DQN_OS_WIN32)
+    LARGE_INTEGER start;
+    LARGE_INTEGER end;
+#endif
+};
+
+DQN_API Dqn_Timer Dqn_Timer_Begin ();
+DQN_API void      Dqn_Timer_End   (Dqn_Timer *timer);
+DQN_API Dqn_u64   Dqn_Timer_S     (Dqn_Timer const *timer);
+DQN_API Dqn_u64   Dqn_Timer_Ms    (Dqn_Timer const *timer);
+DQN_API Dqn_u64   Dqn_Timer_MicroS(Dqn_Timer const *timer);
+DQN_API Dqn_u64   Dqn_Timer_Ns    (Dqn_Timer const *timer);
+
 DQN_API char *Dqn_U64ToStr            (Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep);
 DQN_API char *Dqn_U64ToTempStr        (Dqn_u64 val, Dqn_b32 comma_sep = true);
 
@@ -2772,8 +2829,6 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         #pragma comment(lib, "shlwapi.lib")
 
         // Taken from Windows.h
-        typedef unsigned long DWORD;
-        typedef unsigned short WORD;
         typedef int BOOL;
 
         typedef union {
@@ -2787,18 +2842,6 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
             } u;
             Dqn_u64 QuadPart;
         } ULARGE_INTEGER;
-
-        typedef union {
-            struct {
-                DWORD LowPart;
-                long HighPart;
-            };
-            struct {
-                DWORD LowPart;
-                long  HighPart;
-            } u;
-            Dqn_i64 QuadPart;
-        } LARGE_INTEGER;
 
         typedef struct
         {
@@ -2900,6 +2943,8 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
 #else // !defined(DQN_OS_WIN32)
   #include <unistd.h> // access
 #endif
+
+Dqn_Lib dqn__lib;
 
 DQN_API void Dqn__ZeroMemBytes(void *ptr, Dqn_usize count, Dqn_ZeroMem zero_mem)
 {
@@ -3050,18 +3095,10 @@ DQN_API void Dqn_Log(Dqn_LogType type, void *user_data, char const *file, Dqn_us
     va_end(va);
 }
 
-Dqn_LogProc *Dqn__LogCallback   = Dqn_Log;
-void *       dqn__log_user_data = nullptr;
-void Dqn_Log_SetCallback(Dqn_LogProc *proc, void *user_data)
+DQN_API void Dqn_Log_SetCallback(Dqn_LogProc *proc, void *user_data)
 {
-    Dqn__LogCallback   = proc;
-    dqn__log_user_data = user_data;
-}
-
-void Dqn_Log_SetDefaultCallback()
-{
-    Dqn__LogCallback   = Dqn_Log;
-    dqn__log_user_data = nullptr;
+    dqn__lib.LogCallback   = proc;
+    dqn__lib.log_user_data = user_data;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -4707,6 +4744,71 @@ DQN_API Dqn_isize Dqn_EpochTimeToLocalDate(Dqn_i64 timestamp, Dqn_EpochTimeForma
             result = strftime(buf, DQN_CAST(Dqn_usize) buf_len, "%F", date_time);
         break;
     }
+    return result;
+}
+
+DQN_API Dqn_Timer Dqn_Timer_Begin()
+{
+#if defined(DQN_OS_WIN32)
+    Dqn_Timer result     = {};
+    BOOL      qpc_result = QueryPerformanceCounter(&result.start);
+    DQN_ASSERT_MSG(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
+#endif
+    return result;
+}
+
+DQN_API void Dqn_Timer_End(Dqn_Timer *timer)
+{
+#if defined(DQN_OS_WIN32)
+    QueryPerformanceCounter(&timer->end);
+#endif
+}
+
+DQN_FILE_SCOPE void Dqn_Timer__Init()
+{
+#if defined(DQN_OS_WIN32)
+    if (dqn__lib.win32_qpc_frequency.QuadPart == 0)
+        QueryPerformanceFrequency(&dqn__lib.win32_qpc_frequency);
+#endif
+}
+
+DQN_API Dqn_u64 Dqn_Timer_S(Dqn_Timer const *timer)
+{
+    Dqn_Timer__Init();
+#if defined(DQN_OS_WIN32)
+    Dqn_u64 ticks  = timer->end.QuadPart - timer->start.QuadPart;
+    Dqn_u64 result = ticks / dqn__lib.win32_qpc_frequency.QuadPart;
+#endif
+    return result;
+}
+
+DQN_API Dqn_u64 Dqn_Timer_Ms(Dqn_Timer const *timer)
+{
+    Dqn_Timer__Init();
+#if defined(DQN_OS_WIN32)
+    Dqn_u64 ticks  = timer->end.QuadPart - timer->start.QuadPart;
+    Dqn_u64 result = (ticks * 1000) / dqn__lib.win32_qpc_frequency.QuadPart;
+#endif
+    return result;
+}
+
+DQN_API Dqn_u64 Dqn_Timer_MicroS(Dqn_Timer const *timer)
+{
+    Dqn_Timer__Init();
+#if defined(DQN_OS_WIN32)
+    Dqn_u64 ticks  = timer->end.QuadPart - timer->start.QuadPart;
+    Dqn_u64 result = (ticks * 1000000) / dqn__lib.win32_qpc_frequency.QuadPart;
+#endif
+    return result;
+}
+
+DQN_API Dqn_u64 Dqn_Timer_Ns(Dqn_Timer const *timer)
+{
+    Dqn_Timer__Init();
+#if defined(DQN_OS_WIN32)
+    Dqn_u64 ticks  = timer->end.QuadPart - timer->start.QuadPart;
+    Dqn_u64 result = (ticks * 1000000000) / dqn__lib.win32_qpc_frequency.QuadPart;
+#endif
     return result;
 }
 
