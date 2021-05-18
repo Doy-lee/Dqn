@@ -1513,8 +1513,10 @@ DQN_API char const *Dqn_Str_SkipToNextWordInPlace      (char const **src);
 DQN_API char const *Dqn_Str_SkipWhitespaceInPlace      (char const **src);
 DQN_API char const *Dqn_Str_TrimWhitespaceAround       (char const *src, Dqn_isize size, Dqn_isize *new_size);
 DQN_API char const *Dqn_Str_TrimPrefix                 (char const *src, Dqn_isize size, char const *prefix, Dqn_isize prefix_size, Dqn_isize *trimmed_size);
-DQN_API Dqn_u64     Dqn_Str_ToU64                      (char const *buf, int len = -1);
-DQN_API Dqn_i64     Dqn_Str_ToI64                      (char const *buf, int len = -1);
+
+// separator: The separator between the thousand-th digits, i.e. separator = ',' converts '1,234' to '1234'.
+DQN_API Dqn_u64     Dqn_Str_ToU64                      (char const *buf, int len = -1, char separator = ',');
+DQN_API Dqn_i64     Dqn_Str_ToI64                      (char const *buf, int len = -1, char separator = ',');
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -2146,6 +2148,7 @@ Dqn_Map<T> Dqn_Map_InitWithMemory(void *mem, Dqn_isize mem_size)
     // NOTE: Generate the map
     //
     Dqn_isize bytes_required = bytes_for_values + bytes_for_usage_bitset;
+    (void)bytes_required;
     DQN_ASSERT_MSG(bytes_required <= mem_size,
                    "(bytes_for_values = %I64d, bytes_for_usage_bitset = %I64d, mem_size = %I64d)",
                    bytes_for_values, bytes_for_usage_bitset, mem_size);
@@ -2697,7 +2700,7 @@ DQN_API void Dqn_Array_Pop(Dqn_Array<T> *a, Dqn_isize num, Dqn_ZeroMem zero_mem)
     void *begin     = a->data + a->size;
     void *end       = a->data + (a->size + num);
     Dqn_isize bytes = DQN_CAST(Dqn_isize) end - DQN_CAST(Dqn_isize) begin;
-    Dqn__ZeroMemBytes(zero_mem, begin, bytes);
+    Dqn__ZeroMemBytes(begin, bytes, zero_mem);
 }
 
 template <typename T>
@@ -3602,7 +3605,9 @@ DQN_API void *Dqn_Allocator__Allocate(Dqn_Allocator *allocator, Dqn_isize size, 
             void *ptr = zero_mem == Dqn_ZeroMem::Yes ? DQN_CALLOC(1, DQN_CAST(size_t)size) : DQN_MALLOC(size);
             result = Dqn_PointerMetadata_Init(ptr, size, alignment);
             if (!result && allocator->type == Dqn_AllocatorType::XHeap)
+            {
                 DQN_ASSERT(result);
+            }
         }
         break;
 
@@ -4146,7 +4151,7 @@ DQN_API Dqn_i64 Dqn_Safe_MulI64(Dqn_i64 a, Dqn_i64 b)
 DQN_API Dqn_u64 Dqn_Safe_AddU64(Dqn_u64 a, Dqn_u64 b)
 {
     DQN_ASSERT_MSG(a <= DQN_U64_MAX - b, "%I64u <= %I64u", a, DQN_U64_MAX - b);
-    Dqn_u64 result = (a <= DQN_U64_MAX / b) ? (a * b) : DQN_U64_MAX;
+    Dqn_u64 result = (a <= DQN_U64_MAX / b) ? (a + b) : DQN_U64_MAX;
     return result;
 }
 
@@ -4535,7 +4540,7 @@ DQN_API char const *Dqn_Str_TrimPrefix(char const *src, Dqn_isize size, char con
 }
 
 
-DQN_API Dqn_u64 Dqn_Str_ToU64(char const *buf, int len)
+DQN_API Dqn_u64 Dqn_Str_ToU64(char const *buf, int len, char separator)
 {
     Dqn_u64 result = 0;
     if (!buf) return result;
@@ -4547,19 +4552,22 @@ DQN_API Dqn_u64 Dqn_Str_ToU64(char const *buf, int len)
     for (int buf_index = 0; buf_index < len; ++buf_index)
     {
         char ch = buf_ptr[buf_index];
-        if (ch == ',') continue;
-        if (ch < '0' || ch > '9') break;
+        if (buf_index && ch == separator)
+            continue;
+
+        if (ch < '0' || ch > '9')
+            break;
 
         Dqn_u64 val = DQN_CAST(Dqn_u64)(ch - '0');
-        result  = Dqn_Safe_AddU64(result, val);
-        result  = Dqn_Safe_MulU64(result, 10);
+        result      = Dqn_Safe_AddU64(result, val);
+        result      = Dqn_Safe_MulU64(result, 10);
     }
 
     result /= 10;
     return result;
 }
 
-DQN_API Dqn_i64 Dqn_Str_ToI64(char const *buf, int len)
+DQN_API Dqn_i64 Dqn_Str_ToI64(char const *buf, int len, char separator)
 {
     Dqn_i64 result = 0;
     if (!buf) return result;
@@ -4579,7 +4587,7 @@ DQN_API Dqn_i64 Dqn_Str_ToI64(char const *buf, int len)
     for (int buf_index = 0; buf_index < len; ++buf_index)
     {
         char ch = buf_ptr[buf_index];
-        if (ch == ',') continue;
+        if (buf_index && ch == separator) continue;
         if (ch < '0' || ch > '9') break;
 
         Dqn_i64 val = ch - '0';
@@ -4754,6 +4762,7 @@ DQN_API Dqn_Timer Dqn_Timer_Begin()
 #if defined(DQN_OS_WIN32)
     Dqn_Timer result     = {};
     BOOL      qpc_result = QueryPerformanceCounter(&result.start);
+    (void)qpc_result;
     DQN_ASSERT_MSG(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
 #endif
     return result;

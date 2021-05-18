@@ -38,7 +38,7 @@ struct TestingState
         testing_state.allocator = Dqn_Allocator_InitWithArena(&testing_state.arena_);                                  \
         testing_state.test      = {};                                                                                  \
     };                                                                                                                 \
-    testing_state.test.name          = Dqn_String_Fmt(&testing_state.allocator, test_name);                           \
+    testing_state.test.name          = Dqn_String_InitFmt(&testing_state.allocator, test_name);                        \
     testing_state.test.scope_started = true;                                                                           \
     testing_state.num_tests_in_group++
 
@@ -54,8 +54,8 @@ struct TestingState
     DQN_ASSERT(testing_state.test.scope_started);                                                                      \
     if (!(expr))                                                                                                       \
     {                                                                                                                  \
-        testing_state.test.fail_expr = Dqn_String_Fmt(&testing_state.allocator, #expr);                               \
-        testing_state.test.fail_msg  = Dqn_String_Fmt(&testing_state.allocator, msg, ##__VA_ARGS__);                  \
+        testing_state.test.fail_expr = Dqn_String_InitFmt(&testing_state.allocator, #expr);                            \
+        testing_state.test.fail_msg  = Dqn_String_InitFmt(&testing_state.allocator, msg, ##__VA_ARGS__);               \
     }
 
 #define TEST_EXPECT(testing_state, expr) TEST_EXPECT_MSG(testing_state, expr, "")
@@ -70,7 +70,7 @@ void TestingState_PrintGroupResult(TestingState const *result)
     bool all_tests_passed = (result->num_tests_ok_in_group == result->num_tests_in_group);
     char buf[256] = {};
     int size = snprintf(buf, Dqn_ArrayCount(buf), "%02d/%02d Tests Passed ", result->num_tests_ok_in_group, result->num_tests_in_group);
-    Dqn_isize remaining_size = DESIRED_LEN - size - 1;
+    Dqn_isize remaining_size = DESIRED_LEN - size;
     remaining_size       = (all_tests_passed) ? remaining_size - Dqn_CharCount(STATUS_OK) : remaining_size - Dqn_CharCount(STATUS_FAIL);
     remaining_size       = DQN_MAX(remaining_size, 0);
     DQN_FOR_EACH(i, remaining_size) fprintf(stdout, " ");
@@ -99,7 +99,7 @@ void TestState_PrintResult(TestState const *result)
     if (result->fail_expr.str)
     {
         fprintf(stdout, ANSI_COLOR_RED "%s" ANSI_COLOR_RESET "\n", STATUS_FAIL);
-        fprintf(stdout, "%s%sReason: [%s] %s\n", INDENT, INDENT, result->fail_expr.str, result->fail_msg.str);
+        fprintf(stdout, "%s%sReason: Expression failed (%s) %s\n", INDENT, INDENT, result->fail_expr.str, result->fail_msg.str);
     }
     else
     {
@@ -754,55 +754,55 @@ static void UnitTests()
         {
             TEST_START_SCOPE(testing_state, "Convert nullptr");
             Dqn_u64 result = Dqn_Str_ToU64(nullptr);
-            TEST_EXPECT(testing_state, result == 0);
+            TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert empty string");
             Dqn_u64 result = Dqn_Str_ToU64("");
-            TEST_EXPECT(testing_state, result == 0);
+            TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1\"");
             Dqn_u64 result = Dqn_Str_ToU64("1");
-            TEST_EXPECT(testing_state, result == 1);
+            TEST_EXPECT_MSG(testing_state, result == 1, "result: %zu", result);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-0\"");
             Dqn_u64 result = Dqn_Str_ToU64("-0");
-            TEST_EXPECT(testing_state, result == 0);
+            TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"-1\"");
             Dqn_u64 result = Dqn_Str_ToU64("-1");
-            TEST_EXPECT(testing_state, result == 0);
+            TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1.2\"");
             Dqn_u64 result = Dqn_Str_ToU64("1.2");
-            TEST_EXPECT(testing_state, result == 1);
+            TEST_EXPECT_MSG(testing_state, result == 1, "result: %zu", result);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,234\"");
             Dqn_u64 result = Dqn_Str_ToU64("1,234");
-            TEST_EXPECT(testing_state, result == 1234);
+            TEST_EXPECT_MSG(testing_state, result == 1234, "result: %zu", result);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"1,2\"");
             Dqn_u64 result = Dqn_Str_ToU64("1,2");
-            TEST_EXPECT(testing_state, result == 12);
+            TEST_EXPECT_MSG(testing_state, result == 12, "result: %zu", result);
         }
 
         {
             TEST_START_SCOPE(testing_state, "Convert \"12a3\"");
             Dqn_u64 result = Dqn_Str_ToU64("12a3");
-            TEST_EXPECT(testing_state, result == 12);
+            TEST_EXPECT_MSG(testing_state, result == 12, "result: %zu", result);
         }
     }
 
