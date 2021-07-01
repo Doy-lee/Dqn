@@ -120,10 +120,15 @@
 // NOTE: Compiler
 //
 // -------------------------------------------------------------------------------------------------
+// NOTE: Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
-    #define DQN_COMPILER_MSVC
-    #pragma warning(push)
-    #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
+    #if defined(__clang__)
+        #define DQN_COMPILER_W32_CLANG
+    #else
+        #define DQN_COMPILER_W32_MSVC
+        #pragma warning(push)
+        #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
+    #endif
 #elif defined(__clang__)
     #define DQN_COMPILER_CLANG
 #elif defined(__GNUC__)
@@ -134,7 +139,7 @@
     #define DQN_OS_WIN32
 #endif
 
-#if defined(DQN_COMPILER_MSVC)
+#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #if defined(_CRT_SECURE_NO_WARNINGS)
         #define DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED
     #else
@@ -195,10 +200,6 @@
 //
 // -------------------------------------------------------------------------------------------------
 #define DQN_CAST(val) (val)
-#define DQN_ABS(val) (((val) < 0) ? (-(val)) : (val))
-#define DQN_SQUARED(val) ((val) * (val))
-#define DQN_MIN(a, b) ((a < b) ? (a) : (b))
-#define DQN_MAX(a, b) ((a > b) ? (a) : (b))
 #define DQN_SWAP(a, b)                                                                                                 \
     do                                                                                                                 \
     {                                                                                                                  \
@@ -207,41 +208,38 @@
         b        = tmp;                                                                                                \
     } while (0)
 
-#define DQN_LEN_AND_STR(string)                    Dqn_CharCount(str), string
-#define DQN_STR_AND_LEN(string)                    string, Dqn_CharCount(string)
-#define DQN_STR_AND_LEN_I(string)                  string, (int)Dqn_CharCount(string)
-#define DQN_FOR_EACH(i, limit)                     for (Dqn_isize i = 0; i < (Dqn_isize)(limit); ++i)
-#define DQN_FOR_EACH_REVERSE(i, limit)             for (Dqn_isize i = (Dqn_isize)(limit-1); i >= 0; --i)
-#define DQN_FOR_EACH_ITERATOR(it_name, array, num) for (auto it_name = array; it_name != (array + num); it_name++)
+#define DQN_LEN_AND_STR(string) Dqn_CharCount(str), string
+#define DQN_STR_AND_LEN(string) string, Dqn_CharCount(string)
+#define DQN_STR_AND_LEN_I(string) string, (int)Dqn_CharCount(string)
+#define DQN_FOR_EACH(i, limit) for (Dqn_isize i = 0; i < (Dqn_isize)(limit); ++i)
 
-#define DQN_BYTES(val)     (val)
+#define DQN_BYTES(val) (val)
 #define DQN_KILOBYTES(val) (1024ULL * DQN_BYTES(val))
 #define DQN_MEGABYTES(val) (1024ULL * DQN_KILOBYTES(val))
 #define DQN_GIGABYTES(val) (1024ULL * DQN_MEGABYTES(val))
 
-#define DQN_MINS_TO_S(val)  ((val) * 60ULL)
+#define DQN_MINS_TO_S(val) ((val) * 60ULL)
 #define DQN_HOURS_TO_S(val) (DQN_MINS_TO_S(val) * 60ULL)
-#define DQN_DAYS_TO_S(val)  (DQN_HOURS_TO_S(val) * 24ULL)
-#define DQN_YEARS_TO_S(val)  (DQN_DAYS_TO_S(val) * 365ULL)
+#define DQN_DAYS_TO_S(val) (DQN_HOURS_TO_S(val) * 24ULL)
+#define DQN_YEARS_TO_S(val) (DQN_DAYS_TO_S(val) * 365ULL)
 #define DQN_ISIZEOF(val) DQN_CAST(ptrdiff_t)sizeof(val)
 
 #if !defined(DQN_DEBUG_BREAK)
     #if defined(NDEBUG)
         #define DQN_DEBUG_BREAK
     #else
-        #if defined(DQN_COMPILER_MSVC)
+        #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
             #define DQN_DEBUG_BREAK __debugbreak()
         #elif defined(DQN_COMPILER_CLANG) || defined(DQN_COMPILER_GCC)
             #include <signal.h>
             #define DQN_DEBUG_BREAK raise(SIGTRAP)
+        #elif
+            #error "Unhandled compiler"
         #endif
     #endif
 #endif
 
-#define DQN_INVALID_CODE_PATH 0
 #define DQN_SECONDS_TO_MS(val) ((val) * 1000.0f)
-#define DQN_MATH_PI 3.14159265359f
-#define DQN_DEGREE_TO_RADIAN(val) (val) * (DQN_MATH_PI / 180.0f)
 
 #if defined(DQN_STATIC_API)
     #define DQN_API static
@@ -253,28 +251,62 @@
 
 // -------------------------------------------------------------------------------------------------
 //
+// NOTE: Overridable Math Macros
+//
+// ------------------------------------------------------------------------------------------------
+#ifndef DQN_M_SINF
+    #include <math.h>
+    #define DQN_M_SINF(val) sinf(val)
+#endif // DQN_M_SINF
+
+#ifndef DQN_M_COSF
+    #include <math.h>
+    #define DQN_M_COSF(val) cosf(val)
+#endif // DQN_M_COSF
+
+#ifndef DQN_M_TANF
+    #include <math.h>
+    #define DQN_M_TANF(val) tanf(val)
+#endif // DQN_M_TANF
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Math Macros
+//
+// ------------------------------------------------------------------------------------------------
+#define DQN_M_PI 3.14159265359f
+
+#define DQN_M_DEGREE_TO_RADIAN(degrees) ((degrees) * (DQN_M_PI / 180.0f))
+#define DQN_M_RADIAN_TO_DEGREE(radians) ((radians) * (180.f * DQN_M_PI))
+
+#define DQN_M_ABS(val) (((val) < 0) ? (-(val)) : (val))
+#define DQN_M_MAX(a, b) ((a > b) ? (a) : (b))
+#define DQN_M_MIN(a, b) ((a < b) ? (a) : (b))
+#define DQN_M_SQUARED(val) ((val) * (val))
+
+// -------------------------------------------------------------------------------------------------
+//
 // NOTE: Assert Macro
 //
 // ------------------------------------------------------------------------------------------------
+#define DQN_HARD_ASSERT(expr) DQN_HARD_ASSERT_MSG(expr, "")
+#define DQN_HARD_ASSERT_MSG(expr, fmt, ...)                                                                            \
+    if (!(expr))                                                                                                       \
+    {                                                                                                                  \
+        DQN_LOG_E("Assert: [" #expr "] " fmt, ##__VA_ARGS__);                                                          \
+        DQN_DEBUG_BREAK;                                                                                               \
+    }
+
 #if defined(DQN_NO_ASSERT)
     #define DQN_ASSERT(expr)
     #define DQN_ASSERT_MSG(expr, fmt, ...)
-    #define DQN_ASSERT_IF(expr) if ((expr))
-    #define DQN_ASSERT_MSG_IF(expr, fmt, ...) if ((expr))
 #else
-    #define DQN_ASSERT(expr) DQN_ASSERT_MSG(expr, "")
-    #define DQN_ASSERT_MSG(expr, fmt, ...)                                                                                 \
-        if (!(expr))                                                                                                       \
-        {                                                                                                                  \
-            DQN_LOG_E("Assert: [" #expr "] " fmt, ##__VA_ARGS__);                                                          \
-            DQN_DEBUG_BREAK;                                                                                               \
-        }
-
-    #define DQN_ASSERT_IF(expr) DQN_ASSERT_MSG_IF(expr, "")
-    #define DQN_ASSERT_MSG_IF(expr, fmt, ...)                                                                              \
-        DQN_ASSERT_MSG(!(expr), fmt, ## __VA_ARGS__) \
-        if (0)
+    #define DQN_ASSERT(expr) DQN_HARD_ASSERT_MSG(expr, "")
+    #define DQN_ASSERT_MSG(expr, fmt, ...) DQN_HARD_ASSERT_MSG(expr, fmt, ##__VA_ARGS__)
 #endif
+
+#define DQN_INVALID_CODE_PATH DQN_ASSERT(0)
+#define DQN_HARD_INVALID_CODE_PATH DQN_HARD_ASSERT(0 && "Invalid Code Path")
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -290,7 +322,7 @@ using Dqn_i16     = signed short;
 using Dqn_u16     = unsigned short;
 using Dqn_i32     = signed int;
 using Dqn_u32     = unsigned int;
-#if defined(DQN_COMPILER_MSVC)
+#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
 using Dqn_i64     = signed __int64;
 using Dqn_u64     = unsigned __int64;
 #else
@@ -434,19 +466,25 @@ DQN_API void Dqn__ZeroMemBytes(void *ptr, Dqn_usize count, Dqn_ZeroMem zero_mem)
 // NOTE: Intrinsics
 //
 // -------------------------------------------------------------------------------------------------
-#if defined(DQN_COMPILER_MSVC)
+// NOTE: Dqn_AtomicAdd/Exchange return the previous value store in the target
+#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #include <intrin.h>
     #define Dqn_AtomicAddU32(target, value) _InterlockedExchangeAdd(DQN_CAST(long volatile *)target, value)
     #define Dqn_AtomicAddU64(target, value) _InterlockedExchangeAdd64(DQN_CAST(__int64 volatile *)target, value)
-    #define Dqn_AtomicSetPointer(target, value) _InterlockedExchangePointer(DQN_CAST(void *volatile *)target, value)
-    #define Dqn_AtomicSetValue64(target, value) _InterlockedExchange64(DQN_CAST(__int64 volatile *)target, value)
-    #define Dqn_AtomicSetValue32(target, value) _InterlockedExchange(DQN_CAST(long volatile *)target, value)
+    #define Dqn_AtomicSubU32(target, value) InterlockedExchangeSubtract(DQN_CAST(unsigned long volatile *)target, value)
+    #define Dqn_AtomicSubU64(target, value) Dqn_AtomicAddU64(target, -value)
+    #define Dqn_AtomicSetPointer(target, value) InterlockedExchangePointer(DQN_CAST(void *volatile *)target, value)
+    #define Dqn_AtomicSetValue64(target, value) InterlockedExchange64(DQN_CAST(__int64 volatile *)target, value)
+    #define Dqn_AtomicSetValue32(target, value) InterlockedExchange(DQN_CAST(unsigned long volatile *)target, value)
     #define Dqn_CPUClockCycle() __rdtsc()
-    #define Dqn_WriteBarrierAndFence _WriteBarrier(); _mm_sfence()
+    #define Dqn_CompilerReadBarrierAndCPUReadFence _ReadBarrier(); _mm_lfence()
+    #define Dqn_CompilerWriteBarrierAndCPUWriteFence _WriteBarrier(); _mm_sfence()
 #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     #include <x86intrin.h>
     #define Dqn_AtomicAddU32(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_AtomicAddU64(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
+    #define Dqn_AtomicSubU32(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
+    #define Dqn_AtomicSubU64(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_AtomicSetValue64(target, value) __sync_lock_test_and_set(target, value)
     #define Dqn_AtomicSetValue32(target, value) __sync_lock_test_and_set(target, value)
     #if defined(DQN_COMPILER_GCC)
@@ -454,21 +492,15 @@ DQN_API void Dqn__ZeroMemBytes(void *ptr, Dqn_usize count, Dqn_ZeroMem zero_mem)
     #else
         #define Dqn_CPUClockCycle() __builtin_readcyclecounter()
     #endif
-    #define Dqn_WriteBarrierAndFence asm volatile("" ::: "memory")
+    #define Dqn_CompilerReadBarrierAndCPUReadFence asm volatile("lfence" ::: "memory")
+    #define Dqn_CompilerWriteBarrierAndCPUWriteFence asm volatile("sfence" ::: "memory")
 #else
     #error "Compiler not supported"
 #endif
 
-union Dqn_CPUIDRegisters
+struct Dqn_CPUIDRegisters
 {
-    unsigned int array[4];
-    struct Register
-    {
-        unsigned int eax;
-        unsigned int ebx;
-        unsigned int ecx;
-        unsigned int edx;
-    };
+    unsigned int array[4]; // eax, ebx, ecx, edx
 };
 
 struct Dqn_TicketMutex
@@ -478,9 +510,20 @@ struct Dqn_TicketMutex
 };
 
 // Query the CPU's CPUID function and return the data in the registers
-Dqn_CPUIDRegisters Dqn_CPUID            (int function_id);
-void               Dqn_TicketMutex_Begin(Dqn_TicketMutex *mutex);
-void               Dqn_TicketMutex_End  (Dqn_TicketMutex *mutex);
+Dqn_CPUIDRegisters Dqn_CPUID                 (int function_id);
+void               Dqn_TicketMutex_Begin     (Dqn_TicketMutex *mutex);
+void               Dqn_TicketMutex_End       (Dqn_TicketMutex *mutex);
+
+// NOTE: Advance API, more granular functions, the basic sequence to use the API is
+/*
+   Dqn_TicketMutex mutex = {};
+   unsigned int ticket = Dqn_TicketMutex_MakeTicket(&mutex);
+   Dqn_TicketMutex_BeginTicket(&mutex, ticket); // Blocking call until we attain the lock
+   Dqn_TicketMutex_End(&mutex);
+ */
+unsigned int       Dqn_TicketMutex_MakeTicket   (Dqn_TicketMutex *mutex);
+void               Dqn_TicketMutex_BeginTicket  (const Dqn_TicketMutex *mutex, unsigned int ticket);
+Dqn_b32            Dqn_TicketMutex_CanLock      (const Dqn_TicketMutex *mutex, unsigned int ticket);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -689,11 +732,12 @@ DQN_API Dqn_isize Dqn_FmtLen                 (char const *fmt, ...);
 //
 // -------------------------------------------------------------------------------------------------
 #define X_MACRO                                                                                                        \
-    X_ENTRY(Debug,   "DEBUG")   \
-    X_ENTRY(Error,   "ERROR")   \
-    X_ENTRY(Warning, "WARNING") \
-    X_ENTRY(Info,    "INFO")    \
-    X_ENTRY(Memory,  "MEMORY")
+    X_ENTRY(Debug,   "DBUG") \
+    X_ENTRY(Error,   "ERR ") \
+    X_ENTRY(Warning, "WARN") \
+    X_ENTRY(Info,    "INFO") \
+    X_ENTRY(Profile, "PROF") \
+    X_ENTRY(Memory,  "MEM ")
 
 enum struct Dqn_LogType
 {
@@ -723,6 +767,7 @@ typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, char const *file, Dq
 #define DQN_LOG_W(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Warning, dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG_I(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Info,    dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG_M(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Memory,  dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_P(fmt, ...) dqn__lib.LogCallback(Dqn_LogType::Profile, dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG(log_type, fmt, ...) dqn__lib.LogCallback(log_type,     dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 
 // Update the default logging function, all logging functions will run through this callback
@@ -731,8 +776,8 @@ typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, char const *file, Dq
 DQN_API void Dqn_Log_SetCallback       (Dqn_LogProc *proc, void *user_data);
 
 // Internal logging functions, prefer the logging macros above
-DQN_API void Dqn_LogV           (Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
-DQN_API void Dqn_Log            (Dqn_LogType type, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
+DQN_API void Dqn_LogV           (Dqn_LogType type, void *user_data, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, va_list va);
+DQN_API void Dqn_Log            (Dqn_LogType type, void *user_data, char const *file, Dqn_usize file_len, char const *func, Dqn_usize func_len, Dqn_usize line, char const *fmt, ...);
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -741,7 +786,7 @@ DQN_API void Dqn_Log            (Dqn_LogType type, char const *file, Dqn_usize f
 // ------------------------------------------------------------------------------------------------
 struct Dqn_Lib
 {
-    Dqn_LogProc *LogCallback;
+    Dqn_LogProc *LogCallback = Dqn_Log;
     void *       log_user_data;
 #if defined(DQN_OS_WIN32)
     LARGE_INTEGER win32_qpc_frequency;
@@ -785,203 +830,6 @@ DQN_API Dqn_isize           Dqn_PointerMetadata_SizeRequired (Dqn_isize size, Dq
 DQN_API char               *Dqn_PointerMetadata_Init         (void *ptr, Dqn_isize size, Dqn_u8 alignment);
 DQN_API Dqn_PointerMetadata Dqn_PointerMetadata_Get          (void *ptr);
 DQN_API char               *Dqn_PointerMetadata_GetRawPointer(void *ptr);
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Math
-//
-// -------------------------------------------------------------------------------------------------
-union Dqn_V2I
-{
-  struct { Dqn_i32 x, y; };
-  struct { Dqn_i32 w, h; };
-  struct { Dqn_i32 min, max; };
-  Dqn_i32 e[2];
-
-  Dqn_V2I() = default;
-  constexpr Dqn_V2I(Dqn_f32 x_, Dqn_f32 y_): x((Dqn_i32)x_), y((Dqn_i32)y_) {}
-  constexpr Dqn_V2I(Dqn_i32 x_, Dqn_i32 y_): x(x_), y(y_) {}
-  constexpr Dqn_V2I(Dqn_i32 xy):             x(xy), y(xy) {}
-
-  constexpr bool     operator!=(Dqn_V2I other) const { return !(*this == other);                }
-  constexpr bool     operator==(Dqn_V2I other) const { return (x == other.x) && (y == other.y); }
-  constexpr bool     operator>=(Dqn_V2I other) const { return (x >= other.x) && (y >= other.y); }
-  constexpr bool     operator<=(Dqn_V2I other) const { return (x <= other.x) && (y <= other.y); }
-  constexpr bool     operator< (Dqn_V2I other) const { return (x <  other.x) && (y <  other.y); }
-  constexpr bool     operator> (Dqn_V2I other) const { return (x >  other.x) && (y >  other.y); }
-  constexpr Dqn_V2I  operator- (Dqn_V2I other) const { Dqn_V2I result(x - other.x, y - other.y); return result; }
-  constexpr Dqn_V2I  operator+ (Dqn_V2I other) const { Dqn_V2I result(x + other.x, y + other.y); return result; }
-  constexpr Dqn_V2I  operator* (Dqn_V2I other) const { Dqn_V2I result(x * other.x, y * other.y); return result; }
-  constexpr Dqn_V2I  operator* (Dqn_f32 other) const { Dqn_V2I result(x * other,   y * other);   return result; }
-  constexpr Dqn_V2I  operator* (Dqn_i32 other) const { Dqn_V2I result(x * other,   y * other);   return result; }
-  constexpr Dqn_V2I  operator/ (Dqn_V2I other) const { Dqn_V2I result(x / other.x, y / other.y); return result; }
-  constexpr Dqn_V2I  operator/ (Dqn_f32 other) const { Dqn_V2I result(x / other,   y / other);   return result; }
-  constexpr Dqn_V2I  operator/ (Dqn_i32 other) const { Dqn_V2I result(x / other,   y / other);   return result; }
-  constexpr Dqn_V2I &operator*=(Dqn_V2I other)       { *this = *this * other;                    return *this;  }
-  constexpr Dqn_V2I &operator*=(Dqn_f32 other)       { *this = *this * other;                    return *this;  }
-  constexpr Dqn_V2I &operator*=(Dqn_i32 other)       { *this = *this * other;                    return *this;  }
-  constexpr Dqn_V2I &operator-=(Dqn_V2I other)       { *this = *this - other;                    return *this;  }
-  constexpr Dqn_V2I &operator+=(Dqn_V2I other)       { *this = *this + other;                    return *this;  }
-};
-
-union Dqn_V2
-{
-  struct { Dqn_f32 x, y; };
-  struct { Dqn_f32 w, h; };
-  struct { Dqn_f32 min, max; };
-  Dqn_f32 e[2];
-
-  Dqn_V2() = default;
-  constexpr Dqn_V2(Dqn_f32 a)           : x(a),           y(a)           {}
-  constexpr Dqn_V2(Dqn_i32 a)           : x((Dqn_f32)a),  y((Dqn_f32)a)  {}
-  constexpr Dqn_V2(Dqn_f32 x, Dqn_f32 y): x(x),           y(y)           {}
-  constexpr Dqn_V2(Dqn_i32 x, Dqn_i32 y): x((Dqn_f32)x),  y((Dqn_f32)y)  {}
-  constexpr Dqn_V2(Dqn_V2I a)           : x((Dqn_f32)a.x),y((Dqn_f32)a.y){}
-
-  constexpr bool    operator!=(Dqn_V2  other) const { return !(*this == other);                }
-  constexpr bool    operator==(Dqn_V2  other) const { return (x == other.x) && (y == other.y); }
-  constexpr bool    operator>=(Dqn_V2  other) const { return (x >= other.x) && (y >= other.y); }
-  constexpr bool    operator<=(Dqn_V2  other) const { return (x <= other.x) && (y <= other.y); }
-  constexpr bool    operator< (Dqn_V2  other) const { return (x <  other.x) && (y <  other.y); }
-  constexpr bool    operator> (Dqn_V2  other) const { return (x >  other.x) && (y >  other.y); }
-  constexpr Dqn_V2  operator- (Dqn_V2  other) const { Dqn_V2 result(x - other.x, y - other.y); return result; }
-  constexpr Dqn_V2  operator+ (Dqn_V2  other) const { Dqn_V2 result(x + other.x, y + other.y); return result; }
-  constexpr Dqn_V2  operator* (Dqn_V2  other) const { Dqn_V2 result(x * other.x, y * other.y); return result; }
-  constexpr Dqn_V2  operator* (Dqn_f32 other) const { Dqn_V2 result(x * other,   y * other);   return result; }
-  constexpr Dqn_V2  operator* (Dqn_i32 other) const { Dqn_V2 result(x * other,   y * other);   return result; }
-  constexpr Dqn_V2  operator/ (Dqn_V2  other) const { Dqn_V2 result(x / other.x, y / other.y); return result; }
-  constexpr Dqn_V2  operator/ (Dqn_f32 other) const { Dqn_V2 result(x / other,   y / other);   return result; }
-  constexpr Dqn_V2  operator/ (Dqn_i32 other) const { Dqn_V2 result(x / other,   y / other);   return result; }
-  constexpr Dqn_V2 &operator*=(Dqn_V2  other)       { *this = *this * other;               return *this;  }
-  constexpr Dqn_V2 &operator*=(Dqn_f32 other)       { *this = *this * other;               return *this;  }
-  constexpr Dqn_V2 &operator*=(Dqn_i32 other)       { *this = *this * other;               return *this;  }
-  constexpr Dqn_V2 &operator/=(Dqn_V2  other)       { *this = *this / other;               return *this;  }
-  constexpr Dqn_V2 &operator/=(Dqn_f32 other)       { *this = *this / other;               return *this;  }
-  constexpr Dqn_V2 &operator/=(Dqn_i32 other)       { *this = *this / other;               return *this;  }
-  constexpr Dqn_V2 &operator-=(Dqn_V2  other)       { *this = *this - other;               return *this;  }
-  constexpr Dqn_V2 &operator+=(Dqn_V2  other)       { *this = *this + other;               return *this;  }
-};
-
-DQN_API Dqn_V2I Dqn_V2_ToV2I        (Dqn_V2 a);
-DQN_API Dqn_V2  Dqn_V2_Min          (Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2_Max          (Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2_Abs          (Dqn_V2 a);
-DQN_API Dqn_f32 Dqn_V2_Dot          (Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_f32 Dqn_V2_LengthSq     (Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2_Normalise    (Dqn_V2 a);
-DQN_API Dqn_V2  Dqn_V2_Perpendicular(Dqn_V2 a);
-
-union Dqn_V3
-{
-  struct { Dqn_f32 x, y, z; };
-  struct { Dqn_f32 r, g, b; };
-  Dqn_V2  xy;
-  Dqn_f32 e[3];
-
-  Dqn_V3() = default;
-  constexpr Dqn_V3(Dqn_f32 a)                 : x(a),        y(a),       z(a)        {}
-  constexpr Dqn_V3(Dqn_i32 a)                 : x((Dqn_f32)a),   y((Dqn_f32)a),  z((Dqn_f32)a)   {}
-  constexpr Dqn_V3(Dqn_f32 x_, Dqn_f32 y_, Dqn_f32 z_): x(x_),       y(y_),      z(z_)       {}
-  constexpr Dqn_V3(Dqn_i32 x_, Dqn_i32 y_, Dqn_f32 z_): x((Dqn_f32)x_),  y((Dqn_f32)y_), z((Dqn_f32)z_)  {}
-  constexpr Dqn_V3(Dqn_V2  xy, Dqn_f32 z_)        : x(xy.x),     y(xy.y),    z(z_)       {}
-
-  constexpr bool   operator!= (Dqn_V3  other) const { return !(*this == other);                }
-  constexpr bool   operator== (Dqn_V3  other) const { return (x == other.x) && (y == other.y) && (z == other.z); }
-  constexpr bool   operator>= (Dqn_V3  other) const { return (x >= other.x) && (y >= other.y) && (z >= other.z); }
-  constexpr bool   operator<= (Dqn_V3  other) const { return (x <= other.x) && (y <= other.y) && (z <= other.z); }
-  constexpr bool   operator<  (Dqn_V3  other) const { return (x <  other.x) && (y <  other.y) && (z <  other.z); }
-  constexpr bool   operator>  (Dqn_V3  other) const { return (x >  other.x) && (y >  other.y) && (z >  other.z); }
-  constexpr Dqn_V3 operator-  (Dqn_V3  other) const { Dqn_V3 result(x - other.x, y - other.y, z - other.z); return result; }
-  constexpr Dqn_V3 operator+  (Dqn_V3  other) const { Dqn_V3 result(x + other.x, y + other.y, z + other.z); return result; }
-  constexpr Dqn_V3 operator*  (Dqn_V3  other) const { Dqn_V3 result(x * other.x, y * other.y, z * other.z); return result; }
-  constexpr Dqn_V3 operator*  (Dqn_f32 other) const { Dqn_V3 result(x * other,   y * other,   z * other);   return result; }
-  constexpr Dqn_V3 operator*  (Dqn_i32 other) const { Dqn_V3 result(x * other,   y * other,   z * other);   return result; }
-  constexpr Dqn_V3 operator/  (Dqn_V3  other) const { Dqn_V3 result(x / other.x, y / other.y, z / other.z); return result; }
-  constexpr Dqn_V3 operator/  (Dqn_f32 other) const { Dqn_V3 result(x / other,   y / other,   z / other);   return result; }
-  constexpr Dqn_V3 operator/  (Dqn_i32 other) const { Dqn_V3 result(x / other,   y / other,   z / other);   return result; }
-  constexpr Dqn_V3 &operator*=(Dqn_V3  other)       { *this = *this * other;               return *this;  }
-  constexpr Dqn_V3 &operator*=(Dqn_f32 other)       { *this = *this * other;               return *this;  }
-  constexpr Dqn_V3 &operator*=(Dqn_i32 other)       { *this = *this * other;               return *this;  }
-  constexpr Dqn_V3 &operator/=(Dqn_V3  other)       { *this = *this / other;               return *this;  }
-  constexpr Dqn_V3 &operator/=(Dqn_f32 other)       { *this = *this / other;               return *this;  }
-  constexpr Dqn_V3 &operator/=(Dqn_i32 other)       { *this = *this / other;               return *this;  }
-  constexpr Dqn_V3 &operator-=(Dqn_V3  other)       { *this = *this - other;               return *this;  }
-  constexpr Dqn_V3 &operator+=(Dqn_V3  other)       { *this = *this + other;               return *this;  }
-};
-
-union Dqn_V4
-{
-  struct { Dqn_f32 x, y, z, w; };
-  struct { Dqn_f32 r, g, b, a; };
-  struct { Dqn_V2 min; Dqn_V2 max; } v2;
-  Dqn_V3 rgb;
-  Dqn_f32 e[4];
-
-  Dqn_V4() = default;
-  constexpr Dqn_V4(Dqn_f32 xyzw)                                  : x(xyzw), y(xyzw), z(xyzw), w(xyzw) {}
-  constexpr Dqn_V4(Dqn_f32 x_, Dqn_f32 y_, Dqn_f32 z_, Dqn_f32 w_): x(x_), y(y_), z(z_), w(w_) {}
-  constexpr Dqn_V4(Dqn_i32 x_, Dqn_i32 y_, Dqn_i32 z_, Dqn_i32 w_): x((Dqn_f32)x_), y((Dqn_f32)y_), z((Dqn_f32)z_), w((Dqn_f32)w_) {}
-  constexpr Dqn_V4(Dqn_V3 xyz, Dqn_f32 w_)                        : x(xyz.x), y(xyz.y), z(xyz.z), w(w_) {}
-  constexpr Dqn_V4(Dqn_V2 v2)                                     : x(v2.x), y(v2.y), z(v2.x), w(v2.y) {}
-
-  constexpr bool    operator!=(Dqn_V4  other) const { return !(*this == other);            }
-  constexpr bool    operator==(Dqn_V4  other) const { return (x == other.x) && (y == other.y) && (z == other.z) && (w == other.w); }
-  constexpr bool    operator>=(Dqn_V4  other) const { return (x >= other.x) && (y >= other.y) && (z >= other.z) && (w >= other.w); }
-  constexpr bool    operator<=(Dqn_V4  other) const { return (x <= other.x) && (y <= other.y) && (z <= other.z) && (w <= other.w); }
-  constexpr bool    operator< (Dqn_V4  other) const { return (x <  other.x) && (y <  other.y) && (z <  other.z) && (w <  other.w); }
-  constexpr bool    operator> (Dqn_V4  other) const { return (x >  other.x) && (y >  other.y) && (z >  other.z) && (w >  other.w); }
-  constexpr Dqn_V4  operator- (Dqn_V4  other) const { Dqn_V4 result(x - other.x, y - other.y, z - other.z, w - other.w); return result;  }
-  constexpr Dqn_V4  operator+ (Dqn_V4  other) const { Dqn_V4 result(x + other.x, y + other.y, z + other.z, w + other.w); return result;  }
-  constexpr Dqn_V4  operator* (Dqn_V4  other) const { Dqn_V4 result(x * other.x, y * other.y, z * other.z, w * other.w); return result;  }
-  constexpr Dqn_V4  operator* (Dqn_f32 other) const { Dqn_V4 result(x * other,   y * other,   z * other,   w * other);   return result;  }
-  constexpr Dqn_V4  operator* (Dqn_i32 other) const { Dqn_V4 result(x * other,   y * other,   z * other,   w * other);   return result;  }
-  constexpr Dqn_V4  operator/ (Dqn_f32 other) const { Dqn_V4 result(x / other,   y / other,   z / other,   w / other);   return result;  }
-  constexpr Dqn_V4 &operator*=(Dqn_V4  other)       { *this = *this * other;                                             return *this;   }
-  constexpr Dqn_V4 &operator*=(Dqn_f32 other)       { *this = *this * other;                                             return *this;   }
-  constexpr Dqn_V4 &operator*=(Dqn_i32 other)       { *this = *this * other;                                             return *this;   }
-  constexpr Dqn_V4 &operator-=(Dqn_V4  other)       { *this = *this - other;                                             return *this;   }
-  constexpr Dqn_V4 &operator+=(Dqn_V4  other)       { *this = *this + other;                                             return *this;   }
-};
-
-DQN_API Dqn_f32 Dqn_V4_Dot(Dqn_V4 const *a, Dqn_V4 const *b);
-
-struct Dqn_Rect
-{
-    Dqn_V2 min, max;
-    Dqn_Rect() = default;
-    Dqn_Rect(Dqn_V2  min, Dqn_V2 max)  : min(min), max(max) {}
-    Dqn_Rect(Dqn_V2I min, Dqn_V2I max) : min(min), max(max) {}
-    Dqn_Rect(Dqn_f32 x, Dqn_f32 y, Dqn_f32 max_x, Dqn_f32 max_y) : min(x, y), max(max_x, max_y) {}
-    constexpr Dqn_b32 operator==(Dqn_Rect other) const { return (min == other.min) && (max == other.max); }
-};
-
-struct Dqn_RectI32
-{
-    Dqn_V2I min, max;
-    Dqn_RectI32() = default;
-    Dqn_RectI32(Dqn_V2I min, Dqn_V2I max) : min(min), max(max) {}
-};
-
-DQN_API Dqn_Rect Dqn_Rect_InitFromPosAndSize(Dqn_V2 const &pos, Dqn_V2 const &size);
-DQN_API Dqn_V2   Dqn_Rect_Center            (Dqn_Rect const &rect);
-DQN_API Dqn_b32  Dqn_Rect_ContainsPoint     (Dqn_Rect const &rect, Dqn_V2 const &p);
-DQN_API Dqn_b32  Dqn_Rect_ContainsRect      (Dqn_Rect const &a, Dqn_Rect const &b);
-DQN_API Dqn_V2   Dqn_Rect_Size              (Dqn_Rect const &rect);
-DQN_API Dqn_Rect Dqn_Rect_Move              (Dqn_Rect const &src, Dqn_V2 const &move_amount);
-DQN_API Dqn_Rect Dqn_Rect_MoveTo            (Dqn_Rect const &src, Dqn_V2 const &dest);
-DQN_API Dqn_b32  Dqn_Rect_Intersects        (Dqn_Rect const &a, Dqn_Rect const &b);
-DQN_API Dqn_Rect Dqn_Rect_Intersection      (Dqn_Rect const &a, Dqn_Rect const &b);
-DQN_API Dqn_Rect Dqn_Rect_Union             (Dqn_Rect const &a, Dqn_Rect const &b);
-DQN_API Dqn_Rect Dqn_Rect_FromRectI32       (Dqn_RectI32 const &a);
-DQN_API Dqn_V2I  Dqn_RectI32_Size           (Dqn_RectI32 const &rect);
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Math Utils
-//
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_V2  Dqn_LerpV2 (Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
-DQN_API Dqn_f32 Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1135,6 +983,25 @@ enum struct Dqn_AllocatorType
 #define DQN_ALLOCATOR_CUSTOM_FREE_PROC(name) Dqn_isize name(void *ptr, void *user_context)
 typedef DQN_ALLOCATOR_CUSTOM_ALLOCATE_PROC(Dqn_Allocator_CustomAllocateProc);
 typedef DQN_ALLOCATOR_CUSTOM_FREE_PROC(Dqn_Allocator_CustomFreeProc);
+
+// Example of a custom allocator proc
+/*
+DQN_ALLOCATOR_CUSTOM_ALLOCATE_PROC(Dqn_Allocator_MallocProc)
+{
+    Dqn_usize allocation_size = Dqn_PointerMetadata_SizeRequired(size, alignment);
+    void *    result          = malloc(allocation_size);
+    return result;
+}
+
+DQN_ALLOCATOR_CUSTOM_FREE_PROC(Dqn_Allocator_FreeProc)
+{
+    Dqn_PointerMetadata meta    = Dqn_PointerMetadata_Get(ptr);
+    void *              raw_ptr = Dqn_PointerMetadata_GetRawPointer(ptr);
+    free(raw_ptr, meta.size);
+    return meta.size;
+}
+*/
+
 struct Dqn_Allocator
 {
     Dqn_AllocatorType type;
@@ -1326,6 +1193,224 @@ template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_AppendFm
 template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_Append    (Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size = -1);
 template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_Append    (Dqn_FixedString<MAX_> *str, Dqn_String src);
 template <Dqn_isize MAX_> DQN_API Dqn_String            Dqn_FixedString_ToString  (Dqn_FixedString<MAX_> const *str);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Math
+//
+// -------------------------------------------------------------------------------------------------
+struct Dqn_V2I
+{
+    Dqn_i32 x, y;
+
+    Dqn_V2I() = default;
+    Dqn_V2I(Dqn_f32 x_, Dqn_f32 y_): x((Dqn_i32)x_), y((Dqn_i32)y_) {}
+    Dqn_V2I(Dqn_i32 x_, Dqn_i32 y_): x(x_), y(y_) {}
+    Dqn_V2I(Dqn_i32 xy):             x(xy), y(xy) {}
+
+    bool     operator!=(Dqn_V2I other) const { return !(*this == other);                }
+    bool     operator==(Dqn_V2I other) const { return (x == other.x) && (y == other.y); }
+    bool     operator>=(Dqn_V2I other) const { return (x >= other.x) && (y >= other.y); }
+    bool     operator<=(Dqn_V2I other) const { return (x <= other.x) && (y <= other.y); }
+    bool     operator< (Dqn_V2I other) const { return (x <  other.x) && (y <  other.y); }
+    bool     operator> (Dqn_V2I other) const { return (x >  other.x) && (y >  other.y); }
+    Dqn_V2I  operator- (Dqn_V2I other) const { Dqn_V2I result(x - other.x, y - other.y); return result; }
+    Dqn_V2I  operator+ (Dqn_V2I other) const { Dqn_V2I result(x + other.x, y + other.y); return result; }
+    Dqn_V2I  operator* (Dqn_V2I other) const { Dqn_V2I result(x * other.x, y * other.y); return result; }
+    Dqn_V2I  operator* (Dqn_f32 other) const { Dqn_V2I result(x * other,   y * other);   return result; }
+    Dqn_V2I  operator* (Dqn_i32 other) const { Dqn_V2I result(x * other,   y * other);   return result; }
+    Dqn_V2I  operator/ (Dqn_V2I other) const { Dqn_V2I result(x / other.x, y / other.y); return result; }
+    Dqn_V2I  operator/ (Dqn_f32 other) const { Dqn_V2I result(x / other,   y / other);   return result; }
+    Dqn_V2I  operator/ (Dqn_i32 other) const { Dqn_V2I result(x / other,   y / other);   return result; }
+    Dqn_V2I &operator*=(Dqn_V2I other)       { *this = *this * other;                    return *this;  }
+    Dqn_V2I &operator*=(Dqn_f32 other)       { *this = *this * other;                    return *this;  }
+    Dqn_V2I &operator*=(Dqn_i32 other)       { *this = *this * other;                    return *this;  }
+    Dqn_V2I &operator-=(Dqn_V2I other)       { *this = *this - other;                    return *this;  }
+    Dqn_V2I &operator+=(Dqn_V2I other)       { *this = *this + other;                    return *this;  }
+};
+
+struct Dqn_V2
+{
+    Dqn_f32 x, y;
+
+    Dqn_V2() = default;
+    Dqn_V2(Dqn_f32 a)           : x(a),           y(a)           {}
+    Dqn_V2(Dqn_i32 a)           : x((Dqn_f32)a),  y((Dqn_f32)a)  {}
+    Dqn_V2(Dqn_f32 x, Dqn_f32 y): x(x),           y(y)           {}
+    Dqn_V2(Dqn_i32 x, Dqn_i32 y): x((Dqn_f32)x),  y((Dqn_f32)y)  {}
+    Dqn_V2(Dqn_V2I a)           : x((Dqn_f32)a.x),y((Dqn_f32)a.y){}
+
+    bool    operator!=(Dqn_V2  other) const { return !(*this == other);                }
+    bool    operator==(Dqn_V2  other) const { return (x == other.x) && (y == other.y); }
+    bool    operator>=(Dqn_V2  other) const { return (x >= other.x) && (y >= other.y); }
+    bool    operator<=(Dqn_V2  other) const { return (x <= other.x) && (y <= other.y); }
+    bool    operator< (Dqn_V2  other) const { return (x <  other.x) && (y <  other.y); }
+    bool    operator> (Dqn_V2  other) const { return (x >  other.x) && (y >  other.y); }
+    Dqn_V2  operator- (Dqn_V2  other) const { Dqn_V2 result(x - other.x, y - other.y); return result; }
+    Dqn_V2  operator+ (Dqn_V2  other) const { Dqn_V2 result(x + other.x, y + other.y); return result; }
+    Dqn_V2  operator* (Dqn_V2  other) const { Dqn_V2 result(x * other.x, y * other.y); return result; }
+    Dqn_V2  operator* (Dqn_f32 other) const { Dqn_V2 result(x * other,   y * other);   return result; }
+    Dqn_V2  operator* (Dqn_i32 other) const { Dqn_V2 result(x * other,   y * other);   return result; }
+    Dqn_V2  operator/ (Dqn_V2  other) const { Dqn_V2 result(x / other.x, y / other.y); return result; }
+    Dqn_V2  operator/ (Dqn_f32 other) const { Dqn_V2 result(x / other,   y / other);   return result; }
+    Dqn_V2  operator/ (Dqn_i32 other) const { Dqn_V2 result(x / other,   y / other);   return result; }
+    Dqn_V2 &operator*=(Dqn_V2  other)       { *this = *this * other;               return *this;  }
+    Dqn_V2 &operator*=(Dqn_f32 other)       { *this = *this * other;               return *this;  }
+    Dqn_V2 &operator*=(Dqn_i32 other)       { *this = *this * other;               return *this;  }
+    Dqn_V2 &operator/=(Dqn_V2  other)       { *this = *this / other;               return *this;  }
+    Dqn_V2 &operator/=(Dqn_f32 other)       { *this = *this / other;               return *this;  }
+    Dqn_V2 &operator/=(Dqn_i32 other)       { *this = *this / other;               return *this;  }
+    Dqn_V2 &operator-=(Dqn_V2  other)       { *this = *this - other;               return *this;  }
+    Dqn_V2 &operator+=(Dqn_V2  other)       { *this = *this + other;               return *this;  }
+};
+
+struct Dqn_V3
+{
+    Dqn_f32 x, y, z;
+
+    Dqn_V3() = default;
+    Dqn_V3(Dqn_f32 a)                      : x(a),                  y(a),                  z(a)                  {}
+    Dqn_V3(Dqn_i32 a)                      : x(DQN_CAST(Dqn_f32)a), y(DQN_CAST(Dqn_f32)a), z(DQN_CAST(Dqn_f32)a) {}
+    Dqn_V3(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z): x(x),                  y(y),                  z(z)                  {}
+    Dqn_V3(Dqn_i32 x, Dqn_i32 y, Dqn_f32 z): x(DQN_CAST(Dqn_f32)x), y(DQN_CAST(Dqn_f32)y), z(DQN_CAST(Dqn_f32)z) {}
+    Dqn_V3(Dqn_V2  xy, Dqn_f32 z)          : x(xy.x),               y(xy.y),               z(z)                  {}
+
+    bool   operator!= (Dqn_V3  other) const { return !(*this == other); }
+    bool   operator== (Dqn_V3  other) const { return (x == other.x) && (y == other.y) && (z == other.z); }
+    bool   operator>= (Dqn_V3  other) const { return (x >= other.x) && (y >= other.y) && (z >= other.z); }
+    bool   operator<= (Dqn_V3  other) const { return (x <= other.x) && (y <= other.y) && (z <= other.z); }
+    bool   operator<  (Dqn_V3  other) const { return (x <  other.x) && (y <  other.y) && (z <  other.z); }
+    bool   operator>  (Dqn_V3  other) const { return (x >  other.x) && (y >  other.y) && (z >  other.z); }
+    Dqn_V3 operator-  (Dqn_V3  other) const { Dqn_V3 result(x - other.x, y - other.y, z - other.z); return result; }
+    Dqn_V3 operator+  (Dqn_V3  other) const { Dqn_V3 result(x + other.x, y + other.y, z + other.z); return result; }
+    Dqn_V3 operator*  (Dqn_V3  other) const { Dqn_V3 result(x * other.x, y * other.y, z * other.z); return result; }
+    Dqn_V3 operator*  (Dqn_f32 other) const { Dqn_V3 result(x * other,   y * other,   z * other);   return result; }
+    Dqn_V3 operator*  (Dqn_i32 other) const { Dqn_V3 result(x * other,   y * other,   z * other);   return result; }
+    Dqn_V3 operator/  (Dqn_V3  other) const { Dqn_V3 result(x / other.x, y / other.y, z / other.z); return result; }
+    Dqn_V3 operator/  (Dqn_f32 other) const { Dqn_V3 result(x / other,   y / other,   z / other);   return result; }
+    Dqn_V3 operator/  (Dqn_i32 other) const { Dqn_V3 result(x / other,   y / other,   z / other);   return result; }
+    Dqn_V3 &operator*=(Dqn_V3  other)       { *this = *this * other; return *this;  }
+    Dqn_V3 &operator*=(Dqn_f32 other)       { *this = *this * other; return *this;  }
+    Dqn_V3 &operator*=(Dqn_i32 other)       { *this = *this * other; return *this;  }
+    Dqn_V3 &operator/=(Dqn_V3  other)       { *this = *this / other; return *this;  }
+    Dqn_V3 &operator/=(Dqn_f32 other)       { *this = *this / other; return *this;  }
+    Dqn_V3 &operator/=(Dqn_i32 other)       { *this = *this / other; return *this;  }
+    Dqn_V3 &operator-=(Dqn_V3  other)       { *this = *this - other; return *this;  }
+    Dqn_V3 &operator+=(Dqn_V3  other)       { *this = *this + other; return *this;  }
+};
+
+union Dqn_V4
+{
+  struct { Dqn_f32 x, y, z, w; };
+  struct { Dqn_f32 r, g, b, a; };
+  struct { Dqn_V2 min; Dqn_V2 max; } v2;
+  Dqn_V3 rgb;
+  Dqn_f32 e[4];
+
+  Dqn_V4() = default;
+  Dqn_V4(Dqn_f32 xyzw)                              : x(xyzw),               y(xyzw),               z(xyzw),               w(xyzw) {}
+  Dqn_V4(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z, Dqn_f32 w): x(x),                  y(y),                  z(z),                  w(w) {}
+  Dqn_V4(Dqn_i32 x, Dqn_i32 y, Dqn_i32 z, Dqn_i32 w): x(DQN_CAST(Dqn_f32)x), y(DQN_CAST(Dqn_f32)y), z(DQN_CAST(Dqn_f32)z), w(DQN_CAST(Dqn_f32)w) {}
+  Dqn_V4(Dqn_V3 xyz, Dqn_f32 w)                     : x(xyz.x),              y(xyz.y),              z(xyz.z),              w(w) {}
+  Dqn_V4(Dqn_V2 v2)                                 : x(v2.x),               y(v2.y),               z(v2.x),               w(v2.y) {}
+
+  bool    operator!=(Dqn_V4  other) const { return !(*this == other);            }
+  bool    operator==(Dqn_V4  other) const { return (x == other.x) && (y == other.y) && (z == other.z) && (w == other.w); }
+  bool    operator>=(Dqn_V4  other) const { return (x >= other.x) && (y >= other.y) && (z >= other.z) && (w >= other.w); }
+  bool    operator<=(Dqn_V4  other) const { return (x <= other.x) && (y <= other.y) && (z <= other.z) && (w <= other.w); }
+  bool    operator< (Dqn_V4  other) const { return (x <  other.x) && (y <  other.y) && (z <  other.z) && (w <  other.w); }
+  bool    operator> (Dqn_V4  other) const { return (x >  other.x) && (y >  other.y) && (z >  other.z) && (w >  other.w); }
+  Dqn_V4  operator- (Dqn_V4  other) const { Dqn_V4 result(x - other.x, y - other.y, z - other.z, w - other.w); return result;  }
+  Dqn_V4  operator+ (Dqn_V4  other) const { Dqn_V4 result(x + other.x, y + other.y, z + other.z, w + other.w); return result;  }
+  Dqn_V4  operator* (Dqn_V4  other) const { Dqn_V4 result(x * other.x, y * other.y, z * other.z, w * other.w); return result;  }
+  Dqn_V4  operator* (Dqn_f32 other) const { Dqn_V4 result(x * other,   y * other,   z * other,   w * other);   return result;  }
+  Dqn_V4  operator* (Dqn_i32 other) const { Dqn_V4 result(x * other,   y * other,   z * other,   w * other);   return result;  }
+  Dqn_V4  operator/ (Dqn_f32 other) const { Dqn_V4 result(x / other,   y / other,   z / other,   w / other);   return result;  }
+  Dqn_V4 &operator*=(Dqn_V4  other)       { *this = *this * other;                                             return *this;   }
+  Dqn_V4 &operator*=(Dqn_f32 other)       { *this = *this * other;                                             return *this;   }
+  Dqn_V4 &operator*=(Dqn_i32 other)       { *this = *this * other;                                             return *this;   }
+  Dqn_V4 &operator-=(Dqn_V4  other)       { *this = *this - other;                                             return *this;   }
+  Dqn_V4 &operator+=(Dqn_V4  other)       { *this = *this + other;                                             return *this;   }
+};
+
+// NOTE: Column major matrix
+struct Dqn_M4
+{
+    Dqn_f32 columns[4][4];
+};
+
+DQN_API Dqn_V2I Dqn_V2_ToV2I        (Dqn_V2 a);
+DQN_API Dqn_V2  Dqn_V2_Min          (Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_V2  Dqn_V2_Max          (Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_V2  Dqn_V2_Abs          (Dqn_V2 a);
+DQN_API Dqn_f32 Dqn_V2_Dot          (Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_f32 Dqn_V2_LengthSq     (Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_V2  Dqn_V2_Normalise    (Dqn_V2 a);
+DQN_API Dqn_V2  Dqn_V2_Perpendicular(Dqn_V2 a);
+
+DQN_API Dqn_f32 Dqn_V3_LengthSq     (Dqn_V3 a);
+DQN_API Dqn_f32 Dqn_V3_Length       (Dqn_V3 a);
+DQN_API Dqn_V3  Dqn_V3_Normalise    (Dqn_V3 a);
+
+DQN_API Dqn_f32 Dqn_V4_Dot          (Dqn_V4 a, Dqn_V4 b);
+
+DQN_API Dqn_M4  Dqn_M4_Identity     ();
+DQN_API Dqn_M4  Dqn_M4_ScaleF       (Dqn_f32 x, Dqn_f32 y, Dqn_f32 z);
+DQN_API Dqn_M4  Dqn_M4_Scale        (Dqn_V3 xyz);
+DQN_API Dqn_M4  Dqn_M4_TranslateF   (Dqn_f32 x, Dqn_f32 y, Dqn_f32 z);
+DQN_API Dqn_M4  Dqn_M4_Translate    (Dqn_V3 xyz);
+DQN_API Dqn_M4  Dqn_M4_Transpose    (Dqn_M4 mat);
+DQN_API Dqn_M4  Dqn_M4_Rotate       (Dqn_V3 axis, Dqn_f32 radians);
+DQN_API Dqn_M4  Dqn_M4_Orthographic (Dqn_f32 left, Dqn_f32 right, Dqn_f32 bottom, Dqn_f32 top, Dqn_f32 z_near, Dqn_f32 z_far);
+DQN_API Dqn_M4  Dqn_M4_Perspective  (Dqn_f32 fov /*radians*/, Dqn_f32 aspect, Dqn_f32 z_near, Dqn_f32 z_far);
+DQN_API Dqn_M4  Dqn_M4_Add          (Dqn_M4 lhs, Dqn_M4 rhs);
+DQN_API Dqn_M4  Dqn_M4_Sub          (Dqn_M4 lhs, Dqn_M4 rhs);
+DQN_API Dqn_M4  Dqn_M4_Mul          (Dqn_M4 lhs, Dqn_M4 rhs);
+DQN_API Dqn_M4  Dqn_M4_Div          (Dqn_M4 lhs, Dqn_M4 rhs);
+DQN_API Dqn_M4  Dqn_M4_AddF         (Dqn_M4 lhs, Dqn_f32 rhs);
+DQN_API Dqn_M4  Dqn_M4_SubF         (Dqn_M4 lhs, Dqn_f32 rhs);
+DQN_API Dqn_M4  Dqn_M4_MulF         (Dqn_M4 lhs, Dqn_f32 rhs);
+DQN_API Dqn_M4  Dqn_M4_DivF         (Dqn_M4 lhs, Dqn_f32 rhs);
+
+DQN_API Dqn_FixedString<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat);
+
+struct Dqn_Rect
+{
+    Dqn_V2 min, max;
+    Dqn_Rect() = default;
+    Dqn_Rect(Dqn_V2  min, Dqn_V2 max)  : min(min), max(max) {}
+    Dqn_Rect(Dqn_V2I min, Dqn_V2I max) : min(min), max(max) {}
+    Dqn_Rect(Dqn_f32 x, Dqn_f32 y, Dqn_f32 max_x, Dqn_f32 max_y) : min(x, y), max(max_x, max_y) {}
+    Dqn_b32 operator==(Dqn_Rect other) const { return (min == other.min) && (max == other.max); }
+};
+
+struct Dqn_RectI32
+{
+    Dqn_V2I min, max;
+    Dqn_RectI32() = default;
+    Dqn_RectI32(Dqn_V2I min, Dqn_V2I max) : min(min), max(max) {}
+};
+
+DQN_API Dqn_Rect Dqn_Rect_InitFromPosAndSize(Dqn_V2 pos, Dqn_V2 size);
+DQN_API Dqn_V2   Dqn_Rect_Center            (Dqn_Rect rect);
+DQN_API Dqn_b32  Dqn_Rect_ContainsPoint     (Dqn_Rect rect, Dqn_V2 p);
+DQN_API Dqn_b32  Dqn_Rect_ContainsRect      (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_V2   Dqn_Rect_Size              (Dqn_Rect rect);
+DQN_API Dqn_Rect Dqn_Rect_Move              (Dqn_Rect src, Dqn_V2 move_amount);
+DQN_API Dqn_Rect Dqn_Rect_MoveTo            (Dqn_Rect src, Dqn_V2 dest);
+DQN_API Dqn_b32  Dqn_Rect_Intersects        (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_Rect Dqn_Rect_Intersection      (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_Rect Dqn_Rect_Union             (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_Rect Dqn_Rect_FromRectI32       (Dqn_RectI32 a);
+DQN_API Dqn_V2I  Dqn_RectI32_Size           (Dqn_RectI32 rect);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Math Utils
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_V2  Dqn_LerpV2 (Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
+DQN_API Dqn_f32 Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b);
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1570,23 +1655,99 @@ enum struct Dqn_EpochTimeFormat
 // timestamp: Unix epoch timestamp
 DQN_API char *Dqn_EpochTimeToLocalDate(Dqn_i64 timestamp, char *buf, Dqn_isize buf_len);
 
-struct Dqn_Timer
+DQN_API Dqn_u64 Dqn_PerfCounter_Now   ();
+DQN_API Dqn_f64 Dqn_PerfCounter_S     (Dqn_u64 begin, Dqn_u64 end);
+DQN_API Dqn_f64 Dqn_PerfCounter_Ms    (Dqn_u64 begin, Dqn_u64 end);
+DQN_API Dqn_f64 Dqn_PerfCounter_MicroS(Dqn_u64 begin, Dqn_u64 end);
+DQN_API Dqn_f64 Dqn_PerfCounter_Ns    (Dqn_u64 begin, Dqn_u64 end);
+
+struct Dqn_Timer // NOTE: Uses the PerfCounter API
 {
-#if defined(DQN_OS_WIN32)
-    LARGE_INTEGER start;
-    LARGE_INTEGER end;
-#endif
+    Dqn_u64 start;
+    Dqn_u64 end;
 };
 
 DQN_API Dqn_Timer Dqn_Timer_Begin ();
 DQN_API void      Dqn_Timer_End   (Dqn_Timer *timer);
-DQN_API Dqn_u64   Dqn_Timer_S     (Dqn_Timer const *timer);
-DQN_API Dqn_u64   Dqn_Timer_Ms    (Dqn_Timer const *timer);
-DQN_API Dqn_u64   Dqn_Timer_MicroS(Dqn_Timer const *timer);
-DQN_API Dqn_u64   Dqn_Timer_Ns    (Dqn_Timer const *timer);
+DQN_API Dqn_f64   Dqn_Timer_S     (Dqn_Timer timer);
+DQN_API Dqn_f64   Dqn_Timer_Ms    (Dqn_Timer timer);
+DQN_API Dqn_f64   Dqn_Timer_MicroS(Dqn_Timer timer);
+DQN_API Dqn_f64   Dqn_Timer_Ns    (Dqn_Timer timer);
 
 DQN_API char *Dqn_U64ToStr            (Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep);
 DQN_API char *Dqn_U64ToTempStr        (Dqn_u64 val, Dqn_b32 comma_sep = true);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Win32
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_FixedString<1024> Dqn_Win32_LastError();
+DQN_API wchar_t              *Dqn_Win32_ArenaToWChar(Dqn_ArenaAllocator *arena, Dqn_String src, int *wchar_size);
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_TimedBlock
+//
+// ------------------------------------------------------------------------------------------------
+// TimedBlock provides a extremely primitive way of measuring the duration of
+// code blocks, by sprinkling DQN_TIMED_BLOCK_RECORD("record label"), you can
+// measure the time between the macro and the next record call.
+//
+// Example: Record the duration of the for-loop below and print it at the end.
+/*
+   int main()
+   {
+       DQN_TIMED_BLOCK_INIT("Profiling Region", 32); // name, records to allocate
+       DQN_TIMED_BLOCK_RECORD("a");
+       for (int unused1_ = 0; unused1_ < 1000000; unused1_++)
+       {
+           for (int unused2_ = 0; unused2_ < 1000000; unused2_++)
+           {
+               (void)unused1_;
+               (void)unused2_;
+           }
+       }
+       DQN_TIMED_BLOCK_RECORD("b");
+       DQN_TIMED_BLOCK_DUMP;
+       return 0;
+   }
+*/
+struct Dqn_TimedBlock
+{
+    char const *label;
+    Dqn_u64     tick;
+};
+
+// Initialise a timing block region, see DQN_TIMED_BLOCK_INIT_SCOPED but does
+// *not* automatically dump the timings, it must manually be caleld via
+// DQN_TIMED_BLOCK_DUMP
+#define DQN_TIMED_BLOCK_INIT(label, size)                                                                              \
+    Dqn_TimedBlock timings_[size];                                                                                     \
+    Dqn_usize      timings_size_ = 0;                                                                                  \
+    DQN_TIMED_BLOCK_RECORD(label)
+
+// Add a timing record to the previous timing block
+// label: The label to give
+#define DQN_TIMED_BLOCK_RECORD(label) timings_[timings_size_++] = {label, Dqn_PerfCounter_Now()}
+
+// Dump the timing block via Dqn_Log
+#define DQN_TIMED_BLOCK_DUMP                                                                                           \
+    DQN_ASSERT_MSG(timings_size_ < sizeof(timings_) / sizeof(timings_[0]),                                             \
+                   "Timings array indexed out-of-bounds, use a bigger size");                                          \
+    for (int timings_index_ = 0; timings_index_ < (timings_size_ - 1); timings_index_++)                               \
+    {                                                                                                                  \
+        Dqn_TimedBlock t1 = timings_[timings_index_ + 0];                                                              \
+        Dqn_TimedBlock t2 = timings_[timings_index_ + 1];                                                              \
+        DQN_LOG_P("%s -> %s: %fms", t1.label, t2.label, Dqn_PerfCounter_Ms(t1.tick, t2.tick));                         \
+    }                                                                                                                  \
+                                                                                                                       \
+    if (timings_size_ >= 1)                                                                                            \
+    {                                                                                                                  \
+        Dqn_TimedBlock t1 = timings_[0];                                                                               \
+        Dqn_TimedBlock t2 = timings_[timings_size_ - 1];                                                               \
+        DQN_LOG_P("%s -> %s (total): %fms", t1.label, t2.label, Dqn_PerfCounter_Ms(t1.tick, t2.tick));                 \
+    }
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -1766,6 +1927,15 @@ struct Dqn_List
 
 template <typename T> DQN_API Dqn_List<T>  Dqn_List_InitWithArena    (Dqn_ArenaAllocator *arena, Dqn_isize chunk_size = 128);
 template <typename T> DQN_API Dqn_List<T>  Dqn_List_InitWithAllocator(Dqn_Allocator *allocator, Dqn_isize chunk_size = 128);
+
+// Produce an iterator for the data in the list
+/*
+   Dqn_List<int> list = {};
+   for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it);)
+   {
+       int *item = it.data;
+   }
+*/
 template <typename T> DQN_API Dqn_b32      Dqn_List_Iterate          (Dqn_List<T> *list, Dqn_ListIterator<T> *iterator);
 
 #define                                    Dqn_List_TaggedMake(       list, count, tag) Dqn_List__Make(list, count DQN_CALL_SITE(tag))
@@ -1950,7 +2120,13 @@ DQN_API Dqn_b32 Dqn_FixedString_AppendFmtV(Dqn_FixedString<MAX_> *str, char cons
     Dqn_isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
     Dqn_isize space   = MAX_ - str->size;
     Dqn_b32 result    = require <= space;
-    DQN_ASSERT_MSG(require <= space, "(require=%I64d, space=%I64d)", require, space);
+
+    if (!result)
+    {
+        DQN_LOG_W("Insufficient space in string: require=%I64d, space=%I64d", require, space);
+        return result;
+    }
+
     str->size += stbsp_vsnprintf(str->data + str->size, static_cast<int>(space), fmt, va2);
     va_end(va2);
     return result;
@@ -1971,10 +2147,13 @@ DQN_API Dqn_b32 Dqn_FixedString_Append(Dqn_FixedString<MAX_> *str, char const *s
 {
     if (size == -1) size = DQN_CAST(Dqn_isize)Dqn_Str_Len(src);
     Dqn_isize space = MAX_ - str->size;
+    Dqn_b32 result = size <= space;
 
-    Dqn_b32 result = true;
-    DQN_ASSERT_MSG_IF(size >= space, "size: %jd, space: %jd", size, space)
-        return false;
+    if (!result)
+    {
+        DQN_LOG_W("Insufficient space in string: size=%I64d, space=%I64d", size, space);
+        return result;
+    }
 
     DQN_MEMCOPY(str->data + str->size, src, size);
     str->size += size;
@@ -2259,7 +2438,7 @@ DQN_API char *Dqn_StringBuilder__AllocateWriteBuffer(Dqn_StringBuilder<N> *build
     if (new_block_needed)
     {
         Dqn_Allocator *allocator = builder->allocator ? builder->allocator : &builder->backup_allocator;
-        Dqn_isize allocation_size = DQN_MAX(size_required, DQN_STRING_BUILDER_MIN_BLOCK_SIZE);
+        Dqn_isize allocation_size = DQN_M_MAX(size_required, DQN_STRING_BUILDER_MIN_BLOCK_SIZE);
         block                     = Dqn_Allocator_New(allocator, Dqn_StringBuilderBlock, Dqn_ZeroMem::No);
         if (!block) return nullptr;
 
@@ -2333,7 +2512,7 @@ DQN_API void Dqn_StringBuilder_BuildToDest(Dqn_StringBuilder<N> const *builder, 
          block = block->next, remaining_space = end - ptr)
     {
         Dqn_isize num_bytes     = block->used;
-        Dqn_isize bytes_to_copy = DQN_MIN(num_bytes, remaining_space);
+        Dqn_isize bytes_to_copy = DQN_M_MIN(num_bytes, remaining_space);
         DQN_MEMCOPY(ptr, block->mem, bytes_to_copy);
         ptr += bytes_to_copy;
     }
@@ -2432,7 +2611,7 @@ template <typename T> void Dqn__EraseStableFromCArray(T *array, Dqn_isize size, 
 {
     DQN_ASSERT(index >= 0 && index < size);
     DQN_ASSERT(size <= max); (void)max;
-    Dqn_isize next_index    = DQN_MIN(index + 1, size);
+    Dqn_isize next_index    = DQN_M_MIN(index + 1, size);
     Dqn_usize bytes_to_copy = (size - next_index) * sizeof(T);
     memmove(array + index, array + next_index, bytes_to_copy);
 }
@@ -2635,7 +2814,7 @@ DQN_API bool Dqn_Array__GrowIfNeeded(Dqn_Array<T> *a, Dqn_isize num_to_add DQN_C
     bool result        = true;
     if (new_size > a->max)
     {
-        Dqn_isize num_items = DQN_MAX(4, DQN_MAX(new_size, (a->max * 2)));
+        Dqn_isize num_items = DQN_M_MAX(4, DQN_M_MAX(new_size, (a->max * 2)));
         result              = Dqn_Array__Reserve(a, num_items DQN_CALL_SITE_ARGS_INPUT);
     }
 
@@ -2746,7 +2925,7 @@ DQN_API T *Dqn_List__Make(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
         if (!tail)
           return nullptr;
 
-        Dqn_isize items = DQN_MAX(list->chunk_size, count);
+        Dqn_isize items = DQN_M_MAX(list->chunk_size, count);
         tail->data      = (T * )Dqn_Allocator__Allocate(allocator, sizeof(T) * items, alignof(T), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
         tail->size      = items;
 
@@ -2804,7 +2983,7 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
     return result;
 }
 
-#if defined(DQN_COMPILER_MSVC)
+#if defined(DQN_COMPILER_W32_MSVC)
     #pragma warning(pop)
 #endif
 #endif // DQN_H
@@ -2901,6 +3080,11 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         #define INFINITE 0xFFFFFFFF // Infinite timeout
 
         //
+        // NOTE: MultiByteToWideChar
+        //
+        #define CP_UTF8 65001       // UTF-8 translation
+
+        //
         // NOTE: FormatMessageA
         //
         #define FORMAT_MESSAGE_FROM_SYSTEM 0x00001000
@@ -2926,6 +3110,8 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         //
         extern "C"
         {
+        long          _InterlockedExchangeAdd  (long volatile *addend, long value);
+        __int64       _InterlockedExchangeAdd64(__int64 volatile *addend, __int64 value);
         BOOL          CopyFileA                (char const *existing_file_name, char const *new_file_name, BOOL fail_if_exists);
         BOOL          FreeLibrary              (void *lib_module);
         BOOL          QueryPerformanceCounter  (LARGE_INTEGER *performance_count);
@@ -2943,6 +3129,7 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         void         *GetProcAddress           (void *hmodule, char const *proc_name);
         void         *LoadLibraryA             (char const *file_name);
         void         *VirtualAlloc             (void *address, size_t size, DWORD allocation_type, DWORD protect);
+        int           MultiByteToWideChar      (unsigned int CodePage, DWORD dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
         }
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 #else // !defined(DQN_OS_WIN32)
@@ -2982,10 +3169,10 @@ DQN_API void Dqn__ZeroMemBytes(void *ptr, Dqn_usize count, Dqn_ZeroMem zero_mem)
 Dqn_CPUIDRegisters Dqn_CPUID(int function_id)
 {
     Dqn_CPUIDRegisters result = {};
-#if defined(DQN_COMPILER_MSVC)
-    __cpuid((int *)result.array, function_id);
+#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+    __cpuid(DQN_CAST(int *)result.array, function_id);
 #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
-    __get_cpuid(function_id, &result.eax, &result.ebx, &result.ecx, &result.edx);
+    __get_cpuid(function_id, &result.array[0] /*eax*/, &result.array[1] /*ebx*/, &result.array[2] /*ecx*/ , &result.array[3] /*edx*/);
 #else
     #error "Compiler not supported"
 #endif
@@ -3000,12 +3187,43 @@ Dqn_CPUIDRegisters Dqn_CPUID(int function_id)
 void Dqn_TicketMutex_Begin(Dqn_TicketMutex *mutex)
 {
     unsigned int ticket = Dqn_AtomicAddU32(&mutex->ticket, 1);
-    while(ticket != mutex->serving);
+    Dqn_TicketMutex_BeginTicket(mutex, ticket);
 }
 
 void Dqn_TicketMutex_End(Dqn_TicketMutex *mutex)
 {
     Dqn_AtomicAddU32(&mutex->serving, 1);
+}
+
+unsigned int Dqn_TicketMutex_MakeTicket(Dqn_TicketMutex *mutex)
+{
+    unsigned int result = Dqn_AtomicAddU32(&mutex->ticket, 1);
+    return result;
+}
+
+void Dqn_TicketMutex_BeginTicket(const Dqn_TicketMutex *mutex, unsigned int ticket)
+{
+    DQN_ASSERT_MSG(ticket <= mutex->serving,
+                   "Mutex skipped ticket? Was ticket generated by the correct mutex via MakeTicket? ticket = %u, "
+                   "mutex->serving = %u",
+                   ticket,
+                   mutex->serving);
+    while(ticket != mutex->serving)
+    {
+        // NOTE: Use spinlock intrinsic
+        _mm_pause();
+    }
+}
+
+Dqn_b32 Dqn_TicketMutex_CanLock(const Dqn_TicketMutex *mutex, unsigned int ticket)
+{
+    DQN_ASSERT_MSG(ticket <= mutex->serving,
+                   "Mutex skipped ticket? Was ticket generated by the correct mutex via MakeTicket? ticket = %u, "
+                   "mutex->serving = %u",
+                   ticket,
+                   mutex->serving);
+    Dqn_b32 result = (ticket == mutex->serving);
+    return result;
 }
 
 
@@ -3072,7 +3290,7 @@ DQN_API void Dqn_LogV(Dqn_LogType type,
 
     FILE *handle = (type == Dqn_LogType::Error) ? stderr : stdout;
     fprintf(handle,
-            "[%s:%.*s:%05I64u:%.*s] ",
+            "[%s] %.*s:%05I64u:%.*s ",
             Dqn_LogTypeString[DQN_CAST(int) type],
             file_name_len,
             file_name,
@@ -3203,195 +3421,6 @@ DQN_API char *Dqn_PointerMetadata_GetRawPointer(void *ptr)
 {
     Dqn_PointerMetadata metadata = Dqn_PointerMetadata_Get(ptr);
     char *result                 = DQN_CAST(char *) ptr - metadata.offset;
-    return result;
-}
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_V2
-//
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_V2I Dqn_V2_ToV2I(Dqn_V2 a)
-{
-    Dqn_V2I result(static_cast<Dqn_i32>(a.x), static_cast<Dqn_i32>(a.y));
-    return result;
-}
-
-DQN_API Dqn_V2 Dqn_V2_Min(Dqn_V2 a, Dqn_V2 b)
-{
-    Dqn_V2 result = Dqn_V2(DQN_MIN(a.x, b.x), DQN_MIN(a.y, b.y));
-    return result;
-}
-
-DQN_API Dqn_V2 Dqn_V2_Max(Dqn_V2 a, Dqn_V2 b)
-{
-    Dqn_V2 result = Dqn_V2(DQN_MAX(a.x, b.x), DQN_MAX(a.y, b.y));
-    return result;
-}
-
-DQN_API Dqn_V2 Dqn_V2_Abs(Dqn_V2 a)
-{
-    Dqn_V2 result = Dqn_V2(DQN_ABS(a.x), DQN_ABS(a.y));
-    return result;
-}
-
-DQN_API Dqn_f32 Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b)
-{
-    Dqn_f32 result = (a.x * b.x) + (a.y * b.y);
-    return result;
-}
-
-DQN_API Dqn_f32 Dqn_V2_LengthSq(Dqn_V2 a, Dqn_V2 b)
-{
-    Dqn_f32 x_side = b.x - a.x;
-    Dqn_f32 y_side = b.y - a.y;
-    Dqn_f32 result = DQN_SQUARED(x_side) + DQN_SQUARED(y_side);
-    return result;
-}
-
-DQN_API Dqn_V2 Dqn_V2_Normalise(Dqn_V2 a)
-{
-    Dqn_f32 length_sq = DQN_SQUARED(a.x) + DQN_SQUARED(a.y);
-    Dqn_f32 length    = DQN_SQRTF(length_sq);
-    Dqn_V2 result     = a / length;
-    return result;
-}
-
-DQN_API Dqn_V2 Dqn_V2_Perpendicular(Dqn_V2 a)
-{
-    Dqn_V2 result = Dqn_V2(-a.y, a.x);
-    return result;
-}
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_V4
-//
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_f32 Dqn_V4_Dot(Dqn_V4 const *a, Dqn_V4 const *b)
-{
-    Dqn_f32 result = (a->x * b->x) + (a->y * b->y) + (a->z * b->z) + (a->w * b->w);
-    return result;
-}
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Dqn_Rect
-//
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_Rect Dqn_Rect_InitFromPosAndSize(Dqn_V2 const &pos, Dqn_V2 const &size)
-{
-    Dqn_Rect result = {};
-    result.min  = pos;
-    if (size.w < 0) result.min.x -= size.w;
-    if (size.h < 0) result.min.y -= size.h;
-    result.max  = result.min + Dqn_V2_Abs(size);
-    return result;
-}
-
-DQN_API Dqn_V2 Dqn_Rect_Center(Dqn_Rect const &rect)
-{
-    Dqn_V2 size   = rect.max - rect.min;
-    Dqn_V2 result = rect.min + (size * 0.5f);
-    return result;
-}
-
-DQN_API Dqn_b32 Dqn_Rect_ContainsPoint(Dqn_Rect const &rect, Dqn_V2 const &p)
-{
-    Dqn_b32 result = (p.x >= rect.min.x && p.x <= rect.max.x && p.y >= rect.min.y && p.y <= rect.max.y);
-    return result;
-}
-
-
-DQN_API Dqn_b32 Dqn_Rect_ContainsRect(Dqn_Rect const &a, Dqn_Rect const &b)
-{
-    Dqn_b32 result = (b.min >= a.min && b.max <= a.max);
-    return result;
-}
-
-
-DQN_API Dqn_V2 Dqn_Rect_Size(Dqn_Rect const &rect)
-{
-    Dqn_V2 result = rect.max - rect.min;
-    return result;
-}
-
-DQN_API Dqn_Rect Dqn_Rect_Move(Dqn_Rect const &src, Dqn_V2 const &move_amount)
-{
-    Dqn_Rect result = src;
-    result.min += move_amount;
-    result.max += move_amount;
-    return result;
-}
-
-DQN_API Dqn_Rect Dqn_Rect_MoveTo(Dqn_Rect const &src, Dqn_V2 const &dest)
-{
-    Dqn_V2 move_amount = dest - src.min;
-    Dqn_Rect result    = src;
-    result.min += move_amount;
-    result.max += move_amount;
-    return result;
-}
-
-DQN_API Dqn_b32 Dqn_Rect_Intersects(Dqn_Rect const &a, Dqn_Rect const &b)
-{
-    Dqn_b32 result = (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
-                     (a.min.y <= b.max.y && a.max.y >= b.min.y);
-    return result;
-}
-
-DQN_API Dqn_Rect Dqn_Rect_Intersection(Dqn_Rect const &a, Dqn_Rect const &b)
-{
-    Dqn_Rect result  = {};
-    if (Dqn_Rect_Intersects(a, b))
-    {
-        result.min.x = DQN_MAX(a.min.x, b.min.x);
-        result.min.y = DQN_MAX(a.min.y, b.min.y);
-        result.max.x = DQN_MIN(a.max.x, b.max.x);
-        result.max.y = DQN_MIN(a.max.y, b.max.y);
-    }
-
-    return result;
-}
-
-DQN_API Dqn_Rect Dqn_Rect_Union(Dqn_Rect const &a, Dqn_Rect const &b)
-{
-    Dqn_Rect result  = {};
-    result.min.x = DQN_MIN(a.min.x, b.min.x);
-    result.min.y = DQN_MIN(a.min.y, b.min.y);
-    result.max.x = DQN_MAX(a.max.x, b.max.x);
-    result.max.y = DQN_MAX(a.max.y, b.max.y);
-    return result;
-}
-
-DQN_API Dqn_Rect Dqn_Rect_FromRectI32(Dqn_RectI32 const &a)
-{
-    Dqn_Rect result = Dqn_Rect(a.min, a.max);
-    return result;
-}
-
-DQN_API Dqn_V2I Dqn_RectI32_Size(Dqn_RectI32 const &rect)
-{
-    Dqn_V2I result = rect.max - rect.min;
-    return result;
-}
-
-// -------------------------------------------------------------------------------------------------
-//
-// NOTE: Math Utils
-//
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_V2 Dqn_LerpV2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b)
-{
-    Dqn_V2 result = {};
-    result.x  = a.x + ((b.x - a.x) * t);
-    result.y  = a.y + ((b.y - a.y) * t);
-    return result;
-}
-
-DQN_API Dqn_f32 Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b)
-{
-    Dqn_f32 result = a + ((b - a) * t);
     return result;
 }
 
@@ -3594,7 +3623,7 @@ DQN_API void *Dqn_Allocator__Allocate(Dqn_Allocator *allocator, Dqn_isize size, 
         default:
         case Dqn_AllocatorType::Null:
         {
-            DQN_ASSERT(DQN_INVALID_CODE_PATH);
+            DQN_LOG_W("Requested allocation on null allocator");
             return result;
         }
 
@@ -3761,7 +3790,13 @@ DQN_API Dqn_b32 Dqn_String_AppendFmtV(Dqn_String *str, char const *fmt, va_list 
     Dqn_isize require = stbsp_vsnprintf(nullptr, 0, fmt, va) + 1;
     Dqn_isize space   = str->cap - str->size;
     Dqn_b32 result    = require <= space;
-    DQN_ASSERT_MSG(require <= space, "(require=%I64d, space=%I64d)", require, space);
+
+    if (!result)
+    {
+        DQN_LOG_W("Insufficient space in string: require=%I64d, space=%I64d", require, space);
+        return result;
+    }
+
     str->size += stbsp_vsnprintf(str->str + str->size, static_cast<int>(space), fmt, va2);
     va_end(va2);
     return result;
@@ -3852,7 +3887,7 @@ DQN_API Dqn_ArenaAllocatorBlock *Dqn_ArenaAllocator__AllocateBlock(Dqn_ArenaAllo
     Dqn_isize min_block_size = arena->min_block_size;
     if (min_block_size == 0) min_block_size = DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE;
 
-    Dqn_isize mem_block_size = DQN_MAX(min_block_size, requested_size);
+    Dqn_isize mem_block_size = DQN_M_MAX(min_block_size, requested_size);
     auto const allocate_size = DQN_CAST(Dqn_isize)(sizeof(*arena->curr_mem_block) + mem_block_size);
     Dqn_Allocator *allocator = arena->allocator ? arena->allocator : &arena->backup_allocator;
     auto *result             = DQN_CAST(Dqn_ArenaAllocatorBlock *)Dqn_Allocator__Allocate(allocator, allocate_size, alignof(Dqn_ArenaAllocatorBlock), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
@@ -4101,6 +4136,464 @@ DQN_API Dqn_FixedString<512> Dqn_ArenaAllocator_StatsString(Dqn_ArenaAllocator c
                                                stats.total_blocks);
     return result;
 }
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_V2 Implementation
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_V2I Dqn_V2_ToV2I(Dqn_V2 a)
+{
+    Dqn_V2I result = Dqn_V2I(DQN_CAST(Dqn_i32)a.x, DQN_CAST(Dqn_i32)a.y);
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Min(Dqn_V2 a, Dqn_V2 b)
+{
+    Dqn_V2 result = Dqn_V2(DQN_M_MIN(a.x, b.x), DQN_M_MIN(a.y, b.y));
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Max(Dqn_V2 a, Dqn_V2 b)
+{
+    Dqn_V2 result = Dqn_V2(DQN_M_MAX(a.x, b.x), DQN_M_MAX(a.y, b.y));
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Abs(Dqn_V2 a)
+{
+    Dqn_V2 result = Dqn_V2(DQN_M_ABS(a.x), DQN_M_ABS(a.y));
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b)
+{
+    Dqn_f32 result = (a.x * b.x) + (a.y * b.y);
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_V2_LengthSq(Dqn_V2 a, Dqn_V2 b)
+{
+    Dqn_f32 x_side = b.x - a.x;
+    Dqn_f32 y_side = b.y - a.y;
+    Dqn_f32 result = DQN_M_SQUARED(x_side) + DQN_M_SQUARED(y_side);
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Normalise(Dqn_V2 a)
+{
+    Dqn_f32 length_sq = DQN_M_SQUARED(a.x) + DQN_M_SQUARED(a.y);
+    Dqn_f32 length    = DQN_SQRTF(length_sq);
+    Dqn_V2 result     = a / length;
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Perpendicular(Dqn_V2 a)
+{
+    Dqn_V2 result = Dqn_V2(-a.y, a.x);
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_V3 Implementation
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_f32 Dqn_V3_LengthSq(Dqn_V3 a)
+{
+    Dqn_f32 result = DQN_M_SQUARED(a.x) + DQN_M_SQUARED(a.y) + DQN_M_SQUARED(a.z);
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_V3_Length(Dqn_V3 a)
+{
+    Dqn_f32 length_sq = DQN_M_SQUARED(a.x) + DQN_M_SQUARED(a.y) + DQN_M_SQUARED(a.z);
+    Dqn_f32 result    = DQN_SQRTF(length_sq);
+    return result;
+}
+
+DQN_API Dqn_V3 Dqn_V3_Normalise(Dqn_V3 a)
+{
+    Dqn_f32 length = Dqn_V3_Length(a);
+    Dqn_V3  result = a / length;
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_V4 Implementation
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_f32 Dqn_V4_Dot(Dqn_V4 a, Dqn_V4 b)
+{
+    Dqn_f32 result = (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_M4 Implementation
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_M4 Dqn_M4_Identity()
+{
+    Dqn_M4 result =
+    {{
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 0, 1},
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_ScaleF(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z)
+{
+    Dqn_M4 result =
+    {{
+        {x, 0, 0, 0},
+        {0, y, 0, 0},
+        {0, 0, z, 0},
+        {0, 0, 0, 1},
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Scale(Dqn_V3 xyz)
+{
+    Dqn_M4 result =
+    {{
+        {xyz.x, 0,     0,     0},
+        {0,     xyz.y, 0,     0},
+        {0,     0,     xyz.z, 0},
+        {0,     0,     0,     1},
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_TranslateF(Dqn_f32 x, Dqn_f32 y, Dqn_f32 z)
+{
+    Dqn_M4 result =
+    {{
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {x, y, z, 1},
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Translate(Dqn_V3 xyz)
+{
+    Dqn_M4 result =
+    {{
+        {1,     0,     0,     0},
+        {0,     1,     0,     0},
+        {0,     0,     1,     0},
+        {xyz.x, xyz.y, xyz.z, 1},
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Transpose(Dqn_M4 mat)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+        for (int row = 0; row < 4; row++)
+            result.columns[col][row] = mat.columns[row][col];
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Rotate(Dqn_V3 axis01, Dqn_f32 radians)
+{
+    DQN_ASSERT_MSG(DQN_M_ABS(Dqn_V3_Length(axis01) - 1.f) <= 0.01f,
+                   "Rotation axis must be normalised, length = %f",
+                   Dqn_V3_Length(axis01));
+
+    Dqn_f32 sin           = DQN_M_SINF(radians);
+    Dqn_f32 cos           = DQN_M_COSF(radians);
+    Dqn_f32 one_minus_cos = 1.f - cos;
+
+    Dqn_f32 x  = axis01.x;
+    Dqn_f32 y  = axis01.y;
+    Dqn_f32 z  = axis01.z;
+    Dqn_f32 x2 = DQN_M_SQUARED(x);
+    Dqn_f32 y2 = DQN_M_SQUARED(y);
+    Dqn_f32 z2 = DQN_M_SQUARED(z);
+
+    Dqn_M4 result =
+    {{
+        {cos + x2*one_minus_cos,    y*x*one_minus_cos + z*sin, z*x*one_minus_cos - y*sin, 0}, // Col 1
+        {x*y*one_minus_cos - z*sin, cos + y2*one_minus_cos,    z*y*one_minus_cos + x*sin, 0}, // Col 2
+        {x*z*one_minus_cos + y*sin, y*z*one_minus_cos - x*sin, cos + z2*one_minus_cos,    0}, // Col 3
+        {0,                         0,                         0,                         1}, // Col 4
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Orthographic(Dqn_f32 left, Dqn_f32 right, Dqn_f32 bottom, Dqn_f32 top, Dqn_f32 z_near, Dqn_f32 z_far)
+{
+    Dqn_M4 result =
+    {{
+         {2.f / (right - left),                     0.f,                                      0.f,                                          0.f},
+         {0.f,                                      2.f / (top - bottom),                     0.f,                                          0.f},
+         {0.f,                                      0.f,                                      -2.f / (z_far - z_near),                      0.f},
+         {(-1.f * (right + left)) / (right - left), (-1.f * (top + bottom)) / (top - bottom), (-1.f * (z_far + z_near)) / (z_far - z_near), 1.f},
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Perspective(Dqn_f32 fov /*radians*/, Dqn_f32 aspect, Dqn_f32 z_near, Dqn_f32 z_far)
+{
+    Dqn_f32 tan_fov = DQN_M_TANF(fov / 2.f);
+    Dqn_M4 result =
+    {{
+         {1.f / (aspect * tan_fov), 0.f,           0.f,                                     0.f},
+         {0,                        1.f / tan_fov, 0.f,                                     0.f},
+         {0.f,                      0.f,           (z_near + z_far) / (z_near - z_far),    -1.f},
+         {0.f,                      0.f,           (2.f * z_near * z_far)/(z_near - z_far), 0.f},
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Add(Dqn_M4 lhs, Dqn_M4 rhs)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+    {
+        for (int it = 0; it < 4; it++)
+            result.columns[col][it] = lhs.columns[col][it] + rhs.columns[col][it];
+    }
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Sub(Dqn_M4 lhs, Dqn_M4 rhs)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+    {
+        for (int it = 0; it < 4; it++)
+            result.columns[col][it] = lhs.columns[col][it] - rhs.columns[col][it];
+    }
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Mul(Dqn_M4 lhs, Dqn_M4 rhs)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+    {
+        for (int row = 0; row < 4; row++)
+        {
+            Dqn_f32 sum = 0;
+            for (int f32_it = 0; f32_it < 4; f32_it++)
+                sum += lhs.columns[f32_it][row] * rhs.columns[col][f32_it];
+
+            result.columns[col][row] = sum;
+        }
+    }
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_Div(Dqn_M4 lhs, Dqn_M4 rhs)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+    {
+        for (int it = 0; it < 4; it++)
+            result.columns[col][it] = lhs.columns[col][it] / rhs.columns[col][it];
+    }
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_AddF(Dqn_M4 lhs, Dqn_f32 rhs)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+    {
+        for (int it = 0; it < 4; it++)
+            result.columns[col][it] = lhs.columns[col][it] + rhs;
+    }
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_SubF(Dqn_M4 lhs, Dqn_f32 rhs)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+    {
+        for (int it = 0; it < 4; it++)
+            result.columns[col][it] = lhs.columns[col][it] - rhs;
+    }
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_MulF(Dqn_M4 lhs, Dqn_f32 rhs)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+    {
+        for (int it = 0; it < 4; it++)
+            result.columns[col][it] = lhs.columns[col][it] * rhs;
+    }
+    return result;
+}
+
+DQN_API Dqn_M4 Dqn_M4_DivF(Dqn_M4 lhs, Dqn_f32 rhs)
+{
+    Dqn_M4 result;
+    for (int col = 0; col < 4; col++)
+    {
+        for (int it = 0; it < 4; it++)
+            result.columns[col][it] = lhs.columns[col][it] / rhs;
+    }
+    return result;
+}
+
+DQN_API Dqn_FixedString<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
+{
+    Dqn_FixedString<256> result = {};
+    for (int row = 0; row < 4; row++)
+    {
+        for (int it = 0; it < 4; it++)
+        {
+            if (it == 0) Dqn_FixedString_Append(&result, "|");
+            Dqn_FixedString_AppendFmt(&result, "%.5f", mat.columns[it][row]);
+            if (it != 3) Dqn_FixedString_Append(&result, ", ");
+            else         Dqn_FixedString_Append(&result, "|\n");
+        }
+    }
+
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Rect
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_Rect Dqn_Rect_InitFromPosAndSize(Dqn_V2 pos, Dqn_V2 size)
+{
+    Dqn_Rect result = {};
+    result.min      = pos;
+    if (size.x < 0) result.min.x -= size.x;
+    if (size.y < 0) result.min.y -= size.y;
+    result.max  = result.min + Dqn_V2_Abs(size);
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_Rect_Center(Dqn_Rect rect)
+{
+    Dqn_V2 size   = rect.max - rect.min;
+    Dqn_V2 result = rect.min + (size * 0.5f);
+    return result;
+}
+
+DQN_API Dqn_b32 Dqn_Rect_ContainsPoint(Dqn_Rect rect, Dqn_V2 p)
+{
+    Dqn_b32 result = (p.x >= rect.min.x && p.x <= rect.max.x && p.y >= rect.min.y && p.y <= rect.max.y);
+    return result;
+}
+
+DQN_API Dqn_b32 Dqn_Rect_ContainsRect(Dqn_Rect a, Dqn_Rect b)
+{
+    Dqn_b32 result = (b.min >= a.min && b.max <= a.max);
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_Rect_Size(Dqn_Rect rect)
+{
+    Dqn_V2 result = rect.max - rect.min;
+    return result;
+}
+
+DQN_API Dqn_Rect Dqn_Rect_Move(Dqn_Rect src, Dqn_V2 move_amount)
+{
+    Dqn_Rect result = src;
+    result.min += move_amount;
+    result.max += move_amount;
+    return result;
+}
+
+DQN_API Dqn_Rect Dqn_Rect_MoveTo(Dqn_Rect src, Dqn_V2 dest)
+{
+    Dqn_V2 move_amount = dest - src.min;
+    Dqn_Rect result    = src;
+    result.min += move_amount;
+    result.max += move_amount;
+    return result;
+}
+
+DQN_API Dqn_b32 Dqn_Rect_Intersects(Dqn_Rect a, Dqn_Rect b)
+{
+    Dqn_b32 result = (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+                     (a.min.y <= b.max.y && a.max.y >= b.min.y);
+    return result;
+}
+
+DQN_API Dqn_Rect Dqn_Rect_Intersection(Dqn_Rect a, Dqn_Rect b)
+{
+    Dqn_Rect result  = {};
+    if (Dqn_Rect_Intersects(a, b))
+    {
+        result.min.x = DQN_M_MAX(a.min.x, b.min.x);
+        result.min.y = DQN_M_MAX(a.min.y, b.min.y);
+        result.max.x = DQN_M_MIN(a.max.x, b.max.x);
+        result.max.y = DQN_M_MIN(a.max.y, b.max.y);
+    }
+
+    return result;
+}
+
+DQN_API Dqn_Rect Dqn_Rect_Union(Dqn_Rect a, Dqn_Rect b)
+{
+    Dqn_Rect result  = {};
+    result.min.x = DQN_M_MIN(a.min.x, b.min.x);
+    result.min.y = DQN_M_MIN(a.min.y, b.min.y);
+    result.max.x = DQN_M_MAX(a.max.x, b.max.x);
+    result.max.y = DQN_M_MAX(a.max.y, b.max.y);
+    return result;
+}
+
+DQN_API Dqn_Rect Dqn_Rect_FromRectI32(Dqn_RectI32 a)
+{
+    Dqn_Rect result = Dqn_Rect(a.min, a.max);
+    return result;
+}
+
+DQN_API Dqn_V2I Dqn_RectI32_Size(Dqn_RectI32 rect)
+{
+    Dqn_V2I result = rect.max - rect.min;
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Math Utils
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_V2 Dqn_LerpV2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b)
+{
+    Dqn_V2 result = {};
+    result.x  = a.x + ((b.x - a.x) * t);
+    result.y  = a.y + ((b.y - a.y) * t);
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b)
+{
+    Dqn_f32 result = a + ((b - a) * t);
+    return result;
+}
+
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -4727,7 +5220,7 @@ DQN_API Dqn_FileInfo Dqn_File_Info(char const *path)
     }
 #else
     // TODO(doyle): Implement
-    DQN_ASSERT(DQN_INVALID_CODE_PATH);
+    DQN_INVALID_CODE_PATH;
 #endif
 
     return result;
@@ -4757,25 +5250,7 @@ DQN_API Dqn_isize Dqn_EpochTimeToLocalDate(Dqn_i64 timestamp, Dqn_EpochTimeForma
     return result;
 }
 
-DQN_API Dqn_Timer Dqn_Timer_Begin()
-{
-#if defined(DQN_OS_WIN32)
-    Dqn_Timer result     = {};
-    BOOL      qpc_result = QueryPerformanceCounter(&result.start);
-    (void)qpc_result;
-    DQN_ASSERT_MSG(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
-#endif
-    return result;
-}
-
-DQN_API void Dqn_Timer_End(Dqn_Timer *timer)
-{
-#if defined(DQN_OS_WIN32)
-    QueryPerformanceCounter(&timer->end);
-#endif
-}
-
-DQN_FILE_SCOPE void Dqn_Timer__Init()
+DQN_FILE_SCOPE void Dqn_PerfCounter__Init()
 {
 #if defined(DQN_OS_WIN32)
     if (dqn__lib.win32_qpc_frequency.QuadPart == 0)
@@ -4783,43 +5258,94 @@ DQN_FILE_SCOPE void Dqn_Timer__Init()
 #endif
 }
 
-DQN_API Dqn_u64 Dqn_Timer_S(Dqn_Timer const *timer)
+DQN_API Dqn_f64 Dqn_PerfCounter_S(Dqn_u64 begin, Dqn_u64 end)
 {
-    Dqn_Timer__Init();
+    Dqn_PerfCounter__Init();
 #if defined(DQN_OS_WIN32)
-    Dqn_u64 ticks  = timer->end.QuadPart - timer->start.QuadPart;
-    Dqn_u64 result = ticks / dqn__lib.win32_qpc_frequency.QuadPart;
+    Dqn_u64 ticks  = end - begin;
+    Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)dqn__lib.win32_qpc_frequency.QuadPart;
 #endif
     return result;
 }
 
-DQN_API Dqn_u64 Dqn_Timer_Ms(Dqn_Timer const *timer)
+DQN_API Dqn_f64 Dqn_PerfCounter_Ms(Dqn_u64 begin, Dqn_u64 end)
 {
-    Dqn_Timer__Init();
+    Dqn_PerfCounter__Init();
 #if defined(DQN_OS_WIN32)
-    Dqn_u64 ticks  = timer->end.QuadPart - timer->start.QuadPart;
-    Dqn_u64 result = (ticks * 1000) / dqn__lib.win32_qpc_frequency.QuadPart;
+    Dqn_u64 ticks  = end - begin;
+    Dqn_f64 result = (ticks * 1'000) / DQN_CAST(Dqn_f64)dqn__lib.win32_qpc_frequency.QuadPart;
 #endif
     return result;
 }
 
-DQN_API Dqn_u64 Dqn_Timer_MicroS(Dqn_Timer const *timer)
+DQN_API Dqn_f64 Dqn_PerfCounter_MicroS(Dqn_u64 begin, Dqn_u64 end)
 {
-    Dqn_Timer__Init();
+    Dqn_PerfCounter__Init();
 #if defined(DQN_OS_WIN32)
-    Dqn_u64 ticks  = timer->end.QuadPart - timer->start.QuadPart;
-    Dqn_u64 result = (ticks * 1000000) / dqn__lib.win32_qpc_frequency.QuadPart;
+    Dqn_u64 ticks  = end - begin;
+    Dqn_f64 result = (ticks * 1'000'000) / DQN_CAST(Dqn_f64)dqn__lib.win32_qpc_frequency.QuadPart;
 #endif
     return result;
 }
 
-DQN_API Dqn_u64 Dqn_Timer_Ns(Dqn_Timer const *timer)
+DQN_API Dqn_f64 Dqn_PerfCounter_Ns(Dqn_u64 begin, Dqn_u64 end)
 {
-    Dqn_Timer__Init();
+    Dqn_PerfCounter__Init();
 #if defined(DQN_OS_WIN32)
-    Dqn_u64 ticks  = timer->end.QuadPart - timer->start.QuadPart;
-    Dqn_u64 result = (ticks * 1000000000) / dqn__lib.win32_qpc_frequency.QuadPart;
+    Dqn_u64 ticks  = end - begin;
+    Dqn_f64 result = (ticks * 1'000'000'000) / DQN_CAST(Dqn_f64)dqn__lib.win32_qpc_frequency.QuadPart;
 #endif
+    return result;
+}
+
+DQN_API Dqn_u64 Dqn_PerfCounter_Now()
+{
+    Dqn_u64 result = 0;
+#if defined(DQN_OS_WIN32)
+    LARGE_INTEGER integer = {};
+    BOOL      qpc_result = QueryPerformanceCounter(&integer);
+    (void)qpc_result;
+    DQN_ASSERT_MSG(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
+    result = integer.QuadPart;
+#endif
+
+    DQN_ASSERT_MSG(result != 0, "Function not implemented");
+    return result;
+}
+
+DQN_API Dqn_Timer Dqn_Timer_Begin()
+{
+    Dqn_Timer result = {};
+    result.start     = Dqn_PerfCounter_Now();
+    return result;
+}
+
+DQN_API void Dqn_Timer_End(Dqn_Timer *timer)
+{
+    timer->end = Dqn_PerfCounter_Now();
+}
+
+DQN_API Dqn_f64 Dqn_Timer_S(Dqn_Timer timer)
+{
+    Dqn_f64 result = Dqn_PerfCounter_S(timer.start, timer.end);
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_Timer_Ms(Dqn_Timer timer)
+{
+    Dqn_f64 result = Dqn_PerfCounter_Ms(timer.start, timer.end);
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_Timer_MicroS(Dqn_Timer timer)
+{
+    Dqn_f64 result = Dqn_PerfCounter_MicroS(timer.start, timer.end);
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_Timer_Ns(Dqn_Timer timer)
+{
+    Dqn_f64 result = Dqn_PerfCounter_Ns(timer.start, timer.end);
     return result;
 }
 
@@ -4858,6 +5384,52 @@ DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, Dqn_b32 comma_sep)
     DQN_LOCAL_PERSIST Dqn_U64Str string;
     string = {};
     char *result = Dqn_U64ToStr(val, &string, comma_sep);
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
+//
+// NOTE: Dqn_Win32 Implementation
+//
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_FixedString<1024> Dqn_Win32_LastError()
+{
+    Dqn_FixedString<1024> result = {};
+    Dqn_FixedString_AppendFmt(&result, "(%d) ", GetLastError());
+    result.size += FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM,
+                                  nullptr,
+                                  GetLastError(),
+                                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                                  result.str + result.size,
+                                  DQN_CAST(DWORD)(sizeof(result.str) - result.size),
+                                  nullptr);
+    return result;
+}
+
+DQN_API wchar_t *Dqn_Win32_ArenaToWChar(Dqn_ArenaAllocator *arena, Dqn_String src, int *wchar_size)
+{
+    int size_int = Dqn_Safe_TruncateISizeToInt(src.size);
+    int required = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.str, size_int, nullptr, 0);
+    if (required == 0)
+    {
+        DQN_LOG_W("Failed to convert string '%.*s' to wide string: '%.*s'",
+                  DQN_STRING_FMT(src),
+                  Dqn_Win32_LastError().str);
+        return nullptr;
+    }
+
+    wchar_t *result = Dqn_ArenaAllocator_NewArray(arena, wchar_t, required + 1, Dqn_ZeroMem::No);
+    if (result)
+    {
+        *wchar_size = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.str, size_int, result, required);
+        DQN_HARD_ASSERT_MSG(*wchar_size != 0, "Error should be handled in the case above");
+        result[required] = 0;
+        DQN_ASSERT_MSG(*wchar_size == required, "Sanity check this API");
+        DQN_ASSERT_MSG(result[required - 1] != 0,
+                       "Sanity check that str[required] was actually the byte that you have to null-terminate, i.e. "
+                       "the character before is not a null character.");
+    }
+
     return result;
 }
 
@@ -4903,7 +5475,7 @@ DQN_API Dqn_u64 Dqn_FNV1A64_Hash(void const *bytes, Dqn_isize size)
 //
 // -------------------------------------------------------------------------------------------------
 
-#if defined(DQN_COMPILER_MSVC)
+#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #define DQN_MMH3_FORCE_INLINE __forceinline
     #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
     #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)
@@ -6777,7 +7349,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
 
-#if defined(DQN_COMPILER_MSVC)
+#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #if !defined(DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED)
         #undef _CRT_SECURE_NO_WARNINGS
     #endif
