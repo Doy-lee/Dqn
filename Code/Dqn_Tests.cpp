@@ -468,6 +468,74 @@ void Dqn_Test_M4()
     }
 }
 
+void Dqn_Test_Intrinsics()
+{
+    // TODO(doyle): We don't have meaningful tests here, but since
+    // atomics/intrinsics are implemented using macros we ensure the macro was
+    // written properly with these tests.
+
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Atomic");
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_AtomicAddU32");
+        Dqn_u32 val = 0;
+        Dqn_AtomicAddU32(&val, 1);
+        DQN_TEST_EXPECT_MSG(testing_state, val == 1, "val: %I64u", val);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_AtomicAddU64");
+        Dqn_u64 val = 0;
+        Dqn_AtomicAddU64(&val, 1);
+        DQN_TEST_EXPECT_MSG(testing_state, val == 1, "val: %I64u", val);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_AtomicSubU32");
+        Dqn_u32 val = 1;
+        Dqn_AtomicSubU32(&val, 1);
+        DQN_TEST_EXPECT_MSG(testing_state, val == 0, "val: %I64u", val);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_AtomicSubU64");
+        Dqn_u64 val = 1;
+        Dqn_AtomicSubU64(&val, 1);
+        DQN_TEST_EXPECT_MSG(testing_state, val == 0, "val: %I64u", val);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_AtomicSetValue32");
+        long a = 0;
+        long b = 111;
+        Dqn_AtomicSetValue32(&a, b);
+        DQN_TEST_EXPECT_MSG(testing_state, a == b, "a: %I64d, b: %I64d", a, b);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_AtomicSetValue64");
+        Dqn_i64 a = 0;
+        Dqn_i64 b = 111;
+        Dqn_AtomicSetValue64(&a, b);
+        DQN_TEST_EXPECT_MSG(testing_state, a == b, "a: %I64i, b: %I64i", a, b);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_CPUClockCycle");
+        Dqn_CPUClockCycle();
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_CompilerReadBarrierAndCPUReadFence");
+        Dqn_CompilerReadBarrierAndCPUReadFence;
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_CompilerWriteBarrierAndCPUWriteFence");
+        Dqn_CompilerWriteBarrierAndCPUWriteFence;
+    }
+}
+
 void Dqn_Test_Rect()
 {
     Dqn_TestingState testing_state = {};
@@ -904,7 +972,7 @@ void Dqn_Test_TicketMutex()
         Dqn_TicketMutex mutex = {};
         Dqn_TicketMutex_Begin(&mutex);
         Dqn_TicketMutex_End(&mutex);
-        DQN_TEST_EXPECT(testing_state, mutex.ticket == mutex.serving + 1);
+        DQN_TEST_EXPECT(testing_state, mutex.ticket == mutex.serving);
     }
 
     {
@@ -920,7 +988,7 @@ void Dqn_Test_TicketMutex()
         Dqn_TicketMutex_BeginTicket(&mutex, ticket_b);
         Dqn_TicketMutex_End(&mutex);
 
-        DQN_TEST_EXPECT(testing_state, mutex.ticket == mutex.serving + 1);
+        DQN_TEST_EXPECT(testing_state, mutex.ticket == mutex.serving);
         DQN_TEST_EXPECT(testing_state, mutex.ticket == ticket_b + 1);
     }
 }
@@ -931,6 +999,7 @@ void Dqn_Test_RunSuite()
     Dqn_Test_Array();
     Dqn_Test_FixedArray();
     Dqn_Test_FixedString();
+    Dqn_Test_Intrinsics();
     Dqn_Test_M4();
     Dqn_Test_Rect();
     Dqn_Test_Str();
