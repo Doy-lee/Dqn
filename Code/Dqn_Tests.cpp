@@ -31,6 +31,9 @@ struct Dqn_TestingState
     Dqn_ArenaAllocator arena;
 };
 
+static int g_dqn_test_total_good_tests;
+static int g_dqn_test_total_tests;
+
 #if defined(DQN_TEST_NO_ANSI_COLORS)
     #define DQN_TEST_ANSI_COLOR_RED
     #define DQN_TEST_ANSI_COLOR_GREEN
@@ -61,20 +64,12 @@ struct Dqn_TestingState
     testing_state.test.scope_started = true;                                                                           \
     testing_state.num_tests_in_group++
 
-// NOTE: Zero initialised allocators can be a null allocator if #define
-// DQN_ALLOCATOR_DEFAULT_TO_NULL is defined, so handle this case specially
-// by defaulting to the heap allocator which is the behaviour it would have
-// used if the hash define was not used.
-
-// In the macro below we ensure that the allocator is not null, this idiom is
-// repeated whereever we zero initialise an allocator.
-
 #define DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, name)                                                             \
     fprintf(stdout, name "\n");                                                                                        \
-    if (testing_state.arena.backup_allocator.type == Dqn_AllocatorType::Null)                                         \
-        testing_state.arena.backup_allocator = Dqn_Allocator_InitWithHeap();                                          \
     DQN_DEFER                                                                                                          \
     {                                                                                                                  \
+        g_dqn_test_total_good_tests += testing_state.num_tests_ok_in_group; \
+        g_dqn_test_total_tests      += testing_state.num_tests_in_group; \
         Dqn_TestingState_PrintGroupResult(&testing_state);                                                             \
         testing_state = {};                                                                                            \
         fprintf(stdout, "\n\n");                                                                                       \
@@ -85,7 +80,7 @@ struct Dqn_TestingState
     if (!(expr))                                                                                                       \
     {                                                                                                                  \
         testing_state.test.fail_expr = DQN_STRING(#expr);                                                              \
-        testing_state.test.fail_msg  = Dqn_String_InitArenaFmt(&testing_state.arena, msg, ##__VA_ARGS__);               \
+        testing_state.test.fail_msg  = Dqn_String_Fmt(&testing_state.arena, msg, ##__VA_ARGS__);               \
     }
 
 #define DQN_TEST_EXPECT(testing_state, expr) DQN_TEST_EXPECT_MSG(testing_state, expr, "")
@@ -138,6 +133,7 @@ void Dqn_TestState_PrintResult(Dqn_TestState const *result)
 
 void Dqn_Test_Allocator()
 {
+#if 0
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Allocator");
 
@@ -235,6 +231,7 @@ void Dqn_Test_Allocator()
             DQN_TEST_EXPECT_MSG(testing_state, metadata.offset <= MAX_OFFSET, "metadata.offset: %u, MAX_OFFSET: %u", metadata.offset, MAX_OFFSET);
         }
     }
+#endif
 }
 
 void Dqn_Test_Array()
@@ -325,43 +322,34 @@ void Dqn_Test_Array()
             DQN_TEST_EXPECT_MSG(testing_state, array.size == 1, "array.size: %d", array.size);
             DQN_TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
         }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Fixed Memory: Test free on fixed memory array does nothing");
-            int memory[4]        = {};
-            Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_ArrayCount(memory), 0 /*size*/);
-            DQN_DEFER { Dqn_Array_Free(&array); };
-        }
     }
 
     // NOTE: Dynamic Memory: Dqn_Array
     {
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Dynamic Memory: Reserve and check over commit reallocates");
-            Dqn_Array<int> array = {};
-            if (array.allocator.type == Dqn_AllocatorType::Null)
-                array.allocator = Dqn_Allocator_InitWithHeap();
+        DQN_TEST_START_SCOPE(testing_state, "Dynamic Memory: Reserve and check over commit reallocates");
+        Dqn_ArenaAllocator arena = {};
+        Dqn_Array<int> array = {};
+        array.arena = &arena;
 
-            DQN_DEFER { Dqn_Array_Free(&array); };
+        Dqn_Array_Reserve(&array, 4);
+        DQN_TEST_EXPECT_MSG(testing_state, array.size == 0, "array.size: %d", array.size);
+        DQN_TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
 
-            Dqn_Array_Reserve(&array, 4);
-            DQN_TEST_EXPECT_MSG(testing_state, array.size == 0, "array.size: %d", array.size);
-            DQN_TEST_EXPECT_MSG(testing_state, array.max == 4, "array.max: %d", array.max);
+        int DATA[] = {1, 2, 3, 4};
+        Dqn_Array_AddArray(&array, DATA, Dqn_ArrayCount(DATA));
+        DQN_TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
+        DQN_TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data: %d", array.data[1]);
+        DQN_TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data: %d", array.data[2]);
+        DQN_TEST_EXPECT_MSG(testing_state, array.data[3] == 4, "array.data: %d", array.data[3]);
+        DQN_TEST_EXPECT_MSG(testing_state, array.size == 4, "array.size: %d", array.size);
 
-            int DATA[] = {1, 2, 3, 4};
-            Dqn_Array_AddArray(&array, DATA, Dqn_ArrayCount(DATA));
-            DQN_TEST_EXPECT_MSG(testing_state, array.data[0] == 1, "array.data: %d", array.data[0]);
-            DQN_TEST_EXPECT_MSG(testing_state, array.data[1] == 2, "array.data: %d", array.data[1]);
-            DQN_TEST_EXPECT_MSG(testing_state, array.data[2] == 3, "array.data: %d", array.data[2]);
-            DQN_TEST_EXPECT_MSG(testing_state, array.data[3] == 4, "array.data: %d", array.data[3]);
-            DQN_TEST_EXPECT_MSG(testing_state, array.size == 4, "array.size: %d", array.size);
+        int *added_item = Dqn_Array_Add(&array, 5);
+        DQN_TEST_EXPECT_MSG(testing_state, *added_item == 5, "added_item: %d", *added_item);
+        DQN_TEST_EXPECT_MSG(testing_state, array.data[4] == 5, "array.data: %d", array.data[4]);
+        DQN_TEST_EXPECT_MSG(testing_state, array.size == 5, "array.size: %d", array.size);
+        DQN_TEST_EXPECT_MSG(testing_state, array.max >= 5, "array.max: %d", array.max);
 
-            int *added_item = Dqn_Array_Add(&array, 5);
-            DQN_TEST_EXPECT_MSG(testing_state, *added_item == 5, "added_item: %d", *added_item);
-            DQN_TEST_EXPECT_MSG(testing_state, array.data[4] == 5, "array.data: %d", array.data[4]);
-            DQN_TEST_EXPECT_MSG(testing_state, array.size == 5, "array.size: %d", array.size);
-            DQN_TEST_EXPECT_MSG(testing_state, array.max >= 5, "array.max: %d", array.max);
-        }
+        Dqn_ArenaAllocator_Free(&arena);
     }
 }
 
@@ -468,9 +456,160 @@ void Dqn_Test_M4()
     }
 }
 
+void Dqn_Test_Map()
+{
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Map");
+    Dqn_ArenaAllocator arena = {};
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add r-value item to map");
+        Dqn_Map<int> map         = Dqn_Map_InitWithArena<int>(&arena, 1);
+        Dqn_MapEntry<int> *entry = Dqn_Map_AddCopy(&map, 3 /*hash*/, 5 /*value*/, Dqn_MapCollideRule::Overwrite);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 1, "size: %I64d", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.chain_count == 0, "chain_count: %I64u", map.chain_count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list == nullptr, "free_list: %p", map.free_list);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->hash == 3, "hash: %I64u", entry->hash);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->value == 5, "value: %d", entry->value);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->next == nullptr, "next: %p", entry->next);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add l-value item to map");
+        Dqn_Map<int>       map   = Dqn_Map_InitWithArena<int>(&arena, 1);
+        int                value = 5;
+        Dqn_MapEntry<int> *entry = Dqn_Map_Add(&map, 3 /*hash*/, value, Dqn_MapCollideRule::Overwrite);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 1, "size: %I64d", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.chain_count == 0, "chain_count: %I64u", map.chain_count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list == nullptr, "free_list: %p", map.free_list);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->hash == 3, "hash: %I64u", entry->hash);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->value == 5, "value: %d", entry->value);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->next == nullptr, "next: %p", entry->next);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add r-value item and overwrite on collision");
+        Dqn_Map<int>       map   = Dqn_Map_InitWithArena<int>(&arena, 1);
+        Dqn_MapEntry<int> *entry_a = Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
+        Dqn_MapEntry<int> *entry_b = Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Overwrite);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 1, "size: %I64u", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.chain_count == 0, "chain_count: %I64u", map.chain_count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list == nullptr, "free_list: %p", map.free_list);
+        DQN_TEST_EXPECT_MSG(testing_state, entry_a == entry_b, "Expected entry to be overwritten");
+        DQN_TEST_EXPECT_MSG(testing_state, entry_b->hash == 4, "hash: %I64u", entry_b->hash);
+        DQN_TEST_EXPECT_MSG(testing_state, entry_b->value == 6, "value: %d", entry_b->value);
+        DQN_TEST_EXPECT_MSG(testing_state, entry_b->next == nullptr, "next: %p", entry_b->next);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add r-value item and fail on collision");
+        Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(&arena, 1);
+        Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
+        Dqn_MapEntry<int> *entry_b = Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Fail);
+        DQN_TEST_EXPECT_MSG(testing_state, entry_b == nullptr, "Expected entry to be overwritten");
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 1, "size: %I64u", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.chain_count == 0, "chain_count: %I64u", map.chain_count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list == nullptr, "free_list: %p", map.free_list);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add r-value item and chain on collision");
+        Dqn_Map<int>       map   = Dqn_Map_InitWithArena<int>(&arena, 1);
+        Dqn_MapEntry<int> *entry_a = Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
+        Dqn_MapEntry<int> *entry_b = Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Chain);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 1, "size: %I64u", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.chain_count == 1, "chain_count: %I64u", map.chain_count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list == nullptr, "free_list: %p", map.free_list);
+        DQN_TEST_EXPECT_MSG(testing_state, entry_a != entry_b, "Expected colliding entry to be chained");
+        DQN_TEST_EXPECT_MSG(testing_state, entry_a->next == entry_b, "Expected chained entry to be next to our first map entry");
+        DQN_TEST_EXPECT_MSG(testing_state, entry_b->hash == 4, "hash: %I64u", entry_b->hash);
+        DQN_TEST_EXPECT_MSG(testing_state, entry_b->value == 6, "value: %d", entry_b->value);
+        DQN_TEST_EXPECT_MSG(testing_state, entry_b->next == nullptr, "next: %p", entry_b->next);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add r-value item and get them back out again");
+        Dqn_Map<int>       map   = Dqn_Map_InitWithArena<int>(&arena, 1);
+        Dqn_MapEntry<int> *entry_a = Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
+        Dqn_MapEntry<int> *entry_b = Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Chain);
+
+        Dqn_MapEntry<int> *entry_a_copy = Dqn_Map_Get(&map, 3 /*hash*/);
+        Dqn_MapEntry<int> *entry_b_copy = Dqn_Map_Get(&map, 4 /*hash*/);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 1, "size: %I64u", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.chain_count == 1, "chain_count: %I64u", map.chain_count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list == nullptr, "free_list: %p", map.free_list);
+        DQN_TEST_EXPECT(testing_state, entry_a_copy == entry_a);
+        DQN_TEST_EXPECT(testing_state, entry_b_copy == entry_b);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add r-value item and erase it");
+        Dqn_Map<int>       map   = Dqn_Map_InitWithArena<int>(&arena, 1);
+        Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
+        Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Chain);
+        Dqn_Map_Get(&map, 3 /*hash*/);
+
+        Dqn_Map_Erase(&map, 3 /*hash*/, Dqn_ZeroMem::No);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 1, "size: %I64u", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.chain_count == 0, "chain_count: %I64u", map.chain_count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list != nullptr, "free_list: %p", map.free_list);
+
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list->hash == 3, "Entry should not be zeroed out on erase");
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list->value == 5, "Entry should not be zeroed out on erase");
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list->next == nullptr, "This should be the first and only entry in the free list");
+
+        Dqn_MapEntry<int> *entry = Dqn_Map_Get(&map, 4 /*hash*/);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->hash == 4, "hash: %I64u", entry->hash);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->value == 6, "value: %d", entry->value);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->next == nullptr, "next: %p", entry->next);
+
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add r-value item and erase it, zeroing the memory out");
+        Dqn_Map<int>       map   = Dqn_Map_InitWithArena<int>(&arena, 1);
+        Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
+        Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Chain);
+        Dqn_Map_Get(&map, 3 /*hash*/);
+
+        Dqn_Map_Erase(&map, 3 /*hash*/, Dqn_ZeroMem::Yes);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 1, "size: %I64u", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.chain_count == 0, "chain_count: %I64u", map.chain_count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list != nullptr, "free_list: %p", map.free_list);
+
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list->hash == 0, "Entry should be zeroed out on erase");
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list->value == 0, "Entry should be zeroed out on erase");
+        DQN_TEST_EXPECT_MSG(testing_state, map.free_list->next == nullptr, "This should be the first and only entry in the free list");
+
+        Dqn_MapEntry<int> *entry = Dqn_Map_Get(&map, 4 /*hash*/);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->hash == 4, "hash: %I64u", entry->hash);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->value == 6, "value: %d", entry->value);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->next == nullptr, "next: %p", entry->next);
+
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    // TODO(dqn): Test free list is chained correctly
+    // TODO(dqn): Test deleting 'b' from the list in the situation [map] - [a]->[b], we currently only test deleting a
+}
+
 void Dqn_Test_Intrinsics()
 {
-    // TODO(doyle): We don't have meaningful tests here, but since
+    // TODO(dqn): We don't have meaningful tests here, but since
     // atomics/intrinsics are implemented using macros we ensure the macro was
     // written properly with these tests.
 
@@ -812,24 +951,92 @@ void Dqn_Test_Str()
     }
 }
 
+void Dqn_Test_String()
+{
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_String");
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Initialise with string literal w/ macro");
+        Dqn_String string = DQN_STRING("AB");
+        DQN_TEST_EXPECT_MSG(testing_state, string.size == 2, "size: %I64d", string.size);
+        DQN_TEST_EXPECT_MSG(testing_state, string.cap  == 2, "cap: %I64d", string.cap);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[0] == 'A', "string[0]: %c", string.str[0]);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[1] == 'B', "string[1]: %c", string.str[1]);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Initialise with format string");
+        Dqn_ArenaAllocator arena  = {};
+        Dqn_String         string = Dqn_String_Fmt(&arena, "%s", "AB");
+        DQN_TEST_EXPECT_MSG(testing_state, string.size == 2, "size: %I64d", string.size);
+        DQN_TEST_EXPECT_MSG(testing_state, string.cap == 2, "cap: %I64d", string.cap);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[0] == 'A', "string[0]: %c", string.str[0]);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[1] == 'B', "string[1]: %c", string.str[1]);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[2] == 0, "string[2]: %c", string.str[2]);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Copy string");
+        Dqn_ArenaAllocator arena  = {};
+        Dqn_String         string = DQN_STRING("AB");
+        Dqn_String         copy   = Dqn_String_Copy(string, &arena);
+        DQN_TEST_EXPECT_MSG(testing_state, copy.size == 2, "size: %I64d", copy.size);
+        DQN_TEST_EXPECT_MSG(testing_state, copy.cap  == 2, "cap: %I64d", copy.cap);
+        DQN_TEST_EXPECT_MSG(testing_state, copy.str[0] == 'A', "copy[0]: %c", copy.str[0]);
+        DQN_TEST_EXPECT_MSG(testing_state, copy.str[1] == 'B', "copy[1]: %c", copy.str[1]);
+        DQN_TEST_EXPECT_MSG(testing_state, copy.str[2] ==  0,  "copy[2]: %c", copy.str[2]);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Trim whitespace around string");
+        Dqn_String         string = Dqn_String_TrimWhitespaceAround(DQN_STRING(" AB "));
+        DQN_TEST_EXPECT_MSG(testing_state, string.size == 2, "size: %I64d", string.size);
+        DQN_TEST_EXPECT_MSG(testing_state, string.cap  == 2, "cap: %I64d", string.cap);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[0] == 'A', "string[0]: %c", string.str[0]);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[1] == 'B', "string[1]: %c", string.str[1]);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[2] == ' ', "string[1]: %c", string.str[1]);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Allocate string from arena");
+        Dqn_ArenaAllocator arena  = {};
+        Dqn_String         string = Dqn_String_Allocate(&arena, 2, Dqn_ZeroMem::No);
+        DQN_TEST_EXPECT_MSG(testing_state, string.size == 0, "size: %I64d", string.size);
+        DQN_TEST_EXPECT_MSG(testing_state, string.cap  == 2, "cap: %I64d", string.cap);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Append to allocated string");
+        Dqn_ArenaAllocator arena  = {};
+        Dqn_String         string = Dqn_String_Allocate(&arena, 2, Dqn_ZeroMem::No);
+        Dqn_String_AppendFmt(&string, "%c", 'A');
+        Dqn_String_AppendFmt(&string, "%c", 'B');
+        DQN_TEST_EXPECT_MSG(testing_state, string.size   ==  2,  "size: %I64d", string.size);
+        DQN_TEST_EXPECT_MSG(testing_state, string.cap    ==  2,  "cap: %I64d", string.cap);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[0] == 'A', "string[0]: %c", string.str[0]);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[1] == 'B', "string[1]: %c", string.str[1]);
+        DQN_TEST_EXPECT_MSG(testing_state, string.str[2] ==  0,  "string[2]: %c", string.str[2]);
+    }
+}
+
 void Dqn_Test_StringBuilder()
 {
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_StringBuilder");
-    Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
+    Dqn_ArenaAllocator arena = {};
     // NOTE: Dqn_StringBuilder_Append
     {
         {
-            DQN_TEST_START_SCOPE(testing_state, "Append variable size strings and build using heap allocator");
+            DQN_TEST_START_SCOPE(testing_state, "Append variable size strings and build using heap arena");
             Dqn_StringBuilder<> builder = {};
-            if (builder.backup_allocator.type == Dqn_AllocatorType::Null)
-                builder.backup_allocator = Dqn_Allocator_InitWithHeap();
-
             Dqn_StringBuilder_Append(&builder, "Abc", 1);
             Dqn_StringBuilder_Append(&builder, "cd");
             Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
+            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
+            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
 
             char const EXPECT_STR[] = "Acd";
             DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
@@ -837,16 +1044,13 @@ void Dqn_Test_StringBuilder()
         }
 
         {
-            DQN_TEST_START_SCOPE(testing_state, "Append empty string and build using heap allocator");
+            DQN_TEST_START_SCOPE(testing_state, "Append empty string and build using heap arena");
             Dqn_StringBuilder<> builder = {};
-            if (builder.backup_allocator.type == Dqn_AllocatorType::Null)
-                builder.backup_allocator = Dqn_Allocator_InitWithHeap();
-
             Dqn_StringBuilder_Append(&builder, "");
             Dqn_StringBuilder_Append(&builder, "");
             Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
+            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
+            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
 
             char const EXPECT_STR[] = "";
             DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
@@ -854,16 +1058,13 @@ void Dqn_Test_StringBuilder()
         }
 
         {
-            DQN_TEST_START_SCOPE(testing_state, "Append empty string onto string and build using heap allocator");
+            DQN_TEST_START_SCOPE(testing_state, "Append empty string onto string and build using heap arena");
             Dqn_StringBuilder<> builder = {};
-            if (builder.backup_allocator.type == Dqn_AllocatorType::Null)
-                builder.backup_allocator = Dqn_Allocator_InitWithHeap();
-
             Dqn_StringBuilder_Append(&builder, "Acd");
             Dqn_StringBuilder_Append(&builder, "");
             Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
+            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
+            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
 
             char const EXPECT_STR[] = "Acd";
             DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
@@ -871,15 +1072,12 @@ void Dqn_Test_StringBuilder()
         }
 
         {
-            DQN_TEST_START_SCOPE(testing_state, "Append nullptr and build using heap allocator");
+            DQN_TEST_START_SCOPE(testing_state, "Append nullptr and build using heap arena");
             Dqn_StringBuilder<> builder = {};
-            if (builder.backup_allocator.type == Dqn_AllocatorType::Null)
-                builder.backup_allocator = Dqn_Allocator_InitWithHeap();
-
             Dqn_StringBuilder_Append(&builder, nullptr, 5);
             Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
+            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
+            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
 
             char const EXPECT_STR[] = "";
             DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
@@ -887,17 +1085,15 @@ void Dqn_Test_StringBuilder()
         }
 
         {
-            DQN_TEST_START_SCOPE(testing_state, "Append and require new linked buffer and build using heap allocator");
+            DQN_TEST_START_SCOPE(testing_state, "Append and require new linked buffer and build using heap arena");
             Dqn_StringBuilder<2> builder = {};
-            if (builder.backup_allocator.type == Dqn_AllocatorType::Null)
-                builder.backup_allocator = Dqn_Allocator_InitWithHeap();
-
+            Dqn_StringBuilder_InitWithArena(&builder, &arena);
             Dqn_StringBuilder_Append(&builder, "A");
             Dqn_StringBuilder_Append(&builder, "z"); // Should force a new memory block
             Dqn_StringBuilder_Append(&builder, "tec");
             Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
+            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
+            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
 
             char const EXPECT_STR[] = "Aztec";
             DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
@@ -907,16 +1103,13 @@ void Dqn_Test_StringBuilder()
 
     // NOTE: Dqn_StringBuilder_AppendChar
     {
-        DQN_TEST_START_SCOPE(testing_state, "Append char and build using heap allocator");
+        DQN_TEST_START_SCOPE(testing_state, "Append char and build using heap arena");
         Dqn_StringBuilder<> builder = {};
-        if (builder.backup_allocator.type == Dqn_AllocatorType::Null)
-            builder.backup_allocator = Dqn_Allocator_InitWithHeap();
-
         Dqn_StringBuilder_AppendChar(&builder, 'a');
         Dqn_StringBuilder_AppendChar(&builder, 'b');
         Dqn_isize size    = 0;
-        char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
-        DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
+        char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
+        DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
 
         char const EXPECT_STR[] = "ab";
         DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
@@ -926,16 +1119,13 @@ void Dqn_Test_StringBuilder()
     // NOTE: Dqn_StringBuilder_AppendFmt
     {
         {
-            DQN_TEST_START_SCOPE(testing_state, "Append format string and build using heap allocator");
+            DQN_TEST_START_SCOPE(testing_state, "Append format string and build using heap arena");
             Dqn_StringBuilder<> builder = {};
-            if (builder.backup_allocator.type == Dqn_AllocatorType::Null)
-                builder.backup_allocator = Dqn_Allocator_InitWithHeap();
-
             Dqn_StringBuilder_AppendFmt(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
             Dqn_StringBuilder_AppendFmt(&builder, "Extra Stuff");
             Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
+            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
+            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
 
             char const EXPECT_STR[] = "Number: 4, String: Hello Sailor, Extra Stuff";
             DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
@@ -943,15 +1133,12 @@ void Dqn_Test_StringBuilder()
         }
 
         {
-            DQN_TEST_START_SCOPE(testing_state, "Append nullptr format string and build using heap allocator");
+            DQN_TEST_START_SCOPE(testing_state, "Append nullptr format string and build using heap arena");
             Dqn_StringBuilder<> builder = {};
-            if (builder.backup_allocator.type == Dqn_AllocatorType::Null)
-                builder.backup_allocator = Dqn_Allocator_InitWithHeap();
-
             Dqn_StringBuilder_AppendFmt(&builder, nullptr);
             Dqn_isize size = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &allocator, &size);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, result); };
+            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
+            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
 
             char const EXPECT_STR[] = "";
             DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
@@ -1001,10 +1188,13 @@ void Dqn_Test_RunSuite()
     Dqn_Test_FixedString();
     Dqn_Test_Intrinsics();
     Dqn_Test_M4();
+    Dqn_Test_Map();
     Dqn_Test_Rect();
     Dqn_Test_Str();
+    Dqn_Test_String();
     Dqn_Test_StringBuilder();
     Dqn_Test_TicketMutex();
+    fprintf(stdout, "Summary: %d/%d tests succeeded\n", g_dqn_test_total_good_tests, g_dqn_test_total_tests);
 }
 
 #if defined(DQN_TEST_WITH_MAIN)
