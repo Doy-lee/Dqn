@@ -2577,10 +2577,53 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         #pragma comment(lib, "shlwapi.lib")
 
         // Taken from Windows.h
+        // ---------------------------------------------------------------------
+        // Typedefs
+        // ---------------------------------------------------------------------
         typedef int BOOL;
         typedef void * HWND;
         typedef void * HMODULE;
+        typedef void * HANDLE;
 
+        // ---------------------------------------------------------------------
+        // Defines
+        // ---------------------------------------------------------------------
+        #define MAX_PATH 260
+
+        // NOTE: Wait/Synchronization
+        #define INFINITE 0xFFFFFFFF // Infinite timeout
+
+        // NOTE: FormatMessageA
+        #define FORMAT_MESSAGE_FROM_SYSTEM 0x00001000
+        #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
+        #define MAKELANGID(p, s) ((((unsigned short  )(s)) << 10) | (unsigned short  )(p))
+        #define SUBLANG_DEFAULT 0x01    // user default
+        #define LANG_NEUTRAL 0x00
+
+        // NOTE: MultiByteToWideChar
+        #define CP_UTF8 65001 // UTF-8 translation
+
+        // NOTE: VirtualAlloc
+        // NOTE: Allocation Type
+        #define MEM_RESERVE 0x00002000
+        #define MEM_COMMIT 0x00001000
+
+        // NOTE: Free Type
+        #define MEM_RELEASE 0x00008000
+
+        // NOTE: Protect
+        #define PAGE_READWRITE 0x04
+
+        // NOTE: FindFirstFile
+        #define INVALID_HANDLE_VALUE ((HANDLE)(long *)-1)
+        #define FIND_FIRST_EX_LARGE_FETCH 0x00000002
+        #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
+        #define FILE_ATTRIBUTE_READONLY 0x00000001
+        #define FILE_ATTRIBUTE_HIDDEN 0x00000002
+
+        // ---------------------------------------------------------------------
+        // Data Structures
+        // ---------------------------------------------------------------------
         typedef union {
             struct {
                 DWORD LowPart;
@@ -2651,38 +2694,40 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
             WORD wMilliseconds;
         } SYSTEMTIME;
 
-        //
-        // NOTE: Wait/Synchronization
-        //
-        #define INFINITE 0xFFFFFFFF // Infinite timeout
+        typedef struct {
+            DWORD dwFileAttributes;
+            FILETIME ftCreationTime;
+            FILETIME ftLastAccessTime;
+            FILETIME ftLastWriteTime;
+            DWORD nFileSizeHigh;
+            DWORD nFileSizeLow;
+            DWORD dwReserved0;
+            DWORD dwReserved1;
+            wchar_t cFileName[MAX_PATH];
+            wchar_t cAlternateFileName[14];
+#ifdef _MAC
+            DWORD dwFileType;
+            DWORD dwCreatorType;
+            WORD  wFinderFlags;
+#endif
+        } WIN32_FIND_DATAW;
 
-        //
-        // NOTE: FormatMessageA
-        //
-        #define FORMAT_MESSAGE_FROM_SYSTEM 0x00001000
-        #define MAKELANGID(p, s) ((((unsigned short  )(s)) << 10) | (unsigned short  )(p))
-        #define SUBLANG_DEFAULT 0x01    // user default
-        #define LANG_NEUTRAL 0x00
+        typedef enum {
+            FindExInfoStandard,
+            FindExInfoBasic,
+            FindExInfoMaxInfoLevel,
+        } FINDEX_INFO_LEVELS;
 
-        // NOTE: MultiByteToWideChar
-        #define CP_UTF8 65001 // UTF-8 translation
+        typedef enum {
+            FindExSearchNameMatch,
+            FindExSearchLimitToDirectories,
+            FindExSearchLimitToDevices,
+            FindExSearchMaxSearchOp
+        } FINDEX_SEARCH_OPS;
 
-        //
-        // NOTE: VirtualAlloc
-        //
-        // NOTE: Allocation Type
-        #define MEM_RESERVE 0x00002000
-        #define MEM_COMMIT 0x00001000
-
-        // NOTE: Free Type
-        #define MEM_RELEASE 0x00008000
-
-        // NOTE: Protect
-        #define PAGE_READWRITE 0x04
-
-        //
-        // NOTE: Win32 Functions
-        //
+        // ---------------------------------------------------------------------
+        // Functions
+        // ---------------------------------------------------------------------
         extern "C"
         {
         BOOL          CopyFileA                (char const *existing_file_name, char const *new_file_name, BOOL fail_if_exists);
@@ -2706,6 +2751,9 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         int           WideCharToMultiByte      (unsigned int CodePage, DWORD dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
         void          GetSystemTime            (SYSTEMTIME *lpSystemTime);
         void          GetLocalTime             (SYSTEMTIME *lpSystemTime);
+        DWORD         GetCurrentDirectoryW     (DWORD nBufferLength, wchar_t *lpBuffer);
+        bool          FindNextFileW            (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+        HANDLE        FindFirstFileExW         (const wchar_t *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, DWORD dwAdditionalFlags);
         }
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 #else // !defined(DQN_OS_WIN32)
