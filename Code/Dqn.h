@@ -2731,29 +2731,36 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         extern "C"
         {
         BOOL          CopyFileA                (char const *existing_file_name, char const *new_file_name, BOOL fail_if_exists);
-        BOOL          FreeLibrary              (void *lib_module);
-        BOOL          QueryPerformanceCounter  (LARGE_INTEGER *performance_count);
-        BOOL          QueryPerformanceFrequency(LARGE_INTEGER *frequency);
-        BOOL          ReleaseSemaphore         (void *semaphore, long release_count, long *prev_count);
-        BOOL          VirtualFree              (void *address, size_t size, DWORD free_type);
-        DWORD         FormatMessageA           (DWORD flags, void *source, DWORD message_id, DWORD language_id, char *buffer, DWORD size, va_list *args);
-        DWORD         GetFileAttributesExA     (char const *file_name, GET_FILEEX_INFO_LEVELS info_level, WIN32_FILE_ATTRIBUTE_DATA *file_information);
-        DWORD         GetLastError             ();
-        DWORD         WaitForSingleObject      (void *handle, DWORD milliseconds);
-        unsigned int  GetWindowModuleFileNameA (void *hwnd, char *file_name, unsigned int file_name_max);
-        void          GetSystemInfo            (SYSTEM_INFO *system_info);
-        void         *CreateSemaphoreA         (SECURITY_ATTRIBUTES *security_attributes, long initial_count, long max_count, char *lpName);
-        void         *CreateThread             (SECURITY_ATTRIBUTES *thread_attributes, size_t stack_size, DWORD (*start_function)(void *), void *user_context, DWORD creation_flags, DWORD *thread_id);
-        void         *GetProcAddress           (void *hmodule, char const *proc_name);
-        void         *LoadLibraryA             (char const *file_name);
-        void         *VirtualAlloc             (void *address, size_t size, DWORD allocation_type, DWORD protect);
-        int           MultiByteToWideChar      (unsigned int CodePage, DWORD dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
-        int           WideCharToMultiByte      (unsigned int CodePage, DWORD dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
-        void          GetSystemTime            (SYSTEMTIME *lpSystemTime);
-        void          GetLocalTime             (SYSTEMTIME *lpSystemTime);
         DWORD         GetCurrentDirectoryW     (DWORD nBufferLength, wchar_t *lpBuffer);
         bool          FindNextFileW            (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
         HANDLE        FindFirstFileExW         (const wchar_t *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, DWORD dwAdditionalFlags);
+        DWORD         GetFileAttributesExA     (char const *file_name, GET_FILEEX_INFO_LEVELS info_level, WIN32_FILE_ATTRIBUTE_DATA *file_information);
+
+        HMODULE       LoadLibraryA             (char const *file_name);
+        BOOL          FreeLibrary              (void *lib_module);
+        void         *GetProcAddress           (void *hmodule, char const *proc_name);
+        unsigned int  GetWindowModuleFileNameA (void *hwnd, char *file_name, unsigned int file_name_max);
+        DWORD         WaitForSingleObject      (HANDLE handle, DWORD milliseconds);
+
+        BOOL          QueryPerformanceCounter  (LARGE_INTEGER *performance_count);
+        BOOL          QueryPerformanceFrequency(LARGE_INTEGER *frequency);
+
+        HANDLE        CreateThread             (SECURITY_ATTRIBUTES *thread_attributes, size_t stack_size, DWORD (*start_function)(void *), void *user_context, DWORD creation_flags, DWORD *thread_id);
+        HANDLE        CreateSemaphoreA         (SECURITY_ATTRIBUTES *security_attributes, long initial_count, long max_count, char *lpName);
+        BOOL          ReleaseSemaphore         (HANDLE semaphore, long release_count, long *prev_count);
+
+        void         *VirtualAlloc             (void *address, size_t size, DWORD allocation_type, DWORD protect);
+        BOOL          VirtualFree              (void *address, size_t size, DWORD free_type);
+
+        void          GetSystemInfo            (SYSTEM_INFO *system_info);
+        void          GetSystemTime            (SYSTEMTIME *lpSystemTime);
+        void          GetLocalTime             (SYSTEMTIME *lpSystemTime);
+
+        DWORD         FormatMessageA           (DWORD flags, void *source, DWORD message_id, DWORD language_id, char *buffer, DWORD size, va_list *args);
+        DWORD         GetLastError             ();
+
+        int           MultiByteToWideChar      (unsigned int CodePage, DWORD dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
+        int           WideCharToMultiByte      (unsigned int CodePage, DWORD dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
         }
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 #else // !defined(DQN_OS_WIN32)
