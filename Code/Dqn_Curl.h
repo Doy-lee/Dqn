@@ -47,6 +47,8 @@ struct Dqn_CurlProcs
 };
 
 Dqn_CurlProcs Dqn_CurlProcs_Init();
+void          Dqn_Curl_SetPostData(CURL *curl, char const *post_data, int post_size);
+
 #endif // DQN_CURL_H
 
 #if defined(DQN_CURL_IMPLEMENTATION)
@@ -76,5 +78,12 @@ Dqn_CurlProcs Dqn_CurlProcs_Init()
     result.curl_slist_free_all = curl_slist_free_all;
 
     return result;
+}
+
+void Dqn_Curl_SetPostData(CURL *curl, char const *post_data, int post_size)
+{
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, post_size);
 }
 #endif // DQN_CURL_IMPLEMENTATION

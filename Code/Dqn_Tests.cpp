@@ -80,7 +80,7 @@ static int g_dqn_test_total_tests;
     if (!(expr))                                                                                                       \
     {                                                                                                                  \
         testing_state.test.fail_expr = DQN_STRING(#expr);                                                              \
-        testing_state.test.fail_msg  = Dqn_String_Fmt(&testing_state.arena, msg, ##__VA_ARGS__);               \
+        testing_state.test.fail_msg  = Dqn_String_Fmt(&testing_state.arena, msg, ##__VA_ARGS__);                       \
     }
 
 #define DQN_TEST_EXPECT(testing_state, expr) DQN_TEST_EXPECT_MSG(testing_state, expr, "")
@@ -129,109 +129,6 @@ void Dqn_TestState_PrintResult(Dqn_TestState const *result)
     {
         fprintf(stdout, DQN_TEST_ANSI_COLOR_GREEN "%s" DQN_TEST_ANSI_COLOR_RESET "\n", STATUS_OK);
     }
-}
-
-void Dqn_Test_Allocator()
-{
-#if 0
-    Dqn_TestingState testing_state = {};
-    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Allocator");
-
-    // NOTE: Various allocator test
-    {
-        {
-            DQN_TEST_START_SCOPE(testing_state, "HeapAllocator - Allocate Small");
-            Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
-            char const EXPECT[]     = "hello_world";
-            char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char), Dqn_ZeroMem::Yes);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-            memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
-            DQN_TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "XHeapAllocator - Allocate Small");
-            Dqn_Allocator allocator = Dqn_Allocator_InitWithXHeap();
-            char const EXPECT[]     = "hello_world";
-            char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char), Dqn_ZeroMem::Yes);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-            memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
-            DQN_TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "ArenaAllocator - Allocate Small");
-            Dqn_ArenaAllocator arena = Dqn_ArenaAllocator_InitWithNewAllocator(Dqn_Allocator_InitWithHeap(), 0, nullptr);
-            Dqn_Allocator allocator  = Dqn_Allocator_InitWithArena(&arena);
-            char const EXPECT[]     = "hello_world";
-            char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, Dqn_ArrayCount(EXPECT), alignof(char), Dqn_ZeroMem::Yes);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-            memcpy(buf, EXPECT, Dqn_ArrayCount(EXPECT));
-            DQN_TEST_EXPECT_MSG(testing_state, memcmp(EXPECT, buf, Dqn_ArrayCount(EXPECT)) == 0, "buf: %s, expect: %s", buf, EXPECT);
-        }
-    }
-
-    // NOTE: Alignment Test
-    {
-        Dqn_u8 const ALIGNMENT3 = 4;
-        Dqn_u8 const NUM_BYTES  = sizeof(Dqn_u32);
-        {
-            DQN_TEST_START_SCOPE(testing_state, "HeapAllocator - Align to 32 bytes");
-            Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
-            auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-            int buf_mod_alignment = DQN_CAST(int)(DQN_CAST(uintptr_t)buf % ALIGNMENT3);
-            DQN_TEST_EXPECT_MSG(testing_state, buf_mod_alignment == 0, "buf_mod_alignment: %d", buf_mod_alignment);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "XHeapAllocator - Align to 32 bytes");
-            Dqn_Allocator allocator = Dqn_Allocator_InitWithXHeap();
-            auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-            int buf_mod_alignment = DQN_CAST(int)(DQN_CAST(uintptr_t)buf % ALIGNMENT3);
-            DQN_TEST_EXPECT_MSG(testing_state, buf_mod_alignment == 0, "buf_mod_alignment: %d", buf_mod_alignment);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "ArenaAllocator - Align to 32 bytes");
-            Dqn_ArenaAllocator arena = {};
-            if (arena.backup_allocator.type == Dqn_AllocatorType::Null)
-                arena.backup_allocator = Dqn_Allocator_InitWithHeap();
-
-            Dqn_Allocator allocator = Dqn_Allocator_InitWithArena(&arena);
-            auto *buf               = DQN_CAST(Dqn_u32 *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
-            int buf_mod_alignment = DQN_CAST(int)(DQN_CAST(uintptr_t)buf % ALIGNMENT3);
-            DQN_TEST_EXPECT_MSG(testing_state, buf_mod_alignment == 0, "buf_mod_alignment: %d", buf_mod_alignment);
-        }
-    }
-
-    // NOTE: Dqn_PointerMetadata tests
-    {
-        Dqn_u8 const ALIGNMENT3 = 4;
-        Dqn_u8 const NUM_BYTES  = 4;
-        Dqn_u8 const MAX_OFFSET = (ALIGNMENT3 - 1) + sizeof(Dqn_PointerMetadata);
-        {
-            DQN_TEST_START_SCOPE(testing_state, "HeapAllocator - Allocation metadata initialised");
-            Dqn_Allocator allocator = Dqn_Allocator_InitWithHeap();
-            char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-            Dqn_PointerMetadata metadata = Dqn_PointerMetadata_Get(buf);
-            DQN_TEST_EXPECT_MSG(testing_state, metadata.alignment == ALIGNMENT3, "metadata.alignment: %u, ALIGNMENT3: %u", metadata.alignment, ALIGNMENT3);
-            DQN_TEST_EXPECT_MSG(testing_state, metadata.offset <= MAX_OFFSET, "metadata.offset: %u, MAX_OFFSET: %u", metadata.offset, MAX_OFFSET);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "XHeapAllocator - Allocation metadata initialised");
-            Dqn_Allocator allocator = Dqn_Allocator_InitWithXHeap();
-            char *buf               = DQN_CAST(char *)Dqn_Allocator_Allocate(&allocator, NUM_BYTES, ALIGNMENT3, Dqn_ZeroMem::Yes);
-            DQN_DEFER { Dqn_Allocator_Free(&allocator, buf); };
-            Dqn_PointerMetadata metadata = Dqn_PointerMetadata_Get(buf);
-            DQN_TEST_EXPECT_MSG(testing_state, metadata.alignment == ALIGNMENT3, "metadata.alignment: %u, ALIGNMENT3: %u", metadata.alignment, ALIGNMENT3);
-            DQN_TEST_EXPECT_MSG(testing_state, metadata.offset <= MAX_OFFSET, "metadata.offset: %u, MAX_OFFSET: %u", metadata.offset, MAX_OFFSET);
-        }
-    }
-#endif
 }
 
 void Dqn_Test_Array()
@@ -431,6 +328,77 @@ void Dqn_Test_FixedString()
     }
 }
 
+void Dqn_Test_Hex()
+{
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Hex");
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert 0x123");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("0x123"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0x123, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert 0xFFFF");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("0xFFFF"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0xFFFF, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert FFFF");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("FFFF"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0xFFFF, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert abCD");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("abCD"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0xabCD, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert 0xabCD");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("0xabCD"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0xabCD, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert 0x");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("0x"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0x0, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert 0X");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("0X"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0x0, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert 3");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("3"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 3, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert f");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("f"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0xf, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert g");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("g"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %I64u", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Convert -0x3");
+        Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("-0x3"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %I64u", result);
+    }
+}
+
 void Dqn_Test_M4()
 {
     Dqn_TestingState testing_state = {};
@@ -453,6 +421,99 @@ void Dqn_Test_M4()
                             "\nresult =\n%s\nexpected =\n%s",
                             Dqn_M4_ColumnMajorString(result).str,
                             Dqn_M4_ColumnMajorString(EXPECT).str);
+    }
+}
+
+void Dqn_Test_DSMap()
+{
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_DSMap");
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add r-value item to map");
+        Dqn_DSMap<int> map         = Dqn_DSMap_Init<int>(128);
+        Dqn_DSMapEntry<int> *entry = Dqn_DSMap_AddCopy(&map, 3 /*hash*/, 5 /*value*/);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 128, "size: %I64d", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->hash == 3, "hash: %I64u", entry->hash);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->value == 5, "value: %d", entry->value);
+        Dqn_DSMap_Free(&map);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Add l-value item to map");
+        Dqn_DSMap<int>       map   = Dqn_DSMap_Init<int>(128);
+        int                  value = 5;
+        Dqn_DSMapEntry<int> *entry = Dqn_DSMap_Add(&map, 3 /*hash*/, value);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == 128, "size: %I64d", map.size);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64u", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->hash == 3, "hash: %I64u", entry->hash);
+        DQN_TEST_EXPECT_MSG(testing_state, entry->value == 5, "value: %d", entry->value);
+        Dqn_DSMap_Free(&map);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Get item from map");
+        Dqn_DSMap<int> map         = Dqn_DSMap_Init<int>(128);
+        Dqn_DSMapEntry<int> *entry = Dqn_DSMap_AddCopy(&map, 3 /*hash*/, 5 /*value*/);
+        Dqn_DSMapEntry<int> *get_entry = Dqn_DSMap_Get(&map, 3 /*hash*/);
+        DQN_TEST_EXPECT_MSG(testing_state, get_entry == entry, "get_entry: %p, entry: %p", get_entry, entry);
+        Dqn_DSMap_Free(&map);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Get non-existent item from map");
+        Dqn_DSMap<int> map         = Dqn_DSMap_Init<int>(128);
+        Dqn_DSMapEntry<int> *entry = Dqn_DSMap_Get(&map, 3 /*hash*/);
+        DQN_TEST_EXPECT(testing_state, entry == nullptr);
+        Dqn_DSMap_Free(&map);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Erase item from map");
+        Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(128);
+        Dqn_DSMap_AddCopy(&map, 3 /*hash*/, 5 /*value*/);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 1, "count: %I64d", map.count);
+        Dqn_DSMap_Erase(&map, 3 /*hash*/, Dqn_ZeroMem::No);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 0, "count: %I64d", map.count);
+        Dqn_DSMap_Free(&map);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Erase non-existent item from map");
+        Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(128);
+        Dqn_DSMap_Erase(&map, 3 /*hash*/, Dqn_ZeroMem::No);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 0, "count: %I64d", map.count);
+        Dqn_DSMap_Free(&map);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Test resize on maximum load");
+        const Dqn_isize INIT_SIZE = 4;
+        Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(INIT_SIZE);
+        Dqn_DSMap_AddCopy(&map, 0 /*hash*/, 5 /*value*/);
+        Dqn_DSMap_AddCopy(&map, 1 /*hash*/, 5 /*value*/);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 2, "count: %I64d", map.count);
+
+        // This *should* cause a resize because 3/4 slots filled is 75% load
+        Dqn_DSMap_AddCopy(&map, 6 /*hash*/, 5 /*value*/);
+        DQN_TEST_EXPECT_MSG(testing_state, map.count == 3, "count: %I64d", map.count);
+        DQN_TEST_EXPECT_MSG(testing_state, map.size == INIT_SIZE * 2, "size: %I64d", map.size);
+
+        // Check that the elements are rehashed where we expected them to be
+        DQN_TEST_EXPECT    (testing_state, map.slots[0].occupied == DQN_CAST(Dqn_u8)true);
+        DQN_TEST_EXPECT    (testing_state, map.slots[1].occupied == DQN_CAST(Dqn_u8)true);
+        DQN_TEST_EXPECT    (testing_state, map.slots[2].occupied == DQN_CAST(Dqn_u8)false);
+        DQN_TEST_EXPECT    (testing_state, map.slots[3].occupied == DQN_CAST(Dqn_u8)false);
+        DQN_TEST_EXPECT    (testing_state, map.slots[4].occupied == DQN_CAST(Dqn_u8)false);
+        DQN_TEST_EXPECT    (testing_state, map.slots[5].occupied == DQN_CAST(Dqn_u8)false);
+        DQN_TEST_EXPECT    (testing_state, map.slots[6].occupied == DQN_CAST(Dqn_u8)true);
+        DQN_TEST_EXPECT    (testing_state, map.slots[7].occupied == DQN_CAST(Dqn_u8)false);
+
+        DQN_TEST_EXPECT_MSG(testing_state, map.slots[0].value == 5, "value: %d", map.slots[0].value);
+        DQN_TEST_EXPECT_MSG(testing_state, map.slots[1].value == 5, "value: %d", map.slots[1].value);
+        DQN_TEST_EXPECT_MSG(testing_state, map.slots[6].value == 5, "value: %d", map.slots[6].value);
+
+        Dqn_DSMap_Free(&map);
     }
 }
 
@@ -1182,18 +1243,20 @@ void Dqn_Test_TicketMutex()
 
 void Dqn_Test_RunSuite()
 {
-    Dqn_Test_Allocator();
     Dqn_Test_Array();
     Dqn_Test_FixedArray();
     Dqn_Test_FixedString();
+    Dqn_Test_Hex();
     Dqn_Test_Intrinsics();
     Dqn_Test_M4();
+    Dqn_Test_DSMap();
     Dqn_Test_Map();
     Dqn_Test_Rect();
     Dqn_Test_Str();
     Dqn_Test_String();
     Dqn_Test_StringBuilder();
     Dqn_Test_TicketMutex();
+
     fprintf(stdout, "Summary: %d/%d tests succeeded\n", g_dqn_test_total_good_tests, g_dqn_test_total_tests);
 }
 
