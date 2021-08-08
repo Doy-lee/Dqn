@@ -1254,7 +1254,7 @@ struct Dqn_FixedString
     char       *end          ()              { return data + size; }
 };
 
-template <Dqn_isize MAX_> DQN_API Dqn_FixedString<MAX_> Dqn_FixedString_Fmt   (char const *fmt, ...);
+template <Dqn_isize MAX_> DQN_API Dqn_FixedString<MAX_> Dqn_FixedString_Fmt       (char const *fmt, ...);
 template <Dqn_isize MAX_> DQN_API Dqn_isize             Dqn_FixedString_Max       (Dqn_FixedString<MAX_> *);
 template <Dqn_isize MAX_> DQN_API void                  Dqn_FixedString_Clear     (Dqn_FixedString<MAX_> *str);
 template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_AppendFmtV(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va);
@@ -1262,6 +1262,164 @@ template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_AppendFm
 template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_Append    (Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size = -1);
 template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedString_Append    (Dqn_FixedString<MAX_> *str, Dqn_String src);
 template <Dqn_isize MAX_> DQN_API Dqn_String            Dqn_FixedString_ToString  (Dqn_FixedString<MAX_> const *str);
+
+// -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_StringList
+// -------------------------------------------------------------------------------------------------
+struct Dqn_StringListNode
+{
+    Dqn_String string;
+    Dqn_StringListNode *next;
+};
+
+struct Dqn_StringList
+{
+    Dqn_isize           string_size;
+    Dqn_StringListNode *head;
+    Dqn_StringListNode *curr;
+};
+
+DQN_API Dqn_StringListNode *Dqn_StringList_MakeNode(Dqn_ArenaAllocator *arena, Dqn_isize size);
+DQN_API void                Dqn_StringList_AddNode(Dqn_StringList *list, Dqn_StringListNode *node);
+DQN_API void                Dqn_StringList_AppendFmtV(Dqn_StringList *list, Dqn_ArenaAllocator *arena, char const *fmt, va_list args);
+DQN_API void                Dqn_StringList_AppendFmt(Dqn_StringList *list, Dqn_ArenaAllocator *arena, char const *fmt, ...);
+DQN_API void                Dqn_StringList_AppendFmt(Dqn_StringList *list, Dqn_ArenaAllocator *arena, char const *fmt, ...);
+DQN_API Dqn_String          Dqn_StringList_Build(Dqn_StringList const *list, Dqn_ArenaAllocator *arena);
+
+// -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_StringBuilder
+// -------------------------------------------------------------------------------------------------
+// TODO(dqn): Rewrite this, iirc the logic here is way more complicated than it
+// needs to be have written a StringList implementation that is many times
+// simpler than this. There's value in being able to allocate a block up-front
+// and append to it until we run out of space for operations where we make a lot
+// of small nodes, like using JsonWriter.
+struct Dqn_StringBuilderBlock
+{
+    char                   *mem;
+    Dqn_isize               size;
+    Dqn_isize               used;
+    Dqn_StringBuilderBlock *next;
+};
+
+// TODO(dqn): Rewrite this as string lists
+Dqn_isize constexpr DQN_STRING_BUILDER_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
+template <Dqn_isize N = DQN_KILOBYTES(16)>
+struct Dqn_StringBuilder
+{
+    Dqn_ArenaAllocator     *arena;
+    char                    fixed_mem[N];
+    Dqn_StringBuilderBlock  fixed_mem_block;
+    Dqn_StringBuilderBlock *last_mem_block;
+};
+
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_InitWithArena           (Dqn_StringBuilder<N> *builder, Dqn_ArenaAllocator *arena);
+
+// Get the size required to build the string, it returns the length not including the null-terminator.
+template <Dqn_isize N> DQN_API Dqn_isize   Dqn_StringBuilder_GetSize                 (Dqn_StringBuilder<N> const *builder);
+
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_BuildToDest             (Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size);
+template <Dqn_isize N> DQN_API Dqn_String  Dqn_StringBuilder_BuildStringWithArena    (Dqn_StringBuilder<N> *builder, Dqn_ArenaAllocator *arena);
+#define                                    Dqn_StringBuilder_Build(                   builder, arena, len) Dqn_StringBuilder__Build(builder, arena, len DQN_CALL_SITE(""))
+
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendFmtV              (Dqn_StringBuilder<N> *builder, char const *fmt, va_list va);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendFmt               (Dqn_StringBuilder<N> *builder, char const *fmt, ...);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_Append                  (Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendString            (Dqn_StringBuilder<N> *builder, Dqn_String const string);
+template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendChar              (Dqn_StringBuilder<N> *builder, char ch);
+
+// -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_FixedArray
+// -------------------------------------------------------------------------------------------------
+#define DQN_FIXED_ARRAY_TEMPLATE template <typename T, int MAX_>
+#define DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray<T, MAX_>
+DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
+{
+    T               data[MAX_];
+    Dqn_isize       size;
+
+    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data[i]; }
+    T       *begin      ()                  { return data; }
+    T       *end        ()                  { return data + size; }
+    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
+
+    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, i, size); return data[i]; }
+    T const *begin      ()            const { return data; }
+    T const *end        ()            const { return data + size; }
+    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
+};
+
+DQN_FIXED_ARRAY_TEMPLATE DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL     Dqn_FixedArray_Init         (T const *item, int num);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArray_Max          (DQN_FIXED_ARRAY_TEMPLATE_DECL const *);
+
+// Calculate the index of a item from the its pointer
+DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArray_GetIndex     (DQN_FIXED_ARRAY_TEMPLATE_DECL const *a, T const *entry);
+
+// return: The newly added item, nullptr if failed
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Add          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Add          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const &item);
+
+// Bump the size of the array and return a pointer to 'num' uninitialised elements
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Make         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num);
+
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_Clear        (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_EraseStable  (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
+
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_Pop          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Peek         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                 Dqn_FixedArray_PeekCopy     (DQN_FIXED_ARRAY_TEMPLATE_DECL const *a);
+
+template <typename T, int MAX_, typename IsEqual> DQN_API T       *Dqn_FixedArray_Find         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc);
+template <typename T, int MAX_, typename IsEqual> DQN_API Dqn_b32  Dqn_FixedArray_FindElseMake (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Find         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
+
+// -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_List - Chunked Linked Lists
+// -------------------------------------------------------------------------------------------------
+template <typename T>
+struct Dqn_ListChunk
+{
+    T                *data;
+    Dqn_isize         size;
+    Dqn_isize         count;
+    Dqn_ListChunk<T> *next;
+};
+
+template <typename T>
+struct Dqn_ListIterator
+{
+    Dqn_b32           init;             // (Internal): True if Dqn_List_Iterate has been called at-least once on this iterator
+    Dqn_ListChunk<T> *chunk;            // (Internal): The chunk that the iterator is reading from
+    Dqn_isize         chunk_data_index; // (Internal): The index in the chunk the iterator is referencing
+    T                *data;             // (Read):     Pointer to the data the iterator is referencing. Nullptr if invalid.
+};
+
+template <typename T>
+struct Dqn_List
+{
+    Dqn_ArenaAllocator *arena;
+    Dqn_isize           count;      // Cumulative count of all items made across all list chunks
+    Dqn_isize           chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
+    Dqn_ListChunk<T>   *head;
+    Dqn_ListChunk<T>   *tail;
+};
+
+template <typename T> DQN_API Dqn_List<T>  Dqn_List_InitWithArena(Dqn_ArenaAllocator *arena, Dqn_isize chunk_size = 128);
+
+// Produce an iterator for the data in the list
+/*
+   Dqn_List<int> list = {};
+   for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it);)
+   {
+       int *item = it.data;
+   }
+*/
+template <typename T> DQN_API Dqn_b32      Dqn_List_Iterate          (Dqn_List<T> *list, Dqn_ListIterator<T> *iterator);
+
+#define                                    Dqn_List_TaggedMake(       list, count, tag) Dqn_List__Make(list, count DQN_CALL_SITE(tag))
+#define                                    Dqn_List_Make(             list, count)      Dqn_List__Make(list, count DQN_CALL_SITE(""))
+template <typename T> DQN_API T           *Dqn_List__Make(            Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS);
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Math
@@ -1639,8 +1797,49 @@ DQN_API Dqn_f64   Dqn_Timer_Ms    (Dqn_Timer timer);
 DQN_API Dqn_f64   Dqn_Timer_MicroS(Dqn_Timer timer);
 DQN_API Dqn_f64   Dqn_Timer_Ns    (Dqn_Timer timer);
 
-DQN_API char *Dqn_U64ToStr            (Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep);
-DQN_API char *Dqn_U64ToTempStr        (Dqn_u64 val, Dqn_b32 comma_sep = true);
+// TODO(dqn): We need to rewrite this so that we just return a Dqn_U64Str which
+// makes this a lot more ergonomic to use. Although the typical way we convert
+// a number to a string is in reverse order, so I thought it'd be smart to write
+// into the string buffer backwards and return a the char pointer to it, we
+// should just write it in and memory copy it back so that it's at the start of
+// the buffer. See Dqn_MoneyString for an example of this.
+DQN_API char *Dqn_U64ToStr    (Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep);
+DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, Dqn_b32 comma_sep = true);
+
+// -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_JsonWriter
+// -------------------------------------------------------------------------------------------------
+// TODO(dqn): We need to write tests for this
+struct Dqn_JsonWriter
+{
+    Dqn_FixedArray<Dqn_u16, 32>  parent_field_count_stack;
+    Dqn_ArenaAllocator          *arena;
+    Dqn_StringList               list;
+    int                          indent_level;
+    int                          spaces_per_indent;
+};
+
+Dqn_JsonWriter Dqn_JsonWriter_Init(Dqn_ArenaAllocator *arena, int spaces_per_indent);
+Dqn_String     Dqn_JsonWriter_Build(Dqn_JsonWriter *writer, Dqn_ArenaAllocator *arena);
+
+DQN_API void Dqn_JsonWriter_BeginNamedObject(Dqn_JsonWriter *writer, Dqn_String name);
+DQN_API void Dqn_JsonWriter_BeginObject(Dqn_JsonWriter *writer);
+DQN_API void Dqn_JsonWriter_EndObject(Dqn_JsonWriter *writer);
+
+DQN_API void Dqn_JsonWriter_BeginNamedArray(Dqn_JsonWriter *writer, Dqn_String name);
+DQN_API void Dqn_JsonWriter_BeginArray(Dqn_JsonWriter *writer, Dqn_String name);
+DQN_API void Dqn_JsonWriter_EndArray(Dqn_JsonWriter *writer);
+
+DQN_API void Dqn_JsonWriter_NamedString(Dqn_JsonWriter *writer, Dqn_String key, Dqn_String value);
+DQN_API void Dqn_JsonWriter_String(Dqn_JsonWriter *writer, Dqn_String value);
+
+DQN_API void Dqn_JsonWriter_NamedU64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_u64 value);
+DQN_API void Dqn_JsonWriter_U64(Dqn_JsonWriter *writer, Dqn_u64 value);
+
+// decimal_places: When < 0 show the maximum amount of decimal places
+//                 When >=0 show the specified amount of decimal places
+DQN_API void Dqn_JsonWriter_NamedF64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_f64 value, int decimal_places = -1);
+DQN_API void Dqn_JsonWriter_F64(Dqn_JsonWriter *writer, Dqn_f64 value, int decimal_places = -1);
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Win
@@ -1727,136 +1926,6 @@ struct Dqn_TimedBlock
         DQN_LOG_P("%s -> %s (total): %fms", t1.label, t2.label, Dqn_PerfCounter_Ms(t1.tick, t2.tick));                 \
     }
 
-// -------------------------------------------------------------------------------------------------
-// NOTE: Dqn_StringBuilder
-// -------------------------------------------------------------------------------------------------
-struct Dqn_StringBuilderBlock
-{
-    char                   *mem;
-    Dqn_isize               size;
-    Dqn_isize               used;
-    Dqn_StringBuilderBlock *next;
-};
-
-// TODO(dqn): Rewrite this as string lists
-Dqn_isize constexpr DQN_STRING_BUILDER_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
-template <Dqn_isize N = DQN_KILOBYTES(16)>
-struct Dqn_StringBuilder
-{
-    Dqn_ArenaAllocator     *arena;
-    char                    fixed_mem[N];
-    Dqn_StringBuilderBlock  fixed_mem_block;
-    Dqn_StringBuilderBlock *last_mem_block;
-};
-
-template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_InitWithArena           (Dqn_StringBuilder<N> *builder, Dqn_ArenaAllocator *arena);
-
-// Get the size required to build the string, it returns the length not including the null-terminator.
-template <Dqn_isize N> DQN_API Dqn_isize   Dqn_StringBuilder_GetSize                 (Dqn_StringBuilder<N> const *builder);
-
-template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_BuildToDest             (Dqn_StringBuilder<N> const *builder, char *dest, Dqn_usize dest_size);
-template <Dqn_isize N> DQN_API Dqn_String  Dqn_StringBuilder_BuildStringWithArena    (Dqn_StringBuilder<N> *builder, Dqn_ArenaAllocator *arena);
-#define                                    Dqn_StringBuilder_Build(                   builder, arena, len) Dqn_StringBuilder__Build(builder, arena, len DQN_CALL_SITE(""))
-
-template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendFmtV              (Dqn_StringBuilder<N> *builder, char const *fmt, va_list va);
-template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendFmt               (Dqn_StringBuilder<N> *builder, char const *fmt, ...);
-template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_Append                  (Dqn_StringBuilder<N> *builder, char const *str, Dqn_isize len = -1);
-template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendString            (Dqn_StringBuilder<N> *builder, Dqn_String const string);
-template <Dqn_isize N> DQN_API void        Dqn_StringBuilder_AppendChar              (Dqn_StringBuilder<N> *builder, char ch);
-
-// -------------------------------------------------------------------------------------------------
-// NOTE: Dqn_FixedArray
-// -------------------------------------------------------------------------------------------------
-
-#define DQN_FIXED_ARRAY_TEMPLATE template <typename T, int MAX_>
-#define DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray<T, MAX_>
-DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
-{
-    T               data[MAX_];
-    Dqn_isize       size;
-
-    T       &operator[] (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data[i]; }
-    T       *begin      ()                  { return data; }
-    T       *end        ()                  { return data + size; }
-    T       *operator+  (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
-
-    T const &operator[] (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, i, size); return data[i]; }
-    T const *begin      ()            const { return data; }
-    T const *end        ()            const { return data + size; }
-    T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%jd >= 0 && %jd < %jd", i, size); return data + i; }
-};
-
-DQN_FIXED_ARRAY_TEMPLATE DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL     Dqn_FixedArray_Init         (T const *item, int num);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArray_Max          (DQN_FIXED_ARRAY_TEMPLATE_DECL const *);
-
-// Calculate the index of a item from the its pointer
-DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArray_GetIndex     (DQN_FIXED_ARRAY_TEMPLATE_DECL const *a, T const *entry);
-
-// return: The newly added item, nullptr if failed
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Add          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Add          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const &item);
-
-// Bump the size of the array and return a pointer to 'num' uninitialised elements
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Make         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num);
-
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_Clear        (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_EraseStable  (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
-
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_Pop          (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Peek         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                 Dqn_FixedArray_PeekCopy     (DQN_FIXED_ARRAY_TEMPLATE_DECL const *a);
-
-template <typename T, int MAX_, typename IsEqual> DQN_API T       *Dqn_FixedArray_Find         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc);
-template <typename T, int MAX_, typename IsEqual> DQN_API Dqn_b32  Dqn_FixedArray_FindElseMake (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Find         (DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
-
-// -------------------------------------------------------------------------------------------------
-// NOTE: Dqn_List - Chunked Linked Lists
-// -------------------------------------------------------------------------------------------------
-template <typename T>
-struct Dqn_ListChunk
-{
-    T                *data;
-    Dqn_isize         size;
-    Dqn_isize         count;
-    Dqn_ListChunk<T> *next;
-};
-
-template <typename T>
-struct Dqn_ListIterator
-{
-    Dqn_b32           init;             // (Internal): True if Dqn_List_Iterate has been called at-least once on this iterator
-    Dqn_ListChunk<T> *chunk;            // (Internal): The chunk that the iterator is reading from
-    Dqn_isize         chunk_data_index; // (Internal): The index in the chunk the iterator is referencing
-    T                *data;             // (Read):     Pointer to the data the iterator is referencing. Nullptr if invalid.
-};
-
-template <typename T>
-struct Dqn_List
-{
-    Dqn_ArenaAllocator *arena;
-    Dqn_isize           count;      // Cumulative count of all items made across all list chunks
-    Dqn_isize           chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
-    Dqn_ListChunk<T>   *head;
-    Dqn_ListChunk<T>   *tail;
-};
-
-template <typename T> DQN_API Dqn_List<T>  Dqn_List_InitWithArena(Dqn_ArenaAllocator *arena, Dqn_isize chunk_size = 128);
-
-// Produce an iterator for the data in the list
-/*
-   Dqn_List<int> list = {};
-   for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it);)
-   {
-       int *item = it.data;
-   }
-*/
-template <typename T> DQN_API Dqn_b32      Dqn_List_Iterate          (Dqn_List<T> *list, Dqn_ListIterator<T> *iterator);
-
-#define                                    Dqn_List_TaggedMake(       list, count, tag) Dqn_List__Make(list, count DQN_CALL_SITE(tag))
-#define                                    Dqn_List_Make(             list, count)      Dqn_List__Make(list, count DQN_CALL_SITE(""))
-template <typename T> DQN_API T           *Dqn_List__Make(            Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS);
 // -------------------------------------------------------------------------------------------------
 // NOTE: Hashing - Dqn_FNV1A[32|64]
 // -------------------------------------------------------------------------------------------------
@@ -3584,6 +3653,65 @@ DQN_API Dqn_i64 Dqn_String_ToI64(Dqn_String str)
 }
 
 // -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_StringList Implementation
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_StringListNode *Dqn_StringList_MakeNode(Dqn_ArenaAllocator *arena, Dqn_isize size)
+{
+    Dqn_StringListNode *result = Dqn_ArenaAllocator_New(arena, Dqn_StringListNode, Dqn_ZeroMem::Yes);
+    if (size) result->string = Dqn_String_Allocate(arena, size, Dqn_ZeroMem::Yes);
+    return result;
+}
+
+DQN_API void Dqn_StringList_AddNode(Dqn_StringList *list, Dqn_StringListNode *node)
+{
+    if (list->curr)
+    {
+        list->curr->next = node;
+        list->curr       = list->curr->next;
+    }
+    else
+    {
+        list->head = node;
+        list->curr = node;
+    }
+
+    list->string_size += node->string.size;
+}
+
+DQN_API void Dqn_StringList_AppendFmtV(Dqn_StringList *list, Dqn_ArenaAllocator *arena, char const *fmt, va_list args)
+{
+    Dqn_StringListNode *node = Dqn_StringList_MakeNode(arena, 0 /*size*/);
+    node->string             = Dqn_String_FmtV(arena, fmt, args);
+    Dqn_StringList_AddNode(list, node);
+}
+
+DQN_API void Dqn_StringList_AppendFmt(Dqn_StringList *list, Dqn_ArenaAllocator *arena, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_StringList_AppendFmtV(list, arena, fmt, args);
+    va_end(args);
+}
+
+DQN_API void Dqn_StringList_AppendString(Dqn_StringList *list, Dqn_ArenaAllocator *arena, Dqn_String string)
+{
+    Dqn_StringListNode *node = Dqn_StringList_MakeNode(arena, 0 /*size*/);
+    node->string             = Dqn_String_Copy(string, arena);
+    Dqn_StringList_AddNode(list, node);
+}
+
+DQN_API Dqn_String Dqn_StringList_Build(Dqn_StringList const *list, Dqn_ArenaAllocator *arena)
+{
+    Dqn_String result = Dqn_String_Allocate(arena, list->string_size, Dqn_ZeroMem::No);
+    for (Dqn_StringListNode const *node = list->head; node; node = node->next)
+    {
+        DQN_MEMCOPY(result.str + result.size, node->string.str, node->string.size);
+        result.size += node->string.size;
+    }
+    return result;
+}
+
+// -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_ArenaAllocator
 // -------------------------------------------------------------------------------------------------
 DQN_API void *Dqn_ArenaAllocator__Copy(Dqn_ArenaAllocator *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS)
@@ -5264,6 +5392,180 @@ DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, Dqn_b32 comma_sep)
     char *result = Dqn_U64ToStr(val, &string, comma_sep);
     return result;
 }
+
+// -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_JsonWriter
+// -------------------------------------------------------------------------------------------------
+DQN_API Dqn_JsonWriter Dqn_JsonWriter_Init(Dqn_ArenaAllocator *arena, int spaces_per_indent)
+{
+    Dqn_JsonWriter result        = {};
+    result.arena             = arena;
+    result.spaces_per_indent = spaces_per_indent;
+    return result;
+}
+
+DQN_API Dqn_String Dqn_JsonWriter_Build(Dqn_JsonWriter *writer, Dqn_ArenaAllocator *arena)
+{
+    Dqn_String result = Dqn_StringList_Build(&writer->list, arena);
+    return result;
+}
+
+DQN_API void Dqn_JsonWriter__DoIndent(Dqn_JsonWriter *writer)
+{
+    int spaces_per_indent = writer->spaces_per_indent ? writer->spaces_per_indent : 2;
+    int spaces            = writer->indent_level * spaces_per_indent;
+    if (spaces)
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, "%*s", spaces, "");
+}
+
+DQN_API void Dqn_JsonWriter__PreAddItem(Dqn_JsonWriter *writer)
+{
+    if (writer->parent_field_count_stack.size <= 0)
+        return;
+
+    Dqn_u16 *parent_field_count = Dqn_FixedArray_Peek(&writer->parent_field_count_stack);
+    if (*parent_field_count == 0)
+    {
+        // NOTE: First time we're adding an item to an object, we need to write
+        // on a new line for nice formatting.
+        Dqn_StringList_AppendString(&writer->list, writer->arena, DQN_STRING("\n"));
+    }
+    else if (*parent_field_count > 0)
+    {
+        // NOTE: We have items in the object already and we're adding another
+        // item so we need to add a comma on the previous item.
+        Dqn_StringList_AppendString(&writer->list, writer->arena, DQN_STRING(",\n"));
+    }
+
+    Dqn_JsonWriter__DoIndent(writer);
+}
+
+DQN_API void Dqn_JsonWriter__PostAddItem(Dqn_JsonWriter *writer)
+{
+    if (writer->parent_field_count_stack.size <= 0)
+        return;
+
+    Dqn_u16 *parent_field_count = Dqn_FixedArray_Peek(&writer->parent_field_count_stack);
+    (*parent_field_count)++;
+}
+
+DQN_API void Dqn_JsonWriter__BeginContainer(Dqn_JsonWriter *writer, Dqn_String name, bool array)
+{
+    Dqn_String container_ch = array ? DQN_STRING("[") : DQN_STRING("{");
+    Dqn_JsonWriter__PreAddItem(writer);
+    if (name.size)
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
+    else
+        Dqn_StringList_AppendString(&writer->list, writer->arena, container_ch);
+    Dqn_JsonWriter__PostAddItem(writer);
+
+    writer->indent_level++;
+    Dqn_u16 *parent_field_count = Dqn_FixedArray_Make(&writer->parent_field_count_stack, 1);
+    *parent_field_count         = 0;
+}
+
+DQN_API void Dqn_JsonWriter__EndContainer(Dqn_JsonWriter *writer, Dqn_b32 array)
+{
+    Dqn_u16 *parent_field_count = Dqn_FixedArray_Peek(&writer->parent_field_count_stack);
+    if (*parent_field_count > 0)
+    {
+        // NOTE: End of object/array should start on a new line if the
+        // array/object has atleast one field in it.
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, "\n");
+    }
+    Dqn_FixedArray_Pop(&writer->parent_field_count_stack);
+
+    writer->indent_level--;
+    DQN_ASSERT(writer->indent_level >= 0);
+
+    Dqn_JsonWriter__DoIndent(writer);
+    Dqn_StringList_AppendString(&writer->list, writer->arena, array ? DQN_STRING("]") : DQN_STRING("}"));
+}
+
+DQN_API void Dqn_JsonWriter_BeginNamedObject(Dqn_JsonWriter *writer, Dqn_String name)
+{
+    Dqn_JsonWriter__BeginContainer(writer, name, false /*array*/);
+}
+
+DQN_API void Dqn_JsonWriter_BeginObject(Dqn_JsonWriter *writer)
+{
+    Dqn_JsonWriter__BeginContainer(writer, DQN_STRING(""), false /*array*/);
+}
+
+DQN_API void Dqn_JsonWriter_EndObject(Dqn_JsonWriter *writer)
+{
+    Dqn_JsonWriter__EndContainer(writer, false /*array*/);
+}
+
+DQN_API void Dqn_JsonWriter_BeginNamedArray(Dqn_JsonWriter *writer, Dqn_String name)
+{
+    Dqn_JsonWriter__BeginContainer(writer, name, true /*array*/);
+}
+
+DQN_API void Dqn_JsonWriter_BeginArray(Dqn_JsonWriter *writer)
+{
+    Dqn_JsonWriter__BeginContainer(writer, DQN_STRING(""), false /*array*/);
+}
+
+DQN_API void Dqn_JsonWriter_EndArray(Dqn_JsonWriter *writer)
+{
+    Dqn_JsonWriter__EndContainer(writer, true /*array*/);
+}
+
+DQN_API void Dqn_JsonWriter_NamedString(Dqn_JsonWriter *writer, Dqn_String key, Dqn_String value)
+{
+    Dqn_JsonWriter__PreAddItem(writer);
+    if (key.size)
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
+    else
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, "\"%.*s\"", DQN_STRING_FMT(value));
+    Dqn_JsonWriter__PostAddItem(writer);
+}
+
+DQN_API void Dqn_JsonWriter_String(Dqn_JsonWriter *writer, Dqn_String value)
+{
+    Dqn_JsonWriter_NamedString(writer, DQN_STRING("") /*key*/, value);
+}
+
+DQN_API void Dqn_JsonWriter_NamedU64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_u64 value)
+{
+    Dqn_JsonWriter__PreAddItem(writer);
+    if (key.size)
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
+    else
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, "%I64u", value);
+    Dqn_JsonWriter__PostAddItem(writer);
+}
+
+DQN_API void Dqn_JsonWriter_U64(Dqn_JsonWriter *writer, Dqn_u64 value)
+{
+    Dqn_JsonWriter_NamedU64(writer, DQN_STRING("") /*key*/, value);
+}
+
+DQN_API void Dqn_JsonWriter_NamedF64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_f64 value, int decimal_places)
+{
+    Dqn_FixedString<8> const float_fmt =
+        decimal_places > 0
+            ? Dqn_FixedString_Fmt<8>("%%.%df", decimal_places) // %.<decimal_places>f i.e. %.1f
+            : Dqn_FixedString_Fmt<8>("%%f");                   // %f
+
+    Dqn_FixedString<32> const fmt_string =
+        key.size ? Dqn_FixedString_Fmt<32>(R"("%%.*s": %s)", float_fmt) :
+                   Dqn_FixedString_Fmt<32>(R"(%s)",        float_fmt);
+
+    Dqn_JsonWriter__PreAddItem(writer);
+    if (key.size)
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, fmt_string.str, DQN_STRING_FMT(key), value);
+    else
+        Dqn_StringList_AppendFmt(&writer->list, writer->arena, fmt_string.str, value);
+    Dqn_JsonWriter__PostAddItem(writer);
+}
+
+DQN_API void Dqn_JsonWriter_F64(Dqn_JsonWriter *writer, Dqn_f64 value, int decimal_places)
+{
+    Dqn_JsonWriter_NamedF64(writer, DQN_STRING("") /*key*/, value, decimal_places);
+}
+
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Win Implementation
