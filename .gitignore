@@ -1,6 +1,6 @@
 tags
 *.swp
 *.swo
-bin/
+Build
 .vs/
 *.db

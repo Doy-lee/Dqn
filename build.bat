@@ -1,8 +1,8 @@
 @echo OFF
 
 set code_dir=%~dp0
-if not exist ..\Build mkdir ..\Build
-pushd ..\Build
+if not exist Build mkdir Build
+pushd Build
 
     REM MT     Static CRT
     REM EHa-   Disable exception handling
