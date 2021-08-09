@@ -865,6 +865,38 @@ void Dqn_Test_Rect()
     }
 }
 
+void Dqn_Test_PerfCounter()
+{
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_PerfCounter");
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Dqn_PerfCounter_Now");
+        Dqn_u64 result = Dqn_PerfCounter_Now();
+        DQN_TEST_EXPECT(testing_state, result != 0);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Consecutive ticks are ordered");
+        Dqn_u64 a = Dqn_PerfCounter_Now();
+        Dqn_u64 b = Dqn_PerfCounter_Now();
+        DQN_TEST_EXPECT(testing_state, b > a);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Ticks to time are a correct order of magnitude");
+        Dqn_u64 a = Dqn_PerfCounter_Now();
+        Dqn_u64 b = Dqn_PerfCounter_Now();
+
+        Dqn_f64 s       = Dqn_PerfCounter_S(a, b);
+        Dqn_f64 ms      = Dqn_PerfCounter_Ms(a, b);
+        Dqn_f64 micro_s = Dqn_PerfCounter_MicroS(a, b);
+        Dqn_f64 ns      = Dqn_PerfCounter_Ns(a, b);
+        DQN_TEST_EXPECT(testing_state, s < ms);
+        DQN_TEST_EXPECT(testing_state, ms < micro_s);
+        DQN_TEST_EXPECT(testing_state, micro_s < ns);
+    }
+}
+
 void Dqn_Test_Str()
 {
     Dqn_TestingState testing_state = {};
@@ -1252,6 +1284,7 @@ void Dqn_Test_RunSuite()
     Dqn_Test_DSMap();
     Dqn_Test_Map();
     Dqn_Test_Rect();
+    Dqn_Test_PerfCounter();
     Dqn_Test_Str();
     Dqn_Test_String();
     Dqn_Test_StringBuilder();

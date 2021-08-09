@@ -119,6 +119,8 @@
 
 #if defined(_WIN32)
     #define DQN_OS_WIN32
+#else
+    #define DQN_OS_UNIX
 #endif
 
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
@@ -1841,6 +1843,7 @@ DQN_API void Dqn_JsonWriter_U64(Dqn_JsonWriter *writer, Dqn_u64 value);
 DQN_API void Dqn_JsonWriter_NamedF64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_f64 value, int decimal_places = -1);
 DQN_API void Dqn_JsonWriter_F64(Dqn_JsonWriter *writer, Dqn_f64 value, int decimal_places = -1);
 
+#if defined(DQN_OS_WIN32)
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Win
 // -------------------------------------------------------------------------------------------------
@@ -1863,6 +1866,7 @@ DQN_API Dqn_String             Dqn_Win_CurrentDir  (Dqn_ArenaAllocator *arena, D
 DQN_API Dqn_StringW            Dqn_Win_CurrentDirW (Dqn_ArenaAllocator *arena, Dqn_StringW suffix);
 DQN_API Dqn_Array<Dqn_String>  Dqn_Win_FolderFiles (Dqn_String path, Dqn_ArenaAllocator *arena, Dqn_ArenaAllocator *tmp_arena);
 DQN_API Dqn_Array<Dqn_StringW> Dqn_Win_FolderFilesW(Dqn_StringW path, Dqn_ArenaAllocator *arena);
+#endif // DQN_OS_WIN32
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_TimedBlock
@@ -3195,9 +3199,9 @@ DQN_API void Dqn_LogV(Dqn_LogType type,
             func);
 #else
     fprintf(handle,
-            "[%s|%.*s|%05I64u|%.*s] ",
+            "[%s|%.*s|%05llu|%.*s] ",
             Dqn_LogTypeString[DQN_CAST(int) type],
-            file_name_len,
+            DQN_CAST(int)file_name_len,
             file_name,
             line,
             DQN_CAST(int)func_len,
@@ -3295,18 +3299,18 @@ DQN_API char *Dqn_PointerMetadata_Init(void *ptr, Dqn_isize size, Dqn_u8 alignme
     // [Raw Pointer] -> [Metadata Storage]        [Aligned Pointer]
 
     // Offset is [0->Alignment-1] bytes from the Unaligned ptr.
-    auto raw_ptr       = DQN_CAST(uintptr_t) ptr;
+    auto raw_ptr       = DQN_CAST(Dqn_uintptr) ptr;
     auto unaligned_ptr = raw_ptr + sizeof(Dqn_PointerMetadata);
-    auto result        = DQN_CAST(uintptr_t) unaligned_ptr;
+    auto result        = DQN_CAST(Dqn_uintptr) unaligned_ptr;
 
     if ((unaligned_ptr % alignment) > 0)
     {
-        uintptr_t unaligned_to_aligned_offset = alignment - (unaligned_ptr % alignment);
+        Dqn_uintptr unaligned_to_aligned_offset = alignment - (unaligned_ptr % alignment);
         result += unaligned_to_aligned_offset;
     }
     DQN_ASSERT(result % alignment == 0);
     DQN_ASSERT(result >= raw_ptr);
-    ptrdiff_t difference = DQN_CAST(ptrdiff_t)result - DQN_CAST(ptrdiff_t)raw_ptr;
+    Dqn_intptr difference = DQN_CAST(Dqn_intptr)result - DQN_CAST(Dqn_intptr)raw_ptr;
     DQN_ASSERT(difference <= DQN_CAST(Dqn_u8)-1);
 
     auto *metadata_ptr      = DQN_CAST(Dqn_PointerMetadata *)(result - sizeof(Dqn_PointerMetadata));
@@ -5267,9 +5271,11 @@ DQN_FILE_SCOPE void Dqn_PerfCounter__Init()
 DQN_API Dqn_f64 Dqn_PerfCounter_S(Dqn_u64 begin, Dqn_u64 end)
 {
     Dqn_PerfCounter__Init();
-#if defined(DQN_OS_WIN32)
     Dqn_u64 ticks  = end - begin;
+#if defined(DQN_OS_WIN32)
     Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)dqn__lib.win32_qpc_frequency.QuadPart;
+#else
+    Dqn_f64 result = ticks / 1'000'000'000;
 #endif
     return result;
 }
@@ -5277,9 +5283,11 @@ DQN_API Dqn_f64 Dqn_PerfCounter_S(Dqn_u64 begin, Dqn_u64 end)
 DQN_API Dqn_f64 Dqn_PerfCounter_Ms(Dqn_u64 begin, Dqn_u64 end)
 {
     Dqn_PerfCounter__Init();
-#if defined(DQN_OS_WIN32)
     Dqn_u64 ticks  = end - begin;
+#if defined(DQN_OS_WIN32)
     Dqn_f64 result = (ticks * 1'000) / DQN_CAST(Dqn_f64)dqn__lib.win32_qpc_frequency.QuadPart;
+#else
+    Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)1'000'000;
 #endif
     return result;
 }
@@ -5287,9 +5295,11 @@ DQN_API Dqn_f64 Dqn_PerfCounter_Ms(Dqn_u64 begin, Dqn_u64 end)
 DQN_API Dqn_f64 Dqn_PerfCounter_MicroS(Dqn_u64 begin, Dqn_u64 end)
 {
     Dqn_PerfCounter__Init();
-#if defined(DQN_OS_WIN32)
     Dqn_u64 ticks  = end - begin;
+#if defined(DQN_OS_WIN32)
     Dqn_f64 result = (ticks * 1'000'000) / DQN_CAST(Dqn_f64)dqn__lib.win32_qpc_frequency.QuadPart;
+#else
+    Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)1'000;
 #endif
     return result;
 }
@@ -5297,9 +5307,11 @@ DQN_API Dqn_f64 Dqn_PerfCounter_MicroS(Dqn_u64 begin, Dqn_u64 end)
 DQN_API Dqn_f64 Dqn_PerfCounter_Ns(Dqn_u64 begin, Dqn_u64 end)
 {
     Dqn_PerfCounter__Init();
-#if defined(DQN_OS_WIN32)
     Dqn_u64 ticks  = end - begin;
+#if defined(DQN_OS_WIN32)
     Dqn_f64 result = (ticks * 1'000'000'000) / DQN_CAST(Dqn_f64)dqn__lib.win32_qpc_frequency.QuadPart;
+#else
+    Dqn_f64 result = ticks;
 #endif
     return result;
 }
@@ -5313,9 +5325,12 @@ DQN_API Dqn_u64 Dqn_PerfCounter_Now()
     (void)qpc_result;
     DQN_ASSERT_MSG(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
     result = integer.QuadPart;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    result = DQN_CAST(Dqn_u64)ts.tv_sec * 1'000'000'000 + DQN_CAST(Dqn_u64)ts.tv_nsec;
 #endif
 
-    DQN_ASSERT_MSG(result != 0, "Function not implemented");
     return result;
 }
 
@@ -5566,7 +5581,7 @@ DQN_API void Dqn_JsonWriter_F64(Dqn_JsonWriter *writer, Dqn_f64 value, int decim
     Dqn_JsonWriter_NamedF64(writer, DQN_STRING("") /*key*/, value, decimal_places);
 }
 
-
+#if defined(DQN_OS_WIN32)
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Win Implementation
 // -------------------------------------------------------------------------------------------------
@@ -5784,6 +5799,7 @@ DQN_API Dqn_Array<Dqn_String> Dqn_Win_FolderFiles(Dqn_String path, Dqn_ArenaAllo
 
     return result;
 }
+#endif
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Hashing - Dqn_FNV1A[32|64]
