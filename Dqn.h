@@ -1182,7 +1182,8 @@ struct Dqn_StringW
 };
 
 // Make a string from a pre-existing string.
-DQN_API Dqn_String Dqn_String_Init      (char const *string, Dqn_isize size);
+DQN_API Dqn_String Dqn_String_Init       (char const *string, Dqn_isize size);
+DQN_API Dqn_String Dqn_String_InitCString(char const *string);
 
 // Make an empty string from a the buffer. 1 byte is reserved for the null-terminator
 DQN_API Dqn_String Dqn_String_InitMemory(char *buf, Dqn_isize capacity);
@@ -1210,6 +1211,7 @@ DQN_API Dqn_String Dqn_String__Copy(Dqn_String const src, Dqn_ArenaAllocator *ar
 
 DQN_API Dqn_String Dqn_String_TrimWhitespaceAround(Dqn_String src);
 DQN_API Dqn_b32    operator==                     (Dqn_String const &lhs, Dqn_String const &rhs);
+DQN_API Dqn_b32    operator!=                     (Dqn_String const &lhs, Dqn_String const &rhs);
 
 // Append to the string if there's enough capacity. No reallocation is permitted, fails if not enough space
 DQN_API Dqn_b32    Dqn_String_AppendFmtV            (Dqn_String *str, char const *fmt, va_list va);
@@ -1225,7 +1227,12 @@ DQN_API Dqn_b32               Dqn_String_Eq                   (Dqn_String const 
 DQN_API Dqn_b32               Dqn_String_EqInsensitive        (Dqn_String const lhs, Dqn_String const rhs);
 DQN_API Dqn_b32               Dqn_String_StartsWith           (Dqn_String string, Dqn_String prefix,       Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
 DQN_API Dqn_b32               Dqn_String_StartsWithInsensitive(Dqn_String string, Dqn_String prefix);
+DQN_API Dqn_b32               Dqn_String_EndsWith             (Dqn_String string, Dqn_String prefix,       Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
+DQN_API Dqn_b32               Dqn_String_EndsWithInsensitive  (Dqn_String string, Dqn_String prefix);
 DQN_API Dqn_Array<Dqn_String> Dqn_String_Split                (Dqn_String src, Dqn_ArenaAllocator *arena);
+DQN_API Dqn_String            Dqn_String_TrimPrefix           (Dqn_String src, Dqn_String prefix, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
+DQN_API Dqn_String            Dqn_String_TrimSuffix           (Dqn_String src, Dqn_String suffix, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
+DQN_API Dqn_b32               Dqn_String_IsAllDigits          (Dqn_String src);
 
 DQN_API Dqn_u64               Dqn_String_ToU64                (Dqn_String str);
 DQN_API Dqn_i64               Dqn_String_ToI64                (Dqn_String str);
@@ -1704,12 +1711,12 @@ DQN_API Dqn_String         Dqn_Hex_U8ArrayToString (Dqn_Array<Dqn_u8> const byte
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Str
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32     Dqn_Str_Equals                     (char const *a, char const *b, Dqn_isize a_len = -1, Dqn_isize b_len = -1);
-DQN_API char const *Dqn_Str_FindMulti                  (char const *buf, char const *find_list[], Dqn_isize const *find_string_lens, Dqn_isize find_len, Dqn_isize *match_index, Dqn_isize buf_len = -1);
-DQN_API char const *Dqn_Str_Find                       (char const *buf, char const *find, Dqn_isize buf_len = -1, Dqn_isize find_len = -1, Dqn_b32 case_insensitive = false);
-DQN_API char const *Dqn_Str_FileNameFromPath           (char const *path, Dqn_isize len = -1, Dqn_isize *file_name_len = nullptr);
+DQN_API Dqn_b32     Dqn_Str_Equals                     (char const *a, char const *b, Dqn_isize a_size = -1, Dqn_isize b_size = -1);
+DQN_API char const *Dqn_Str_FindMulti                  (char const *buf, char const *find_list[], Dqn_isize const *find_string_sizes, Dqn_isize find_size, Dqn_isize *match_index, Dqn_isize buf_size = -1);
+DQN_API char const *Dqn_Str_Find                       (char const *buf, char const *find, Dqn_isize buf_size = -1, Dqn_isize find_size = -1, Dqn_b32 case_insensitive = false);
+DQN_API char const *Dqn_Str_FileNameFromPath           (char const *path, Dqn_isize size = -1, Dqn_isize *file_name_size = nullptr);
 DQN_API Dqn_isize   Dqn_Str_Size                       (char const *a);
-DQN_API Dqn_b32     Dqn_Str_Match                      (char const *src, char const *find, int find_len);
+DQN_API Dqn_b32     Dqn_Str_Match                      (char const *src, char const *find, int find_size);
 DQN_API char const *Dqn_Str_SkipToChar                 (char const *src, char ch);
 DQN_API char const *Dqn_Str_SkipToNextAlphaNum         (char const *src);
 DQN_API char const *Dqn_Str_SkipToNextDigit            (char const *src);
@@ -1725,10 +1732,11 @@ DQN_API char const *Dqn_Str_SkipToNextWordInPlace      (char const **src);
 DQN_API char const *Dqn_Str_SkipWhitespaceInPlace      (char const **src);
 DQN_API char const *Dqn_Str_TrimWhitespaceAround       (char const *src, Dqn_isize size, Dqn_isize *new_size);
 DQN_API char const *Dqn_Str_TrimPrefix                 (char const *src, Dqn_isize size, char const *prefix, Dqn_isize prefix_size, Dqn_isize *trimmed_size);
+DQN_API Dqn_b32     Dqn_Str_IsAllDigits                (char const *src, Dqn_isize size);
 
 // separator: The separator between the thousand-th digits, i.e. separator = ',' converts '1,234' to '1234'.
-DQN_API Dqn_u64     Dqn_Str_ToU64                      (char const *buf, int len = -1, char separator = ',');
-DQN_API Dqn_i64     Dqn_Str_ToI64                      (char const *buf, int len = -1, char separator = ',');
+DQN_API Dqn_u64     Dqn_Str_ToU64                      (char const *buf, int size = -1, char separator = ',');
+DQN_API Dqn_i64     Dqn_Str_ToI64                      (char const *buf, int size = -1, char separator = ',');
 
 DQN_API Dqn_isize   Dqn_StrW_Size                      (wchar_t const *a);
 
@@ -1858,6 +1866,9 @@ DQN_API void            Dqn_Win_DumpLastError(Dqn_String prefix); // Automatical
 
 DQN_API Dqn_StringW Dqn_Win_UTF8ToWChar  (Dqn_String src, Dqn_ArenaAllocator *arena);
 DQN_API Dqn_String  Dqn_Win_WCharToUTF8  (Dqn_StringW src, Dqn_ArenaAllocator *arena);
+
+DQN_API Dqn_StringW Dqn_Win_GetExecutableDirectoryW(Dqn_ArenaAllocator *arena);
+DQN_API Dqn_String  Dqn_Win_GetExecutableDirectory (Dqn_ArenaAllocator *arena, Dqn_ArenaAllocator *tmp_arena);
 
 // size: (Optional) The size of the current directory string returned
 // suffix: (Optional) A suffix to append to the current working directory
@@ -2897,6 +2908,9 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         #define FILE_ATTRIBUTE_READONLY 0x00000001
         #define FILE_ATTRIBUTE_HIDDEN 0x00000002
 
+        // NOTE: GetModuleFileNameW
+        #define ERROR_INSUFFICIENT_BUFFER 122L
+
         // ---------------------------------------------------------------------
         // Data Structures
         // ---------------------------------------------------------------------
@@ -3017,6 +3031,7 @@ Dqn_b32 Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         void         *GetProcAddress           (void *hmodule, char const *proc_name);
         unsigned int  GetWindowModuleFileNameA (void *hwnd, char *file_name, unsigned int file_name_max);
         HMODULE       GetModuleHandleA         (char const *lpModuleName);
+        DWORD         GetModuleFileNameW       (HMODULE hModule, wchar_t *lpFilename, DWORD nSize);
 
         DWORD         WaitForSingleObject      (HANDLE handle, DWORD milliseconds);
 
@@ -3446,6 +3461,16 @@ DQN_API Dqn_String Dqn_String_Init(char const *string, Dqn_isize size)
     return result;
 }
 
+DQN_API Dqn_String Dqn_String_InitCString(char const *string)
+{
+    Dqn_String result = {};
+    result.str        = DQN_CAST(char *)string;
+    result.size       = Dqn_Str_Size(string);
+    result.cap        = result.size;
+    return result;
+}
+
+
 DQN_API Dqn_String Dqn_String_InitMemory(char *buf, Dqn_isize capacity)
 {
     DQN_ASSERT(capacity > 0);
@@ -3523,7 +3548,15 @@ DQN_API Dqn_String Dqn_String_TrimWhitespaceAround(Dqn_String const src)
 
 DQN_API Dqn_b32 operator==(Dqn_String const &lhs, Dqn_String const &rhs)
 {
-    Dqn_b32 result = lhs.size == rhs.size && (DQN_MEMCMP(lhs.str, rhs.str, lhs.size) == 0);
+    Dqn_b32 result = false;
+    if (lhs.size == rhs.size)
+        result = (lhs.str == rhs.str) || (DQN_MEMCMP(lhs.str, rhs.str, lhs.size) == 0);
+    return result;
+}
+
+DQN_API Dqn_b32 operator!=(Dqn_String const &lhs, Dqn_String const &rhs)
+{
+    Dqn_b32 result = !(lhs == rhs);
     return result;
 }
 
@@ -3595,6 +3628,25 @@ DQN_API Dqn_b32 Dqn_String_StartsWithInsensitive(Dqn_String string, Dqn_String p
     return result;
 }
 
+DQN_API Dqn_b32 Dqn_String_EndsWith(Dqn_String       string,
+                                    Dqn_String       suffix,
+                                    Dqn_StringEqCase eq_case)
+{
+    Dqn_b32 result = false;
+    if (suffix.size > string.size)
+        return result;
+
+    Dqn_String substring = Dqn_String{string.str + string.size - suffix.size, suffix.size, suffix.size};
+    result               = Dqn_String_Eq(substring, suffix, eq_case);
+    return result;
+}
+
+DQN_API Dqn_b32 Dqn_String_EndsWithInsensitive(Dqn_String string, Dqn_String suffix)
+{
+    Dqn_b32 result = Dqn_String_EndsWith(string, suffix, Dqn_StringEqCase::Insensitive);
+    return result;
+}
+
 DQN_API Dqn_Array<Dqn_String> Dqn_String_Split(Dqn_String src, Dqn_ArenaAllocator *arena)
 {
     enum StringSplitStage
@@ -3641,6 +3693,41 @@ DQN_API Dqn_Array<Dqn_String> Dqn_String_Split(Dqn_String src, Dqn_ArenaAllocato
     }
 
     DQN_ASSERT(split_count == split_index);
+    return result;
+}
+
+DQN_API Dqn_String Dqn_String_TrimPrefix(Dqn_String str, Dqn_String prefix, Dqn_StringEqCase eq_case)
+{
+    Dqn_String result = str;
+    if (Dqn_String_StartsWith(str, prefix, eq_case))
+    {
+        result.str += prefix.size;
+        result.size -= prefix.size;
+    }
+
+    return result;
+}
+
+DQN_API Dqn_String Dqn_String_TrimSuffix(Dqn_String str, Dqn_String suffix, Dqn_StringEqCase eq_case)
+{
+    Dqn_String result = str;
+    if (Dqn_String_EndsWith(str, suffix, eq_case))
+        result.size -= suffix.size;
+
+    return result;
+}
+
+DQN_API Dqn_b32 Dqn_String_IsAllDigits(Dqn_String src)
+{
+    if (!src.str)
+        return false;
+
+    for (Dqn_isize ch_index = 0; ch_index < src.size; ch_index++)
+    {
+        if (!(src.str[ch_index] >= '0' && src.str[ch_index] <= '9'))
+            return false;
+    }
+    Dqn_b32 result = src.str && src.size;
     return result;
 }
 
@@ -3712,6 +3799,7 @@ DQN_API Dqn_String Dqn_StringList_Build(Dqn_StringList const *list, Dqn_ArenaAll
         DQN_MEMCOPY(result.str + result.size, node->string.str, node->string.size);
         result.size += node->string.size;
     }
+    result.str[result.size] = 0;
     return result;
 }
 
@@ -4793,31 +4881,31 @@ DQN_API Dqn_String Dqn_Hex_U8ArrayToString(Dqn_Array<Dqn_u8> const bytes, Dqn_Ar
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Str
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32 Dqn_Str_Equals(char const *a, char const *b, Dqn_isize a_len, Dqn_isize b_len)
+DQN_API Dqn_b32 Dqn_Str_Equals(char const *a, char const *b, Dqn_isize a_size, Dqn_isize b_size)
 {
-    if (a_len == -1) a_len = DQN_CAST(Dqn_isize)Dqn_Str_Size(a);
-    if (b_len == -1) b_len = DQN_CAST(Dqn_isize)Dqn_Str_Size(b);
-    if (a_len != b_len) return false;
-    return (DQN_MEMCMP(a, b, DQN_CAST(size_t)a_len) == 0);
+    if (a_size == -1) a_size = DQN_CAST(Dqn_isize)Dqn_Str_Size(a);
+    if (b_size == -1) b_size = DQN_CAST(Dqn_isize)Dqn_Str_Size(b);
+    if (a_size != b_size) return false;
+    return (DQN_MEMCMP(a, b, DQN_CAST(size_t)a_size) == 0);
 }
 
-DQN_API char const *Dqn_Str_FindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_lens, Dqn_isize find_len, Dqn_isize *match_index, Dqn_isize buf_len)
+DQN_API char const *Dqn_Str_FindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_sizes, Dqn_isize find_size, Dqn_isize *match_index, Dqn_isize buf_size)
 {
     char const *result = nullptr;
-    if (find_len == 0) return result;
-    if (buf_len < 0) buf_len = DQN_CAST(Dqn_isize)Dqn_Str_Size(buf);
+    if (find_size == 0) return result;
+    if (buf_size < 0) buf_size = DQN_CAST(Dqn_isize)Dqn_Str_Size(buf);
 
-    char const *buf_end = buf + buf_len;
+    char const *buf_end = buf + buf_size;
     for (; buf != buf_end; ++buf)
     {
         Dqn_isize remaining = static_cast<Dqn_isize>(buf_end - buf);
-        DQN_FOR_EACH(find_index, find_len)
+        DQN_FOR_EACH(find_index, find_size)
         {
             char const *find   = find_list[find_index];
-            Dqn_isize find_str_len = find_string_lens[find_index];
-            if (remaining < find_str_len) continue;
+            Dqn_isize find_str_size = find_string_sizes[find_index];
+            if (remaining < find_str_size) continue;
 
-            if (strncmp(buf, find, DQN_CAST(size_t)find_str_len) == 0)
+            if (strncmp(buf, find, DQN_CAST(size_t)find_str_size) == 0)
             {
                 result       = buf;
                 *match_index = find_index;
@@ -4829,21 +4917,21 @@ DQN_API char const *Dqn_Str_FindMulti(char const *buf, char const *find_list[], 
     return result;
 }
 
-DQN_API char const *Dqn_Str_Find(char const *buf, char const *find, Dqn_isize buf_len, Dqn_isize find_len, Dqn_b32 case_insensitive)
+DQN_API char const *Dqn_Str_Find(char const *buf, char const *find, Dqn_isize buf_size, Dqn_isize find_size, Dqn_b32 case_insensitive)
 {
-    if (find_len == 0) return nullptr;
-    if (buf_len < 0) buf_len = DQN_CAST(Dqn_isize)Dqn_Str_Size(buf);
-    if (find_len < 0) find_len = DQN_CAST(Dqn_isize)Dqn_Str_Size(find);
+    if (find_size == 0) return nullptr;
+    if (buf_size < 0) buf_size = DQN_CAST(Dqn_isize)Dqn_Str_Size(buf);
+    if (find_size < 0) find_size = DQN_CAST(Dqn_isize)Dqn_Str_Size(find);
 
-    char const *buf_end = buf + buf_len;
+    char const *buf_end = buf + buf_size;
     char const *result = nullptr;
     for (; buf != buf_end; ++buf)
     {
         Dqn_isize remaining = static_cast<Dqn_isize>(buf_end - buf);
-        if (remaining < find_len) break;
+        if (remaining < find_size) break;
 
         Dqn_b32 matched = true;
-        for (Dqn_isize index = 0; index < find_len; index++)
+        for (Dqn_isize index = 0; index < find_size; index++)
         {
             char lhs = buf[index];
             char rhs = find[index];
@@ -4870,24 +4958,22 @@ DQN_API char const *Dqn_Str_Find(char const *buf, char const *find, Dqn_isize bu
     return result;
 }
 
-DQN_API char const *Dqn_Str_FileNameFromPath(char const *path, Dqn_isize len, Dqn_isize *file_name_len)
+DQN_API char const *Dqn_Str_FileNameFromPath(char const *path, Dqn_isize size, Dqn_isize *file_name_size)
 {
-    char const *result     = path;
-    Dqn_isize   result_len = len == -1 ? Dqn_Str_Size(path) : len;
-    for (Dqn_isize i = (result_len - 1); i >= 0; --i)
+    char const *result      = path;
+    Dqn_isize   result_size = size <= -1 ? Dqn_Str_Size(path) : size;
+    for (Dqn_isize i = (result_size - 1); i >= 0; --i)
     {
         if (result[i] == '\\' || result[i] == '/')
         {
-            char const *file_end = result + result_len;
+            char const *file_end = result + result_size;
             result               = result + (i + 1);
-            result_len           = DQN_CAST(Dqn_isize)(file_end - result);
+            result_size          = DQN_CAST(Dqn_isize)(file_end - result);
             break;
         }
     }
 
-    if (file_name_len)
-        *file_name_len = result_len;
-
+    if (file_name_size) *file_name_size = result_size;
     return result;
 }
 
@@ -4903,10 +4989,10 @@ DQN_API Dqn_isize Dqn_Str_Size(char const *src)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_Str_Match(char const *src, char const *find, int find_len)
+DQN_API Dqn_b32 Dqn_Str_Match(char const *src, char const *find, int find_size)
 {
-    if (find_len == -1) find_len = Dqn_Safe_TruncateUSizeToInt(Dqn_Str_Size(find));
-    auto result = DQN_CAST(Dqn_b32)(strncmp(src, find, DQN_CAST(size_t)find_len) == 0);
+    if (find_size == -1) find_size = Dqn_Safe_TruncateUSizeToInt(Dqn_Str_Size(find));
+    Dqn_b32 result = (DQN_MEMCMP(src, find, DQN_CAST(size_t)find_size) == 0);
     return result;
 }
 
@@ -5014,40 +5100,44 @@ DQN_API char const *Dqn_Str_TrimWhitespaceAround(char const *src, Dqn_isize size
 
 DQN_API char const *Dqn_Str_TrimPrefix(char const *src, Dqn_isize size, char const *prefix, Dqn_isize prefix_size, Dqn_isize *trimmed_size)
 {
+    if (size <= -1) size = Dqn_Str_Size(src);
+    if (prefix_size <= -1) prefix_size = Dqn_Str_Size(prefix);
     char const *result = src;
-    if (size >= prefix_size)
-    {
-        Dqn_b32 prefix_matched = true;
-        for (Dqn_isize prefix_index = 0;
-             prefix_index < prefix_size && prefix_matched;
-             prefix_index++)
-        {
-            char prefix_ch = prefix[prefix_index];
-            char src_ch    = src[prefix_index];
-            prefix_matched = src_ch == prefix_ch;
-        }
+    if (prefix_size > size)
+        return result;
 
-        if (prefix_matched)
-        {
-            result += prefix_size;
-            *trimmed_size = size - prefix_size;
-        }
+    if (DQN_MEMCMP(src, prefix, prefix_size) == 0)
+    {
+        result += prefix_size;
+        if (trimmed_size) *trimmed_size = size - prefix_size;
     }
 
     return result;
 }
 
+DQN_API Dqn_b32 Dqn_Str_IsAllDigits(char const *src, Dqn_isize size)
+{
+    if (!src) return false;
+    if (size <= -1) size = Dqn_Str_Size(src);
+    for (Dqn_isize ch_index = 0; ch_index < size; ch_index++)
+    {
+        if (!(src[ch_index] >= '0' && src[ch_index] <= '9'))
+            return false;
+    }
+    Dqn_b32 result = src && size > 0;
+    return result;
+}
 
-DQN_API Dqn_u64 Dqn_Str_ToU64(char const *buf, int len, char separator)
+DQN_API Dqn_u64 Dqn_Str_ToU64(char const *buf, int size, char separator)
 {
     Dqn_u64 result = 0;
     if (!buf) return result;
-    if (len == -1) len = Dqn_Safe_TruncateUSizeToInt(Dqn_Str_Size(buf));
-    if (len == 0) return result;
+    if (size == -1) size = Dqn_Safe_TruncateUSizeToInt(Dqn_Str_Size(buf));
+    if (size == 0) return result;
 
     char const *buf_ptr = Dqn_Str_SkipWhitespace(buf);
-    len -= static_cast<int>(buf_ptr - buf);
-    for (int buf_index = 0; buf_index < len; ++buf_index)
+    size -= DQN_CAST(int)(buf_ptr - buf);
+    for (int buf_index = 0; buf_index < size; ++buf_index)
     {
         char ch = buf_ptr[buf_index];
         if (buf_index && ch == separator)
@@ -5065,24 +5155,24 @@ DQN_API Dqn_u64 Dqn_Str_ToU64(char const *buf, int len, char separator)
     return result;
 }
 
-DQN_API Dqn_i64 Dqn_Str_ToI64(char const *buf, int len, char separator)
+DQN_API Dqn_i64 Dqn_Str_ToI64(char const *buf, int size, char separator)
 {
     Dqn_i64 result = 0;
     if (!buf) return result;
-    if (len == -1) len = Dqn_Safe_TruncateUSizeToInt(Dqn_Str_Size(buf));
-    if (len == 0) return result;
+    if (size == -1) size = Dqn_Safe_TruncateUSizeToInt(Dqn_Str_Size(buf));
+    if (size == 0) return result;
 
     char const *buf_ptr = Dqn_Str_SkipWhitespace(buf);
-    len -= static_cast<int>(buf_ptr - buf);
+    size -= static_cast<int>(buf_ptr - buf);
 
     Dqn_b32 negative = (buf[0] == '-');
     if (negative)
     {
         ++buf_ptr;
-        --len;
+        --size;
     }
 
-    for (int buf_index = 0; buf_index < len; ++buf_index)
+    for (int buf_index = 0; buf_index < size; ++buf_index)
     {
         char ch = buf_ptr[buf_index];
         if (buf_index && ch == separator) continue;
@@ -5687,6 +5777,47 @@ DQN_API Dqn_String Dqn_Win_WCharToUTF8(Dqn_StringW src, Dqn_ArenaAllocator *aren
     }
 
     result = Dqn_String_Init(string, string_size);
+    return result;
+}
+
+DQN_API Dqn_StringW Dqn_Win_GetExecutableDirectoryW(Dqn_ArenaAllocator *arena)
+{
+    // NOTE: Max size from MSDN, using \\? syntax, but the ? bit can be expanded
+    // even more so the max size is kind of not well defined.
+    wchar_t buffer[32767 + 128 /*fudge*/];
+    int file_path_size = GetModuleFileNameW(nullptr /*module*/, buffer, Dqn_ArrayCountI(buffer));
+    DQN_HARD_ASSERT_MSG(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
+
+    int directory_size = file_path_size;
+    for (int index = directory_size - 1; index >= 0; index--, directory_size--)
+    {
+        if (buffer[index] == '\\')
+        {
+            directory_size--;
+            break;
+        }
+    }
+
+    Dqn_StringW result = {};
+    if (directory_size != 0)
+    {
+        auto *str = Dqn_ArenaAllocator_NewArray(arena, wchar_t, directory_size + 1, Dqn_ZeroMem::No);
+        if (str)
+        {
+            DQN_MEMCOPY(str, buffer, sizeof(wchar_t) * directory_size);
+            str[directory_size] = 0;
+            result = Dqn_StringW{str, directory_size, directory_size};
+        }
+    }
+
+    return result;
+}
+
+DQN_API Dqn_String Dqn_Win_GetExecutableDirectory(Dqn_ArenaAllocator *arena, Dqn_ArenaAllocator *tmp_arena)
+{
+    Dqn_ArenaAllocatorAutoRegion tmp_mem_region = Dqn_ArenaAllocator_AutoRegion(tmp_arena);
+    Dqn_StringW                  exe_dir_w      = Dqn_Win_GetExecutableDirectoryW(tmp_arena);
+    Dqn_String                   result         = Dqn_Win_WCharToUTF8(exe_dir_w, arena);
     return result;
 }
 
