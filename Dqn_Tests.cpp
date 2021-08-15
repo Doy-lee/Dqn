@@ -1,7 +1,5 @@
 // -------------------------------------------------------------------------------------------------
-//
 // NOTE: Preprocessor Config
-//
 // -------------------------------------------------------------------------------------------------
 /*
 #define DQN_TEST_WITH_MAIN      Define this to enable the main function and allow standalone compiling
@@ -11,6 +9,15 @@
 
 #if defined(DQN_TEST_WITH_MAIN)
     #define DQN_IMPLEMENTATION
+    #define DQN_WITH_CRT_ALLOCATOR  // Dqn_CRTAllocator
+    #define DQN_WITH_DSMAP          // Dqn_DSMap
+    #define DQN_WITH_FIXED_ARRAY    // Dqn_FixedArray
+    #define DQN_WITH_FIXED_STRING   // Dqn_FixedString
+    #define DQN_WITH_HEX            // Dqn_Hex and friends ...
+    #define DQN_WITH_JSON_WRITER    // Dqn_JsonWriter
+    #define DQN_WITH_MAP            // Dqn_Map
+    #define DQN_WITH_MATH           // Dqn_V2/3/4/Mat4 and friends ...
+    #define DQN_WITH_THREAD_CONTEXT // Dqn_ThreadContext and friends ...
     #include "Dqn.h"
 #endif
 
@@ -96,7 +103,7 @@ void Dqn_TestingState_PrintGroupResult(Dqn_TestingState const *result)
     int size = snprintf(buf, Dqn_ArrayCount(buf), "%02d/%02d Tests Passed ", result->num_tests_ok_in_group, result->num_tests_in_group);
     Dqn_isize remaining_size = DESIRED_LEN - size;
     remaining_size       = (all_tests_passed) ? remaining_size - Dqn_CharCount(STATUS_OK) : remaining_size - Dqn_CharCount(STATUS_FAIL);
-    remaining_size       = DQN_M_MAX(remaining_size, 0);
+    remaining_size       = DQN_MAX(remaining_size, 0);
     DQN_FOR_EACH(i, remaining_size) fprintf(stdout, " ");
 
     fprintf(stdout, "%s", buf);
@@ -117,7 +124,7 @@ void Dqn_TestState_PrintResult(Dqn_TestState const *result)
 
     Dqn_isize remaining_size = DESIRED_LEN - result->name.size - Dqn_CharCount(INDENT);
     remaining_size = (result->fail_expr.str) ? remaining_size - Dqn_CharCount(STATUS_FAIL) : remaining_size - Dqn_CharCount(STATUS_OK);
-    remaining_size = DQN_M_MAX(remaining_size, 0);
+    remaining_size = DQN_MAX(remaining_size, 0);
 
     DQN_FOR_EACH(i, remaining_size) fprintf(stdout, ".");
     if (result->fail_expr.str)
@@ -250,8 +257,73 @@ void Dqn_Test_Array()
     }
 }
 
+void Dqn_Test_File()
+{
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_File");
+    {
+        Dqn_ArenaAllocator arena = {};
+        DQN_TEST_START_SCOPE(testing_state, "Make directory recursive \"abcd/efgh\"");
+        Dqn_b32 success = Dqn_File_MakeDir(DQN_STRING("abcd/efgh"), &arena);
+        DQN_TEST_EXPECT(testing_state, success);
+        DQN_TEST_EXPECT(testing_state, Dqn_File_DirExists(DQN_STRING("abcd")));
+        DQN_TEST_EXPECT(testing_state, Dqn_File_DirExists(DQN_STRING("abcd/efgh")));
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_File_Exists(DQN_STRING("abcd")) == false, "This function should only return true for files");
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_File_Exists(DQN_STRING("abcd/efgh")) == false, "This function should only return true for files");
+
+        DQN_TEST_EXPECT(testing_state, Dqn_File_Delete(DQN_STRING("abcd/efgh")));
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_File_Delete(DQN_STRING("abcd")), "Failed to cleanup directory");
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        // NOTE: Write step
+        Dqn_String const SRC_FILE = DQN_STRING("dqn_test_file");
+        DQN_TEST_START_SCOPE(testing_state, "Write file, read it, copy it, move it and delete it");
+        Dqn_b32 write_result = Dqn_File_WriteFile(SRC_FILE.str, "test", 4);
+        DQN_TEST_EXPECT(testing_state, write_result);
+        DQN_TEST_EXPECT(testing_state, Dqn_File_Exists(SRC_FILE));
+
+        // NOTE: Read step
+        Dqn_ArenaAllocator arena = {};
+        Dqn_String read_file = Dqn_File_ArenaReadFileToString(SRC_FILE.str, &arena);
+        DQN_TEST_EXPECT(testing_state, Dqn_String_IsValid(read_file));
+        DQN_TEST_EXPECT(testing_state, read_file.size == 4);
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_String_Eq(read_file, DQN_STRING("test")), "read(%I64u): %.*s", read_file.size, DQN_STRING_FMT(read_file));
+
+        // NOTE: Copy step
+        Dqn_String const COPY_FILE = DQN_STRING("dqn_test_file_copy");
+        Dqn_b32 copy_result = Dqn_File_Copy(SRC_FILE, COPY_FILE, true /*overwrite*/);
+        DQN_TEST_EXPECT(testing_state, copy_result);
+        DQN_TEST_EXPECT(testing_state, Dqn_File_Exists(COPY_FILE));
+
+        // NOTE: Move step
+        Dqn_String const MOVE_FILE = DQN_STRING("dqn_test_file_move");
+        Dqn_b32 move_result = Dqn_File_Move(COPY_FILE, MOVE_FILE, true /*overwrite*/);
+        DQN_TEST_EXPECT(testing_state, move_result);
+        DQN_TEST_EXPECT(testing_state, Dqn_File_Exists(MOVE_FILE));
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_File_Exists(COPY_FILE) == false, "Moving a file should remove the original");
+
+        // NOTE: Delete step
+        Dqn_b32 delete_src_file   = Dqn_File_Delete(SRC_FILE);
+        Dqn_b32 delete_moved_file = Dqn_File_Delete(MOVE_FILE);
+        DQN_TEST_EXPECT(testing_state, delete_src_file);
+        DQN_TEST_EXPECT(testing_state, delete_moved_file);
+
+        // NOTE: Deleting non-existent file fails
+        Dqn_b32 delete_non_existent_src_file   = Dqn_File_Delete(SRC_FILE);
+        Dqn_b32 delete_non_existent_moved_file = Dqn_File_Delete(MOVE_FILE);
+        DQN_TEST_EXPECT(testing_state, delete_non_existent_moved_file == false);
+        DQN_TEST_EXPECT(testing_state, delete_non_existent_src_file == false);
+
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+}
+
 void Dqn_Test_FixedArray()
 {
+#if defined(DQN_WITH_FIXED_ARRAY)
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_FixedArray");
     // NOTE: Dqn_FixedArray_Init
@@ -306,10 +378,12 @@ void Dqn_Test_FixedArray()
         Dqn_FixedArray_Clear(&array);
         DQN_TEST_EXPECT(testing_state, array.size == 0);
     }
+#endif // DQN_WITH_FIXED_ARRAY
 }
 
 void Dqn_Test_FixedString()
 {
+#if defined(DQN_WITH_FIXED_STRING)
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_FixedString");
 
@@ -326,10 +400,12 @@ void Dqn_Test_FixedString()
         Dqn_FixedString<4> str = {};
         DQN_TEST_EXPECT_MSG(testing_state, Dqn_FixedString_AppendFmt(&str, "abcd") == false, "We need space for the null-terminator");
     }
+#endif // DQN_WITH_FIXED_STRING
 }
 
 void Dqn_Test_Hex()
 {
+#if defined(DQN_WITH_HEX)
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Hex");
     {
@@ -397,10 +473,12 @@ void Dqn_Test_Hex()
         Dqn_u64 result = Dqn_Hex_StringToU64(DQN_STRING("-0x3"));
         DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %I64u", result);
     }
+#endif // DQN_WITH_HEX
 }
 
 void Dqn_Test_M4()
 {
+#if defined(DQN_WITH_MATH)
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_M4");
     {
@@ -422,10 +500,12 @@ void Dqn_Test_M4()
                             Dqn_M4_ColumnMajorString(result).str,
                             Dqn_M4_ColumnMajorString(EXPECT).str);
     }
+#endif // DQN_WITH_MATH
 }
 
 void Dqn_Test_DSMap()
 {
+#if defined(DQN_WITH_DSMAP)
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_DSMap");
     {
@@ -515,10 +595,12 @@ void Dqn_Test_DSMap()
 
         Dqn_DSMap_Free(&map);
     }
+#endif // DQN_WITH_DSMAP
 }
 
 void Dqn_Test_Map()
 {
+#if defined(DQN_WITH_MAP)
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Map");
     Dqn_ArenaAllocator arena = {};
@@ -666,6 +748,7 @@ void Dqn_Test_Map()
 
     // TODO(dqn): Test free list is chained correctly
     // TODO(dqn): Test deleting 'b' from the list in the situation [map] - [a]->[b], we currently only test deleting a
+#endif // DQN_WITH_MAP
 }
 
 void Dqn_Test_Intrinsics()
@@ -738,6 +821,7 @@ void Dqn_Test_Intrinsics()
 
 void Dqn_Test_Rect()
 {
+#if defined(DQN_WITH_MATH)
     Dqn_TestingState testing_state = {};
     DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Rect");
     // NOTE: Dqn_Rect_Intersection
@@ -863,6 +947,7 @@ void Dqn_Test_Rect()
                             ab.max.y);
         }
     }
+#endif // DQN_WITH_MATH
 }
 
 void Dqn_Test_PerfCounter()
@@ -879,7 +964,7 @@ void Dqn_Test_PerfCounter()
         DQN_TEST_START_SCOPE(testing_state, "Consecutive ticks are ordered");
         Dqn_u64 a = Dqn_PerfCounter_Now();
         Dqn_u64 b = Dqn_PerfCounter_Now();
-        DQN_TEST_EXPECT(testing_state, b > a);
+        DQN_TEST_EXPECT_MSG(testing_state, b >= a, "a: %I64u, b: %I64u", a, b);
     }
 
     {
@@ -891,156 +976,278 @@ void Dqn_Test_PerfCounter()
         Dqn_f64 ms      = Dqn_PerfCounter_Ms(a, b);
         Dqn_f64 micro_s = Dqn_PerfCounter_MicroS(a, b);
         Dqn_f64 ns      = Dqn_PerfCounter_Ns(a, b);
-        DQN_TEST_EXPECT(testing_state, s < ms);
-        DQN_TEST_EXPECT(testing_state, ms < micro_s);
-        DQN_TEST_EXPECT(testing_state, micro_s < ns);
+        DQN_TEST_EXPECT_MSG(testing_state, s <= ms, "s: %I64u, ms: %I64u", s, ms);
+        DQN_TEST_EXPECT_MSG(testing_state, ms <= micro_s, "ms: %I64u, micro_s: %I64u", ms, micro_s);
+        DQN_TEST_EXPECT_MSG(testing_state, micro_s <= ns, "micro_s: %I64u, ns: %I64u", micro_s, ns);
+    }
+}
+
+void Dqn_Test_OS()
+{
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_OS");
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Generate secure RNG bytes with nullptr");
+        Dqn_b32 result = Dqn_OS_SecureRNGBytes(nullptr, 1);
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Generate secure RNG bytes with -1 size");
+        char buf[1];
+        Dqn_b32 result = Dqn_OS_SecureRNGBytes(buf, -1);
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Generate secure RNG 32 bytes");
+        char const ZERO[32] = {};
+        char       buf[32]  = {};
+        Dqn_b32 result = Dqn_OS_SecureRNGBytes(buf, Dqn_ArrayCountI(buf));
+        DQN_TEST_EXPECT(testing_state, result);
+        DQN_TEST_EXPECT(testing_state, DQN_MEMCMP(buf, ZERO, Dqn_ArrayCount(buf)) != 0);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Generate secure RNG 0 bytes");
+        char buf[32] = {};
+        buf[0] = 'Z';
+        Dqn_b32 result = Dqn_OS_SecureRNGBytes(buf, 0);
+        DQN_TEST_EXPECT(testing_state, result);
+        DQN_TEST_EXPECT(testing_state, buf[0] == 'Z');
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Query executable directory");
+        Dqn_ArenaAllocator arena = {};
+        Dqn_String result = Dqn_OS_ExecutableDirectory(&arena);
+        DQN_TEST_EXPECT(testing_state, Dqn_String_IsValid(result));
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_File_DirExists(result), "result(%I64u): %.*s", result.size, DQN_STRING_FMT(result));
+        Dqn_ArenaAllocator_Free(&arena);
     }
 }
 
 void Dqn_Test_Str()
 {
     Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str");
     // ---------------------------------------------------------------------------------------------
     // NOTE: Dqn_Str_ToI64
     // ---------------------------------------------------------------------------------------------
     {
-        DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str_ToI64");
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert nullptr");
-            Dqn_i64 result = Dqn_Str_ToI64(nullptr);
-            DQN_TEST_EXPECT(testing_state, result == 0);
-        }
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert nullptr");
+        Dqn_i64 result = Dqn_Str_ToI64(nullptr);
+        DQN_TEST_EXPECT(testing_state, result == 0);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert empty string");
-            Dqn_i64 result = Dqn_Str_ToI64("");
-            DQN_TEST_EXPECT(testing_state, result == 0);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert empty string");
+        Dqn_i64 result = Dqn_Str_ToI64("");
+        DQN_TEST_EXPECT(testing_state, result == 0);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"1\"");
-            Dqn_i64 result = Dqn_Str_ToI64("1");
-            DQN_TEST_EXPECT(testing_state, result == 1);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert \"1\"");
+        Dqn_i64 result = Dqn_Str_ToI64("1");
+        DQN_TEST_EXPECT(testing_state, result == 1);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"-0\"");
-            Dqn_i64 result = Dqn_Str_ToI64("-0");
-            DQN_TEST_EXPECT(testing_state, result == 0);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert \"-0\"");
+        Dqn_i64 result = Dqn_Str_ToI64("-0");
+        DQN_TEST_EXPECT(testing_state, result == 0);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"-1\"");
-            Dqn_i64 result = Dqn_Str_ToI64("-1");
-            DQN_TEST_EXPECT(testing_state, result == -1);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert \"-1\"");
+        Dqn_i64 result = Dqn_Str_ToI64("-1");
+        DQN_TEST_EXPECT(testing_state, result == -1);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"1.2\"");
-            Dqn_i64 result = Dqn_Str_ToI64("1.2");
-            DQN_TEST_EXPECT(testing_state, result == 1);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert \"1.2\"");
+        Dqn_i64 result = Dqn_Str_ToI64("1.2");
+        DQN_TEST_EXPECT(testing_state, result == 1);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"1,234\"");
-            Dqn_i64 result = Dqn_Str_ToI64("1,234");
-            DQN_TEST_EXPECT(testing_state, result == 1234);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert \"1,234\"");
+        Dqn_i64 result = Dqn_Str_ToI64("1,234");
+        DQN_TEST_EXPECT(testing_state, result == 1234);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"1,2\"");
-            Dqn_i64 result = Dqn_Str_ToI64("1,2");
-            DQN_TEST_EXPECT(testing_state, result == 12);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert \"1,2\"");
+        Dqn_i64 result = Dqn_Str_ToI64("1,2");
+        DQN_TEST_EXPECT(testing_state, result == 12);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"12a3\"");
-            Dqn_i64 result = Dqn_Str_ToI64("12a3");
-            DQN_TEST_EXPECT(testing_state, result == 12);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To I64: Convert \"12a3\"");
+        Dqn_i64 result = Dqn_Str_ToI64("12a3");
+        DQN_TEST_EXPECT(testing_state, result == 12);
     }
 
     // ---------------------------------------------------------------------------------------------
     // NOTE: Dqn_Str_ToU64
     // ---------------------------------------------------------------------------------------------
     {
-        DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str_ToU64");
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert nullptr");
-            Dqn_u64 result = Dqn_Str_ToU64(nullptr);
-            DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
-        }
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert nullptr");
+        Dqn_u64 result = Dqn_Str_ToU64(nullptr);
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert empty string");
-            Dqn_u64 result = Dqn_Str_ToU64("");
-            DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert empty string");
+        Dqn_u64 result = Dqn_Str_ToU64("");
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"1\"");
-            Dqn_u64 result = Dqn_Str_ToU64("1");
-            DQN_TEST_EXPECT_MSG(testing_state, result == 1, "result: %zu", result);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert \"1\"");
+        Dqn_u64 result = Dqn_Str_ToU64("1");
+        DQN_TEST_EXPECT_MSG(testing_state, result == 1, "result: %zu", result);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"-0\"");
-            Dqn_u64 result = Dqn_Str_ToU64("-0");
-            DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert \"-0\"");
+        Dqn_u64 result = Dqn_Str_ToU64("-0");
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"-1\"");
-            Dqn_u64 result = Dqn_Str_ToU64("-1");
-            DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert \"-1\"");
+        Dqn_u64 result = Dqn_Str_ToU64("-1");
+        DQN_TEST_EXPECT_MSG(testing_state, result == 0, "result: %zu", result);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"1.2\"");
-            Dqn_u64 result = Dqn_Str_ToU64("1.2");
-            DQN_TEST_EXPECT_MSG(testing_state, result == 1, "result: %zu", result);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert \"1.2\"");
+        Dqn_u64 result = Dqn_Str_ToU64("1.2");
+        DQN_TEST_EXPECT_MSG(testing_state, result == 1, "result: %zu", result);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"1,234\"");
-            Dqn_u64 result = Dqn_Str_ToU64("1,234");
-            DQN_TEST_EXPECT_MSG(testing_state, result == 1234, "result: %zu", result);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert \"1,234\"");
+        Dqn_u64 result = Dqn_Str_ToU64("1,234");
+        DQN_TEST_EXPECT_MSG(testing_state, result == 1234, "result: %zu", result);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"1,2\"");
-            Dqn_u64 result = Dqn_Str_ToU64("1,2");
-            DQN_TEST_EXPECT_MSG(testing_state, result == 12, "result: %zu", result);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert \"1,2\"");
+        Dqn_u64 result = Dqn_Str_ToU64("1,2");
+        DQN_TEST_EXPECT_MSG(testing_state, result == 12, "result: %zu", result);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Convert \"12a3\"");
-            Dqn_u64 result = Dqn_Str_ToU64("12a3");
-            DQN_TEST_EXPECT_MSG(testing_state, result == 12, "result: %zu", result);
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "To U64: Convert \"12a3\"");
+        Dqn_u64 result = Dqn_Str_ToU64("12a3");
+        DQN_TEST_EXPECT_MSG(testing_state, result == 12, "result: %zu", result);
     }
 
     // ---------------------------------------------------------------------------------------------
     // NOTE: Dqn_Str_Find
     // ---------------------------------------------------------------------------------------------
     {
-        DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Str_Find");
-        {
-            DQN_TEST_START_SCOPE(testing_state, "String (char) is not in buffer");
-            char const buf[]  = "836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55";
-            char const find[] = "2";
-            char const *result = Dqn_Str_Find(buf, find, Dqn_CharCountI(buf), Dqn_CharCountI(find));
-            DQN_TEST_EXPECT(testing_state, result == nullptr);
-        }
+        DQN_TEST_START_SCOPE(testing_state, "Find: String (char) is not in buffer");
+        char const buf[]  = "836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55";
+        char const find[] = "2";
+        char const *result = Dqn_Str_Find(buf, find, Dqn_CharCountI(buf), Dqn_CharCountI(find));
+        DQN_TEST_EXPECT(testing_state, result == nullptr);
+    }
 
-        {
-            DQN_TEST_START_SCOPE(testing_state, "String (char) is in buffer");
-            char const buf[]  = "836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55";
-            char const find[] = "6";
-            char const *result = Dqn_Str_Find(buf, find, Dqn_CharCountI(buf), Dqn_CharCountI(find));
-            DQN_TEST_EXPECT(testing_state, result != nullptr);
-            DQN_TEST_EXPECT(testing_state, result[0] == '6' && result[1] == 'a');
-        }
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Find: String (char) is in buffer");
+        char const buf[]  = "836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55";
+        char const find[] = "6";
+        char const *result = Dqn_Str_Find(buf, find, Dqn_CharCountI(buf), Dqn_CharCountI(find));
+        DQN_TEST_EXPECT(testing_state, result != nullptr);
+        DQN_TEST_EXPECT(testing_state, result[0] == '6' && result[1] == 'a');
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // NOTE: Dqn_Str_FileNameFromPath
+    // ---------------------------------------------------------------------------------------------
+    {
+        DQN_TEST_START_SCOPE(testing_state, "File name from Windows path");
+        Dqn_isize file_name_size = 0;
+        char const buf[]  = "C:\\ABC\\test.exe";
+        char const *result = Dqn_Str_FileNameFromPath(buf, Dqn_CharCountI(buf), &file_name_size);
+        DQN_TEST_EXPECT_MSG(testing_state, file_name_size == 8, "size: %I64d", file_name_size);
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_String_Init(result, file_name_size) == DQN_STRING("test.exe"), "%.*s", file_name_size, result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "File name from Linux path");
+        Dqn_isize file_name_size = 0;
+        char const buf[]  = "/ABC/test.exe";
+        char const *result = Dqn_Str_FileNameFromPath(buf, Dqn_CharCountI(buf), &file_name_size);
+        DQN_TEST_EXPECT_MSG(testing_state, file_name_size == 8, "size: %I64d", file_name_size);
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_String_Init(result, file_name_size) == DQN_STRING("test.exe"), "%.*s", file_name_size, result);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // NOTE: Dqn_Str_TrimPrefix
+    // ---------------------------------------------------------------------------------------------
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Trim prefix");
+        char const  prefix[]     = "@123";
+        char const  buf[]        = "@123string";
+        Dqn_isize   trimmed_size = 0;
+        char const *result = Dqn_Str_TrimPrefix(buf, Dqn_CharCountI(buf), prefix, Dqn_CharCountI(prefix), &trimmed_size);
+        DQN_TEST_EXPECT_MSG(testing_state, trimmed_size == 6, "size: %I64d", trimmed_size);
+        DQN_TEST_EXPECT_MSG(testing_state, Dqn_String_Init(result, trimmed_size) == DQN_STRING("string"), "%.*s", trimmed_size, result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Trim prefix, nullptr trimmed size");
+        char const  prefix[]     = "@123";
+        char const  buf[]        = "@123string";
+        char const *result = Dqn_Str_TrimPrefix(buf, Dqn_CharCountI(buf), prefix, Dqn_CharCountI(prefix), nullptr);
+        DQN_TEST_EXPECT(testing_state, result);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // NOTE: Dqn_Str_IsAllDigits
+    // ---------------------------------------------------------------------------------------------
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on non-digit string");
+        char const buf[]  = "@123string";
+        Dqn_b32    result = Dqn_Str_IsAllDigits(buf, Dqn_CharCountI(buf));
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on nullptr");
+        Dqn_b32 result = Dqn_Str_IsAllDigits(nullptr, 0);
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on nullptr w/ size");
+        Dqn_b32 result = Dqn_Str_IsAllDigits(nullptr, 1);
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on 0 size w/ string");
+        char const buf[]  = "@123string";
+        Dqn_b32    result = Dqn_Str_IsAllDigits(buf, 0);
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits success");
+        char const buf[]  = "23";
+        Dqn_b32    result = Dqn_Str_IsAllDigits(buf, Dqn_CharCountI(buf));
+        DQN_TEST_EXPECT(testing_state, DQN_CAST(bool)result == true);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on whitespace");
+        char const buf[]  = "23 ";
+        Dqn_b32    result = Dqn_Str_IsAllDigits(buf, Dqn_CharCountI(buf));
+        DQN_TEST_EXPECT(testing_state, DQN_CAST(bool)result == false);
     }
 }
 
@@ -1112,6 +1319,78 @@ void Dqn_Test_String()
         DQN_TEST_EXPECT_MSG(testing_state, string.str[0] == 'A', "string[0]: %c", string.str[0]);
         DQN_TEST_EXPECT_MSG(testing_state, string.str[1] == 'B', "string[1]: %c", string.str[1]);
         DQN_TEST_EXPECT_MSG(testing_state, string.str[2] ==  0,  "string[2]: %c", string.str[2]);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // NOTE: Dqn_Str_Trim[Prefix/Suffix]
+    // ---------------------------------------------------------------------------------------------
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Trim prefix with matching prefix");
+        Dqn_String input  = DQN_STRING("nft/abc");
+        Dqn_String result = Dqn_String_TrimPrefix(input, DQN_STRING("nft/"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == DQN_STRING("abc"), "%.*s", DQN_STRING_FMT(result));
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Trim prefix with non matching prefix");
+        Dqn_String input  = DQN_STRING("nft/abc");
+        Dqn_String result = Dqn_String_TrimPrefix(input, DQN_STRING(" ft/"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == input, "%.*s", DQN_STRING_FMT(result));
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Trim suffix with matching suffix");
+        Dqn_String input  = DQN_STRING("nft/abc");
+        Dqn_String result = Dqn_String_TrimSuffix(input, DQN_STRING("abc"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == DQN_STRING("nft/"), "%.*s", DQN_STRING_FMT(result));
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Trim suffix with non matching suffix");
+        Dqn_String input  = DQN_STRING("nft/abc");
+        Dqn_String result = Dqn_String_TrimSuffix(input, DQN_STRING("ab"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == input, "%.*s", DQN_STRING_FMT(result));
+    }
+
+
+    // ---------------------------------------------------------------------------------------------
+    // NOTE: Dqn_String_IsAllDigits
+    // ---------------------------------------------------------------------------------------------
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on non-digit string");
+        Dqn_b32 result = Dqn_String_IsAllDigits(DQN_STRING("@123string"));
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on nullptr");
+        Dqn_b32 result = Dqn_String_IsAllDigits(Dqn_String_Init(nullptr, 0));
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on nullptr w/ size");
+        Dqn_b32 result = Dqn_String_IsAllDigits(Dqn_String_Init(nullptr, 1));
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on string w/ 0 size");
+        char const buf[]  = "@123string";
+        Dqn_b32    result = Dqn_String_IsAllDigits(Dqn_String_Init(buf, 0));
+        DQN_TEST_EXPECT(testing_state, result == false);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits success");
+        Dqn_b32 result = Dqn_String_IsAllDigits(DQN_STRING("23"));
+        DQN_TEST_EXPECT(testing_state, DQN_CAST(bool)result == true);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Is all digits fails on whitespace");
+        Dqn_b32 result = Dqn_String_IsAllDigits(DQN_STRING("23 "));
+        DQN_TEST_EXPECT(testing_state, DQN_CAST(bool)result == false);
     }
 }
 
@@ -1273,9 +1552,67 @@ void Dqn_Test_TicketMutex()
     }
 }
 
+void Dqn_Test_Win()
+{
+#if defined(DQN_OS_WIN32)
+    Dqn_TestingState testing_state = {};
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Win");
+    {
+        DQN_TEST_START_SCOPE(testing_state, "UTF8 to wide character size calculation");
+        int result = Dqn_Win_UTF8ToWCharSizeRequired(DQN_STRING("String"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 6, "Size returned: %d. This size should be including the null-terminator", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "UTF8 to wide character");
+        Dqn_ArenaAllocator arena = {};
+        Dqn_String const INPUT   = DQN_STRING("String");
+        int size_required        = Dqn_Win_UTF8ToWCharSizeRequired(INPUT);
+        wchar_t *string          = Dqn_ArenaAllocator_NewArray(&arena, wchar_t, size_required + 1, Dqn_ZeroMem::No);
+
+        // Fill the string with error sentinels, which ensures the string is zero terminated
+        DQN_MEMSET(string, 'Z', size_required + 1);
+
+        int size_returned = Dqn_Win_UTF8ToWChar(INPUT, string, size_required + 1);
+        wchar_t const EXPECTED[] = {L'S', L't', L'r', L'i', L'n', L'g', 0};
+
+        DQN_TEST_EXPECT_MSG(testing_state, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
+        DQN_TEST_EXPECT_MSG(testing_state, size_returned == Dqn_ArrayCount(EXPECTED) - 1, "string_size: %d, expected: %d", size_returned, sizeof(EXPECTED));
+        DQN_TEST_EXPECT(testing_state, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Wide char to UTF8 size calculation");
+        int result = Dqn_Win_WCharToUTF8SizeRequired(DQN_STRINGW(L"String"));
+        DQN_TEST_EXPECT_MSG(testing_state, result == 6, "Size returned: %d. This size should be including the null-terminator", result);
+    }
+
+    {
+        DQN_TEST_START_SCOPE(testing_state, "Wide char to UTF8");
+        Dqn_ArenaAllocator arena = {};
+        Dqn_StringW const INPUT  = DQN_STRINGW(L"String");
+        int size_required        = Dqn_Win_WCharToUTF8SizeRequired(INPUT);
+        char *string             = Dqn_ArenaAllocator_NewArray(&arena, char, size_required + 1, Dqn_ZeroMem::No);
+
+        // Fill the string with error sentinels, which ensures the string is zero terminated
+        DQN_MEMSET(string, 'Z', size_required + 1);
+
+        int size_returned = Dqn_Win_WCharToUTF8(INPUT, string, size_required + 1);
+        char const EXPECTED[] = {'S', 't', 'r', 'i', 'n', 'g', 0};
+
+        DQN_TEST_EXPECT_MSG(testing_state, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
+        DQN_TEST_EXPECT_MSG(testing_state, size_returned == Dqn_ArrayCount(EXPECTED) - 1, "string_size: %d, expected: %d", size_returned, sizeof(EXPECTED));
+        DQN_TEST_EXPECT(testing_state, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
+        Dqn_ArenaAllocator_Free(&arena);
+    }
+#endif // DQN_OS_WIN32
+}
+
 void Dqn_Test_RunSuite()
 {
     Dqn_Test_Array();
+    Dqn_Test_File();
     Dqn_Test_FixedArray();
     Dqn_Test_FixedString();
     Dqn_Test_Hex();
@@ -1285,10 +1622,12 @@ void Dqn_Test_RunSuite()
     Dqn_Test_Map();
     Dqn_Test_Rect();
     Dqn_Test_PerfCounter();
+    Dqn_Test_OS();
     Dqn_Test_Str();
     Dqn_Test_String();
     Dqn_Test_StringBuilder();
     Dqn_Test_TicketMutex();
+    Dqn_Test_Win();
 
     fprintf(stdout, "Summary: %d/%d tests succeeded\n", g_dqn_test_total_good_tests, g_dqn_test_total_tests);
 }
