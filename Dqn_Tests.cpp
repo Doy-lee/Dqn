@@ -18,8 +18,13 @@
     #define DQN_WITH_MAP            // Dqn_Map
     #define DQN_WITH_MATH           // Dqn_V2/3/4/Mat4 and friends ...
     #define DQN_WITH_THREAD_CONTEXT // Dqn_ThreadContext and friends ...
-    #include "Dqn.h"
+    #include "dqn.h"
+
+    #define DQN_KECCAK_IMPLEMENTATION
+    #include "dqn_keccak.h"
 #endif
+
+#include "dqn_tests_helpers.cpp"
 
 struct Dqn_TestState
 {
@@ -59,7 +64,7 @@ static int g_dqn_test_total_tests;
     #define DQN_TEST_ANSI_COLOR_RESET "\x1b[0m"
 #endif
 
-#define DQN_TEST_START_SCOPE(testing_state, test_name)                                                                 \
+#define DQN_TEST_START_SCOPE(testing_state, test_name, ...)                                                            \
     DQN_DEFER                                                                                                          \
     {                                                                                                                  \
         if (testing_state.test.fail_expr.size == 0) testing_state.num_tests_ok_in_group++;                             \
@@ -67,7 +72,7 @@ static int g_dqn_test_total_tests;
         Dqn_ArenaAllocator_ResetUsage(&testing_state.arena, Dqn_ZeroMem::No);                                          \
         testing_state.test = {};                                                                                       \
     };                                                                                                                 \
-    testing_state.test.name          = DQN_STRING(test_name);                                                          \
+    testing_state.test.name          = Dqn_String_Fmt(&testing_state.arena, test_name, ##__VA_ARGS__);                 \
     testing_state.test.scope_started = true;                                                                           \
     testing_state.num_tests_in_group++
 
@@ -1394,131 +1399,6 @@ void Dqn_Test_String()
     }
 }
 
-void Dqn_Test_StringBuilder()
-{
-    Dqn_TestingState testing_state = {};
-    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_StringBuilder");
-    Dqn_ArenaAllocator arena = {};
-    // NOTE: Dqn_StringBuilder_Append
-    {
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Append variable size strings and build using heap arena");
-            Dqn_StringBuilder<> builder = {};
-            Dqn_StringBuilder_Append(&builder, "Abc", 1);
-            Dqn_StringBuilder_Append(&builder, "cd");
-            Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
-            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
-
-            char const EXPECT_STR[] = "Acd";
-            DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
-            DQN_TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Append empty string and build using heap arena");
-            Dqn_StringBuilder<> builder = {};
-            Dqn_StringBuilder_Append(&builder, "");
-            Dqn_StringBuilder_Append(&builder, "");
-            Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
-            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
-
-            char const EXPECT_STR[] = "";
-            DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
-            DQN_TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Append empty string onto string and build using heap arena");
-            Dqn_StringBuilder<> builder = {};
-            Dqn_StringBuilder_Append(&builder, "Acd");
-            Dqn_StringBuilder_Append(&builder, "");
-            Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
-            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
-
-            char const EXPECT_STR[] = "Acd";
-            DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
-            DQN_TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Append nullptr and build using heap arena");
-            Dqn_StringBuilder<> builder = {};
-            Dqn_StringBuilder_Append(&builder, nullptr, 5);
-            Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
-            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
-
-            char const EXPECT_STR[] = "";
-            DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
-            DQN_TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Append and require new linked buffer and build using heap arena");
-            Dqn_StringBuilder<2> builder = {};
-            Dqn_StringBuilder_InitWithArena(&builder, &arena);
-            Dqn_StringBuilder_Append(&builder, "A");
-            Dqn_StringBuilder_Append(&builder, "z"); // Should force a new memory block
-            Dqn_StringBuilder_Append(&builder, "tec");
-            Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
-            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
-
-            char const EXPECT_STR[] = "Aztec";
-            DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
-            DQN_TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
-        }
-    }
-
-    // NOTE: Dqn_StringBuilder_AppendChar
-    {
-        DQN_TEST_START_SCOPE(testing_state, "Append char and build using heap arena");
-        Dqn_StringBuilder<> builder = {};
-        Dqn_StringBuilder_AppendChar(&builder, 'a');
-        Dqn_StringBuilder_AppendChar(&builder, 'b');
-        Dqn_isize size    = 0;
-        char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
-        DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
-
-        char const EXPECT_STR[] = "ab";
-        DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
-        DQN_TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
-    }
-
-    // NOTE: Dqn_StringBuilder_AppendFmt
-    {
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Append format string and build using heap arena");
-            Dqn_StringBuilder<> builder = {};
-            Dqn_StringBuilder_AppendFmt(&builder, "Number: %d, String: %s, ", 4, "Hello Sailor");
-            Dqn_StringBuilder_AppendFmt(&builder, "Extra Stuff");
-            Dqn_isize size    = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
-            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
-
-            char const EXPECT_STR[] = "Number: 4, String: Hello Sailor, Extra Stuff";
-            DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
-            DQN_TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
-        }
-
-        {
-            DQN_TEST_START_SCOPE(testing_state, "Append nullptr format string and build using heap arena");
-            Dqn_StringBuilder<> builder = {};
-            Dqn_StringBuilder_AppendFmt(&builder, nullptr);
-            Dqn_isize size = 0;
-            char *result = Dqn_StringBuilder_Build(&builder, &arena, &size);
-            DQN_DEFER { Dqn_ArenaAllocator_Free(&arena); };
-
-            char const EXPECT_STR[] = "";
-            DQN_TEST_EXPECT_MSG(testing_state, size == Dqn_CharCountI(EXPECT_STR), "size: %zd", size);
-            DQN_TEST_EXPECT_MSG(testing_state, strncmp(result, EXPECT_STR, size) == 0, "result: %s", result);
-        }
-    }
-}
-
 void Dqn_Test_TicketMutex()
 {
     Dqn_TestingState testing_state = {};
@@ -1609,6 +1489,221 @@ void Dqn_Test_Win()
 #endif // DQN_OS_WIN32
 }
 
+#define DQN_TESTS_HASH_X_MACRO \
+    DQN_TESTS_HASH_X_ENTRY(SHA3_224, "SHA3-224") \
+    DQN_TESTS_HASH_X_ENTRY(SHA3_256, "SHA3-256") \
+    DQN_TESTS_HASH_X_ENTRY(SHA3_384, "SHA3-384") \
+    DQN_TESTS_HASH_X_ENTRY(SHA3_512, "SHA3-512") \
+    DQN_TESTS_HASH_X_ENTRY(Keccak_224, "Keccak-224") \
+    DQN_TESTS_HASH_X_ENTRY(Keccak_256, "Keccak-256") \
+    DQN_TESTS_HASH_X_ENTRY(Keccak_384, "Keccak-384") \
+    DQN_TESTS_HASH_X_ENTRY(Keccak_512, "Keccak-512") \
+    DQN_TESTS_HASH_X_ENTRY(Count, "Keccak-512")
+
+enum Dqn_Tests__HashType
+{
+#define DQN_TESTS_HASH_X_ENTRY(enum_val, string) Hash_##enum_val,
+    DQN_TESTS_HASH_X_MACRO
+#undef DQN_TESTS_HASH_X_ENTRY
+};
+
+Dqn_String const DQN_TESTS__HASH_STRING[] =
+{
+#define DQN_TESTS_HASH_X_ENTRY(enum_val, string) DQN_STRING(string),
+    DQN_TESTS_HASH_X_MACRO
+#undef DQN_TESTS_HASH_X_ENTRY
+};
+
+
+void Dqn_Test__KeccakDispatch(Dqn_TestingState *testing_state, int hash_type, Dqn_String input)
+{
+#if defined(DQN_KECCAK_H)
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch();
+    Dqn_String input_hex = Dqn_Hex_BytesToHexStringArena(input.str, input.size, scratch.arena);
+
+    switch(hash_type)
+    {
+        case Hash_SHA3_224:
+        {
+            Dqn_KeccakBytes28 hash = Dqn_Keccak_SHA3_224_StringToBytes28(input);
+            Dqn_KeccakBytes28 expect;
+            FIPS202_SHA3_224(DQN_CAST(u8 *)input.str, input.size, (u8 *)expect.data);
+            DQN_TEST_EXPECT_MSG((*testing_state),
+                                Dqn_Keccak_Bytes28Equals(&hash, &expect),
+                                "\ninput:  %.*s"
+                                "\nhash:   %.*s"
+                                "\nexpect: %.*s"
+                                ,
+                                DQN_STRING_FMT(input_hex),
+                                DQN_KECCAK_STRING56_FMT(Dqn_Keccak_Bytes28ToHex(&hash).str),
+                                DQN_KECCAK_STRING56_FMT(Dqn_Keccak_Bytes28ToHex(&expect).str));
+        }
+        break;
+
+        case Hash_SHA3_256:
+        {
+            Dqn_KeccakBytes32 hash = Dqn_Keccak_SHA3_256_StringToBytes32(input);
+            Dqn_KeccakBytes32 expect;
+            FIPS202_SHA3_256(DQN_CAST(u8 *)input.str, input.size, (u8 *)expect.data);
+            DQN_TEST_EXPECT_MSG((*testing_state),
+                                Dqn_Keccak_Bytes32Equals(&hash, &expect),
+                                "\ninput:  %.*s"
+                                "\nhash:   %.*s"
+                                "\nexpect: %.*s"
+                                ,
+                                DQN_STRING_FMT(input_hex),
+                                DQN_KECCAK_STRING64_FMT(Dqn_Keccak_Bytes32ToHex(&hash).str),
+                                DQN_KECCAK_STRING64_FMT(Dqn_Keccak_Bytes32ToHex(&expect).str));
+        }
+        break;
+
+        case Hash_SHA3_384:
+        {
+            Dqn_KeccakBytes48 hash = Dqn_Keccak_SHA3_384_StringToBytes48(input);
+            Dqn_KeccakBytes48 expect;
+            FIPS202_SHA3_384(DQN_CAST(u8 *)input.str, input.size, (u8 *)expect.data);
+            DQN_TEST_EXPECT_MSG((*testing_state),
+                                Dqn_Keccak_Bytes48Equals(&hash, &expect),
+                                "\ninput:  %.*s"
+                                "\nhash:   %.*s"
+                                "\nexpect: %.*s"
+                                ,
+                                DQN_STRING_FMT(input_hex),
+                                DQN_KECCAK_STRING96_FMT(Dqn_Keccak_Bytes48ToHex(&hash).str),
+                                DQN_KECCAK_STRING96_FMT(Dqn_Keccak_Bytes48ToHex(&expect).str));
+        }
+        break;
+
+        case Hash_SHA3_512:
+        {
+            Dqn_KeccakBytes64 hash = Dqn_Keccak_SHA3_512_StringToBytes64(input);
+            Dqn_KeccakBytes64 expect;
+            FIPS202_SHA3_512(DQN_CAST(u8 *)input.str, input.size, (u8 *)expect.data);
+            DQN_TEST_EXPECT_MSG((*testing_state),
+                                Dqn_Keccak_Bytes64Equals(&hash, &expect),
+                                "\ninput:  %.*s"
+                                "\nhash:   %.*s"
+                                "\nexpect: %.*s"
+                                ,
+                                DQN_STRING_FMT(input_hex),
+                                DQN_KECCAK_STRING128_FMT(Dqn_Keccak_Bytes64ToHex(&hash).str),
+                                DQN_KECCAK_STRING128_FMT(Dqn_Keccak_Bytes64ToHex(&expect).str));
+        }
+        break;
+
+        case Hash_Keccak_224:
+        {
+            Dqn_KeccakBytes28 hash = Dqn_Keccak_224_StringToBytes28(input);
+            Dqn_KeccakBytes28 expect;
+            Keccak(1152, 448, DQN_CAST(u8 *)input.str, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
+            DQN_TEST_EXPECT_MSG((*testing_state),
+                                Dqn_Keccak_Bytes28Equals(&hash, &expect),
+                                "\ninput:  %.*s"
+                                "\nhash:   %.*s"
+                                "\nexpect: %.*s"
+                                ,
+                                DQN_STRING_FMT(input_hex),
+                                DQN_KECCAK_STRING56_FMT(Dqn_Keccak_Bytes28ToHex(&hash).str),
+                                DQN_KECCAK_STRING56_FMT(Dqn_Keccak_Bytes28ToHex(&expect).str));
+        }
+        break;
+
+        case Hash_Keccak_256:
+        {
+            Dqn_KeccakBytes32 hash = Dqn_Keccak_256_StringToBytes32(input);
+            Dqn_KeccakBytes32 expect;
+            Keccak(1088, 512, DQN_CAST(u8 *)input.str, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
+            DQN_TEST_EXPECT_MSG((*testing_state),
+                                Dqn_Keccak_Bytes32Equals(&hash, &expect),
+                                "\ninput:  %.*s"
+                                "\nhash:   %.*s"
+                                "\nexpect: %.*s"
+                                ,
+                                DQN_STRING_FMT(input_hex),
+                                DQN_KECCAK_STRING64_FMT(Dqn_Keccak_Bytes32ToHex(&hash).str),
+                                DQN_KECCAK_STRING64_FMT(Dqn_Keccak_Bytes32ToHex(&expect).str));
+        }
+        break;
+
+        case Hash_Keccak_384:
+        {
+            Dqn_KeccakBytes48 hash = Dqn_Keccak_384_StringToBytes48(input);
+            Dqn_KeccakBytes48 expect;
+            Keccak(832, 768, DQN_CAST(u8 *)input.str, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
+            DQN_TEST_EXPECT_MSG((*testing_state),
+                                Dqn_Keccak_Bytes48Equals(&hash, &expect),
+                                "\ninput:  %.*s"
+                                "\nhash:   %.*s"
+                                "\nexpect: %.*s"
+                                ,
+                                DQN_STRING_FMT(input_hex),
+                                DQN_KECCAK_STRING96_FMT(Dqn_Keccak_Bytes48ToHex(&hash).str),
+                                DQN_KECCAK_STRING96_FMT(Dqn_Keccak_Bytes48ToHex(&expect).str));
+        }
+        break;
+
+        case Hash_Keccak_512:
+        {
+            Dqn_KeccakBytes64 hash = Dqn_Keccak_512_StringToBytes64(input);
+            Dqn_KeccakBytes64 expect;
+            Keccak(576, 1024, DQN_CAST(u8 *)input.str, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
+            DQN_TEST_EXPECT_MSG((*testing_state),
+                                Dqn_Keccak_Bytes64Equals(&hash, &expect),
+                                "\ninput:  %.*s"
+                                "\nhash:   %.*s"
+                                "\nexpect: %.*s"
+                                ,
+                                DQN_STRING_FMT(input_hex),
+                                DQN_KECCAK_STRING128_FMT(Dqn_Keccak_Bytes64ToHex(&hash).str),
+                                DQN_KECCAK_STRING128_FMT(Dqn_Keccak_Bytes64ToHex(&expect).str));
+        }
+        break;
+
+    }
+#endif // DQN_KECCAK_H
+}
+
+void Dqn_Test_Keccak()
+{
+#if defined(DQN_KECCAK_H)
+    Dqn_TestingState testing_state = {};
+
+    Dqn_String const INPUTS[] = {
+        DQN_STRING("abc"),
+        DQN_STRING(""),
+        DQN_STRING("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
+        DQN_STRING("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmno"
+                   "pqrstnopqrstu"),
+    };
+
+    DQN_TEST_DECLARE_GROUP_SCOPED(testing_state, "Dqn_Keccak");
+    for (int hash_type = 0; hash_type < Hash_Count; hash_type++)
+    {
+        pcg32_random_t rng = {};
+        pcg32_srandom_r(&rng, 0xd48e'be21'2af8'733d, 0x3f89'3bd2'd6b0'4eef);
+
+        for (Dqn_String input : INPUTS)
+        {
+            DQN_TEST_START_SCOPE(testing_state, "%.*s - Input: %.*s", DQN_STRING_FMT(DQN_TESTS__HASH_STRING[hash_type]), DQN_MIN(input.size, 54), input.str);
+            Dqn_Test__KeccakDispatch(&testing_state, hash_type, input);
+        }
+
+        DQN_TEST_START_SCOPE(testing_state, "%.*s - Deterministic random inputs", DQN_STRING_FMT(DQN_TESTS__HASH_STRING[hash_type]));
+        for (int index = 0; index < 128; index++)
+        {
+            char    src[4096] = {};
+            Dqn_u32 src_size  = pcg32_boundedrand_r(&rng, sizeof(src));
+
+            for (int src_index = 0; src_index < src_size; src_index++)
+                src[src_index] = pcg32_boundedrand_r(&rng, 255);
+
+            Dqn_String input = Dqn_String_Init(src, src_size);
+            Dqn_Test__KeccakDispatch(&testing_state, hash_type, input);
+        }
+    }
+#endif // DQN_KECCAK_H
+}
+
 void Dqn_Test_RunSuite()
 {
     Dqn_Test_Array();
@@ -1623,9 +1718,9 @@ void Dqn_Test_RunSuite()
     Dqn_Test_Rect();
     Dqn_Test_PerfCounter();
     Dqn_Test_OS();
+    Dqn_Test_Keccak();
     Dqn_Test_Str();
     Dqn_Test_String();
-    Dqn_Test_StringBuilder();
     Dqn_Test_TicketMutex();
     Dqn_Test_Win();
 

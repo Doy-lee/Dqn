@@ -1,4 +1,4 @@
-#ifndef DQN_JSMN_H
+#if !defined(DQN_JSMN_H)
 #define DQN_JSMN_H
 // -----------------------------------------------------------------------------
 // NOTE: Dqn_Jsmn
@@ -16,7 +16,7 @@
 //
 
 #if !defined(DQN_H)
-    #error You must include "Dqn.h" before including "Dqn_Jsmn.h"
+    #error You must include "dqn.h" before including "dqn_jsmn.h"
 #endif // DQN_H
 
 // -----------------------------------------------------------------------------
@@ -135,15 +135,149 @@ JSMN_API int jsmn_parse(jsmn_parser *parser, const char *js, const size_t len,
 #endif
 #endif // JSMN_H
 
+// NOTE: Iterator copied from: https://github.com/zserge/jsmn/pull/69
+// TODO(dqn): Write our own iterator logic in a manner that is more stateful
+// than the current implementation, we should not have pass information back and
+// forth between iterators, i.e. see my iterator abstraction that sits on top of
+// this.
+#ifndef __JSMN_ITERATOR_H__
+#define __JSMN_ITERATOR_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * Error return codes for jsmn iterator
+ */
+enum {
+  /* Input parameter error */
+  JSMNITER_ERR_PARAMETER  = -1,
+  /* JSMN index doesn't point at an Array/Object */
+  JSMNITER_ERR_TYPE       = -2,  
+  /* Group item misses string identifier */
+  JSMNITER_ERR_NOIDENT    = -3,
+  /* Broken JSON */
+  JSMNITER_ERR_BROKEN     = -4,
+};
+
+
+/**
+ * Struct with state information for jsmn iterator
+ * - When the no more items for iterator the parser_pos value will point to 
+ *   JSMN index for next object after current Array/Object
+ */
+typedef struct {
+  jsmntok_t *jsmn_tokens;
+  unsigned int jsmn_len;
+  unsigned int parent_pos;
+  unsigned int parser_pos;
+  unsigned int index;
+} jsmn_iterator_t;
+
+
+/**
+ * @brief Takes an JSMN Array/Object and locates index for last item in collection
+ * @details Iterates over JSMN Array/Object until last item is found
+ * 
+ * @param jsmn_tokens   JSMN tokens
+ * @param jsmn_len      JSMN token count
+ * @param parser_pos    Current JSMN token
+ *
+ * @return  < 0 - Error has occured, corresponds to one of JSMNITER_ERR_*
+ *          >=0 - JSMN index for last item in Array/Object
+ */
+int jsmn_iterator_find_last( jsmntok_t *jsmn_tokens, unsigned int jsmn_len, unsigned int parser_pos );
+
+
+/**
+ * @brief Initialize iterator
+ * @details Set initial value for iterator struct
+ * 
+ * @param iterator      Iterator struct
+ * @param jsmn_tokens   JSMN tokens
+ * @param jsmn_len      JSMN token count
+ * @param parser_pos    Current JSMN token
+ * 
+ * @return  < 0 - Error has occured, corresponds to one of JSMNITER_ERR_*
+ *          >=0 - Ok
+ */
+int jsmn_iterator_init( jsmn_iterator_t *iterator, jsmntok_t *jsmn_tokens, unsigned int jsmn_len, 
+                        unsigned int parser_pos );
+
+
+/**
+ * @brief Get next item in JSMN Array/Object
+ * @details Gets JSMN position for next identifier and value in Array/Object
+ * 
+ * @param iterator            Iterator struct
+ * @param jsmn_identifier     Return pointer for identifier, NULL for Array
+ * @param jsmn_value          Return pointer for value
+ * @param next_value_index    Possible to indicate where next value begins, allows determine end of sub
+ *                            Array/Object withouth manually searching for it
+ * 
+ * @return  < 0 - Error has occured, corresponds to one of JSMNITER_ERR_*
+ *            0 - No more values
+ *          > 0 - Value (and identifier) has been returned
+ */
+int jsmn_iterator_next( jsmn_iterator_t *iterator, jsmntok_t **jsmn_identifier, jsmntok_t **jsmn_value, 
+                        unsigned int next_value_index );
+
+
+
+/**
+ * @brief Return current parser position
+ * @details For Array the parser point to current value index
+ *          For Object the parser points to the identifier
+ * 
+ * @param iterator [description]
+ * @return [description]
+ */
+#define jsmn_iterator_position(_iterator_) ((_iterator_)->parser_pos)
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /*__JSMN_ITERATOR_H__*/
+
 // -----------------------------------------------------------------------------
 // Header File
 // -----------------------------------------------------------------------------
+#define DQN_JSMN_X_MACRO \
+    DQN_JSMN_X_ENTRY(Object) \
+    DQN_JSMN_X_ENTRY(Array) \
+    DQN_JSMN_X_ENTRY(String) \
+    DQN_JSMN_X_ENTRY(Number) \
+    DQN_JSMN_X_ENTRY(Bool)
+
+enum struct Dqn_JsmnTokenIs
+{
+#define DQN_JSMN_X_ENTRY(enum_val) enum_val,
+DQN_JSMN_X_MACRO
+#undef DQN_JSMN_X_ENTRY
+};
+
+inline Dqn_String const Dqn_JsmnTokenIsEnumString(Dqn_JsmnTokenIs token)
+{
+    switch (token)
+    {
+        #define DQN_JSMN_X_ENTRY(enum_val) case Dqn_JsmnTokenIs::enum_val: return DQN_STRING(#enum_val);
+        DQN_JSMN_X_MACRO
+        #undef DQN_JSMN_X_ENTRY
+    }
+
+    return DQN_STRING("DQN_JSMN_UNHANDLED_ENUM");
+};
+
 struct Dqn_JsmnError
 {
-    jsmntok_t   token;
-    char const *cpp_func;
-    char const *cpp_file; // The file of the .cpp/h source code that triggered the error
-    int         cpp_line; // The line of the .cpp/h source code that triggered the error
+    jsmntok_t        token;
+    Dqn_String       json;
+    Dqn_JsmnTokenIs  expected;
+    char const      *cpp_file; // The file of the .cpp/h source code that triggered the error
+    int              cpp_line; // The line of the .cpp/h source code that triggered the error
 };
 
 struct Dqn_JsmnErrorHandle
@@ -152,28 +286,94 @@ struct Dqn_JsmnErrorHandle
     Dqn_List<Dqn_JsmnError> list;
 };
 
-void        Dqn_JsmnErrorHandle_AddError     (Dqn_JsmnErrorHandle *err_handle, char const *func, char const *file, int line);
-Dqn_String  Dqn_JsmnToken_String             (Dqn_String json, jsmntok_t token);
-Dqn_b32     Dqn_JsmnToken_Bool               (Dqn_String json, jsmntok_t token);
-Dqn_u64     Dqn_JsmnToken_U64                (Dqn_String json, jsmntok_t token);
-jsmntok_t  *Dqn_JsmnToken_AdvanceItPastObject(jsmntok_t *start_it, Dqn_JsmnErrorHandle *err_handle, Dqn_String json);
-jsmntok_t  *Dqn_JsmnToken_AdvanceItPastArray (jsmntok_t *start_it, Dqn_JsmnErrorHandle *err_handle, Dqn_String json);
+struct Dqn_Jsmn
+{
+    jsmn_parser  parser;
+    Dqn_String   json;
+    int          tokens_size;
+    jsmntok_t   *tokens;
+};
 
-#define Dqn_JsmnToken_ExpectBool(json, token, err_handle) Dqn_JsmnToken__ExpectBool(json, token, err_handle, __FILE__, __LINE__)
-#define Dqn_JsmnToken_ExpectNumber(json, token, err_handle) Dqn_JsmnToken__ExpectNumber(json, token, err_handle, __FILE__, __LINE__)
-#define Dqn_JsmnToken_ExpectString(token, err_handle) Dqn_JsmnToken__ExpectString(token, err_handle, __FILE__, __LINE__)
-#define Dqn_JsmnToken_ExpectArray(token, err_handle) Dqn_JsmnToken__ExpectArray(token, err_handle, __FILE__, __LINE__)
-#define Dqn_JsmnToken_ExpectObject(token, err_handle) Dqn_JsmnToken__ExpectObject(token, err_handle, __FILE__, __LINE__)
+struct Dqn_JsmnIterator
+{
+    Dqn_b32         init;
+    jsmn_iterator_t jsmn_it;
+    Dqn_String      json;
+    jsmntok_t      *key;
+    jsmntok_t      *value;
 
-#define DQN_JSMN_ERROR_HANDLE_DUMP(handle)                                                                                 \
-    for (Dqn_ListChunk<Dqn_JsmnError> *chunk = handle.list.head; chunk; chunk = chunk->next)                               \
+    // When obj/array iteration is finished, we set the token_index_hint to the
+    // parent iterator so that it knows where to continue off from and to skip
+    // over the object/array we just iterated.
+    int             token_index_hint;
+};
+
+Dqn_Jsmn    Dqn_Jsmn_InitWithJSON       (Dqn_String json, Dqn_ArenaAllocator *arena);
+Dqn_Jsmn    Dqn_Jsmn_InitWithJSONFile   (Dqn_String file, Dqn_ArenaAllocator *arena);
+
+// return: If the token is an array, return the size of the array otherwise -1.
+int        Dqn_Jsmn_TokenArraySize(jsmntok_t token);
+Dqn_String Dqn_Jsmn_TokenString(jsmntok_t token, Dqn_String json);
+Dqn_b32    Dqn_Jsmn_TokenBool(jsmntok_t token, Dqn_String json);
+Dqn_u64    Dqn_Jsmn_TokenU64(jsmntok_t token, Dqn_String json);
+
+// Iterator abstraction over jsmn_iterator_t, example on how to use this is
+// shown below. The goal here is to minimise the amount of state the user has to
+// manage.
+#if 0
+    Dqn_ArenaAllocator arena = {};
+    Dqn_String json = DQN_STRING(R"({
+        "test": {
+            "test2": 0
+        }
+    })");
+
+    Dqn_Jsmn jsmn_state = Dqn_Jsmn_InitWithJSON(json, &arena);
+    for (Dqn_JsmnIterator it = {}; Dqn_JsmnIterator_Next(&it, &jsmn_state, nullptr /*prev_it*/); )
+    {
+        Dqn_String key_str = Dqn_Jsmn_TokenString(*it.key, jsmn_state.json);
+        if (Dqn_JsmnIterator_Key(&it) == DQN_STRING("test"))
+        {
+            if (!Dqn_JsmnIterator_ExpectValue(&it, Dqn_JsmnTokenIs::Object, nullptr))
+                continue;
+
+            for (Dqn_JsmnIterator obj_it = {}; Dqn_JsmnIterator_Next(&obj_it, &jsmn_state, &it); )
+            {
+                if (Dqn_JsmnIterator_Key(&it) == DQN_STRING("test2"))
+                {
+                    if (!Dqn_JsmnIterator_ExpectValue(&it, Dqn_JsmnTokenIs::Number, nullptr))
+                        continue;
+
+                    Dqn_u64 test_2_value = Dqn_JsmnIterator_U64(&obj_it);
+                }
+            }
+        }
+    }
+#endif
+Dqn_b32          Dqn_JsmnIterator_Next(Dqn_JsmnIterator *it, Dqn_Jsmn *jsmn_state, Dqn_JsmnIterator *prev_it);
+Dqn_String       Dqn_JsmnIterator_Key (Dqn_JsmnIterator *it);
+Dqn_JsmnIterator Dqn_JsmnIterator_FindKey(Dqn_Jsmn *jsmn_state, Dqn_String key, Dqn_JsmnIterator *parent_it);
+
+#define Dqn_JsmnIterator_ExpectValue(it, expected, err_handle) Dqn_JsmnIterator__ExpectValue(it, expected, err_handle, __FILE__, __LINE__)
+#define Dqn_JsmnIterator_ExpectKey(it, expected, err_handle) Dqn_JsmnIterator__ExpectKey(it, expected, err_handle, __FILE__, __LINE__)
+
+// Convert the value part of the key-value JSON pair the iterator is currently
+// pointing to, to a string/bool/u64. If the iterator's value does not point to
+// the type requested, a zero initialised value is returned.
+Dqn_String  Dqn_JsmnIterator_String(Dqn_JsmnIterator const *it);
+Dqn_b32     Dqn_JsmnIterator_Bool  (Dqn_JsmnIterator const *it);
+Dqn_u64     Dqn_JsmnIterator_U64   (Dqn_JsmnIterator const *it);
+
+#define DQN_JSMN_ERROR_HANDLE_DUMP(handle)                                                                             \
+    for (Dqn_ListChunk<Dqn_JsmnError> *chunk = handle.list.head; chunk; chunk = chunk->next)                           \
     {                                                                                                                  \
         for (auto *error = chunk->data; error != (chunk->data + chunk->count); error++)                                \
         {                                                                                                              \
-            DQN_LOG_E("Json parsing error at %s from %s:%d",                                                           \
-                      error->cpp_func,                                                                                 \
+            DQN_LOG_E("Json parsing error in %s:%d, expected token type: %.*s, token was: %.*s",                       \
                       Dqn_Str_FileNameFromPath(error->cpp_file),                                                       \
-                      error->cpp_line);                                                                                \
+                      error->cpp_line,                                                                                 \
+                      DQN_STRING_FMT(Dqn_JsmnTokenIsEnumString(error->expected)),                                      \
+                      DQN_STRING_FMT(Dqn_Jsmn_TokenString(error->token, error->json)));                                \
         }                                                                                                              \
     }
 
@@ -183,7 +383,58 @@ jsmntok_t  *Dqn_JsmnToken_AdvanceItPastArray (jsmntok_t *start_it, Dqn_JsmnError
 // -----------------------------------------------------------------------------
 // Implementation
 // -----------------------------------------------------------------------------
-void Dqn_JsmnErrorHandle_AddError(Dqn_JsmnErrorHandle *err_handle, char const *func, char const *file, int line)
+Dqn_Jsmn Dqn_Jsmn_InitWithJSON(Dqn_String json, Dqn_ArenaAllocator *arena)
+{
+    Dqn_Jsmn result = {};
+    result.json     = json;
+
+    jsmn_init(&result.parser);
+    result.tokens_size = jsmn_parse(&result.parser, result.json.str, result.json.size, nullptr, 0);
+    result.tokens      = Dqn_ArenaAllocator_NewArray(arena, jsmntok_t, result.tokens_size, Dqn_ZeroMem::No);
+
+    jsmn_init(&result.parser);
+    result.tokens_size = jsmn_parse(&result.parser, result.json.str, result.json.size, result.tokens, result.tokens_size);
+
+    return result;
+}
+
+Dqn_Jsmn Dqn_Jsmn_InitWithJSONFile(Dqn_String file, Dqn_ArenaAllocator *arena)
+{
+    Dqn_String json   = Dqn_File_ArenaReadFileToString(file.str, arena);
+    Dqn_Jsmn   result = Dqn_Jsmn_InitWithJSON(json, arena);
+    return result;
+}
+
+int Dqn_Jsmn_TokenArraySize(jsmntok_t token)
+{
+    int result = token.type == JSMN_ARRAY ? token.size : -1;
+    return result;
+}
+
+Dqn_String Dqn_Jsmn_TokenString(jsmntok_t token, Dqn_String json)
+{
+    Dqn_String result = Dqn_String_Init(json.str + token.start, token.end - token.start);
+    return result;
+}
+
+Dqn_b32 Dqn_Jsmn_TokenBool(jsmntok_t token, Dqn_String json)
+{
+    DQN_ASSERT_MSG(token.start < json.size, "%I64d < %I64u", token.start, json.size);
+    char    ch     = json.str[token.start];
+    Dqn_b32 result = ch == 't';
+    if (!result) { DQN_ASSERT(ch == 'f'); }
+    return result;
+}
+
+Dqn_u64 Dqn_Jsmn_TokenU64(jsmntok_t token, Dqn_String json)
+{
+    DQN_ASSERT_MSG(token.start < json.size, "%I64d < %I64u", token.start, json.size);
+    Dqn_String string = Dqn_String_Init(json.str + token.start, token.end - token.start);
+    Dqn_u64    result = Dqn_String_ToU64(string);
+    return result;
+}
+
+void Dqn_JsmnErrorHandle__AddError(Dqn_JsmnErrorHandle *err_handle, jsmntok_t token, Dqn_String json, Dqn_JsmnTokenIs expected, char const *file, int line)
 {
     if (!err_handle)
         return;
@@ -194,120 +445,123 @@ void Dqn_JsmnErrorHandle_AddError(Dqn_JsmnErrorHandle *err_handle, char const *f
     Dqn_JsmnError *error = Dqn_List_Make(&err_handle->list, 1);
     if (error)
     {
-        error->cpp_func = func;
+        error->expected = expected;
+        error->json     = json;
         error->cpp_file = file;
         error->cpp_line = line;
     }
 }
 
-Dqn_b32 Dqn_JsmnToken__ExpectBool(Dqn_String json, jsmntok_t token, Dqn_JsmnErrorHandle *err_handle, char const *file, int line)
+Dqn_b32 Dqn_JsmnIterator_Next(Dqn_JsmnIterator *it, Dqn_Jsmn *jsmn_state, Dqn_JsmnIterator *prev_it)
 {
-    DQN_ASSERT_MSG(token.start < json.size, "%I64d < %I64u", token.start, json.size);
-    char ch = json.str[token.start];
-    Dqn_b32 result = token.type == JSMN_PRIMITIVE && (ch == 't' || ch == 'f');
-    if (!result) Dqn_JsmnErrorHandle_AddError(err_handle, __func__, file, line);
-    return result;
-}
-
-Dqn_b32 Dqn_JsmnToken__ExpectNumber(Dqn_String json, jsmntok_t token, Dqn_JsmnErrorHandle *err_handle, char const *file, int line)
-{
-    DQN_ASSERT_MSG(token.start < json.size, "%I64d < %I64u", token.start, json.size);
-    char    ch     = json.str[token.start];
-    Dqn_b32 result = token.type == JSMN_PRIMITIVE && (ch == '-' || Dqn_Char_IsDigit(ch));
-    if (!result) Dqn_JsmnErrorHandle_AddError(err_handle, __func__, file, line);
-    return result;
-}
-
-Dqn_b32 Dqn_JsmnToken__ExpectString(jsmntok_t token, Dqn_JsmnErrorHandle *err_handle, char const *file, int line)
-{
-    Dqn_b32 result = token.type == JSMN_STRING;
-    if (!result) Dqn_JsmnErrorHandle_AddError(err_handle, __func__, file, line);
-    return result;
-}
-
-Dqn_b32 Dqn_JsmnToken__ExpectArray(jsmntok_t token, Dqn_JsmnErrorHandle *err_handle, char const *file, int line)
-{
-    Dqn_b32 result = token.type == JSMN_ARRAY;
-    if (!result) Dqn_JsmnErrorHandle_AddError(err_handle, __func__, file, line);
-    return result;
-}
-
-Dqn_b32 Dqn_JsmnToken__ExpectObject(jsmntok_t token, Dqn_JsmnErrorHandle *err_handle, char const *file, int line)
-{
-    Dqn_b32 result = token.type == JSMN_OBJECT;
-    if (!result) Dqn_JsmnErrorHandle_AddError(err_handle, __func__, file, line);
-    return result;
-}
-
-Dqn_String Dqn_JsmnToken_String(Dqn_String json, jsmntok_t token)
-{
-    Dqn_String result = Dqn_String_Init(json.str + token.start, token.end - token.start);
-    return result;
-}
-
-Dqn_b32 Dqn_JsmnToken_Bool(Dqn_String json, jsmntok_t token)
-{
-    DQN_ASSERT_MSG(token.start < json.size, "%I64d < %I64u", token.start, json.size);
-    char    ch     = json.str[token.start];
-    Dqn_b32 result = ch == 't';
-    if (!result) { DQN_ASSERT(ch == 'f'); }
-    return result;
-}
-
-Dqn_u64 Dqn_JsmnToken_U64(Dqn_String json, jsmntok_t token)
-{
-    DQN_ASSERT_MSG(token.start < json.size, "%I64d < %I64u", token.start, json.size);
-    Dqn_String string = Dqn_JsmnToken_String(json, token);
-    Dqn_u64    result = Dqn_String_ToU64(string);
-    return result;
-}
-
-jsmntok_t *Dqn_JsmnToken_AdvanceItPastObject(jsmntok_t *start_it, Dqn_JsmnErrorHandle *err_handle, Dqn_String json)
-{
-    jsmntok_t *result = start_it;
-    if (!Dqn_JsmnToken_ExpectObject(*result, err_handle)) return result;
-    jsmntok_t *object = result++;
-
-    for (int index = 0; index < object->size; index++)
+    if (!it->init)
     {
-        jsmntok_t *key       = result++;
-        jsmntok_t *value     = result++;
-        Dqn_String key_str   = Dqn_JsmnToken_String(json, *key);
-        Dqn_String value_str = Dqn_JsmnToken_String(json, *value); (void)value_str;
+        it->init = true;
+        it->json = jsmn_state->json;
+        jsmn_iterator_init(&it->jsmn_it, jsmn_state->tokens, jsmn_state->tokens_size, prev_it ? jsmn_iterator_position(&prev_it->jsmn_it) : 0);
+    }
 
-        if (value->type == JSMN_OBJECT)
+    Dqn_b32 result = false;
+    if (!Dqn_String_IsValid(it->json) || it->json.size <= 0) {
+        return result;
+    }
+
+    result = jsmn_iterator_next(&it->jsmn_it, &it->key, &it->value, it->token_index_hint) > 0;
+    if (!result)
+    {
+        // NOTE: Iterator has finished object/array, previous iterator will
+        // continue off where this iterator left off.
+        if (prev_it)
+            prev_it->token_index_hint = jsmn_iterator_position(&it->jsmn_it);
+    }
+
+    return result;
+}
+
+Dqn_String Dqn_JsmnIterator_Key(Dqn_JsmnIterator *it)
+{
+    Dqn_String result = {};
+    if (it && it->key)
+        result = Dqn_String_Init(it->json.str + it->key->start, it->key->end - it->key->start);
+    return result;
+}
+
+Dqn_JsmnIterator Dqn_JsmnIterator_FindKey(Dqn_Jsmn *jsmn_state, Dqn_String key, Dqn_JsmnIterator *parent_it)
+{
+    Dqn_JsmnIterator result = {};
+    for (Dqn_JsmnIterator it = {}; Dqn_JsmnIterator_Next(&it, jsmn_state, parent_it); )
+    {
+        Dqn_String it_key = Dqn_Jsmn_TokenString(*it.key, jsmn_state->json);
+        if (it_key == key)
         {
-            result = Dqn_JsmnToken_AdvanceItPastObject(value, err_handle, json);
-        }
-        else if (value->type == JSMN_ARRAY)
-        {
-            result = Dqn_JsmnToken_AdvanceItPastArray(value, err_handle, json);
+            result = it;
+            break;
         }
     }
 
     return result;
 }
 
-jsmntok_t *Dqn_JsmnToken_AdvanceItPastArray(jsmntok_t *start_it, Dqn_JsmnErrorHandle *err_handle, Dqn_String json)
+static Dqn_b32 Dqn_JsmnIterator__Expect(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, jsmntok_t token, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
 {
-    jsmntok_t *result = start_it;
-    if (!Dqn_JsmnToken_ExpectArray(*result, err_handle)) return result;
-    jsmntok_t *array = result++;
-
-    for (int index = 0; index < array->size; index++)
+    Dqn_b32   result = false;
+    switch (expected)
     {
-        jsmntok_t *value     = result++;
-        Dqn_String value_str = Dqn_JsmnToken_String(json, *value); (void)value_str;
-        if (value->type == JSMN_OBJECT)
+        case Dqn_JsmnTokenIs::Object: result = token.type == JSMN_OBJECT; break;
+        case Dqn_JsmnTokenIs::Array:  result = token.type == JSMN_ARRAY; break;
+        case Dqn_JsmnTokenIs::String: result = token.type == JSMN_STRING; break;
+
+        case Dqn_JsmnTokenIs::Number:
         {
-            Dqn_JsmnToken_AdvanceItPastObject(start_it, err_handle, json);
+            DQN_ASSERT_MSG(token.start < it->json.size, "%I64d < %I64u", token.start, it->json.size);
+            char ch = it->json.str[token.start];
+            result  = token.type == JSMN_PRIMITIVE && (ch == '-' || Dqn_Char_IsDigit(ch));
         }
-        else if (value->type == JSMN_ARRAY)
+        break;
+
+        case Dqn_JsmnTokenIs::Bool:
         {
-            Dqn_JsmnToken_AdvanceItPastArray(start_it, err_handle, json);
+            DQN_ASSERT_MSG(token.start < it->json.size, "%I64d < %I64u", token.start, it->json.size);
+            char ch = it->json.str[token.start];
+            result = token.type == JSMN_PRIMITIVE && (ch == 't' || ch == 'f');
         }
+        break;
     }
 
+    if (!result)
+        Dqn_JsmnErrorHandle__AddError(err_handle, token, it->json, expected, file, line);
+
+    return result;
+}
+
+Dqn_b32 Dqn_JsmnIterator__ExpectValue(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
+{
+    Dqn_b32 result = it->value && Dqn_JsmnIterator__Expect(it, expected, *it->value, err_handle, file, line);
+    return result;
+}
+
+Dqn_b32 Dqn_JsmnIterator__ExpectKey(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
+{
+    Dqn_b32 result = it->key && Dqn_JsmnIterator__Expect(it, expected, *it->key, err_handle, file, line);
+    return result;
+}
+
+Dqn_String Dqn_JsmnIterator_String(Dqn_JsmnIterator const *it)
+{
+    Dqn_String result = {};
+    if (it->value && it->json.str) result = Dqn_String_Init(it->json.str + it->value->start, it->value->end - it->value->start);
+    return result;
+}
+
+Dqn_b32 Dqn_JsmnIterator_Bool(Dqn_JsmnIterator const *it)
+{
+    Dqn_b32 result = it->value && Dqn_Jsmn_TokenBool(*it->value, it->json);
+    return result;
+}
+
+Dqn_u64 Dqn_JsmnIterator_U64(Dqn_JsmnIterator const *it)
+{
+    Dqn_u64 result = it->value && Dqn_Jsmn_TokenU64(*it->value, it->json);
     return result;
 }
 
@@ -681,4 +935,236 @@ JSMN_API void jsmn_init(jsmn_parser *parser) {
 #ifdef __cplusplus
 }
 #endif
+
+/**
+ * @brief Takes an JSMN Array/Object and locates index for last item in collection
+ * @details Iterates over JSMN Array/Object until last item is found
+ * 
+ * @param jsmn_tokens   JSMN tokens
+ * @param jsmn_len      JSMN token count
+ * @param parser_pos    Current JSMN token
+ *
+ * @return  < 0 - Error has occured, corresponds to one of JSMNITER_ERR_*
+ *          >=0 - JSMN index for last item in Array/Object
+ */
+int jsmn_iterator_find_last( jsmntok_t *jsmn_tokens, unsigned int jsmn_len, unsigned int parser_pos ) {
+  int child_count;
+  unsigned int child_index;
+  int parent_end;
+
+  /* No tokens */
+  if (!jsmn_tokens)
+    return JSMNITER_ERR_PARAMETER;
+  /* pos outside tokens */
+  if (parser_pos >= jsmn_len)
+    return JSMNITER_ERR_PARAMETER;
+  /* Not an Array/Object */
+  if (jsmn_tokens[parser_pos].type != JSMN_ARRAY && 
+      jsmn_tokens[parser_pos].type != JSMN_OBJECT)
+    return JSMNITER_ERR_TYPE;
+
+  /* End position for Array/Object */
+  parent_end = jsmn_tokens[parser_pos].end;
+
+  /* First child item */
+  child_index = parser_pos + 1;
+  
+  /* Count number of children we need to iterate */
+  child_count = jsmn_tokens[parser_pos].size * (jsmn_tokens[parser_pos].type == JSMN_OBJECT ? 2 : 1);
+
+  /* Loop until end of current Array/Object */
+  while(child_index < jsmn_len && jsmn_tokens[child_index].start <= parent_end && child_count >= 0) {
+    /* Add item count in sub Arrays/Objects that we need to skip */
+    if (jsmn_tokens[child_index].type == JSMN_ARRAY)
+      child_count += jsmn_tokens[child_index].size;
+    else if (jsmn_tokens[child_index].type == JSMN_OBJECT)
+      child_count += jsmn_tokens[child_index].size * 2;
+
+    child_count--;
+    child_index++;
+  }
+
+  /* Validate that we have visited correct number of children */
+  if (child_count != 0)
+    return JSMNITER_ERR_BROKEN;
+
+  /* Points to last index inside Array/Object */
+  return (int)child_index - 1;
+}
+
+
+/**
+ * @brief Initialize iterator
+ * @details Set initial value for iterator struct
+ * 
+ * @param iterator      Iterator struct
+ * @param jsmn_tokens   JSMN tokens
+ * @param jsmn_len      JSMN token count
+ * @param parser_pos    Current JSMN token
+ * 
+ * @return  < 0 - Error has occured, corresponds to one of JSMNITER_ERR_*
+ *          >=0 - Ok
+ */
+int jsmn_iterator_init(jsmn_iterator_t *iterator, jsmntok_t *jsmn_tokens, unsigned int jsmn_len, unsigned int parser_pos) {
+  /* No iterator */
+  if (!iterator)
+    return JSMNITER_ERR_PARAMETER;
+  /* No tokens */
+  if (!jsmn_tokens)
+    return JSMNITER_ERR_PARAMETER;
+  /* pos outside tokens */
+  if (parser_pos >= jsmn_len)
+    return JSMNITER_ERR_PARAMETER;
+  /* Not an Array/Object */
+  if (jsmn_tokens[parser_pos].type != JSMN_ARRAY && 
+      jsmn_tokens[parser_pos].type != JSMN_OBJECT)
+    return JSMNITER_ERR_TYPE;
+
+  /* Save jsmn pointer */
+  iterator->jsmn_tokens = jsmn_tokens;
+  iterator->jsmn_len    = jsmn_len;
+
+  iterator->parent_pos  = parser_pos;
+  iterator->parser_pos  = parser_pos;
+
+  iterator->index  = 0;
+  return 0;
+}
+
+
+/**
+ * @brief Get next item in JSMN Array/Object
+ * @details Gets JSMN position for next identifier and value in Array/Object
+ * 
+ * @param iterator            Iterator struct
+ * @param jsmn_identifier     Return pointer for identifier, NULL for Array
+ * @param jsmn_value          Return pointer for value
+ * @param next_value_index    Possible to indicate where next value begins, allows determine end of sub
+ *                            Array/Object withouth manually searching for it
+ * 
+ * @return  < 0 - Error has occured, corresponds to one of JSMNITER_ERR_*
+ *            0 - No more values
+ *          > 0 - Value (and identifier) has been returned
+ */
+ int jsmn_iterator_next(jsmn_iterator_t *iterator, jsmntok_t **jsmn_identifier, jsmntok_t **jsmn_value, 
+                        unsigned int next_value_index) {
+  unsigned int is_object;
+  jsmntok_t *parent_item;
+  jsmntok_t *current_item;
+  jsmntok_t *jsmn_tokens;
+  unsigned int jsmn_len;
+
+  /* No iterator */
+  if (!iterator)
+    return JSMNITER_ERR_PARAMETER;
+  /* No value return pointer */
+  if (!jsmn_value)
+    return JSMNITER_ERR_PARAMETER;
+  /* Parser position is outside JSMN tokens array */
+  if (iterator->parser_pos > iterator->jsmn_len)
+    return JSMNITER_ERR_BROKEN;
+
+  jsmn_tokens = iterator->jsmn_tokens;
+  jsmn_len = iterator->jsmn_len;
+  parent_item  = &jsmn_tokens[iterator->parent_pos];
+
+  /* parser_position is at the end of JSMN token array or points outside parent Array/Object */
+  if (jsmn_iterator_position(iterator) == iterator->jsmn_len || jsmn_tokens[jsmn_iterator_position(iterator)].start > parent_item->end) {
+    if (iterator->index != (unsigned int)parent_item->size)
+      return JSMNITER_ERR_BROKEN;
+    return 0;
+  }
+
+  current_item = &jsmn_tokens[jsmn_iterator_position(iterator)];
+
+  /* Are we in an Object */
+  is_object = (parent_item->type == JSMN_OBJECT ? 1 : 0);
+
+  /* Is it item we only need jump one to the next index */
+  if (jsmn_iterator_position(iterator) == iterator->parent_pos) {
+    next_value_index = jsmn_iterator_position(iterator) + 1;
+  }
+  /* For items that isn't Array/Object we only need to take the next value */
+  else if (current_item->type != JSMN_ARRAY &&
+           current_item->type != JSMN_OBJECT) {
+    next_value_index = jsmn_iterator_position(iterator) + 1;
+  }
+  /* Check if next_value_index is correct, else we need to calculate it ourself */
+  else if (next_value_index == 0 ||
+           next_value_index > jsmn_len || 
+           next_value_index <= jsmn_iterator_position(iterator) ||
+           current_item->end < jsmn_tokens[next_value_index - 1].end ||
+           (next_value_index < jsmn_len && current_item->end >= jsmn_tokens[next_value_index].start)) {
+    /* Find index for last item in the Array/Object manually */
+    int return_pos = jsmn_iterator_find_last(jsmn_tokens, jsmn_len, jsmn_iterator_position(iterator));
+
+    /* Error, bail out */
+    if (return_pos < 0)
+      return return_pos;
+  
+    /* Update position to the next item token */
+    next_value_index = (unsigned int)(return_pos) + 1;
+
+    /* Outside valid array */
+    if (next_value_index > jsmn_len)
+      return JSMNITER_ERR_BROKEN;
+    /* Earlier than current value (not valid jsmn tree) */
+    if (next_value_index <= jsmn_iterator_position(iterator))
+      return JSMNITER_ERR_BROKEN;
+    /* Previus item is NOT inside current Array/Object */
+    if (jsmn_tokens[next_value_index - 1].end > current_item->end)
+      return JSMNITER_ERR_BROKEN;
+    /* Not last item and next item is NOT outside Array/Object */
+    if (next_value_index < jsmn_len && current_item->end > jsmn_tokens[next_value_index].start)
+      return JSMNITER_ERR_BROKEN;
+  }
+
+  /* Parser position is outside JSMN tokens array */
+  if (next_value_index > iterator->jsmn_len)
+    return JSMNITER_ERR_BROKEN;
+
+  /* parser_position is at the end of JSMN token array or points outside parent Array/Object */
+  if (next_value_index == (unsigned int)iterator->jsmn_len || jsmn_tokens[next_value_index].start > parent_item->end) {
+    if (iterator->index != (unsigned int)parent_item->size)
+      return JSMNITER_ERR_BROKEN;
+    /* Update parser position before exit */
+    iterator->parser_pos = next_value_index;
+    return 0;
+  }
+
+  /* Get current value/identifier */
+  current_item = &jsmn_tokens[next_value_index];
+
+  /* We have identifier, read it */
+  if (is_object) {
+    /* Must be string */
+    if (current_item->type != JSMN_STRING)
+      return JSMNITER_ERR_NOIDENT;
+    /* Ensure that we have next token */
+    if (next_value_index + 1 >= jsmn_len)
+      return JSMNITER_ERR_BROKEN;
+    /* Missing identifier pointer */
+    if (!jsmn_identifier)
+      return JSMNITER_ERR_PARAMETER;
+    
+    /* Set identifier and update current pointer to value item */
+    *jsmn_identifier = current_item;
+    next_value_index++;
+    current_item = &jsmn_tokens[next_value_index];
+  }
+  /* Clear identifier if is set */
+  else if (jsmn_identifier) {
+    *jsmn_identifier = NULL;
+  }
+  
+  /* Set value */
+  *jsmn_value = current_item;
+
+  /* Update parser position */
+  iterator->parser_pos = next_value_index;
+
+  /* Increase the index and return it as the positive value */
+  iterator->index++;
+  return (int)iterator->index;
+}
 #endif // DQN_JSMN_IMPLEMENTATION

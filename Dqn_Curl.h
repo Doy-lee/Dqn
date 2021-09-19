@@ -3,9 +3,8 @@
 // -----------------------------------------------------------------------------
 // NOTE: Dqn_Curl
 // -----------------------------------------------------------------------------
-// A wrapper over CURL that is primarily used for hot-code reloading by
-// packaging the CURL api into a struct that can be passed across DLL
-// boundaries.
+// Define DQN_CURL_IMPLEMENTATION in one and only one file to enable the
+// implementation in translation unit.
 //
 // curl_global_init(CURL_GLOBAL_ALL) must return CURLE_OK before anything
 // in this file is used. You may cleanup curl on exit via curl_global_cleanup()
@@ -14,15 +13,56 @@
 // An easy way to generate the curl commands required to query a url is to use
 // CURL itself and the option to dump the command to a C-compatible file, i.e.
 //
-// curl --libcurl RequestToCCode.c -X POST -H "Content-Type: application/json" --data-binary "{\"jsonrpc\": \"2.0\", \"id\": \"0\", \"method\": \"get_service_nodes\", \"params\": []}" oxen.observer:22023/json_rpc
+// curl --libcurl RequestToCCode.c -X POST -H "Content-Type: application/json" --data-binary "{\"jsonrpc\": \"2.0\", \"id\": \"0\", \"method\": \"get_block_count\", \"params\": []}" oxen.observer:22023/json_rpc
 //
 // -----------------------------------------------------------------------------
-// NOTE: Configuration
+// NOTE: Example
 // -----------------------------------------------------------------------------
-// #define DQN_CURL_IMPLEMENTATION
-//     Define this in one and only one C++ file to enable the implementation
-//     code of the header file.
+#if 0
+struct CurlWriteFunctionUserData
+{
+    Dqn_ArenaAllocator *arena;
+    Dqn_StringList      data;
+};
 
+size_t CurlWriteFunction(char *ptr, size_t size, size_t nmemb, void *userdata)
+{
+    auto *user_data = DQN_CAST(CurlWriteFunctionUserData *)userdata;
+    Dqn_StringList_AppendStringCopy(&user_data->data, user_data->arena, Dqn_String_Init(ptr, nmemb));
+    DQN_ASSERT(size == 1);
+    return nmemb;
+}
+
+void main()
+{
+    // NOTE: Setup Curl handle
+    CURL *handle = curl_easy_init();
+
+    struct curl_slist *header_list = nullptr;
+    header_list                    = curl_slist_append(header_list, "Content-Type: application/json");
+    curl_easy_setopt(handle, CURLOPT_HTTPHEADER, header_list);
+
+    Dqn_String post_data = DQN_STRING("{\"jsonrpc\": \"2.0\", \"id\": \"0\", \"method\": \"get_block_count\", \"params\": []}");
+    Dqn_Curl_SetHTTPPost(handle, "oxen.observer:22023/json_rpc", post_data.str, DQN_CAST(int)post_data.size);
+
+    // NOTE: Set write callback
+    Dqn_ThreadScratch scratch           = Dqn_Thread_GetScratch();
+    CurlWriteFunctionUserData user_data = {};
+    user_data.arena                     = scratch.arena;
+    Dqn_Curl_SetWriteCallback(handle, CurlWriteFunction, &user_data);
+
+    // NOTE: Execute CURL query
+    curl_easy_perform(handle);
+    Dqn_String output = Dqn_StringList_Build(&user_data.string_list, scoped_arena.arena);
+    DQN_LOG_I("%.*s", DQN_STRING_FMT(output));
+
+    // NOTE: Cleanup
+    curl_slist_free_all(header_list);
+    curl_easy_cleanup(handle);
+}
+#endif
+
+// NOTE: Warning this causes Windows.h to be included.
 #define CURL_STATICLIB
 #define NOMINMAX
 #include <curl-7.72.0/include/curl/curl.h>
@@ -47,8 +87,9 @@ struct Dqn_CurlProcs
 };
 
 Dqn_CurlProcs Dqn_CurlProcs_Init();
-void          Dqn_Curl_SetPostData(CURL *curl, char const *post_data, int post_size);
-
+void          Dqn_Curl_SetURL(CURL *handle, char const *url);
+void          Dqn_Curl_SetHTTPPost(CURL *handle, char const *url, char const *post_data, int post_data_size);
+void          Dqn_Curl_SetWriteCallback(CURL *handle, size_t (*curl_write_callback)(char *ptr, size_t size, size_t nmemb, void *userdata), void *user_data);
 #endif // DQN_CURL_H
 
 #if defined(DQN_CURL_IMPLEMENTATION)
@@ -80,10 +121,29 @@ Dqn_CurlProcs Dqn_CurlProcs_Init()
     return result;
 }
 
-void Dqn_Curl_SetPostData(CURL *curl, char const *post_data, int post_size)
+void Dqn_Curl_SetURL(CURL *handle, char const *url)
 {
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, post_size);
+    curl_easy_setopt(handle, CURLOPT_URL, url);
+}
+
+void Dqn_Curl_SetHTTPPost(CURL *handle, char const *url, char const *post_data, int post_data_size)
+{
+    curl_easy_setopt(handle, CURLOPT_BUFFERSIZE, 102400L);
+    curl_easy_setopt(handle, CURLOPT_URL, url);
+    curl_easy_setopt(handle, CURLOPT_NOPROGRESS, 1L);
+    curl_easy_setopt(handle, CURLOPT_POSTFIELDS, post_data);
+    curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)post_data_size);
+    curl_easy_setopt(handle, CURLOPT_USERAGENT, "curl/7.55.1");
+    curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 50L);
+    curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_easy_setopt(handle, CURLOPT_TCP_KEEPALIVE, 1L);
+}
+
+void Dqn_Curl_SetWriteCallback(CURL *handle,
+                               size_t (*curl_write_callback)(char *ptr, size_t size, size_t nmemb, void *userdata),
+                               void *user_data)
+{
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, curl_write_callback);
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, user_data);
 }
 #endif // DQN_CURL_IMPLEMENTATION
