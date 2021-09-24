@@ -38,26 +38,6 @@
 // #define DQN_KECCAK_IMPLEMENTATION
 //     Define this in one and only one C++ file to enable the implementation
 //     code of the header file.
-//
-// #define DQN_KECCAK_MEMCOPY
-//     Define this macro to override the memcpy implementation and avoid pulling
-//     in string.h.
-//
-// #define DQN_KECCAK_MEMCMP
-//     Define this macro to override the memcmp implementation and avoid pulling
-//     in string.h.
-//
-// #define DQN_NO_MALLOC_FUNCTIONS
-//     Define this macro to disable the non-essential helper functions that use
-//     malloc.
-//
-// #define DQN_KECCAK_MALLOC
-//     Define this macro to override the malloc implementation. This library
-//     provides helper functions that use malloc if DQN_NO_MALLOC_FUNCTIONS is
-//     not defined.
-//
-// #define DQN_KECCAK_ASSERT
-//     Define this macro to override the assert implementation.
 
 #if !defined(DQN_KECCAK_MEMCOPY)
     #include <string.h>
@@ -69,18 +49,11 @@
     #define DQN_KECCAK_MEMCMP(dest, src, count) memcmp(dest, src, count)
 #endif
 
-#if !defined(DQN_NO_MALLOC_FUNCTIONS)
-    #if !defined(DQN_KECCAK_MALLOC)
-        #include <stdlib.h>
-        #define DQN_KECCAK_MALLOC(size) malloc(size)
-    #endif
-#endif
-
 #if !defined(DQN_KECCAK_ASSERT)
     #if defined(NDEBUG)
         #define DQN_KECCAK_ASSERT(expr)
     #else
-        #define DQN_KECCAK_ASSERT(expr)                                                            \
+        #define DQN_KECCAK_ASSERT(expr)                                                                  \
             do                                                                                     \
             {                                                                                      \
                 if (!(expr))                                                                       \
@@ -132,26 +105,18 @@ typedef unsigned int   Dqn_Keccak_uint;
 // NOTE: SHA3
 // -----------------------------------------------------------------------------
 // Applies the FIPS 202 SHA3 algorithm on the supplied buffer. The size of
-// the returned hash is (bit-rate/8) bytes, i.e. the dest_size must be at least
+// the returned hash is (bit-rate/8) bytes, i.e. the dest_size must be atleast
 // 32 bytes for SHA-256 and so forth.
 
-// dest_size: The passed in destination buffer must be >= 28 (bytes), otherwise
-// the function asserts or does no-op in release.
 void              Dqn_Keccak_SHA3_224(void const *src, Dqn_Keccak_u64 src_size, void *dest, int dest_size);
 Dqn_KeccakBytes28 Dqn_Keccak_SHA3_224_ToBytes28(void *bytes, Dqn_Keccak_u64 bytes_size);
 
-// dest_size: The passed in destination buffer must be >= 32 (bytes), otherwise
-// the function asserts or does no-op in release.
 void              Dqn_Keccak_SHA3_256(void const *src, Dqn_Keccak_u64 src_size, void *dest, int dest_size);
 Dqn_KeccakBytes32 Dqn_Keccak_SHA3_256_ToBytes32(void *bytes, Dqn_Keccak_u64 bytes_size);
 
-// dest_size: The passed in destination buffer must be >= 48 (bytes), otherwise
-// the function asserts or does no-op in release.
 void              Dqn_Keccak_SHA3_384(void const *src, Dqn_Keccak_u64 src_size, void *dest, int dest_size);
 Dqn_KeccakBytes48 Dqn_Keccak_SHA3_384_ToBytes48(void *bytes, Dqn_Keccak_u64 bytes_size);
 
-// dest_size: The passed in destination buffer must be >= 64 (bytes), otherwise
-// the function asserts or does no-op in release.
 void              Dqn_Keccak_SHA3_512(void const *src, Dqn_Keccak_u64 src_size, void *dest, int dest_size);
 Dqn_KeccakBytes64 Dqn_Keccak_SHA3_512_ToBytes64(void *bytes, Dqn_Keccak_u64 bytes_size);
 
@@ -176,24 +141,15 @@ Dqn_KeccakBytes64 Dqn_Keccak_SHA3_512_U8ArrayToBytes64(Dqn_Array<Dqn_Keccak_u8> 
 // Applies the non-finalized SHA3 algorithm (i.e. a delimited suffix of 0x1
 // instead of 0x6 in SHA3). This is the version of the algorithm used by
 // Ethereum and Monero as they adopted SHA3 before it was finalized.
-
-// dest_size: The passed in destination buffer must be >= 28 (bytes), otherwise
-// the function asserts or does no-op in release.
 void              Dqn_Keccak_224(void const *src, Dqn_Keccak_u64 src_size, void *dest, int dest_size);
 Dqn_KeccakBytes28 Dqn_Keccak_224_ToBytes28(void *bytes, Dqn_Keccak_u64 bytes_size);
 
-// dest_size: The passed in destination buffer must be >= 32 (bytes), otherwise
-// the function asserts or does no-op in release.
 void              Dqn_Keccak_256(void const *src, Dqn_Keccak_u64 src_size, void *dest, int dest_size);
 Dqn_KeccakBytes32 Dqn_Keccak_256_ToBytes32(void *bytes, Dqn_Keccak_u64 bytes_size);
 
-// dest_size: The passed in destination buffer must be >= 48 (bytes), otherwise
-// the function asserts or does no-op in release.
 void              Dqn_Keccak_384(void const *src, Dqn_Keccak_u64 src_size, void *dest, int dest_size);
 Dqn_KeccakBytes48 Dqn_Keccak_384_ToBytes48(void *bytes, Dqn_Keccak_u64 bytes_size);
 
-// dest_size: The passed in destination buffer must be >= 64 (bytes), otherwise
-// the function asserts or does no-op in release.
 void              Dqn_Keccak_512(void const *src, Dqn_Keccak_u64 src_size, void *dest, int dest_size);
 Dqn_KeccakBytes64 Dqn_Keccak_512_ToBytes64(void *bytes, Dqn_Keccak_u64 bytes_size);
 
@@ -217,19 +173,8 @@ Dqn_KeccakBytes64 Dqn_Keccak_512_U8ArrayToBytes64(Dqn_Array<Dqn_Keccak_u8> array
 // -----------------------------------------------------------------------------
 // Convert a binary buffer into its hex representation into dest. The dest
 // buffer must be large enough to contain the hex representation, i.e.
-// at least src_size * 2). This function does *not* null-terminate the buffer.
-// The returned result does *not* include a leading 0x prefix.
+// atleast src_size * 2). This function does *not* null-terminate the buffer.
 void Dqn_Keccak_BytesToHex(void const *src, Dqn_Keccak_u64 src_size, char *dest, Dqn_Keccak_u64 dest_size);
-
-#if defined(DQN_NO_MALLOC_FUNCTIONS)
-// Convert the src bytes into a null-terminated c-string using malloc. Calls
-// into Dqn_Keccak_BytesToHex under the hood.
-// src: If src is nullptr, the function returns an empty null-terminated
-// string, otherwise, the bytes will be converted and returned as hex.
-// return: A null-terminated c-string. This string must be freed by the user
-// using the CRT free(..). If malloc fails the returned string is nullptr.
-char *Dqn_Keccak_BytesToHexCString(void const *src, Dqn_Keccak_u64 src_size);
-#endif // DQN_NO_MALLOC_FUNCTIONS
 
 // Converts a fixed amount of bytes into a hexadecimal string. Helper functions
 // that call into Dqn_Keccak_BytesToHex.
@@ -878,21 +823,6 @@ void Dqn_Keccak_BytesToHex(void const *src, Dqn_Keccak_u64 src_size, char *dest,
     }
 }
 
-#if defined(DQN_NO_MALLOC_FUNCTIONS)
-char *Dqn_Keccak_BytesToHexCString(void const *src, Dqn_Keccak_u64 src_size)
-{
-    int result_size = (src_size * 2);
-    char *result = DQN_KECCAK_MALLOC(result_size + 1 /*null-terminator*/);
-    if (result)
-    {
-        Dqn_Keccak_BytesToHex(src, src_size, result, result_size);
-        result[result_size] = 0;
-    }
-
-    return result;
-}
-#endif // DQN_NO_MALLOC_FUNCTIONS
-
 Dqn_KeccakString56 Dqn_Keccak_Bytes28ToHex(Dqn_KeccakBytes28 const *bytes)
 {
     Dqn_KeccakString56 result;
@@ -957,7 +887,7 @@ Dqn_KeccakBytes32 Dqn_Keccak_Hex64StringToBytes(Dqn_String hex)
 {
     DQN_KECCAK_ASSERT(hex.size == 64);
     Dqn_KeccakBytes32 result;
-    Dqn_Hex_HexToBytes(hex.str, hex.size, result.data, sizeof(result));
+    Dqn_HexToBytes(hex.str, hex.size, result.data, sizeof(result));
     return result;
 }
 #endif // DQN_H
