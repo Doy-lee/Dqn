@@ -3720,7 +3720,7 @@ DQN_API Dqn_String Dqn_StringTrimByteOrderMark(Dqn_String src)
 
 DQN_API Dqn_b32 Dqn_StringIsAllDigits(Dqn_String src)
 {
-    if (!Dqn_StringIsValid(src))
+    if (!Dqn_StringIsValid(src) || src.size == 0)
         return false;
 
     for (Dqn_isize ch_index = 0; ch_index < src.size; ch_index++)
@@ -5453,7 +5453,7 @@ DQN_API Dqn_u64 Dqn_CStringToU64(char const *buf, int size, char separator)
         if (index && ch == separator)
             continue;
 
-        if (ch >= '0' || ch <= '9')
+        if (ch < '0' || ch > '9')
             break;
 
         result    = Dqn_SafeMulU64(result, 10);
