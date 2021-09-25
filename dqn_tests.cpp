@@ -123,10 +123,6 @@ void Dqn_TestBegin(Dqn_Test *state, char const *fmt, ...)
     va_end(args);
 }
 
-void Dqn_TestFinalize(Dqn_Test const *result)
-{
-}
-
 Dqn_Test Dqn_Test_Array()
 {
     Dqn_Test test = {};
