@@ -266,13 +266,13 @@ Dqn_Test Dqn_Test_File()
         // NOTE: Write step
         Dqn_String const SRC_FILE = DQN_STRING("dqn_test_file");
         DQN_TEST(test, "Write file, read it, copy it, move it and delete it");
-        Dqn_b32 write_result = Dqn_FileWriteFile(SRC_FILE.str, "test", 4);
+        Dqn_b32 write_result = Dqn_FileWriteFile(SRC_FILE.str, SRC_FILE.size, "test", 4);
         DQN_TEST_ASSERT(test, write_result);
         DQN_TEST_ASSERT(test, Dqn_FileExists(SRC_FILE));
 
         // NOTE: Read step
         Dqn_Arena arena = {};
-        Dqn_String read_file = Dqn_FileArenaReadFileToString(SRC_FILE.str, &arena);
+        Dqn_String read_file = Dqn_FileArenaReadToString(SRC_FILE.str, SRC_FILE.size, &arena);
         DQN_TEST_ASSERT(test, Dqn_StringIsValid(read_file));
         DQN_TEST_ASSERT(test, read_file.size == 4);
         DQN_TEST_ASSERT_MSG(test, Dqn_StringEq(read_file, DQN_STRING("test")), "read(%zu): %.*s", read_file.size, DQN_STRING_FMT(read_file));
@@ -988,13 +988,6 @@ Dqn_Test Dqn_Test_OS()
     }
 
     {
-        DQN_TEST(test, "Generate secure RNG bytes with -1 size");
-        char buf[1];
-        Dqn_b32 result = Dqn_OSSecureRNGBytes(buf, -1);
-        DQN_TEST_ASSERT(test, result == false);
-    }
-
-    {
         DQN_TEST(test, "Generate secure RNG 32 bytes");
         char const ZERO[32] = {};
         char       buf[32]  = {};
@@ -1520,137 +1513,137 @@ void Dqn_Test__KeccakDispatch(Dqn_Test *test, int hash_type, Dqn_String input)
     {
         case Hash_SHA3_224:
         {
-            Dqn_KeccakBytes28 hash = Dqn_Keccak_SHA3_224_StringToBytes28(input);
+            Dqn_KeccakBytes28 hash = Dqn_SHA3_224StringToBytes28(input);
             Dqn_KeccakBytes28 expect;
             FIPS202_SHA3_224(DQN_CAST(u8 *)input.str, input.size, (u8 *)expect.data);
             DQN_TEST_ASSERT_MSG((*test),
-                                Dqn_Keccak_Bytes28Equals(&hash, &expect),
+                                Dqn_KeccakBytes28Equals(&hash, &expect),
                                 "\ninput:  %.*s"
                                 "\nhash:   %.*s"
                                 "\nexpect: %.*s"
                                 ,
                                 DQN_STRING_FMT(input_hex),
-                                DQN_KECCAK_STRING56_FMT(Dqn_Keccak_Bytes28ToHex(&hash).str),
-                                DQN_KECCAK_STRING56_FMT(Dqn_Keccak_Bytes28ToHex(&expect).str));
+                                DQN_KECCAK_STRING56_FMT(Dqn_KeccakBytes28ToHex(&hash).str),
+                                DQN_KECCAK_STRING56_FMT(Dqn_KeccakBytes28ToHex(&expect).str));
         }
         break;
 
         case Hash_SHA3_256:
         {
-            Dqn_KeccakBytes32 hash = Dqn_Keccak_SHA3_256_StringToBytes32(input);
+            Dqn_KeccakBytes32 hash = Dqn_SHA3_256StringToBytes32(input);
             Dqn_KeccakBytes32 expect;
             FIPS202_SHA3_256(DQN_CAST(u8 *)input.str, input.size, (u8 *)expect.data);
             DQN_TEST_ASSERT_MSG((*test),
-                                Dqn_Keccak_Bytes32Equals(&hash, &expect),
+                                Dqn_KeccakBytes32Equals(&hash, &expect),
                                 "\ninput:  %.*s"
                                 "\nhash:   %.*s"
                                 "\nexpect: %.*s"
                                 ,
                                 DQN_STRING_FMT(input_hex),
-                                DQN_KECCAK_STRING64_FMT(Dqn_Keccak_Bytes32ToHex(&hash).str),
-                                DQN_KECCAK_STRING64_FMT(Dqn_Keccak_Bytes32ToHex(&expect).str));
+                                DQN_KECCAK_STRING64_FMT(Dqn_KeccakBytes32ToHex(&hash).str),
+                                DQN_KECCAK_STRING64_FMT(Dqn_KeccakBytes32ToHex(&expect).str));
         }
         break;
 
         case Hash_SHA3_384:
         {
-            Dqn_KeccakBytes48 hash = Dqn_Keccak_SHA3_384_StringToBytes48(input);
+            Dqn_KeccakBytes48 hash = Dqn_SHA3_384StringToBytes48(input);
             Dqn_KeccakBytes48 expect;
             FIPS202_SHA3_384(DQN_CAST(u8 *)input.str, input.size, (u8 *)expect.data);
             DQN_TEST_ASSERT_MSG((*test),
-                                Dqn_Keccak_Bytes48Equals(&hash, &expect),
+                                Dqn_KeccakBytes48Equals(&hash, &expect),
                                 "\ninput:  %.*s"
                                 "\nhash:   %.*s"
                                 "\nexpect: %.*s"
                                 ,
                                 DQN_STRING_FMT(input_hex),
-                                DQN_KECCAK_STRING96_FMT(Dqn_Keccak_Bytes48ToHex(&hash).str),
-                                DQN_KECCAK_STRING96_FMT(Dqn_Keccak_Bytes48ToHex(&expect).str));
+                                DQN_KECCAK_STRING96_FMT(Dqn_KeccakBytes48ToHex(&hash).str),
+                                DQN_KECCAK_STRING96_FMT(Dqn_KeccakBytes48ToHex(&expect).str));
         }
         break;
 
         case Hash_SHA3_512:
         {
-            Dqn_KeccakBytes64 hash = Dqn_Keccak_SHA3_512_StringToBytes64(input);
+            Dqn_KeccakBytes64 hash = Dqn_SHA3_512StringToBytes64(input);
             Dqn_KeccakBytes64 expect;
             FIPS202_SHA3_512(DQN_CAST(u8 *)input.str, input.size, (u8 *)expect.data);
             DQN_TEST_ASSERT_MSG((*test),
-                                Dqn_Keccak_Bytes64Equals(&hash, &expect),
+                                Dqn_KeccakBytes64Equals(&hash, &expect),
                                 "\ninput:  %.*s"
                                 "\nhash:   %.*s"
                                 "\nexpect: %.*s"
                                 ,
                                 DQN_STRING_FMT(input_hex),
-                                DQN_KECCAK_STRING128_FMT(Dqn_Keccak_Bytes64ToHex(&hash).str),
-                                DQN_KECCAK_STRING128_FMT(Dqn_Keccak_Bytes64ToHex(&expect).str));
+                                DQN_KECCAK_STRING128_FMT(Dqn_KeccakBytes64ToHex(&hash).str),
+                                DQN_KECCAK_STRING128_FMT(Dqn_KeccakBytes64ToHex(&expect).str));
         }
         break;
 
         case Hash_Keccak_224:
         {
-            Dqn_KeccakBytes28 hash = Dqn_Keccak_224_StringToBytes28(input);
+            Dqn_KeccakBytes28 hash = Dqn_Keccak224StringToBytes28(input);
             Dqn_KeccakBytes28 expect;
             Keccak(1152, 448, DQN_CAST(u8 *)input.str, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
             DQN_TEST_ASSERT_MSG((*test),
-                                Dqn_Keccak_Bytes28Equals(&hash, &expect),
+                                Dqn_KeccakBytes28Equals(&hash, &expect),
                                 "\ninput:  %.*s"
                                 "\nhash:   %.*s"
                                 "\nexpect: %.*s"
                                 ,
                                 DQN_STRING_FMT(input_hex),
-                                DQN_KECCAK_STRING56_FMT(Dqn_Keccak_Bytes28ToHex(&hash).str),
-                                DQN_KECCAK_STRING56_FMT(Dqn_Keccak_Bytes28ToHex(&expect).str));
+                                DQN_KECCAK_STRING56_FMT(Dqn_KeccakBytes28ToHex(&hash).str),
+                                DQN_KECCAK_STRING56_FMT(Dqn_KeccakBytes28ToHex(&expect).str));
         }
         break;
 
         case Hash_Keccak_256:
         {
-            Dqn_KeccakBytes32 hash = Dqn_Keccak_256_StringToBytes32(input);
+            Dqn_KeccakBytes32 hash = Dqn_Keccak256StringToBytes32(input);
             Dqn_KeccakBytes32 expect;
             Keccak(1088, 512, DQN_CAST(u8 *)input.str, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
             DQN_TEST_ASSERT_MSG((*test),
-                                Dqn_Keccak_Bytes32Equals(&hash, &expect),
+                                Dqn_KeccakBytes32Equals(&hash, &expect),
                                 "\ninput:  %.*s"
                                 "\nhash:   %.*s"
                                 "\nexpect: %.*s"
                                 ,
                                 DQN_STRING_FMT(input_hex),
-                                DQN_KECCAK_STRING64_FMT(Dqn_Keccak_Bytes32ToHex(&hash).str),
-                                DQN_KECCAK_STRING64_FMT(Dqn_Keccak_Bytes32ToHex(&expect).str));
+                                DQN_KECCAK_STRING64_FMT(Dqn_KeccakBytes32ToHex(&hash).str),
+                                DQN_KECCAK_STRING64_FMT(Dqn_KeccakBytes32ToHex(&expect).str));
         }
         break;
 
         case Hash_Keccak_384:
         {
-            Dqn_KeccakBytes48 hash = Dqn_Keccak_384_StringToBytes48(input);
+            Dqn_KeccakBytes48 hash = Dqn_Keccak384StringToBytes48(input);
             Dqn_KeccakBytes48 expect;
             Keccak(832, 768, DQN_CAST(u8 *)input.str, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
             DQN_TEST_ASSERT_MSG((*test),
-                                Dqn_Keccak_Bytes48Equals(&hash, &expect),
+                                Dqn_KeccakBytes48Equals(&hash, &expect),
                                 "\ninput:  %.*s"
                                 "\nhash:   %.*s"
                                 "\nexpect: %.*s"
                                 ,
                                 DQN_STRING_FMT(input_hex),
-                                DQN_KECCAK_STRING96_FMT(Dqn_Keccak_Bytes48ToHex(&hash).str),
-                                DQN_KECCAK_STRING96_FMT(Dqn_Keccak_Bytes48ToHex(&expect).str));
+                                DQN_KECCAK_STRING96_FMT(Dqn_KeccakBytes48ToHex(&hash).str),
+                                DQN_KECCAK_STRING96_FMT(Dqn_KeccakBytes48ToHex(&expect).str));
         }
         break;
 
         case Hash_Keccak_512:
         {
-            Dqn_KeccakBytes64 hash = Dqn_Keccak_512_StringToBytes64(input);
+            Dqn_KeccakBytes64 hash = Dqn_Keccak512StringToBytes64(input);
             Dqn_KeccakBytes64 expect;
             Keccak(576, 1024, DQN_CAST(u8 *)input.str, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
             DQN_TEST_ASSERT_MSG((*test),
-                                Dqn_Keccak_Bytes64Equals(&hash, &expect),
+                                Dqn_KeccakBytes64Equals(&hash, &expect),
                                 "\ninput:  %.*s"
                                 "\nhash:   %.*s"
                                 "\nexpect: %.*s"
                                 ,
                                 DQN_STRING_FMT(input_hex),
-                                DQN_KECCAK_STRING128_FMT(Dqn_Keccak_Bytes64ToHex(&hash).str),
-                                DQN_KECCAK_STRING128_FMT(Dqn_Keccak_Bytes64ToHex(&expect).str));
+                                DQN_KECCAK_STRING128_FMT(Dqn_KeccakBytes64ToHex(&hash).str),
+                                DQN_KECCAK_STRING128_FMT(Dqn_KeccakBytes64ToHex(&expect).str));
         }
         break;
 

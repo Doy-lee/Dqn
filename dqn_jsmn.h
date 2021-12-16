@@ -14,7 +14,48 @@
 //     code of the header file. This will also automatically enable the JSMN
 //     implementation.
 //
-#include <assert.h>
+// #define DQN_JSMN_NO_CRT
+//     Define this macro to disable functions using the CRT where possible. JSMN
+//     itself includes <stddef.h> and this is the only dependency.
+//
+
+#if !defined(DQN_JSMN_NO_CRT)
+    #include <stdio.h>
+    #include <stdlib.h>
+#endif
+
+#if defined(__cplusplus)
+    #define DQN_JSMN_CLITERAL(Type) Type
+    #define DQN_JSMN_ZERO_INIT {}
+#else
+    #define DQN_JSMN_CLITERAL(Type) (Type)
+    #define DQN_JSMN_ZERO_INIT {0}
+    #include <stdbool.h>
+#endif
+
+#if !defined(DQN_JSMN_DEBUG_BREAK)
+    #include <signal.h>
+    #if defined(NDEBUG)
+        #define DQN_JSMN_DEBUG_BREAK
+    #else
+        #if defined(_WIN32)
+            #define DQN_JSMN_DEBUG_BREAK __debugbreak()
+        #else
+            #define DQN_JSMN_DEBUG_BREAK raise(SIGTRAP)
+        #endif
+    #endif
+#endif
+
+#if !defined(DQN_JSMN_ASSERT)
+    #define DQN_JSMN_ASSERT(expr)                                                    \
+        do                                                                                         \
+        {                                                                                          \
+            if (!(expr))                                                                           \
+            {                                                                                      \
+                DQN_JSMN_DEBUG_BREAK;                                                              \
+            }                                                                                      \
+        } while (0)
+#endif
 
 // -----------------------------------------------------------------------------
 // NOTE: JSMN Configuration
@@ -242,69 +283,78 @@ int jsmn_iterator_next( jsmn_iterator_t *iterator, jsmntok_t **jsmn_identifier, 
 // -----------------------------------------------------------------------------
 // Header File
 // -----------------------------------------------------------------------------
-#define DQN_JSMN_STRING(string) Dqn_JsmnString{(string), sizeof(string) - 1}
-struct Dqn_JsmnString
-{
-    union {
-        char *      str;
-        char const *const_str;
-    };
-    int size;
-};
+#if defined(_WIN32)
+    typedef unsigned __int64 Dqn_JsmnU64;
+    typedef signed __int64 Dqn_JsmnI64;
+#else
+    typedef unsigned long long Dqn_JsmnU64;
+    typedef signed long long Dqn_JsmnI64;
+#endif
 
-bool     Dqn_Jsmn_StringEq(Dqn_JsmnString lhs, Dqn_JsmnString rhs);
-bool     Dqn_Jsmn_StringIsValid(Dqn_JsmnString string);
-bool     Dqn_Jsmn_IsDigit(char ch);
-uint64_t Dqn_Jsmn_StringToU64(Dqn_JsmnString string);
-bool     operator==(Dqn_JsmnString lhs, Dqn_JsmnString rhs);
+typedef struct Dqn_JsmnString
+{
+    union Dqn_JsmnStringBuffer { char const *const_str; char *str; } buf;
+    Dqn_JsmnI64 size;
+} Dqn_JsmnString;
+
+#define DQN_JSMN_STRING(string) DQN_JSMN_CLITERAL(Dqn_JsmnString){{(string)}, sizeof(string) - 1}
+#define DQN_JSMN_STRING_FMT(string) (int)((string).size), (string).buf.str
+
+bool        Dqn_JsmnStringEq(Dqn_JsmnString lhs, Dqn_JsmnString rhs);
+bool        Dqn_JsmnStringIsValid(Dqn_JsmnString string);
+bool        Dqn_JsmnIsDigit(char ch);
+Dqn_JsmnU64 Dqn_JsmnStringToU64(Dqn_JsmnString string);
+
+#if defined(__cplusplus)
+bool        operator==(Dqn_JsmnString lhs, Dqn_JsmnString rhs);
+#endif // __cplusplus
 
 #define DQN_JSMN_X_MACRO \
+    DQN_JSMN_X_ENTRY(Invalid) \
     DQN_JSMN_X_ENTRY(Object) \
     DQN_JSMN_X_ENTRY(Array) \
     DQN_JSMN_X_ENTRY(String) \
     DQN_JSMN_X_ENTRY(Number) \
     DQN_JSMN_X_ENTRY(Bool)
 
-enum Dqn_JsmnTokenIs
+typedef enum Dqn_JsmnTokenIs
 {
 #define DQN_JSMN_X_ENTRY(enum_val) Dqn_JsmnTokenIs_##enum_val,
     DQN_JSMN_X_MACRO
 #undef DQN_JSMN_X_ENTRY
-};
+} Dqn_JsmnTokenIs;
 
-Dqn_JsmnString const Dqn_Jsmn_TokenIsToString[]
-{
-#define DQN_JSMN_X_ENTRY(enum_val) DQN_JSMN_STRING(#enum_val),
-    DQN_JSMN_X_MACRO
-#undef DQN_JSMN_X_ENTRY
-};
-
-struct Dqn_JsmnError
+typedef struct Dqn_JsmnError
 {
     jsmntok_t        token;
     Dqn_JsmnString   json;
+    Dqn_JsmnTokenIs  actual;
     Dqn_JsmnTokenIs  expected;
     char const      *cpp_file; // The file of the .cpp/h source code that triggered the error
     int              cpp_line; // The line of the .cpp/h source code that triggered the error
-};
+} Dqn_JsmnError;
 
-#define DQN_JSMN_ERROR_HANDLE_SIZE 128
-struct Dqn_JsmnErrorHandle
+#if !defined(DQN_JSMN_ERROR_HANDLE_SIZE)
+    #define DQN_JSMN_ERROR_HANDLE_SIZE 128
+#endif
+
+typedef struct Dqn_JsmnErrorHandle
 {
     Dqn_JsmnError errors[DQN_JSMN_ERROR_HANDLE_SIZE];
     int           errors_size;
-};
+} Dqn_JsmnErrorHandle;
 
-struct Dqn_Jsmn
+typedef struct Dqn_Jsmn
 {
     bool            valid;
     jsmn_parser     parser;
     Dqn_JsmnString  json;
-    int             tokens_size;
+    bool            json_needs_crt_free;
+    unsigned int    tokens_size;
     jsmntok_t      *tokens;
-};
+} Dqn_Jsmn;
 
-struct Dqn_JsmnIterator
+typedef struct Dqn_JsmnIterator
 {
     bool            init;
     jsmn_iterator_t jsmn_it;
@@ -316,217 +366,316 @@ struct Dqn_JsmnIterator
     // parent iterator so that it knows where to continue off from and to skip
     // over the object/array we just iterated.
     int             token_index_hint;
-};
+} Dqn_JsmnIterator;
 
 // Calculate the number of tokens required to parse the 'json' input.
-int Dqn_Jsmn_TokensRequired(char const *json, int size);
+unsigned int   Dqn_JsmnTokensRequired(char const *json, Dqn_JsmnI64 size);
+Dqn_JsmnString Dqn_JsmnTokenIsToString(Dqn_JsmnTokenIs enum_val);
 
-// To initialise successfully, call this function with the 'jsmn' parameter
-// set with the 'jsmn->tokens' and 'jsmn->tokens_size' fields set to a valid
-// destination buffer with a sufficient size that will be written on completion
-// of the function. The required amount of tokens can be calculated using
-// Dqn_Jsmn_TokensRequired.
-//
-// The function *does* not validate that the 'jsmn->tokens_size' is sufficient
-// to hold the tokens in release mode.
-//
-// return: False if any of the parameters are invalid or the 'jsmn' tokens or
-// size are not set, otherwise true. Additionally, 'jsmn->valid' is set
-// accordingly to match the result of initialisation.
-bool Dqn_Jsmn_InitWithJSONCString(char const *json, int size, Dqn_Jsmn *jsmn);
+// Initialise a Dqn_Jsmn context by passing the JSON string and pass in a token
+// array sufficient to parse the JSON string. The number of tokens that must be
+// allocated and passed in can be calculated using Dqn_JsmnTokensRequire(...).
+Dqn_Jsmn       Dqn_JsmnInitWithJSONCString(char const *json, Dqn_JsmnI64 size, jsmntok_t *tokens, unsigned int tokens_size);
+Dqn_Jsmn       Dqn_JsmnInitWithJSONString(Dqn_JsmnString json, jsmntok_t *tokens, unsigned int tokens_size);
+
+#if !defined(DQN_JSMN_NO_CRT)
+Dqn_Jsmn       Dqn_JsmnInitWithMallocJSONCString(char const *json, Dqn_JsmnI64 size);
+Dqn_Jsmn       Dqn_JsmnInitWithMallocJSON(Dqn_JsmnString json);
+Dqn_Jsmn       Dqn_JsmnInitWithMallocJSONFile(Dqn_JsmnString json_file);
+void           Dqn_JsmnFree(Dqn_Jsmn *jsmn);
+void           Dqn_JsmnErrorHandleDumpToCRTFile(Dqn_JsmnErrorHandle const *handle, FILE *file);
+void           Dqn_JsmnErrorDumpToCRTFile(Dqn_JsmnError const *error, FILE *file);
+#endif // !DQN_JSMN_NO_CRT
 
 #if defined(DQN_H)
-Dqn_Jsmn Dqn_Jsmn_InitWithJSON(Dqn_JsmnString json, Dqn_ArenaAllocator *arena);
-Dqn_Jsmn Dqn_Jsmn_InitWithJSONFile(Dqn_JsmnString file, Dqn_ArenaAllocator *arena);
+Dqn_Jsmn       Dqn_JsmnInitWithArenaJSONCString(char const *json, Dqn_JsmnI64 size, Dqn_Arena *arena);
+Dqn_Jsmn       Dqn_JsmnInitWithArenaJSON(Dqn_JsmnString json, Dqn_Arena *arena);
+Dqn_Jsmn       Dqn_JsmnInitWithArenaJSONFile(Dqn_JsmnString file, Dqn_Arena *arena);
 #endif // DQN_H
 
 // return: If the token is an array, return the size of the array otherwise -1.
-int            Dqn_Jsmn_TokenArraySize(jsmntok_t token);
-Dqn_JsmnString Dqn_Jsmn_TokenString(jsmntok_t token, Dqn_JsmnString json);
-bool           Dqn_Jsmn_TokenBool(jsmntok_t token, Dqn_JsmnString json);
-uint64_t       Dqn_Jsmn_TokenU64(jsmntok_t token, Dqn_JsmnString json);
+int            Dqn_JsmnTokenArraySize(jsmntok_t token);
+Dqn_JsmnString Dqn_JsmnTokenString(jsmntok_t token, Dqn_JsmnString json);
+bool           Dqn_JsmnTokenBool(jsmntok_t token, Dqn_JsmnString json);
+Dqn_JsmnU64    Dqn_JsmnTokenU64(jsmntok_t token, Dqn_JsmnString json);
 
 // Iterator abstraction over jsmn_iterator_t, example on how to use this is
 // shown below. The goal here is to minimise the amount of state the user has to
 // manage.
 #if 0
-    Dqn_ArenaAllocator arena = {};
-    Dqn_JsmnString json = DQN_STRING(R"({
-        "test": {
-            "test2": 0
-        }
-    })");
-
-    Dqn_Jsmn jsmn_state = Dqn_Jsmn_InitWithJSON(json, &arena);
-    for (Dqn_JsmnIterator it = {}; Dqn_Jsmn_IteratorNext(&it, &jsmn_state, nullptr /*prev_it*/); )
+    Dqn_JsmnString json = DQN_JSMN_STRING("{ \"test\": { \"test2\": 0 } }");
+    Dqn_Jsmn jsmn_state = Dqn_JsmnInitWithMallocJSON(json);
+    for (Dqn_JsmnIterator it = DQN_JSMN_ZERO_INIT; Dqn_JsmnIteratorNext(&it, &jsmn_state, NULL /*prev_it*/); )
     {
-        Dqn_JsmnString key = Dqn_JsmnITerator_Key(&it);
-        if (key == DQN_STRING("test"))
+        Dqn_JsmnString key = Dqn_JsmnIteratorKey(&it);
+        if (Dqn_JsmnStringEq(key, DQN_JSMN_STRING("test")))
         {
-            if (!Dqn_Jsmn_IteratorExpectValue(&it, Dqn_JsmnTokenIs_Object, nullptr))
+            if (!Dqn_JsmnIteratorExpectValue(&it, Dqn_JsmnTokenIs_Object, NULL))
                 continue;
 
-            for (Dqn_JsmnIterator obj_it = {}; Dqn_Jsmn_IteratorNext(&obj_it, &jsmn_state, &it); )
+            for (Dqn_JsmnIterator obj_it = DQN_JSMN_ZERO_INIT; Dqn_JsmnIteratorNext(&obj_it, &jsmn_state, &it); )
             {
-                Dqn_JsmnString obj_key = Dqn_JsmnITerator_Key(&obj_it);
-                if (obj_key == DQN_STRING("test2"))
+                Dqn_JsmnString obj_key = Dqn_JsmnIteratorKey(&obj_it);
+                if (Dqn_JsmnStringEq(obj_key, DQN_JSMN_STRING("test2")))
                 {
-                    if (!Dqn_Jsmn_IteratorExpectValue(&obj_it, Dqn_JsmnTokenIs_Number, nullptr))
+                    if (!Dqn_JsmnIteratorExpectValue(&obj_it, Dqn_JsmnTokenIs_Number, NULL))
                         continue;
 
-                    uint64_t test_2_value = Dqn_Jsmn_IteratorU64(&obj_it);
+                    Dqn_JsmnU64 test_2_value = Dqn_JsmnIteratorU64(&obj_it);
+                    (void)test_2_value;
                 }
             }
         }
     }
 #endif
-bool             Dqn_Jsmn_IteratorNext(Dqn_JsmnIterator *it, Dqn_Jsmn *jsmn_state, Dqn_JsmnIterator *prev_it);
-Dqn_JsmnString   Dqn_Jsmn_IteratorKey(Dqn_JsmnIterator *it);
-Dqn_JsmnIterator Dqn_Jsmn_IteratorFindKey(Dqn_Jsmn *jsmn_state, Dqn_JsmnString key, Dqn_JsmnIterator *parent_it);
+bool             Dqn_JsmnIteratorNext(Dqn_JsmnIterator *it, Dqn_Jsmn *jsmn_state, Dqn_JsmnIterator *prev_it);
+Dqn_JsmnString   Dqn_JsmnIteratorKey(Dqn_JsmnIterator *it);
+Dqn_JsmnIterator Dqn_JsmnIteratorFindKey(Dqn_Jsmn *jsmn_state, Dqn_JsmnString key, Dqn_JsmnIterator *parent_it);
 
-#define Dqn_Jsmn_IteratorExpectValue(it, expected, err_handle) Dqn_Jsmn_Iterator_ExpectValue(it, expected, err_handle, __FILE__, __LINE__)
-#define Dqn_Jsmn_IteratorExpectKey(it, expected, err_handle) Dqn_Jsmn_Iterator_ExpectKey(it, expected, err_handle, __FILE__, __LINE__)
+#define Dqn_JsmnIteratorExpectValue(it, expected, err_handle) Dqn_Jsmn_IteratorExpectValue(it, expected, err_handle, __FILE__, __LINE__)
+#define Dqn_JsmnIteratorExpectKey(it, expected, err_handle) Dqn_Jsmn_IteratorExpectKey(it, expected, err_handle, __FILE__, __LINE__)
 
 // Convert the value part of the key-value JSON pair the iterator is currently
 // pointing to, to a string/bool/u64. If the iterator's value does not point to
 // the type requested, a zero initialised value is returned.
-Dqn_JsmnString  Dqn_Jsmn_IteratorString(Dqn_JsmnIterator const *it);
-bool            Dqn_Jsmn_IteratorBool(Dqn_JsmnIterator const *it);
-uint64_t        Dqn_Jsmn_IteratorU64(Dqn_JsmnIterator const *it);
-
-#define DQN_JSMN_ERROR_HANDLE_DUMP(handle)                                                                             \
-    for (Dqn_ListChunk<Dqn_JsmnError> *chunk = handle.list.head; chunk; chunk = chunk->next)                           \
-    {                                                                                                                  \
-        for (auto *error = chunk->data; error != (chunk->data + chunk->count); error++)                                \
-        {                                                                                                              \
-            DQN_LOG_E("Json parsing error in %s:%d, expected token type: %.*s, token was: %.*s",                       \
-                      Dqn_Str_FileNameFromPath(error->cpp_file),                                                       \
-                      error->cpp_line,                                                                                 \
-                      DQN_STRING_FMT(Dqn_Jsmn_TokenIsToString(error->expected)),                                       \
-                      DQN_STRING_FMT(Dqn_Jsmn_TokenString(error->token, error->json)));                                \
-        }                                                                                                              \
-    }
-
+Dqn_JsmnString Dqn_JsmnIteratorString(Dqn_JsmnIterator const *it);
+bool           Dqn_JsmnIteratorBool(Dqn_JsmnIterator const *it);
+Dqn_JsmnU64    Dqn_JsmnIteratorU64(Dqn_JsmnIterator const *it);
 #endif // DQN_JSMN_H
 
 #if defined(DQN_JSMN_IMPLEMENTATION)
 // -----------------------------------------------------------------------------
 // Implementation
 // -----------------------------------------------------------------------------
-bool Dqn_Jsmn_StringEq(Dqn_JsmnString lhs, Dqn_JsmnString rhs)
+bool Dqn_JsmnStringEq(Dqn_JsmnString lhs, Dqn_JsmnString rhs)
 {
     bool result = lhs.size == rhs.size;
-    for (int i = 0; i < lhs.size && result; i++) result &= lhs.str[i] == rhs.str[i];
+    for (int i = 0; i < lhs.size && result; i++) result &= lhs.buf.str[i] == rhs.buf.str[i];
     return result;
 }
 
-bool Dqn_Jsmn_StringIsValid(Dqn_JsmnString string)
+bool Dqn_JsmnStringIsValid(Dqn_JsmnString string)
 {
-    bool result = string.str && string.size >= 0;
+    bool result = string.buf.str && string.size >= 0;
     return result;
 }
 
-bool Dqn_Jsmn_IsDigit(char ch)
+bool Dqn_JsmnIsDigit(char ch)
 {
     bool result = (ch >= '0' && ch <= '9');
     return result;
 }
 
-uint64_t Dqn_Jsmn_StringToU64(Dqn_JsmnString string)
+Dqn_JsmnU64 Dqn_JsmnStringToU64(Dqn_JsmnString string)
 {
-    uint64_t result = 0;
-    if (!Dqn_Jsmn_StringIsValid(string))
+    Dqn_JsmnU64 result = 0;
+    if (!Dqn_JsmnStringIsValid(string))
         return result;
 
     for (int i = 0; i < string.size; i++)
     {
-        char ch = string.str[i];
-        if (!Dqn_Jsmn_IsDigit(ch))
+        char ch = string.buf.str[i];
+        if (!Dqn_JsmnIsDigit(ch))
             return result;
 
-        uint64_t digit = ch - '0';
+        Dqn_JsmnU64 digit = ch - '0';
         result         = (result * 10) + digit;
     }
 
     return result;
 }
 
+#if defined(__cplusplus)
 bool operator==(Dqn_JsmnString lhs, Dqn_JsmnString rhs)
 {
-    bool result = Dqn_Jsmn_StringEq(lhs, rhs);
+    bool result = Dqn_JsmnStringEq(lhs, rhs);
     return result;
 }
+#endif // __cplusplus
 
-int Dqn_Jsmn_TokensRequired(char const *json, int size)
+unsigned int Dqn_JsmnTokensRequired(char const *json, Dqn_JsmnI64 size)
 {
     jsmn_parser parser;
     jsmn_init(&parser);
-    int result = jsmn_parse(&parser, json, size, nullptr, 0);
+    unsigned int result = jsmn_parse(&parser, json, size, NULL, 0);
     return result;
 }
 
-bool Dqn_Jsmn_InitWithJSONCString(char const *json, int size, Dqn_Jsmn *jsmn)
+Dqn_JsmnString Dqn_JsmnTokenIsToString(Dqn_JsmnTokenIs enum_val)
 {
-    if (!jsmn || !jsmn->tokens || jsmn->tokens_size == 0 || !json)
-        return false;
-
-    assert(jsmn->tokens_size == Dqn_Jsmn_TokensRequired(json, size));
-
-    *jsmn = {};
-    jsmn_init(&jsmn->parser);
-    jsmn->valid = jsmn_parse(&jsmn->parser, jsmn->json.str, jsmn->json.size, jsmn->tokens, jsmn->tokens_size) > 0;
-    return jsmn->valid;
+    switch (enum_val)
+    {
+#define DQN_JSMN_X_ENTRY(enum_val) case Dqn_JsmnTokenIs_##enum_val: return DQN_JSMN_STRING(#enum_val);
+    DQN_JSMN_X_MACRO
+#undef DQN_JSMN_X_ENTRY
+    }
+    return DQN_JSMN_STRING("DQN_JSMN_UNHANDLED_ENUM");
 }
 
-#if defined(DQN_H)
-Dqn_Jsmn Dqn_Jsmn_InitWithJSON(Dqn_JsmnString json, Dqn_ArenaAllocator *arena)
+Dqn_Jsmn Dqn_JsmnInitWithJSONCString(char const *json, Dqn_JsmnI64 size, jsmntok_t *tokens, unsigned int tokens_size)
 {
-    Dqn_Jsmn result    = {};
-    result.tokens_size = Dqn_Jsmn_InitWithJSONCString(json.str, json.size, nullptr);
-    result.tokens      = Dqn_ArenaAllocator_NewArray(arena, jsmntok_t, result.tokens_size, Dqn_ZeroMem::No);
+    Dqn_Jsmn result = DQN_JSMN_ZERO_INIT;
+    if (!tokens || tokens_size <= 0 || !json || size <= 0)
+        return result;
 
-    Dqn_Jsmn_InitWithJSONCString(json.str, json.size, &result)
+    DQN_JSMN_ASSERT(tokens_size == Dqn_JsmnTokensRequired(json, size));
+    jsmn_init(&result.parser);
+    result.json.buf.const_str = json;
+    result.json.size          = size;
+    result.tokens             = tokens;
+    result.tokens_size        = tokens_size;
+    result.valid = jsmn_parse(&result.parser, result.json.buf.str, result.json.size, result.tokens, result.tokens_size) > 0;
     return result;
 }
 
-Dqn_Jsmn Dqn_Jsmn_InitWithJSONFile(Dqn_JsmnString file, Dqn_ArenaAllocator *arena)
+Dqn_Jsmn Dqn_JsmnInitWithJSONString(Dqn_JsmnString json, jsmntok_t *tokens, unsigned int size)
 {
-    Dqn_JsmnString json   = Dqn_File_ArenaReadFileToString(file.str, arena);
-    Dqn_Jsmn   result = Dqn_Jsmn_InitWithJSON(json, arena);
+    Dqn_Jsmn result = Dqn_JsmnInitWithJSONCString(json.buf.str, json.size, tokens, size);
     return result;
 }
-#endif // DQN_H
 
-int Dqn_Jsmn_TokenArraySize(jsmntok_t token)
+#if !defined(DQN_JSMN_NO_CRT)
+Dqn_Jsmn Dqn_JsmnInitWithMallocJSONCString(char const *json, Dqn_JsmnI64 size)
+{
+    unsigned int tokens_size = Dqn_JsmnTokensRequired(json, size);
+    jsmntok_t *tokens        = (jsmntok_t *)malloc(sizeof(jsmntok_t) * tokens_size);
+
+    Dqn_Jsmn result = DQN_JSMN_ZERO_INIT;
+    if (tokens)
+        result = Dqn_JsmnInitWithJSONCString(json, size, tokens, tokens_size);
+
+    if (!result.valid)
+        free(tokens);
+
+    return result;
+}
+
+Dqn_Jsmn Dqn_JsmnInitWithMallocJSON(Dqn_JsmnString json)
+{
+    Dqn_Jsmn result = Dqn_JsmnInitWithMallocJSONCString(json.buf.str, json.size);
+    return result;
+}
+
+Dqn_Jsmn Dqn_JsmnInitWithMallocJSONFile(Dqn_JsmnString json_file)
+{
+    Dqn_Jsmn result      = DQN_JSMN_ZERO_INIT;
+    FILE *   file_handle = NULL;
+    fopen_s(&file_handle, json_file.buf.str, "rb");
+    if (!file_handle)
+        return result;
+
+    fseek(file_handle, 0, SEEK_END);
+    size_t json_size = ftell(file_handle);
+    rewind(file_handle);
+
+    char *json = (char *)malloc(json_size + 1);
+    if (json)
+    {
+        json[json_size] = 0;
+        if (fread(json, json_size, 1, file_handle) == 1)
+        {
+            unsigned int tokens_size = Dqn_JsmnTokensRequired(json, json_size);
+            jsmntok_t *  tokens      = (jsmntok_t *)malloc(sizeof(jsmntok_t) * tokens_size);
+            if (tokens)
+            {
+                result = Dqn_JsmnInitWithJSONCString(json, json_size, tokens, tokens_size);
+                result.json_needs_crt_free = true;
+            }
+        }
+    }
+
+    fclose(file_handle);
+    if (!result.valid)
+        Dqn_JsmnFree(&result);
+
+    return result;
+}
+
+void Dqn_JsmnFree(Dqn_Jsmn *jsmn)
+{
+    if (jsmn->json.buf.str && jsmn->json_needs_crt_free)
+        free(jsmn->json.buf.str);
+
+    if (jsmn->tokens)
+        free(jsmn->tokens);
+
+    jsmn->valid = false;
+}
+
+void Dqn_JsmnErrorHandleDumpToCRTFile(Dqn_JsmnErrorHandle const *handle, FILE *file)
+{
+    for (int err_index = 0; err_index < handle->errors_size; err_index++)
+    {
+        Dqn_JsmnError const *error = handle->errors + err_index;
+        Dqn_JsmnErrorDumpToCRTFile(error, file);
+    }
+}
+
+void Dqn_JsmnErrorDumpToCRTFile(Dqn_JsmnError const *error, FILE *file)
+{
+    fprintf(file,
+            "Json parsing error in %s:%d, expected token type: %.*s, token was: %.*s (%.*s)\n",
+            error->cpp_file,
+            error->cpp_line,
+            DQN_JSMN_STRING_FMT(Dqn_JsmnTokenIsToString(error->expected)),
+            DQN_JSMN_STRING_FMT(Dqn_JsmnTokenIsToString(error->actual)),
+            DQN_JSMN_STRING_FMT(Dqn_JsmnTokenString(error->token, error->json)));
+}
+#endif // !DQN_JSMN_NO_CRT
+
+#if defined(DQN_IMPLEMENTATION)
+Dqn_Jsmn Dqn_JsmnInitWithArenaJSONCString(char const *json, Dqn_JsmnI64 size, Dqn_Arena *arena)
+{
+    int        tokens_size = Dqn_JsmnTokensRequired(json, size);
+    jsmntok_t *tokens      = Dqn_ArenaNewArray(arena, jsmntok_t, tokens_size, Dqn_ZeroMem::No);
+    Dqn_Jsmn   result      = Dqn_JsmnInitWithJSONCString(json, size, tokens, tokens_size);
+    return result;
+}
+
+Dqn_Jsmn Dqn_JsmnInitWithArenaJSON(Dqn_JsmnString json, Dqn_Arena *arena)
+{
+    Dqn_Jsmn result = Dqn_JsmnInitWithArenaJSONCString(json.buf.str, json.size, arena);
+    return result;
+}
+
+Dqn_Jsmn Dqn_JsmnInitWithArenaJSONFile(Dqn_JsmnString file, Dqn_Arena *arena)
+{
+    Dqn_String json   = Dqn_FileArenaReadToString(file.buf.str, file.size, arena);
+    Dqn_Jsmn   result = Dqn_JsmnInitWithArenaJSON({{json.str}, (int)json.size}, arena);
+    return result;
+}
+#endif // DQN_IMPLEMENTATION
+
+int Dqn_JsmnTokenArraySize(jsmntok_t token)
 {
     int result = token.type == JSMN_ARRAY ? token.size : -1;
     return result;
 }
 
-Dqn_JsmnString Dqn_Jsmn_TokenString(jsmntok_t token, Dqn_JsmnString json)
+Dqn_JsmnString Dqn_JsmnTokenString(jsmntok_t token, Dqn_JsmnString json)
 {
-    Dqn_JsmnString result = {json.str + token.start, token.end - token.start};
+    Dqn_JsmnString result = {{json.buf.str + token.start}, token.end - token.start};
     return result;
 }
 
-bool Dqn_Jsmn_TokenBool(jsmntok_t token, Dqn_JsmnString json)
+bool Dqn_JsmnTokenBool(jsmntok_t token, Dqn_JsmnString json)
 {
-    assert(token.start < json.size);
-    char    ch     = json.str[token.start];
+    DQN_JSMN_ASSERT(token.start < json.size);
+    char    ch     = json.buf.str[token.start];
     bool result = ch == 't';
-    if (!result) { assert(ch == 'f'); }
+    if (!result) { DQN_JSMN_ASSERT(ch == 'f'); }
     return result;
 }
 
-uint64_t Dqn_Jsmn_TokenU64(jsmntok_t token, Dqn_JsmnString json)
+Dqn_JsmnU64 Dqn_JsmnTokenU64(jsmntok_t token, Dqn_JsmnString json)
 {
-    assert(token.start < json.size);
-    Dqn_JsmnString string = {json.str + token.start, token.end - token.start};
-    uint64_t       result = Dqn_Jsmn_StringToU64(string);
+    DQN_JSMN_ASSERT(token.start < json.size);
+    Dqn_JsmnString string = {{json.buf.str + token.start}, token.end - token.start};
+    Dqn_JsmnU64   result = Dqn_JsmnStringToU64(string);
     return result;
 }
 
-void Dqn_JsmnErrorHandle__AddError(Dqn_JsmnErrorHandle *handle, jsmntok_t token, Dqn_JsmnString json, Dqn_JsmnTokenIs expected, char const *file, int line)
+void Dqn_JsmnErrorHandleAddError(Dqn_JsmnErrorHandle *handle, jsmntok_t token, Dqn_JsmnString json, Dqn_JsmnTokenIs actual, Dqn_JsmnTokenIs expected, char const *file, int line)
 {
     if (!handle)
         return;
@@ -535,13 +684,15 @@ void Dqn_JsmnErrorHandle__AddError(Dqn_JsmnErrorHandle *handle, jsmntok_t token,
         return;
 
     Dqn_JsmnError *error = handle->errors + handle->errors_size++;
+    error->token         = token;
+    error->actual        = actual;
     error->expected      = expected;
     error->json          = json;
     error->cpp_file      = file;
     error->cpp_line      = line;
 }
 
-bool Dqn_Jsmn_IteratorNext(Dqn_JsmnIterator *it, Dqn_Jsmn *jsmn_state, Dqn_JsmnIterator *prev_it)
+bool Dqn_JsmnIteratorNext(Dqn_JsmnIterator *it, Dqn_Jsmn *jsmn_state, Dqn_JsmnIterator *prev_it)
 {
     if (!it->init)
     {
@@ -554,7 +705,7 @@ bool Dqn_Jsmn_IteratorNext(Dqn_JsmnIterator *it, Dqn_Jsmn *jsmn_state, Dqn_JsmnI
     }
 
     bool result = false;
-    if (!Dqn_Jsmn_StringIsValid(it->json) || it->json.size <= 0) {
+    if (!Dqn_JsmnStringIsValid(it->json) || it->json.size <= 0) {
         return result;
     }
 
@@ -570,21 +721,21 @@ bool Dqn_Jsmn_IteratorNext(Dqn_JsmnIterator *it, Dqn_Jsmn *jsmn_state, Dqn_JsmnI
     return result;
 }
 
-Dqn_JsmnString Dqn_Jsmn_IteratorKey(Dqn_JsmnIterator *it)
+Dqn_JsmnString Dqn_JsmnIteratorKey(Dqn_JsmnIterator *it)
 {
-    Dqn_JsmnString result = {};
+    Dqn_JsmnString result = DQN_JSMN_ZERO_INIT;
     if (it && it->key)
-        result = {it->json.str + it->key->start, it->key->end - it->key->start};
+        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){{it->json.buf.str + it->key->start}, it->key->end - it->key->start};
     return result;
 }
 
-Dqn_JsmnIterator Dqn_Jsmn_IteratorFindKey(Dqn_Jsmn *jsmn_state, Dqn_JsmnString key, Dqn_JsmnIterator *parent_it)
+Dqn_JsmnIterator Dqn_JsmnIteratorFindKey(Dqn_Jsmn *jsmn_state, Dqn_JsmnString key, Dqn_JsmnIterator *parent_it)
 {
-    Dqn_JsmnIterator result = {};
-    for (Dqn_JsmnIterator it = {}; Dqn_Jsmn_IteratorNext(&it, jsmn_state, parent_it); )
+    Dqn_JsmnIterator result = DQN_JSMN_ZERO_INIT;
+    for (Dqn_JsmnIterator it = DQN_JSMN_ZERO_INIT; Dqn_JsmnIteratorNext(&it, jsmn_state, parent_it); )
     {
-        Dqn_JsmnString it_key = Dqn_Jsmn_TokenString(*it.key, jsmn_state->json);
-        if (it_key == key)
+        Dqn_JsmnString it_key = Dqn_JsmnTokenString(*it.key, jsmn_state->json);
+        if (Dqn_JsmnStringEq(it_key, key))
         {
             result = it;
             break;
@@ -594,67 +745,87 @@ Dqn_JsmnIterator Dqn_Jsmn_IteratorFindKey(Dqn_Jsmn *jsmn_state, Dqn_JsmnString k
     return result;
 }
 
-static bool Dqn_Jsmn_Iterator_Expect(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, jsmntok_t token, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
+static bool Dqn_Jsmn_IteratorExpect(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, jsmntok_t token, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
 {
-    bool   result = false;
+    bool result = false;
     switch (expected)
     {
-        case Dqn_JsmnTokenIs_Object: result = token.type == JSMN_OBJECT; break;
-        case Dqn_JsmnTokenIs_Array:  result = token.type == JSMN_ARRAY; break;
-        case Dqn_JsmnTokenIs_String: result = token.type == JSMN_STRING; break;
+        case Dqn_JsmnTokenIs_Invalid: result = token.type == JSMN_UNDEFINED; break;
+        case Dqn_JsmnTokenIs_Object: result  = token.type == JSMN_OBJECT; break;
+        case Dqn_JsmnTokenIs_Array:  result  = token.type == JSMN_ARRAY; break;
+        case Dqn_JsmnTokenIs_String: result  = token.type == JSMN_STRING; break;
 
         case Dqn_JsmnTokenIs_Number:
         {
-            assert(token.start < it->json.size);
-            char ch = it->json.str[token.start];
-            result  = token.type == JSMN_PRIMITIVE && (ch == '-' || Dqn_Jsmn_IsDigit(ch));
+            DQN_JSMN_ASSERT(token.start < it->json.size);
+            char ch = it->json.buf.str[token.start];
+            result  = token.type == JSMN_PRIMITIVE && (ch == '-' || Dqn_JsmnIsDigit(ch));
         }
         break;
 
         case Dqn_JsmnTokenIs_Bool:
         {
-            assert(token.start < it->json.size);
-            char ch = it->json.str[token.start];
+            DQN_JSMN_ASSERT(token.start < it->json.size);
+            char ch = it->json.buf.str[token.start];
             result = token.type == JSMN_PRIMITIVE && (ch == 't' || ch == 'f');
         }
         break;
     }
 
+    Dqn_JsmnTokenIs actual = DQN_JSMN_ZERO_INIT;
+    switch (token.type)
+    {
+        case JSMN_UNDEFINED: actual = Dqn_JsmnTokenIs_Invalid; break;
+        case JSMN_OBJECT: actual = Dqn_JsmnTokenIs_Object; break;
+        case JSMN_ARRAY: actual = Dqn_JsmnTokenIs_Array; break;
+        case JSMN_STRING: actual = Dqn_JsmnTokenIs_String; break;
+
+        case JSMN_PRIMITIVE:
+        {
+            char first = it->json.buf.str[token.start];
+            if (first == 't' || first == 'f')
+                actual = Dqn_JsmnTokenIs_Bool;
+            else
+                actual = Dqn_JsmnTokenIs_Number;
+        }
+        break;
+    }
+
     if (!result)
-        Dqn_JsmnErrorHandle__AddError(err_handle, token, it->json, expected, file, line);
+        Dqn_JsmnErrorHandleAddError(err_handle, token, it->json, actual, expected, file, line);
 
     return result;
 }
 
-bool Dqn_Jsmn_Iterator_ExpectValue(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
+bool Dqn_Jsmn_IteratorExpectValue(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
 {
-    bool result = it->value && Dqn_Jsmn_Iterator_Expect(it, expected, *it->value, err_handle, file, line);
+    bool result = it->value && Dqn_Jsmn_IteratorExpect(it, expected, *it->value, err_handle, file, line);
     return result;
 }
 
-bool Dqn_Jsmn_Iterator_ExpectKey(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
+bool Dqn_Jsmn_IteratorExpectKey(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, Dqn_JsmnErrorHandle *err_handle, char const *file, unsigned int line)
 {
-    bool result = it->key && Dqn_Jsmn_Iterator_Expect(it, expected, *it->key, err_handle, file, line);
+    bool result = it->key && Dqn_Jsmn_IteratorExpect(it, expected, *it->key, err_handle, file, line);
     return result;
 }
 
-Dqn_JsmnString Dqn_Jsmn_IteratorString(Dqn_JsmnIterator const *it)
+Dqn_JsmnString Dqn_JsmnIteratorString(Dqn_JsmnIterator const *it)
 {
-    Dqn_JsmnString result = {};
-    if (it->value && it->json.str)
-        result = {it->json.str + it->value->start, it->value->end - it->value->start};
+    Dqn_JsmnString result = DQN_JSMN_ZERO_INIT;
+    if (it->value && it->json.buf.str)
+        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){{it->json.buf.str + it->value->start}, it->value->end - it->value->start};
     return result;
 }
 
-bool Dqn_Jsmn_IteratorBool(Dqn_JsmnIterator const *it)
+bool Dqn_JsmnIteratorBool(Dqn_JsmnIterator const *it)
 {
-    bool result = it->value && Dqn_Jsmn_TokenBool(*it->value, it->json);
+    bool result = it->value && Dqn_JsmnTokenBool(*it->value, it->json);
     return result;
 }
 
-uint64_t Dqn_Jsmn_IteratorU64(Dqn_JsmnIterator const *it)
+Dqn_JsmnU64 Dqn_JsmnIteratorU64(Dqn_JsmnIterator const *it)
 {
-    uint64_t result = it->value && Dqn_Jsmn_TokenU64(*it->value, it->json);
+    Dqn_JsmnU64 result = it->value && Dqn_JsmnTokenU64(*it->value, it->json);
     return result;
 }
 

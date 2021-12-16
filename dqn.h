@@ -109,6 +109,7 @@
 #endif
 
 #include <stdarg.h> // va_list
+#include <stdio.h>  // fprintf, FILE, stdout, stderr
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Overridable Macros
@@ -908,7 +909,7 @@ enum struct Dqn_ArenaMemProvider
 struct Dqn_ArenaStatsString
 {
     char str[256];
-    int size;
+    int  size;
 };
 
 struct Dqn_ArenaStats
@@ -919,7 +920,7 @@ struct Dqn_ArenaStats
     Dqn_i32   block_count;
 };
 
-DQN_API Dqn_ArenaStatsString Dqn_ArenaStats_String(Dqn_ArenaStats const *stats);
+DQN_API Dqn_ArenaStatsString Dqn_ArenaStatsToString(Dqn_ArenaStats const *stats);
 
 Dqn_usize const DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
 struct Dqn_Arena
@@ -1071,6 +1072,7 @@ struct Dqn_DSMap
 template <typename T> Dqn_DSMap<T>       Dqn_DSMapInit(Dqn_isize size);
 template <typename T> void               Dqn_DSMapFree(Dqn_DSMap<T> *map);
 
+template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapFind(Dqn_DSMap<T> *map, Dqn_u64 hash);
 template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapFindOrAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_b32 find_only);
 template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, T &value);
 template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapAddCopy(Dqn_DSMap<T> *map, Dqn_u64 hash, T const &value);
@@ -1113,8 +1115,8 @@ template <typename T> DQN_API T *          Dqn_ArrayPeek(Dqn_Array<T> *a);
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_String
 // -------------------------------------------------------------------------------------------------
-#define DQN_STRING(string) Dqn_String{(char *)string, (Dqn_isize)DQN_CHAR_COUNT(string), (Dqn_isize)DQN_CHAR_COUNT(string)}
-#define DQN_STRINGW(string) Dqn_StringW{(wchar_t *)string, (sizeof(string)/sizeof(string[0])) - 1, (sizeof(string)/sizeof(string[0])) - 1}
+#define DQN_STRING(string) Dqn_String{(char *)(string), (Dqn_isize)DQN_CHAR_COUNT(string), (Dqn_isize)DQN_CHAR_COUNT(string)}
+#define DQN_STRINGW(string) Dqn_StringW{(wchar_t *)(string), (sizeof(string)/sizeof(string[0])) - 1}
 #define DQN_STRING_FMT(string) (int)((string).size), (string).str
 struct Dqn_String
 {
@@ -1132,7 +1134,6 @@ struct Dqn_StringW
 {
     wchar_t   *str;
     Dqn_isize  size;
-    Dqn_isize  cap;
 
     wchar_t const *begin() const { return str; }
     wchar_t const *end  () const { return str + size; }
@@ -1151,11 +1152,11 @@ DQN_API Dqn_String Dqn_StringInitMemory(char *buf, Dqn_isize capacity);
 // otherwise true.
 DQN_API Dqn_b32    Dqn_StringIsValid(Dqn_String in);
 
-#define            Dqn_StringTaggedFmt(arena, tag, fmt, ...) Dqn_String_Fmt(arena DQN_CALL_SITE(tag), fmt, ## __VA_ARGS__)
-#define            Dqn_StringTaggedFmtV(arena, tag, fmt, ...) Dqn_String_FmtV(arena DQN_CALL_SITE(tag), fmt, ## __VA_ARGS__)
+#define            Dqn_StringTaggedFmt(arena, tag, fmt, ...) Dqn__StringFmt(arena DQN_CALL_SITE(tag), fmt, ## __VA_ARGS__)
+#define            Dqn_StringTaggedFmtV(arena, tag, fmt, ...) Dqn__StringFmtV(arena DQN_CALL_SITE(tag), fmt, ## __VA_ARGS__)
 
-#define            Dqn_StringFmt(arena, fmt, ...) Dqn_String_Fmt(arena DQN_CALL_SITE(""), fmt, ## __VA_ARGS__)
-#define            Dqn_StringFmtV(arena, fmt, ...) Dqn_String_FmtV(arena DQN_CALL_SITE(""), fmt, ## __VA_ARGS__)
+#define            Dqn_StringFmt(arena, fmt, ...) Dqn__StringFmt(arena DQN_CALL_SITE(""), fmt, ## __VA_ARGS__)
+#define            Dqn_StringFmtV(arena, fmt, ...) Dqn__StringFmtV(arena DQN_CALL_SITE(""), fmt, ## __VA_ARGS__)
 
 #define            Dqn_StringTaggedAllocate(arena, size, zero_mem, tag) Dqn_String_Allocate(arena, size, zero_mem DQN_CALL_SITE(tag))
 #define            Dqn_StringTaggedCopy(src, arena, tag) Dqn_String_Copy(src, arena DQN_CALL_SITE(tag))
@@ -1165,8 +1166,8 @@ DQN_API Dqn_b32    Dqn_StringIsValid(Dqn_String in);
 #define            Dqn_StringCopyCString(src, size, arena) Dqn_String_CopyCString(src, size, arena DQN_CALL_SITE(""))
 #define            Dqn_StringCopy(src, arena) Dqn_String_Copy(src, arena DQN_CALL_SITE(""))
 
-DQN_API Dqn_String Dqn_String_Fmt(Dqn_Arena *arena DQN_CALL_SITE_ARGS, char const *fmt, ...);
-DQN_API Dqn_String Dqn_String_FmtV(Dqn_Arena *arena, char const *fmt, va_list va DQN_CALL_SITE_ARGS);
+DQN_API Dqn_String Dqn__StringFmt(Dqn_Arena *arena DQN_CALL_SITE_ARGS, char const *fmt, ...);
+DQN_API Dqn_String Dqn__StringFmtV(Dqn_Arena *arena, char const *fmt, va_list va DQN_CALL_SITE_ARGS);
 DQN_API Dqn_String Dqn_String_Allocate(Dqn_Arena *arena, Dqn_isize size, Dqn_ZeroMem zero_mem);
 DQN_API Dqn_String Dqn_String_CopyCString(char const *string, Dqn_isize size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
 DQN_API Dqn_String Dqn_String_Copy(Dqn_String const src, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
@@ -1208,7 +1209,12 @@ DQN_API void                  Dqn_StringRemove(Dqn_String *in, Dqn_isize begin, 
 
 // start_index: Set an index within the src string to start the search from, if not desired, set to 0
 // return: The index of the matching find, -1 if it is not found
-DQN_API Dqn_isize             Dqn_StringFind(Dqn_String src, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
+DQN_API Dqn_isize             Dqn_StringFindOffset(Dqn_String src, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
+
+// start_index: Set an index within the src string to start the search from, if not desired, set to 0
+// return: A string that points to the matching find, otherwise a 0 length string.
+DQN_API Dqn_String            Dqn_StringFind(Dqn_String src, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
+
 DQN_API Dqn_String            Dqn_StringReplace(Dqn_String src, Dqn_String find, Dqn_String replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
 DQN_API Dqn_String            Dqn_StringReplaceInsensitive(Dqn_String src, Dqn_String find, Dqn_String replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena);
 
@@ -1753,8 +1759,8 @@ DQN_API char const *Dqn_CStringTrimPrefix(char const *src, Dqn_isize size, char 
 DQN_API Dqn_b32     Dqn_CStringIsAllDigits(char const *src, Dqn_isize size);
 
 // separator: The separator between the thousand-th digits, i.e. separator = ',' converts '1,234' to '1234'.
-DQN_API Dqn_u64     Dqn_CStringToU64(char const *buf, int size = -1, char separator = ',');
-DQN_API Dqn_i64     Dqn_CStringToI64(char const *buf, int size = -1, char separator = ',');
+DQN_API Dqn_u64     Dqn_CStringToU64(char const *buf, Dqn_isize size = -1, char separator = ',');
+DQN_API Dqn_i64     Dqn_CStringToI64(char const *buf, Dqn_isize size = -1, char separator = ',');
 
 DQN_API Dqn_isize   Dqn_LStringSize(wchar_t const *a);
 
@@ -1787,13 +1793,14 @@ DQN_API Dqn_b32      Dqn_FileDelete(Dqn_String path);
 // file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
 // allocator: (Optional) When null, the buffer is allocated with DQN_MALLOC, result should be freed with DQN_FREE.
 // return: nullptr if allocation failed.
-#define             Dqn_FileArenaReadFile(file, file_size, arena) Dqn__FileArenaReadFile(file, file_size, arena DQN_CALL_SITE(""))
-#define             Dqn_FileTaggedArenaReadFileToString(file, arena, tag) Dqn__FileArenaReadFileToString(file, arena DQN_CALL_SITE(tag))
-#define             Dqn_FileArenaReadFileToString(file, arena) Dqn__FileArenaReadFileToString(file, arena DQN_CALL_SITE(""))
-DQN_API Dqn_b32     Dqn_FileWriteFile(char const *file, char const *buffer, Dqn_isize buffer_size);
+#define             Dqn_FileArenaRead(file_path, file_path_size, file_size, arena) Dqn__FileArenaRead(file_path, file_path_size, file_size, arena DQN_CALL_SITE(""))
+#define             Dqn_FileTaggedArenaReadFileToString(file_path, file_path_size, arena, tag) Dqn__FileArenaReadToString(file_path, file_path_size, arena DQN_CALL_SITE(tag))
+#define             Dqn_FileArenaReadToString(file_path, file_path_size, arena) Dqn__FileArenaReadToString(file_path, file_path_size, arena DQN_CALL_SITE(""))
+DQN_API Dqn_b32     Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size);
 
-DQN_API char       *Dqn__FileArenaReadFile(char const *file, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
-DQN_API Dqn_String  Dqn__FileArenaReadFileToString(char const *file, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
+DQN_API char       *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
+DQN_API char       *Dqn__FileArenaRead(char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
+DQN_API Dqn_String  Dqn__FileArenaReadToString(char const *file, Dqn_isize file_path_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Date
@@ -1829,7 +1836,7 @@ DQN_API Dqn_u64 Dqn_DateEpochTime();
 // NOTE: OS
 // -------------------------------------------------------------------------------------------------
 // Generate cryptographically secure bytes
-DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_isize size);
+DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size);
 
 // return: The directory without the trailing '/' or ('\' for windows). Empty
 //         string with a nullptr if it fails.
@@ -2015,7 +2022,7 @@ DQN_API int         Dqn_WinUTF8ToWChar(Dqn_String src, wchar_t *dest, int dest_s
 DQN_API Dqn_StringW Dqn_WinArenaUTF8ToWChar(Dqn_String src, Dqn_Arena *arena);
 
 // See: Dqn_WinUTF8ToWchar notes
-DQN_API int         Dqn_WinWCharToUTF8SizeRequired(Dqn_String src);
+DQN_API int         Dqn_WinWCharToUTF8SizeRequired(Dqn_StringW src);
 DQN_API int         Dqn_WinWCharToUTF8(Dqn_StringW src, char *dest, int dest_size);
 DQN_API Dqn_String  Dqn_WinArenaWCharToUTF8(Dqn_StringW src, Dqn_Arena *arena);
 
@@ -2024,10 +2031,95 @@ DQN_API Dqn_StringW Dqn_WinExecutableDirectoryW(Dqn_Arena *arena);
 // size: (Optional) The size of the current directory string returned
 // suffix: (Optional) A suffix to append to the current working directory
 // suffix_size: (Optional) The size of the suffix to append
-DQN_API Dqn_String             Dqn_WinCurrentDir(Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String suffix);
-DQN_API Dqn_StringW            Dqn_WinCurrentDirW(Dqn_Arena *arena, Dqn_StringW suffix);
-DQN_API Dqn_Array<Dqn_String>  Dqn_WinFolderFiles(Dqn_String path, Dqn_Arena *arena, Dqn_Arena *temp_arena);
-DQN_API Dqn_Array<Dqn_StringW> Dqn_WinFolderFilesW(Dqn_StringW path, Dqn_Arena *arena);
+DQN_API Dqn_String  Dqn_WinCurrentDir(Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String suffix);
+DQN_API Dqn_StringW Dqn_WinCurrentDirW(Dqn_Arena *arena, Dqn_StringW suffix);
+
+struct Dqn_WinFolderIteratorW
+{
+    void       *handle;
+    Dqn_StringW file_name;
+    wchar_t     file_name_buf[512];
+};
+
+struct Dqn_WinFolderIterator
+{
+    void       *handle;
+    Dqn_String file_name;
+    char       file_name_buf[512];
+};
+
+DQN_API bool Dqn_WinFolderIterate(Dqn_String path, Dqn_WinFolderIterator *it);
+DQN_API bool Dqn_WinFolderWIterate(Dqn_StringW path, Dqn_WinFolderIteratorW *it);
+
+enum struct Dqn_WinNetHandleState
+{
+    Invalid,
+    Initialised,
+    RequestFailed,
+    RequestGood,
+};
+
+// The number of bytes each pump of the connection downloads at most. If this is
+// zero we default to DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE.
+#if !defined(DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE)
+    #define DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE 4096
+#endif
+
+struct Dqn_WinNetHandle
+{
+    // NOTE: We copy out the host name because it needs to be null-terminated.
+    // Luckily, we can assume a DNS domain won't exceed 256 characters so this
+    // will generally always work.
+    char host_name[256];
+    int  host_name_size;
+
+    // NOTE: Everything after the domain/host name part of the string i.e. the
+    // '/test' part of the full url 'mywebsite.com/test'.
+    // TODO(dqn): I don't want to make our network API allocate here so we don't
+    // copy the string since we require that the string is null-terminated so
+    // then taking a pointer to the input string should work .. maybe this is
+    // ok?
+    char *url;
+    int   url_size;
+
+    // NOTE: docs.microsoft.com/en-us/windows/win32/wininet/setting-and-retrieving-internet-options#scope-of-hinternet-handle
+    // These handles have three levels:
+    //
+    // The root HINTERNET handle (created by a call to InternetOpen) would contain all the Internet options that affect this instance of WinINet.
+    // HINTERNET handles that connect to a server (created by a call to InternetConnect)
+    // HINTERNET handles associated with a resource or enumeration of resources on a particular server.
+    //
+    // More detailed information about the HINTERNET dependency is listed here
+    // NOTE: https://docs.microsoft.com/en-us/windows/win32/wininet/appendix-a-hinternet-handles
+    void                 *internet_open_handle;
+    void                 *internet_connect_handle;
+    void                 *http_handle;
+    Dqn_WinNetHandleState state;
+};
+
+// TODO(dqn): Useful options to expose in the handle
+// https://docs.microsoft.com/en-us/windows/win32/wininet/option-flags
+// INTERNET_OPTION_CONNECT_RETRIES -- default is 5 retries
+// INTERNET_OPTION_CONNECT_TIMEOUT -- milliseconds
+// INTERNET_OPTION_RECEIVE_TIMEOUT
+// INTERNET_OPTION_SEND_TIMEOUT
+
+// Initialise a new networking handle that is pointing to the specified URL.
+// The URL string must be null-terminated because Windows is a C API and
+// requires null-termination.
+Dqn_WinNetHandle Dqn_WinNetHandleInitCString(char const *url, int url_size);
+Dqn_WinNetHandle Dqn_WinNetHandleInitString(Dqn_String url);
+
+void             Dqn_WinNetHandleFinish(Dqn_WinNetHandle *handle);
+bool             Dqn_WinNetHandleIsValid(Dqn_WinNetHandle const *handle);
+void             Dqn_WinNetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
+bool             Dqn_WinNetHandlePump(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size);
+char *           Dqn_WinNetHandlePumpToCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size);
+Dqn_String       Dqn_WinNetHandlePumpToString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena);
+
+void             Dqn_WinNetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, FILE *file);
+char            *Dqn_WinNetHandlePumpToMallocCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, size_t *download_size);
+Dqn_String       Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size);
 #endif // DQN_OS_WIN32
 
 // -------------------------------------------------------------------------------------------------
@@ -2282,20 +2374,29 @@ void Dqn_DSMapFree(Dqn_DSMap<T> *map)
 }
 
 template <typename T>
+Dqn_DSMapEntry<T> *Dqn_DSMapFind(Dqn_DSMap<T> *map, Dqn_u64 hash)
+{
+    Dqn_DSMapEntry<T> *result = Dqn_DSMapFindOrAdd(map, hash, true /*find_only*/);
+    return result;
+}
+
+template <typename T>
 Dqn_DSMapEntry<T> *Dqn_DSMapFindOrAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_b32 find_only)
 {
     if (!map->slots)
     {
-        if (!find_only) *map = Dqn_DSMapInit<T>(DQN_DS_MAP_MIN_SIZE);
-        return nullptr;
+        if (find_only)
+            return nullptr;
+        else
+            *map = Dqn_DSMapInit<T>(DQN_DS_MAP_MIN_SIZE);
     }
 
     Dqn_isize          index  = hash % map->size;
     Dqn_DSMapEntry<T> *result = map->slots + index;
     while (result->occupied && result->hash != hash)
     {
-        Dqn_isize next_index = (index + 1) % map->size;
-        result               = map->slots + next_index;
+        index  = (index + 1) % map->size;
+        result = map->slots + index;
     }
 
     if (result->occupied)
@@ -2852,10 +2953,10 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
 // NOTE: Implementation
 // -------------------------------------------------------------------------------------------------
 #if defined(DQN_IMPLEMENTATION)
-#include <stdio.h> // fprintf, FILE, stdout, stderr
 
 #if defined(DQN_OS_WIN32)
     #pragma comment(lib, "bcrypt")
+    #pragma comment(lib, "wininet")
     #if !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 
         // Taken from Windows.h
@@ -2915,6 +3016,29 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         // NOTE: MoveFile
         #define MOVEFILE_REPLACE_EXISTING 0x00000001
         #define MOVEFILE_COPY_ALLOWED 0x00000002
+
+        // NOTE: Wininet
+        typedef WORD INTERNET_PORT;
+        #define INTERNET_OPEN_TYPE_PRECONFIG 0 // use registry configuration
+        #define INTERNET_DEFAULT_HTTPS_PORT 443 // HTTPS
+        #define INTERNET_SERVICE_HTTP 3
+        #define INTERNET_OPTION_USER_AGENT 41
+        #define INTERNET_FLAG_NO_AUTH 0x00040000  // no automatic authentication handling
+        #define INTERNET_FLAG_SECURE 0x00800000  // use PCT/SSL if applicable (HTTP)
+
+        // NOTE: CreateFile
+        #define GENERIC_READ (0x80000000L)
+        #define GENERIC_WRITE (0x40000000L)
+        #define GENERIC_EXECUTE (0x20000000L)
+        #define GENERIC_ALL (0x10000000L)
+
+        #define CREATE_NEW          1
+        #define CREATE_ALWAYS       2
+        #define OPEN_EXISTING       3
+        #define OPEN_ALWAYS         4
+        #define TRUNCATE_EXISTING   5
+
+        #define INVALID_FILE_SIZE ((DWORD)0xFFFFFFFF)
 
         // ---------------------------------------------------------------------
         // Data Structures
@@ -3020,6 +3144,45 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
             FindExSearchMaxSearchOp
         } FINDEX_SEARCH_OPS;
 
+
+        typedef enum {
+            INTERNET_SCHEME_PARTIAL = -2,
+            INTERNET_SCHEME_UNKNOWN = -1,
+            INTERNET_SCHEME_DEFAULT = 0,
+            INTERNET_SCHEME_FTP,
+            INTERNET_SCHEME_GOPHER,
+            INTERNET_SCHEME_HTTP,
+            INTERNET_SCHEME_HTTPS,
+            INTERNET_SCHEME_FILE,
+            INTERNET_SCHEME_NEWS,
+            INTERNET_SCHEME_MAILTO,
+            INTERNET_SCHEME_SOCKS,
+            INTERNET_SCHEME_JAVASCRIPT,
+            INTERNET_SCHEME_VBSCRIPT,
+            INTERNET_SCHEME_RES,
+            INTERNET_SCHEME_FIRST = INTERNET_SCHEME_FTP,
+            INTERNET_SCHEME_LAST = INTERNET_SCHEME_RES
+        } INTERNET_SCHEME;
+
+        typedef struct {
+            DWORD   dwStructSize;       // size of this structure. Used in version check
+            char   *lpszScheme;         // pointer to scheme name
+            DWORD   dwSchemeLength;     // length of scheme name
+            INTERNET_SCHEME nScheme;    // enumerated scheme type (if known)
+            char   *lpszHostName;       // pointer to host name
+            DWORD   dwHostNameLength;   // length of host name
+            INTERNET_PORT nPort;        // converted port number
+            char   *lpszUserName;       // pointer to user name
+            DWORD   dwUserNameLength;   // length of user name
+            char   *lpszPassword;       // pointer to password
+            DWORD   dwPasswordLength;   // length of password
+            char   *lpszUrlPath;        // pointer to URL-path
+            DWORD   dwUrlPathLength;    // length of URL-path
+            char   *lpszExtraInfo;      // pointer to extra information (e.g. ?foo or #foo)
+            DWORD   dwExtraInfoLength;  // length of extra information
+        } URL_COMPONENTSA;
+
+
         // ---------------------------------------------------------------------
         // Functions
         // ---------------------------------------------------------------------
@@ -3069,6 +3232,19 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
 
         NTSTATUS      BCryptOpenAlgorithmProvider(BCRYPT_ALG_HANDLE *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
         NTSTATUS      BCryptGenRandom            (BCRYPT_ALG_HANDLE hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
+
+        BOOL          InternetCrackUrlA          (char const *lpszUrl, DWORD dwUrlLength, DWORD dwFlags, URL_COMPONENTSA *lpUrlComponents);
+        void         *InternetOpenA              (char const *lpszAgent, DWORD dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, DWORD dwFlags);
+        void         *InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, DWORD dwService, DWORD dwFlags, DWORD *dwContext);
+        bool          InternetSetOptionA         (void *hInternet, DWORD dwOption, void *lpBuffer, DWORD dwBufferLength);
+        BOOL          InternetReadFile           (void *hFile, void *lpBuffer, DWORD dwNumberOfBytesToRead, DWORD *lpdwNumberOfBytesRead);
+        void         *HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, DWORD dwFlags, DWORD *dwContext);
+        BOOL          HttpSendRequestA           (void *hRequest, char const *lpszHeaders, DWORD dwHeadersLength, void *lpOptional, DWORD dwOptionalLength);
+        BOOL          InternetCloseHandle        (void *hInternet);
+        HANDLE        CreateFileW                (wchar_t const *lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+        BOOL          CloseHandle                (HANDLE hObject);
+        BOOL          ReadFile                   (HANDLE hFile, void *lpBuffer, DWORD nNumberOfBytesToRead, DWORD *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
+        BOOL          GetFileSizeEx              (HANDLE hFile, LARGE_INTEGER *lpFileSize);
         }
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 #elif defined(DQN_OS_UNIX)
@@ -3469,16 +3645,16 @@ DQN_API Dqn_b32 Dqn_StringIsValid(Dqn_String in)
     return result;
 }
 
-DQN_API Dqn_String Dqn_String_Fmt(Dqn_Arena *arena DQN_CALL_SITE_ARGS, char const *fmt, ...)
+DQN_API Dqn_String Dqn__StringFmt(Dqn_Arena *arena DQN_CALL_SITE_ARGS, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    Dqn_String result = Dqn_String_FmtV(arena, fmt, va DQN_CALL_SITE_ARGS_INPUT);
+    Dqn_String result = Dqn__StringFmtV(arena, fmt, va DQN_CALL_SITE_ARGS_INPUT);
     va_end(va);
     return result;
 }
 
-DQN_API Dqn_String Dqn_String_FmtV(Dqn_Arena *arena, char const *fmt, va_list va DQN_CALL_SITE_ARGS)
+DQN_API Dqn_String Dqn__StringFmtV(Dqn_Arena *arena, char const *fmt, va_list va DQN_CALL_SITE_ARGS)
 {
     Dqn_String result = {};
     va_list va2;
@@ -3776,9 +3952,12 @@ DQN_API void Dqn_StringRemove(Dqn_String *in, Dqn_isize begin, Dqn_isize size)
     in->size -= size;
 }
 
-DQN_API Dqn_isize Dqn_StringFind(Dqn_String src, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case)
+DQN_API Dqn_isize Dqn_StringFindOffset(Dqn_String src, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case)
 {
     Dqn_isize result  = -1;
+    if (!Dqn_StringIsValid(src) || !Dqn_StringIsValid(find))
+        return -1;
+
     Dqn_isize src_end = src.size - find.size;
     for (Dqn_isize index = start_index; index <= src_end; index++)
     {
@@ -3788,6 +3967,23 @@ DQN_API Dqn_isize Dqn_StringFind(Dqn_String src, Dqn_String find, Dqn_isize star
             result = index;
             break;
         }
+    }
+
+    return result;
+}
+
+DQN_API Dqn_String Dqn_StringFind(Dqn_String src, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case)
+{
+    Dqn_isize offset = Dqn_StringFindOffset(src, find, start_index, eq_case);
+    Dqn_String result = src;
+    if (offset == -1)
+    {
+        result.size = 0;
+    }
+    else
+    {
+        result.str += offset;
+        result.size -= offset;
     }
 
     return result;
@@ -3956,7 +4152,7 @@ DQN_API Dqn_String Dqn_StringListBuild(Dqn_StringList const *list, Dqn_Arena *ar
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Arena
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_ArenaStatsString Dqn_ArenaStats_String(Dqn_ArenaStats const *stats)
+DQN_API Dqn_ArenaStatsString Dqn_ArenaStatsToString(Dqn_ArenaStats const *stats)
 {
     // NOTE: We use a non-standard format string that is only usable via
     // stb sprintf that GCC warns about as an error. This pragma mutes that.
@@ -3973,7 +4169,7 @@ DQN_API Dqn_ArenaStatsString Dqn_ArenaStats_String(Dqn_ArenaStats const *stats)
 
     Dqn_ArenaStatsString result = {};
     result.size = STB_SPRINTF_DECORATE(snprintf)(result.str,
-                                                 Dqn_ArrayCountI(result.str),
+                                                 DQN_CAST(int)Dqn_ArrayCountI(result.str),
                                                  "%_$$I64d/%_$$I64d (wasted %_$$I64d - %d blks)",
                                                  stats->bytes_used,
                                                  stats->bytes_allocated,
@@ -4248,10 +4444,10 @@ DQN_API void *Dqn__ArenaAllocate(Dqn_Arena *arena, Dqn_isize size, Dqn_u8 alignm
     return result;
 }
 
-DQN_API void Dqn_ArenaLogStats(Dqn_Arena const *arena, char const *label)
+DQN_API void Dqn_ArenaLogStats(Dqn_Arena const *arena)
 {
-    Dqn_ArenaStatsString highest = Dqn_ArenaStats_String(&arena->highest_stats);
-    Dqn_ArenaStatsString current = Dqn_ArenaStats_String(&arena->current_stats);
+    Dqn_ArenaStatsString highest = Dqn_ArenaStatsToString(&arena->highest_stats);
+    Dqn_ArenaStatsString current = Dqn_ArenaStatsToString(&arena->current_stats);
     DQN_LOG_M("HIGH %.*s\nCURR %.*s\n", highest.size, highest.str, current.size, current.str);
 }
 
@@ -5009,8 +5205,8 @@ DQN_API int Dqn_UTF16EncodeCodepoint(Dqn_u16 utf16[2], Dqn_u32 codepoint)
     if (codepoint <= 0b1111'1111'1111'1111'1111)
     {
         Dqn_u32 surrogate_codepoint = codepoint + 0x10000;
-        utf16[0] = 0b1101'1000'0000'0000 | ((codepoint >> 10) & 0b11'1111'1111); // x
-        utf16[1] = 0b1101'1100'0000'0000 | ((codepoint >>  0) & 0b11'1111'1111); // y
+        utf16[0] = 0b1101'1000'0000'0000 | ((surrogate_codepoint >> 10) & 0b11'1111'1111); // x
+        utf16[1] = 0b1101'1100'0000'0000 | ((surrogate_codepoint >>  0) & 0b11'1111'1111); // y
         return 2;
     }
 
@@ -5438,7 +5634,7 @@ DQN_API Dqn_b32 Dqn_CStringIsAllDigits(char const *src, Dqn_isize size)
     return result;
 }
 
-DQN_API Dqn_u64 Dqn_CStringToU64(char const *buf, int size, char separator)
+DQN_API Dqn_u64 Dqn_CStringToU64(char const *buf, Dqn_isize size, char separator)
 {
     Dqn_u64 result = 0;
     if (!buf)
@@ -5447,7 +5643,7 @@ DQN_API Dqn_u64 Dqn_CStringToU64(char const *buf, int size, char separator)
     if (size <= -1)
         size = Dqn_CStringSize(buf);
 
-    for (int index = 0; index < size; ++index)
+    for (Dqn_isize index = 0; index < size; ++index)
     {
         char ch = buf[index];
         if (index && ch == separator)
@@ -5464,7 +5660,7 @@ DQN_API Dqn_u64 Dqn_CStringToU64(char const *buf, int size, char separator)
     return result;
 }
 
-DQN_API Dqn_i64 Dqn_CStringToI64(char const *buf, int size, char separator)
+DQN_API Dqn_i64 Dqn_CStringToI64(char const *buf, Dqn_isize size, char separator)
 {
     Dqn_i64 result = 0;
     if (!buf)
@@ -5515,16 +5711,66 @@ DQN_API Dqn_isize Dqn_LStringSize(wchar_t const *src)
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_File
 // -------------------------------------------------------------------------------------------------
-DQN_API char *Dqn__FileReadFile(char const *file, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS)
+DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS)
 {
+#if defined(DQN_OS_WIN32)
+    if (file_path_size <= 0)
+        file_path_size = Dqn_CStringSize(file_path);
+
+    Dqn_ThreadScratch scratch            = Dqn_ThreadGetScratch(arena);
+    Dqn_String        file_path_string   = Dqn_StringInit(file_path, file_path_size);
+    Dqn_StringW       file_path_string_w = Dqn_WinArenaUTF8ToWChar(file_path_string, scratch.arena);
+
+    HANDLE file_handle =
+        CreateFileW(file_path_string_w.str, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, nullptr);
+    if (file_handle == INVALID_HANDLE_VALUE)
+    {
+        Dqn_WinDumpLastError("Failed to open file %.*s", file_path_size, file_path);
+        return nullptr;
+    }
+
+    DQN_DEFER { CloseHandle(file_handle); };
+    LARGE_INTEGER win_file_size;
+    bool get_file_size_result = GetFileSizeEx(file_handle, &win_file_size);
+    if (!get_file_size_result || win_file_size.QuadPart > (DWORD)-1)
+    {
+        if (!get_file_size_result)
+        {
+            Dqn_WinDumpLastError("GetFileSizeEx");
+        }
+        else
+        {
+            DQN_LOG_E(
+                "We don't support files larger than %$.2d yet, Win32 layer needs to use overlapped IO to chunk reading in "
+                "the data");
+        }
+
+        return nullptr;
+    }
+
+    auto  arena_undo = Dqn_ArenaBeginScope(arena);
+    auto *result     = DQN_CAST(char *) Dqn__ArenaAllocate(arena, win_file_size.QuadPart + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+
+    // TODO(dqn): We need to chunk this and ensure that readfile read the bytes we wanted.
+    DWORD bytes_read = 0;
+    if (ReadFile(file_handle, result, DQN_CAST(DWORD)win_file_size.QuadPart, &bytes_read, nullptr /*overlapped*/) == 0)
+    {
+        Dqn_ArenaEndScope(arena_undo);
+        Dqn_WinDumpLastError("ReadFile");
+        return nullptr;
+    }
+
+    if (file_size) *file_size = win_file_size.QuadPart;
+    return result;
+#else
     Dqn_isize file_size_ = 0;
     if (!file_size)
         file_size = &file_size_;
 
-    FILE *file_handle = fopen(file, "rb");
+    FILE *file_handle = fopen(file_path, "rb");
     if (!file_handle)
     {
-        DQN_LOG_E("Failed to open file '%s' using fopen\n", file);
+        DQN_LOG_E("Failed to open file '%s' using fopen\n", file_path);
         return nullptr;
     }
 
@@ -5556,22 +5802,28 @@ DQN_API char *Dqn__FileReadFile(char const *file, Dqn_isize *file_size, Dqn_Aren
     }
 
     return result;
+#endif
 }
 
-DQN_API Dqn_String Dqn__FileArenaReadFileToString(char const *file, Dqn_Arena *arena DQN_CALL_SITE_ARGS)
+DQN_API Dqn_String Dqn__FileArenaReadToString(char const *     file_path,
+                                              Dqn_isize        file_path_size,
+                                              Dqn_Arena *arena DQN_CALL_SITE_ARGS)
 {
     Dqn_isize     file_size = 0;
-    char *        string    = Dqn__FileReadFile(file, &file_size, arena DQN_CALL_SITE_ARGS_INPUT);
+    char *        string    = Dqn__FileRead(file_path, file_path_size, &file_size, arena DQN_CALL_SITE_ARGS_INPUT);
     Dqn_String    result    = Dqn_StringInit(string, file_size);
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file, char const *buffer, Dqn_isize buffer_size)
+DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size)
 {
-    FILE *file_handle = fopen(file, "w+b");
+    // TODO(dqn): Use OS apis
+    (void)file_path_size;
+
+    FILE *file_handle = fopen(file_path, "w+b");
     if (!file_handle)
     {
-        DQN_LOG_E("Failed to open file '%s' using fopen\n", file);
+        DQN_LOG_E("Failed to open file '%s' using fopen\n", file_path);
         return false;
     }
 
@@ -5580,7 +5832,7 @@ DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file, char const *buffer, Dqn_isiz
 
     if (write_count != 1)
     {
-        DQN_LOG_E("Failed to write to file '%s' using fwrite\n", file);
+        DQN_LOG_E("Failed to write to file '%s' using fwrite\n", file_path);
         return false;
     }
 
@@ -5612,7 +5864,7 @@ DQN_API Dqn_b32 Dqn_FileExists(Dqn_String path)
     Dqn_b32 result = false;
 #if defined(DQN_OS_WIN32)
     wchar_t path_w[DQN_OS_WIN32_MAX_PATH];
-    Dqn_WinUTF8ToWChar(path, path_w, Dqn_ArrayCountI(path_w));
+    Dqn_WinUTF8ToWChar(path, path_w, DQN_CAST(int)Dqn_ArrayCountI(path_w));
 
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     if (GetFileAttributesExW(path_w, GetFileExInfoStandard, &attrib_data))
@@ -5639,7 +5891,7 @@ DQN_API Dqn_b32 Dqn_FileDirExists(Dqn_String path)
     Dqn_b32 result = false;
 #if defined(DQN_OS_WIN32)
     wchar_t path_w[DQN_OS_WIN32_MAX_PATH];
-    Dqn_WinUTF8ToWChar(path, path_w, Dqn_ArrayCountInt(path_w));
+    Dqn_WinUTF8ToWChar(path, path_w, DQN_CAST(int)Dqn_ArrayCountInt(path_w));
 
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     if (GetFileAttributesExW(path_w, GetFileExInfoStandard, &attrib_data))
@@ -5665,7 +5917,7 @@ DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String path)
 #if defined(DQN_OS_WIN32)
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     wchar_t path_w[DQN_OS_WIN32_MAX_PATH];
-    Dqn_WinUTF8ToWChar(path, path_w, Dqn_ArrayCountInt(path_w));
+    Dqn_WinUTF8ToWChar(path, path_w, DQN_CAST(int)Dqn_ArrayCountInt(path_w));
     if (!GetFileAttributesExW(path_w, GetFileExInfoStandard, &attrib_data))
         return result;
 
@@ -5707,8 +5959,8 @@ DQN_API Dqn_b32 Dqn_FileCopy(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite)
 #if defined(DQN_OS_WIN32)
     wchar_t src_w [DQN_OS_WIN32_MAX_PATH];
     wchar_t dest_w[DQN_OS_WIN32_MAX_PATH];
-    Dqn_WinUTF8ToWChar(src, src_w, Dqn_ArrayCountInt(src_w));
-    Dqn_WinUTF8ToWChar(dest, dest_w, Dqn_ArrayCountInt(dest_w));
+    Dqn_WinUTF8ToWChar(src, src_w, DQN_CAST(int)Dqn_ArrayCountInt(src_w));
+    Dqn_WinUTF8ToWChar(dest, dest_w, DQN_CAST(int)Dqn_ArrayCountInt(dest_w));
 
     BOOL fail_if_exists = overwrite == false;
     result = CopyFileW(src_w, dest_w, fail_if_exists) != 0;
@@ -5753,6 +6005,8 @@ DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String path, Dqn_Arena *temp_arena)
     Dqn_u16 path_indexes[64] = {};
 
 #if defined(DQN_OS_WIN32)
+    (void)temp_arena;
+
     wchar_t src_w[DQN_OS_WIN32_MAX_PATH];
     int src_w_size = Dqn_WinUTF8ToWChar(path, src_w, DQN_CAST(int)Dqn_ArrayCountI(src_w));
 
@@ -5917,7 +6171,7 @@ DQN_API Dqn_b32 Dqn_FileDelete(Dqn_String path)
     Dqn_b32 result = false;
 #if defined(DQN_OS_WIN32)
     wchar_t path_w [DQN_OS_WIN32_MAX_PATH];
-    Dqn_WinUTF8ToWChar(path, path_w, Dqn_ArrayCountInt(path_w));
+    Dqn_WinUTF8ToWChar(path, path_w, DQN_CAST(int)Dqn_ArrayCountInt(path_w));
     result = DeleteFileW(path_w);
     if (!result)
         result = RemoveDirectoryW(path_w);
@@ -5981,23 +6235,23 @@ DQN_API Dqn_DateHMSTimeString Dqn_DateHMSLocalTimeStringNow(char date_separator,
     Dqn_DateHMSTime const time = Dqn_DateHMSLocalTimeNow();
 
     Dqn_DateHMSTimeString result = {};
-    result.hms_size = STB_SPRINTF_DECORATE(snprintf)(result.hms,
-                                                     Dqn_ArrayCountI(result.hms),
-                                                     "%02d%c%02d%c%02d",
-                                                     time.hour,
-                                                     hms_separator,
-                                                     time.minutes,
-                                                     hms_separator,
-                                                     time.seconds);
+    result.hms_size              = DQN_CAST(Dqn_i8) STB_SPRINTF_DECORATE(snprintf)(result.hms,
+                                                                      DQN_CAST(int) Dqn_ArrayCountI(result.hms),
+                                                                      "%02d%c%02d%c%02d",
+                                                                      time.hour,
+                                                                      hms_separator,
+                                                                      time.minutes,
+                                                                      hms_separator,
+                                                                      time.seconds);
 
-    result.date_size = STB_SPRINTF_DECORATE(snprintf)(result.date,
-                                                      Dqn_ArrayCountI(result.date),
-                                                      "%d%c%02d%c%02d",
-                                                      time.year,
-                                                      date_separator,
-                                                      time.month,
-                                                      date_separator,
-                                                      time.day);
+    result.date_size = DQN_CAST(Dqn_i8) STB_SPRINTF_DECORATE(snprintf)(result.date,
+                                                                       DQN_CAST(int) Dqn_ArrayCountI(result.date),
+                                                                       "%d%c%02d%c%02d",
+                                                                       time.year,
+                                                                       date_separator,
+                                                                       time.month,
+                                                                       date_separator,
+                                                                       time.day);
 
     return result;
 }
@@ -6028,7 +6282,7 @@ DQN_API Dqn_u64 Dqn_DateEpochTime()
 // -------------------------------------------------------------------------------------------------
 // NOTE: OS
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_isize size)
+DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size)
 {
     if (!buffer || size < 0)
         return false;
@@ -6084,9 +6338,9 @@ DQN_API Dqn_String Dqn_OSExecutableDirectory(Dqn_Arena *arena)
 
 #if defined(DQN_OS_WIN32)
     char temp_mem[sizeof(wchar_t) * DQN_OS_WIN32_MAX_PATH + sizeof(Dqn_ArenaMemBlock)];
-    Dqn_Arena temp_arena = Dqn_ArenaInitWithMemory(temp_mem, Dqn_ArrayCountI(temp_mem));
-    Dqn_StringW exe_dir_w        = Dqn_WinExecutableDirectoryW(&temp_arena);
-    result                       = Dqn_WinArenaWCharToUTF8(exe_dir_w, arena);
+    Dqn_Arena   temp_arena = Dqn_ArenaInitWithMemory(temp_mem, Dqn_ArrayCountI(temp_mem));
+    Dqn_StringW exe_dir_w  = Dqn_WinExecutableDirectoryW(&temp_arena);
+    result                 = Dqn_WinArenaWCharToUTF8(exe_dir_w, arena);
 
 #elif defined(DQN_OS_UNIX)
 
@@ -6699,14 +6953,14 @@ DQN_API void Dqn__WinDumpLastError(Dqn_String file, Dqn_String function, Dqn_uin
     {
         va_list args;
         va_start(args, fmt);
-        Dqn_LogV(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, file_name_size, function.str, function.size, line, fmt, args);
+        Dqn_LogV(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, DQN_CAST(int)file_name_size, function.str, DQN_CAST(int)function.size, line, fmt, args);
         va_end(args);
     }
 
     if (msg.size)
-        Dqn_Log(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, file_name_size, function.str, function.size, line, "Error: %.*s", msg.size, msg.str);
+        Dqn_Log(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, DQN_CAST(int)file_name_size, function.str, DQN_CAST(int)function.size, line, "Error: %.*s", msg.size, msg.str);
     else
-        Dqn_Log(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, file_name_size, function.str, function.size, line, "FormatMessage error: %d. No error message for: %d", GetLastError(), msg.code);
+        Dqn_Log(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, DQN_CAST(int)file_name_size, function.str, DQN_CAST(int)function.size, line, "FormatMessage error: %d. No error message for: %d", GetLastError(), msg.code);
 }
 
 DQN_API int Dqn_WinUTF8ToWCharSizeRequired(Dqn_String src)
@@ -6752,7 +7006,7 @@ DQN_API Dqn_StringW Dqn_WinArenaUTF8ToWChar(Dqn_String src, Dqn_Arena *arena)
     wchar_t *string = Dqn_ArenaNewArray(arena, wchar_t, required + 1, Dqn_ZeroMem::No);
     int string_size = Dqn_WinUTF8ToWChar(src, string, required);
 
-    result = Dqn_StringW{string, string_size, string_size};
+    result = Dqn_StringW{string, string_size};
     return result;
 }
 
@@ -6805,7 +7059,7 @@ DQN_API Dqn_String Dqn_WinArenaWCharToUTF8(Dqn_StringW src, Dqn_Arena *arena)
 DQN_API Dqn_StringW Dqn_WinExecutableDirectoryW(Dqn_Arena *arena)
 {
     wchar_t buffer[DQN_OS_WIN32_MAX_PATH];
-    int file_path_size = GetModuleFileNameW(nullptr /*module*/, buffer, Dqn_ArrayCountI(buffer));
+    int file_path_size = GetModuleFileNameW(nullptr /*module*/, buffer, DQN_CAST(DWORD)Dqn_ArrayCountI(buffer));
     DQN_HARD_ASSERT_MSG(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
 
     int directory_size = file_path_size;
@@ -6826,7 +7080,7 @@ DQN_API Dqn_StringW Dqn_WinExecutableDirectoryW(Dqn_Arena *arena)
         {
             DQN_MEMCOPY(str, buffer, sizeof(wchar_t) * directory_size);
             str[directory_size] = 0;
-            result = Dqn_StringW{str, directory_size, directory_size};
+            result = Dqn_StringW{str, directory_size};
         }
     }
 
@@ -6869,77 +7123,369 @@ DQN_API Dqn_StringW Dqn_WinCurrentDirW(Dqn_Arena *arena, Dqn_StringW suffix)
         w_path[desired_size] = 0;
     }
 
-    result = Dqn_StringW{w_path, desired_size - 1, desired_size - 1};
+    result = Dqn_StringW{w_path, desired_size - 1};
     return result;
 }
 
-DQN_API Dqn_Array<Dqn_StringW> Dqn_WinFolderFilesW(Dqn_StringW path, Dqn_Arena *arena)
+DQN_API bool Dqn_WinFolderWIterate(Dqn_StringW path, Dqn_WinFolderIteratorW *it)
 {
-    enum Step
+    WIN32_FIND_DATAW find_data = {};
+    if (it->handle)
     {
-        Step_CountFiles,
-        Step_Allocate,
-        Step_Count
-    };
-
-    Dqn_Array<Dqn_StringW> result    = {};
-    Dqn_isize              num_files = 0;
-    for (int step = Step_CountFiles; step < Step_Count; step++)
+        if (FindNextFileW(it->handle, &find_data) == 0)
+            return false;
+    }
+    else
     {
-        if (step == Step_Allocate)
-            result = Dqn_ArrayInitWithArenaNoGrow(arena, Dqn_StringW, num_files, 0, Dqn_ZeroMem::No);
+        it->handle = FindFirstFileExW(path.str,              /*LPCWSTR lpFileName,*/
+                                      FindExInfoStandard,    /*FINDEX_INFO_LEVELS fInfoLevelId,*/
+                                      &find_data,            /*LPVOID lpFindFileData,*/
+                                      FindExSearchNameMatch, /*FINDEX_SEARCH_OPS fSearchOp,*/
+                                      nullptr,               /*LPVOID lpSearchFilter,*/
+                                      FIND_FIRST_EX_LARGE_FETCH /*DWORD dwAdditionalFlags)*/);
 
-        WIN32_FIND_DATAW find_data   = {};
-        HANDLE           find_handle = FindFirstFileExW(path.str,              /*LPCWSTR lpFileName,*/
-                                                        FindExInfoStandard,    /*FINDEX_INFO_LEVELS fInfoLevelId,*/
-                                                        &find_data,            /*LPVOID lpFindFileData,*/
-                                                        FindExSearchNameMatch, /*FINDEX_SEARCH_OPS fSearchOp,*/
-                                                        nullptr,               /*LPVOID lpSearchFilter,*/
-                                                        FIND_FIRST_EX_LARGE_FETCH /*DWORD dwAdditionalFlags)*/);
+        if (it->handle == INVALID_HANDLE_VALUE)
+            return false;
+    }
 
-        if (find_handle == INVALID_HANDLE_VALUE)
-            return result;
+    it->file_name_buf[0] = 0;
+    it->file_name        = Dqn_StringW{it->file_name_buf, 0};
 
-        do
+    do
+    {
+        if (find_data.cFileName[0] == '.' || (find_data.cFileName[0] == '.' && find_data.cFileName[1] == '.'))
+            continue;
+
+        if (find_data.dwFileAttributes & ~FILE_ATTRIBUTE_DIRECTORY)
         {
-            if (find_data.cFileName[0] == '.' || (find_data.cFileName[0] == '.' && find_data.cFileName[1] == '.'))
-            {
-                continue;
-            }
+            it->file_name.size = Dqn_LStringSize(find_data.cFileName);
+            DQN_ASSERT(it->file_name.size < (Dqn_ArrayCountI(it->file_name_buf) - 1));
 
-            if (find_data.dwFileAttributes & ~FILE_ATTRIBUTE_DIRECTORY)
+            DQN_MEMCOPY(it->file_name.str, find_data.cFileName, it->file_name.size * sizeof(wchar_t));
+            it->file_name_buf[it->file_name.size] = 0;
+
+            break;
+        }
+    } while (FindNextFileW(it->handle, &find_data) != 0);
+
+    return true;
+}
+
+DQN_API bool Dqn_WinFolderIterate(Dqn_String path, Dqn_WinFolderIterator *it)
+{
+    wchar_t path_w[DQN_OS_WIN32_MAX_PATH];
+    path_w[0] = 0;
+    int path_w_size = 0;
+
+    Dqn_WinFolderIteratorW wide_it = {};
+    if (it->handle)
+        wide_it.handle = it->handle;
+    else
+    {
+        path_w_size = Dqn_WinUTF8ToWChar(path, path_w, DQN_OS_WIN32_MAX_PATH);
+        if (path_w[path_w_size - 2] != L'\\' &&
+            path_w[path_w_size - 1] != L'*')
+        {
+            if ((path_w_size + 2) < (DQN_OS_WIN32_MAX_PATH - 1))
             {
-                LARGE_INTEGER file_size = {};
-                file_size.LowPart       = find_data.nFileSizeLow;
-                file_size.HighPart      = find_data.nFileSizeHigh;
-                if (step == Step_CountFiles)
-                {
-                    num_files++;
-                }
-                else
-                {
-                    DQN_ASSERT(step == Step_Allocate);
-                    Dqn_StringW *string = Dqn_ArrayMake(&result, 1);
-                    string->size = Dqn_LStringSize(find_data.cFileName);
-                    string->str  = Dqn_ArenaCopyNullTerminate(arena, wchar_t, find_data.cFileName, string->size);
-                }
+                path_w[path_w_size++] = L'\\';
+                path_w[path_w_size++] = L'*';
             }
-        } while (FindNextFileW(find_handle, &find_data) != 0);
+        }
+        else if (path_w[path_w_size - 1] == L'\\')
+        {
+            if ((path_w_size + 1) < (DQN_OS_WIN32_MAX_PATH - 1))
+            {
+                path_w[path_w_size++] = L'*';
+            }
+        }
+
+        path_w[path_w_size++] = 0;
+        DQN_ASSERT(path_w_size <= DQN_OS_WIN32_MAX_PATH);
+    }
+
+    bool result = Dqn_WinFolderWIterate(Dqn_StringW{path_w, path_w_size}, &wide_it);
+    it->handle = wide_it.handle;
+    if (result)
+    {
+        int size = Dqn_WinWCharToUTF8(wide_it.file_name, it->file_name_buf, DQN_CAST(int)Dqn_ArrayCountI(it->file_name_buf));
+        it->file_name = Dqn_StringInit(it->file_name_buf, size);
     }
 
     return result;
 }
 
-DQN_API Dqn_Array<Dqn_String> Dqn_WinFolderFiles(Dqn_String path, Dqn_Arena *arena, Dqn_Arena *temp_arena)
+DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitCString(char const *url, int url_size)
 {
-    auto                   arena_scope = Dqn_ArenaScope(temp_arena);
-    Dqn_StringW            w_path      = Dqn_WinArenaUTF8ToWChar(path, temp_arena);
-    Dqn_Array<Dqn_StringW> files       = Dqn_WinFolderFilesW(w_path, temp_arena);
+    URL_COMPONENTSA components  = {};
+    components.dwStructSize     = sizeof(components);
+    components.dwHostNameLength = url_size;
+    components.dwUrlPathLength  = url_size;
 
-    Dqn_Array<Dqn_String> result = Dqn_ArrayInitWithArenaNoGrow(arena, Dqn_String, files.size, 0, Dqn_ZeroMem::No);
-    for (Dqn_StringW file : files)
-        Dqn_ArrayAdd(&result, Dqn_WinArenaWCharToUTF8(file, arena));
+    // Seperate the URL into bits and bobs
+    Dqn_WinNetHandle result = {};
+    if (!InternetCrackUrlA(url, url_size, 0 /*flags*/, &components))
+    {
+        Dqn_WinDumpLastError("InternetCrackUrlA");
+        return result;
+    }
 
+    if (url[url_size] != 0)
+    {
+        DQN_LOG_E("URL '%.*s' must be null-terminated", url_size, url);
+        return result;
+    }
+
+    if (components.dwHostNameLength > (sizeof(result.host_name)/sizeof(result.host_name[0])) - 1)
+    {
+        // TODO(dqn): Error message for host being too long
+        return result;
+    }
+
+    result.host_name_size = components.dwHostNameLength;
+    DQN_MEMCOPY(result.host_name, components.lpszHostName, result.host_name_size);
+    result.host_name[result.host_name_size] = 0;
+
+    result.url_size = components.dwUrlPathLength;
+    result.url      = components.lpszUrlPath;
+
+    // Create the Win32 networking handles we need
+    result.internet_open_handle = InternetOpenA("Generic/Win32",
+                                                INTERNET_OPEN_TYPE_PRECONFIG,
+                                                nullptr /*proxy*/,
+                                                nullptr /*proxy bypass*/,
+                                                0 /*flags*/);
+
+    result.internet_connect_handle = InternetConnectA(result.internet_open_handle,
+                                                      result.host_name,
+                                                      INTERNET_DEFAULT_HTTPS_PORT,
+                                                      nullptr /*username*/,
+                                                      nullptr /*password*/,
+                                                      INTERNET_SERVICE_HTTP,
+                                                      0 /*flags*/,
+                                                      0 /*context*/);
+
+    result.state = Dqn_WinNetHandleState::Initialised;
+    return result;
+}
+
+DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitString(Dqn_String url)
+{
+    Dqn_WinNetHandle result = Dqn_WinNetHandleInitCString(url.str, DQN_CAST(int)url.size);
+    return result;
+}
+
+DQN_API void Dqn_WinNetHandleFinish(Dqn_WinNetHandle *handle)
+{
+    if (!Dqn_WinNetHandleIsValid(handle))
+        return;
+
+    InternetCloseHandle(handle->internet_open_handle);
+    InternetCloseHandle(handle->internet_connect_handle);
+    InternetCloseHandle(handle->http_handle);
+    handle->internet_open_handle    = nullptr;
+    handle->internet_connect_handle = nullptr;
+    handle->http_handle             = nullptr;
+}
+
+DQN_API bool Dqn_WinNetHandleIsValid(Dqn_WinNetHandle const *handle)
+{
+    bool result = handle->state >= Dqn_WinNetHandleState::Initialised;
+    return result;
+}
+
+DQN_API void Dqn_WinNetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size)
+{
+    if (!Dqn_WinNetHandleIsValid(handle))
+        return;
+
+    InternetSetOptionA(handle->internet_open_handle, INTERNET_OPTION_USER_AGENT, (void *)user_agent, user_agent_size);
+}
+
+DQN_API bool Dqn_WinNetHandlePump(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size)
+{
+    if (!Dqn_WinNetHandleIsValid(handle))
+        return false;
+
+    if (handle->state == Dqn_WinNetHandleState::Initialised)
+    {
+        DQN_ASSERT(handle->http_handle == nullptr);
+
+        const char *ACCEPT_TYPES[] = {"text/html", nullptr};
+        handle->http_handle        = HttpOpenRequestA(handle->internet_connect_handle,
+                                                      http_verb,
+                                                      handle->url,
+                                                      nullptr /*http version*/,
+                                                      nullptr /*referrer*/,
+                                                      nullptr,
+                                                      INTERNET_FLAG_NO_AUTH | INTERNET_FLAG_SECURE,
+                                                      0 /*context*/);
+
+        if (HttpSendRequestA(handle->http_handle,
+                             nullptr /*headers*/,
+                             0 /*headers length*/,
+                             post_data,
+                             post_data_size))
+        {
+            handle->state = Dqn_WinNetHandleState::RequestGood;
+            return true;
+        }
+        else
+        {
+            handle->state = Dqn_WinNetHandleState::RequestFailed;
+            Dqn_WinDumpLastError("Failed to send request for: %.*s", handle->host_name_size, handle->host_name);
+        }
+    }
+
+    if (handle->state == Dqn_WinNetHandleState::RequestFailed)
+        return false;
+
+    bool result = true;
+    DWORD bytes_read;
+    if (InternetReadFile(handle->http_handle, dest, dest_size, &bytes_read))
+    {
+        if (bytes_read == 0)
+            result = false;
+        *download_size = bytes_read;
+    }
+    else
+    {
+        *download_size = 0;
+        result = false;
+    }
+
+    if (!result)
+    {
+        // NOTE: If it's false here, we've finished downloading/the pumping the
+        // handled finished. We can reset the handle state to allow the user to
+        // re-use this handle by calling the function again with new post data.
+        // IF they need to set a new URL/resource location then they need to
+        // make a new handle for that otherwise they can re-use this handle to
+        // hit that same end point.
+        handle->state = Dqn_WinNetHandleState::Initialised;
+        InternetCloseHandle(handle->http_handle);
+        handle->http_handle = nullptr;
+    }
+
+    return result;
+}
+
+struct Dqn_WinNetChunk
+{
+    char             data[DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE];
+    size_t           size;
+    Dqn_WinNetChunk *next;
+};
+
+DQN_API char *Dqn_WinNetHandlePumpToCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size)
+{
+    Dqn_ThreadScratch scratch     = Dqn_ThreadGetScratch(arena);
+    size_t            total_size  = 0;
+    Dqn_WinNetChunk * first_chunk = nullptr;
+    for (Dqn_WinNetChunk *last_chunk = nullptr;;)
+    {
+        Dqn_WinNetChunk *chunk = Dqn_ArenaNew(scratch.arena, Dqn_WinNetChunk, Dqn_ZeroMem::Yes);
+        bool pump_result       = Dqn_WinNetHandlePump(handle, http_verb, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
+        if (chunk->size)
+        {
+            total_size += chunk->size;
+            if (first_chunk)
+            {
+                last_chunk->next = chunk;
+                last_chunk       = chunk;
+            }
+            else
+            {
+                first_chunk = chunk;
+                last_chunk  = chunk;
+            }
+        }
+
+        if (!pump_result)
+            break;
+    }
+
+    char *result     = Dqn_ArenaNewArray(arena, char, total_size + 1 /*null-terminator*/, Dqn_ZeroMem::No);
+    char *result_ptr = result;
+    for (Dqn_WinNetChunk *chunk = first_chunk; chunk; chunk = chunk->next)
+    {
+        DQN_MEMCOPY(result_ptr, chunk->data, chunk->size);
+        result_ptr += chunk->size;
+    }
+
+    *download_size     = total_size;
+    result[total_size] = 0;
+    return result;
+}
+
+DQN_API Dqn_String Dqn_WinNetHandlePumpToString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena)
+{
+    size_t     size     = 0;
+    char *     download = Dqn_WinNetHandlePumpToCString(handle, http_verb, post_data, post_data_size, arena, &size);
+    Dqn_String result   = Dqn_StringInit(download, size);
+    return result;
+}
+
+DQN_API void Dqn_WinNetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, FILE *file)
+{
+    for (bool keep_pumping = true; keep_pumping;)
+    {
+        char buffer[DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE];
+        size_t buffer_size = 0;
+        keep_pumping = Dqn_WinNetHandlePump(handle, http_verb, post_data, post_data_size, buffer, sizeof(buffer), &buffer_size);
+        fprintf(file, "%.*s", (int)buffer_size, buffer);
+    }
+}
+
+DQN_API char *Dqn_WinNetHandlePumpToMallocCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, size_t *download_size)
+{
+    size_t            total_size  = 0;
+    Dqn_WinNetChunk * first_chunk = nullptr;
+    for (Dqn_WinNetChunk *last_chunk = nullptr;;)
+    {
+        Dqn_WinNetChunk *chunk = (Dqn_WinNetChunk *)calloc(1, sizeof(Dqn_WinNetChunk));
+        bool pump_result       = Dqn_WinNetHandlePump(handle, http_verb, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
+        if (chunk->size)
+        {
+            total_size += chunk->size;
+            if (first_chunk)
+            {
+                last_chunk->next = chunk;
+                last_chunk       = chunk;
+            }
+            else
+            {
+                first_chunk = chunk;
+                last_chunk  = chunk;
+            }
+        }
+
+        if (!pump_result)
+            break;
+    }
+
+    char *result     = (char *)malloc((total_size + 1) * sizeof(char));
+    char *result_ptr = result;
+    for (Dqn_WinNetChunk *chunk = first_chunk; chunk;)
+    {
+        DQN_MEMCOPY(result_ptr, chunk->data, chunk->size);
+        result_ptr += chunk->size;
+
+        Dqn_WinNetChunk *prev_chunk = chunk;
+        chunk                       = chunk->next;
+        free(prev_chunk);
+    }
+
+    *download_size     = total_size;
+    result[total_size] = 0;
+    return result;
+}
+
+DQN_API Dqn_String Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size)
+{
+    size_t     download_size = 0;
+    char *     download      = Dqn_WinNetHandlePumpToMallocCString(handle, http_verb, post_data, post_data_size, &download_size);
+    Dqn_String result        = Dqn_StringInit(download, download_size);
     return result;
 }
 #endif
