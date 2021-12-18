@@ -18,6 +18,7 @@
 // #define DQN_WITH_JSON_WRITER    // Dqn_JsonWriter
 // #define DQN_WITH_MAP            // Dqn_Map
 // #define DQN_WITH_MATH           // Dqn_V2/3/4/Mat4 and friends ...
+// #define DQN_WITH_WIN_NET        // Dqn_WinNet
 //
 // -----------------------------------------------------------------------------
 // NOTE: Configuration
@@ -349,7 +350,12 @@ static_assert(sizeof(Dqn_f64) == 8,                 "Sanity check f64 is 8 bytes
 // NOTE: Win32 Minimal Header
 // ------------------------------------------------------------------------------------------------
 #if defined(DQN_OS_WIN32)
-    #if !defined(DQN_NO_WIN32_MINIMAL_HEADER)
+    #if defined(DQN_NO_WIN32_MINIMAL_HEADER)
+        #include <bcrypt.h> // Dqn_OSSecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
+        #if defined(DQN_WITH_WIN_NET)
+            #include <wininet.h> // Dqn_WinNet -> InternetConnect ... etc
+        #endif // DQN_WITH_WIN_NET
+    #else
         // Taken from Windows.h
         typedef unsigned long DWORD;
         typedef unsigned short WORD;
@@ -1240,16 +1246,15 @@ struct Dqn_Lib
 
 #if defined(DQN_OS_WIN32)
     LARGE_INTEGER     win32_qpc_frequency;
-
     Dqn_TicketMutex   win32_bcrypt_rng_mutex;
-    BCRYPT_ALG_HANDLE win32_bcrypt_rng_handle;
+    void             *win32_bcrypt_rng_handle;
 #endif
 
 #if defined(DQN_DEBUG_THREAD_CONTEXT)
     Dqn_TicketMutex thread_context_mutex;
     Dqn_ArenaStats  thread_context_arena_current_stats[256];
     Dqn_ArenaStats  thread_context_arena_highest_stats[256];
-    int             thread_context_arena_stats_size;
+    Dqn_u8          thread_context_arena_stats_size;
 #endif
 };
 
@@ -1354,27 +1359,27 @@ DQN_FIXED_ARRAY_TEMPLATE struct Dqn_FixedArray
     T const *operator+  (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i <= size, "%I64d >= 0 && %I64d < %I64d", i, size); return data + i; }
 };
 
-DQN_FIXED_ARRAY_TEMPLATE DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL     Dqn_FixedArray_Init(T const *item, int num);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArray_Max(DQN_FIXED_ARRAY_TEMPLATE_DECL const *);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL     Dqn_FixedArrayInit(T const *item, int num);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArrayMax(DQN_FIXED_ARRAY_TEMPLATE_DECL const *);
 
 // Calculate the index of a item from the its pointer
-DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a, T const *entry);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API Dqn_isize                         Dqn_FixedArrayGetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a, T const *entry);
 
 // return: The newly added item, nullptr if failed
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const &item);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArrayAdd(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArrayAdd(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const &item);
 
 // Bump the size of the array and return a pointer to 'num' uninitialised elements
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Make(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_Clear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_EraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Peek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                 Dqn_FixedArray_PeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a);
-template <typename T, int MAX_, typename IsEqual> DQN_API T       *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc);
-template <typename T, int MAX_, typename IsEqual> DQN_API Dqn_b32  Dqn_FixedArray_FindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArrayMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayClear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayEraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayEraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayPop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArrayPeek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                 Dqn_FixedArrayPeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a);
+template <typename T, int MAX_, typename IsEqual> DQN_API T       *Dqn_FixedArrayFind(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc);
+template <typename T, int MAX_, typename IsEqual> DQN_API Dqn_b32  Dqn_FixedArrayFindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArrayFind(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
 #endif // DQN_WITH_FIXED_ARRAY
 
 // -------------------------------------------------------------------------------------------------
@@ -1897,7 +1902,7 @@ DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, Dqn_b32 comma_sep = true);
 struct Dqn_ThreadScratchData
 {
     Dqn_Arena arena;
-    Dqn_i8             arena_stats_index; // Index into Dqn_Lib's thread context arena stats array
+    Dqn_u8    arena_stats_index; // Index into Dqn_Lib's thread context arena stats array
 };
 
 struct Dqn_ThreadContext
@@ -2010,7 +2015,7 @@ DQN_API Dqn_WinErrorMsg Dqn_WinLastError    ();
 DQN_API void        Dqn__WinDumpLastError(Dqn_String file, Dqn_String function, Dqn_uint line, char const *fmt, ...);
 
 // return: The size required not including the null-terminator
-int                 Dqn_WinUTF8ToWCharSizeRequired(Dqn_String src);
+DQN_API int         Dqn_WinUTF8ToWCharSizeRequired(Dqn_String src);
 
 // Converts the UTF8 string into a wide string. This function always
 // null-terminates the buffer. If you use the SizeRequired(...) function, this
@@ -2051,6 +2056,7 @@ struct Dqn_WinFolderIterator
 DQN_API bool Dqn_WinFolderIterate(Dqn_String path, Dqn_WinFolderIterator *it);
 DQN_API bool Dqn_WinFolderWIterate(Dqn_StringW path, Dqn_WinFolderIteratorW *it);
 
+#if defined(DQN_WITH_WIN_NET)
 enum struct Dqn_WinNetHandleState
 {
     Invalid,
@@ -2107,19 +2113,20 @@ struct Dqn_WinNetHandle
 // Initialise a new networking handle that is pointing to the specified URL.
 // The URL string must be null-terminated because Windows is a C API and
 // requires null-termination.
-Dqn_WinNetHandle Dqn_WinNetHandleInitCString(char const *url, int url_size);
-Dqn_WinNetHandle Dqn_WinNetHandleInitString(Dqn_String url);
+DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitCString(char const *url, int url_size);
+DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitString(Dqn_String url);
 
-void             Dqn_WinNetHandleFinish(Dqn_WinNetHandle *handle);
-bool             Dqn_WinNetHandleIsValid(Dqn_WinNetHandle const *handle);
-void             Dqn_WinNetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
-bool             Dqn_WinNetHandlePump(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size);
-char *           Dqn_WinNetHandlePumpToCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size);
-Dqn_String       Dqn_WinNetHandlePumpToString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena);
+DQN_API void             Dqn_WinNetHandleFinish(Dqn_WinNetHandle *handle);
+DQN_API bool             Dqn_WinNetHandleIsValid(Dqn_WinNetHandle const *handle);
+DQN_API void             Dqn_WinNetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
+DQN_API bool             Dqn_WinNetHandlePump(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size);
+DQN_API char *           Dqn_WinNetHandlePumpToCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size);
+DQN_API Dqn_String       Dqn_WinNetHandlePumpToString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena);
 
-void             Dqn_WinNetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, FILE *file);
-char            *Dqn_WinNetHandlePumpToMallocCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, size_t *download_size);
-Dqn_String       Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size);
+DQN_API void             Dqn_WinNetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, FILE *file);
+DQN_API char            *Dqn_WinNetHandlePumpToMallocCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, size_t *download_size);
+DQN_API Dqn_String       Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size);
+#endif // DQN_WITH_WIN_NET
 #endif // DQN_OS_WIN32
 
 // -------------------------------------------------------------------------------------------------
@@ -2584,7 +2591,7 @@ DQN_API Dqn_b32 Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String src
 template <Dqn_isize MAX_>
 DQN_API Dqn_String Dqn_FixedStringToString(Dqn_FixedString<MAX_> const *str)
 {
-    auto result = Dqn_String_Init(str->str, str->size);
+    auto result = Dqn_StringInit(str->str, str->size);
     return result;
 }
 #endif // DQN_WITH_FIXED_STRING
@@ -2603,22 +2610,22 @@ template <typename T> void Dqn__EraseStableFromCArray(T *array, Dqn_isize size, 
 // NOTE: Dqn_FixedArray Template Implementation
 // -------------------------------------------------------------------------------------------------
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArray_Init(T const *item, int num)
+DQN_API DQN_FIXED_ARRAY_TEMPLATE_DECL Dqn_FixedArrayInit(T const *item, int num)
 {
     DQN_FIXED_ARRAY_TEMPLATE_DECL result = {};
-    Dqn_FixedArray_Add(&result, item, num);
+    Dqn_FixedArrayAdd(&result, item, num);
     return result;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API Dqn_isize Dqn_FixedArray_Max(DQN_FIXED_ARRAY_TEMPLATE_DECL const *)
+DQN_API Dqn_isize Dqn_FixedArrayMax(DQN_FIXED_ARRAY_TEMPLATE_DECL const *)
 {
     Dqn_isize result = MAX_;
     return result;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API Dqn_isize Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a, T const *entry)
+DQN_API Dqn_isize Dqn_FixedArrayGetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a, T const *entry)
 {
     DQN_ASSERT(entry >= a->begin() && entry <= a->end());
     Dqn_isize result = a->end() - entry;
@@ -2626,7 +2633,7 @@ DQN_API Dqn_isize Dqn_FixedArray_GetIndex(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API T *Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num)
+DQN_API T *Dqn_FixedArrayAdd(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, Dqn_isize num)
 {
     DQN_ASSERT(a->size + num <= MAX_);
     T *result = static_cast<T *>(DQN_MEMCOPY(a->data + a->size, items, sizeof(T) * num));
@@ -2635,7 +2642,7 @@ DQN_API T *Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const *items, 
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API T *Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const &item)
+DQN_API T *Dqn_FixedArrayAdd(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const &item)
 {
     DQN_ASSERT(a->size < MAX_);
     a->data[a->size++] = item;
@@ -2643,7 +2650,7 @@ DQN_API T *Dqn_FixedArray_Add(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T const &item)
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API T *Dqn_FixedArray_Make(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num)
+DQN_API T *Dqn_FixedArrayMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num)
 {
     DQN_ASSERT(a->size + num <= MAX_);
     T *result = a->data + a->size;
@@ -2652,20 +2659,20 @@ DQN_API T *Dqn_FixedArray_Make(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num)
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API void Dqn_FixedArray_Clear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem)
+DQN_API void Dqn_FixedArrayClear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem)
 {
     a->size = 0;
     Dqn__ZeroMemBytes(a->data, sizeof(T) * MAX_, zero_mem);
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API void Dqn_FixedArray_EraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index)
+DQN_API void Dqn_FixedArrayEraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index)
 {
     Dqn__EraseStableFromCArray<T>(a->data, a->size--, MAX_, index);
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API void Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index)
+DQN_API void Dqn_FixedArrayEraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index)
 {
     DQN_ASSERT(index >= 0 && index < a->size);
     if (--a->size == 0) return;
@@ -2673,7 +2680,7 @@ DQN_API void Dqn_FixedArray_EraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API void Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num, Dqn_ZeroMem zero_mem)
+DQN_API void Dqn_FixedArrayPop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num, Dqn_ZeroMem zero_mem)
 {
     DQN_ASSERT(a->size - num >= 0);
     a->size -= num;
@@ -2684,14 +2691,14 @@ DQN_API void Dqn_FixedArray_Pop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num,
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API T *Dqn_FixedArray_Peek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a)
+DQN_API T *Dqn_FixedArrayPeek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a)
 {
     T *result = (a->size == 0) ? nullptr : a->data + (a->size - 1);
     return result;
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API T Dqn_FixedArray_PeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a)
+DQN_API T Dqn_FixedArrayPeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a)
 {
     DQN_ASSERT(a->size > 0);
     T const *result = a->data + (a->size - 1);
@@ -2699,7 +2706,7 @@ DQN_API T Dqn_FixedArray_PeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a)
 }
 
 template <typename T, int MAX_, typename IsEqual>
-DQN_API T *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc)
+DQN_API T *Dqn_FixedArrayFind(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc)
 {
     for (T &entry : (*a))
     {
@@ -2709,16 +2716,16 @@ DQN_API T *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqual
     return nullptr;
 }
 
-// return: True if the entry was found, false if not- the entry is made using Dqn_FixedArray_Make() in this case
+// return: True if the entry was found, false if not- the entry is made using Dqn_FixedArrayMake() in this case
 template <typename T, int MAX_, typename IsEqual>
-DQN_API Dqn_b32 Dqn_FixedArray_FindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc)
+DQN_API Dqn_b32 Dqn_FixedArrayFindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc)
 {
     Dqn_b32 result = true;
-    T *search  = Dqn_FixedArray_Find(a, IsEqualProc);
+    T *search  = Dqn_FixedArrayFind(a, IsEqualProc);
     if (!search)
     {
         result = false;
-        search = Dqn_FixedArray_Make(a, 1);
+        search = Dqn_FixedArrayMake(a, 1);
     }
 
     *entry = search;
@@ -2726,7 +2733,7 @@ DQN_API Dqn_b32 Dqn_FixedArray_FindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T 
 }
 
 DQN_FIXED_ARRAY_TEMPLATE
-DQN_API T *Dqn_FixedArray_Find(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find)
+DQN_API T *Dqn_FixedArrayFind(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find)
 {
     for (T &entry : (*a))
     {
@@ -3009,9 +3016,6 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
 
         // NOTE: GetModuleFileNameW
         #define ERROR_INSUFFICIENT_BUFFER 122L
-
-        // NOTE: BCrypt
-        #define BCRYPT_RNG_ALGORITHM L"RNG"
 
         // NOTE: MoveFile
         #define MOVEFILE_REPLACE_EXISTING 0x00000001
@@ -6295,7 +6299,8 @@ DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size)
     Dqn_TicketMutexBegin(&dqn__lib.win32_bcrypt_rng_mutex);
     if (!dqn__lib.win32_bcrypt_rng_handle)
     {
-        NTSTATUS init_status = BCryptOpenAlgorithmProvider(&dqn__lib.win32_bcrypt_rng_handle, BCRYPT_RNG_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
+        wchar_t const BCRYPT_ALGORITHM[] = L"RNG";
+        long /*NTSTATUS*/ init_status = BCryptOpenAlgorithmProvider(&dqn__lib.win32_bcrypt_rng_handle, BCRYPT_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
         if (!dqn__lib.win32_bcrypt_rng_handle || init_status != 0)
         {
             DQN_LOG_E("Failed to initialise random number generator, error: %d", init_status);
@@ -6640,8 +6645,8 @@ DQN_API void Dqn_LibDumpThreadContextArenaStats(Dqn_String file_path)
                 highest_cumulative_stats.block_count     = DQN_MAX(highest_cumulative_stats.block_count, highest->block_count);
             }
 
-            Dqn_ArenaStatsString cumulative_stats_string = Dqn_ArenaStats_String(&cumulative_stats);
-            Dqn_ArenaStatsString highest_cumulative_stats_string = Dqn_ArenaStats_String(&highest_cumulative_stats);
+            Dqn_ArenaStatsString cumulative_stats_string         = Dqn_ArenaStatsToString(&cumulative_stats);
+            Dqn_ArenaStatsString highest_cumulative_stats_string = Dqn_ArenaStatsToString(&highest_cumulative_stats);
             fprintf(file, "  [ALL] CURR %.*s\n", cumulative_stats_string.size, cumulative_stats_string.str);
             fprintf(file, "        HIGH %.*s\n", highest_cumulative_stats_string.size, highest_cumulative_stats_string.str);
         }
@@ -6654,8 +6659,8 @@ DQN_API void Dqn_LibDumpThreadContextArenaStats(Dqn_String file_path)
             Dqn_ArenaStats const *current = current_stats + index;
             Dqn_ArenaStats const *highest = current_stats + index;
 
-            Dqn_ArenaStatsString current_string = Dqn_ArenaStats_String(current);
-            Dqn_ArenaStatsString highest_string = Dqn_ArenaStats_String(highest);
+            Dqn_ArenaStatsString current_string = Dqn_ArenaStatsToString(current);
+            Dqn_ArenaStatsString highest_string = Dqn_ArenaStatsToString(highest);
 
             fprintf(file, "  [%03d] CURR %.*s\n", DQN_CAST(int)index, current_string.size, current_string.str);
             fprintf(file, "         HIGH %.*s\n", highest_string.size, highest_string.str);
@@ -7215,6 +7220,7 @@ DQN_API bool Dqn_WinFolderIterate(Dqn_String path, Dqn_WinFolderIterator *it)
     return result;
 }
 
+#if defined(DQN_WITH_WIN_NET)
 DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitCString(char const *url, int url_size)
 {
     URL_COMPONENTSA components  = {};
@@ -7488,7 +7494,8 @@ DQN_API Dqn_String Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, 
     Dqn_String result        = Dqn_StringInit(download, download_size);
     return result;
 }
-#endif
+#endif // DQN_WITH_WIN_NET
+#endif // DQN_OS_WIN32
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Hashing - Dqn_FNV1A[32|64]

@@ -312,56 +312,56 @@ Dqn_Test Dqn_Test_FixedArray()
     Dqn_Test test = {};
 #if defined(DQN_WITH_FIXED_ARRAY)
     DQN_TEST_GROUP(test, "Dqn_FixedArray");
-    // NOTE: Dqn_FixedArray_Init
+    // NOTE: Dqn_FixedArrayInit
     {
         DQN_TEST(test, "Initialise from raw array");
         int raw_array[] = {1, 2};
-        auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
+        auto array = Dqn_FixedArrayInit<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
         DQN_TEST_ASSERT(test, array.size == 2);
         DQN_TEST_ASSERT(test, array[0] == 1);
         DQN_TEST_ASSERT(test, array[1] == 2);
     }
 
-    // NOTE: Dqn_FixedArray_EraseStable
+    // NOTE: Dqn_FixedArrayEraseStable
     {
         DQN_TEST(test, "Erase stable 1 element from array");
         int raw_array[] = {1, 2, 3};
-        auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
-        Dqn_FixedArray_EraseStable(&array, 1);
+        auto array = Dqn_FixedArrayInit<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
+        Dqn_FixedArrayEraseStable(&array, 1);
         DQN_TEST_ASSERT(test, array.size == 2);
         DQN_TEST_ASSERT(test, array[0] == 1);
         DQN_TEST_ASSERT(test, array[1] == 3);
     }
 
-    // NOTE: Dqn_FixedArray_EraseUnstable
+    // NOTE: Dqn_FixedArrayEraseUnstable
     {
         DQN_TEST(test, "Erase unstable 1 element from array");
         int raw_array[] = {1, 2, 3};
-        auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
-        Dqn_FixedArray_EraseUnstable(&array, 0);
+        auto array = Dqn_FixedArrayInit<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
+        Dqn_FixedArrayEraseUnstable(&array, 0);
         DQN_TEST_ASSERT(test, array.size == 2);
         DQN_TEST_ASSERT(test, array[0] == 3);
         DQN_TEST_ASSERT(test, array[1] == 2);
     }
 
-    // NOTE: Dqn_FixedArray_Add
+    // NOTE: Dqn_FixedArrayAdd
     {
         DQN_TEST(test, "Add 1 element to array");
         int const ITEM  = 2;
         int raw_array[] = {1};
-        auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
-        Dqn_FixedArray_Add(&array, ITEM);
+        auto array      = Dqn_FixedArrayInit<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
+        Dqn_FixedArrayAdd(&array, ITEM);
         DQN_TEST_ASSERT(test, array.size == 2);
         DQN_TEST_ASSERT(test, array[0] == 1);
         DQN_TEST_ASSERT(test, array[1] == ITEM);
     }
 
-    // NOTE: Dqn_FixedArray_Clear
+    // NOTE: Dqn_FixedArrayClear
     {
         DQN_TEST(test, "Clear array");
         int raw_array[] = {1};
-        auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
-        Dqn_FixedArray_Clear(&array);
+        auto array      = Dqn_FixedArrayInit<int, 4>(raw_array, (int)Dqn_ArrayCount(raw_array));
+        Dqn_FixedArrayClear(&array);
         DQN_TEST_ASSERT(test, array.size == 0);
     }
 #endif // DQN_WITH_FIXED_ARRAY
