@@ -35,14 +35,6 @@
 //     prototypes and definitions in this file. Useful for stopping redefinition
 //     of symbols if another library includes "Windows.h"
 //
-// #define DQN_NO_WIN32_SHLWAPI
-//     See DQN_NO_WIN32_MINIMAL_HEADER. Useful if another library includes
-//     "shlwapi.h"
-//
-// #define DQN_NO_WIN32_SHELL_OBJ
-//     See DQN_NO_WIN32_MINIMAL_HEADER. Useful if another library includes
-//     "Shlobj.h"
-//
 // #define DQN_STATIC_API
 //     Apply static to all function definitions and disable external linkage to
 //     other translation units.
@@ -351,20 +343,16 @@ static_assert(sizeof(Dqn_f64) == 8,                 "Sanity check f64 is 8 bytes
 // ------------------------------------------------------------------------------------------------
 #if defined(DQN_OS_WIN32)
     #if defined(DQN_NO_WIN32_MINIMAL_HEADER)
-        #include <bcrypt.h> // Dqn_OSSecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
-        #if defined(DQN_WITH_WIN_NET)
-            #include <wininet.h> // Dqn_WinNet -> InternetConnect ... etc
-        #endif // DQN_WITH_WIN_NET
     #else
         // Taken from Windows.h
         // typedef unsigned long DWORD;
         // typedef unsigned short WORD;
         // typedef int BOOL;
         // typedef void * HWND;
-        // typedef void * HMODULE;
         // typedef void * HANDLE;
         // typedef long NTSTATUS;
 
+        typedef void * HMODULE;
         typedef union {
             struct {
                 unsigned long LowPart;
@@ -3043,8 +3031,14 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
 #if defined(DQN_OS_WIN32)
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "wininet")
-    #if !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 
+    #if defined(DQN_NO_WIN32_MINIMAL_HEADER)
+        #include <bcrypt.h>          // Dqn_OSSecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
+        #include <shellscalingapi.h> // Dqn_WinMakeProcessDPIAware -> SetProcessDpiAwareProc
+        #if defined(DQN_WITH_WIN_NET)
+            #include <wininet.h> // Dqn_WinNet -> InternetConnect ... etc
+        #endif // DQN_WITH_WIN_NET
+    #else
         // Taken from Windows.h
         // ---------------------------------------------------------------------
         // Defines
@@ -3114,9 +3108,15 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
 
         #define INVALID_FILE_SIZE ((unsigned long)0xFFFFFFFF)
 
-        // ---------------------------------------------------------------------
-        // Data Structures
-        // ---------------------------------------------------------------------
+        typedef enum PROCESS_DPI_AWARENESS
+        {
+            PROCESS_DPI_UNAWARE           = 0,
+            PROCESS_SYSTEM_DPI_AWARE      = 1,
+            PROCESS_PER_MONITOR_DPI_AWARE = 2
+        } PROCESS_DPI_AWARENESS;
+
+        #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((void *)-4)
+
         typedef union {
             struct {
                 unsigned long LowPart;
@@ -7021,19 +7021,6 @@ DQN_API Dqn_WinErrorMsg Dqn_WinLastError()
     return result;
 }
 
-#if defined(DQN_NO_WIN32_MINIMAL_HEADER)
-    #include <shellscalingapi.h> // SetProcessDpiAwareProc
-#else
-    typedef enum PROCESS_DPI_AWARENESS
-    {
-        PROCESS_DPI_UNAWARE           = 0,
-        PROCESS_SYSTEM_DPI_AWARE      = 1,
-        PROCESS_PER_MONITOR_DPI_AWARE = 2
-    } PROCESS_DPI_AWARENESS;
-
-    #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((void *)-4)
-#endif
-
 DQN_API void Dqn_WinMakeProcessDPIAware()
 {
     typedef bool SetProcessDpiAwareProc(void);
@@ -7045,15 +7032,15 @@ DQN_API void Dqn_WinMakeProcessDPIAware()
     // GetProcAddress on the DPI function. If it's not there, we're on an old
     // version of windows, so we can call an older version of the API.
     void *lib_handle = LoadLibraryA("user32.dll");
-    if (auto *set_process_dpi_awareness_context = DQN_CAST(SetProcessDpiAwarenessContextProc *)GetProcAddress(lib_handle, "SetProcessDpiAwarenessContext"))
+    if (auto *set_process_dpi_awareness_context = DQN_CAST(SetProcessDpiAwarenessContextProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAwarenessContext"))
     {
         set_process_dpi_awareness_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
-    else if (auto *set_process_dpi_awareness = DQN_CAST(SetProcessDpiAwarenessProc *)GetProcAddress(lib_handle, "SetProcessDpiAwareness"))
+    else if (auto *set_process_dpi_awareness = DQN_CAST(SetProcessDpiAwarenessProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAwareness"))
     {
         set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
     }
-    else if (auto *set_process_dpi_aware = DQN_CAST(SetProcessDpiAwareProc *)GetProcAddress(lib_handle, "SetProcessDpiAware"))
+    else if (auto *set_process_dpi_aware = DQN_CAST(SetProcessDpiAwareProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAware"))
     {
         set_process_dpi_aware();
     }
