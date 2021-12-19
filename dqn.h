@@ -357,18 +357,22 @@ static_assert(sizeof(Dqn_f64) == 8,                 "Sanity check f64 is 8 bytes
         #endif // DQN_WITH_WIN_NET
     #else
         // Taken from Windows.h
-        typedef unsigned long DWORD;
-        typedef unsigned short WORD;
-        typedef void * BCRYPT_ALG_HANDLE;
+        // typedef unsigned long DWORD;
+        // typedef unsigned short WORD;
+        // typedef int BOOL;
+        // typedef void * HWND;
+        // typedef void * HMODULE;
+        // typedef void * HANDLE;
+        // typedef long NTSTATUS;
 
         typedef union {
             struct {
-                DWORD LowPart;
-                long HighPart;
+                unsigned long LowPart;
+                long          HighPart;
             };
             struct {
-                DWORD LowPart;
-                long  HighPart;
+                unsigned long LowPart;
+                long          HighPart;
             } u;
             Dqn_i64 QuadPart;
         } LARGE_INTEGER;
@@ -1392,6 +1396,7 @@ struct Dqn_ListChunk
     Dqn_isize         size;
     Dqn_isize         count;
     Dqn_ListChunk<T> *next;
+    Dqn_ListChunk<T> *prev;
 };
 
 template <typename T>
@@ -1406,11 +1411,11 @@ struct Dqn_ListIterator
 template <typename T>
 struct Dqn_List
 {
-    Dqn_Arena *arena;
-    Dqn_isize           count;      // Cumulative count of all items made across all list chunks
-    Dqn_isize           chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
-    Dqn_ListChunk<T>   *head;
-    Dqn_ListChunk<T>   *tail;
+    Dqn_Arena        *arena;
+    Dqn_isize         count;      // Cumulative count of all items made across all list chunks
+    Dqn_isize         chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
+    Dqn_ListChunk<T> *head;
+    Dqn_ListChunk<T> *tail;
 };
 
 template <typename T> DQN_API Dqn_List<T>  Dqn_ListInitWithArena(Dqn_Arena *arena, Dqn_isize chunk_size = 128);
@@ -1418,12 +1423,18 @@ template <typename T> DQN_API Dqn_List<T>  Dqn_ListInitWithArena(Dqn_Arena *aren
 // Produce an iterator for the data in the list
 /*
    Dqn_List<int> list = {};
-   for (Dqn_ListIterator<int> it = {}; Dqn_ListIterate(&list, &it);)
+   for (Dqn_ListIterator<int> it = {}; Dqn_ListIterate(&list, &it, 0);)
    {
        int *item = it.data;
    }
 */
-template <typename T> DQN_API Dqn_b32  Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator);
+// start_index: The index to start iterating from
+template <typename T> DQN_API Dqn_b32  Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index);
+
+// at_chunk: (Optional) The chunk that the index belongs to will be set in this parameter if given
+// return: The element, or null pointer if it is not a valid index.
+template <typename T> DQN_API T       *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> *at_chunk);
+
 #define                                Dqn_ListTaggedMake(list, count, tag) Dqn__ListMake(list, count DQN_CALL_SITE(tag))
 #define                                Dqn_ListMake(list, count) Dqn__ListMake(list, count DQN_CALL_SITE(""))
 template <typename T> DQN_API T       *Dqn__ListMake(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS);
@@ -2004,18 +2015,23 @@ DQN_API void           Dqn_JsonWriterF64(Dqn_JsonWriter *writer, Dqn_f64 value, 
 // -------------------------------------------------------------------------------------------------
 struct Dqn_WinErrorMsg
 {
-    DWORD code;
-    char  str[DQN_KILOBYTES(64) - 1]; // Maximum error size
-    DWORD size;
+    unsigned long code;
+    char          str[DQN_KILOBYTES(64) - 1]; // Maximum error size
+    unsigned long size;
 };
-DQN_API Dqn_WinErrorMsg Dqn_WinLastError    ();
+DQN_API Dqn_WinErrorMsg Dqn_WinLastError();
+
+// Call once at application start-up to ensure that the application is DPI aware
+// on Windows and ensure that application UI is scaled up appropriately for the
+// monitor.
+DQN_API void Dqn_WinMakeProcessDPIAware();
 
 // Automatically dumps to DQN_LOG_E
 #define Dqn_WinDumpLastError(fmt, ...) Dqn__WinDumpLastError(DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ##__VA_ARGS__)
-DQN_API void        Dqn__WinDumpLastError(Dqn_String file, Dqn_String function, Dqn_uint line, char const *fmt, ...);
+DQN_API void Dqn__WinDumpLastError(Dqn_String file, Dqn_String function, Dqn_uint line, char const *fmt, ...);
 
 // return: The size required not including the null-terminator
-DQN_API int         Dqn_WinUTF8ToWCharSizeRequired(Dqn_String src);
+DQN_API int Dqn_WinUTF8ToWCharSizeRequired(Dqn_String src);
 
 // Converts the UTF8 string into a wide string. This function always
 // null-terminates the buffer. If you use the SizeRequired(...) function, this
@@ -2904,7 +2920,10 @@ DQN_API T *Dqn__ListMake(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
             return nullptr;
 
         if (list->tail)
+        {
             list->tail->next = tail;
+            tail->prev       = list->tail;
+        }
 
         list->tail = tail;
 
@@ -2919,14 +2938,27 @@ DQN_API T *Dqn__ListMake(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
 }
 
 template <typename T>
-Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
+DQN_API Dqn_b32 Dqn_ListIterateFrom(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index)
 {
     Dqn_b32 result = false;
+    if (!list || !iterator || start_index < 0 || list->chunk_size <= 0)
+        return result;
+
     if (!iterator->init)
     {
-        *iterator       = {};
-        iterator->chunk = list->head;
-        iterator->init  = true;
+        *iterator = {};
+        if (start_index == 0)
+        {
+            iterator->chunk = list->head;
+        }
+        else
+        {
+            Dqn_ListAt(list, start_index, &iterator->chunk);
+            if (list->chunk_size > 0)
+                iterator->chunk_data_index = start_index % list->chunk_size;
+        }
+
+        iterator->init = true;
     }
 
     if (iterator->chunk)
@@ -2951,6 +2983,53 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
     return result;
 }
 
+template <typename T>
+DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_chunk)
+{
+    if (!list || !list->chunk_size || index < 0 || index >= list->count)
+        return nullptr;
+
+    Dqn_isize total_chunks       = list->count / (list->chunk_size + (list->chunk_size - 1));
+    Dqn_isize desired_chunk      = index / list->chunk_size;
+    Dqn_isize forward_scan_dist  = desired_chunk;
+    Dqn_isize backward_scan_dist = total_chunks - desired_chunk;
+
+    // NOTE: Linearly scan forwards/backwards to the chunk we need. We don't
+    // have random access to chunks
+    Dqn_isize current_chunk = 0;
+    Dqn_ListChunk<T> **chunk = nullptr;
+    if (forward_scan_dist <= backward_scan_dist)
+    {
+        for (chunk = &list->head;
+             *chunk && current_chunk != desired_chunk;
+             *chunk = (*chunk)->next, current_chunk++)
+        {
+        }
+    }
+    else
+    {
+        current_chunk = total_chunks;
+        for (chunk = &list->tail;
+             *chunk && current_chunk != desired_chunk;
+             *chunk = (*chunk)->prev, current_chunk--)
+        {
+        }
+    }
+
+    T *result = nullptr;
+    if (*chunk)
+    {
+        Dqn_isize relative_index = index % list->chunk_size;
+        result                   = (*chunk)->data + relative_index;
+        DQN_ASSERT(relative_index < (*chunk)->count);
+    }
+
+    if (result && at_chunk)
+        *at_chunk = *chunk;
+
+    return result;
+}
+
 #if defined(DQN_COMPILER_W32_MSVC)
     #pragma warning(pop)
 #endif
@@ -2967,15 +3046,6 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
     #if !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 
         // Taken from Windows.h
-        // ---------------------------------------------------------------------
-        // Typedefs
-        // ---------------------------------------------------------------------
-        typedef int BOOL;
-        typedef void * HWND;
-        typedef void * HMODULE;
-        typedef void * HANDLE;
-        typedef long NTSTATUS;
-
         // ---------------------------------------------------------------------
         // Defines
         // ---------------------------------------------------------------------
@@ -3007,8 +3077,8 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         #define PAGE_READWRITE 0x04
 
         // NOTE: FindFirstFile
-        #define INVALID_HANDLE_VALUE ((HANDLE)(long *)-1)
-        #define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
+        #define INVALID_HANDLE_VALUE ((void *)(long *)-1)
+        #define INVALID_FILE_ATTRIBUTES ((unsigned long)-1)
         #define FIND_FIRST_EX_LARGE_FETCH 0x00000002
         #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
         #define FILE_ATTRIBUTE_READONLY 0x00000001
@@ -3022,7 +3092,7 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         #define MOVEFILE_COPY_ALLOWED 0x00000002
 
         // NOTE: Wininet
-        typedef WORD INTERNET_PORT;
+        typedef unsigned short INTERNET_PORT;
         #define INTERNET_OPEN_TYPE_PRECONFIG 0 // use registry configuration
         #define INTERNET_DEFAULT_HTTPS_PORT 443 // HTTPS
         #define INTERNET_SERVICE_HTTP 3
@@ -3042,37 +3112,37 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         #define OPEN_ALWAYS         4
         #define TRUNCATE_EXISTING   5
 
-        #define INVALID_FILE_SIZE ((DWORD)0xFFFFFFFF)
+        #define INVALID_FILE_SIZE ((unsigned long)0xFFFFFFFF)
 
         // ---------------------------------------------------------------------
         // Data Structures
         // ---------------------------------------------------------------------
         typedef union {
             struct {
-                DWORD LowPart;
-                DWORD HighPart;
+                unsigned long LowPart;
+                unsigned long HighPart;
             } DUMMYSTRUCTNAME;
             struct {
-                DWORD LowPart;
-                DWORD HighPart;
+                unsigned long LowPart;
+                unsigned long HighPart;
             } u;
             Dqn_u64 QuadPart;
         } ULARGE_INTEGER;
 
         typedef struct
         {
-            DWORD dwLowDateTime;
-            DWORD dwHighDateTime;
+            unsigned long dwLowDateTime;
+            unsigned long dwHighDateTime;
         } FILETIME;
 
         typedef struct
         {
-            DWORD dwFileAttributes;
+            unsigned long dwFileAttributes;
             FILETIME ftCreationTime;
             FILETIME ftLastAccessTime;
             FILETIME ftLastWriteTime;
-            DWORD nFileSizeHigh;
-            DWORD nFileSizeLow;
+            unsigned long nFileSizeHigh;
+            unsigned long nFileSizeLow;
         } WIN32_FILE_ATTRIBUTE_DATA;
 
         typedef enum
@@ -3082,56 +3152,56 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         } GET_FILEEX_INFO_LEVELS;
 
         typedef struct {
-            DWORD nLength;
+            unsigned long nLength;
             void *lpSecurityDescriptor;
             bool bInheritHandle;
         } SECURITY_ATTRIBUTES;
 
         typedef struct {
             union {
-                DWORD dwOemId;          // Obsolete field...do not use
+                unsigned long dwOemId;          // Obsolete field...do not use
                 struct {
                     Dqn_u16 wProcessorArchitecture;
                     Dqn_u16 wReserved;
                 } DUMMYSTRUCTNAME;
             } DUMMYUNIONNAME;
-            DWORD dwPageSize;
+            unsigned long dwPageSize;
             void *lpMinimumApplicationAddress;
             void *lpMaximumApplicationAddress;
-            DWORD *dwActiveProcessorMask;
-            DWORD dwNumberOfProcessors;
-            DWORD dwProcessorType;
-            DWORD dwAllocationGranularity;
+            unsigned long *dwActiveProcessorMask;
+            unsigned long dwNumberOfProcessors;
+            unsigned long dwProcessorType;
+            unsigned long dwAllocationGranularity;
             Dqn_u16 wProcessorLevel;
             Dqn_u16 wProcessorRevision;
         } SYSTEM_INFO;
 
         typedef struct {
-            WORD wYear;
-            WORD wMonth;
-            WORD wDayOfWeek;
-            WORD wDay;
-            WORD wHour;
-            WORD wMinute;
-            WORD wSecond;
-            WORD wMilliseconds;
+            unsigned short wYear;
+            unsigned short wMonth;
+            unsigned short wDayOfWeek;
+            unsigned short wDay;
+            unsigned short wHour;
+            unsigned short wMinute;
+            unsigned short wSecond;
+            unsigned short wMilliseconds;
         } SYSTEMTIME;
 
         typedef struct {
-            DWORD dwFileAttributes;
+            unsigned long dwFileAttributes;
             FILETIME ftCreationTime;
             FILETIME ftLastAccessTime;
             FILETIME ftLastWriteTime;
-            DWORD nFileSizeHigh;
-            DWORD nFileSizeLow;
-            DWORD dwReserved0;
-            DWORD dwReserved1;
+            unsigned long nFileSizeHigh;
+            unsigned long nFileSizeLow;
+            unsigned long dwReserved0;
+            unsigned long dwReserved1;
             wchar_t cFileName[MAX_PATH];
             wchar_t cAlternateFileName[14];
 #ifdef _MAC
-            DWORD dwFileType;
-            DWORD dwCreatorType;
-            WORD  wFinderFlags;
+            unsigned long dwFileType;
+            unsigned long dwCreatorType;
+            unsigned short wFinderFlags;
 #endif
         } WIN32_FIND_DATAW;
 
@@ -3147,7 +3217,6 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
             FindExSearchLimitToDevices,
             FindExSearchMaxSearchOp
         } FINDEX_SEARCH_OPS;
-
 
         typedef enum {
             INTERNET_SCHEME_PARTIAL = -2,
@@ -3169,86 +3238,87 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
         } INTERNET_SCHEME;
 
         typedef struct {
-            DWORD   dwStructSize;       // size of this structure. Used in version check
-            char   *lpszScheme;         // pointer to scheme name
-            DWORD   dwSchemeLength;     // length of scheme name
-            INTERNET_SCHEME nScheme;    // enumerated scheme type (if known)
-            char   *lpszHostName;       // pointer to host name
-            DWORD   dwHostNameLength;   // length of host name
-            INTERNET_PORT nPort;        // converted port number
-            char   *lpszUserName;       // pointer to user name
-            DWORD   dwUserNameLength;   // length of user name
-            char   *lpszPassword;       // pointer to password
-            DWORD   dwPasswordLength;   // length of password
-            char   *lpszUrlPath;        // pointer to URL-path
-            DWORD   dwUrlPathLength;    // length of URL-path
-            char   *lpszExtraInfo;      // pointer to extra information (e.g. ?foo or #foo)
-            DWORD   dwExtraInfoLength;  // length of extra information
+            unsigned long    dwStructSize;       // size of this structure. Used in version check
+            char            *lpszScheme;         // pointer to scheme name
+            unsigned long    dwSchemeLength;     // length of scheme name
+            INTERNET_SCHEME  nScheme;            // enumerated scheme type (if known)
+            char            *lpszHostName;       // pointer to host name
+            unsigned long    dwHostNameLength;   // length of host name
+            INTERNET_PORT    nPort;              // converted port number
+            char            *lpszUserName;       // pointer to user name
+            unsigned long    dwUserNameLength;   // length of user name
+            char            *lpszPassword;       // pointer to password
+            unsigned long    dwPasswordLength;   // length of password
+            char            *lpszUrlPath;        // pointer to URL-path
+            unsigned long    dwUrlPathLength;    // length of URL-path
+            char            *lpszExtraInfo;      // pointer to extra information (e.g. ?foo or #foo)
+            unsigned long    dwExtraInfoLength;  // length of extra information
         } URL_COMPONENTSA;
-
 
         // ---------------------------------------------------------------------
         // Functions
         // ---------------------------------------------------------------------
         extern "C"
         {
-        bool          CreateDirectoryW         (wchar_t const *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
+        /*BOOL*/     int             CreateDirectoryW           (wchar_t const *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
+        /*BOOL*/     int             RemoveDirectoryW           (wchar_t const *lpPathName);
+        /*DWORD*/    unsigned long   GetCurrentDirectoryW       (unsigned long nBufferLength, wchar_t *lpBuffer);
 
-        BOOL          MoveFileExW              (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, DWORD flags);
-        BOOL          CopyFileW                (wchar_t const *existing_file_name, wchar_t const *new_file_name, BOOL fail_if_exists);
-        BOOL          DeleteFileW              (wchar_t const *existing_file_name);
-        BOOL          RemoveDirectoryW         (wchar_t const *lpPathName);
-        DWORD         GetCurrentDirectoryW     (DWORD nBufferLength, wchar_t *lpBuffer);
-        bool          FindNextFileW            (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
-        HANDLE        FindFirstFileExW         (wchar_t const *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, DWORD dwAdditionalFlags);
-        DWORD         GetFileAttributesExW     (wchar_t const *file_name, GET_FILEEX_INFO_LEVELS info_level, WIN32_FILE_ATTRIBUTE_DATA *file_information);
+        /*BOOL*/     int             FindNextFileW              (void *hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+        /*HANDLE*/   void           *FindFirstFileExW           (wchar_t const *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, unsigned long dwAdditionalFlags);
+        /*DWORD*/    unsigned long   GetFileAttributesExW       (wchar_t const *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, WIN32_FILE_ATTRIBUTE_DATA *lpFileInformation);
+        /*BOOL*/     int             GetFileSizeEx              (void *hFile, LARGE_INTEGER *lpFileSize);
 
-        HMODULE       LoadLibraryA             (char const *file_name);
-        bool          FreeLibrary              (void *lib_module);
-        void         *GetProcAddress           (void *hmodule, char const *proc_name);
-        unsigned int  GetWindowModuleFileNameA (void *hwnd, char *file_name, unsigned int file_name_max);
-        HMODULE       GetModuleHandleA         (char const *lpModuleName);
-        DWORD         GetModuleFileNameW       (HMODULE hModule, wchar_t *lpFilename, DWORD nSize);
+        /*BOOL*/     int             MoveFileExW                (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, unsigned long dwFlags);
+        /*BOOL*/     int             CopyFileW                  (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, int bFailIfExists);
+        /*BOOL*/     int             DeleteFileW                (wchar_t const *lpExistingFileName);
+        /*HANDLE*/   void           *CreateFileW                (wchar_t const *lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void *hTemplateFile);
+        /*BOOL*/     int             ReadFile                   (void *hFile, void *lpBuffer, unsigned long nNumberOfBytesToRead, unsigned long *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
+        /*BOOL*/     int             CloseHandle                (void *hObject);
 
-        DWORD         WaitForSingleObject      (HANDLE handle, DWORD milliseconds);
+        /*HMODULE*/  void           *LoadLibraryA               (char const *lpFileName);
+        /*BOOL*/     int             FreeLibrary                (void *hModule);
+        /*FARPROC*/  void           *GetProcAddress             (void *hModule, char const *lpProcName);
 
-        bool          QueryPerformanceCounter  (LARGE_INTEGER *performance_count);
-        bool          QueryPerformanceFrequency(LARGE_INTEGER *frequency);
+        /*DWORD*/    unsigned long   GetWindowModuleFileNameA   (void *hwnd, char *pszFileName, unsigned int cchFileNameMax);
+        /*HMODULE*/  void           *GetModuleHandleA           (char const *lpModuleName);
+        /*DWORD*/    unsigned long   GetModuleFileNameW         (void *hModule, wchar_t *lpFilename, unsigned long nSize);
 
-        HANDLE        CreateThread             (SECURITY_ATTRIBUTES *thread_attributes, size_t stack_size, DWORD (*start_function)(void *), void *user_context, DWORD creation_flags, DWORD *thread_id);
-        HANDLE        CreateSemaphoreA         (SECURITY_ATTRIBUTES *security_attributes, long initial_count, long max_count, char *lpName);
-        bool          ReleaseSemaphore         (HANDLE semaphore, long release_count, long *prev_count);
-        void          Sleep                    (DWORD dwMilliseconds);
+        /*DWORD*/    unsigned long   WaitForSingleObject        (void *hHandle, unsigned long dwMilliseconds);
 
-        void         *VirtualAlloc             (void *address, size_t size, DWORD allocation_type, DWORD protect);
-        bool          VirtualFree              (void *address, size_t size, DWORD free_type);
+        /*BOOL*/     int             QueryPerformanceCounter    (LARGE_INTEGER *lpPerformanceCount);
+        /*BOOL*/     int             QueryPerformanceFrequency  (LARGE_INTEGER *lpFrequency);
 
-        void          GetSystemInfo            (SYSTEM_INFO *system_info);
-        void          GetSystemTime            (SYSTEMTIME *lpSystemTime);
-        void          GetSystemTimeAsFileTime  (FILETIME   *lpFileTime);
-        void          GetLocalTime             (SYSTEMTIME *lpSystemTime);
+        /*HANDLE*/   void           *CreateThread               (SECURITY_ATTRIBUTES *lpThreadAttributes, size_t dwStackSize, unsigned long (*lpStartAddress)(void *), void *lpParameter, unsigned long dwCreationFlags, unsigned long *lpThreadId);
+        /*HANDLE*/   void           *CreateSemaphoreA           (SECURITY_ATTRIBUTES *lpSecurityAttributes, long lInitialCount, long lMaxCount, char *lpName);
+        /*BOOL*/     int             ReleaseSemaphore           (void *semaphore, long lReleaseCount, long *lpPreviousCount);
+                     void            Sleep                      (unsigned long dwMilliseconds);
 
-        DWORD         FormatMessageA           (DWORD flags, void *source, DWORD message_id, DWORD language_id, char *buffer, DWORD size, va_list *args);
-        DWORD         GetLastError             ();
+                     void           *VirtualAlloc               (void *lpAddress, size_t dwSize, unsigned long flAllocationType, unsigned long flProtect);
+        /*BOOL*/     int             VirtualFree                (void *lpAddress, size_t dwSize, unsigned long dwFreeType);
 
-        int           MultiByteToWideChar      (unsigned int CodePage, DWORD dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
-        int           WideCharToMultiByte      (unsigned int CodePage, DWORD dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
+                     void            GetSystemInfo              (SYSTEM_INFO *system_info);
+                     void            GetSystemTime              (SYSTEMTIME  *lpSystemTime);
+                     void            GetSystemTimeAsFileTime    (FILETIME    *lpFileTime);
+                     void            GetLocalTime               (SYSTEMTIME  *lpSystemTime);
 
-        NTSTATUS      BCryptOpenAlgorithmProvider(BCRYPT_ALG_HANDLE *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
-        NTSTATUS      BCryptGenRandom            (BCRYPT_ALG_HANDLE hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
+        /*DWORD*/    unsigned long   FormatMessageA             (unsigned long dwFlags, void *lpSource, unsigned long dwMessageId, unsigned long dwLanguageId, char *lpBuffer, unsigned long nSize, va_list *Arguments);
+        /*DWORD*/    unsigned long   GetLastError               ();
 
-        BOOL          InternetCrackUrlA          (char const *lpszUrl, DWORD dwUrlLength, DWORD dwFlags, URL_COMPONENTSA *lpUrlComponents);
-        void         *InternetOpenA              (char const *lpszAgent, DWORD dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, DWORD dwFlags);
-        void         *InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, DWORD dwService, DWORD dwFlags, DWORD *dwContext);
-        bool          InternetSetOptionA         (void *hInternet, DWORD dwOption, void *lpBuffer, DWORD dwBufferLength);
-        BOOL          InternetReadFile           (void *hFile, void *lpBuffer, DWORD dwNumberOfBytesToRead, DWORD *lpdwNumberOfBytesRead);
-        void         *HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, DWORD dwFlags, DWORD *dwContext);
-        BOOL          HttpSendRequestA           (void *hRequest, char const *lpszHeaders, DWORD dwHeadersLength, void *lpOptional, DWORD dwOptionalLength);
-        BOOL          InternetCloseHandle        (void *hInternet);
-        HANDLE        CreateFileW                (wchar_t const *lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
-        BOOL          CloseHandle                (HANDLE hObject);
-        BOOL          ReadFile                   (HANDLE hFile, void *lpBuffer, DWORD nNumberOfBytesToRead, DWORD *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
-        BOOL          GetFileSizeEx              (HANDLE hFile, LARGE_INTEGER *lpFileSize);
+                     int             MultiByteToWideChar        (unsigned int CodePage, unsigned long dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
+                     int             WideCharToMultiByte        (unsigned int CodePage, unsigned long dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
+
+        /*NTSTATUS*/ long            BCryptOpenAlgorithmProvider(void *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
+        /*NTSTATUS*/ long            BCryptGenRandom            (void *hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
+
+        /*BOOLAPI*/  int             InternetCrackUrlA          (char const *lpszUrl, unsigned long dwUrlLength, unsigned long dwFlags, URL_COMPONENTSA *lpUrlComponents);
+        /*HANDLE*/   void           *InternetOpenA              (char const *lpszAgent, unsigned long dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, unsigned long dwFlags);
+        /*HANDLE*/   void           *InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, unsigned long dwService, unsigned long dwFlags, unsigned long *dwContext);
+        /*BOOLAPI*/  int             InternetSetOptionA         (void *hInternet, unsigned long dwOption, void *lpBuffer, unsigned long dwBufferLength);
+        /*BOOLAPI*/  int             InternetReadFile           (void *hFile, void *lpBuffer, unsigned long dwNumberOfBytesToRead, unsigned long *lpdwNumberOfBytesRead);
+        /*BOOLAPI*/  int             InternetCloseHandle        (void *hInternet);
+        /*HANDLE*/   void           *HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, unsigned long dwFlags, unsigned long *dwContext);
+        /*BOOLAPI*/  int             HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
         }
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 #elif defined(DQN_OS_UNIX)
@@ -3264,7 +3334,6 @@ Dqn_b32 Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator)
 #endif
 
 Dqn_Lib dqn__lib;
-
 DQN_API void Dqn__ZeroMemBytes(void *ptr, Dqn_usize count, Dqn_ZeroMem zero_mem)
 {
     if (zero_mem == Dqn_ZeroMem::Yes)
@@ -3408,7 +3477,7 @@ DQN_API void Dqn_LogVDefault(Dqn_LogType type,
             Dqn_ThreadScratch scratch  = Dqn_ThreadGetScratch();
             Dqn_String        exe_dir  = Dqn_OSExecutableDirectory(scratch.arena);
             Dqn_String        log_file = Dqn_StringFmt(scratch.arena, "%.*s/dqn.log", DQN_STRING_FMT(exe_dir));
-            dqn__lib.log_file          = fopen(log_file.str, "a");
+            fopen_s(DQN_CAST(FILE **)&dqn__lib.log_file, log_file.str, "a");
         }
     }
     Dqn_TicketMutexEnd(&dqn__lib.log_file_mutex);
@@ -4221,6 +4290,11 @@ DQN_API Dqn_ArenaMemBlock *Dqn__ArenaAllocateBlock(Dqn_Arena *arena, Dqn_isize r
         break;
 
         case Dqn_ArenaMemProvider::Virtual:
+        {
+            result = DQN_CAST(Dqn_ArenaMemBlock *)VirtualAlloc(nullptr, allocate_size, MEM_RESERVE, PAGE_READWRITE);
+        }
+        break;
+
         case Dqn_ArenaMemProvider::UserMemory:
         break;
     }
@@ -4250,7 +4324,7 @@ DQN_API void Dqn__ArenaFreeBlock(Dqn_Arena *arena, Dqn_ArenaMemBlock *block)
     switch (arena->mem_provider)
     {
         case Dqn_ArenaMemProvider::CRT: DQN_FREE(block); break;
-        case Dqn_ArenaMemProvider::Virtual:
+        case Dqn_ArenaMemProvider::Virtual: VirtualFree(block, block->size, MEM_RELEASE);
         case Dqn_ArenaMemProvider::UserMemory:
         break;
     }
@@ -5725,7 +5799,7 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
     Dqn_String        file_path_string   = Dqn_StringInit(file_path, file_path_size);
     Dqn_StringW       file_path_string_w = Dqn_WinArenaUTF8ToWChar(file_path_string, scratch.arena);
 
-    HANDLE file_handle =
+    void *file_handle =
         CreateFileW(file_path_string_w.str, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, nullptr);
     if (file_handle == INVALID_HANDLE_VALUE)
     {
@@ -5736,7 +5810,7 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
     DQN_DEFER { CloseHandle(file_handle); };
     LARGE_INTEGER win_file_size;
     bool get_file_size_result = GetFileSizeEx(file_handle, &win_file_size);
-    if (!get_file_size_result || win_file_size.QuadPart > (DWORD)-1)
+    if (!get_file_size_result || win_file_size.QuadPart > (unsigned long)-1)
     {
         if (!get_file_size_result)
         {
@@ -5756,8 +5830,8 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
     auto *result     = DQN_CAST(char *) Dqn__ArenaAllocate(arena, win_file_size.QuadPart + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
 
     // TODO(dqn): We need to chunk this and ensure that readfile read the bytes we wanted.
-    DWORD bytes_read = 0;
-    if (ReadFile(file_handle, result, DQN_CAST(DWORD)win_file_size.QuadPart, &bytes_read, nullptr /*overlapped*/) == 0)
+    unsigned long bytes_read = 0;
+    if (ReadFile(file_handle, result, DQN_CAST(unsigned long)win_file_size.QuadPart, &bytes_read, nullptr /*overlapped*/) == 0)
     {
         Dqn_ArenaEndScope(arena_undo);
         Dqn_WinDumpLastError("ReadFile");
@@ -5824,7 +5898,8 @@ DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_siz
     // TODO(dqn): Use OS apis
     (void)file_path_size;
 
-    FILE *file_handle = fopen(file_path, "w+b");
+    FILE *file_handle = nullptr;
+    fopen_s(&file_handle, file_path, "w+b");
     if (!file_handle)
     {
         DQN_LOG_E("Failed to open file '%s' using fopen\n", file_path);
@@ -5966,7 +6041,7 @@ DQN_API Dqn_b32 Dqn_FileCopy(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite)
     Dqn_WinUTF8ToWChar(src, src_w, DQN_CAST(int)Dqn_ArrayCountInt(src_w));
     Dqn_WinUTF8ToWChar(dest, dest_w, DQN_CAST(int)Dqn_ArrayCountInt(dest_w));
 
-    BOOL fail_if_exists = overwrite == false;
+    int fail_if_exists = overwrite == false;
     result = CopyFileW(src_w, dest_w, fail_if_exists) != 0;
     if (!result)
         Dqn_WinDumpLastError("Failed to copy from %.*s to %.*s", DQN_STRING_FMT(src), DQN_STRING_FMT(dest));
@@ -6143,7 +6218,7 @@ DQN_API Dqn_b32 Dqn_FileMove(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite)
     Dqn_WinUTF8ToWChar(src, src_w, DQN_CAST(int)Dqn_ArrayCountI(src_w));
     Dqn_WinUTF8ToWChar(dest, dest_w, DQN_CAST(int)Dqn_ArrayCountI(dest_w));
 
-    DWORD flags = MOVEFILE_COPY_ALLOWED;
+    unsigned long flags = MOVEFILE_COPY_ALLOWED;
     if (overwrite) flags |= MOVEFILE_REPLACE_EXISTING;
 
     result = MoveFileExW(src_w, dest_w, flags) != 0;
@@ -6312,7 +6387,7 @@ DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size)
     if (!init)
         return false;
 
-    NTSTATUS gen_status = BCryptGenRandom(dqn__lib.win32_bcrypt_rng_handle, DQN_CAST(unsigned char *)buffer, size, 0 /*flags*/);
+    long gen_status = BCryptGenRandom(dqn__lib.win32_bcrypt_rng_handle, DQN_CAST(unsigned char *)buffer, size, 0 /*flags*/);
     if (gen_status != 0)
     {
         DQN_LOG_E("Failed to generate random bytes: %d", gen_status);
@@ -6503,7 +6578,7 @@ DQN_API Dqn_u64 Dqn_PerfCounterNow()
     Dqn_u64 result = 0;
 #if defined(DQN_OS_WIN32)
     LARGE_INTEGER integer = {};
-    BOOL      qpc_result = QueryPerformanceCounter(&integer);
+    int qpc_result = QueryPerformanceCounter(&integer);
     (void)qpc_result;
     DQN_ASSERT_MSG(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
     result = integer.QuadPart;
@@ -6597,7 +6672,8 @@ DQN_API void Dqn_LibDumpThreadContextArenaStats(Dqn_String file_path)
 {
     (void)file_path;
 #if defined(DQN_DEBUG_THREAD_CONTEXT)
-    FILE *file = fopen(file_path.str, "a+b");
+    FILE *file = nullptr;
+    fopen_s(&file, file_path.str, "a+b");
     if (file)
     {
         // ---------------------------------------------------------------------
@@ -6924,8 +7000,8 @@ DQN_API Dqn_WinErrorMsg Dqn_WinLastError()
     result.code   = GetLastError();
     result.str[0] = 0;
 
-    DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-    HMODULE module_to_get_errors_from = nullptr;
+    unsigned long flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    void *module_to_get_errors_from = nullptr;
 
     if (result.code >= 12000 && result.code <= 12175) // WinINET Errors
     {
@@ -6935,14 +7011,52 @@ DQN_API Dqn_WinErrorMsg Dqn_WinLastError()
 
     result.size = FormatMessageA(flags,
                                  module_to_get_errors_from,                   // LPCVOID lpSource,
-                                 result.code,                                 // DWORD   dwMessageId,
-                                 0,                                           // DWORD   dwLanguageId,
+                                 result.code,                                 // unsigned long   dwMessageId,
+                                 0,                                           // unsigned long   dwLanguageId,
                                  result.str,                                  // LPSTR   lpBuffer,
-                                 DQN_CAST(DWORD) Dqn_ArrayCountI(result.str), // DWORD   nSize,
+                                 DQN_CAST(unsigned long) Dqn_ArrayCountI(result.str), // unsigned long   nSize,
                                  nullptr                                      // va_list * Arguments);
     );
 
     return result;
+}
+
+#if defined(DQN_NO_WIN32_MINIMAL_HEADER)
+    #include <shellscalingapi.h> // SetProcessDpiAwareProc
+#else
+    typedef enum PROCESS_DPI_AWARENESS
+    {
+        PROCESS_DPI_UNAWARE           = 0,
+        PROCESS_SYSTEM_DPI_AWARE      = 1,
+        PROCESS_PER_MONITOR_DPI_AWARE = 2
+    } PROCESS_DPI_AWARENESS;
+
+    #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((void *)-4)
+#endif
+
+DQN_API void Dqn_WinMakeProcessDPIAware()
+{
+    typedef bool SetProcessDpiAwareProc(void);
+    typedef bool SetProcessDpiAwarenessProc(PROCESS_DPI_AWARENESS);
+    typedef bool SetProcessDpiAwarenessContextProc(void * /*DPI_AWARENESS_CONTEXT*/);
+
+    // NOTE(doyle): Taken from cmuratori/refterm snippet on DPI awareness. It
+    // appears we can make this robust by just loading user32.dll and using
+    // GetProcAddress on the DPI function. If it's not there, we're on an old
+    // version of windows, so we can call an older version of the API.
+    void *lib_handle = LoadLibraryA("user32.dll");
+    if (auto *set_process_dpi_awareness_context = DQN_CAST(SetProcessDpiAwarenessContextProc *)GetProcAddress(lib_handle, "SetProcessDpiAwarenessContext"))
+    {
+        set_process_dpi_awareness_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+    else if (auto *set_process_dpi_awareness = DQN_CAST(SetProcessDpiAwarenessProc *)GetProcAddress(lib_handle, "SetProcessDpiAwareness"))
+    {
+        set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
+    }
+    else if (auto *set_process_dpi_aware = DQN_CAST(SetProcessDpiAwareProc *)GetProcAddress(lib_handle, "SetProcessDpiAware"))
+    {
+        set_process_dpi_aware();
+    }
 }
 
 DQN_API void Dqn__WinDumpLastError(Dqn_String file, Dqn_String function, Dqn_uint line, char const *fmt, ...)
@@ -7064,7 +7178,7 @@ DQN_API Dqn_String Dqn_WinArenaWCharToUTF8(Dqn_StringW src, Dqn_Arena *arena)
 DQN_API Dqn_StringW Dqn_WinExecutableDirectoryW(Dqn_Arena *arena)
 {
     wchar_t buffer[DQN_OS_WIN32_MAX_PATH];
-    int file_path_size = GetModuleFileNameW(nullptr /*module*/, buffer, DQN_CAST(DWORD)Dqn_ArrayCountI(buffer));
+    int file_path_size = GetModuleFileNameW(nullptr /*module*/, buffer, DQN_CAST(unsigned long)Dqn_ArrayCountI(buffer));
     DQN_HARD_ASSERT_MSG(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
 
     int directory_size = file_path_size;
@@ -7106,15 +7220,15 @@ DQN_API Dqn_StringW Dqn_WinCurrentDirW(Dqn_Arena *arena, Dqn_StringW suffix)
     Dqn_StringW result = {};
 
     // NOTE: required_size is the size required *including* the null-terminator
-    DWORD         required_size  = GetCurrentDirectoryW(0, nullptr);
-    DWORD         desired_size   = required_size + DQN_CAST(DWORD) suffix.size;
+    unsigned long         required_size  = GetCurrentDirectoryW(0, nullptr);
+    unsigned long         desired_size   = required_size + DQN_CAST(unsigned long) suffix.size;
     Dqn_ArenaScopeData temp_state = Dqn_ArenaBeginScope(arena);
 
     wchar_t *w_path = Dqn_ArenaNewArray(arena, wchar_t, desired_size, Dqn_ZeroMem::No);
     if (!w_path)
         return result;
 
-    DWORD bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, w_path);
+    unsigned long bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, w_path);
     if ((bytes_written_wo_null_terminator + 1) != required_size)
     {
         // TODO(dqn): Error
@@ -7147,7 +7261,7 @@ DQN_API bool Dqn_WinFolderWIterate(Dqn_StringW path, Dqn_WinFolderIteratorW *it)
                                       &find_data,            /*LPVOID lpFindFileData,*/
                                       FindExSearchNameMatch, /*FINDEX_SEARCH_OPS fSearchOp,*/
                                       nullptr,               /*LPVOID lpSearchFilter,*/
-                                      FIND_FIRST_EX_LARGE_FETCH /*DWORD dwAdditionalFlags)*/);
+                                      FIND_FIRST_EX_LARGE_FETCH /*unsigned long dwAdditionalFlags)*/);
 
         if (it->handle == INVALID_HANDLE_VALUE)
             return false;
@@ -7347,7 +7461,7 @@ DQN_API bool Dqn_WinNetHandlePump(Dqn_WinNetHandle *handle, char const *http_ver
         return false;
 
     bool result = true;
-    DWORD bytes_read;
+    unsigned long bytes_read;
     if (InternetReadFile(handle->http_handle, dest, dest_size, &bytes_read))
     {
         if (bytes_read == 0)
