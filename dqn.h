@@ -786,6 +786,13 @@ typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, char const *file, Dq
 #define DQN_LOG_P(fmt, ...) Dqn_Log(Dqn_LogType::Profile, dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 #define DQN_LOG(log_type, fmt, ...) Dqn_Log(log_type,     dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, ## __VA_ARGS__)
 
+#define DQN_LOGV_E(fmt, va) Dqn_LogV(Dqn_LogType::Error,   dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_D(fmt, va) Dqn_LogV(Dqn_LogType::Debug,   dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_W(fmt, va) Dqn_LogV(Dqn_LogType::Warning, dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_I(fmt, va) Dqn_LogV(Dqn_LogType::Info,    dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_M(fmt, va) Dqn_LogV(Dqn_LogType::Memory,  dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_P(fmt, va) Dqn_LogV(Dqn_LogType::Profile, dqn__lib.log_user_data, DQN_STR_AND_LEN(__FILE__), DQN_STR_AND_LEN(__func__), __LINE__, fmt, va)
+
 // Internal logging functions, prefer the logging macros above
 DQN_API void Dqn_LogVDefault(Dqn_LogType type, void *user_data, char const *file, Dqn_uint file_len, char const *func, Dqn_uint func_len, Dqn_uint line, char const *fmt, va_list va);
 DQN_API void Dqn_LogV       (Dqn_LogType type, void *user_data, char const *file, Dqn_uint file_len, char const *func, Dqn_uint func_len, Dqn_uint line, char const *fmt, va_list va);
@@ -5803,7 +5810,7 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
         CreateFileW(file_path_string_w.str, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, nullptr);
     if (file_handle == INVALID_HANDLE_VALUE)
     {
-        Dqn_WinDumpLastError("Failed to open file %.*s", file_path_size, file_path);
+        Dqn_WinDumpLastError("Failed to open file for reading [file=%.*s]", file_path_size, file_path);
         return nullptr;
     }
 
@@ -5895,6 +5902,40 @@ DQN_API Dqn_String Dqn__FileArenaReadToString(char const *     file_path,
 
 DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size)
 {
+#if defined(DQN_OS_WIN32)
+    if (!file_path || file_path_size <= 0 || !buffer || buffer_size <= 0)
+        return false;
+
+    if (file_path_size == 0)
+        file_path_size = Dqn_CStringSize(file_path);
+
+    Dqn_ThreadScratch scratch       = Dqn_ThreadGetScratch();
+    Dqn_String        file_path_str = Dqn_StringInit(file_path, file_path_size);
+    Dqn_StringW       file_path_w   = Dqn_WinArenaUTF8ToWChar(file_path_str, scratch.arena);
+
+    Dqn_b32 result = false;
+    if (buffer_size > 0)
+    {
+        HANDLE file_handle = CreateFileW(file_path_w.str,       // LPCWSTR               lpFileName,
+                                         GENERIC_WRITE,         // DWORD                 dwDesiredAccess,
+                                         0,                     // DWORD                 dwShareMode,
+                                         nullptr,               // LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                                         CREATE_ALWAYS,         // DWORD                 dwCreationDisposition,
+                                         FILE_ATTRIBUTE_NORMAL, // DWORD                 dwFlagsAndAttributes,
+                                         nullptr                // HANDLE                hTemplateFile
+        );
+
+        if (file_handle == INVALID_HANDLE_VALUE)
+            return result;
+
+        DWORD bytes_written = 0;
+        result              = WriteFile(file_handle, buffer, DQN_CAST(DWORD)buffer_size, &bytes_written, nullptr /*lpOverlapped*/);
+        CloseHandle(file_handle);
+        DQN_ASSERT(bytes_written == buffer_size);
+    }
+
+    return result;
+#else
     // TODO(dqn): Use OS apis
     (void)file_path_size;
 
@@ -5916,6 +5957,7 @@ DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_siz
     }
 
     return true;
+#endif
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -6743,11 +6785,11 @@ DQN_API void Dqn_LibDumpThreadContextArenaStats(Dqn_String file_path)
         }
 
         fclose(file);
-        DQN_LOG_I("Dumped thread context arenas to %.*s", DQN_STRING_FMT(file_path));
+        DQN_LOG_I("Dumped thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
     }
     else
     {
-        DQN_LOG_E("Failed to dump thread context arenas to %.*s", DQN_STRING_FMT(file_path));
+        DQN_LOG_E("Failed to dump thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
     }
 #endif // #if defined(DQN_DEBUG_THREAD_CONTEXT)
 }
@@ -7064,9 +7106,9 @@ DQN_API void Dqn__WinDumpLastError(Dqn_String file, Dqn_String function, Dqn_uin
     }
 
     if (msg.size)
-        Dqn_Log(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, DQN_CAST(int)file_name_size, function.str, DQN_CAST(int)function.size, line, "Error: %.*s", msg.size, msg.str);
+        Dqn_Log(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, DQN_CAST(int)file_name_size, function.str, DQN_CAST(int)function.size, line, "Last Windows error [msg=%.*s]", msg.size, msg.str);
     else
-        Dqn_Log(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, DQN_CAST(int)file_name_size, function.str, DQN_CAST(int)function.size, line, "FormatMessage error: %d. No error message for: %d", GetLastError(), msg.code);
+        Dqn_Log(Dqn_LogType::Error, dqn__lib.log_user_data, file_name, DQN_CAST(int)file_name_size, function.str, DQN_CAST(int)function.size, line, "Failed to dump last error, no error message found [format_message_error=%d, msg_error=%d]", GetLastError(), msg.code);
 }
 
 DQN_API int Dqn_WinUTF8ToWCharSizeRequired(Dqn_String src)
