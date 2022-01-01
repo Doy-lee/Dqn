@@ -1676,6 +1676,7 @@ DQN_API Dqn_u32   Dqn_SafeTruncateUSizeToU32  (Dqn_usize val);
 DQN_API int       Dqn_SafeTruncateUSizeToI32  (Dqn_usize val);
 DQN_API int       Dqn_SafeTruncateUSizeToInt  (Dqn_usize val);
 DQN_API Dqn_isize Dqn_SafeTruncateUSizeToISize(Dqn_usize val);
+DQN_API Dqn_isize Dqn_SafeTruncateI64ToISize  (Dqn_i64 val);
 DQN_API Dqn_u32   Dqn_SafeTruncateU64ToU32    (Dqn_u64 val);
 DQN_API Dqn_u16   Dqn_SafeTruncateU64ToU16    (Dqn_u64 val);
 DQN_API Dqn_u8    Dqn_SafeTruncateU64ToU8     (Dqn_u64 val);
@@ -3106,6 +3107,7 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
         #define GENERIC_WRITE (0x40000000L)
         #define GENERIC_EXECUTE (0x20000000L)
         #define GENERIC_ALL (0x10000000L)
+        #define FILE_ATTRIBUTE_NORMAL 0x00000080
 
         #define CREATE_NEW          1
         #define CREATE_ALWAYS       2
@@ -3267,65 +3269,66 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
         // ---------------------------------------------------------------------
         extern "C"
         {
-        /*BOOL*/     int             CreateDirectoryW           (wchar_t const *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
-        /*BOOL*/     int             RemoveDirectoryW           (wchar_t const *lpPathName);
-        /*DWORD*/    unsigned long   GetCurrentDirectoryW       (unsigned long nBufferLength, wchar_t *lpBuffer);
+        /*BOOL*/     int            __stdcall CreateDirectoryW           (wchar_t const *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
+        /*BOOL*/     int            __stdcall RemoveDirectoryW           (wchar_t const *lpPathName);
+        /*DWORD*/    unsigned long  __stdcall GetCurrentDirectoryW       (unsigned long nBufferLength, wchar_t *lpBuffer);
 
-        /*BOOL*/     int             FindNextFileW              (void *hFindFile, WIN32_FIND_DATAW *lpFindFileData);
-        /*HANDLE*/   void           *FindFirstFileExW           (wchar_t const *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, unsigned long dwAdditionalFlags);
-        /*DWORD*/    unsigned long   GetFileAttributesExW       (wchar_t const *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, WIN32_FILE_ATTRIBUTE_DATA *lpFileInformation);
-        /*BOOL*/     int             GetFileSizeEx              (void *hFile, LARGE_INTEGER *lpFileSize);
+        /*BOOL*/     int            __stdcall FindNextFileW              (void *hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+        /*HANDLE*/   void *         __stdcall FindFirstFileExW           (wchar_t const *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, unsigned long dwAdditionalFlags);
+        /*DWORD*/    unsigned long  __stdcall GetFileAttributesExW       (wchar_t const *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, WIN32_FILE_ATTRIBUTE_DATA *lpFileInformation);
+        /*BOOL*/     int            __stdcall GetFileSizeEx              (void *hFile, LARGE_INTEGER *lpFileSize);
 
-        /*BOOL*/     int             MoveFileExW                (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, unsigned long dwFlags);
-        /*BOOL*/     int             CopyFileW                  (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, int bFailIfExists);
-        /*BOOL*/     int             DeleteFileW                (wchar_t const *lpExistingFileName);
-        /*HANDLE*/   void           *CreateFileW                (wchar_t const *lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void *hTemplateFile);
-        /*BOOL*/     int             ReadFile                   (void *hFile, void *lpBuffer, unsigned long nNumberOfBytesToRead, unsigned long *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
-        /*BOOL*/     int             CloseHandle                (void *hObject);
+        /*BOOL*/     int            __stdcall MoveFileExW                (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, unsigned long dwFlags);
+        /*BOOL*/     int            __stdcall CopyFileW                  (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, int bFailIfExists);
+        /*BOOL*/     int            __stdcall DeleteFileW                (wchar_t const *lpExistingFileName);
+        /*HANDLE*/   void *         __stdcall CreateFileW                (wchar_t const *lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void *hTemplateFile);
+        /*BOOL*/     int            __stdcall ReadFile                   (void *hFile, void *lpBuffer, unsigned long nNumberOfBytesToRead, unsigned long *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
+        /*BOOL*/     int            __stdcall WriteFile                  (void *hFile, void const *lpBuffer, unsigned long nNumberOfBytesToWrite, unsigned long *lpNumberOfBytesWritten, struct OVERLAPPED *lpOverlapped);
+        /*BOOL*/     int            __stdcall CloseHandle                (void *hObject);
 
-        /*HMODULE*/  void           *LoadLibraryA               (char const *lpFileName);
-        /*BOOL*/     int             FreeLibrary                (void *hModule);
-        /*FARPROC*/  void           *GetProcAddress             (void *hModule, char const *lpProcName);
+        /*HMODULE*/  void *         __stdcall LoadLibraryA               (char const *lpFileName);
+        /*BOOL*/     int            __stdcall FreeLibrary                (void *hModule);
+        /*FARPROC*/  void *         __stdcall GetProcAddress             (void *hModule, char const *lpProcName);
 
-        /*DWORD*/    unsigned long   GetWindowModuleFileNameA   (void *hwnd, char *pszFileName, unsigned int cchFileNameMax);
-        /*HMODULE*/  void           *GetModuleHandleA           (char const *lpModuleName);
-        /*DWORD*/    unsigned long   GetModuleFileNameW         (void *hModule, wchar_t *lpFilename, unsigned long nSize);
+        /*DWORD*/    unsigned long  __stdcall GetWindowModuleFileNameA   (void *hwnd, char *pszFileName, unsigned int cchFileNameMax);
+        /*HMODULE*/  void *         __stdcall GetModuleHandleA           (char const *lpModuleName);
+        /*DWORD*/    unsigned long  __stdcall GetModuleFileNameW         (void *hModule, wchar_t *lpFilename, unsigned long nSize);
 
-        /*DWORD*/    unsigned long   WaitForSingleObject        (void *hHandle, unsigned long dwMilliseconds);
+        /*DWORD*/    unsigned long  __stdcall WaitForSingleObject        (void *hHandle, unsigned long dwMilliseconds);
 
-        /*BOOL*/     int             QueryPerformanceCounter    (LARGE_INTEGER *lpPerformanceCount);
-        /*BOOL*/     int             QueryPerformanceFrequency  (LARGE_INTEGER *lpFrequency);
+        /*BOOL*/     int            __stdcall QueryPerformanceCounter    (LARGE_INTEGER *lpPerformanceCount);
+        /*BOOL*/     int            __stdcall QueryPerformanceFrequency  (LARGE_INTEGER *lpFrequency);
 
-        /*HANDLE*/   void           *CreateThread               (SECURITY_ATTRIBUTES *lpThreadAttributes, size_t dwStackSize, unsigned long (*lpStartAddress)(void *), void *lpParameter, unsigned long dwCreationFlags, unsigned long *lpThreadId);
-        /*HANDLE*/   void           *CreateSemaphoreA           (SECURITY_ATTRIBUTES *lpSecurityAttributes, long lInitialCount, long lMaxCount, char *lpName);
-        /*BOOL*/     int             ReleaseSemaphore           (void *semaphore, long lReleaseCount, long *lpPreviousCount);
-                     void            Sleep                      (unsigned long dwMilliseconds);
+        /*HANDLE*/   void *         __stdcall CreateThread               (SECURITY_ATTRIBUTES *lpThreadAttributes, size_t dwStackSize, unsigned long (*lpStartAddress)(void *), void *lpParameter, unsigned long dwCreationFlags, unsigned long *lpThreadId);
+        /*HANDLE*/   void *         __stdcall CreateSemaphoreA           (SECURITY_ATTRIBUTES *lpSecurityAttributes, long lInitialCount, long lMaxCount, char *lpName);
+        /*BOOL*/     int            __stdcall ReleaseSemaphore           (void *semaphore, long lReleaseCount, long *lpPreviousCount);
+                     void           __stdcall Sleep                      (unsigned long dwMilliseconds);
 
-                     void           *VirtualAlloc               (void *lpAddress, size_t dwSize, unsigned long flAllocationType, unsigned long flProtect);
-        /*BOOL*/     int             VirtualFree                (void *lpAddress, size_t dwSize, unsigned long dwFreeType);
+                     void *         __stdcall VirtualAlloc               (void *lpAddress, size_t dwSize, unsigned long flAllocationType, unsigned long flProtect);
+        /*BOOL*/     int            __stdcall VirtualFree                (void *lpAddress, size_t dwSize, unsigned long dwFreeType);
 
-                     void            GetSystemInfo              (SYSTEM_INFO *system_info);
-                     void            GetSystemTime              (SYSTEMTIME  *lpSystemTime);
-                     void            GetSystemTimeAsFileTime    (FILETIME    *lpFileTime);
-                     void            GetLocalTime               (SYSTEMTIME  *lpSystemTime);
+                     void           __stdcall GetSystemInfo              (SYSTEM_INFO *system_info);
+                     void           __stdcall GetSystemTime              (SYSTEMTIME  *lpSystemTime);
+                     void           __stdcall GetSystemTimeAsFileTime    (FILETIME    *lpFileTime);
+                     void           __stdcall GetLocalTime               (SYSTEMTIME  *lpSystemTime);
 
-        /*DWORD*/    unsigned long   FormatMessageA             (unsigned long dwFlags, void *lpSource, unsigned long dwMessageId, unsigned long dwLanguageId, char *lpBuffer, unsigned long nSize, va_list *Arguments);
-        /*DWORD*/    unsigned long   GetLastError               ();
+        /*DWORD*/    unsigned long  __stdcall FormatMessageA             (unsigned long dwFlags, void *lpSource, unsigned long dwMessageId, unsigned long dwLanguageId, char *lpBuffer, unsigned long nSize, va_list *Arguments);
+        /*DWORD*/    unsigned long  __stdcall GetLastError               ();
 
-                     int             MultiByteToWideChar        (unsigned int CodePage, unsigned long dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
-                     int             WideCharToMultiByte        (unsigned int CodePage, unsigned long dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
+                     int            __stdcall MultiByteToWideChar        (unsigned int CodePage, unsigned long dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
+                     int            __stdcall WideCharToMultiByte        (unsigned int CodePage, unsigned long dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
 
-        /*NTSTATUS*/ long            BCryptOpenAlgorithmProvider(void *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
-        /*NTSTATUS*/ long            BCryptGenRandom            (void *hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
+        /*NTSTATUS*/ long           __stdcall BCryptOpenAlgorithmProvider(void *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
+        /*NTSTATUS*/ long           __stdcall BCryptGenRandom            (void *hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
 
-        /*BOOLAPI*/  int             InternetCrackUrlA          (char const *lpszUrl, unsigned long dwUrlLength, unsigned long dwFlags, URL_COMPONENTSA *lpUrlComponents);
-        /*HANDLE*/   void           *InternetOpenA              (char const *lpszAgent, unsigned long dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, unsigned long dwFlags);
-        /*HANDLE*/   void           *InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, unsigned long dwService, unsigned long dwFlags, unsigned long *dwContext);
-        /*BOOLAPI*/  int             InternetSetOptionA         (void *hInternet, unsigned long dwOption, void *lpBuffer, unsigned long dwBufferLength);
-        /*BOOLAPI*/  int             InternetReadFile           (void *hFile, void *lpBuffer, unsigned long dwNumberOfBytesToRead, unsigned long *lpdwNumberOfBytesRead);
-        /*BOOLAPI*/  int             InternetCloseHandle        (void *hInternet);
-        /*HANDLE*/   void           *HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, unsigned long dwFlags, unsigned long *dwContext);
-        /*BOOLAPI*/  int             HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
+        /*BOOLAPI*/  int            __stdcall InternetCrackUrlA          (char const *lpszUrl, unsigned long dwUrlLength, unsigned long dwFlags, URL_COMPONENTSA *lpUrlComponents);
+        /*HANDLE*/   void *         __stdcall InternetOpenA              (char const *lpszAgent, unsigned long dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, unsigned long dwFlags);
+        /*HANDLE*/   void *         __stdcall InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, unsigned long dwService, unsigned long dwFlags, unsigned long *dwContext);
+        /*BOOLAPI*/  int            __stdcall InternetSetOptionA         (void *hInternet, unsigned long dwOption, void *lpBuffer, unsigned long dwBufferLength);
+        /*BOOLAPI*/  int            __stdcall InternetReadFile           (void *hFile, void *lpBuffer, unsigned long dwNumberOfBytesToRead, unsigned long *lpdwNumberOfBytesRead);
+        /*BOOLAPI*/  int            __stdcall InternetCloseHandle        (void *hInternet);
+        /*HANDLE*/   void *         __stdcall HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, unsigned long dwFlags, unsigned long *dwContext);
+        /*BOOLAPI*/  int            __stdcall HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
         }
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
 #elif defined(DQN_OS_UNIX)
@@ -5097,6 +5100,13 @@ DQN_API Dqn_isize Dqn_SafeTruncateUSizeToISize(Dqn_usize val)
     return result;
 }
 
+DQN_API Dqn_isize Dqn_SafeTruncateI64ToISize(Dqn_i64 val)
+{
+    DQN_ASSERT_MSG(val <= DQN_ISIZE_MAX, "[val=%zu, max=%zu]", val, DQN_ISIZE_MAX);
+    auto result = (val <= DQN_ISIZE_MAX) ? DQN_CAST(Dqn_isize)val : DQN_ISIZE_MAX;
+    return result;
+}
+
 DQN_API Dqn_u32 Dqn_SafeTruncateU64ToU32(Dqn_u64 val)
 {
     DQN_ASSERT_MSG(val <= DQN_U32_MAX, "%I64u <= %I64u", val, DQN_U32_MAX);
@@ -5833,8 +5843,9 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
         return nullptr;
     }
 
-    auto  arena_undo = Dqn_ArenaBeginScope(arena);
-    auto *result     = DQN_CAST(char *) Dqn__ArenaAllocate(arena, win_file_size.QuadPart + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+    Dqn_isize allocate_size = Dqn_SafeTruncateI64ToISize(win_file_size.QuadPart + 1);
+    auto  arena_undo        = Dqn_ArenaBeginScope(arena);
+    auto *result            = DQN_CAST(char *) Dqn__ArenaAllocate(arena, allocate_size, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
 
     // TODO(dqn): We need to chunk this and ensure that readfile read the bytes we wanted.
     unsigned long bytes_read = 0;
@@ -5845,7 +5856,7 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
         return nullptr;
     }
 
-    if (file_size) *file_size = win_file_size.QuadPart;
+    if (file_size) *file_size = Dqn_SafeTruncateI64ToISize(win_file_size.QuadPart);
     return result;
 #else
     Dqn_isize file_size_ = 0;
@@ -5916,20 +5927,20 @@ DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_siz
     Dqn_b32 result = false;
     if (buffer_size > 0)
     {
-        HANDLE file_handle = CreateFileW(file_path_w.str,       // LPCWSTR               lpFileName,
-                                         GENERIC_WRITE,         // DWORD                 dwDesiredAccess,
-                                         0,                     // DWORD                 dwShareMode,
-                                         nullptr,               // LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-                                         CREATE_ALWAYS,         // DWORD                 dwCreationDisposition,
-                                         FILE_ATTRIBUTE_NORMAL, // DWORD                 dwFlagsAndAttributes,
-                                         nullptr                // HANDLE                hTemplateFile
+        void *file_handle = CreateFileW(file_path_w.str,       // LPCWSTR               lpFileName,
+                                        GENERIC_WRITE,         // DWORD                 dwDesiredAccess,
+                                        0,                     // DWORD                 dwShareMode,
+                                        nullptr,               // LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                                        CREATE_ALWAYS,         // DWORD                 dwCreationDisposition,
+                                        FILE_ATTRIBUTE_NORMAL, // DWORD                 dwFlagsAndAttributes,
+                                        nullptr                // HANDLE                hTemplateFile
         );
 
         if (file_handle == INVALID_HANDLE_VALUE)
             return result;
 
-        DWORD bytes_written = 0;
-        result              = WriteFile(file_handle, buffer, DQN_CAST(DWORD)buffer_size, &bytes_written, nullptr /*lpOverlapped*/);
+        unsigned long bytes_written = 0;
+        result                      = WriteFile(file_handle, buffer, DQN_CAST(unsigned long)buffer_size, &bytes_written, nullptr /*lpOverlapped*/);
         CloseHandle(file_handle);
         DQN_ASSERT(bytes_written == buffer_size);
     }
@@ -7271,7 +7282,7 @@ DQN_API Dqn_StringW Dqn_WinCurrentDirW(Dqn_Arena *arena, Dqn_StringW suffix)
         w_path[desired_size] = 0;
     }
 
-    result = Dqn_StringW{w_path, desired_size - 1};
+    result = Dqn_StringW{w_path, DQN_CAST(Dqn_isize)(desired_size - 1)};
     return result;
 }
 
