@@ -799,16 +799,6 @@ DQN_API void Dqn_LogV       (Dqn_LogType type, void *user_data, char const *file
 DQN_API void Dqn_Log        (Dqn_LogType type, void *user_data, char const *file, Dqn_uint file_len, char const *func, Dqn_uint func_len, Dqn_uint line, char const *fmt, ...);
 
 // -------------------------------------------------------------------------------------------------
-// NOTE: Dqn_Align
-// -------------------------------------------------------------------------------------------------
-// 'AlignAddressEnsuringSpace" aligns even if pointer is aligned, align it again, ensuring there's
-// at minimum 1 byte and at most 'alignment' bytes of space between the aligned pointer and raw
-// pointer. We do this to keep metadata exactly 1 byte behind the aligned pointer.
-// 'AlignAddress' is the same as above except it's a no-op if the address is already aligned.
-DQN_API Dqn_uintptr Dqn_AlignAddressEnsuringSpace(Dqn_uintptr address, Dqn_u8 alignment);
-DQN_API Dqn_uintptr Dqn_AlignAddress             (Dqn_uintptr address, Dqn_u8 alignment);
-
-// -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_AllocationTracer
 // -------------------------------------------------------------------------------------------------
 #if DQN_ALLOCATION_TRACING
@@ -3563,35 +3553,6 @@ DQN_API void Dqn_Log(Dqn_LogType type, void *user_data, char const *file, Dqn_ui
     va_start(va, fmt);
     Dqn_LogV(type, user_data, file, file_len, func, func_len, line, fmt, va);
     va_end(va);
-}
-
-// -------------------------------------------------------------------------------------------------
-// NOTE: Dqn_Align*
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_uintptr Dqn_AlignAddressEnsuringSpace(Dqn_uintptr address, Dqn_u8 alignment)
-{
-    Dqn_uintptr remainder       = address % alignment;
-    Dqn_uintptr offset_to_align = alignment - remainder;
-    Dqn_uintptr result          = address + offset_to_align;
-    DQN_ASSERT(result % alignment == 0);
-    DQN_ASSERT(result >= address);
-    DQN_ASSERT(offset_to_align >= 1 && offset_to_align <= alignment);
-    return result;
-}
-
-DQN_API Dqn_uintptr Dqn_AlignAddress(Dqn_uintptr address, Dqn_u8 alignment)
-{
-    Dqn_uintptr result = address;
-    if (alignment > 0)
-    {
-        Dqn_uintptr remainder = result % alignment;
-        if (remainder > 0)
-        {
-            Dqn_uintptr offset_to_align = alignment - remainder;
-            result += offset_to_align;
-        }
-    }
-    return result;
 }
 
 // -------------------------------------------------------------------------------------------------
