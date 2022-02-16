@@ -799,6 +799,14 @@ DQN_API void Dqn_LogV       (Dqn_LogType type, void *user_data, char const *file
 DQN_API void Dqn_Log        (Dqn_LogType type, void *user_data, char const *file, Dqn_uint file_len, char const *func, Dqn_uint func_len, Dqn_uint line, char const *fmt, ...);
 
 // -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_Virtual
+// -------------------------------------------------------------------------------------------------
+DQN_API void *Dqn_VirtualReserve(Dqn_usize size, Dqn_b32 commit);
+DQN_API Dqn_b32 Dqn_VirtualCommit(void *ptr, Dqn_usize size);
+DQN_API void Dqn_VirtualDecommit(void *ptr, Dqn_usize size);
+DQN_API void Dqn_VirtualRelease(void *ptr, Dqn_usize size);
+
+// -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_AllocationTracer
 // -------------------------------------------------------------------------------------------------
 #if DQN_ALLOCATION_TRACING
@@ -3067,8 +3075,7 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
         // NOTE: Allocation Type
         #define MEM_RESERVE 0x00002000
         #define MEM_COMMIT 0x00001000
-
-        // NOTE: Free Type
+        #define MEM_DECOMMIT 0x00004000
         #define MEM_RELEASE 0x00008000
 
         // NOTE: Protect
@@ -3203,11 +3210,11 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
             unsigned long dwReserved1;
             wchar_t cFileName[MAX_PATH];
             wchar_t cAlternateFileName[14];
-#ifdef _MAC
+            #ifdef _MAC
             unsigned long dwFileType;
             unsigned long dwCreatorType;
             unsigned short wFinderFlags;
-#endif
+            #endif
         } WIN32_FIND_DATAW;
 
         typedef enum {
@@ -3301,6 +3308,7 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
                      void           __stdcall Sleep                      (unsigned long dwMilliseconds);
 
                      void *         __stdcall VirtualAlloc               (void *lpAddress, size_t dwSize, unsigned long flAllocationType, unsigned long flProtect);
+        /*BOOL*/     int            __stdcall VirtualProtect             (void *lpAddress, size_t dwSize, unsigned long flNewProtect, unsigned long *lpflOldProtect);
         /*BOOL*/     int            __stdcall VirtualFree                (void *lpAddress, size_t dwSize, unsigned long dwFreeType);
 
                      void           __stdcall GetSystemInfo              (SYSTEM_INFO *system_info);
@@ -3335,6 +3343,7 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
     #include <sys/random.h>   // getrandom
     #include <sys/stat.h>     // stat
     #include <sys/sendfile.h> // sendfile
+    #include <sys/mman.h>     // mmap
     #include <time.h>         // clock_gettime, nanosleep
     #include <unistd.h>       // access
 #endif
@@ -3553,6 +3562,68 @@ DQN_API void Dqn_Log(Dqn_LogType type, void *user_data, char const *file, Dqn_ui
     va_start(va, fmt);
     Dqn_LogV(type, user_data, file, file_len, func, func_len, line, fmt, va);
     va_end(va);
+}
+
+// -------------------------------------------------------------------------------------------------
+// NOTE: Dqn_Virtual
+// -------------------------------------------------------------------------------------------------
+DQN_API void *Dqn_VirtualReserve(Dqn_usize size, Dqn_b32 commit)
+{
+#if defined(DQN_OS_WIN32)
+
+    unsigned long flags = MEM_RESERVE;
+    if (commit)
+        flags |= MEM_COMMIT;
+    void *result = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);
+
+#elif defined(DQN_OS_UNIX)
+
+    unsigned flags = PROT_NONE;
+    if (commit)
+        flags = PROT_READ | PROT_WRITE;
+    void *result = mmap(nullptr, size, flags, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (result == MAP_FAILED)
+        result = nullptr;
+
+#else
+    #error "Missing implementation for Dqn_VirtualReserve"
+#endif
+    return result;
+}
+
+DQN_API Dqn_b32 Dqn_VirtualCommit(void *ptr, Dqn_usize size)
+{
+#if defined(DQN_OS_WIN32)
+    Dqn_b32 result = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != nullptr;
+#elif defined(DQN_OS_UNIX)
+    Dqn_b32 result = mprotect(ptr, size, PROT_READ|PROT_WRITE) == 0;
+#else
+    #error "Missing implementation for Dqn_VirtualCommit"
+#endif
+    return result;
+}
+
+DQN_API void Dqn_VirtualDecommit(void *ptr, Dqn_usize size)
+{
+#if defined(DQN_OS_WIN32)
+    VirtualFree(ptr, size, MEM_DECOMMIT);
+#elif defined(DQN_OS_UNIX)
+    mprotect(ptr, size, PROT_NONE)
+    madvise(ptr, size, MADV_FREE)
+#else
+    #error "Missing implementation for Dqn_VirtualDecommit"
+#endif
+}
+
+DQN_API void Dqn_VirtualRelease(void *ptr, Dqn_usize size)
+{
+#if defined(DQN_OS_WIN32)
+    VirtualFree(ptr, size, MEM_RELEASE);
+#elif defined(DQN_OS_UNIX)
+    munmap(ptr, size);
+#else
+    #error "Missing implementation for Dqn_VirtualRelease"
+#endif
 }
 
 // -------------------------------------------------------------------------------------------------
