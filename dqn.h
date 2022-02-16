@@ -895,20 +895,13 @@ DQN_API void             *Dqn__CRTAllocatorRealloc(Dqn_CRTAllocator *allocator, 
 // -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Arena
 // -------------------------------------------------------------------------------------------------
-struct Dqn_ArenaMemBlock
+struct Dqn_ArenaBlock
 {
-    void              *memory;
-    Dqn_isize          size;
-    Dqn_isize          used;
-    Dqn_ArenaMemBlock *prev;
-    Dqn_ArenaMemBlock *next;
-};
-
-enum struct Dqn_ArenaMemProvider
-{
-    CRT,
-    Virtual,
-    UserMemory,
+    void           *memory; // The backing memory of the block
+    Dqn_isize       size;   // The size of the block
+    Dqn_isize       used;   // The number of bytes used up in the block
+    Dqn_ArenaBlock *prev;   // The previous linked block
+    Dqn_ArenaBlock *next;   // The next linked block
 };
 
 struct Dqn_ArenaStatsString
@@ -919,48 +912,41 @@ struct Dqn_ArenaStatsString
 
 struct Dqn_ArenaStats
 {
-    Dqn_isize bytes_allocated;
-    Dqn_isize bytes_used;
-    Dqn_isize bytes_wasted;
-    Dqn_i32   block_count;
+    Dqn_isize capacity; // The total byte allocating capacity of the arena
+    Dqn_isize used;     // The bytes used out of the capacity of the arena
+
+    // The total bytes wasted due to allocations that require a new block to be
+    // appended, orphaning the space in the prior block.
+    Dqn_isize wasted;
+    Dqn_u32   block_count; // The number of blocks in the arena
 };
 
-DQN_API Dqn_ArenaStatsString Dqn_ArenaStatsToString(Dqn_ArenaStats const *stats);
+Dqn_usize const DQN_ARENA_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
 
-Dqn_usize const DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
+//
 struct Dqn_Arena
 {
-    Dqn_ArenaMemProvider mem_provider;
-
-    // NOTE: Read/Write
-    Dqn_isize min_block_size; // (Optional): When 0, DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE is used. Otherwise every new block will at minimum be sized to this value.
-
-    // The following fields are should be set once after zero initialisation
-    Dqn_AllocationTracer *tracer;
-
-    // NOTE: Read Only
-    Dqn_ArenaMemBlock *curr_mem_block;
-    Dqn_ArenaMemBlock *top_mem_block;
-    Dqn_ArenaStats     current_stats; // Current allocator stats, zero-ed when ResetUsage is called
-    Dqn_ArenaStats     highest_stats; // Lifetime allocator stats, never zero-ed out
+    // Write/Optional: The min block size to attach to the arena when an
+    // allocation fails due to insufficient space in the arena's block. Ignored
+    // if the user manually grows the arena.
+    Dqn_isize       min_block_size;
+    Dqn_b32         is_static;      // True if the arena was initialised with memory from the user.
+    Dqn_ArenaBlock *curr;           // The current memory block of the arena
+    Dqn_ArenaBlock *tail;           // The tail memory block of the arena
+    Dqn_ArenaStats  stats;          // Current allocator stats, zero-ed when ResetUsage is called
+    Dqn_ArenaStats  highest_stats;  // Lifetime allocator stats, never zero-ed out
 };
 
-struct Dqn_ArenaScopeData
+struct Dqn_ArenaScopeData // Snapshot of the arena state
 {
-    Dqn_Arena *arena;
-    Dqn_ArenaMemBlock *curr_mem_block;
-    Dqn_ArenaMemBlock *top_mem_block;
-
-    // NOTE: Fields to manually remember and restore once we end the scope
-    Dqn_isize           curr_mem_block_used;
-    Dqn_ArenaStats      current_stats;
+    Dqn_Arena      *arena;     // The arena the scope is for
+    Dqn_ArenaBlock *curr;      // The current block of the arena at the beginning of the scope
+    Dqn_ArenaBlock *tail;      // The tail block of the arena at the beginning of the scope
+    Dqn_isize       curr_used; // The current used amount of the current block
+    Dqn_ArenaStats  stats;     // The stats of the arena at the beginning of the scope
 };
 
-// NOTE: Automatically start an undo region at the declaration of this variable
-// and on scope exit, the arena will trigger the end of the undo region,
-// reverting all allocations between the declaration of this variable and the
-// end of it's scope.
-struct Dqn_ArenaScope
+struct Dqn_ArenaScope // An automatic begin and end allocation scope
 {
     Dqn_ArenaScope(Dqn_Arena *arena);
     ~Dqn_ArenaScope();
@@ -969,39 +955,59 @@ struct Dqn_ArenaScope
     Dqn_ArenaScopeData region;
 };
 
-// NOTE: Dqn_Arena can also be zero initialised and will default to the heap allocator with 0 size.
+// Initialise the arena with a fixed memory block. A fixed memory arena can not
+// grow and will fail once the block is full. The size of the given memory must
+// include space for the memory block itself.
 DQN_API Dqn_Arena Dqn_ArenaInitWithMemory(void *memory, Dqn_isize size);
-DQN_API Dqn_Arena Dqn_ArenaInitWithCRT(Dqn_isize size DQN_CALL_SITE_ARGS);
-DQN_API void      Dqn_ArenaFree(Dqn_Arena *arena);
-DQN_API Dqn_b32   Dqn_ArenaReserve(Dqn_Arena *arena, Dqn_isize size DQN_CALL_SITE_ARGS);
-DQN_API void      Dqn_ArenaResetUsage(Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
 
-// Allocations between a BeginScope and EndScope are reverted when EndScope is
-// invoked. Calling BeginScope without an EndScope is well defined (incase the
-// code decides it does not need to undo any allocations for whatever reason).
-// Doing so ensures the Arena keeps the allocations that occured since
-// BeginScope was called.
+// Free all the blocks in the arena invalidating any pointers allocated by the
+// arena.
+DQN_API void Dqn_ArenaFree(Dqn_Arena *arena);
+
+// Grow the allocating capacity by the size
+// size: The size in bytes to expand the capacity of the arena
+// return: True if growing suceeded, false if allocation failure or the arena is
+// using a fixed block of memory.
+DQN_API Dqn_b32 Dqn_ArenaGrow(Dqn_Arena *arena, Dqn_isize size DQN_CALL_SITE_ARGS);
+
+// Set the arena's current block to the first block in the linked list of blocks
+// and mark all blocks free.
+DQN_API void Dqn_ArenaResetUsage(Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
+
+// Begin an allocation scope where all allocations between begin and end calls
+// will be reverted. Useful for short-lived or highly defined lifetime
+// allocations. An allocation scope is invalidated if the arena is freed between
+// the begin and end call.
 DQN_API Dqn_ArenaScopeData Dqn_ArenaBeginScope(Dqn_Arena *arena);
-DQN_API void               Dqn_ArenaEndScope(Dqn_ArenaScopeData region);
 
-#define Dqn_ArenaTaggedAllocate(arena, size, alignment, zero_mem, tag) Dqn__ArenaAllocate(arena, size, alignment, zero_mem DQN_CALL_SITE(tag))
-#define Dqn_ArenaAllocate(arena, size, alignment, zero_mem) Dqn__ArenaAllocate(arena, size, alignment, zero_mem DQN_CALL_SITE(""))
+// End an allocation scope previously begun by calling begin scope.
+DQN_API void Dqn_ArenaEndScope(Dqn_ArenaScopeData region);
 
-#define Dqn_ArenaTaggedNew(arena, Type, zero_mem, tag) (Type *)Dqn__ArenaAllocate(arena, sizeof(Type), alignof(Type), zero_mem DQN_CALL_SITE(tag))
-#define Dqn_ArenaNew(arena, Type, zero_mem) (Type *) Dqn__ArenaAllocate(arena, sizeof(Type), alignof(Type), zero_mem DQN_CALL_SITE(""))
+// Arena Macro Summary
+// Allocate: Allocate bytes from the arena
+// New:      Allocate a single object from the arena
+// NewArray: Allocate an array of objects from the arena
+// Copy:     Allocate a copy of the pointer contents
+// CopyZ:    Allocate a copy of the pointer contents and null-terminate the
+//           allocation. This macro is only relevant for null-terminating byte
+//           streams.
+#define Dqn_ArenaTaggedAllocate(arena, size, align, zero_mem, tag) Dqn_ArenaAllocateInternal(arena, size, align, zero_mem DQN_CALL_SITE(tag))
+#define Dqn_ArenaTaggedNew(arena, Type, zero_mem, tag) (Type *)Dqn_ArenaAllocateInternal(arena, sizeof(Type), alignof(Type), zero_mem DQN_CALL_SITE(tag))
+#define Dqn_ArenaTaggedNewArray(arena, Type, count, zero_mem, tag) (Type *)Dqn_ArenaAllocateInternal(arena, sizeof(Type) * count, alignof(Type), zero_mem DQN_CALL_SITE(tag))
+#define Dqn_ArenaTaggedCopyZ(arena, Type, src, count, tag) (Type *)Dqn_ArenaCopyZInternal(arena, src, sizeof(*src) * count, alignof(Type) DQN_CALL_SITE(tag))
+#define Dqn_ArenaTaggedCopy(arena, Type, src, count, tag) (Type *)Dqn_ArenaCopyInternal(arena, src, sizeof(*src) * count, alignof(Type) DQN_CALL_SITE(tag))
 
-#define Dqn_ArenaTaggedNewArray(arena, Type, count, zero_mem, tag) (Type *)Dqn__ArenaAllocate(arena, sizeof(Type) * count, alignof(Type), zero_mem DQN_CALL_SITE(tag))
-#define Dqn_ArenaNewArray(arena, Type, count, zero_mem) (Type *)Dqn__ArenaAllocate(arena, sizeof(Type) * count, alignof(Type), zero_mem DQN_CALL_SITE(""))
+#define Dqn_ArenaAllocate(arena, size, align, zero_mem) Dqn_ArenaTaggedAllocate(arena, size, align, zero_mem, "")
+#define Dqn_ArenaNew(arena, Type, zero_mem) Dqn_ArenaTaggedNew(arena, Type, zero_mem, "")
+#define Dqn_ArenaNewArray(arena, Type, count, zero_mem) Dqn_ArenaTaggedNewArray(arena, Type, count, zero_mem, "")
+#define Dqn_ArenaCopyZ(arena, Type, src, count) Dqn_ArenaTaggedCopyZ(arena, Type, src, count, "")
+#define Dqn_ArenaCopy(arena, Type, src, count) Dqn_ArenaTaggedCopy(arena, Type, src, count, tag, "")
 
-#define Dqn_ArenaTaggedCopyNullTerminate(arena, Type, src, count, tag) (Type *)Dqn__ArenaCopyNullTerminate(arena, src, sizeof(*src) * count, alignof(Type) DQN_CALL_SITE(tag))
-#define Dqn_ArenaCopyNullTerminate(arena, Type, src, count) (Type *)Dqn__ArenaCopyNullTerminate(arena, src, sizeof(*src) * count, alignof(Type) DQN_CALL_SITE(""))
+// Allocate bytes from the arena, prefer the allocation macros which fill in the
+// call site arguments appropriately.
+DQN_API void *Dqn_ArenaAllocateInternal(Dqn_Arena *arena, Dqn_isize size, Dqn_u8 align, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS);
 
-#define Dqn_ArenaTaggedCopy(arena, Type, src, count, tag) (Type *)Dqn__ArenaCopy(arena, src, sizeof(*src) * count, alignof(Type) DQN_CALL_SITE(tag))
-#define Dqn_ArenaCopy(arena, Type, src, count) (Type *)Dqn__ArenaCopy(arena, src, sizeof(*src) * count, alignof(Type) DQN_CALL_SITE(""))
-
-DQN_API void *Dqn__ArenaCopy(Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS);
-DQN_API void *Dqn__ArenaCopyNullTerminate(Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS);
-DQN_API void *Dqn__ArenaAllocate(Dqn_Arena *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS);
+// Log usage statistics of the arena
 DQN_API void  Dqn_ArenaLogStats(Dqn_Arena const *arena, char const *label);
 
 // -------------------------------------------------------------------------------------------------
@@ -1251,7 +1257,7 @@ struct Dqn_Lib
 
 #if defined(DQN_DEBUG_THREAD_CONTEXT)
     Dqn_TicketMutex thread_context_mutex;
-    Dqn_ArenaStats  thread_context_arena_current_stats[256];
+    Dqn_ArenaStats  thread_context_arena_stats[256];
     Dqn_ArenaStats  thread_context_arena_highest_stats[256];
     Dqn_u8          thread_context_arena_stats_size;
 #endif
@@ -1934,7 +1940,7 @@ struct Dqn_ThreadScratch
     {
     #if defined(DQN_DEBUG_THREAD_CONTEXT)
         dqn__lib.thread_context_arena_highest_stats[arena_stats_index] = arena->highest_stats;
-        dqn__lib.thread_context_arena_current_stats[arena_stats_index] = arena->current_stats;
+        dqn__lib.thread_context_arena_stats[arena_stats_index] = arena->stats;
     #endif
 
         DQN_ASSERT(destructed == false);
@@ -2775,7 +2781,7 @@ DQN_API Dqn_Array<T> Dqn_Array_InitWithArenaNoGrow(Dqn_Arena *arena, Dqn_isize m
     Dqn_Array<T> result = {};
     if (max && arena)
     {
-        auto *memory = DQN_CAST(T *)Dqn__ArenaAllocate(arena, sizeof(T) * max, alignof(T), zero_mem DQN_CALL_SITE_ARGS_INPUT);
+        auto *memory = DQN_CAST(T *)Dqn_ArenaAllocateInternal(arena, sizeof(T) * max, alignof(T), zero_mem DQN_CALL_SITE_ARGS_INPUT);
         result = Dqn_ArrayInitWithMemory(memory, max, size);
     }
 
@@ -2788,7 +2794,7 @@ DQN_API bool Dqn_Array_Reserve(Dqn_Array<T> *a, Dqn_isize size DQN_CALL_SITE_ARG
     if (size <= a->size) return true;
     if (!a->arena) return false;
 
-    T *new_ptr = DQN_CAST(T *)Dqn__ArenaAllocate(a->arena, sizeof(T) * size, alignof(T), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
+    T *new_ptr = DQN_CAST(T *)Dqn_ArenaAllocateInternal(a->arena, sizeof(T) * size, alignof(T), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
     if (!new_ptr) return false;
 
     if (a->data)
@@ -2904,12 +2910,12 @@ DQN_API T *Dqn__ListMake(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
 
     if (!list->tail || (list->tail->count + count) > list->tail->size)
     {
-        auto *tail = (Dqn_ListChunk<T> * )Dqn__ArenaAllocate(list->arena, sizeof(Dqn_ListChunk<T>), alignof(Dqn_ListChunk<T>), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
+        auto *tail = (Dqn_ListChunk<T> * )Dqn_ArenaAllocateInternal(list->arena, sizeof(Dqn_ListChunk<T>), alignof(Dqn_ListChunk<T>), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
         if (!tail)
           return nullptr;
 
         Dqn_isize items = DQN_MAX(list->chunk_size, count);
-        tail->data      = (T * )Dqn__ArenaAllocate(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
+        tail->data      = (T * )Dqn_ArenaAllocateInternal(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
         tail->size      = items;
 
         if (!tail->data)
@@ -3743,7 +3749,7 @@ DQN_API Dqn_String Dqn__StringFmtV(Dqn_Arena *arena, char const *fmt, va_list va
     va_list va2;
     va_copy(va2, va);
     result.size = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, va);
-    result.str  = DQN_CAST(char *)Dqn__ArenaAllocate(arena, sizeof(char) * (result.size + 1), alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+    result.str  = DQN_CAST(char *)Dqn_ArenaAllocateInternal(arena, sizeof(char) * (result.size + 1), alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
     if (result.str)
     {
         STB_SPRINTF_DECORATE(vsnprintf)(result.str, Dqn_SafeTruncateISizeToInt(result.size + 1), fmt, va2);
@@ -3757,7 +3763,7 @@ DQN_API Dqn_String Dqn__StringFmtV(Dqn_Arena *arena, char const *fmt, va_list va
 DQN_API Dqn_String Dqn_String_Allocate(Dqn_Arena *arena, Dqn_isize size, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
 {
     Dqn_String result = {};
-    result.str        = DQN_CAST(char *)Dqn__ArenaAllocate(arena, size + 1, alignof(char), zero_mem DQN_CALL_SITE_ARGS_INPUT);
+    result.str        = DQN_CAST(char *)Dqn_ArenaAllocateInternal(arena, size + 1, alignof(char), zero_mem DQN_CALL_SITE_ARGS_INPUT);
     result.cap        = size;
     return result;
 }
@@ -3771,7 +3777,7 @@ DQN_API Dqn_String Dqn_String_CopyCString(char const *string, Dqn_isize size, Dq
         return result;
     }
 
-    char *copy = DQN_CAST(char *)Dqn__ArenaAllocate(arena, size + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+    char *copy = DQN_CAST(char *)Dqn_ArenaAllocateInternal(arena, size + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
     DQN_MEMCOPY(copy, string, DQN_CAST(size_t)size);
     copy[size] = 0;
 
@@ -4254,9 +4260,9 @@ DQN_API Dqn_ArenaStatsString Dqn_ArenaStatsToString(Dqn_ArenaStats const *stats)
     result.size = STB_SPRINTF_DECORATE(snprintf)(result.str,
                                                  DQN_CAST(int)Dqn_ArrayCountI(result.str),
                                                  "%_$$I64d/%_$$I64d (wasted %_$$I64d - %d blks)",
-                                                 stats->bytes_used,
-                                                 stats->bytes_allocated,
-                                                 stats->bytes_wasted,
+                                                 stats->used,
+                                                 stats->capacity,
+                                                 stats->wasted,
                                                  stats->block_count);
 
     #if defined(DQN_COMPILER_GCC)
@@ -4268,216 +4274,150 @@ DQN_API Dqn_ArenaStatsString Dqn_ArenaStatsToString(Dqn_ArenaStats const *stats)
     return result;
 }
 
-DQN_API void *Dqn__ArenaCopy(Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS)
+DQN_API void *Dqn_ArenaCopyInternal(Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS)
 {
-    void *result = Dqn__ArenaAllocate(arena, size, alignment, Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+    void *result = Dqn_ArenaAllocateInternal(arena, size, alignment, Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
     DQN_MEMCOPY(result, src, size);
     return result;
 }
 
-DQN_API void *Dqn__ArenaCopyNullTerminate(Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS)
+DQN_API void *Dqn_ArenaCopyZInternal(Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS)
 {
-    void *result = Dqn__ArenaAllocate(arena, size + 1, alignment, Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
+    void *result = Dqn_ArenaAllocateInternal(arena, size + 1, alignment, Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
     DQN_MEMCOPY(result, src, size);
     return result;
 }
 
-DQN_API Dqn_ArenaMemBlock *Dqn__ArenaAllocateBlock(Dqn_Arena *arena, Dqn_isize requested_size DQN_CALL_SITE_ARGS)
+DQN_FILE_SCOPE void Dqn__ArenaAttachBlock(Dqn_Arena *arena, Dqn_ArenaBlock *block)
 {
-    Dqn_isize min_block_size = arena->min_block_size;
-    if (min_block_size == 0) min_block_size = DQN_MEM_ARENA_DEFAULT_MIN_BLOCK_SIZE;
+    if (!arena->curr)
+        arena->curr = block;
 
-    Dqn_isize mem_block_size = DQN_MAX(min_block_size, requested_size);
-    auto const allocate_size = DQN_CAST(Dqn_isize)(sizeof(*arena->curr_mem_block) + mem_block_size);
+    block->prev = arena->tail;
+    block->next = nullptr;
 
-    Dqn_ArenaMemBlock *result = nullptr;
-    switch (arena->mem_provider)
+    if (arena->tail)
     {
-        case Dqn_ArenaMemProvider::CRT:
-        {
-            result = DQN_CAST(Dqn_ArenaMemBlock *)DQN_MALLOC(allocate_size);
-        }
-        break;
-
-        case Dqn_ArenaMemProvider::Virtual:
-        {
-            result = DQN_CAST(Dqn_ArenaMemBlock *)VirtualAlloc(nullptr, allocate_size, MEM_RESERVE, PAGE_READWRITE);
-        }
-        break;
-
-        case Dqn_ArenaMemProvider::UserMemory:
-        break;
+        DQN_ASSERT(arena->tail->next == nullptr);
+        arena->tail->next = block;
     }
 
-    if (!result) return result;
+    arena->tail = block;
 
-    *result        = {};
-    result->size   = mem_block_size;
-    result->memory = DQN_CAST(Dqn_u8 *)result + sizeof(*result);
-    return result;
+    arena->stats.block_count++;
+    arena->highest_stats.block_count = DQN_MAX(arena->highest_stats.block_count, arena->stats.block_count);
+
+    arena->stats.capacity += arena->curr->size;
+    arena->highest_stats.capacity = DQN_MAX(arena->highest_stats.capacity, arena->stats.capacity);
 }
 
-DQN_API void Dqn__ArenaFreeBlock(Dqn_Arena *arena, Dqn_ArenaMemBlock *block)
+
+DQN_API Dqn_b32 Dqn_ArenaGrow(Dqn_Arena *arena, Dqn_isize size DQN_CALL_SITE_ARGS)
 {
+    if (arena->is_static)
+        return false;
+
+    auto const allocate_size = DQN_CAST(Dqn_isize)(sizeof(*arena->curr) + size);
+    auto *block              = DQN_CAST(Dqn_ArenaBlock *)DQN_MALLOC(allocate_size);
     if (!block)
-        return;
+        return false;
 
-    if (block->next)
-        block->next->prev = block->prev;
-
-    if (block->prev)
-        block->prev->next = block->next;
-
-    arena->current_stats.block_count--;
-    arena->current_stats.bytes_allocated -= block->size;
-
-    switch (arena->mem_provider)
-    {
-        case Dqn_ArenaMemProvider::CRT: DQN_FREE(block); break;
-        case Dqn_ArenaMemProvider::Virtual: VirtualFree(block, block->size, MEM_RELEASE);
-        case Dqn_ArenaMemProvider::UserMemory:
-        break;
-    }
-}
-
-DQN_API void Dqn__ArenaAttachBlock(Dqn_Arena *arena, Dqn_ArenaMemBlock *new_block)
-{
-    if (arena->top_mem_block)
-    {
-        DQN_ASSERT(arena->top_mem_block->next == nullptr);
-        arena->top_mem_block->next = new_block;
-        new_block->prev            = arena->top_mem_block;
-        arena->top_mem_block       = new_block;
-    }
-    else
-    {
-        arena->top_mem_block  = new_block;
-        arena->curr_mem_block = new_block;
-    }
-
-    arena->current_stats.block_count++;
-    arena->highest_stats.block_count = DQN_MAX(arena->highest_stats.block_count, arena->current_stats.block_count);
-
-    arena->current_stats.bytes_allocated += arena->curr_mem_block->size;
-    arena->highest_stats.bytes_allocated = DQN_MAX(arena->highest_stats.bytes_allocated, arena->current_stats.bytes_allocated);
-}
-
-DQN_API Dqn_Arena Dqn_ArenaInitWithCRT(Dqn_isize size DQN_CALL_SITE_ARGS)
-{
-    Dqn_Arena result = {};
-    result.mem_provider       = Dqn_ArenaMemProvider::CRT;
-    if (size > 0)
-    {
-        DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%I64u >= %I64u) There needs to be enough space to encode the Dqn_ArenaMemBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
-        Dqn_ArenaMemBlock *mem_block = Dqn__ArenaAllocateBlock(&result, size DQN_CALL_SITE_ARGS_INPUT);
-        Dqn__ArenaAttachBlock(&result, mem_block);
-    }
-
-    return result;
+    *block        = {};
+    block->size   = size;
+    block->memory = DQN_CAST(Dqn_u8 *)block + sizeof(*block);
+    Dqn__ArenaAttachBlock(arena, block);
+    return true;
 }
 
 DQN_API Dqn_Arena Dqn_ArenaInitWithMemory(void *memory, Dqn_isize size)
 {
     Dqn_Arena result = {};
-    result.mem_provider       = Dqn_ArenaMemProvider::UserMemory;
-    if (size > 0)
+    result.is_static = true;
+    if (size > DQN_CAST(Dqn_isize)sizeof(*result.curr))
     {
-        DQN_ASSERT_MSG(size >= DQN_ISIZEOF(*result.curr_mem_block), "(%I64u >= %I64u) There needs to be enough space to encode the Dqn_ArenaMemBlock struct into the memory buffer", size, sizeof(*result.curr_mem_block));
-        auto *mem_block     = DQN_CAST(Dqn_ArenaMemBlock *) memory;
-        *mem_block          = {};
-        mem_block->memory   = DQN_CAST(Dqn_u8 *) memory + sizeof(*mem_block);
-        mem_block->size     = size - DQN_CAST(Dqn_isize)sizeof(*mem_block);
-        Dqn__ArenaAttachBlock(&result, mem_block);
+        auto *block   = DQN_CAST(Dqn_ArenaBlock *) memory;
+        *block        = {};
+        block->memory = DQN_CAST(Dqn_u8 *)memory + sizeof(*block);
+        block->size   = size - DQN_CAST(Dqn_isize)sizeof(*block);
+        Dqn__ArenaAttachBlock(&result, block);
     }
     return result;
 }
 
 DQN_API void Dqn_ArenaFree(Dqn_Arena *arena)
 {
-    for (Dqn_ArenaMemBlock *mem_block = arena->top_mem_block; mem_block;)
+    if (arena->is_static)
     {
-        Dqn_ArenaMemBlock *block_to_free = mem_block;
-        mem_block                        = block_to_free->prev;
-        Dqn__ArenaFreeBlock(arena, block_to_free);
+        DQN_ASSERT(arena->curr == arena->tail);
+        arena->curr->used = 0;
+    }
+    else
+    {
+        while (arena->tail)
+        {
+            Dqn_ArenaBlock *prev_block = arena->tail->prev;
+            DQN_FREE(arena->tail);
+            arena->tail = prev_block;
+        }
     }
 
-    // NOTE: Copy
-    Dqn_ArenaMemProvider mem_provider  = arena->mem_provider;
-    Dqn_ArenaStats       highest_stats = arena->highest_stats;
-
-    // NOTE: Reset and restore persistent information
-    *arena               = {};
-    arena->highest_stats = highest_stats;
-    arena->mem_provider  = mem_provider;
-}
-
-DQN_API Dqn_b32 Dqn_ArenaReserve(Dqn_Arena *arena, Dqn_isize size DQN_CALL_SITE_ARGS)
-{
-    if (arena->top_mem_block)
-    {
-        Dqn_isize remaining_space = arena->top_mem_block->size - arena->top_mem_block->used;
-        if (remaining_space >= size) return true;
-    }
-
-    Dqn_ArenaMemBlock *new_block = Dqn__ArenaAllocateBlock(arena, size DQN_CALL_SITE_ARGS_INPUT);
-    if (!new_block) return false;
-    Dqn__ArenaAttachBlock(arena, new_block);
-    return true;
+    arena->curr = arena->tail = nullptr;
+    arena->stats = {};
 }
 
 DQN_API void Dqn_ArenaResetUsage(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
 {
-    for (Dqn_ArenaMemBlock *block = arena->top_mem_block; block; block = block->prev)
+    // Zero all the blocks until we reach the first block in the list
+    for (Dqn_ArenaBlock *block = arena->tail; block; block = block->prev)
     {
         if (!block->prev)
-            arena->curr_mem_block = block;
+            arena->curr = block;
 
         Dqn__ZeroMemBytes(block->memory, DQN_CAST(size_t)block->used, zero_mem);
         block->used = 0;
     }
 
-    arena->current_stats.bytes_used   = 0;
-    arena->current_stats.bytes_wasted = 0;
+    arena->stats.used   = 0;
+    arena->stats.wasted = 0;
 }
 
 DQN_API Dqn_ArenaScopeData Dqn_ArenaBeginScope(Dqn_Arena *arena)
 {
     Dqn_ArenaScopeData result = {};
     result.arena              = arena;
-    result.curr_mem_block     = arena->curr_mem_block;
-    result.top_mem_block      = arena->top_mem_block;
-
-    result.curr_mem_block_used = (arena->curr_mem_block) ? arena->curr_mem_block->used : 0;
-    result.current_stats       = arena->current_stats;
+    result.curr               = arena->curr;
+    result.tail               = arena->tail;
+    result.curr_used          = (arena->curr) ? arena->curr->used : 0;
+    result.stats              = arena->stats;
     return result;
 }
 
 DQN_API void Dqn_ArenaEndScope(Dqn_ArenaScopeData scope)
 {
-    // Revert the top and current memory block until we hit the one we were at
-    // when the scope was started.
+    // Revert arena stats
     Dqn_Arena *arena = scope.arena;
-    while (arena->top_mem_block != scope.top_mem_block)
+    arena->stats     = scope.stats;
+
+    // Revert the current block to the scope's current block
+    arena->curr          = scope.curr;
+    arena->curr->used    = scope.curr_used;
+
+    // Free the tail blocks until we reach the scope's tail block
+    while (arena->tail != scope.tail)
     {
-        Dqn_ArenaMemBlock *block_to_free = arena->top_mem_block;
-        if (arena->curr_mem_block == block_to_free)
-            arena->curr_mem_block = block_to_free->prev;
-        arena->top_mem_block = block_to_free->prev;
-        Dqn__ArenaFreeBlock(arena, block_to_free);
+        Dqn_ArenaBlock *tail = arena->tail;
+        arena->tail          = tail->prev;
+        DQN_FREE(tail);
     }
 
-    // All the blocks between the top memory block and the current memory block
-    // need to be zeroed
-    for (Dqn_ArenaMemBlock *mem_block = arena->top_mem_block; mem_block != scope.curr_mem_block; mem_block = mem_block->prev)
-        mem_block->used = 0;
+    // Reset the usage of all the blocks between the tail and current block's
+    if (arena->tail)
+    {
+        arena->tail->next = nullptr;
+        for (Dqn_ArenaBlock *block = arena->tail; block && block != arena->curr; block = block->prev)
+            block->used = 0;
+    }
 
-    // Restore the current memory block's usage state and then restore the
-    // stats. Note that we persist the highest used count as this is useful for
-    // checking over/under-utilization of the arena throughout it's lifetime.
-    if (arena->curr_mem_block)
-        arena->curr_mem_block->used = scope.curr_mem_block_used;
-
-    arena->current_stats = scope.current_stats;
 }
 
 Dqn_ArenaScope::Dqn_ArenaScope(Dqn_Arena *arena)
@@ -4491,51 +4431,49 @@ Dqn_ArenaScope::~Dqn_ArenaScope()
     Dqn_ArenaEndScope(this->region);
 }
 
-DQN_API void *Dqn__ArenaAllocate(Dqn_Arena *arena, Dqn_isize size, Dqn_u8 alignment, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
+DQN_API void *Dqn_ArenaAllocateInternal(Dqn_Arena *arena, Dqn_isize size, Dqn_u8 align, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
 {
-    // Check for sufficient space in the arena
-    Dqn_isize allocation_size  = size + (alignment - 1);
-    Dqn_b32 need_new_mem_block = true;
-    for (Dqn_ArenaMemBlock *mem_block = arena->curr_mem_block; mem_block; mem_block = mem_block->next)
+    DQN_ASSERT_MSG((align & (align - 1)) == 0, "Power of two alignment required");
+    Dqn_isize allocation_size = size + (align - 1);
+    while (!arena->curr || (arena->curr->used + allocation_size) > arena->curr->size)
     {
-        Dqn_b32 can_fit_in_block = (mem_block->used + allocation_size) <= mem_block->size;
-        if (can_fit_in_block)
+        if (arena->curr)
         {
-            arena->curr_mem_block = mem_block;
-            need_new_mem_block    = false;
-            break;
+            arena->curr = arena->curr->next;
+        }
+        else
+        {
+            Dqn_isize grow_size = DQN_MAX(DQN_MAX(allocation_size, arena->min_block_size), DQN_ARENA_MIN_BLOCK_SIZE);
+            if (!Dqn_ArenaGrow(arena, grow_size DQN_CALL_SITE_ARGS_INPUT))
+                return nullptr;
         }
     }
 
-    if (need_new_mem_block)
-    {
-        Dqn_ArenaMemBlock *new_block = Dqn__ArenaAllocateBlock(arena, allocation_size DQN_CALL_SITE_ARGS_INPUT);
-        if (!new_block) return nullptr;
+    // Alignment offset
+    Dqn_ArenaBlock *block  = arena->curr;
+    Dqn_uintptr address    = DQN_CAST(Dqn_uintptr)block->memory + block->used;
+    Dqn_isize align_offset = (align - (address & (align - 1))) & (align - 1);
 
-        Dqn__ArenaAttachBlock(arena, new_block);
-        arena->curr_mem_block = arena->top_mem_block;
-    }
-
-    // Divvy out the pointer for the user
-    Dqn_uintptr address = DQN_CAST(Dqn_uintptr) arena->curr_mem_block->memory + arena->curr_mem_block->used;
-    void *result        = DQN_CAST(void *) Dqn_AlignAddress(address, alignment);
-
-    // Prepare the pointer for use
-    DQN_ASSERT(arena->curr_mem_block->used <= arena->curr_mem_block->size);
+    // Allocate the memory
+    void *result           = DQN_CAST(char *)block->memory + (block->used + align_offset);
+    block->used           += allocation_size;
     Dqn__ZeroMemBytes(DQN_CAST(void *)address, allocation_size, zero_mem);
-    Dqn_AllocationTracerAdd(arena->tracer, DQN_CAST(void *)address, allocation_size DQN_CALL_SITE_ARGS_INPUT);
 
-    // Update the block and arena stats
-    arena->curr_mem_block->used += allocation_size;
-    arena->current_stats.bytes_used += allocation_size;
-    arena->highest_stats.bytes_used = DQN_MAX(arena->highest_stats.bytes_used, arena->current_stats.bytes_used);
+    // Pointer checks
+    DQN_ASSERT_MSG(size + align_offset <= allocation_size, "Internal error: Alignment size calculation error [size=%zd, offset=%zd, allocation_size=%zd]", size, align_offset, allocation_size);
+    DQN_ASSERT_MSG(block->used <= block->size, "Internal error: Allocating exceeded block capacity [used=%zd, size=%zd]", block->used, block->size);
+    DQN_ASSERT_MSG(((DQN_CAST(Dqn_uintptr)result) & (align - 1)) == 0, "Internal error: Pointer alignment failed [address=%p, align=%d]", result, align);
+
+    // Update arena
+    arena->stats.used += allocation_size;
+    arena->highest_stats.used = DQN_MAX(arena->highest_stats.used, arena->stats.used);
     return result;
 }
 
 DQN_API void Dqn_ArenaLogStats(Dqn_Arena const *arena)
 {
     Dqn_ArenaStatsString highest = Dqn_ArenaStatsToString(&arena->highest_stats);
-    Dqn_ArenaStatsString current = Dqn_ArenaStatsToString(&arena->current_stats);
+    Dqn_ArenaStatsString current = Dqn_ArenaStatsToString(&arena->stats);
     DQN_LOG_M("HIGH %.*s\nCURR %.*s\n", highest.size, highest.str, current.size, current.str);
 }
 
@@ -5845,7 +5783,7 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
 
     Dqn_isize allocate_size = Dqn_SafeTruncateI64ToISize(win_file_size.QuadPart + 1);
     auto  arena_undo        = Dqn_ArenaBeginScope(arena);
-    auto *result            = DQN_CAST(char *) Dqn__ArenaAllocate(arena, allocate_size, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+    auto *result            = DQN_CAST(char *) Dqn_ArenaAllocateInternal(arena, allocate_size, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
 
     // TODO(dqn): We need to chunk this and ensure that readfile read the bytes we wanted.
     unsigned long bytes_read = 0;
@@ -5882,7 +5820,7 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
 
     rewind(file_handle);
     auto  arena_undo = Dqn_ArenaBeginScope(arena);
-    auto *result     = DQN_CAST(char *) Dqn__ArenaAllocate(arena, *file_size + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+    auto *result     = DQN_CAST(char *) Dqn_ArenaAllocateInternal(arena, *file_size + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
     if (!result)
     {
         DQN_LOG_M("Failed to allocate %td bytes to read file '%s'\n", *file_size + 1, file);
@@ -6470,7 +6408,7 @@ DQN_API Dqn_String Dqn_OSExecutableDirectory(Dqn_Arena *arena)
     Dqn_String result = {};
 
 #if defined(DQN_OS_WIN32)
-    char temp_mem[sizeof(wchar_t) * DQN_OS_WIN32_MAX_PATH + sizeof(Dqn_ArenaMemBlock)];
+    char temp_mem[sizeof(wchar_t) * DQN_OS_WIN32_MAX_PATH + sizeof(Dqn_ArenaBlock)];
     Dqn_Arena   temp_arena = Dqn_ArenaInitWithMemory(temp_mem, Dqn_ArrayCountI(temp_mem));
     Dqn_StringW exe_dir_w  = Dqn_WinExecutableDirectoryW(&temp_arena);
     result                 = Dqn_WinArenaWCharToUTF8(exe_dir_w, arena);
@@ -6734,13 +6672,13 @@ DQN_API void Dqn_LibDumpThreadContextArenaStats(Dqn_String file_path)
         // ---------------------------------------------------------------------
         // NOTE: Extremely short critical section, copy the stats then do our
         // work on it.
-        Dqn_ArenaStats current_stats[Dqn_ArrayCountI(dqn__lib.thread_context_arena_current_stats)];
+        Dqn_ArenaStats stats[Dqn_ArrayCountI(dqn__lib.thread_context_arena_stats)];
         Dqn_ArenaStats highest_stats[Dqn_ArrayCountI(dqn__lib.thread_context_arena_highest_stats)];
         int stats_size = 0;
 
         Dqn_TicketMutexBegin(&dqn__lib.thread_context_mutex);
         stats_size = dqn__lib.thread_context_arena_stats_size;
-        DQN_MEMCOPY(current_stats, dqn__lib.thread_context_arena_current_stats, sizeof(current_stats[0]) * stats_size);
+        DQN_MEMCOPY(stats, dqn__lib.thread_context_arena_stats, sizeof(stats[0]) * stats_size);
         DQN_MEMCOPY(highest_stats, dqn__lib.thread_context_arena_highest_stats, sizeof(highest_stats[0]) * stats_size);
         Dqn_TicketMutexEnd(&dqn__lib.thread_context_mutex);
 
@@ -6756,28 +6694,28 @@ DQN_API void Dqn_LibDumpThreadContextArenaStats(Dqn_String file_path)
 
         // Write the cumulative thread arena data
         {
-            Dqn_ArenaStats cumulative_stats = {};
-            Dqn_ArenaStats highest_cumulative_stats = {};
+            Dqn_ArenaStats stats = {};
+            Dqn_ArenaStats high_water_mark_stats = {};
             for (Dqn_isize index = 0; index < stats_size; index++)
             {
-                Dqn_ArenaStats const *current    = current_stats + index;
-                Dqn_ArenaStats const *highest    = highest_stats + index;
+                Dqn_ArenaStats const *current = stats + index;
+                Dqn_ArenaStats const *highest = highest_stats + index;
 
-                cumulative_stats.bytes_allocated += current->bytes_allocated;
-                cumulative_stats.bytes_used      += current->bytes_used;
-                cumulative_stats.bytes_wasted    += current->bytes_wasted;
-                cumulative_stats.block_count     += current->block_count;
+                stats.capacity    += current->capacity;
+                stats.used        += current->used;
+                stats.wasted      += current->wasted;
+                stats.block_count += current->block_count;
 
-                highest_cumulative_stats.bytes_allocated = DQN_MAX(highest_cumulative_stats.bytes_allocated, highest->bytes_allocated);
-                highest_cumulative_stats.bytes_used      = DQN_MAX(highest_cumulative_stats.bytes_used, highest->bytes_used);
-                highest_cumulative_stats.bytes_wasted    = DQN_MAX(highest_cumulative_stats.bytes_wasted, highest->bytes_wasted);
-                highest_cumulative_stats.block_count     = DQN_MAX(highest_cumulative_stats.block_count, highest->block_count);
+                high_water_mark_stats.capacity    = DQN_MAX(high_water_mark_stats.capacity, highest->capacity);
+                high_water_mark_stats.used        = DQN_MAX(high_water_mark_stats.used, highest->used);
+                high_water_mark_stats.wasted      = DQN_MAX(high_water_mark_stats.wasted, highest->wasted);
+                high_water_mark_stats.block_count = DQN_MAX(high_water_mark_stats.block_count, highest->block_count);
             }
 
-            Dqn_ArenaStatsString cumulative_stats_string         = Dqn_ArenaStatsToString(&cumulative_stats);
-            Dqn_ArenaStatsString highest_cumulative_stats_string = Dqn_ArenaStatsToString(&highest_cumulative_stats);
-            fprintf(file, "  [ALL] CURR %.*s\n", cumulative_stats_string.size, cumulative_stats_string.str);
-            fprintf(file, "        HIGH %.*s\n", highest_cumulative_stats_string.size, highest_cumulative_stats_string.str);
+            Dqn_ArenaStatsString stats_string                 = Dqn_ArenaStatsToString(&stats);
+            Dqn_ArenaStatsString high_water_mark_stats_string = Dqn_ArenaStatsToString(&high_water_mark_stats);
+            fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.str);
+            fprintf(file, "        HIGH %.*s\n", high_water_mark_stats_string.size, high_water_mark_stats_string.str);
         }
 
         // ---------------------------------------------------------------------
@@ -6785,8 +6723,8 @@ DQN_API void Dqn_LibDumpThreadContextArenaStats(Dqn_String file_path)
         // ---------------------------------------------------------------------
         for (Dqn_isize index = 0; index < stats_size; index++)
         {
-            Dqn_ArenaStats const *current = current_stats + index;
-            Dqn_ArenaStats const *highest = current_stats + index;
+            Dqn_ArenaStats const *current = stats + index;
+            Dqn_ArenaStats const *highest = stats + index;
 
             Dqn_ArenaStatsString current_string = Dqn_ArenaStatsToString(current);
             Dqn_ArenaStatsString highest_string = Dqn_ArenaStatsToString(highest);
@@ -6830,7 +6768,7 @@ DQN_API Dqn_ThreadContext *Dqn_ThreadGetContext()
         result.init = true;
         for (Dqn_ThreadScratchData &scratch_data : result.scratch_data)
         {
-            scratch_data.arena = Dqn_ArenaInitWithCRT(DQN_MEGABYTES(4));
+            Dqn_ArenaGrow(&scratch_data.arena, DQN_MEGABYTES(4));
 
 #if defined(DQN_DEBUG_THREAD_CONTEXT)
             // NOTE: Allocate this arena a slot in the stats array that we use
@@ -6838,7 +6776,7 @@ DQN_API Dqn_ThreadContext *Dqn_ThreadGetContext()
             Dqn_TicketMutexBegin(&dqn__lib.thread_context_mutex);
             scratch_data.arena_stats_index = dqn__lib.thread_context_arena_stats_size++;
             Dqn_TicketMutexEnd(&dqn__lib.thread_context_mutex);
-            DQN_HARD_ASSERT(dqn__lib.thread_context_arena_stats_size < Dqn_ArrayCountI(dqn__lib.thread_context_arena_current_stats));
+            DQN_HARD_ASSERT(dqn__lib.thread_context_arena_stats_size < Dqn_ArrayCountI(dqn__lib.thread_context_arena_stats));
 #endif
         }
     }
