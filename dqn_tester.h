@@ -69,13 +69,15 @@
         bool all_clear = (test)->num_tests_ok_in_group == (test)->num_tests_in_group;                                  \
         fprintf(stdout,                                                                                                \
                 "%s\n  %02d/%02d tests passed -- %s\n\n" DQN_TESTER_COLOR_RESET,                                       \
-                all_clear ? DQN_TESTER_GOOD_COLOR : DQN_TESTER_BAD_COLOR,                                             \
+                all_clear ? DQN_TESTER_GOOD_COLOR : DQN_TESTER_BAD_COLOR,                                              \
                 (test)->num_tests_ok_in_group,                                                                         \
                 (test)->num_tests_in_group,                                                                            \
                 all_clear ? "OK" : "FAILED");                                                                          \
     } while (0)
 
-#define DQN_TESTER_ASSERT(test, expr, fmt, ...) DQN_TESTER_ASSERT_AT((test), __FILE__, __LINE__, expr, fmt, ## __VA_ARGS__)
+#define DQN_TESTER_ASSERTF(test, expr, fmt, ...) DQN_TESTER_ASSERTF_AT((test), __FILE__, __LINE__, (expr), fmt, ## __VA_ARGS__)
+
+#define DQN_TESTER_ASSERT(test, expr) DQN_TESTER_ASSERT_AT((test), __FILE__, __LINE__, (expr))
 
 #define DQN_TESTER_LOG(test, fmt, ...)                                                                                 \
     do                                                                                                                 \
@@ -84,7 +86,7 @@
         fprintf(stdout, "%*s" fmt "\n", DQN_TESTER_SPACING * 2, "", ##__VA_ARGS__);                                    \
     } while (0)
 
-#define DQN_TESTER_ASSERT_AT(test, file, line, expr, fmt, ...)                                                         \
+#define DQN_TESTER_ASSERTF_AT(test, file, line, expr, fmt, ...)                                                        \
     do                                                                                                                 \
     {                                                                                                                  \
         if (!(expr))                                                                                                   \
@@ -104,6 +106,25 @@
                     DQN_TESTER_SPACING * 2,                                                                            \
                     "",                                                                                                \
                     ##__VA_ARGS__);                                                                                    \
+        }                                                                                                              \
+    } while (0)
+
+#define DQN_TESTER_ASSERT_AT(test, file, line, expr)                                                                   \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (!(expr))                                                                                                   \
+        {                                                                                                              \
+            if ((test)->log_count++ == 0) fprintf(stdout, "\n");                                                       \
+            (test)->failed = true;                                                                                     \
+            fprintf(stderr,                                                                                            \
+                    "%*sFile: %s:%d\n"                                                                                 \
+                    "%*sExpression: [" #expr "]\n",                                                                    \
+                    DQN_TESTER_SPACING * 2,                                                                            \
+                    "",                                                                                                \
+                    file,                                                                                              \
+                    line,                                                                                              \
+                    DQN_TESTER_SPACING * 2,                                                                            \
+                    "");                                                                                               \
         }                                                                                                              \
     } while (0)
 
