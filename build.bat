@@ -15,7 +15,8 @@ pushd Build
     REM Z7     Combine multi-debug files to one debug file
     REM wd4201 Nonstandard extension used: nameless struct/union
     REM Tp     Treat header file as CPP source file
-    set flags=-MT -EHa -GR- -Od -Oi -Z7 -wd4201 -D DQN_TEST_WITH_MAIN %code_dir%Dqn_Tests.cpp -link -nologo
+    set compile_flags=-MT -EHa -GR- -Od -Oi -Z7 -wd4201 -D DQN_TEST_WITH_MAIN
+    set linker_flags=-link -nologo
     set msvc_flags=-fsanitize=address -D STBSP__ASAN=__declspec(no_sanitize_address)
     set clang_flags=-fsanitize=address -fsanitize=undefined
 
@@ -29,7 +30,7 @@ pushd Build
 
     if not exist msvc mkdir msvc
     pushd msvc
-    cl %msvc_flags% %flags%
+    cl %compile_flags% %msvc_flags% %code_dir%Dqn_Tests.cpp %link_flags%
     popd
 
     REM ------------------------------------------------------------------------
@@ -42,6 +43,6 @@ pushd Build
 
     if not exist clang mkdir clang
     pushd clang
-    clang-cl %clang_flags% %flags%
+    clang-cl %compile_flags% %clang_flags% %code_dir%Dqn_Tests.cpp %link_flags%
     popd
 popd
