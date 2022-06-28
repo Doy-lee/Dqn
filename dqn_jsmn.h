@@ -293,12 +293,12 @@ int jsmn_iterator_next( jsmn_iterator_t *iterator, jsmntok_t **jsmn_identifier, 
 
 typedef struct Dqn_JsmnString
 {
-    union Dqn_JsmnStringBuffer { char const *const_str; char *str; } buf;
+    char        *data;
     Dqn_JsmnI64 size;
 } Dqn_JsmnString;
 
-#define DQN_JSMN_STRING(string) DQN_JSMN_CLITERAL(Dqn_JsmnString){{(string)}, sizeof(string) - 1}
-#define DQN_JSMN_STRING_FMT(string) (int)((string).size), (string).buf.str
+#define DQN_JSMN_STRING(string) DQN_JSMN_CLITERAL(Dqn_JsmnString){(char *)string, sizeof(string) - 1}
+#define DQN_JSMN_STRING_FMT(string) (int)((string).size), (string).data
 
 bool        Dqn_JsmnStringEq(Dqn_JsmnString lhs, Dqn_JsmnString rhs);
 bool        Dqn_JsmnStringIsValid(Dqn_JsmnString string);
@@ -450,13 +450,13 @@ Dqn_JsmnU64    Dqn_JsmnIteratorU64(Dqn_JsmnIterator const *it);
 bool Dqn_JsmnStringEq(Dqn_JsmnString lhs, Dqn_JsmnString rhs)
 {
     bool result = lhs.size == rhs.size;
-    for (int i = 0; i < lhs.size && result; i++) result &= lhs.buf.str[i] == rhs.buf.str[i];
+    for (int i = 0; i < lhs.size && result; i++) result &= lhs.data[i] == rhs.data[i];
     return result;
 }
 
 bool Dqn_JsmnStringIsValid(Dqn_JsmnString string)
 {
-    bool result = string.buf.str && string.size >= 0;
+    bool result = string.data && string.size >= 0;
     return result;
 }
 
@@ -474,7 +474,7 @@ Dqn_JsmnU64 Dqn_JsmnStringToU64(Dqn_JsmnString string)
 
     for (int i = 0; i < string.size; i++)
     {
-        char ch = string.buf.str[i];
+        char ch = string.data[i];
         if (!Dqn_JsmnIsDigit(ch))
             return result;
 
@@ -520,17 +520,17 @@ Dqn_Jsmn Dqn_JsmnInitWithJSONCString(char const *json, Dqn_JsmnI64 size, jsmntok
 
     DQN_JSMN_ASSERT(tokens_size == Dqn_JsmnTokensRequired(json, size));
     jsmn_init(&result.parser);
-    result.json.buf.const_str = json;
-    result.json.size          = size;
-    result.tokens             = tokens;
-    result.tokens_size        = tokens_size;
-    result.valid = jsmn_parse(&result.parser, result.json.buf.str, result.json.size, result.tokens, result.tokens_size) > 0;
+    result.json.data   = (char *)json;
+    result.json.size   = size;
+    result.tokens      = tokens;
+    result.tokens_size = tokens_size;
+    result.valid = jsmn_parse(&result.parser, result.json.data, result.json.size, result.tokens, result.tokens_size) > 0;
     return result;
 }
 
 Dqn_Jsmn Dqn_JsmnInitWithJSONString(Dqn_JsmnString json, jsmntok_t *tokens, unsigned int size)
 {
-    Dqn_Jsmn result = Dqn_JsmnInitWithJSONCString(json.buf.str, json.size, tokens, size);
+    Dqn_Jsmn result = Dqn_JsmnInitWithJSONCString(json.data, json.size, tokens, size);
     return result;
 }
 
@@ -552,7 +552,7 @@ Dqn_Jsmn Dqn_JsmnInitWithMallocJSONCString(char const *json, Dqn_JsmnI64 size)
 
 Dqn_Jsmn Dqn_JsmnInitWithMallocJSON(Dqn_JsmnString json)
 {
-    Dqn_Jsmn result = Dqn_JsmnInitWithMallocJSONCString(json.buf.str, json.size);
+    Dqn_Jsmn result = Dqn_JsmnInitWithMallocJSONCString(json.data, json.size);
     return result;
 }
 
@@ -560,7 +560,7 @@ Dqn_Jsmn Dqn_JsmnInitWithMallocJSONFile(Dqn_JsmnString json_file)
 {
     Dqn_Jsmn result      = DQN_JSMN_ZERO_INIT;
     FILE *   file_handle = NULL;
-    fopen_s(&file_handle, json_file.buf.str, "rb");
+    fopen_s(&file_handle, json_file.data, "rb");
     if (!file_handle)
         return result;
 
@@ -593,8 +593,8 @@ Dqn_Jsmn Dqn_JsmnInitWithMallocJSONFile(Dqn_JsmnString json_file)
 
 void Dqn_JsmnFree(Dqn_Jsmn *jsmn)
 {
-    if (jsmn->json.buf.str && jsmn->json_needs_crt_free)
-        free(jsmn->json.buf.str);
+    if (jsmn->json.data && jsmn->json_needs_crt_free)
+        free(jsmn->json.data);
 
     if (jsmn->tokens)
         free(jsmn->tokens);
@@ -634,13 +634,13 @@ Dqn_Jsmn Dqn_JsmnInitWithArenaJSONCString(char const *json, Dqn_JsmnI64 size, Dq
 
 Dqn_Jsmn Dqn_JsmnInitWithArenaJSON(Dqn_JsmnString json, Dqn_Arena *arena)
 {
-    Dqn_Jsmn result = Dqn_JsmnInitWithArenaJSONCString(json.buf.str, json.size, arena);
+    Dqn_Jsmn result = Dqn_JsmnInitWithArenaJSONCString(json.data, json.size, arena);
     return result;
 }
 
 Dqn_Jsmn Dqn_JsmnInitWithArenaJSONFile(Dqn_JsmnString file, Dqn_Arena *arena)
 {
-    Dqn_String json   = Dqn_FileArenaReadToString(file.buf.str, file.size, arena);
+    Dqn_String json   = Dqn_FileArenaReadToString(file.data, file.size, arena);
     Dqn_Jsmn   result = Dqn_JsmnInitWithArenaJSON({{json.str}, (int)json.size}, arena);
     return result;
 }
@@ -654,14 +654,14 @@ int Dqn_JsmnTokenArraySize(jsmntok_t token)
 
 Dqn_JsmnString Dqn_JsmnTokenString(jsmntok_t token, Dqn_JsmnString json)
 {
-    Dqn_JsmnString result = {{json.buf.str + token.start}, token.end - token.start};
+    Dqn_JsmnString result = {{json.data + token.start}, token.end - token.start};
     return result;
 }
 
 bool Dqn_JsmnTokenBool(jsmntok_t token, Dqn_JsmnString json)
 {
     DQN_JSMN_ASSERT(token.start < json.size);
-    char    ch     = json.buf.str[token.start];
+    char    ch     = json.data[token.start];
     bool result = ch == 't';
     if (!result) { DQN_JSMN_ASSERT(ch == 'f'); }
     return result;
@@ -670,7 +670,7 @@ bool Dqn_JsmnTokenBool(jsmntok_t token, Dqn_JsmnString json)
 Dqn_JsmnU64 Dqn_JsmnTokenU64(jsmntok_t token, Dqn_JsmnString json)
 {
     DQN_JSMN_ASSERT(token.start < json.size);
-    Dqn_JsmnString string = {{json.buf.str + token.start}, token.end - token.start};
+    Dqn_JsmnString string = {{json.data + token.start}, token.end - token.start};
     Dqn_JsmnU64   result = Dqn_JsmnStringToU64(string);
     return result;
 }
@@ -725,7 +725,7 @@ Dqn_JsmnString Dqn_JsmnIteratorKey(Dqn_JsmnIterator *it)
 {
     Dqn_JsmnString result = DQN_JSMN_ZERO_INIT;
     if (it && it->key)
-        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){{it->json.buf.str + it->key->start}, it->key->end - it->key->start};
+        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){{it->json.data + it->key->start}, it->key->end - it->key->start};
     return result;
 }
 
@@ -758,7 +758,7 @@ static bool Dqn_Jsmn_IteratorExpect(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expect
         case Dqn_JsmnTokenIs_Number:
         {
             DQN_JSMN_ASSERT(token.start < it->json.size);
-            char ch = it->json.buf.str[token.start];
+            char ch = it->json.data[token.start];
             result  = token.type == JSMN_PRIMITIVE && (ch == '-' || Dqn_JsmnIsDigit(ch));
         }
         break;
@@ -766,7 +766,7 @@ static bool Dqn_Jsmn_IteratorExpect(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expect
         case Dqn_JsmnTokenIs_Bool:
         {
             DQN_JSMN_ASSERT(token.start < it->json.size);
-            char ch = it->json.buf.str[token.start];
+            char ch = it->json.data[token.start];
             result = token.type == JSMN_PRIMITIVE && (ch == 't' || ch == 'f');
         }
         break;
@@ -782,7 +782,7 @@ static bool Dqn_Jsmn_IteratorExpect(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expect
 
         case JSMN_PRIMITIVE:
         {
-            char first = it->json.buf.str[token.start];
+            char first = it->json.data[token.start];
             if (first == 't' || first == 'f')
                 actual = Dqn_JsmnTokenIs_Bool;
             else
@@ -812,8 +812,8 @@ bool Dqn_Jsmn_IteratorExpectKey(Dqn_JsmnIterator *it, Dqn_JsmnTokenIs expected, 
 Dqn_JsmnString Dqn_JsmnIteratorString(Dqn_JsmnIterator const *it)
 {
     Dqn_JsmnString result = DQN_JSMN_ZERO_INIT;
-    if (it->value && it->json.buf.str)
-        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){{it->json.buf.str + it->value->start}, it->value->end - it->value->start};
+    if (it->value && it->json.data)
+        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){{it->json.data + it->value->start}, it->value->end - it->value->start};
     return result;
 }
 

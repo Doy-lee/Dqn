@@ -7,7 +7,7 @@
 // -----------------------------------------------------------------------------
 // NOTE: Dqn_CppFile: Helper functions to generate formatted CPP files
 // -----------------------------------------------------------------------------
-#define DQN_CPPF_ASSERT(expr) do { if (!(expr)) { *((int *)0) = 0; } } while (0)
+#define DQN_CPPF_ASSERT(expr) do { if (!(expr)) { *((int volatile *)0) = 0; } } while (0)
 
 struct Dqn_CppFile
 {
