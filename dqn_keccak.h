@@ -180,10 +180,10 @@ Dqn_KeccakBytes64 Dqn_Keccak512ToBytes64(void *bytes, Dqn_KeccakU64 bytes_size);
 // -----------------------------------------------------------------------------
 // NOTE: SHA3 - Helpers for Dqn data structures
 // -----------------------------------------------------------------------------
-Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_String string);
-Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String string);
-Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String string);
-Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String string);
+Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_String8 string);
+Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String8 string);
+Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String8 string);
+Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String8 string);
 
 Dqn_KeccakBytes28 Dqn_SHA3_224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array);
 Dqn_KeccakBytes32 Dqn_SHA3_256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array);
@@ -193,10 +193,10 @@ Dqn_KeccakBytes64 Dqn_SHA3_512_U8ArrayToBytes64(Dqn_Array<Dqn_KeccakU8> array);
 // -----------------------------------------------------------------------------
 // NOTE: Keccak - Helpers for Dqn data structures
 // -----------------------------------------------------------------------------
-Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String string);
-Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String string);
-Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String string);
-Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String string);
+Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String8 string);
+Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String8 string);
+Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String8 string);
+Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String8 string);
 
 Dqn_KeccakBytes28 Dqn_Keccak224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array);
 Dqn_KeccakBytes32 Dqn_Keccak256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array);
@@ -234,7 +234,7 @@ int Dqn_KeccakBytes64Equals(Dqn_KeccakBytes64 const *a, Dqn_KeccakBytes64 const 
 // Converts a 64 character hex string into the 32 byte binary representation.
 // Invalid hex characters in the string will be represented as 0.
 // hex: Must be exactly a 64 character hex string.
-Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_String hex);
+Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_String8 hex);
 #endif // DQN_H && DQN_WITH_HEX
 #endif // DQN_KECCAK_H
 
@@ -512,7 +512,7 @@ Dqn_KeccakBytes64 Dqn_Keccak512ToBytes64(void *bytes, Dqn_KeccakU64 bytes_size)
 // -----------------------------------------------------------------------------
 // NOTE: SHA3 - Helpers for Dqn data structures
 // -----------------------------------------------------------------------------
-Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_String string)
+Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_String8 string)
 {
     Dqn_KeccakBytes28 result;
     Dqn_SHA3_224(string.data, string.size, result.data, sizeof(result));
@@ -526,7 +526,7 @@ Dqn_KeccakBytes28 Dqn_SHA3_224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array)
     return result;
 }
 
-Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String string)
+Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String8 string)
 {
     Dqn_KeccakBytes32 result;
     Dqn_SHA3_256(string.data, string.size, result.data, sizeof(result));
@@ -540,7 +540,7 @@ Dqn_KeccakBytes32 Dqn_SHA3_256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array)
     return result;
 }
 
-Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String string)
+Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String8 string)
 {
     Dqn_KeccakBytes48 result;
     Dqn_SHA3_384(string.data, string.size, result.data, sizeof(result));
@@ -554,7 +554,7 @@ Dqn_KeccakBytes48 Dqn_SHA3_384_U8ArrayToBytes48(Dqn_Array<Dqn_KeccakU8> array)
     return result;
 }
 
-Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String string)
+Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String8 string)
 {
     Dqn_KeccakBytes64 result;
     Dqn_SHA3_512(string.data, string.size, result.data, sizeof(result));
@@ -573,7 +573,7 @@ Dqn_KeccakBytes64 Dqn_SHA3_512_U8ArrayToBytes64(Dqn_Array<Dqn_KeccakU8> array)
 // -----------------------------------------------------------------------------
 // NOTE: Keccak - Helpers for Dqn data structures
 // -----------------------------------------------------------------------------
-Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String string)
+Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String8 string)
 {
     Dqn_KeccakBytes28 result;
     Dqn_Keccak224(string.data, string.size, result.data, sizeof(result));
@@ -587,7 +587,7 @@ Dqn_KeccakBytes28 Dqn_Keccak224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array)
     return result;
 }
 
-Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String string)
+Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String8 string)
 {
     Dqn_KeccakBytes32 result;
     Dqn_Keccak256(string.data, string.size, result.data, sizeof(result));
@@ -602,7 +602,7 @@ Dqn_KeccakBytes32 Dqn_Keccak256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array)
 }
 
 
-Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String string)
+Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String8 string)
 {
     Dqn_KeccakBytes48 result;
     Dqn_Keccak384(string.data, string.size, result.data, sizeof(result));
@@ -616,7 +616,7 @@ Dqn_KeccakBytes48 Dqn_Keccak384_U8ArrayToBytes48(Dqn_Array<Dqn_KeccakU8> array)
     return result;
 }
 
-Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String string)
+Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String8 string)
 {
     Dqn_KeccakBytes64 result;
     Dqn_Keccak512(string.data, string.size, result.data, sizeof(result));
@@ -712,7 +712,7 @@ int Dqn_KeccakBytes64Equals(Dqn_KeccakBytes64 const *a, Dqn_KeccakBytes64 const 
 // -----------------------------------------------------------------------------
 // NOTE: Other helper functions for Dqn data structures
 // -----------------------------------------------------------------------------
-Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_String hex)
+Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_String8 hex)
 {
     DQN_KECCAK_ASSERT(hex.size == 64);
     Dqn_KeccakBytes32 result;

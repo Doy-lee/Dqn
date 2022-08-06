@@ -737,14 +737,14 @@ DQN_API Dqn_isize Dqn_FmtLenNoNullTerminator (char const *fmt, ...);
 DQN_API Dqn_isize Dqn_FmtVLen                (char const *fmt, va_list args);
 DQN_API Dqn_isize Dqn_FmtLen                 (char const *fmt, ...);
 
-// NOTE: Dqn_String
+// NOTE: Dqn_String8
 // -------------------------------------------------------------------------------------------------
 struct Dqn_Arena;
 
-#define DQN_STRING(string)     Dqn_String{(char *)(string), sizeof(string) - 1}
+#define DQN_STRING(string)     Dqn_String8{(char *)(string), sizeof(string) - 1}
 #define DQN_STRINGW(string)    Dqn_String16{(wchar_t *)(string), (sizeof(string)/sizeof(string[0])) - 1}
 #define DQN_STRING_FMT(string) (int)((string).size), (string).data
-struct Dqn_String
+struct Dqn_String8
 {
     char      *data;
     Dqn_isize  size;
@@ -767,20 +767,20 @@ struct Dqn_String16
 };
 
 // @info   Initialise a string from a pointer and length.
-//         The string is invalid (i.e. 'Dqn_StringIsValid' returns false) if
+//         The string is invalid (i.e. 'Dqn_String8IsValid' returns false) if
 //         size is negative or the string is null.
-DQN_API Dqn_String Dqn_StringInit(char const *string, Dqn_isize size);
+DQN_API Dqn_String8 Dqn_String8Init(char const *string, Dqn_isize size);
 
 // @info   Initialise a string from a C-string. The C-string must be
 //         null-terminated as its length is evaluated using 'strlen'.
-//         The string is invalid (i.e. 'Dqn_StringIsValid' returns false) if
+//         The string is invalid (i.e. 'Dqn_String8IsValid' returns false) if
 //         size is negative or the string is null.
-DQN_API Dqn_String Dqn_StringInitCString(char const *string);
+DQN_API Dqn_String8 Dqn_String8InitCString(char const *string);
 
 // @info   Determine if the string structure has valid values.
 //         A string is invalid if size is negative or the string is null.
 // @return True if the string is valid, false otherwise.
-DQN_API bool       Dqn_StringIsValid(Dqn_String string);
+DQN_API bool        Dqn_String8IsValid(Dqn_String8 string);
 
 // @info   Create a slice from a pre-existing string. The requested slice is
 //         clamped to within the bounds of the original 'string'.
@@ -788,29 +788,29 @@ DQN_API bool       Dqn_StringIsValid(Dqn_String string);
 // @in     offset: The starting byte to slice from
 // @in     size: The size of the slice
 // @return The sliced string.
-DQN_API Dqn_String Dqn_StringSlice(Dqn_String string, Dqn_isize offset, Dqn_isize size);
+DQN_API Dqn_String8 Dqn_String8Slice(Dqn_String8 string, Dqn_isize offset, Dqn_isize size);
 
-#define            Dqn_StringFmtTagged(tag, arena, fmt, ...) Dqn_StringFmt_(DQN_CALL_SITE(tag) arena, fmt, ## __VA_ARGS__)
-#define            Dqn_StringFmt(arena, fmt, ...)            Dqn_StringFmtTagged(nullptr, arena, fmt, ## __VA_ARGS__)
-DQN_API Dqn_String Dqn_StringFmt_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, ...);
+#define             Dqn_String8FmtTagged(tag, arena, fmt, ...) Dqn_String8Fmt_(DQN_CALL_SITE(tag) arena, fmt, ## __VA_ARGS__)
+#define             Dqn_String8Fmt(arena, fmt, ...)            Dqn_String8FmtTagged(nullptr, arena, fmt, ## __VA_ARGS__)
+DQN_API Dqn_String8 Dqn_String8Fmt_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, ...);
 
-#define            Dqn_StringFmtVTagged(tag, arena, fmt, ...) Dqn_StringFmtV_(DQN_CALL_SITE(tag) arena, fmt, ## __VA_ARGS__)
-#define            Dqn_StringFmtV(arena, fmt, ...)            Dqn_StringFmtVTagged(nullptr, arena, fmt, ## __VA_ARGS__)
-DQN_API Dqn_String Dqn_StringFmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, va_list va);
+#define             Dqn_String8FmtVTagged(tag, arena, fmt, ...) Dqn_String8FmtV_(DQN_CALL_SITE(tag) arena, fmt, ## __VA_ARGS__)
+#define             Dqn_String8FmtV(arena, fmt, ...)            Dqn_String8FmtVTagged(nullptr, arena, fmt, ## __VA_ARGS__)
+DQN_API Dqn_String8 Dqn_String8FmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, va_list va);
 
-#define            Dqn_StringAllocateTagged(tag, arena, size, zero_mem) Dqn_StringAllocate_(DQN_CALL_SITE(tag) arena, size, zero_mem)
-#define            Dqn_StringAllocate(arena, size, zero_mem)            Dqn_StringAllocateTagged(nullptr, arena, size, zero_mem)
-DQN_API Dqn_String Dqn_StringAllocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_ZeroMem zero_mem);
+#define             Dqn_String8AllocateTagged(tag, arena, size, zero_mem) Dqn_String8Allocate_(DQN_CALL_SITE(tag) arena, size, zero_mem)
+#define             Dqn_String8Allocate(arena, size, zero_mem)            Dqn_String8AllocateTagged(nullptr, arena, size, zero_mem)
+DQN_API Dqn_String8 Dqn_String8Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_ZeroMem zero_mem);
 
-#define            Dqn_StringCopyCStringTagged(tag, arena, string, size) Dqn_StringCopyCString(DQN_CALL_SITE(tag) arena, string, size)
-#define            Dqn_StringCopyCString(arena, string, size)            Dqn_StringCopyCString_(nullptr, arena, string, size)
-DQN_API Dqn_String Dqn_StringCopyCString_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *string, Dqn_isize size);
+#define             Dqn_String8CopyCStringTagged(tag, arena, string, size) Dqn_String8CopyCString(DQN_CALL_SITE(tag) arena, string, size)
+#define             Dqn_String8CopyCString(arena, string, size)            Dqn_String8CopyCString_(nullptr, arena, string, size)
+DQN_API Dqn_String8 Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *string, Dqn_isize size);
 
-#define            Dqn_StringCopyTagged(tag, string, arena) Dqn_StringCopy_(DQN_CALL_SITE(tag) string, arena)
-#define            Dqn_StringCopy(string, arena)            Dqn_StringCopyTagged("", string, arena)
-DQN_API Dqn_String Dqn_StringCopy_(DQN_CALL_SITE_ARGS Dqn_String *arena, Dqn_String string);
+#define             Dqn_String8CopyTagged(tag, arena, string) Dqn_String8Copy_(DQN_CALL_SITE(tag) arena, string)
+#define             Dqn_String8Copy(arena, string)            Dqn_String8CopyTagged(nullptr, arena, string)
+DQN_API Dqn_String8 Dqn_String8Copy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_String8 string);
 
-enum struct Dqn_StringEqCase
+enum struct Dqn_String8EqCase
 {
     Sensitive,
     Insensitive,
@@ -821,12 +821,12 @@ enum struct Dqn_StringEqCase
 // @in     rhs: The second string to compare equality with
 // @in     eq_case: Set the comparison to be case sensitive or insensitive
 // @return True if the strings are equal, false otherwise.
-DQN_API bool Dqn_StringEq(Dqn_String lhs, Dqn_String rhs, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
-DQN_API bool Dqn_StringEqInsensitive(Dqn_String lhs, Dqn_String rhs);
-DQN_API bool Dqn_StringStartsWith(Dqn_String string, Dqn_String prefix, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
-DQN_API bool Dqn_StringStartsWithInsensitive(Dqn_String string, Dqn_String prefix);
-DQN_API bool Dqn_StringEndsWith(Dqn_String string, Dqn_String prefix, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
-DQN_API bool Dqn_StringEndsWithInsensitive(Dqn_String string, Dqn_String prefix);
+DQN_API bool Dqn_String8Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
+DQN_API bool Dqn_String8EqInsensitive(Dqn_String8 lhs, Dqn_String8 rhs);
+DQN_API bool Dqn_String8StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
+DQN_API bool Dqn_String8StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix);
+DQN_API bool Dqn_String8EndsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
+DQN_API bool Dqn_String8EndsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix);
 
 // @info   Split a string by the delimiting character. This function can
 //         evaluate the number of splits required in the return value by setting
@@ -841,30 +841,30 @@ DQN_API bool Dqn_StringEndsWithInsensitive(Dqn_String string, Dqn_String prefix)
 //         to the capacity given by the caller, i.e. 'splits_count'. This
 //         function should be called again with a sufficiently sized array if
 //         all splits are desired.
-DQN_API Dqn_isize  Dqn_StringSplit(Dqn_String string, char delimiter, Dqn_String *splits, Dqn_isize splits_count);
-DQN_API Dqn_String Dqn_StringTrimPrefix(Dqn_String string, Dqn_String prefix, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
-DQN_API Dqn_String Dqn_StringTrimSuffix(Dqn_String string, Dqn_String suffix, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
-DQN_API Dqn_String Dqn_StringTrimWhitespaceAround(Dqn_String string);
+DQN_API Dqn_isize   Dqn_String8Split(Dqn_String8 string, char delimiter, Dqn_String8 *splits, Dqn_isize splits_count);
+DQN_API Dqn_String8 Dqn_String8TrimPrefix(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8TrimSuffix(Dqn_String8 string, Dqn_String8 suffix, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8TrimWhitespaceAround(Dqn_String8 string);
 
 // Trim UTF8, UTF16 BE/LE, UTF32 BE/LE byte order mark in the string.
-DQN_API Dqn_String Dqn_StringTrimByteOrderMark(Dqn_String string);
-DQN_API bool       Dqn_StringIsAllDigits(Dqn_String string);
-DQN_API bool       Dqn_StringIsAllHex(Dqn_String string);
-DQN_API bool       Dqn_StringHasChar(Dqn_String string, char ch);
+DQN_API Dqn_String8 Dqn_String8TrimByteOrderMark(Dqn_String8 string);
+DQN_API bool        Dqn_String8IsAllDigits(Dqn_String8 string);
+DQN_API bool        Dqn_String8IsAllHex(Dqn_String8 string);
+DQN_API bool        Dqn_String8HasChar(Dqn_String8 string, char ch);
 
 // Remove the substring denoted by the begin index and the size from the string
 // string in-place using MEMMOVE to shift the string back.
-DQN_API void       Dqn_StringRemove(Dqn_String *string, Dqn_isize begin, Dqn_isize size);
+DQN_API void        Dqn_String8Remove(Dqn_String8 *string, Dqn_isize begin, Dqn_isize size);
 
 // start_index: Set an index within the string string to start the search from, if not desired, set to 0
 // return: The index of the matching find, -1 if it is not found
-DQN_API Dqn_isize  Dqn_StringFindOffset(Dqn_String string, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
+DQN_API Dqn_isize   Dqn_String8FindOffset(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
 
 // start_index: Set an index within the string string to start the search from, if not desired, set to 0
 // return: A string that points to the matching find, otherwise a 0 length string.
-DQN_API Dqn_String Dqn_StringFind(Dqn_String string, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
-DQN_API Dqn_String Dqn_StringReplace(Dqn_String string, Dqn_String find, Dqn_String replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_StringEqCase eq_case = Dqn_StringEqCase::Sensitive);
-DQN_API Dqn_String Dqn_StringReplaceInsensitive(Dqn_String string, Dqn_String find, Dqn_String replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena);
+DQN_API Dqn_String8 Dqn_String8Find(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8Replace(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena);
 
 // @info   Get the file name from a file path by searching from the end of the
 //         string backwards to the first occurring path separator '/' or '\'. If
@@ -872,9 +872,9 @@ DQN_API Dqn_String Dqn_StringReplaceInsensitive(Dqn_String string, Dqn_String fi
 // @in     path: A file path on the disk
 // @return The file name of the file path, if none is found, the path string
 //         is returned.
-DQN_API Dqn_String Dqn_StringFileNameFromPath(Dqn_String path);
-DQN_API Dqn_u64    Dqn_StringToU64(Dqn_String string);
-DQN_API Dqn_i64    Dqn_StringToI64(Dqn_String string);
+DQN_API Dqn_String8 Dqn_String8FileNameFromPath(Dqn_String8 path);
+DQN_API Dqn_u64     Dqn_String8ToU64(Dqn_String8 string);
+DQN_API Dqn_i64     Dqn_String8ToI64(Dqn_String8 string);
 
 
 // NOTE: Dqn_Log
@@ -901,7 +901,7 @@ char const *Dqn_LogTypeString[] = {
 };
 #undef X_MACRO
 
-typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, Dqn_String file, Dqn_String func, Dqn_uint line, char const *fmt, va_list va);
+typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, va_list va);
 
 // NOTE: Logging Macros
 // ------------------------------------------------------------------------------------------------
@@ -922,9 +922,9 @@ typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, Dqn_String file, Dqn
 #define DQN_LOGV_P(fmt, va) Dqn_LogV(Dqn_LogType::Profile, dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, va)
 
 // Internal logging functions, prefer the logging macros above
-DQN_API void Dqn_LogVDefault(Dqn_LogType type, void *user_data, Dqn_String file, Dqn_String func, Dqn_uint line, char const *fmt, va_list va);
-DQN_API void Dqn_LogV(Dqn_LogType type, void *user_data, Dqn_String file, Dqn_String func, Dqn_uint line, char const *fmt, va_list va);
-DQN_API void Dqn_Log(Dqn_LogType type, void *user_data, Dqn_String file, Dqn_String func, Dqn_uint line, char const *fmt, ...);
+DQN_API void Dqn_LogVDefault(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, va_list va);
+DQN_API void Dqn_LogV(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, va_list va);
+DQN_API void Dqn_Log(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, ...);
 
 // NOTE: Dqn_Virtual
 // -------------------------------------------------------------------------------------------------
@@ -1265,7 +1265,7 @@ DQN_API void Dqn_LibSetLogCallback(Dqn_LogProc *proc, void *user_data);
 // file: Pass in nullptr to turn off writing logs to disk, otherwise point it to
 // the FILE that you wish to write to.
 DQN_API void Dqn_LibSetLogFile(void *file);
-DQN_API void Dqn_LibDumpThreadContextArenaStat(Dqn_String file_path);
+DQN_API void Dqn_LibDumpThreadContextArenaStat(Dqn_String8 file_path);
 
 #if defined(DQN_WITH_FIXED_STRING)
 // NOTE: Dqn_FixedString
@@ -1299,38 +1299,38 @@ template <Dqn_isize MAX_> DQN_API void                  Dqn_FixedStringClear(Dqn
 template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppendFmtV(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va);
 template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...);
 template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size = -1);
-template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String src);
-template <Dqn_isize MAX_> DQN_API Dqn_String            Dqn_FixedStringToString(Dqn_FixedString<MAX_> const *str);
+template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String8 src);
+template <Dqn_isize MAX_> DQN_API Dqn_String8            Dqn_FixedStringToString(Dqn_FixedString<MAX_> const *str);
 #endif // DQN_WITH_FIXED_STRING
 
-// NOTE: Dqn_StringList
+// NOTE: Dqn_String8List
 // -------------------------------------------------------------------------------------------------
-struct Dqn_StringListNode
+struct Dqn_String8ListNode
 {
-    Dqn_String          string;
-    Dqn_StringListNode *next;
+    Dqn_String8          string;
+    Dqn_String8ListNode *next;
 };
 
-struct Dqn_StringList
+struct Dqn_String8List
 {
     Dqn_isize           string_size;
-    Dqn_StringListNode *head;
-    Dqn_StringListNode *curr;
+    Dqn_String8ListNode *head;
+    Dqn_String8ListNode *curr;
 };
 
-DQN_API Dqn_StringListNode *Dqn_StringListMakeNode(Dqn_Arena *arena, Dqn_isize size);
-DQN_API void                Dqn_StringListAddNode(Dqn_StringList *list, Dqn_StringListNode *node);
-DQN_API void                Dqn_StringListAppendFmtV(Dqn_StringList *list, Dqn_Arena *arena, char const *fmt, va_list args);
-DQN_API void                Dqn_StringListAppendFmt(Dqn_StringList *list, Dqn_Arena *arena, char const *fmt, ...);
+DQN_API Dqn_String8ListNode *Dqn_String8ListMakeNode(Dqn_Arena *arena, Dqn_isize size);
+DQN_API void                Dqn_String8ListAddNode(Dqn_String8List *list, Dqn_String8ListNode *node);
+DQN_API void                Dqn_String8ListAppendFmtV(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, va_list args);
+DQN_API void                Dqn_String8ListAppendFmt(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, ...);
 
 // Append a string to the list. The "Copy" variant will copy the string before
 // appending and should be used if the string to be passed in has transient
 // memory or will be further modified. The non "Copy" variant will avoid
 // a memory allocation and just shallow copy the string into the node.
-DQN_API void                Dqn_StringListAppendString(Dqn_StringList *list, Dqn_Arena *arena, Dqn_String string);
-DQN_API void                Dqn_StringListAppendStringCopy(Dqn_StringList *list, Dqn_Arena *arena, Dqn_String string);
-DQN_API void                Dqn_StringListAppendFmt(Dqn_StringList *list, Dqn_Arena *arena, char const *fmt, ...);
-DQN_API Dqn_String          Dqn_StringListBuild(Dqn_StringList const *list, Dqn_Arena *arena);
+DQN_API void                Dqn_String8ListAppendString(Dqn_String8List *list, Dqn_Arena *arena, Dqn_String8 string);
+DQN_API void                Dqn_String8ListAppendStringCopy(Dqn_String8List *list, Dqn_Arena *arena, Dqn_String8 string);
+DQN_API void                Dqn_String8ListAppendFmt(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, ...);
+DQN_API Dqn_String8          Dqn_String8ListBuild(Dqn_String8List const *list, Dqn_Arena *arena);
 
 #if defined(DQN_WITH_FIXED_ARRAY)
 // NOTE: Dqn_FixedArray
@@ -1697,12 +1697,12 @@ DQN_API int Dqn_UTF16EncodeCodepoint(Dqn_u16 utf16[2], Dqn_u32 codepoint);
 // NOTE: Dqn_Hex
 // -------------------------------------------------------------------------------------------------
 DQN_API char const *Dqn_HexCStringTrimSpaceAnd0xPrefix(char const *hex, Dqn_isize size, Dqn_isize *real_size);
-DQN_API Dqn_String  Dqn_HexStringTrimSpaceAnd0xPrefix (Dqn_String const string);
+DQN_API Dqn_String8  Dqn_HexStringTrimSpaceAnd0xPrefix (Dqn_String8 const string);
 
 // Convert a hexadecimal string a 64 bit value. Asserts if the hex string is too
 // big to be converted into a 64 bit number.
 DQN_API Dqn_u64 Dqn_HexCStringToU64(char const *hex, Dqn_isize size);
-DQN_API Dqn_u64 Dqn_HexStringToU64(Dqn_String hex);
+DQN_API Dqn_u64 Dqn_HexStringToU64(Dqn_String8 hex);
 
 // Convert a binary buffer into its hex representation into dest. The dest
 // buffer must be large enough to contain the hex representation, i.e.
@@ -1718,17 +1718,17 @@ DQN_API void Dqn_HexToBytes(char const *hex, int hex_size, void *dest, int dest_
 
 // Convert a series of bytes into a string. The CString variant returns a string
 // with length (size * 2) with 1 extra byte for the null-terminator. The
-// return: nullptr/invalid Dqn_String if the allocation failed, otherwise the hex string in ASCII.
+// return: nullptr/invalid Dqn_String8 if the allocation failed, otherwise the hex string in ASCII.
 DQN_API char       *Dqn_HexBytesToHexCStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena);
-DQN_API Dqn_String  Dqn_HexBytesToHexStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena);
+DQN_API Dqn_String8  Dqn_HexBytesToHexStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena);
 DQN_API char       *Dqn_HexU8ArrayToHexCStringArena(Dqn_Array<Dqn_u8> const array, Dqn_Arena *arena);
-DQN_API Dqn_String  Dqn_HexU8ArrayToHexStringArena(Dqn_Array<Dqn_u8> const array, Dqn_Arena *arena);
+DQN_API Dqn_String8  Dqn_HexU8ArrayToHexStringArena(Dqn_Array<Dqn_u8> const array, Dqn_Arena *arena);
 
 // Convert a char string to a binary representation without any checks except assertions in debug.
 // A leading "0x" is permitted and will be skipped as well as odd-sized strings.
 DQN_API Dqn_u8            *Dqn_HexCStringToU8Bytes(char const *hex, Dqn_isize size, Dqn_isize *real_size, Dqn_Arena *arena);
 DQN_API Dqn_Array<Dqn_u8>  Dqn_HexCStringToU8Array(char const *hex, Dqn_isize size, Dqn_Arena *arena);
-DQN_API Dqn_Array<Dqn_u8>  Dqn_HexStringToU8Array(Dqn_String const hex, Dqn_Arena *arena);
+DQN_API Dqn_Array<Dqn_u8>  Dqn_HexStringToU8Array(Dqn_String8 const hex, Dqn_Arena *arena);
 #endif // DQN_WITH_HEX
 
 // NOTE: Dqn_Str
@@ -1773,19 +1773,19 @@ struct Dqn_FileInfo
     operator bool() const { return size > 0; }
 };
 
-// TODO(dqn): We should have a Dqn_String interface and a CString interface
-DQN_API Dqn_b32      Dqn_FileExists(Dqn_String path);
-DQN_API Dqn_b32      Dqn_FileDirExists(Dqn_String path);
-DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String path);
-DQN_API Dqn_b32      Dqn_FileCopy(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite);
+// TODO(dqn): We should have a Dqn_String8 interface and a CString interface
+DQN_API Dqn_b32      Dqn_FileExists(Dqn_String8 path);
+DQN_API Dqn_b32      Dqn_FileDirExists(Dqn_String8 path);
+DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String8 path);
+DQN_API Dqn_b32      Dqn_FileCopy(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrite);
 
 // temp_arena: Only used on Linux otherwise ignored
-DQN_API Dqn_b32      Dqn_FileMakeDir(Dqn_String path, Dqn_Arena *temp_arena);
-DQN_API Dqn_b32      Dqn_FileMove(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite);
+DQN_API Dqn_b32      Dqn_FileMakeDir(Dqn_String8 path, Dqn_Arena *temp_arena);
+DQN_API Dqn_b32      Dqn_FileMove(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrite);
 
 // TODO(dqn): This doesn't work on directories unless you delete the files
 // in that directory first.
-DQN_API Dqn_b32      Dqn_FileDelete(Dqn_String path);
+DQN_API Dqn_b32      Dqn_FileDelete(Dqn_String8 path);
 
 // file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
 // allocator: (Optional) When null, the buffer is allocated with DQN_MALLOC, result should be freed with DQN_FREE.
@@ -1797,7 +1797,7 @@ DQN_API Dqn_b32     Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path
 
 DQN_API char       *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
 DQN_API char       *Dqn__FileArenaRead(char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
-DQN_API Dqn_String  Dqn__FileArenaReadToString(char const *file, Dqn_isize file_path_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
+DQN_API Dqn_String8  Dqn__FileArenaReadToString(char const *file, Dqn_isize file_path_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
 
 // NOTE: Date
 // -------------------------------------------------------------------------------------------------
@@ -1835,7 +1835,7 @@ DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size);
 
 // return: The directory without the trailing '/' or ('\' for windows). Empty
 //         string with a nullptr if it fails.
-DQN_API Dqn_String Dqn_OSEXEDir(Dqn_Arena *arena);
+DQN_API Dqn_String8 Dqn_OSEXEDir(Dqn_Arena *arena);
 
 // NOTE: Utiltiies
 // -------------------------------------------------------------------------------------------------
@@ -1957,31 +1957,31 @@ struct Dqn_JsonWriter
     Dqn_u16         parent_field_count_stack[32];
     int             parent_field_count_stack_size;
     Dqn_Arena      *arena;
-    Dqn_StringList  list;
+    Dqn_String8List  list;
     int             indent_level;
     int             spaces_per_indent;
 };
 
 DQN_API Dqn_JsonWriter Dqn_JsonWriterInit(Dqn_Arena *arena, int spaces_per_indent);
-DQN_API Dqn_String     Dqn_JsonWriterBuild(Dqn_JsonWriter *writer, Dqn_Arena *arena);
+DQN_API Dqn_String8     Dqn_JsonWriterBuild(Dqn_JsonWriter *writer, Dqn_Arena *arena);
 
-DQN_API void           Dqn_JsonWriterBeginNamedObject(Dqn_JsonWriter *writer, Dqn_String name);
+DQN_API void           Dqn_JsonWriterBeginNamedObject(Dqn_JsonWriter *writer, Dqn_String8 name);
 DQN_API void           Dqn_JsonWriterBeginObject(Dqn_JsonWriter *writer);
 DQN_API void           Dqn_JsonWriterEndObject(Dqn_JsonWriter *writer);
 
-DQN_API void           Dqn_JsonWriterBeginNamedArray(Dqn_JsonWriter *writer, Dqn_String name);
-DQN_API void           Dqn_JsonWriterBeginArray(Dqn_JsonWriter *writer, Dqn_String name);
+DQN_API void           Dqn_JsonWriterBeginNamedArray(Dqn_JsonWriter *writer, Dqn_String8 name);
+DQN_API void           Dqn_JsonWriterBeginArray(Dqn_JsonWriter *writer, Dqn_String8 name);
 DQN_API void           Dqn_JsonWriterEndArray(Dqn_JsonWriter *writer);
 
-DQN_API void           Dqn_JsonWriterNamedString(Dqn_JsonWriter *writer, Dqn_String key, Dqn_String value);
-DQN_API void           Dqn_JsonWriterString(Dqn_JsonWriter *writer, Dqn_String value);
+DQN_API void           Dqn_JsonWriterNamedString(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_String8 value);
+DQN_API void           Dqn_JsonWriterString(Dqn_JsonWriter *writer, Dqn_String8 value);
 
-DQN_API void           Dqn_JsonWriterNamedU64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_u64 value);
+DQN_API void           Dqn_JsonWriterNamedU64(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_u64 value);
 DQN_API void           Dqn_JsonWriterU64(Dqn_JsonWriter *writer, Dqn_u64 value);
 
 // decimal_places: When < 0 show the maximum amount of decimal places
 //                 When >=0 show the specified amount of decimal places
-DQN_API void           Dqn_JsonWriterNamedF64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_f64 value, int decimal_places = -1);
+DQN_API void           Dqn_JsonWriterNamedF64(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_f64 value, int decimal_places = -1);
 DQN_API void           Dqn_JsonWriterF64(Dqn_JsonWriter *writer, Dqn_f64 value, int decimal_places = -1);
 #endif // DQN_WITH_JSON_WRITER
 
@@ -2003,7 +2003,7 @@ DQN_API void Dqn_WinMakeProcessDPIAware();
 
 // Automatically dumps to DQN_LOG_E
 #define Dqn_WinDumpLastError(fmt, ...) Dqn_WinDumpLastError_(DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ##__VA_ARGS__)
-DQN_API void Dqn_WinDumpLastError_(Dqn_String file, Dqn_String func, Dqn_uint line, char const *fmt, ...);
+DQN_API void Dqn_WinDumpLastError_(Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, ...);
 
 // NOTE: Windows String8 To String16
 // -----------------------------------------------------------------------------
@@ -2015,8 +2015,8 @@ DQN_API void Dqn_WinDumpLastError_(Dqn_String file, Dqn_String func, Dqn_uint li
 // @return The number of u16's written/required for conversion. 0 if there was
 //         a conversion error and can be queried using 'Dqn_WinLastError'
 DQN_API int          Dqn_WinCString8ToCString16(const char *src, int src_size, wchar_t *dest, int dest_size);
-DQN_API int          Dqn_WinString8ToCString16(Dqn_String src, wchar_t* dest, int dest_size);
-DQN_API Dqn_String16 Dqn_WinString8ToString16Arena(Dqn_String src, Dqn_Arena *arena);
+DQN_API int          Dqn_WinString8ToCString16(Dqn_String8 src, wchar_t* dest, int dest_size);
+DQN_API Dqn_String16 Dqn_WinString8ToString16Arena(Dqn_String8 src, Dqn_Arena *arena);
 
 // NOTE: Windows String16 To String8
 // -----------------------------------------------------------------------------
@@ -2028,9 +2028,9 @@ DQN_API Dqn_String16 Dqn_WinString8ToString16Arena(Dqn_String src, Dqn_Arena *ar
 // @return The number of u8's written/required for conversion. 0 if there was
 //         a conversion error and can be queried using 'Dqn_WinLastError'
 DQN_API int        Dqn_WinCString16ToCString8(const wchar_t *src, int src_size, char *dest, int dest_size);
-DQN_API Dqn_String Dqn_WinCString16ToString8Arena(const wchar_t *src, int src_size, Dqn_Arena *arena);
+DQN_API Dqn_String8 Dqn_WinCString16ToString8Arena(const wchar_t *src, int src_size, Dqn_Arena *arena);
 DQN_API int        Dqn_WinString16ToCString8(Dqn_String16 src, char *dest, int dest_size);
-DQN_API Dqn_String Dqn_WinString16ToString8Arena(Dqn_String16 src, Dqn_Arena *arena);
+DQN_API Dqn_String8 Dqn_WinString16ToString8Arena(Dqn_String16 src, Dqn_Arena *arena);
 
 // NOTE: Windows Executable Directory
 // -----------------------------------------------------------------------------
@@ -2048,7 +2048,7 @@ DQN_API Dqn_String16 Dqn_WinEXEDirWArena(Dqn_Arena *arena);
 // size: (Optional) The size of the current directory string returned
 // suffix: (Optional) A suffix to append to the current working directory
 // suffix_size: (Optional) The size of the suffix to append
-DQN_API Dqn_String   Dqn_WinWorkingDir(Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String suffix);
+DQN_API Dqn_String8   Dqn_WinWorkingDir(Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String8 suffix);
 DQN_API Dqn_String16 Dqn_WinWorkingDirW(Dqn_Arena *arena, Dqn_String16 suffix);
 
 struct Dqn_WinFolderIteratorW
@@ -2061,11 +2061,11 @@ struct Dqn_WinFolderIteratorW
 struct Dqn_WinFolderIterator
 {
     void       *handle;
-    Dqn_String file_name;
+    Dqn_String8 file_name;
     char       file_name_buf[512];
 };
 
-DQN_API bool Dqn_WinFolderIterate(Dqn_String path, Dqn_WinFolderIterator *it);
+DQN_API bool Dqn_WinFolderIterate(Dqn_String8 path, Dqn_WinFolderIterator *it);
 DQN_API bool Dqn_WinFolderWIterate(Dqn_String16 path, Dqn_WinFolderIteratorW *it);
 
 #if defined(DQN_WITH_WIN_NET)
@@ -2126,18 +2126,18 @@ struct Dqn_WinNetHandle
 // The URL string must be null-terminated because Windows is a C API and
 // requires null-termination.
 DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitCString(char const *url, int url_size);
-DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitString(Dqn_String url);
+DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitString(Dqn_String8 url);
 
 DQN_API void             Dqn_WinNetHandleFinish(Dqn_WinNetHandle *handle);
 DQN_API bool             Dqn_WinNetHandleIsValid(Dqn_WinNetHandle const *handle);
 DQN_API void             Dqn_WinNetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
 DQN_API bool             Dqn_WinNetHandlePump(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size);
 DQN_API char *           Dqn_WinNetHandlePumpToCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size);
-DQN_API Dqn_String       Dqn_WinNetHandlePumpToString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena);
+DQN_API Dqn_String8       Dqn_WinNetHandlePumpToString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena);
 
 DQN_API void             Dqn_WinNetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, FILE *file);
 DQN_API char            *Dqn_WinNetHandlePumpToMallocCString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, size_t *download_size);
-DQN_API Dqn_String       Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size);
+DQN_API Dqn_String8       Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size);
 #endif // DQN_WITH_WIN_NET
 #endif // DQN_OS_WIN32
 
@@ -2578,16 +2578,16 @@ DQN_API Dqn_b32 Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, char const *sr
 }
 
 template <Dqn_isize MAX_>
-DQN_API Dqn_b32 Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String src)
+DQN_API Dqn_b32 Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String8 src)
 {
     Dqn_b32 result = Dqn_FixedStringAppend(str, src.data, src.size);
     return result;
 }
 
 template <Dqn_isize MAX_>
-DQN_API Dqn_String Dqn_FixedStringToString(Dqn_FixedString<MAX_> const *str)
+DQN_API Dqn_String8 Dqn_FixedStringToString(Dqn_FixedString<MAX_> const *str)
 {
-    auto result = Dqn_StringInit(str->str, str->size);
+    auto result = Dqn_String8Init(str->str, str->size);
     return result;
 }
 #endif // DQN_WITH_FIXED_STRING
@@ -3431,8 +3431,8 @@ DQN_API Dqn_isize Dqn_FmtLen(char const *fmt, ...)
 // -------------------------------------------------------------------------------------------------
 DQN_API void Dqn_LogVDefault(Dqn_LogType type,
                              void *      user_data,
-                             Dqn_String  file,
-                             Dqn_String  func,
+                             Dqn_String8  file,
+                             Dqn_String8  func,
                              Dqn_uint    line,
                              char const  *fmt,
                              va_list     va)
@@ -3444,8 +3444,8 @@ DQN_API void Dqn_LogVDefault(Dqn_LogType type,
     if (!dqn_lib_.log_no_output_file) {
         if (!dqn_lib_.log_file) {
             Dqn_ThreadScratch scratch  = Dqn_ThreadGetScratch();
-            Dqn_String        exe_dir  = Dqn_OSEXEDir(scratch.arena);
-            Dqn_String        log_file = Dqn_StringFmt(scratch.arena, "%.*s/dqn.log", DQN_STRING_FMT(exe_dir));
+            Dqn_String8        exe_dir  = Dqn_OSEXEDir(scratch.arena);
+            Dqn_String8        log_file = Dqn_String8Fmt(scratch.arena, "%.*s/dqn.log", DQN_STRING_FMT(exe_dir));
             fopen_s(DQN_CAST(FILE **)&dqn_lib_.log_file, log_file.data, "a");
         }
     }
@@ -3453,11 +3453,11 @@ DQN_API void Dqn_LogVDefault(Dqn_LogType type,
 
 
     // NOTE: Construct log
-    Dqn_String file_name             = Dqn_StringFileNameFromPath(file);
+    Dqn_String8 file_name             = Dqn_String8FileNameFromPath(file);
     Dqn_ThreadScratch scratch        = Dqn_ThreadGetScratch();
     Dqn_DateHMSTimeString const time = Dqn_DateHMSLocalTimeStringNow();
-    Dqn_StringList string_list       = {};
-    Dqn_StringListAppendFmt(&string_list,
+    Dqn_String8List string_list       = {};
+    Dqn_String8ListAppendFmt(&string_list,
                             scratch.arena,
                             "[%.*s|%.*s|%s|%.*s|%05u|%.*s] ",
                             time.date_size,
@@ -3469,8 +3469,8 @@ DQN_API void Dqn_LogVDefault(Dqn_LogType type,
                             line,
                             DQN_STRING_FMT(func));
 
-    Dqn_StringListAppendFmtV(&string_list, scratch.arena, fmt, va);
-    Dqn_String log_line = Dqn_StringListBuild(&string_list, scratch.arena);
+    Dqn_String8ListAppendFmtV(&string_list, scratch.arena, fmt, va);
+    Dqn_String8 log_line = Dqn_String8ListBuild(&string_list, scratch.arena);
 
     // NOTE: Print log to destinations
     FILE *handles[] = {
@@ -3486,8 +3486,8 @@ DQN_API void Dqn_LogVDefault(Dqn_LogType type,
 
 DQN_API void Dqn_LogV(Dqn_LogType type,
                       void *      user_data,
-                      Dqn_String  file,
-                      Dqn_String  func,
+                      Dqn_String8  file,
+                      Dqn_String8  func,
                       Dqn_uint    line,
                       char const *fmt,
                       va_list     va)
@@ -3498,8 +3498,8 @@ DQN_API void Dqn_LogV(Dqn_LogType type,
 
 DQN_API void Dqn_Log(Dqn_LogType type,
                      void *user_data,
-                     Dqn_String file,
-                     Dqn_String func,
+                     Dqn_String8 file,
+                     Dqn_String8 func,
                      Dqn_uint line,
                      char const *fmt, ...)
 {
@@ -3666,54 +3666,54 @@ DQN_API void Dqn__CRTAllocatorFree(Dqn_CRTAllocator *allocator, void *ptr)
 }
 #endif // DQN_WITH_CRT_ALLOCATOR
 
-// NOTE: Dqn_String
+// NOTE: Dqn_String8
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_String Dqn_StringInit(char const *string, Dqn_isize size)
+DQN_API Dqn_String8 Dqn_String8Init(char const *string, Dqn_isize size)
 {
-    Dqn_String result = {};
+    Dqn_String8 result = {};
     result.data = DQN_CAST(char *)string;
     result.size = size;
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringInitCString(char const *string)
+DQN_API Dqn_String8 Dqn_String8InitCString(char const *string)
 {
     Dqn_isize size     = Dqn_CStringSize(string);
-    Dqn_String result  = Dqn_StringInit(string, size);
+    Dqn_String8 result  = Dqn_String8Init(string, size);
     return result;
 }
 
-DQN_API bool Dqn_StringIsValid(Dqn_String string)
+DQN_API bool Dqn_String8IsValid(Dqn_String8 string)
 {
     bool result = string.size >= 0 && string.data;
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringSlice(Dqn_String string, Dqn_isize offset, Dqn_isize size)
+DQN_API Dqn_String8 Dqn_String8Slice(Dqn_String8 string, Dqn_isize offset, Dqn_isize size)
 {
-    Dqn_String result = Dqn_StringInit(string.data, 0);
-    if (!Dqn_StringIsValid(string) || offset < 0 || size < 0)
+    Dqn_String8 result = Dqn_String8Init(string.data, 0);
+    if (!Dqn_String8IsValid(string) || offset < 0 || size < 0)
         return result;
 
     Dqn_isize capped_offset = DQN_MIN(offset, string.size);
     Dqn_isize max_size      = string.size - capped_offset;
     Dqn_isize capped_size   = DQN_MIN(size, max_size);
-    result                  = Dqn_StringInit(string.data + capped_offset, capped_size);
+    result                  = Dqn_String8Init(string.data + capped_offset, capped_size);
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringFmt_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, ...)
+DQN_API Dqn_String8 Dqn_String8Fmt_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    Dqn_String result = Dqn_StringFmtV_(DQN_CALL_SITE_ARGS_INPUT arena, fmt, va);
+    Dqn_String8 result = Dqn_String8FmtV_(DQN_CALL_SITE_ARGS_INPUT arena, fmt, va);
     va_end(va);
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringFmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, va_list va)
+DQN_API Dqn_String8 Dqn_String8FmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, va_list va)
 {
-    Dqn_String result = {};
+    Dqn_String8 result = {};
     if (!arena || !fmt)
         return result;
 
@@ -3722,17 +3722,17 @@ DQN_API Dqn_String Dqn_StringFmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char con
     int size = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, va2);
     va_end(va2);
 
-    result = Dqn_StringAllocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, Dqn_ZeroMem::No);
-    if (Dqn_StringIsValid(result)) {
+    result = Dqn_String8Allocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, Dqn_ZeroMem::No);
+    if (Dqn_String8IsValid(result)) {
         STB_SPRINTF_DECORATE(vsnprintf)(result.data, size + 1 /*null-terminator*/, fmt, va);
         result.data[result.size] = 0;
     }
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringAllocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_ZeroMem zero_mem)
+DQN_API Dqn_String8 Dqn_String8Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_ZeroMem zero_mem)
 {
-    Dqn_String result = {};
+    Dqn_String8 result = {};
     result.data       = DQN_CAST(char *)Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS_INPUT arena, size + 1, alignof(char), zero_mem);
     if (result.data) {
         result.size = size;
@@ -3740,34 +3740,34 @@ DQN_API Dqn_String Dqn_StringAllocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringCopyCString_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *string, Dqn_isize size)
+DQN_API Dqn_String8 Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *string, Dqn_isize size)
 {
-    Dqn_String result = {};
+    Dqn_String8 result = {};
     if (!arena || !string || size <= 0)
         return result;
 
-    result = Dqn_StringAllocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, Dqn_ZeroMem::No);
-    if (Dqn_StringIsValid(result)) {
+    result = Dqn_String8Allocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, Dqn_ZeroMem::No);
+    if (Dqn_String8IsValid(result)) {
         DQN_MEMCOPY(result.data, string, DQN_CAST(size_t)size);
         result.data[size] = 0;
     }
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringCopy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_String string)
+DQN_API Dqn_String8 Dqn_String8Copy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_String8 string)
 {
-    Dqn_String result = Dqn_StringCopyCString_(DQN_CALL_SITE_ARGS_INPUT arena, string.data, string.size);
+    Dqn_String8 result = Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS_INPUT arena, string.data, string.size);
     return result;
 }
 
-DQN_API bool Dqn_StringEq(Dqn_String lhs, Dqn_String rhs, Dqn_StringEqCase eq_case)
+DQN_API bool Dqn_String8Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case)
 {
-    if (!Dqn_StringIsValid(lhs) || !Dqn_StringIsValid(rhs))
+    if (!Dqn_String8IsValid(lhs) || !Dqn_String8IsValid(rhs))
         return false;
 
     bool result = lhs.size == rhs.size;
     if (result) {
-        if (eq_case == Dqn_StringEqCase::Sensitive) {
+        if (eq_case == Dqn_String8EqCase::Sensitive) {
             result = (DQN_MEMCMP(lhs.data, rhs.data, DQN_CAST(size_t)lhs.size) == 0);
         } else {
             for (Dqn_isize index = 0; index < lhs.size && result; index++)
@@ -3777,44 +3777,44 @@ DQN_API bool Dqn_StringEq(Dqn_String lhs, Dqn_String rhs, Dqn_StringEqCase eq_ca
     return result;
 }
 
-DQN_API bool Dqn_StringEqInsensitive(Dqn_String lhs, Dqn_String rhs)
+DQN_API bool Dqn_String8EqInsensitive(Dqn_String8 lhs, Dqn_String8 rhs)
 {
-    bool result = Dqn_StringEq(lhs, rhs, Dqn_StringEqCase::Insensitive);
+    bool result = Dqn_String8Eq(lhs, rhs, Dqn_String8EqCase::Insensitive);
     return result;
 }
 
-DQN_API bool Dqn_StringStartsWith(Dqn_String string, Dqn_String prefix, Dqn_StringEqCase eq_case)
+DQN_API bool Dqn_String8StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case)
 {
-    Dqn_String substring = Dqn_StringSlice(string, 0, prefix.size);
-    bool result          = Dqn_StringEq(substring, prefix, eq_case);
+    Dqn_String8 substring = Dqn_String8Slice(string, 0, prefix.size);
+    bool result          = Dqn_String8Eq(substring, prefix, eq_case);
     return result;
 }
 
-DQN_API bool Dqn_StringStartsWithInsensitive(Dqn_String string, Dqn_String prefix)
+DQN_API bool Dqn_String8StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix)
 {
-    Dqn_b32 result = Dqn_StringStartsWith(string, prefix, Dqn_StringEqCase::Insensitive);
+    Dqn_b32 result = Dqn_String8StartsWith(string, prefix, Dqn_String8EqCase::Insensitive);
     return result;
 }
 
-DQN_API bool Dqn_StringEndsWith(Dqn_String       string,
-                                Dqn_String       suffix,
-                                Dqn_StringEqCase eq_case)
+DQN_API bool Dqn_String8EndsWith(Dqn_String8       string,
+                                Dqn_String8       suffix,
+                                Dqn_String8EqCase eq_case)
 {
-    Dqn_String substring = Dqn_StringSlice(string, string.size - suffix.size, suffix.size);
-    bool result          = Dqn_StringEq(substring, suffix, eq_case);
+    Dqn_String8 substring = Dqn_String8Slice(string, string.size - suffix.size, suffix.size);
+    bool result          = Dqn_String8Eq(substring, suffix, eq_case);
     return result;
 }
 
-DQN_API bool Dqn_StringEndsWithInsensitive(Dqn_String string, Dqn_String suffix)
+DQN_API bool Dqn_String8EndsWithInsensitive(Dqn_String8 string, Dqn_String8 suffix)
 {
-    bool result = Dqn_StringEndsWith(string, suffix, Dqn_StringEqCase::Insensitive);
+    bool result = Dqn_String8EndsWith(string, suffix, Dqn_String8EqCase::Insensitive);
     return result;
 }
 
-DQN_API Dqn_isize Dqn_StringSplit(Dqn_String string, char delimiter, Dqn_String *splits, Dqn_isize splits_count)
+DQN_API Dqn_isize Dqn_String8Split(Dqn_String8 string, char delimiter, Dqn_String8 *splits, Dqn_isize splits_count)
 {
     Dqn_isize result = 0; // The number of splits in the actual string.
-    if (!Dqn_StringIsValid(string))
+    if (!Dqn_String8IsValid(string))
         return result;
 
     Dqn_isize splits_index = 0; // The number of splits written.
@@ -3826,7 +3826,7 @@ DQN_API Dqn_isize Dqn_StringSplit(Dqn_String string, char delimiter, Dqn_String 
         }
 
         if (splits && splits_index < splits_count) {
-            auto split = Dqn_StringInit(string.data + begin, index - begin);
+            auto split = Dqn_String8Init(string.data + begin, index - begin);
             splits[splits_index++] = split;
         }
 
@@ -3837,34 +3837,34 @@ DQN_API Dqn_isize Dqn_StringSplit(Dqn_String string, char delimiter, Dqn_String 
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringTrimPrefix(Dqn_String string, Dqn_String prefix, Dqn_StringEqCase eq_case)
+DQN_API Dqn_String8 Dqn_String8TrimPrefix(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case)
 {
-    Dqn_String result = string;
-    if (Dqn_StringStartsWith(result, prefix, eq_case)) {
-        result = Dqn_StringSlice(result, prefix.size, result.size - prefix.size);
+    Dqn_String8 result = string;
+    if (Dqn_String8StartsWith(result, prefix, eq_case)) {
+        result = Dqn_String8Slice(result, prefix.size, result.size - prefix.size);
     }
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringTrimSuffix(Dqn_String string, Dqn_String suffix, Dqn_StringEqCase eq_case)
+DQN_API Dqn_String8 Dqn_String8TrimSuffix(Dqn_String8 string, Dqn_String8 suffix, Dqn_String8EqCase eq_case)
 {
-    Dqn_String result = string;
-    if (Dqn_StringEndsWith(string, suffix, eq_case)) {
-        result = Dqn_StringSlice(result, 0, result.size - suffix.size);
+    Dqn_String8 result = string;
+    if (Dqn_String8EndsWith(string, suffix, eq_case)) {
+        result = Dqn_String8Slice(result, 0, result.size - suffix.size);
     }
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringTrimWhitespaceAround(Dqn_String string)
+DQN_API Dqn_String8 Dqn_String8TrimWhitespaceAround(Dqn_String8 string)
 {
-    Dqn_String result = {};
-    if (Dqn_StringIsValid(string)) {
+    Dqn_String8 result = {};
+    if (Dqn_String8IsValid(string)) {
         result.data = DQN_CAST(char *)Dqn_CStringTrimWhitespaceAround(string.data, string.size, &result.size);
     }
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringTrimByteOrderMark(Dqn_String string)
+DQN_API Dqn_String8 Dqn_String8TrimByteOrderMark(Dqn_String8 string)
 {
     // TODO(dqn): This is little endian
     auto const UTF8_BOM     = DQN_STRING("\xEF\xBB\xBF");
@@ -3872,27 +3872,27 @@ DQN_API Dqn_String Dqn_StringTrimByteOrderMark(Dqn_String string)
     auto const UTF16_BOM_LE = DQN_STRING("\xFF\xEF");
     auto const UTF32_BOM_BE = DQN_STRING("\x00\x00\xFE\xFF");
     auto const UTF32_BOM_LE = DQN_STRING("\xFF\xFE\x00\x00");
-    Dqn_String result       = string;
-    result                  = Dqn_StringTrimPrefix(result, UTF8_BOM);
-    result                  = Dqn_StringTrimPrefix(result, UTF16_BOM_BE);
-    result                  = Dqn_StringTrimPrefix(result, UTF16_BOM_LE);
-    result                  = Dqn_StringTrimPrefix(result, UTF32_BOM_BE);
-    result                  = Dqn_StringTrimPrefix(result, UTF32_BOM_LE);
+    Dqn_String8 result       = string;
+    result                  = Dqn_String8TrimPrefix(result, UTF8_BOM);
+    result                  = Dqn_String8TrimPrefix(result, UTF16_BOM_BE);
+    result                  = Dqn_String8TrimPrefix(result, UTF16_BOM_LE);
+    result                  = Dqn_String8TrimPrefix(result, UTF32_BOM_BE);
+    result                  = Dqn_String8TrimPrefix(result, UTF32_BOM_LE);
     return result;
 }
 
-DQN_API bool Dqn_StringIsAllDigits(Dqn_String string)
+DQN_API bool Dqn_String8IsAllDigits(Dqn_String8 string)
 {
-    bool result = Dqn_StringIsValid(string) && string.size > 0;
+    bool result = Dqn_String8IsValid(string) && string.size > 0;
     for (Dqn_isize index = 0; result && index < string.size; index++)
         result = string.data[index] >= '0' && string.data[index] <= '9';
     return result;
 }
 
-DQN_API bool Dqn_StringIsAllHex(Dqn_String string)
+DQN_API bool Dqn_String8IsAllHex(Dqn_String8 string)
 {
-    Dqn_String trimmed = Dqn_StringTrimPrefix(string, DQN_STRING("0x"), Dqn_StringEqCase::Insensitive);
-    bool result        = Dqn_StringIsValid(trimmed) && trimmed.size > 0;
+    Dqn_String8 trimmed = Dqn_String8TrimPrefix(string, DQN_STRING("0x"), Dqn_String8EqCase::Insensitive);
+    bool result        = Dqn_String8IsValid(trimmed) && trimmed.size > 0;
     for (Dqn_isize index = 0; result && index < trimmed.size; index++) {
         char ch = trimmed.data[index];
         result  = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
@@ -3900,7 +3900,7 @@ DQN_API bool Dqn_StringIsAllHex(Dqn_String string)
     return result;
 }
 
-DQN_API bool Dqn_StringHasChar(Dqn_String string, char ch)
+DQN_API bool Dqn_String8HasChar(Dqn_String8 string, char ch)
 {
     bool result = false;
     for (Dqn_isize index = 0; !result && index < string.size; index++) {
@@ -3909,10 +3909,10 @@ DQN_API bool Dqn_StringHasChar(Dqn_String string, char ch)
     return result;
 }
 
-DQN_API void Dqn_StringRemove(Dqn_String *string, Dqn_isize begin, Dqn_isize size)
+DQN_API void Dqn_String8Remove(Dqn_String8 *string, Dqn_isize begin, Dqn_isize size)
 {
     if (!string ||
-        !Dqn_StringIsValid(*string) ||
+        !Dqn_String8IsValid(*string) ||
         (begin < 0 || begin >= string->size) ||
         (size <= 0 || size >= string->size))
     {
@@ -3926,45 +3926,45 @@ DQN_API void Dqn_StringRemove(Dqn_String *string, Dqn_isize begin, Dqn_isize siz
     string->size -= size;
 }
 
-DQN_API Dqn_isize Dqn_StringFindOffset(Dqn_String string, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case)
+DQN_API Dqn_isize Dqn_String8FindOffset(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_String8EqCase eq_case)
 {
     Dqn_isize result  = -1;
-    if (!Dqn_StringIsValid(string) || !Dqn_StringIsValid(find) || start_index < 0)
+    if (!Dqn_String8IsValid(string) || !Dqn_String8IsValid(find) || start_index < 0)
         return -1;
 
     Dqn_isize max = string.size - find.size;
     for (Dqn_isize index = start_index; result == -1 && index <= max; index++) {
-        Dqn_String check = Dqn_StringSlice(string, index, find.size);
-        if (Dqn_StringEq(check, find, eq_case))
+        Dqn_String8 check = Dqn_String8Slice(string, index, find.size);
+        if (Dqn_String8Eq(check, find, eq_case))
             result = index;
     }
 
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringFind(Dqn_String string, Dqn_String find, Dqn_isize start_index, Dqn_StringEqCase eq_case)
+DQN_API Dqn_String8 Dqn_String8Find(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_String8EqCase eq_case)
 {
-    Dqn_isize offset  = Dqn_StringFindOffset(string, find, start_index, eq_case);
-    Dqn_String result = Dqn_StringSlice(string, offset == -1 ? 0 : offset, offset == -1 ? 0 : find.size);
+    Dqn_isize offset  = Dqn_String8FindOffset(string, find, start_index, eq_case);
+    Dqn_String8 result = Dqn_String8Slice(string, offset == -1 ? 0 : offset, offset == -1 ? 0 : find.size);
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringReplace(Dqn_String string,
-                                     Dqn_String find,
-                                     Dqn_String replace,
-                                     Dqn_isize start_index,
-                                     Dqn_Arena *arena,
-                                     Dqn_Arena *temp_arena,
-                                     Dqn_StringEqCase eq_case)
+DQN_API Dqn_String8 Dqn_String8Replace(Dqn_String8 string,
+                                       Dqn_String8 find,
+                                       Dqn_String8 replace,
+                                       Dqn_isize start_index,
+                                       Dqn_Arena *arena,
+                                       Dqn_Arena *temp_arena,
+                                       Dqn_String8EqCase eq_case)
 {
     auto temp_arena_scope      = Dqn_ArenaTempMemoryScope(temp_arena);
-    Dqn_StringList string_list = {};
+    Dqn_String8List string_list = {};
     Dqn_isize max              = string.size - find.size;
     Dqn_isize head             = start_index;
 
     for (Dqn_isize tail = head; tail <= max; tail++) {
-        Dqn_String check = Dqn_StringSlice(string, tail, find.size);
-        if (!Dqn_StringEq(check, find, eq_case))
+        Dqn_String8 check = Dqn_String8Slice(string, tail, find.size);
+        if (!Dqn_String8Eq(check, find, eq_case))
             continue;
 
         if (start_index > 0 && string_list.string_size == 0) {
@@ -3972,75 +3972,75 @@ DQN_API Dqn_String Dqn_StringReplace(Dqn_String string,
             // need to add the string up to the hint. We only do this if there's
             // a replacement action, otherwise we have a special case for no
             // replacements, where the entire string gets copied.
-            Dqn_String slice = Dqn_StringInit(string.data, head);
-            Dqn_StringListAppendString(&string_list, temp_arena, slice);
+            Dqn_String8 slice = Dqn_String8Init(string.data, head);
+            Dqn_String8ListAppendString(&string_list, temp_arena, slice);
         }
 
-        Dqn_String range = Dqn_StringSlice(string, head, (tail - head));
-        Dqn_StringListAppendString(&string_list, temp_arena, range);
-        Dqn_StringListAppendString(&string_list, temp_arena, replace);
+        Dqn_String8 range = Dqn_String8Slice(string, head, (tail - head));
+        Dqn_String8ListAppendString(&string_list, temp_arena, range);
+        Dqn_String8ListAppendString(&string_list, temp_arena, replace);
         head = tail + find.size;
         tail += find.size - 1; // NOTE: -1 since the for loop will post increment us past the end of the find string
     }
 
-    Dqn_String result = {};
+    Dqn_String8 result = {};
     if (string_list.string_size == 0) {
         // NOTE: No replacement possible, so we just do a full-copy
-        result = Dqn_StringCopy(arena, string);
+        result = Dqn_String8Copy(arena, string);
     } else {
-        Dqn_String remainder = Dqn_StringInit(string.data + head, string.size - head);
-        Dqn_StringListAppendString(&string_list, temp_arena, remainder);
-        result = Dqn_StringListBuild(&string_list, arena);
+        Dqn_String8 remainder = Dqn_String8Init(string.data + head, string.size - head);
+        Dqn_String8ListAppendString(&string_list, temp_arena, remainder);
+        result = Dqn_String8ListBuild(&string_list, arena);
     }
 
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringReplaceInsensitive(Dqn_String string, Dqn_String find, Dqn_String replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena)
+DQN_API Dqn_String8 Dqn_String8ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena)
 {
-    Dqn_String result = Dqn_StringReplace(string, find, replace, start_index, arena, temp_arena, Dqn_StringEqCase::Insensitive);
+    Dqn_String8 result = Dqn_String8Replace(string, find, replace, start_index, arena, temp_arena, Dqn_String8EqCase::Insensitive);
     return result;
 }
 
-DQN_API Dqn_String Dqn_StringFileNameFromPath(Dqn_String path)
+DQN_API Dqn_String8 Dqn_String8FileNameFromPath(Dqn_String8 path)
 {
-    Dqn_String result = path;
-    if (!Dqn_StringIsValid(path)) {
+    Dqn_String8 result = path;
+    if (!Dqn_String8IsValid(path)) {
         return result;
     }
 
     for (Dqn_isize index = (result.size - 1); index >= 0; --index) {
         if (result.data[index] == '\\' || result.data[index] == '/') {
             char const *end = result.data + result.size;
-            result = Dqn_StringSlice(path, index + 1, end - result.data);
+            result = Dqn_String8Slice(path, index + 1, end - result.data);
             break;
         }
     }
     return result;
 }
 
-DQN_API Dqn_u64 Dqn_StringToU64(Dqn_String string)
+DQN_API Dqn_u64 Dqn_String8ToU64(Dqn_String8 string)
 {
     Dqn_u64 result = Dqn_CStringToU64(string.data, DQN_CAST(int)string.size);
     return result;
 }
 
-DQN_API Dqn_i64 Dqn_StringToI64(Dqn_String string)
+DQN_API Dqn_i64 Dqn_String8ToI64(Dqn_String8 string)
 {
     Dqn_i64 result = Dqn_CStringToI64(string.data, DQN_CAST(int)string.size);
     return result;
 }
 
-// NOTE: Dqn_StringList Implementation
+// NOTE: Dqn_String8List Implementation
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_StringListNode *Dqn_StringListMakeNode(Dqn_Arena *arena, Dqn_isize size)
+DQN_API Dqn_String8ListNode *Dqn_String8ListMakeNode(Dqn_Arena *arena, Dqn_isize size)
 {
-    Dqn_StringListNode *result = Dqn_ArenaNew(arena, Dqn_StringListNode, Dqn_ZeroMem::Yes);
-    if (size) result->string = Dqn_StringAllocate(arena, size, Dqn_ZeroMem::Yes);
+    Dqn_String8ListNode *result = Dqn_ArenaNew(arena, Dqn_String8ListNode, Dqn_ZeroMem::Yes);
+    if (size) result->string = Dqn_String8Allocate(arena, size, Dqn_ZeroMem::Yes);
     return result;
 }
 
-DQN_API void Dqn_StringListAddNode(Dqn_StringList *list, Dqn_StringListNode *node)
+DQN_API void Dqn_String8ListAddNode(Dqn_String8List *list, Dqn_String8ListNode *node)
 {
     if (list->curr)
     {
@@ -4056,45 +4056,45 @@ DQN_API void Dqn_StringListAddNode(Dqn_StringList *list, Dqn_StringListNode *nod
     list->string_size += node->string.size;
 }
 
-DQN_API void Dqn_StringListAppendFmtV(Dqn_StringList *list, Dqn_Arena *arena, char const *fmt, va_list args)
+DQN_API void Dqn_String8ListAppendFmtV(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, va_list args)
 {
-    Dqn_StringListNode *node = Dqn_StringListMakeNode(arena, 0 /*size*/);
-    node->string             = Dqn_StringFmtV(arena, fmt, args);
-    Dqn_StringListAddNode(list, node);
+    Dqn_String8ListNode *node = Dqn_String8ListMakeNode(arena, 0 /*size*/);
+    node->string             = Dqn_String8FmtV(arena, fmt, args);
+    Dqn_String8ListAddNode(list, node);
 }
 
-DQN_API void Dqn_StringListAppendFmt(Dqn_StringList *list, Dqn_Arena *arena, char const *fmt, ...)
+DQN_API void Dqn_String8ListAppendFmt(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    Dqn_StringListAppendFmtV(list, arena, fmt, args);
+    Dqn_String8ListAppendFmtV(list, arena, fmt, args);
     va_end(args);
 }
 
-DQN_API void Dqn_StringListAppendStringCopy(Dqn_StringList *list, Dqn_Arena *arena, Dqn_String string)
+DQN_API void Dqn_String8ListAppendStringCopy(Dqn_String8List *list, Dqn_Arena *arena, Dqn_String8 string)
 {
     if (string.size <= 0)
         return;
 
-    Dqn_StringListNode *node = Dqn_StringListMakeNode(arena, 0 /*size*/);
-    node->string             = Dqn_StringCopy(arena, string);
-    Dqn_StringListAddNode(list, node);
+    Dqn_String8ListNode *node = Dqn_String8ListMakeNode(arena, 0 /*size*/);
+    node->string              = Dqn_String8Copy(arena, string);
+    Dqn_String8ListAddNode(list, node);
 }
 
-DQN_API void Dqn_StringListAppendString(Dqn_StringList *list, Dqn_Arena *arena, Dqn_String string)
+DQN_API void Dqn_String8ListAppendString(Dqn_String8List *list, Dqn_Arena *arena, Dqn_String8 string)
 {
     if (string.size <= 0)
         return;
 
-    Dqn_StringListNode *node = Dqn_StringListMakeNode(arena, 0 /*size*/);
+    Dqn_String8ListNode *node = Dqn_String8ListMakeNode(arena, 0 /*size*/);
     node->string             = string;
-    Dqn_StringListAddNode(list, node);
+    Dqn_String8ListAddNode(list, node);
 }
 
-DQN_API Dqn_String Dqn_StringListBuild(Dqn_StringList const *list, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_String8ListBuild(Dqn_String8List const *list, Dqn_Arena *arena)
 {
-    Dqn_String result = Dqn_StringAllocate(arena, list->string_size, Dqn_ZeroMem::No);
-    for (Dqn_StringListNode const *node = list->head; node; node = node->next) {
+    Dqn_String8 result = Dqn_String8Allocate(arena, list->string_size, Dqn_ZeroMem::No);
+    for (Dqn_String8ListNode const *node = list->head; node; node = node->next) {
         DQN_MEMCOPY(result.data + result.size, node->string.data, node->string.size);
         result.size += node->string.size;
     }
@@ -5144,11 +5144,11 @@ DQN_API char const *Dqn_HexCStringTrimSpaceAnd0xPrefix(char const *hex, Dqn_isiz
     return result;
 }
 
-DQN_API Dqn_String Dqn_HexStringTrimSpaceAnd0xPrefix(Dqn_String const string)
+DQN_API Dqn_String8 Dqn_HexStringTrimSpaceAnd0xPrefix(Dqn_String8 const string)
 {
     Dqn_isize trimmed_size = 0;
     char const *trimmed    = Dqn_HexCStringTrimSpaceAnd0xPrefix(string.data, string.size, &trimmed_size);
-    Dqn_String result      = Dqn_StringInit(trimmed, trimmed_size);
+    Dqn_String8 result      = Dqn_String8Init(trimmed, trimmed_size);
     return result;
 }
 
@@ -5182,7 +5182,7 @@ DQN_API Dqn_u64 Dqn_HexCStringToU64(char const *hex, Dqn_isize size)
     return result;
 }
 
-DQN_API Dqn_u64 Dqn_HexStringToU64(Dqn_String hex)
+DQN_API Dqn_u64 Dqn_HexStringToU64(Dqn_String8 hex)
 {
     Dqn_u64 result = Dqn_HexCStringToU64(hex.data, hex.size);
     return result;
@@ -5246,12 +5246,12 @@ DQN_API char *Dqn_HexBytesToHexCStringArena(void const *bytes, Dqn_isize size, D
     return result;
 }
 
-DQN_API Dqn_String Dqn_HexBytesToHexStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_HexBytesToHexStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena)
 {
     char *c_string = Dqn_HexBytesToHexCStringArena(bytes, size, arena);
-    Dqn_String result = {};
+    Dqn_String8 result = {};
     if (c_string)
-        result = Dqn_StringInit(c_string, size * 2);
+        result = Dqn_String8Init(c_string, size * 2);
     return result;
 }
 
@@ -5261,9 +5261,9 @@ DQN_API char *Dqn_HexU8ArrayToHexCStringArena(Dqn_Array<Dqn_u8> const bytes, Dqn
     return result;
 }
 
-DQN_API Dqn_String Dqn_HexU8ArrayToHexStringArena(Dqn_Array<Dqn_u8> const bytes, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_HexU8ArrayToHexStringArena(Dqn_Array<Dqn_u8> const bytes, Dqn_Arena *arena)
 {
-    Dqn_String result = Dqn_HexBytesToHexStringArena(bytes.data, bytes.size, arena);
+    Dqn_String8 result = Dqn_HexBytesToHexStringArena(bytes.data, bytes.size, arena);
     return result;
 }
 
@@ -5287,7 +5287,7 @@ DQN_API Dqn_Array<Dqn_u8> Dqn_HexCStringToU8Array(char const *hex, Dqn_isize siz
     return result;
 }
 
-DQN_API Dqn_Array<Dqn_u8> Dqn_HexStringToU8Array(Dqn_String const hex, Dqn_Arena *arena)
+DQN_API Dqn_Array<Dqn_u8> Dqn_HexStringToU8Array(Dqn_String8 const hex, Dqn_Arena *arena)
 {
     Dqn_isize data_size      = 0;
     auto *data               = DQN_CAST(Dqn_u8 *) Dqn_HexCStringToU8Bytes(hex.data, hex.size, &data_size, arena);
@@ -5627,7 +5627,7 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
         file_path_size = Dqn_CStringSize(file_path);
 
     Dqn_ThreadScratch scratch            = Dqn_ThreadGetScratch(arena);
-    Dqn_String        file_path_string   = Dqn_StringInit(file_path, file_path_size);
+    Dqn_String8        file_path_string   = Dqn_String8Init(file_path, file_path_size);
     Dqn_String16      file_path_string_w = Dqn_WinString8ToString16Arena(file_path_string, scratch.arena);
 
     void *file_handle =
@@ -5714,13 +5714,13 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
 #endif
 }
 
-DQN_API Dqn_String Dqn__FileArenaReadToString(char const *     file_path,
+DQN_API Dqn_String8 Dqn__FileArenaReadToString(char const *     file_path,
                                               Dqn_isize        file_path_size,
                                               Dqn_Arena *arena DQN_CALL_SITE_ARGS)
 {
     Dqn_isize     file_size = 0;
     char *        string    = Dqn__FileRead(file_path, file_path_size, &file_size, arena DQN_CALL_SITE_ARGS_INPUT);
-    Dqn_String    result    = Dqn_StringInit(string, file_size);
+    Dqn_String8    result    = Dqn_String8Init(string, file_size);
     return result;
 }
 
@@ -5734,7 +5734,7 @@ DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_siz
         file_path_size = Dqn_CStringSize(file_path);
 
     Dqn_ThreadScratch scratch       = Dqn_ThreadGetScratch();
-    Dqn_String        file_path_str = Dqn_StringInit(file_path, file_path_size);
+    Dqn_String8        file_path_str = Dqn_String8Init(file_path, file_path_size);
     Dqn_String16      file_path16   = Dqn_WinString8ToString16Arena(file_path_str, scratch.arena);
 
     Dqn_b32 result = false;
@@ -5802,7 +5802,7 @@ DQN_API Dqn_u64 Dqn__WinFileTimeToSeconds(FILETIME const *time)
     #define DQN_OS_WIN32_MAX_PATH 32767 + 128 /*fudge*/
 #endif
 
-DQN_API Dqn_b32 Dqn_FileExists(Dqn_String path)
+DQN_API Dqn_b32 Dqn_FileExists(Dqn_String8 path)
 {
     Dqn_b32 result = false;
 #if defined(DQN_OS_WIN32)
@@ -5829,7 +5829,7 @@ DQN_API Dqn_b32 Dqn_FileExists(Dqn_String path)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileDirExists(Dqn_String path)
+DQN_API Dqn_b32 Dqn_FileDirExists(Dqn_String8 path)
 {
     Dqn_b32 result = false;
 #if defined(DQN_OS_WIN32)
@@ -5854,7 +5854,7 @@ DQN_API Dqn_b32 Dqn_FileDirExists(Dqn_String path)
     return result;
 }
 
-DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String path)
+DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String8 path)
 {
     Dqn_FileInfo result = {};
 #if defined(DQN_OS_WIN32)
@@ -5895,7 +5895,7 @@ DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String path)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileCopy(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite)
+DQN_API Dqn_b32 Dqn_FileCopy(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrite)
 {
     Dqn_b32 result = false;
 #if defined(DQN_OS_WIN32)
@@ -5940,7 +5940,7 @@ DQN_API Dqn_b32 Dqn_FileCopy(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String path, Dqn_Arena *temp_arena)
+DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String8 path, Dqn_Arena *temp_arena)
 {
     Dqn_b32 result           = true;
     int path_indexes_size    = 0;
@@ -6015,7 +6015,7 @@ DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String path, Dqn_Arena *temp_arena)
 
 #elif defined(DQN_OS_UNIX)
     auto scoped_arena = Dqn_ArenaTempMemoryScope(temp_arena);
-    Dqn_String copy = Dqn_StringCopy(path, temp_arena);
+    Dqn_String8 copy  = Dqn_String8Copy(temp_arena, path);
 
     for (Dqn_i32 index = copy.size - 1; index >= 0; index--)
     {
@@ -6071,7 +6071,7 @@ DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String path, Dqn_Arena *temp_arena)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileMove(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite)
+DQN_API Dqn_b32 Dqn_FileMove(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrite)
 {
     Dqn_b32 result = false;
 
@@ -6108,7 +6108,7 @@ DQN_API Dqn_b32 Dqn_FileMove(Dqn_String src, Dqn_String dest, Dqn_b32 overwrite)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileDelete(Dqn_String path)
+DQN_API Dqn_b32 Dqn_FileDelete(Dqn_String8 path)
 {
     Dqn_b32 result = false;
 #if defined(DQN_OS_WIN32)
@@ -6272,9 +6272,9 @@ DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size)
     return true;
 }
 
-DQN_API Dqn_String Dqn_OSEXEDir(Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_OSEXEDir(Dqn_Arena *arena)
 {
-    Dqn_String result = {};
+    Dqn_String8 result = {};
 
 #if defined(DQN_OS_WIN32)
     wchar_t exe_dir[DQN_OS_WIN32_MAX_PATH];
@@ -6350,7 +6350,7 @@ DQN_API Dqn_String Dqn_OSEXEDir(Dqn_Arena *arena)
         }
         else
         {
-            result = Dqn_StringInit(exe_path, required_size_wo_null_terminator);
+            result = Dqn_String8Init(exe_path, required_size_wo_null_terminator);
         }
     }
 
@@ -6525,7 +6525,7 @@ DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, Dqn_b32 comma_sep)
 
 // NOTE: Dqn_Lib
 // -------------------------------------------------------------------------------------------------
-DQN_API void Dqn_LibDumpThreadContextArenaStat(Dqn_String file_path)
+DQN_API void Dqn_LibDumpThreadContextArenaStat(Dqn_String8 file_path)
 {
     (void)file_path;
 #if defined(DQN_DEBUG_THREAD_CONTEXT)
@@ -6670,9 +6670,9 @@ DQN_API Dqn_JsonWriter Dqn_JsonWriterInit(Dqn_Arena *arena, int spaces_per_inden
     return result;
 }
 
-DQN_API Dqn_String Dqn_JsonWriterBuild(Dqn_JsonWriter *writer, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_JsonWriterBuild(Dqn_JsonWriter *writer, Dqn_Arena *arena)
 {
-    Dqn_String result = Dqn_StringListBuild(&writer->list, arena);
+    Dqn_String8 result = Dqn_String8ListBuild(&writer->list, arena);
     return result;
 }
 
@@ -6681,7 +6681,7 @@ DQN_API void Dqn_JsonWriter_DoIndent(Dqn_JsonWriter *writer)
     int spaces_per_indent = writer->spaces_per_indent ? writer->spaces_per_indent : 2;
     int spaces            = writer->indent_level * spaces_per_indent;
     if (spaces)
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, "%*s", spaces, "");
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "%*s", spaces, "");
 }
 
 DQN_API void Dqn_JsonWriter_PreAddItem(Dqn_JsonWriter *writer)
@@ -6694,13 +6694,13 @@ DQN_API void Dqn_JsonWriter_PreAddItem(Dqn_JsonWriter *writer)
     {
         // NOTE: First time we're adding an item to an object, we need to write
         // on a new line for nice formatting.
-        Dqn_StringListAppendString(&writer->list, writer->arena, DQN_STRING("\n"));
+        Dqn_String8ListAppendString(&writer->list, writer->arena, DQN_STRING("\n"));
     }
     else if (*parent_field_count > 0)
     {
         // NOTE: We have items in the object already and we're adding another
         // item so we need to add a comma on the previous item.
-        Dqn_StringListAppendString(&writer->list, writer->arena, DQN_STRING(",\n"));
+        Dqn_String8ListAppendString(&writer->list, writer->arena, DQN_STRING(",\n"));
     }
 
     Dqn_JsonWriter_DoIndent(writer);
@@ -6715,14 +6715,14 @@ DQN_API void Dqn_JsonWriter_PostAddItem(Dqn_JsonWriter *writer)
     (*parent_field_count)++;
 }
 
-DQN_API void Dqn_JsonWriter_BeginContainer(Dqn_JsonWriter *writer, Dqn_String name, bool array)
+DQN_API void Dqn_JsonWriter_BeginContainer(Dqn_JsonWriter *writer, Dqn_String8 name, bool array)
 {
-    Dqn_String container_ch = array ? DQN_STRING("[") : DQN_STRING("{");
+    Dqn_String8 container_ch = array ? DQN_STRING("[") : DQN_STRING("{");
     Dqn_JsonWriter_PreAddItem(writer);
     if (name.size)
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
     else
-        Dqn_StringListAppendString(&writer->list, writer->arena, container_ch);
+        Dqn_String8ListAppendString(&writer->list, writer->arena, container_ch);
     Dqn_JsonWriter_PostAddItem(writer);
 
     writer->indent_level++;
@@ -6740,7 +6740,7 @@ DQN_API void Dqn_JsonWriter_EndContainer(Dqn_JsonWriter *writer, Dqn_b32 array)
     {
         // NOTE: End of object/array should start on a new line if the
         // array/object has atleast one field in it.
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, "\n");
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\n");
     }
 
     writer->parent_field_count_stack_size--;
@@ -6750,10 +6750,10 @@ DQN_API void Dqn_JsonWriter_EndContainer(Dqn_JsonWriter *writer, Dqn_b32 array)
     DQN_ASSERT(writer->indent_level >= 0);
 
     Dqn_JsonWriter_DoIndent(writer);
-    Dqn_StringListAppendString(&writer->list, writer->arena, array ? DQN_STRING("]") : DQN_STRING("}"));
+    Dqn_String8ListAppendString(&writer->list, writer->arena, array ? DQN_STRING("]") : DQN_STRING("}"));
 }
 
-DQN_API void Dqn_JsonWriterBeginNamedObject(Dqn_JsonWriter *writer, Dqn_String name)
+DQN_API void Dqn_JsonWriterBeginNamedObject(Dqn_JsonWriter *writer, Dqn_String8 name)
 {
     Dqn_JsonWriter_BeginContainer(writer, name, false /*array*/);
 }
@@ -6768,7 +6768,7 @@ DQN_API void Dqn_JsonWriterEndObject(Dqn_JsonWriter *writer)
     Dqn_JsonWriter_EndContainer(writer, false /*array*/);
 }
 
-DQN_API void Dqn_JsonWriterBeginNamedArray(Dqn_JsonWriter *writer, Dqn_String name)
+DQN_API void Dqn_JsonWriterBeginNamedArray(Dqn_JsonWriter *writer, Dqn_String8 name)
 {
     Dqn_JsonWriter_BeginContainer(writer, name, true /*array*/);
 }
@@ -6783,28 +6783,28 @@ DQN_API void Dqn_JsonWriterEndArray(Dqn_JsonWriter *writer)
     Dqn_JsonWriter_EndContainer(writer, true /*array*/);
 }
 
-DQN_API void Dqn_JsonWriterNamedString(Dqn_JsonWriter *writer, Dqn_String key, Dqn_String value)
+DQN_API void Dqn_JsonWriterNamedString(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_String8 value)
 {
     Dqn_JsonWriter_PreAddItem(writer);
     if (key.size)
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
     else
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, "\"%.*s\"", DQN_STRING_FMT(value));
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\"%.*s\"", DQN_STRING_FMT(value));
     Dqn_JsonWriter_PostAddItem(writer);
 }
 
-DQN_API void Dqn_JsonWriterString(Dqn_JsonWriter *writer, Dqn_String value)
+DQN_API void Dqn_JsonWriterString(Dqn_JsonWriter *writer, Dqn_String8 value)
 {
     Dqn_JsonWriterNamedString(writer, DQN_STRING("") /*key*/, value);
 }
 
-DQN_API void Dqn_JsonWriterNamedU64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_u64 value)
+DQN_API void Dqn_JsonWriterNamedU64(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_u64 value)
 {
     Dqn_JsonWriter_PreAddItem(writer);
     if (key.size)
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
     else
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, "%I64u", value);
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "%I64u", value);
     Dqn_JsonWriter_PostAddItem(writer);
 }
 
@@ -6813,7 +6813,7 @@ DQN_API void Dqn_JsonWriterU64(Dqn_JsonWriter *writer, Dqn_u64 value)
     Dqn_JsonWriterNamedU64(writer, DQN_STRING("") /*key*/, value);
 }
 
-DQN_API void Dqn_JsonWriterNamedF64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_f64 value, int decimal_places)
+DQN_API void Dqn_JsonWriterNamedF64(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_f64 value, int decimal_places)
 {
     Dqn_FixedString<8> const float_fmt =
         decimal_places > 0
@@ -6826,9 +6826,9 @@ DQN_API void Dqn_JsonWriterNamedF64(Dqn_JsonWriter *writer, Dqn_String key, Dqn_
 
     Dqn_JsonWriter_PreAddItem(writer);
     if (key.size)
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, fmt_string.data, DQN_STRING_FMT(key), value);
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, fmt_string.data, DQN_STRING_FMT(key), value);
     else
-        Dqn_StringListAppendFmt(&writer->list, writer->arena, fmt_string.data, value);
+        Dqn_String8ListAppendFmt(&writer->list, writer->arena, fmt_string.data, value);
     Dqn_JsonWriter_PostAddItem(writer);
 }
 
@@ -6888,10 +6888,10 @@ DQN_API void Dqn_WinMakeProcessDPIAware()
     }
 }
 
-DQN_API void Dqn_WinDumpLastError_(Dqn_String file, Dqn_String func, Dqn_uint line, char const *fmt, ...)
+DQN_API void Dqn_WinDumpLastError_(Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, ...)
 {
     Dqn_WinErrorMsg msg  = Dqn_WinLastError();
-    Dqn_String file_name = Dqn_StringFileNameFromPath(file);
+    Dqn_String8 file_name = Dqn_String8FileNameFromPath(file);
 
     // TODO(dqn): Hmmm .. should this be a separate log or part of the above
     // macro. If so we need to make the logging macros more flexible.
@@ -6924,7 +6924,7 @@ DQN_API int Dqn_WinCString8ToCString16(const char *src, int src_size, wchar_t *d
     return result;
 }
 
-DQN_API int Dqn_WinString8ToCString16(Dqn_String src, wchar_t *dest, int dest_size)
+DQN_API int Dqn_WinString8ToCString16(Dqn_String8 src, wchar_t *dest, int dest_size)
 {
     int result   = 0;
     int src_size = Dqn_SafeTruncateISizeToInt(src.size);
@@ -6933,7 +6933,7 @@ DQN_API int Dqn_WinString8ToCString16(Dqn_String src, wchar_t *dest, int dest_si
     return result;
 }
 
-DQN_API Dqn_String16 Dqn_WinString8ToString16Arena(Dqn_String src, Dqn_Arena *arena)
+DQN_API Dqn_String16 Dqn_WinString8ToString16Arena(Dqn_String8 src, Dqn_Arena *arena)
 {
     Dqn_String16 result = {};
     int required = Dqn_WinString8ToCString16(src, nullptr, 0);
@@ -6963,16 +6963,16 @@ DQN_API int Dqn_WinCString16ToCString8(const wchar_t* src, int src_size, char *d
     return result;
 }
 
-DQN_API Dqn_String Dqn_WinCString16ToString8Arena(const wchar_t* src, int src_size, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_WinCString16ToString8Arena(const wchar_t* src, int src_size, Dqn_Arena *arena)
 {
-    Dqn_String result = {};
+    Dqn_String8 result = {};
     int required = Dqn_WinCString16ToCString8(src, src_size, nullptr, 0);
     if (required != 0) {
         // NOTE: String allocate ensures there's one extra byte for
         // null-termination already so we need to undo the +1 from our
         // functions.
-        result = Dqn_StringAllocate(arena, required - 1, Dqn_ZeroMem::No);
-        if (Dqn_StringIsValid(result)) {
+        result = Dqn_String8Allocate(arena, required - 1, Dqn_ZeroMem::No);
+        if (Dqn_String8IsValid(result)) {
             int next_required = Dqn_WinCString16ToCString8(src, src_size, result.data, required);
             DQN_ASSERT(required == next_required);
         }
@@ -6990,9 +6990,9 @@ DQN_API int Dqn_WinString16ToCString8(Dqn_String16 src, char *dest, int dest_siz
     return result;
 }
 
-DQN_API Dqn_String Dqn_WinString16ToString8Arena(Dqn_String16 src, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_WinString16ToString8Arena(Dqn_String16 src, Dqn_Arena *arena)
 {
-    Dqn_String result = {};
+    Dqn_String8 result = {};
     int src_size = Dqn_SafeTruncateISizeToInt(src.size);
     if (src_size) {
         result = Dqn_WinCString16ToString8Arena(src.data, src_size, arena);
@@ -7036,11 +7036,11 @@ DQN_API Dqn_String16 Dqn_WinEXEDirWArena(Dqn_Arena *arena)
     return result;
 }
 
-DQN_API Dqn_String Dqn_WinWorkingDir(Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String suffix)
+DQN_API Dqn_String8 Dqn_WinWorkingDir(Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String8 suffix)
 {
     Dqn_String16 w_suffix = Dqn_WinString8ToString16Arena(suffix, temp_arena);
     Dqn_String16 curr_dir = Dqn_WinWorkingDirW(temp_arena, w_suffix);
-    Dqn_String result     = Dqn_WinString16ToString8Arena(curr_dir, arena);
+    Dqn_String8 result     = Dqn_WinString16ToString8Arena(curr_dir, arena);
     return result;
 }
 
@@ -7120,7 +7120,7 @@ DQN_API bool Dqn_WinFolderWIterate(Dqn_String16 path, Dqn_WinFolderIteratorW *it
     return true;
 }
 
-DQN_API bool Dqn_WinFolderIterate(Dqn_String path, Dqn_WinFolderIterator *it)
+DQN_API bool Dqn_WinFolderIterate(Dqn_String8 path, Dqn_WinFolderIterator *it)
 {
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
     path16[0] = 0;
@@ -7152,7 +7152,7 @@ DQN_API bool Dqn_WinFolderIterate(Dqn_String path, Dqn_WinFolderIterator *it)
     it->handle = wide_it.handle;
     if (result) {
         int size = Dqn_WinString16ToCString8(wide_it.file_name, it->file_name_buf, DQN_ARRAY_ICOUNT(it->file_name_buf));
-        it->file_name = Dqn_StringInit(it->file_name_buf, size);
+        it->file_name = Dqn_String8Init(it->file_name_buf, size);
     }
 
     return result;
@@ -7213,7 +7213,7 @@ DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitCString(char const *url, int url_si
     return result;
 }
 
-DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitString(Dqn_String url)
+DQN_API Dqn_WinNetHandle Dqn_WinNetHandleInitString(Dqn_String8 url)
 {
     Dqn_WinNetHandle result = Dqn_WinNetHandleInitCString(url.data, DQN_CAST(int)url.size);
     return result;
@@ -7360,11 +7360,11 @@ DQN_API char *Dqn_WinNetHandlePumpToCString(Dqn_WinNetHandle *handle, char const
     return result;
 }
 
-DQN_API Dqn_String Dqn_WinNetHandlePumpToString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_WinNetHandlePumpToString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena)
 {
     size_t     size     = 0;
     char *     download = Dqn_WinNetHandlePumpToCString(handle, http_verb, post_data, post_data_size, arena, &size);
-    Dqn_String result   = Dqn_StringInit(download, size);
+    Dqn_String8 result   = Dqn_String8Init(download, size);
     return result;
 }
 
@@ -7423,11 +7423,11 @@ DQN_API char *Dqn_WinNetHandlePumpToMallocCString(Dqn_WinNetHandle *handle, char
     return result;
 }
 
-DQN_API Dqn_String Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size)
+DQN_API Dqn_String8 Dqn_WinNetHandlePumpToMallocString(Dqn_WinNetHandle *handle, char const *http_verb, char *post_data, int post_data_size)
 {
     size_t     download_size = 0;
     char *     download      = Dqn_WinNetHandlePumpToMallocCString(handle, http_verb, post_data, post_data_size, &download_size);
-    Dqn_String result        = Dqn_StringInit(download, download_size);
+    Dqn_String8 result       = Dqn_String8Init(download, download_size);
     return result;
 }
 #endif // DQN_WITH_WIN_NET
