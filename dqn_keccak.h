@@ -101,10 +101,10 @@ typedef struct Dqn_KeccakBytes32  { char data[32]; } Dqn_KeccakBytes32; // 256 b
 typedef struct Dqn_KeccakBytes48  { char data[48]; } Dqn_KeccakBytes48; // 384 bit
 typedef struct Dqn_KeccakBytes64  { char data[64]; } Dqn_KeccakBytes64; // 512 bit
 
-typedef struct Dqn_KeccakString56  { char str[(sizeof(Dqn_KeccakBytes28) * 2) + 1]; } Dqn_KeccakString56;
-typedef struct Dqn_KeccakString64  { char str[(sizeof(Dqn_KeccakBytes32) * 2) + 1]; } Dqn_KeccakString64;
-typedef struct Dqn_KeccakString96  { char str[(sizeof(Dqn_KeccakBytes48) * 2) + 1]; } Dqn_KeccakString96;
-typedef struct Dqn_KeccakString128 { char str[(sizeof(Dqn_KeccakBytes64) * 2) + 1]; } Dqn_KeccakString128;
+typedef struct Dqn_KeccakString56  { char data[(sizeof(Dqn_KeccakBytes28) * 2) + 1]; } Dqn_KeccakString56;
+typedef struct Dqn_KeccakString64  { char data[(sizeof(Dqn_KeccakBytes32) * 2) + 1]; } Dqn_KeccakString64;
+typedef struct Dqn_KeccakString96  { char data[(sizeof(Dqn_KeccakBytes48) * 2) + 1]; } Dqn_KeccakString96;
+typedef struct Dqn_KeccakString128 { char data[(sizeof(Dqn_KeccakBytes64) * 2) + 1]; } Dqn_KeccakString128;
 
 #define DQN_KECCAK_LANE_SIZE_U64 5
 typedef struct Dqn_KeccakState
@@ -350,7 +350,11 @@ Dqn_KeccakState Dqn_KeccakSHA3Init(bool sha3, int hash_size_bits)
     char const KECCAK_DELIMITED_SUFFIX = 0x01;
     int const  bitrate                 = 1600 - (hash_size_bits * 2);
 
+#if defined(__cplusplus)
     Dqn_KeccakState result  = {};
+#else
+    Dqn_KeccakState result  = {0};
+#endif
     result.hash_size_bits   = hash_size_bits;
     result.absorb_size      = bitrate / 8;
     result.delimited_suffix = sha3 ? SHA3_DELIMITED_SUFFIX : KECCAK_DELIMITED_SUFFIX;
@@ -511,7 +515,7 @@ Dqn_KeccakBytes64 Dqn_Keccak512ToBytes64(void *bytes, Dqn_KeccakU64 bytes_size)
 Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_String string)
 {
     Dqn_KeccakBytes28 result;
-    Dqn_SHA3_224(string.str, string.size, result.data, sizeof(result));
+    Dqn_SHA3_224(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
@@ -525,7 +529,7 @@ Dqn_KeccakBytes28 Dqn_SHA3_224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array)
 Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String string)
 {
     Dqn_KeccakBytes32 result;
-    Dqn_SHA3_256(string.str, string.size, result.data, sizeof(result));
+    Dqn_SHA3_256(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
@@ -539,7 +543,7 @@ Dqn_KeccakBytes32 Dqn_SHA3_256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array)
 Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String string)
 {
     Dqn_KeccakBytes48 result;
-    Dqn_SHA3_384(string.str, string.size, result.data, sizeof(result));
+    Dqn_SHA3_384(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
@@ -553,7 +557,7 @@ Dqn_KeccakBytes48 Dqn_SHA3_384_U8ArrayToBytes48(Dqn_Array<Dqn_KeccakU8> array)
 Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String string)
 {
     Dqn_KeccakBytes64 result;
-    Dqn_SHA3_512(string.str, string.size, result.data, sizeof(result));
+    Dqn_SHA3_512(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
@@ -572,7 +576,7 @@ Dqn_KeccakBytes64 Dqn_SHA3_512_U8ArrayToBytes64(Dqn_Array<Dqn_KeccakU8> array)
 Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String string)
 {
     Dqn_KeccakBytes28 result;
-    Dqn_Keccak224(string.str, string.size, result.data, sizeof(result));
+    Dqn_Keccak224(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
@@ -586,7 +590,7 @@ Dqn_KeccakBytes28 Dqn_Keccak224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array)
 Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String string)
 {
     Dqn_KeccakBytes32 result;
-    Dqn_Keccak256(string.str, string.size, result.data, sizeof(result));
+    Dqn_Keccak256(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
@@ -601,7 +605,7 @@ Dqn_KeccakBytes32 Dqn_Keccak256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array)
 Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String string)
 {
     Dqn_KeccakBytes48 result;
-    Dqn_Keccak384(string.str, string.size, result.data, sizeof(result));
+    Dqn_Keccak384(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
@@ -615,7 +619,7 @@ Dqn_KeccakBytes48 Dqn_Keccak384_U8ArrayToBytes48(Dqn_Array<Dqn_KeccakU8> array)
 Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String string)
 {
     Dqn_KeccakBytes64 result;
-    Dqn_Keccak512(string.str, string.size, result.data, sizeof(result));
+    Dqn_Keccak512(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
@@ -651,32 +655,32 @@ void Dqn_KeccakBytesToHex(void const *src, Dqn_KeccakU64 src_size, char *dest, D
 Dqn_KeccakString56 Dqn_KeccakBytes28ToHex(Dqn_KeccakBytes28 const *bytes)
 {
     Dqn_KeccakString56 result;
-    Dqn_KeccakBytesToHex(bytes->data, sizeof(bytes->data), result.str, sizeof(result.str));
-    result.str[sizeof(result.str) - 1] = 0;
+    Dqn_KeccakBytesToHex(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
+    result.data[sizeof(result.data) - 1] = 0;
     return result;
 }
 
 Dqn_KeccakString64 Dqn_KeccakBytes32ToHex(Dqn_KeccakBytes32 const *bytes)
 {
     Dqn_KeccakString64 result;
-    Dqn_KeccakBytesToHex(bytes->data, sizeof(bytes->data), result.str, sizeof(result.str));
-    result.str[sizeof(result.str) - 1] = 0;
+    Dqn_KeccakBytesToHex(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
+    result.data[sizeof(result.data) - 1] = 0;
     return result;
 }
 
 Dqn_KeccakString96 Dqn_KeccakBytes48ToHex(Dqn_KeccakBytes48 const *bytes)
 {
     Dqn_KeccakString96 result;
-    Dqn_KeccakBytesToHex(bytes->data, sizeof(bytes->data), result.str, sizeof(result.str));
-    result.str[sizeof(result.str) - 1] = 0;
+    Dqn_KeccakBytesToHex(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
+    result.data[sizeof(result.data) - 1] = 0;
     return result;
 }
 
 Dqn_KeccakString128 Dqn_KeccakBytes64ToHex(Dqn_KeccakBytes64 const *bytes)
 {
     Dqn_KeccakString128 result;
-    Dqn_KeccakBytesToHex(bytes->data, sizeof(bytes->data), result.str, sizeof(result.str));
-    result.str[sizeof(result.str) - 1] = 0;
+    Dqn_KeccakBytesToHex(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
+    result.data[sizeof(result.data) - 1] = 0;
     return result;
 }
 
@@ -712,7 +716,7 @@ Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_String hex)
 {
     DQN_KECCAK_ASSERT(hex.size == 64);
     Dqn_KeccakBytes32 result;
-    Dqn_HexToBytes(hex.str, hex.size, result.data, sizeof(result));
+    Dqn_HexToBytes(hex.data, hex.size, result.data, sizeof(result));
     return result;
 }
 #endif // DQN_H && DQN_WITH_HEX

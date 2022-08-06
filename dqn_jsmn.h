@@ -640,8 +640,9 @@ Dqn_Jsmn Dqn_JsmnInitWithArenaJSON(Dqn_JsmnString json, Dqn_Arena *arena)
 
 Dqn_Jsmn Dqn_JsmnInitWithArenaJSONFile(Dqn_JsmnString file, Dqn_Arena *arena)
 {
-    Dqn_String json   = Dqn_FileArenaReadToString(file.data, file.size, arena);
-    Dqn_Jsmn   result = Dqn_JsmnInitWithArenaJSON({{json.str}, (int)json.size}, arena);
+    Dqn_String     json   = Dqn_FileArenaReadToString(file.data, file.size, arena);
+    Dqn_JsmnString string = {json.str, (int)json.size};
+    Dqn_Jsmn       result = Dqn_JsmnInitWithArenaJSON(string, arena);
     return result;
 }
 #endif // DQN_IMPLEMENTATION
@@ -654,7 +655,7 @@ int Dqn_JsmnTokenArraySize(jsmntok_t token)
 
 Dqn_JsmnString Dqn_JsmnTokenString(jsmntok_t token, Dqn_JsmnString json)
 {
-    Dqn_JsmnString result = {{json.data + token.start}, token.end - token.start};
+    Dqn_JsmnString result = DQN_JSMN_CLITERAL(Dqn_JsmnString){json.data + token.start, token.end - token.start};
     return result;
 }
 
@@ -670,7 +671,7 @@ bool Dqn_JsmnTokenBool(jsmntok_t token, Dqn_JsmnString json)
 Dqn_JsmnU64 Dqn_JsmnTokenU64(jsmntok_t token, Dqn_JsmnString json)
 {
     DQN_JSMN_ASSERT(token.start < json.size);
-    Dqn_JsmnString string = {{json.data + token.start}, token.end - token.start};
+    Dqn_JsmnString string = DQN_JSMN_CLITERAL(Dqn_JsmnString){json.data + token.start, token.end - token.start};
     Dqn_JsmnU64   result = Dqn_JsmnStringToU64(string);
     return result;
 }
@@ -725,7 +726,7 @@ Dqn_JsmnString Dqn_JsmnIteratorKey(Dqn_JsmnIterator *it)
 {
     Dqn_JsmnString result = DQN_JSMN_ZERO_INIT;
     if (it && it->key)
-        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){{it->json.data + it->key->start}, it->key->end - it->key->start};
+        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){it->json.data + it->key->start, it->key->end - it->key->start};
     return result;
 }
 
@@ -813,7 +814,7 @@ Dqn_JsmnString Dqn_JsmnIteratorString(Dqn_JsmnIterator const *it)
 {
     Dqn_JsmnString result = DQN_JSMN_ZERO_INIT;
     if (it->value && it->json.data)
-        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){{it->json.data + it->value->start}, it->value->end - it->value->start};
+        result = DQN_JSMN_CLITERAL(Dqn_JsmnString){it->json.data + it->value->start, it->value->end - it->value->start};
     return result;
 }
 

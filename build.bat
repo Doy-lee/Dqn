@@ -4,7 +4,6 @@ set code_dir=%~dp0
 if not exist Build mkdir Build
 pushd Build
 
-    REM ------------------------------------------------------------------------
     REM Flags
     REM ------------------------------------------------------------------------
     REM MT     Static CRT
@@ -20,7 +19,6 @@ pushd Build
     set msvc_flags=-fsanitize=address -D STBSP__ASAN=__declspec(no_sanitize_address)
     set clang_flags=-fsanitize=address -fsanitize=undefined
 
-    REM ------------------------------------------------------------------------
     REM Compiler: MSVC cl
     REM ------------------------------------------------------------------------
     where /q cl || (
@@ -33,7 +31,6 @@ pushd Build
     cl %compile_flags% %msvc_flags% %code_dir%Dqn_Tests.cpp %link_flags%
     popd
 
-    REM ------------------------------------------------------------------------
     REM Compiler: clang-cl
     REM ------------------------------------------------------------------------
     where /q clang-cl || (
