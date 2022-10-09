@@ -1,5 +1,7 @@
 #if !defined(DQN_H)
 #define DQN_H
+/// @file dqn.h
+///
 // NOTE: Dqn
 // -----------------------------------------------------------------------------
 // General all-purpose utility library.
@@ -8,12 +10,11 @@
 // -----------------------------------------------------------------------------
 // Access to library primitives must be enabled using the following macros
 //
-// #define DQN_WITH_CRT_ALLOCATOR  // Dqn_CRTAllocator
 // #define DQN_WITH_DSMAP          // Dqn_DSMap
 // #define DQN_WITH_FIXED_ARRAY    // Dqn_FixedArray
 // #define DQN_WITH_FIXED_STRING   // Dqn_FixedString
 // #define DQN_WITH_HEX            // Dqn_Hex and friends ...
-// #define DQN_WITH_JSON_WRITER    // Dqn_JsonWriter
+// #define DQN_WITH_JSON_WRITER    // Dqn_JSONWriter
 // #define DQN_WITH_MAP            // Dqn_Map
 // #define DQN_WITH_MATH           // Dqn_V2/3/4/Mat4 and friends ...
 // #define DQN_WITH_WIN_NET        // Dqn_WinNet
@@ -41,11 +42,10 @@
 //     STB_SPRINTF_IMPLEMENTATION. Useful if another library uses and includes
 //     "stb_sprintf.h"
 //
-// #define DQN_MEMZERO_DEBUG_BYTE 0x0
-//     By defining 'DQN_MEMZERO_DEBUG_BYTE' to some byte value this will enable
-//     functions that receive Dqn_ZeroMem::No to memset the non-zeroed memory to
-//     'DQN_MEMZERO_DEBUG_BYTE' to help detect holding pointers to invalid memory,
-//     i.e. holding pointers to an array element that was popped from the array.
+// #define DQN_MEMSET_BYTE 0
+//     Change the byte that DQN_MEMSET will clear memory with. By default this
+//     is set to 0. Some of this library API accepts are clear memory parameter
+//     to scrub memory after certain operations.
 //
 // #define DQN_ALLOCATION_TRACING 1
 //     When defined to 0 all tracing code is compiled out.
@@ -102,6 +102,8 @@
 
 // NOTE: Macros
 // -------------------------------------------------------------------------------------------------
+#include <stdint.h>
+
 #if !defined(DQN_CALLOC)
     #include <stdlib.h>
     #define DQN_CALLOC(count, size) calloc(count, size)
@@ -182,7 +184,7 @@
 
 // NOTE: Prefer the templated Dqn_Array/CharCount function for type-safety. I prefer
 // the macro version for embedding within macros for debuggers. When we step
-// into a function call using the macro like, DQN_STRING("...") which is very
+// into a function call using the macro like, DQN_STRING8("...") which is very
 // common, the debugger jumps into the templated functions which is a waste of
 // time (they're bug free by virtue of templatizing).
 #define DQN_ARRAY_UCOUNT(array) (sizeof(array)/(sizeof((array)[0])))
@@ -255,6 +257,12 @@
         DQN_DEBUG_BREAK;                                                                                               \
     }
 
+#if defined(__cplusplus__)
+    #define DQN_ZERO_INIT {}
+#else
+    #define DQN_ZERO_INIT {0}
+#endif
+
 #if defined(DQN_NO_ASSERT)
     #define DQN_ASSERT(expr)
     #define DQN_ASSERT_MSG(expr, fmt, ...)
@@ -272,6 +280,7 @@
 // NOTE: Typedefs
 // ------------------------------------------------------------------------------------------------
 // Use compiler builtins and define our own constants to avoid a dependency on stdint.h
+
 typedef double Dqn_f64;
 typedef float Dqn_f32;
 typedef signed char Dqn_i8;
@@ -396,7 +405,7 @@ struct Dqn_Defer
 {
     Procedure proc;
     Dqn_Defer(Procedure p) : proc(p) {}
-    ~Dqn_Defer()                     { proc(); }
+    ~Dqn_Defer() { proc(); }
 };
 
 struct Dqn_DeferHelper
@@ -410,9 +419,17 @@ struct Dqn_DeferHelper
 #define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
 #define DQN_DEFER const auto DQN_UNIQUE_NAME(defer_lambda_) = Dqn_DeferHelper() + [&]()
 
+#define DQN_DEFER_LOOP(begin, end)                   \
+    for (bool DQN_UNIQUE_NAME(once) = (begin, true); \
+         DQN_UNIQUE_NAME(once);                      \
+         end, DQN_UNIQUE_NAME(once) = false)
+
 // NOTE: Utility Enums
 // ------------------------------------------------------------------------------------------------
-enum struct Dqn_ZeroMem { No, Yes };
+typedef enum Dqn_ZeroMem {
+    Dqn_ZeroMem_No,  ///< Memory can be handed out without zero-ing it out
+    Dqn_ZeroMem_Yes, ///< Memory should be zero-ed out before giving to the callee
+} Dqn_ZeroMem;
 
 // NOTE: Intrinsics
 // -------------------------------------------------------------------------------------------------
@@ -445,68 +462,102 @@ enum struct Dqn_ZeroMem { No, Yes };
     #error "Compiler not supported"
 #endif
 
-// TODO(dqn): Force inline
+/// Atomically set the value into the target using an atomic compare and swap.
+/// @todo(dqn): Force inline
+/// @param[in,out] target The target pointer to set atomically
+/// @param[in] value The value to set atomically into the target
+/// @return The value that was last stored in the target
 inline Dqn_i64 Dqn_AtomicSetValue64(Dqn_i64 volatile *target, Dqn_i64 value)
 {
-#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+    #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     Dqn_i64 result;
-    do
-    {
+    do {
         result = *target;
     } while (Dqn_AtomicCompareExchange64(target, value, result) != result);
     return result;
-#elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
+    #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     Dqn_i64 result = __sync_lock_test_and_set(target, value);
     return result;
-#else
-#error Unsupported compiler
-#endif
+    #else
+    #error Unsupported compiler
+    #endif
 }
 
+/// Atomically set the value into the target using an atomic compare and swap.
+/// @todo(dqn): Force inline
+/// @param[in,out] target The target pointer to set atomically
+/// @param[in] value The value to set atomically into the target
+/// @return The value that was last stored in the target
 inline long Dqn_AtomicSetValue32(long volatile *target, long value)
 {
-#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+    #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     long result;
-    do
-    {
+    do {
         result = *target;
     } while (Dqn_AtomicCompareExchange32(target, value, result) != result);
     return result;
-#elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
+    #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     long result = __sync_lock_test_and_set(target, value);
     return result;
-#else
-#error Unsupported compiler
-#endif
+    #else
+    #error Unsupported compiler
+    #endif
 }
 
 struct Dqn_CPUIDRegisters
 {
-    unsigned int array[4]; // eax, ebx, ecx, edx
+    unsigned int array[4]; ///< Values from 'CPUID' instruction for each register (EAX, EBX, ECX, EDX)
 };
 
+/// Execute 'CPUID' instruction to query the capabilities of the current CPU.
+Dqn_CPUIDRegisters Dqn_CPUID(int function_id);
+
+/// A mutex implemented using an atomic compare and swap on tickets handed out
+/// for each critical section.
+///
+/// This mutex serves ticket in order and will block all other threads until the
+/// tickets are returned in order. The thread with the oldest ticket that has
+/// not been returned has right of way to execute, all other threads will be
+/// blocked in an atomic compare and swap loop. block execution by going into an
+/// atomic
+///
+/// When a thread is blocked by this mutex, a spinlock intrinsic `_mm_pause` is
+/// used to yield the CPU and reduce spinlock on the thread. This mutex is not
+/// ideal for long blocking operations. This mutex does not issue any syscalls
+/// and relies entirely on atomic instructions.
 struct Dqn_TicketMutex
 {
-    unsigned int volatile ticket;  // The next ticket ID to give out to the thread taking the mutex
-    unsigned int volatile serving; // The ticket ID that the mutex will block until it receives
+    unsigned int volatile ticket;  ///< The next ticket to give out to the thread taking the mutex
+    unsigned int volatile serving; ///< The ticket ID to block the mutex on until it is returned
 };
 
-// Query the CPU's CPUID function and return the data in the registers
-Dqn_CPUIDRegisters Dqn_CPUID                 (int function_id);
-void               Dqn_TicketMutexBegin     (Dqn_TicketMutex *mutex);
-void               Dqn_TicketMutexEnd       (Dqn_TicketMutex *mutex);
+/// Lock the mutex
+void Dqn_TicketMutexBegin(Dqn_TicketMutex *mutex);
 
-// NOTE: Advance API, more granular functions, the basic sequence to use the API is
-/*
-   Dqn_TicketMutex mutex = {};
-   unsigned int ticket = Dqn_TicketMutexMakeTicket(&mutex);
-   Dqn_TicketMutexBeginTicket(&mutex, ticket); // Blocking call until we attain the lock
-   Dqn_TicketMutexEnd(&mutex);
- */
-unsigned int       Dqn_TicketMutexMakeTicket   (Dqn_TicketMutex *mutex);
-void               Dqn_TicketMutexBeginTicket  (const Dqn_TicketMutex *mutex, unsigned int ticket);
-Dqn_b32            Dqn_TicketMutexCanLock      (const Dqn_TicketMutex *mutex, unsigned int ticket);
+/// Unlock the mutex
+void Dqn_TicketMutexEnd(Dqn_TicketMutex *mutex);
 
+/// Allocate the next available ticket from the mutex for locking using
+/// Dqn_TicketMutexBeginTicket().
+///
+/// @param[in] mutex The mutex
+///
+/// @code
+/// Dqn_TicketMutex mutex = {};
+/// unsigned int ticket = Dqn_TicketMutexMakeTicket(&mutex);
+/// Dqn_TicketMutexBeginTicket(&mutex, ticket); // Blocking call until we attain the lock
+/// Dqn_TicketMutexEnd(&mutex);
+/// @endcode
+unsigned int Dqn_TicketMutexMakeTicket(Dqn_TicketMutex *mutex);
+
+/// Lock the mutex using the given ticket if possible, otherwise block
+/// waiting until the mutex can be locked.
+void Dqn_TicketMutexBeginTicket(Dqn_TicketMutex const *mutex, unsigned int ticket);
+
+/// Determine if the mutex can be locked using the given ticket number.
+bool Dqn_TicketMutexCanLock(Dqn_TicketMutex const *mutex, unsigned int ticket);
+
+/// @cond NO_DOXYYGEN
 // NOTE: stb_sprintf
 // -------------------------------------------------------------------------------------------------
 // stb_sprintf - v1.10 - public domain snprintf() implementation
@@ -725,6 +776,40 @@ STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback,
 STBSP__PUBLICDEC void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
 
 #endif // STB_SPRINTF_H_INCLUDE
+/// @endcond
+
+// NOTE: Allocator API
+// -----------------------------------------------------------------------------
+/// Allocate memory
+/// @param size The number of bytes to allocate
+/// @param zero_mem Flag to indicate if the allocated memory should be zero-ed out
+/// @param user_context The user assigned pointer in the allocator
+typedef void *Dqn_AllocatorAllocProc(DQN_CALL_SITE_ARGS size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context);
+
+/// Deallocate memory
+/// @param ptr The pointer to deallocate memory for
+/// @param size The number of bytes to deallocate
+/// @param user_context The user assigned pointer in the allocator
+typedef void Dqn_AllocatorDeallocProc(DQN_CALL_SITE_ARGS void *ptr, size_t size, void *user_context);
+
+typedef struct Dqn_Allocator {
+    void                     *user_context; ///< User assigned pointer that is passed into the allocator functions
+    Dqn_AllocatorAllocProc   *alloc;        ///< Memory allocating routine
+    Dqn_AllocatorDeallocProc *dealloc;      ///< Memory deallocating routine
+} Dqn_Allocator;
+
+/// Allocate bytes from the given allocator
+/// @param allocator The allocator to allocate bytes from
+/// @param size The amount of bytes to allocator
+/// @param zero_mem Flag to indicate if the allocated must be zero-ed out
+void *Dqn_AllocatorAlloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem);
+void  Dqn_AllocatorDealloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, void *ptr, size_t size);
+
+#define Dqn_AllocatorNewArray(allocator, Type, count, zero_mem) Dqn_AllocatorNewArrayTagged("", allocator, Type, count, zero_mem)
+#define Dqn_AllocatorNewArrayTagged(tag, allocator, Type, count, zero_mem) (Type *)Dqn_AllocatorAlloc(DQN_CALL_SITE(tag) allocator, sizeof(Type) * count, alignof(Type), zero_mem)
+
+#define Dqn_AllocatorNew(allocator, Type, zero_mem) Dqn_AllocatorNewTagged(nullptr, allocator, Type, zero_mem)
+#define Dqn_AllocatorNewTagged(tag, allocator, Type, zero_mem) Dqn_AllocatorNewArrayTagged(tag, allocator, Type, 1 /*count*/, zero_mem)
 
 // NOTE: Dqn_Fmt
 // -------------------------------------------------------------------------------------------------
@@ -739,76 +824,174 @@ DQN_API Dqn_isize Dqn_FmtLen                 (char const *fmt, ...);
 
 // NOTE: Dqn_String8
 // -------------------------------------------------------------------------------------------------
-struct Dqn_Arena;
+/// Construct a UTF8 c-string literal into a Dqn_String8 referencing a string
+/// stored in the data-segment. This string is read-only.
+#define DQN_STRING8(string) Dqn_String8{(char *)(string), sizeof(string) - 1}
 
-#define DQN_STRING(string)     Dqn_String8{(char *)(string), sizeof(string) - 1}
-#define DQN_STRINGW(string)    Dqn_String16{(wchar_t *)(string), (sizeof(string)/sizeof(string[0])) - 1}
+/// Construct a UTF16 c-string literal into a Dqn_String16 referencing a string
+/// stored in the data-segment. This string is read-only.
+#define DQN_STRING16(string) Dqn_String16{(wchar_t *)(string), (sizeof(string)/sizeof(string[0])) - 1}
+
+/// Unpack a string into arguments for printing a string into a printf style
+/// format string.
 #define DQN_STRING_FMT(string) (int)((string).size), (string).data
-struct Dqn_String8
-{
-    char      *data;
-    Dqn_isize  size;
 
-    char const *begin() const { return data; }
-    char const *end  () const { return data + size; }
-    char       *begin()       { return data; }
-    char       *end  ()       { return data + size; }
+struct Dqn_String8 /// A pointer and length style string that holds slices to UTF8 bytes.
+{
+    char      *data; ///< The UTF8 bytes of the string
+    Dqn_isize  size; ///< The number of bytes in the string
+
+    char const *begin() const { return data; }        ///< Const begin iterator for range-for loops
+    char const *end  () const { return data + size; } ///< Const end iterator for range-for loops
+    char       *begin()       { return data; }        ///< Begin iterator for range-for loops
+    char       *end  ()       { return data + size; } ///< End iterator for range-for loops
 };
 
-struct Dqn_String16
-{
-    wchar_t   *data;
-    Dqn_isize  size;
+typedef struct Dqn_String8Link {
+    Dqn_String8      string; ///< The string
+    Dqn_String8Link *next;   ///< The next string in the linked list
+} Dqn_String8Link;
 
-    wchar_t const *begin() const { return data; }
-    wchar_t const *end  () const { return data + size; }
-    wchar_t       *begin()       { return data; }
-    wchar_t       *end  ()       { return data + size; }
+struct Dqn_String16 /// A pointer and length style string that holds slices to UTF16 bytes.
+{
+    wchar_t   *data; ///< The UTF16 bytes of the string
+    Dqn_isize  size; ///< The number of bytes in the string
+
+    wchar_t const *begin() const { return data; }        ///< Const begin iterator for range-for loops
+    wchar_t const *end  () const { return data + size; } ///< Const end iterator for range-for loops
+    wchar_t       *begin()       { return data; }        ///< Begin iterator for range-for loops
+    wchar_t       *end  ()       { return data + size; } ///< End iterator for range-for loops
 };
 
-// @info   Initialise a string from a pointer and length.
-//         The string is invalid (i.e. 'Dqn_String8IsValid' returns false) if
-//         size is negative or the string is null.
+/// Initialise a string from a pointer and length
+/// The string is invalid (i.e. Dqn_String8IsValid() returns false) if size is
+/// negative or the string is null.
 DQN_API Dqn_String8 Dqn_String8Init(char const *string, Dqn_isize size);
 
-// @info   Initialise a string from a C-string. The C-string must be
-//         null-terminated as its length is evaluated using 'strlen'.
-//         The string is invalid (i.e. 'Dqn_String8IsValid' returns false) if
-//         size is negative or the string is null.
+/// Initialise a string from a cstring
+/// The cstring must be null-terminated as its length is evaluated using
+/// strlen. The string is invalid (i.e. Dqn_String8IsValid() returns false) if
+/// size is negative or the string is null.
 DQN_API Dqn_String8 Dqn_String8InitCString(char const *string);
 
-// @info   Determine if the string structure has valid values.
-//         A string is invalid if size is negative or the string is null.
-// @return True if the string is valid, false otherwise.
-DQN_API bool        Dqn_String8IsValid(Dqn_String8 string);
+/// Determine if the values of the given string are valid
+/// A string is invalid if size is negative or the string is null.
+/// @return True if the string is valid, false otherwise.
+DQN_API bool Dqn_String8IsValid(Dqn_String8 string);
 
-// @info   Create a slice from a pre-existing string. The requested slice is
-//         clamped to within the bounds of the original 'string'.
-// @in     string: The string to slice
-// @in     offset: The starting byte to slice from
-// @in     size: The size of the slice
-// @return The sliced string.
+/// Create a slice from a pre-existing string.
+/// The requested slice is clamped to within the bounds of the original string.
+/// @param[in] string The string to slice
+/// @param[in] offset The starting byte to slice from
+/// @param[in] size The size of the slice
+/// @return The sliced string
 DQN_API Dqn_String8 Dqn_String8Slice(Dqn_String8 string, Dqn_isize offset, Dqn_isize size);
 
-#define             Dqn_String8FmtTagged(tag, arena, fmt, ...) Dqn_String8Fmt_(DQN_CALL_SITE(tag) arena, fmt, ## __VA_ARGS__)
-#define             Dqn_String8Fmt(arena, fmt, ...)            Dqn_String8FmtTagged(nullptr, arena, fmt, ## __VA_ARGS__)
-DQN_API Dqn_String8 Dqn_String8Fmt_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, ...);
+/// Create a string from a printf style format string
+/// @param[in] allocator The allocator the string will be allocated from
+/// @param[in] fmt The printf style format cstring
+#define Dqn_String8Fmt(allocator, fmt, ...) Dqn_String8FmtTagged(nullptr, allocator, fmt, ## __VA_ARGS__)
 
-#define             Dqn_String8FmtVTagged(tag, arena, fmt, ...) Dqn_String8FmtV_(DQN_CALL_SITE(tag) arena, fmt, ## __VA_ARGS__)
-#define             Dqn_String8FmtV(arena, fmt, ...)            Dqn_String8FmtVTagged(nullptr, arena, fmt, ## __VA_ARGS__)
-DQN_API Dqn_String8 Dqn_String8FmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, va_list va);
+/// @copybrief Dqn_String8Fmt The tagged variant takes a cstring to describe the
+/// purpose of the allocation.
+/// Tagged variants can be used to describe the nature of the allocation for
+/// allocation tracking purposes in the leak tracker or memory analytics.
+/// @param[in] tag A cstring to describe the nature of the allocation
+/// @copydetails Dqn_String8Fmt
+#define Dqn_String8FmtTagged(tag, allocator, fmt, ...) Dqn_String8Fmt_(DQN_CALL_SITE(tag) allocator, fmt, ## __VA_ARGS__)
 
-#define             Dqn_String8AllocateTagged(tag, arena, size, zero_mem) Dqn_String8Allocate_(DQN_CALL_SITE(tag) arena, size, zero_mem)
-#define             Dqn_String8Allocate(arena, size, zero_mem)            Dqn_String8AllocateTagged(nullptr, arena, size, zero_mem)
-DQN_API Dqn_String8 Dqn_String8Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_ZeroMem zero_mem);
+/// @copybrief Dqn_String8Fmt Internal function, prefer Dqn_String8Fmt()
+/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
+/// site information is not enabled. Exposes call site information on
+/// allocation.
+/// @copydetails Dqn_String8Fmt
+DQN_API Dqn_String8 Dqn_String8Fmt_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *fmt, ...);
 
-#define             Dqn_String8CopyCStringTagged(tag, arena, string, size) Dqn_String8CopyCString(DQN_CALL_SITE(tag) arena, string, size)
-#define             Dqn_String8CopyCString(arena, string, size)            Dqn_String8CopyCString_(nullptr, arena, string, size)
-DQN_API Dqn_String8 Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *string, Dqn_isize size);
+/// Create a string from a printf style format string using a va_list
+/// @param[in] arena The allocator the string will be allocated from
+/// @param[in] fmt The printf style format cstring
+/// @param[in] va The variable argument list
+#define Dqn_String8FmtV(allocator, fmt, va) Dqn_String8FmtVTagged(nullptr, allocator, fmt, va)
 
-#define             Dqn_String8CopyTagged(tag, arena, string) Dqn_String8Copy_(DQN_CALL_SITE(tag) arena, string)
-#define             Dqn_String8Copy(arena, string)            Dqn_String8CopyTagged(nullptr, arena, string)
-DQN_API Dqn_String8 Dqn_String8Copy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_String8 string);
+/// @copybrief Dqn_String8FmtV The tagged variant takes a cstring to describe the
+/// purpose of the allocation.
+/// @param[in] tag A cstring to describe the nature of the allocation
+/// @copydetails Dqn_String8FmtV
+#define Dqn_String8FmtVTagged(tag, allocator, fmt, va) Dqn_String8FmtV_(DQN_CALL_SITE(tag) allocator, fmt, va)
+
+/// @copybrief Dqn_String8FmtV Internal function, prefer Dqn_String8FmtV()
+/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
+/// site information is not enabled. Exposes call site information on
+/// allocation.
+/// @copydetails Dqn_String8FmtV
+DQN_API Dqn_String8 Dqn_String8FmtV_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *fmt, va_list va);
+
+/// Create an empty string with the requested size
+/// @param[in] allocator The allocator the string will be allocated from
+/// @param[in] size The size in bytes of the string to allocate
+/// @param[in] zero_mem Enum to indicate if the string's memory should be cleared
+#define Dqn_String8Allocate(allocator, size, zero_mem) Dqn_String8AllocateTagged(nullptr, allocator, size, zero_mem)
+
+/// @copybrief Dqn_String8Allocate The tagged variant takes a cstring to
+/// describe the purpose of the allocation.
+/// Tagged variants can be used to describe the nature of the allocation for
+/// allocation tracking purposes in the leak tracker or memory analytics.
+/// @param[in] tag A cstring to describe the nature of the allocation
+/// @copydetails Dqn_String8Allocate
+#define Dqn_String8AllocateTagged(tag, allocator, size, zero_mem) Dqn_String8Allocate_(DQN_CALL_SITE(tag) allocator, size, zero_mem)
+
+/// @copybrief Dqn_String8Allocate Internal function, prefer
+/// Dqn_String8Allocate()
+/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
+/// site information is not enabled. Exposes call site information on
+/// allocation.
+/// @copydetails Dqn_String8Allocate
+DQN_API Dqn_String8 Dqn_String8Allocate_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, Dqn_isize size, Dqn_ZeroMem zero_mem);
+
+/// Create a copy of the given cstring
+/// @param[in] allocator The allocator the string will be allocated from
+/// @param[in] string The cstring to copy
+/// @param[in] size The size of the cstring to copy. This cannot be <= 0
+/// @return A copy of the string, invalid string if any argument was invalid.
+#define Dqn_String8CopyCString(allocator, string, size) Dqn_String8CopyCStringTagged(nullptr, allocator, string, size)
+
+/// @copybrief Dqn_String8CopyCString The tagged variant takes a cstring to
+/// describe the purpose of the allocation.
+/// Tagged variants can be used to describe the nature of the allocation for
+/// allocation tracking purposes in the leak tracker or memory analytics.
+/// @param[in] tag A cstring to describe the nature of the allocation
+/// @copydetails Dqn_String8CopyCString
+#define Dqn_String8CopyCStringTagged(tag, allocator, string, size) Dqn_String8CopyCString_(DQN_CALL_SITE(tag) allocator, string, size)
+
+/// @copybrief Dqn_String8CopyCString Internal function, prefer
+/// Dqn_String8CopyCString()
+/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
+/// site information is not enabled. Exposes call site information on
+/// allocation.
+/// @copydetails Dqn_String8CopyCString
+DQN_API Dqn_String8 Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *string, Dqn_isize size);
+
+/// Create a copy of the given string
+/// @param[in] allocator The allocator the string will be allocated from
+/// @param[in] string The string to copy
+/// @return A copy of the string, invalid string if any argument was invalid.
+#define Dqn_String8Copy(allocator, string) Dqn_String8CopyTagged(nullptr, allocator, string)
+
+/// @copybrief Dqn_String8Copy The tagged variant takes a cstring to
+/// describe the purpose of the allocation.
+/// Tagged variants can be used to describe the nature of the allocation for
+/// allocation tracking purposes in the leak tracker or memory analytics.
+/// @param[in] tag A cstring to describe the nature of the allocation
+/// @copydetails Dqn_String8Copy
+#define Dqn_String8CopyTagged(tag, allocator, string) Dqn_String8Copy_(DQN_CALL_SITE(tag) allocator, string)
+
+/// @copybrief Dqn_String8Copy Internal function, prefer
+/// Dqn_String8Copy()
+/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
+/// site information is not enabled. Exposes call site information on
+/// allocation.
+/// @copydetails Dqn_String8Copy
+DQN_API Dqn_String8 Dqn_String8Copy_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, Dqn_String8 string);
 
 enum struct Dqn_String8EqCase
 {
@@ -816,10 +999,10 @@ enum struct Dqn_String8EqCase
     Insensitive,
 };
 
-// @info   Compare a string for equality
-// @in     lhs: The first string to compare equality with
-// @in     rhs: The second string to compare equality with
-// @in     eq_case: Set the comparison to be case sensitive or insensitive
+// Compare a string for equality
+// @param[in] lhs The first string to compare equality with
+// @param[in] rhs The second string to compare equality with
+// @param[in] eq_case Set the comparison to be case sensitive or insensitive
 // @return True if the strings are equal, false otherwise.
 DQN_API bool Dqn_String8Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
 DQN_API bool Dqn_String8EqInsensitive(Dqn_String8 lhs, Dqn_String8 rhs);
@@ -828,19 +1011,19 @@ DQN_API bool Dqn_String8StartsWithInsensitive(Dqn_String8 string, Dqn_String8 pr
 DQN_API bool Dqn_String8EndsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
 DQN_API bool Dqn_String8EndsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix);
 
-// @info   Split a string by the delimiting character. This function can
-//         evaluate the number of splits required in the return value by setting
-//         'splits' to null and 'splits_count' to 0.
-// @in     string: The source string to split
-// @out    splits: (Optional) The destination array to write the splits to.
-// @in     splits_count: The number of splits that can be written into the
-//         'splits' array.
-// @return The number of splits in the 'string'. If the return value is >=
-//         'splits_count' then there are more splits in the string than can be
-//         written to the 'splits' array. The number of splits written is capped
-//         to the capacity given by the caller, i.e. 'splits_count'. This
-//         function should be called again with a sufficiently sized array if
-//         all splits are desired.
+/// Split a string by the delimiting character.
+/// This function can evaluate the number of splits required in the return value
+/// by setting `splits` to null and `splits_count` to 0.
+/// @param[in] string The source string to split
+/// @param[in] delimiter The character to split the string on
+/// @param[out] splits (Optional) The destination array to write the splits to.
+/// @param[in] splits_count The number of splits that can be written into the
+/// `splits` array.
+/// @return The number of splits in the `string`. If the return value is >=
+/// 'splits_count' then there are more splits in the string than can be written
+/// to the `splits` array. The number of splits written is capped to the
+/// capacity given by the caller, i.e. `splits_count`. This function should be
+/// called again with a sufficiently sized array if all splits are desired.
 DQN_API Dqn_isize   Dqn_String8Split(Dqn_String8 string, char delimiter, Dqn_String8 *splits, Dqn_isize splits_count);
 DQN_API Dqn_String8 Dqn_String8TrimPrefix(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
 DQN_API Dqn_String8 Dqn_String8TrimSuffix(Dqn_String8 string, Dqn_String8 suffix, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
@@ -863,8 +1046,8 @@ DQN_API Dqn_isize   Dqn_String8FindOffset(Dqn_String8 string, Dqn_String8 find, 
 // start_index: Set an index within the string string to start the search from, if not desired, set to 0
 // return: A string that points to the matching find, otherwise a 0 length string.
 DQN_API Dqn_String8 Dqn_String8Find(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
-DQN_API Dqn_String8 Dqn_String8Replace(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
-DQN_API Dqn_String8 Dqn_String8ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena);
+DQN_API Dqn_String8 Dqn_String8Replace(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator, Dqn_String8EqCase eq_case = Dqn_String8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator);
 
 // @info   Get the file name from a file path by searching from the end of the
 //         string backwards to the first occurring path separator '/' or '\'. If
@@ -894,10 +1077,14 @@ enum struct Dqn_LogType
     #undef X_ENTRY
 };
 
-char const *Dqn_LogTypeString[] = {
-    #define X_ENTRY(enum_val, string) string,
-    X_MACRO
-    #undef X_ENTRY
+inline Dqn_String8 Dqn_LogTypeString8(Dqn_LogType type)
+{
+    switch (type) {
+        #define X_ENTRY(enum_val, string) case Dqn_LogType::enum_val: return DQN_STRING8(string);
+        X_MACRO
+        #undef X_ENTRY
+    }
+    return DQN_STRING8("Internal error: Bad log type enum");
 };
 #undef X_MACRO
 
@@ -906,20 +1093,20 @@ typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, Dqn_String8 file, Dq
 // NOTE: Logging Macros
 // ------------------------------------------------------------------------------------------------
 // Macro logging functions, prefer this is you want to log messages
-#define DQN_LOG_E(fmt, ...) Dqn_Log(Dqn_LogType::Error,   dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_D(fmt, ...) Dqn_Log(Dqn_LogType::Debug,   dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_W(fmt, ...) Dqn_Log(Dqn_LogType::Warning, dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_I(fmt, ...) Dqn_Log(Dqn_LogType::Info,    dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_M(fmt, ...) Dqn_Log(Dqn_LogType::Memory,  dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_P(fmt, ...) Dqn_Log(Dqn_LogType::Profile, dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG(log_type, fmt, ...) Dqn_Log(log_type,     dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_E(fmt, ...) Dqn_Log(Dqn_LogType::Error,   dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_D(fmt, ...) Dqn_Log(Dqn_LogType::Debug,   dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_W(fmt, ...) Dqn_Log(Dqn_LogType::Warning, dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_I(fmt, ...) Dqn_Log(Dqn_LogType::Info,    dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_M(fmt, ...) Dqn_Log(Dqn_LogType::Memory,  dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG_P(fmt, ...) Dqn_Log(Dqn_LogType::Profile, dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define DQN_LOG(log_type, fmt, ...) Dqn_Log(log_type,     dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
 
-#define DQN_LOGV_E(fmt, va) Dqn_LogV(Dqn_LogType::Error,   dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_D(fmt, va) Dqn_LogV(Dqn_LogType::Debug,   dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_W(fmt, va) Dqn_LogV(Dqn_LogType::Warning, dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_I(fmt, va) Dqn_LogV(Dqn_LogType::Info,    dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_M(fmt, va) Dqn_LogV(Dqn_LogType::Memory,  dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_P(fmt, va) Dqn_LogV(Dqn_LogType::Profile, dqn_lib_.log_user_data, DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_E(fmt, va) Dqn_LogV(Dqn_LogType::Error,   dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_D(fmt, va) Dqn_LogV(Dqn_LogType::Debug,   dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_W(fmt, va) Dqn_LogV(Dqn_LogType::Warning, dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_I(fmt, va) Dqn_LogV(Dqn_LogType::Info,    dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_M(fmt, va) Dqn_LogV(Dqn_LogType::Memory,  dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
+#define DQN_LOGV_P(fmt, va) Dqn_LogV(Dqn_LogType::Profile, dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
 
 // Internal logging functions, prefer the logging macros above
 DQN_API void Dqn_LogVDefault(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, va_list va);
@@ -928,8 +1115,8 @@ DQN_API void Dqn_Log(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_St
 
 // NOTE: Dqn_Virtual
 // -------------------------------------------------------------------------------------------------
-DQN_API void *Dqn_VirtualReserve(Dqn_usize size, Dqn_b32 commit);
-DQN_API Dqn_b32 Dqn_VirtualCommit(void *ptr, Dqn_usize size);
+DQN_API void *Dqn_VirtualReserve(Dqn_usize size, bool commit);
+DQN_API bool Dqn_VirtualCommit(void *ptr, Dqn_usize size);
 DQN_API void Dqn_VirtualDecommit(void *ptr, Dqn_usize size);
 DQN_API void Dqn_VirtualRelease(void *ptr, Dqn_usize size);
 
@@ -954,56 +1141,6 @@ struct Dqn_AllocationTracer
 
 void Dqn_AllocationTracerAdd   (Dqn_AllocationTracer *tracer, void *ptr, Dqn_usize size DQN_CALL_SITE_ARGS);
 void Dqn_AllocationTracerRemove(Dqn_AllocationTracer *tracer, void *ptr);
-
-#if defined(DQN_WITH_CRT_ALLOCATOR)
-// NOTE: Dqn_CRTAllocator
-// -------------------------------------------------------------------------------------------------
-//
-// CRT Style allocators that are for interfacing with foreign libraries that
-// allow you to override malloc, realloc and free.
-//
-// Dqn_Arena is not designed to be used for replacing library
-// allocation stubs that expect to use CRT style allocation, i.e. malloc and
-// friends. This is by design, C libraries designed around that paradigm should
-// not be shoe-horned into another allocation scheme as the library you're
-// interfacing with has been designed with the liberal allocating and freeing
-// style encouraged by the CRT.
-//
-#define DQN_CRT_ALLOCATOR_MALLOC(name) void *name(size_t size)
-#define DQN_CRT_ALLOCATOR_REALLOC(name) void *name(void *ptr, size_t new_size)
-#define DQN_CRT_ALLOCATOR_FREE(name) void name(void *ptr)
-typedef DQN_CRT_ALLOCATOR_MALLOC(Dqn_CRTAllocatorMallocProc);
-typedef DQN_CRT_ALLOCATOR_REALLOC(Dqn_CRTAllocatorReallocProc);
-typedef DQN_CRT_ALLOCATOR_FREE(Dqn_CRTAllocatorFreeProc);
-struct Dqn_CRTAllocator
-{
-    // NOTE: Configurable Fields: Set after zero initialization or initialization.
-    Dqn_AllocationTracer         *tracer;  // (Optional) Initialize with Dqn_AllocationTracerInitWithMemory() to enable allocation tracing.
-    Dqn_CRTAllocatorMallocProc  *malloc;  // (Optional) When nullptr, DQN_MALLOC is called
-    Dqn_CRTAllocatorReallocProc *realloc; // (Optional) When nullptr, DQN_REALLOC is called
-    Dqn_CRTAllocatorFreeProc    *free;    // (Optional) When nullptr, DQN_FREE is called
-
-    // NOTE: Read Only Fields
-    Dqn_u64 malloc_bytes;
-    Dqn_u64 realloc_bytes;
-
-    Dqn_u64 malloc_count;
-    Dqn_u64 realloc_count;
-    Dqn_u64 free_count;
-};
-
-DQN_API Dqn_CRTAllocator  Dqn_CRTAllocatorInitWithProcs(Dqn_CRTAllocatorMallocProc *allocate_proc, Dqn_CRTAllocatorReallocProc *realloc_proc, Dqn_CRTAllocatorFreeProc *free_proc);
-DQN_API void              Dqn_CRTAllocatorFree         (Dqn_CRTAllocator *allocator, void *ptr);
-
-#define                   Dqn_CRTAllocatorMalloc(allocator, size)       Dqn__CRTAllocatorMalloc(allocator, size, DQN_CALL_SITE(""))
-#define                   Dqn_CRTAllocatorRealloc(allocator, ptr, size) Dqn__CRTAllocatorRealloc(allocator, ptr, size, DQN_CALL_SITE(""))
-
-#define                   Dqn_CRTAllocatorTaggedMalloc(allocator, size, tag)       Dqn__CRTAllocatorMalloc(allocator, size, DQN_CALL_SITE(tag))
-#define                   Dqn_CRTAllocatorTaggedRealloc(allocator, ptr, size, tag) Dqn__CRTAllocatorRealloc(allocator, ptr, size, DQN_CALL_SITE(tag))
-
-DQN_API void             *Dqn__CRTAllocatorMalloc(Dqn_CRTAllocator *allocator, Dqn_usize size DQN_CALL_SITE_ARGS);
-DQN_API void             *Dqn__CRTAllocatorRealloc(Dqn_CRTAllocator *allocator, void *ptr, Dqn_usize size DQN_CALL_SITE_ARGS);
-#endif // DQN_WITH_CRT_ALLOCATOR
 
 // NOTE: Dqn_Arena
 // -------------------------------------------------------------------------------------------------
@@ -1052,7 +1189,7 @@ struct Dqn_ArenaTempMemory
     Dqn_ArenaBlock *curr;      // The current block of the arena at the beginning of the scope
     Dqn_ArenaBlock *tail;      // The tail block of the arena at the beginning of the scope
     Dqn_isize       curr_used; // The current used amount of the current block
-    Dqn_ArenaStat  stats;     // The stats of the arena at the beginning of the scope
+    Dqn_ArenaStat   stats;     // The stats of the arena at the beginning of the scope
 };
 
 // Automatically begin and end a temporary memory scope on object construction
@@ -1073,16 +1210,52 @@ struct Dqn_ArenaTempMemoryScope
 #define      Dqn_ArenaGrow(arena, size, commit) Dqn_ArenaGrowTagged(nullptr, arena, size, commit)
 DQN_API bool Dqn_ArenaGrow_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit);
 
+// @info   Allocate bytes from the given arena
+// @return A pointer to the allocated bytes. Null if the arena failed to
+//         allocate memory
+#define       Dqn_ArenaAllocateTagged(tag, arena, size, align, zero_mem) Dqn_ArenaAllocate_(DQN_CALL_SITE(tag) arena, size, align, zero_mem)
+#define       Dqn_ArenaAllocate(arena, size, align, zero_mem) Dqn_ArenaAllocateTagged(nullptr, arena, size, align, zero_mem)
+DQN_API void *Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_u8 align, Dqn_ZeroMem zero_mem);
+
+// @info   Allocate a single object from the arena. No constructor is called.
+// @return A pointer to the allocated object. Null if the arena failed to
+//         allocate memory
+#define       Dqn_ArenaNew(arena, Type, zero_mem) Dqn_ArenaNewTagged(nullptr, arena, Type, zero_mem)
+#define       Dqn_ArenaNewTagged(tag, arena, Type, zero_mem) (Type *)Dqn_ArenaAllocate_(DQN_CALL_SITE(tag) arena, sizeof(Type), alignof(Type), zero_mem)
+
+// @info   Allocate an array of objects from the arena.
+// @return A pointer to the allocated object. Null if the arena failed to
+//         allocate memory
+#define       Dqn_ArenaNewArray(arena, Type, count, zero_mem) Dqn_ArenaNewArrayTagged(nullptr, arena, Type, count, zero_mem)
+#define       Dqn_ArenaNewArrayTagged(tag, arena, Type, count, zero_mem) (Type *)Dqn_ArenaAllocate_(DQN_CALL_SITE(tag) arena, sizeof(Type) * count, alignof(Type), zero_mem)
+
+// @info   Copy an object by allocating memory for the copy from the arena
+// @return A pointer to the allocated object. Null if the arena failed to
+//         allocate memory
+#define       Dqn_ArenaCopy(arena, Type, src, count) Dqn_ArenaCopyTagged(nullptr, arena, Type, src, count)
+#define       Dqn_ArenaCopyTagged(tag, arena, Type, src, count) (Type *)Dqn_ArenaCopy_(DQN_CALL_SITE_TAG(tag) arena, src, sizeof(*src) * count, alignof(Type))
+DQN_API void *Dqn_ArenaCopy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment);
+
+// @info   Copy an object by allocating memory for the copy from the arena. The
+//         object has a null-terminating byte at the end of the stream.
+// @return A pointer to the allocated object. Null if the arena failed to
+//         allocate memory
+#define       Dqn_ArenaCopyZ(arena, Type, src, count) Dqn_ArenaCopyZTagged(nullptr, arena, Type, src, count)
+#define       Dqn_ArenaCopyZTagged(tag, arena, Type, src, count) (Type *)Dqn_ArenaCopyZ_(DQN_CALL_SITE(tag) arena, src, sizeof(*src) * count, alignof(Type))
+DQN_API void *Dqn_ArenaCopyZ_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment);
+
 // @info   Set the arena's current block to the first block in the linked list
 //         of blocks and mark all blocks free.
-// @in     clear_mem: When true, the memory is cleared using DQN_MEMSET with the
+// @in     zero_mem: When yes, the memory is cleared using DQN_MEMSET with the
 //         value of DQN_MEMSET_BYTE
-DQN_API void Dqn_ArenaReset(Dqn_Arena *arena, bool clear_mem);
+DQN_API void Dqn_ArenaReset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
 
 // @info   Free the arena returning all memory back to the OS
-// @in     clear_mem: When true, the memory is cleared using DQN_MEMSET with the
+// @in     zero_mem: When true, the memory is cleared using DQN_MEMSET with the
 //         value of DQN_MEMSET_BYTE
-DQN_API void Dqn_ArenaFree(Dqn_Arena *arena, bool clear_mem);
+DQN_API void Dqn_ArenaFree(Dqn_Arena *arena, bool zero_mem);
+
+DQN_API Dqn_Allocator Dqn_ArenaAllocator(Dqn_Arena *arena);
 
 // @info   Begin an allocation scope where all allocations between begin and end
 //         calls will be reverted. Useful for short-lived or highly defined
@@ -1093,36 +1266,13 @@ DQN_API Dqn_ArenaTempMemory Dqn_ArenaBeginTempMemory(Dqn_Arena *arena);
 // @info   End an allocation scope previously begun by calling begin scope.
 DQN_API void Dqn_ArenaEndTempMemory(Dqn_ArenaTempMemory arena_temp_memory);
 
-// Arena Macro Summary
-// Allocate: Allocate bytes from the arena
-// New:      Allocate a single object from the arena
-// NewArray: Allocate an array of objects from the arena
-// Copy:     Allocate a copy of the pointer contents
-// CopyZ:    Allocate a copy of the pointer contents and null-terminate the
-//           allocation. This macro is only relevant for null-terminating byte
-//           streams.
-#define Dqn_ArenaTaggedAllocate(arena, size, align, zero_mem, tag) Dqn_ArenaAllocate_(arena, size, align, zero_mem DQN_CALL_SITE(tag))
-#define Dqn_ArenaTaggedNew(arena, Type, zero_mem, tag) (Type *)Dqn_ArenaAllocate_(arena, sizeof(Type), alignof(Type), zero_mem DQN_CALL_SITE(tag))
-#define Dqn_ArenaTaggedNewArray(arena, Type, count, zero_mem, tag) (Type *)Dqn_ArenaAllocate_(arena, sizeof(Type) * count, alignof(Type), zero_mem DQN_CALL_SITE(tag))
-#define Dqn_ArenaTaggedCopyZ(arena, Type, src, count, tag) (Type *)Dqn_ArenaCopyZInternal(arena, src, sizeof(*src) * count, alignof(Type) DQN_CALL_SITE(tag))
-#define Dqn_ArenaTaggedCopy(arena, Type, src, count, tag) (Type *)Dqn_ArenaCopyInternal(arena, src, sizeof(*src) * count, alignof(Type) DQN_CALL_SITE(tag))
-
-#define Dqn_ArenaAllocate(arena, size, align, zero_mem) Dqn_ArenaTaggedAllocate(arena, size, align, zero_mem, "")
-#define Dqn_ArenaNew(arena, Type, zero_mem) Dqn_ArenaTaggedNew(arena, Type, zero_mem, "")
-#define Dqn_ArenaNewArray(arena, Type, count, zero_mem) Dqn_ArenaTaggedNewArray(arena, Type, count, zero_mem, "")
-#define Dqn_ArenaCopyZ(arena, Type, src, count) Dqn_ArenaTaggedCopyZ(arena, Type, src, count, "")
-#define Dqn_ArenaCopy(arena, Type, src, count) Dqn_ArenaTaggedCopy(arena, Type, src, count, tag, "")
-
-// Allocate bytes from the arena, prefer the allocation macros which fill in the
-// call site arguments appropriately.
-DQN_API void *Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_u8 align, Dqn_ZeroMem zero_mem);
-
-// Log usage statistics of the arena
-DQN_API void  Dqn_ArenaLogStats(Dqn_Arena const *arena, char const *label);
+DQN_API Dqn_ArenaStatString Dqn_ArenaStatToString(Dqn_ArenaStat const *stat);
+DQN_API void Dqn_ArenaLogStats(Dqn_Arena const *arena);
 
 #if defined(DQN_WITH_MAP)
 // NOTE: Dqn_Map
 // -------------------------------------------------------------------------------------------------
+// A hash-table implementation that uses a linked-list for collisions.
 struct Dqn_Arena; // Foward declare
 
 template <typename T>
@@ -1153,12 +1303,23 @@ enum struct Dqn_MapCollideRule
     Fail,
 };
 
-template <typename T> Dqn_Map<T>       Dqn_MapInitWithArena(Dqn_Arena *arena, Dqn_isize size = 0);
-template <typename T> Dqn_MapEntry<T> *Dqn_MapFindOrAdd(Dqn_Map<T> *map, Dqn_u64 hash, Dqn_MapCollideRule rule);
-template <typename T> Dqn_MapEntry<T> *Dqn_MapAdd(Dqn_Map<T> *map, Dqn_u64 hash, T *value, Dqn_MapCollideRule rule);
-template <typename T> Dqn_MapEntry<T> *Dqn_MapAddCopy(Dqn_Map<T> *map, Dqn_u64 hash, const T &value, Dqn_MapCollideRule rule);
-template <typename T> Dqn_MapEntry<T> *Dqn_MapGet(Dqn_Map<T> *map, Dqn_u64 hash);
-template <typename T> void             Dqn_MapErase(Dqn_Map<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem);
+template <typename T>
+Dqn_Map<T> Dqn_MapInitWithArena(Dqn_Arena *arena, Dqn_isize size = 0);
+
+template <typename T>
+Dqn_MapEntry<T> *Dqn_MapFindOrAdd(Dqn_Map<T> *map, Dqn_u64 hash, Dqn_MapCollideRule rule);
+
+template <typename T>
+Dqn_MapEntry<T> *Dqn_MapAdd(Dqn_Map<T> *map, Dqn_u64 hash, T *value, Dqn_MapCollideRule rule);
+
+template <typename T>
+Dqn_MapEntry<T> *Dqn_MapAddCopy(Dqn_Map<T> *map, Dqn_u64 hash, const T &value, Dqn_MapCollideRule rule);
+
+template <typename T>
+Dqn_MapEntry<T> *Dqn_MapGet(Dqn_Map<T> *map, Dqn_u64 hash);
+
+template <typename T>
+void Dqn_MapErase(Dqn_Map<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem);
 #endif // DQN_WITH_MAP
 
 #if defined(DQN_WITH_DSMAP)
@@ -1180,24 +1341,41 @@ struct Dqn_DSMapEntry
 template <typename T>
 struct Dqn_DSMap
 {
-    Dqn_Arena  arena;
+    Dqn_Arena           arena;
     Dqn_DSMapEntry<T>  *slots;
     Dqn_isize           size;  // The number of slots
     Dqn_isize           count; // The number of slots occupied in the list
 };
 
-// (Optional) DSMap can be zero initialised, it will default to a size of
-// DQN_DS_MAP_MIN_SIZE elements, but if an initial size use the init function.
-// size: A power of 2 size.
-template <typename T> Dqn_DSMap<T>       Dqn_DSMapInit(Dqn_isize size);
-template <typename T> void               Dqn_DSMapFree(Dqn_DSMap<T> *map, bool clear_mem);
+// @info   Initialise a hash table with a given size. The given size must be
+//         a power of two. Initialisation is optional and the map can be
+//         zero-initialised in which the hash table will default to the size
+//         specified in DQN_DS_MAP_MIN_SIZE.
+// @in     size: The number of slots in the hash-table. This value must be
+//         a power of two.
+template <typename T>
+Dqn_DSMap<T> Dqn_DSMapInit(Dqn_isize size);
 
-template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapFind(Dqn_DSMap<T> *map, Dqn_u64 hash);
-template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapFindOrAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_b32 find_only);
-template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, T &value);
-template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapAddCopy(Dqn_DSMap<T> *map, Dqn_u64 hash, T const &value);
-template <typename T> Dqn_DSMapEntry<T> *Dqn_DSMapGet(Dqn_DSMap<T> *map, Dqn_u64 hash);
-template <typename T> void               Dqn_DSMapErase(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem);
+template <typename T>
+void Dqn_DSMapFree(Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem);
+
+template <typename T>
+Dqn_DSMapEntry<T> *Dqn_DSMapFind(Dqn_DSMap<T> *map, Dqn_u64 hash);
+
+template <typename T>
+Dqn_DSMapEntry<T> *Dqn_DSMapFindOrAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, bool find_only);
+
+template <typename T>
+Dqn_DSMapEntry<T> *Dqn_DSMapAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, T &value);
+
+template <typename T>
+Dqn_DSMapEntry<T> *Dqn_DSMapAddCopy(Dqn_DSMap<T> *map, Dqn_u64 hash, T const &value);
+
+template <typename T>
+Dqn_DSMapEntry<T> *Dqn_DSMapGet(Dqn_DSMap<T> *map, Dqn_u64 hash);
+
+template <typename T>
+void Dqn_DSMapErase(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem);
 #endif // DQN_WITH_DSMAP
 
 // NOTE: Dqn_Array
@@ -1205,9 +1383,9 @@ template <typename T> void               Dqn_DSMapErase(Dqn_DSMap<T> *map, Dqn_u
 template <typename T> struct Dqn_Array
 {
     Dqn_Arena *arena;
-    T                  *data;
-    Dqn_isize           size;
-    Dqn_isize           max;
+    T         *data;
+    Dqn_isize  size;
+    Dqn_isize  max;
 
     T const *begin() const { return data; }
     T const *end()   const { return data + size; }
@@ -1215,21 +1393,27 @@ template <typename T> struct Dqn_Array
     T *      end()         { return data + size; }
 };
 
-template <typename T> DQN_API Dqn_Array<T> Dqn_ArrayInitWithMemory(T *memory, Dqn_isize max, Dqn_isize size = 0);
-#define                                    Dqn_ArrayInitWithArenaNoGrow(arena, Type, max, size, zero_mem) Dqn_Array_InitWithArenaNoGrow<Type>(arena, max, size, zero_mem DQN_CALL_SITE(""))
+template <typename T>
+DQN_API Dqn_Array<T> Dqn_ArrayInitWithMemory(T *memory, Dqn_isize max, Dqn_isize size = 0);
 
-#define                                    Dqn_ArrayReserve(array, size) Dqn_Array_Reserve(array, size DQN_CALL_SITE(""))
+#define Dqn_ArrayInitWithArenaNoGrow(arena, Type, max, size, zero_mem) Dqn_Array_InitWithArenaNoGrow<Type>(arena, max, size, zero_mem DQN_CALL_SITE(""))
+#define Dqn_ArrayReserve(array, size) Dqn_ArrayReserve_(array, size DQN_CALL_SITE(""))
+#define Dqn_ArrayAddArray(array, items, num) Dqn_ArrayAddArray_(array, items, num DQN_CALL_SITE(""))
+#define Dqn_ArrayAdd(array, item) Dqn_ArrayAdd_(array, item DQN_CALL_SITE(""))
+#define Dqn_ArrayMake(array, num) Dqn_ArrayMake_(array, num DQN_CALL_SITE(""))
 
-#define                                    Dqn_ArrayAddArray(array, items, num) Dqn_Array_AddArray(array, items, num DQN_CALL_SITE(""))
-#define                                    Dqn_ArrayAdd(array, item) Dqn_Array_Add(array, item DQN_CALL_SITE(""))
-#define                                    Dqn_ArrayMake(array, num) Dqn_Array_Make(array, num DQN_CALL_SITE(""))
-template <typename T> DQN_API void         Dqn_ArrayClear(Dqn_Array<T> *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
+template <typename T>
+DQN_API void Dqn_ArrayClear(Dqn_Array<T> *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem_No);
 
-template <typename T> DQN_API void         Dqn_ArrayEraseStable(Dqn_Array<T> *a, Dqn_isize index);
-template <typename T> DQN_API void         Dqn_ArrayEraseUnstable(Dqn_Array<T> *a, Dqn_isize index);
+template <typename T>
+DQN_API void Dqn_ArrayEraseStable(Dqn_Array<T> *a, Dqn_isize index);
+template <typename T>
+DQN_API void Dqn_ArrayEraseUnstable(Dqn_Array<T> *a, Dqn_isize index);
 
-template <typename T> DQN_API void         Dqn_ArrayPop(Dqn_Array<T> *a, Dqn_isize num, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
-template <typename T> DQN_API T *          Dqn_ArrayPeek(Dqn_Array<T> *a);
+template <typename T>
+DQN_API void Dqn_ArrayPop(Dqn_Array<T> *a, Dqn_isize num, Dqn_ZeroMem zero_mem = Dqn_ZeroMem_No);
+template <typename T>
+DQN_API T *  Dqn_ArrayPeek(Dqn_Array<T> *a);
 
 // NOTE: Dqn_Lib: Library book-keeping
 // ------------------------------------------------------------------------------------------------
@@ -1249,9 +1433,8 @@ struct Dqn_Lib
 
 #if defined(DQN_DEBUG_THREAD_CONTEXT)
     Dqn_TicketMutex thread_context_mutex;
-    Dqn_ArenaStat  thread_context_arena_stats[256];
-    Dqn_ArenaStat  thread_context_arena_hwm_stats[256];
-    Dqn_u8          thread_context_arena_stats_size;
+    Dqn_ArenaStat   thread_context_arena_stats[256];
+    Dqn_u8          thread_context_arena_stats_count;
 #endif
 };
 
@@ -1276,14 +1459,13 @@ struct Dqn_FixedString
     char      data[MAX_];
     Dqn_isize size;
 
-    Dqn_b32 operator==(Dqn_FixedString const &other) const
-    {
+    bool operator==(Dqn_FixedString const &other) const {
         if (size != other.size) return false;
         bool result = DQN_MEMCMP(data, other.data, size);
         return result;
     }
 
-    Dqn_b32 operator!=(Dqn_FixedString const &other) const { return !(*this == other); }
+    bool operator!=(Dqn_FixedString const &other) const { return !(*this == other); }
 
     char const &operator[]   (Dqn_isize i) const { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data[i]; }
     char       &operator[]   (Dqn_isize i)       { DQN_ASSERT_MSG(i >= 0 && i < size, "%d >= 0 && %d < %d", i, size); return data[i]; }
@@ -1296,41 +1478,57 @@ struct Dqn_FixedString
 template <Dqn_isize MAX_> DQN_API Dqn_FixedString<MAX_> Dqn_FixedStringFmt(char const *fmt, ...);
 template <Dqn_isize MAX_> DQN_API Dqn_isize             Dqn_FixedStringMax(Dqn_FixedString<MAX_> *);
 template <Dqn_isize MAX_> DQN_API void                  Dqn_FixedStringClear(Dqn_FixedString<MAX_> *str);
-template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppendFmtV(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va);
-template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...);
-template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size = -1);
-template <Dqn_isize MAX_> DQN_API Dqn_b32               Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String8 src);
+template <Dqn_isize MAX_> DQN_API bool                  Dqn_FixedStringAppendFmtV(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va);
+template <Dqn_isize MAX_> DQN_API bool                  Dqn_FixedStringAppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...);
+template <Dqn_isize MAX_> DQN_API bool                  Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size = -1);
+template <Dqn_isize MAX_> DQN_API bool                  Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String8 src);
 template <Dqn_isize MAX_> DQN_API Dqn_String8            Dqn_FixedStringToString(Dqn_FixedString<MAX_> const *str);
 #endif // DQN_WITH_FIXED_STRING
 
-// NOTE: Dqn_String8List
-// -------------------------------------------------------------------------------------------------
-struct Dqn_String8ListNode
-{
-    Dqn_String8          string;
-    Dqn_String8ListNode *next;
-};
+// NOTE: Dqn_String8Builder API
+// -----------------------------------------------------------------------------
+typedef struct Dqn_String8Builder {
+    Dqn_Allocator    allocator;   ///< Allocator to use to back the string list
+    Dqn_String8Link *head;        ///< First string in the linked list of strings
+    Dqn_String8Link *tail;        ///< Last string in the linked list of strings
+    ptrdiff_t        string_size; ///< The size in bytes necessary to construct the current string
+    ptrdiff_t        count;       ///< The number of links in the linked list of strings
+} Dqn_String8Builder;
 
-struct Dqn_String8List
-{
-    Dqn_isize           string_size;
-    Dqn_String8ListNode *head;
-    Dqn_String8ListNode *curr;
-};
+/// Append a string to the list of strings in the builder by reference.
+/// The string's data must persist whilst the string builder is being used.
+/// @param builder The builder to append the string to
+/// @param string The string to append to the builder
+/// @return True if append was successful, false if parameters are invalid
+/// or memory allocation failure.
+bool Dqn_String8BuilderAppendString8Ref(Dqn_String8Builder *builder, Dqn_String8 string);
 
-DQN_API Dqn_String8ListNode *Dqn_String8ListMakeNode(Dqn_Arena *arena, Dqn_isize size);
-DQN_API void                Dqn_String8ListAddNode(Dqn_String8List *list, Dqn_String8ListNode *node);
-DQN_API void                Dqn_String8ListAppendFmtV(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, va_list args);
-DQN_API void                Dqn_String8ListAppendFmt(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, ...);
+/// Append a string to the list of strings in the builder by copy.
+/// The string is copied using the builder's allocator before appending.
+/// @param builder The builder to append the string to
+/// @param string The string to append to the builder
+/// @return True if append was successful, false if parameters are invalid
+/// or memory allocation failure.
+bool Dqn_String8BuilderAppendString8Copy(Dqn_String8Builder *builder, Dqn_String8 string);
 
-// Append a string to the list. The "Copy" variant will copy the string before
-// appending and should be used if the string to be passed in has transient
-// memory or will be further modified. The non "Copy" variant will avoid
-// a memory allocation and just shallow copy the string into the node.
-DQN_API void                Dqn_String8ListAppendString(Dqn_String8List *list, Dqn_Arena *arena, Dqn_String8 string);
-DQN_API void                Dqn_String8ListAppendStringCopy(Dqn_String8List *list, Dqn_Arena *arena, Dqn_String8 string);
-DQN_API void                Dqn_String8ListAppendFmt(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, ...);
-DQN_API Dqn_String8          Dqn_String8ListBuild(Dqn_String8List const *list, Dqn_Arena *arena);
+/// @copydoc Dqn_String8BuilderAppendFmtArgs
+/// @param args The variable argument list to use in the format string
+bool Dqn_String8BuilderAppendFmtVArgs(Dqn_String8Builder *builder, char const *fmt, va_list args);
+
+/// Append a printf-style format string to the list of strings in the builder.
+/// @param builder The builder to append the string to
+/// @param fmt The format string to use
+/// @return True if append was successful, false if parameters are invalid
+/// or memory allocation failure.
+bool Dqn_String8BuilderAppendFmtArgs(Dqn_String8Builder *builder, char const *fmt, ...);
+
+/// Build the list of strings into the final composite string from the string
+/// builder
+/// @param builder The string builder to build the string from
+/// @param allocator The allocator to use to build the string
+/// @return The string if build was successful, empty string if parameters are
+/// invalid or memory allocation failure.
+Dqn_String8 Dqn_String8BuilderBuild(Dqn_String8Builder const *builder, Dqn_Allocator allocator);
 
 #if defined(DQN_WITH_FIXED_ARRAY)
 // NOTE: Dqn_FixedArray
@@ -1365,14 +1563,14 @@ DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArra
 
 // Bump the size of the array and return a pointer to 'num' uninitialised elements
 DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArrayMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayClear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayClear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem = Dqn_ZeroMem_No);
 DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayEraseStable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
 DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayEraseUnstable(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize index);
-DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayPop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1, Dqn_ZeroMem zero_mem = Dqn_ZeroMem::No);
+DQN_FIXED_ARRAY_TEMPLATE DQN_API void                              Dqn_FixedArrayPop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num = 1, Dqn_ZeroMem zero_mem = Dqn_ZeroMem_No);
 DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArrayPeek(DQN_FIXED_ARRAY_TEMPLATE_DECL *a);
 DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                 Dqn_FixedArrayPeekCopy(DQN_FIXED_ARRAY_TEMPLATE_DECL const *a);
 template <typename T, int MAX_, typename IsEqual> DQN_API T       *Dqn_FixedArrayFind(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualProc);
-template <typename T, int MAX_, typename IsEqual> DQN_API Dqn_b32  Dqn_FixedArrayFindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc);
+template <typename T, int MAX_, typename IsEqual> DQN_API bool     Dqn_FixedArrayFindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc);
 DQN_FIXED_ARRAY_TEMPLATE DQN_API T                                *Dqn_FixedArrayFind(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T *find);
 #endif // DQN_WITH_FIXED_ARRAY
 
@@ -1418,7 +1616,7 @@ template <typename T> DQN_API Dqn_List<T>  Dqn_ListInitWithArena(Dqn_Arena *aren
    }
 */
 // start_index: The index to start iterating from
-template <typename T> DQN_API Dqn_b32  Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index);
+template <typename T> DQN_API bool     Dqn_ListIterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index);
 
 // at_chunk: (Optional) The chunk that the index belongs to will be set in this parameter if given
 // return: The element, or null pointer if it is not a valid index.
@@ -1615,7 +1813,7 @@ struct Dqn_Rect
     Dqn_Rect(Dqn_V2  min, Dqn_V2 max)  : min(min), max(max) {}
     Dqn_Rect(Dqn_V2I min, Dqn_V2I max) : min(min), max(max) {}
     Dqn_Rect(Dqn_f32 x, Dqn_f32 y, Dqn_f32 max_x, Dqn_f32 max_y) : min(x, y), max(max_x, max_y) {}
-    Dqn_b32 operator==(Dqn_Rect other) const { return (min == other.min) && (max == other.max); }
+    bool operator==(Dqn_Rect other) const { return (min == other.min) && (max == other.max); }
 };
 
 struct Dqn_RectI32
@@ -1627,12 +1825,12 @@ struct Dqn_RectI32
 
 DQN_API Dqn_Rect Dqn_RectInitFromPosAndSize(Dqn_V2 pos, Dqn_V2 size);
 DQN_API Dqn_V2   Dqn_RectCenter(Dqn_Rect rect);
-DQN_API Dqn_b32  Dqn_RectContainsPoint(Dqn_Rect rect, Dqn_V2 p);
-DQN_API Dqn_b32  Dqn_RectContainsRect(Dqn_Rect a, Dqn_Rect b);
+DQN_API bool     Dqn_RectContainsPoint(Dqn_Rect rect, Dqn_V2 p);
+DQN_API bool     Dqn_RectContainsRect(Dqn_Rect a, Dqn_Rect b);
 DQN_API Dqn_V2   Dqn_RectSize(Dqn_Rect rect);
 DQN_API Dqn_Rect Dqn_RectMove(Dqn_Rect src, Dqn_V2 move_amount);
 DQN_API Dqn_Rect Dqn_RectMoveTo(Dqn_Rect src, Dqn_V2 dest);
-DQN_API Dqn_b32  Dqn_RectIntersects(Dqn_Rect a, Dqn_Rect b);
+DQN_API bool     Dqn_RectIntersects(Dqn_Rect a, Dqn_Rect b);
 DQN_API Dqn_Rect Dqn_RectIntersection(Dqn_Rect a, Dqn_Rect b);
 DQN_API Dqn_Rect Dqn_RectUnion(Dqn_Rect a, Dqn_Rect b);
 DQN_API Dqn_Rect Dqn_RectFromRectI32(Dqn_RectI32 a);
@@ -1648,8 +1846,8 @@ DQN_API Dqn_f32 Dqn_LerpF32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b);
 // -------------------------------------------------------------------------------------------------
 DQN_API void    Dqn_BitUnsetInplace(Dqn_u32 *flags, Dqn_u32 bitfield);
 DQN_API void    Dqn_BitSetInplace(Dqn_u32 *flags, Dqn_u32 bitfield);
-DQN_API Dqn_b32 Dqn_BitIsSet(Dqn_u32 bits, Dqn_u32 bits_to_set);
-DQN_API Dqn_b32 Dqn_BitIsNotSet(Dqn_u32 bits, Dqn_u32 bits_to_check);
+DQN_API bool    Dqn_BitIsSet(Dqn_u32 bits, Dqn_u32 bits_to_set);
+DQN_API bool    Dqn_BitIsNotSet(Dqn_u32 bits, Dqn_u32 bits_to_check);
 
 // NOTE: Safe Arithmetic
 // -------------------------------------------------------------------------------------------------
@@ -1678,15 +1876,15 @@ DQN_API int       Dqn_SafeTruncateU64ToInt    (Dqn_u64 val);
 
 // NOTE: Dqn_Char
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32 Dqn_CharIsAlpha       (char ch);
-DQN_API Dqn_b32 Dqn_CharIsDigit       (char ch);
-DQN_API Dqn_b32 Dqn_CharIsAlphaNum    (char ch);
-DQN_API Dqn_b32 Dqn_CharIsWhitespace  (char ch);
-DQN_API Dqn_b32 Dqn_CharIsHex         (char ch);
-DQN_API Dqn_u8  Dqn_CharHexToU8       (char ch);
-DQN_API char    Dqn_CharToHex         (char ch);
-DQN_API char    Dqn_CharToHexUnchecked(char ch);
-DQN_API char    Dqn_CharToLower       (char ch);
+DQN_API bool   Dqn_CharIsAlpha       (char ch);
+DQN_API bool   Dqn_CharIsDigit       (char ch);
+DQN_API bool   Dqn_CharIsAlphaNum    (char ch);
+DQN_API bool   Dqn_CharIsWhitespace  (char ch);
+DQN_API bool   Dqn_CharIsHex         (char ch);
+DQN_API Dqn_u8 Dqn_CharHexToU8       (char ch);
+DQN_API char   Dqn_CharToHex         (char ch);
+DQN_API char   Dqn_CharToHexUnchecked(char ch);
+DQN_API char   Dqn_CharToLower       (char ch);
 
 // NOTE: Dqn_Char
 // -------------------------------------------------------------------------------------------------
@@ -1719,9 +1917,9 @@ DQN_API void Dqn_HexToBytes(char const *hex, int hex_size, void *dest, int dest_
 // Convert a series of bytes into a string. The CString variant returns a string
 // with length (size * 2) with 1 extra byte for the null-terminator. The
 // return: nullptr/invalid Dqn_String8 if the allocation failed, otherwise the hex string in ASCII.
-DQN_API char       *Dqn_HexBytesToHexCStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena);
+DQN_API char        *Dqn_HexBytesToHexCStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena);
 DQN_API Dqn_String8  Dqn_HexBytesToHexStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena);
-DQN_API char       *Dqn_HexU8ArrayToHexCStringArena(Dqn_Array<Dqn_u8> const array, Dqn_Arena *arena);
+DQN_API char        *Dqn_HexU8ArrayToHexCStringArena(Dqn_Array<Dqn_u8> const array, Dqn_Arena *arena);
 DQN_API Dqn_String8  Dqn_HexU8ArrayToHexStringArena(Dqn_Array<Dqn_u8> const array, Dqn_Arena *arena);
 
 // Convert a char string to a binary representation without any checks except assertions in debug.
@@ -1733,12 +1931,12 @@ DQN_API Dqn_Array<Dqn_u8>  Dqn_HexStringToU8Array(Dqn_String8 const hex, Dqn_Are
 
 // NOTE: Dqn_Str
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32     Dqn_CStringEquals(char const *a, char const *b, Dqn_isize a_size = -1, Dqn_isize b_size = -1);
+DQN_API bool        Dqn_CStringEquals(char const *a, char const *b, Dqn_isize a_size = -1, Dqn_isize b_size = -1);
 DQN_API char const *Dqn_CStringFindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_sizes, Dqn_isize find_size, Dqn_isize *match_index, Dqn_isize buf_size = -1);
-DQN_API char const *Dqn_CStringFind(char const *buf, char const *find, Dqn_isize buf_size = -1, Dqn_isize find_size = -1, Dqn_b32 case_insensitive = false);
+DQN_API char const *Dqn_CStringFind(char const *buf, char const *find, Dqn_isize buf_size = -1, Dqn_isize find_size = -1, bool case_insensitive = false);
 DQN_API char const *Dqn_CStringFileNameFromPath(char const *path, Dqn_isize size = -1, Dqn_isize *file_name_size = nullptr);
 DQN_API Dqn_isize   Dqn_CStringSize(char const *a);
-DQN_API Dqn_b32     Dqn_CStringMatch(char const *src, char const *find, int find_size);
+DQN_API bool        Dqn_CStringMatch(char const *src, char const *find, int find_size);
 DQN_API char const *Dqn_CStringSkipToChar(char const *src, char ch);
 DQN_API char const *Dqn_CStringSkipToNextAlphaNum(char const *src);
 DQN_API char const *Dqn_CStringSkipToNextDigit(char const *src);
@@ -1754,7 +1952,7 @@ DQN_API char const *Dqn_CStringSkipToNextWordInPlace(char const **src);
 DQN_API char const *Dqn_CStringSkipWhitespaceInPlace(char const **src);
 DQN_API char const *Dqn_CStringTrimWhitespaceAround(char const *src, Dqn_isize size, Dqn_isize *new_size);
 DQN_API char const *Dqn_CStringTrimPrefix(char const *src, Dqn_isize size, char const *prefix, Dqn_isize prefix_size, Dqn_isize *trimmed_size);
-DQN_API Dqn_b32     Dqn_CStringIsAllDigits(char const *src, Dqn_isize size);
+DQN_API bool        Dqn_CStringIsAllDigits(char const *src, Dqn_isize size);
 
 // separator: The separator between the thousand-th digits, i.e. separator = ',' converts '1,234' to '1234'.
 DQN_API Dqn_u64     Dqn_CStringToU64(char const *buf, Dqn_isize size = -1, char separator = ',');
@@ -1762,9 +1960,9 @@ DQN_API Dqn_i64     Dqn_CStringToI64(char const *buf, Dqn_isize size = -1, char 
 
 DQN_API Dqn_isize   Dqn_LStringSize(wchar_t const *a);
 
-// NOTE: Dqn_File
+// NOTE: Dqn_Fs
 // -------------------------------------------------------------------------------------------------
-struct Dqn_FileInfo
+struct Dqn_FsInfo
 {
     Dqn_u64 create_time_in_s;
     Dqn_u64 last_write_time_in_s;
@@ -1774,30 +1972,35 @@ struct Dqn_FileInfo
 };
 
 // TODO(dqn): We should have a Dqn_String8 interface and a CString interface
-DQN_API Dqn_b32      Dqn_FileExists(Dqn_String8 path);
-DQN_API Dqn_b32      Dqn_FileDirExists(Dqn_String8 path);
-DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String8 path);
-DQN_API Dqn_b32      Dqn_FileCopy(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrite);
+DQN_API bool         Dqn_FsExists(Dqn_String8 path);
+DQN_API bool         Dqn_FsDirExists(Dqn_String8 path);
+DQN_API Dqn_FsInfo   Dqn_FsGetInfo(Dqn_String8 path);
+DQN_API bool         Dqn_FsCopy(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
 
-// temp_arena: Only used on Linux otherwise ignored
-DQN_API Dqn_b32      Dqn_FileMakeDir(Dqn_String8 path, Dqn_Arena *temp_arena);
-DQN_API Dqn_b32      Dqn_FileMove(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrite);
+DQN_API bool         Dqn_FsMakeDir(Dqn_String8 path);
+DQN_API bool         Dqn_FsMove(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
 
 // TODO(dqn): This doesn't work on directories unless you delete the files
 // in that directory first.
-DQN_API Dqn_b32      Dqn_FileDelete(Dqn_String8 path);
+DQN_API bool         Dqn_FsDelete(Dqn_String8 path);
 
 // file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
 // allocator: (Optional) When null, the buffer is allocated with DQN_MALLOC, result should be freed with DQN_FREE.
 // return: nullptr if allocation failed.
-#define             Dqn_FileArenaRead(file_path, file_path_size, file_size, arena) Dqn__FileArenaRead(file_path, file_path_size, file_size, arena DQN_CALL_SITE(""))
-#define             Dqn_FileTaggedArenaReadFileToString(file_path, file_path_size, arena, tag) Dqn__FileArenaReadToString(file_path, file_path_size, arena DQN_CALL_SITE(tag))
-#define             Dqn_FileArenaReadToString(file_path, file_path_size, arena) Dqn__FileArenaReadToString(file_path, file_path_size, arena DQN_CALL_SITE(""))
-DQN_API Dqn_b32     Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size);
+DQN_API bool         Dqn_FsWriteFileCString8(char const *path, Dqn_isize path_size, char const *buffer, Dqn_isize buffer_size);
+DQN_API bool         Dqn_FsWriteFileString8(Dqn_String8 path, Dqn_String8 buffer);
 
-DQN_API char       *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
-DQN_API char       *Dqn__FileArenaRead(char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
-DQN_API Dqn_String8  Dqn__FileArenaReadToString(char const *file, Dqn_isize file_path_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS);
+#define              Dqn_FsReadFileCString8ToCString8Arena(path, path_size, file_size, arena) Dqn_FsReadFileCString8ToCString8ArenaTagged(nullptr, path, path_size, file_size, arena)
+#define              Dqn_FsReadFileCString8ToCString8ArenaTagged(tag, path, path_size, arena) Dqn_FsReadFileCString8ToCString8Arena_(DQN_CALL_SITE(tag) path, path_size, arena)
+DQN_API char        *Dqn_FsReadFileCString8ToCString8Arena_(DQN_CALL_SITE_ARGS char const *path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Arena *arena);
+
+#define              Dqn_FsReadFileCString8ToString8Arena(path, path_size, arena) Dqn_FsReadFileCString8ToString8ArenaTagged(nullptr, path, path_size, arena)
+#define              Dqn_FsReadFileCString8ToString8ArenaTagged(tag, path, path_size, arena) Dqn_FsReadFileCString8ToString8Arena_(DQN_CALL_SITE(tag) path, path_size, arena)
+DQN_API Dqn_String8  Dqn_FsReadFileCString8ToString8Arena_(DQN_CALL_SITE_ARGS  char const *path, Dqn_isize path_size, Dqn_Arena *arena);
+
+#define              Dqn_FsReadFileString8ToString8Arena(path, arena) Dqn_FsReadFileString8ToString8ArenaTagged(nullptr, path, arena)
+#define              Dqn_FsReadFileString8ToString8ArenaTagged(tag, path, arena) Dqn_FsReadFileString8ToString8Arena_(DQN_CALL_SITE(tag) path, arena)
+DQN_API Dqn_String8  Dqn_FsReadFileString8ToString8Arena_(DQN_CALL_SITE_ARGS Dqn_String8 path, Dqn_Arena *arena);
 
 // NOTE: Date
 // -------------------------------------------------------------------------------------------------
@@ -1824,6 +2027,7 @@ struct Dqn_DateHMSTime
 // @return The current time at the point of invocation
 DQN_API Dqn_DateHMSTime       Dqn_DateHMSLocalTimeNow();
 DQN_API Dqn_DateHMSTimeString Dqn_DateHMSLocalTimeStringNow(char date_separator = '-', char hms_separator = ':');
+DQN_API Dqn_DateHMSTimeString Dqn_DateHMSLocalTimeString(Dqn_DateHMSTime time, char date_separator = '-', char hms_separator = ':');
 
 // return: The time elapsed since Unix epoch (1970-01-01T00:00:00Z) in seconds
 DQN_API Dqn_u64 Dqn_DateEpochTime();
@@ -1831,11 +2035,11 @@ DQN_API Dqn_u64 Dqn_DateEpochTime();
 // NOTE: OS
 // -------------------------------------------------------------------------------------------------
 // Generate cryptographically secure bytes
-DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size);
+DQN_API bool Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size);
 
 // return: The directory without the trailing '/' or ('\' for windows). Empty
 //         string with a nullptr if it fails.
-DQN_API Dqn_String8 Dqn_OSEXEDir(Dqn_Arena *arena);
+DQN_API Dqn_String8 Dqn_OSEXEDir(Dqn_Allocator allocator);
 
 // NOTE: Utiltiies
 // -------------------------------------------------------------------------------------------------
@@ -1875,8 +2079,8 @@ struct Dqn_U64Str
 // into the string buffer backwards and return a the char pointer to it, we
 // should just write it in and memory copy it back so that it's at the start of
 // the buffer. See Dqn_MoneyString for an example of this.
-DQN_API char *Dqn_U64ToStr    (Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep);
-DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, Dqn_b32 comma_sep = true);
+DQN_API char *Dqn_U64ToStr    (Dqn_u64 val, Dqn_U64Str *result, bool comma_sep);
+DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, bool comma_sep = true);
 
 // NOTE: Dqn_ThreadContext
 // -------------------------------------------------------------------------------------------------
@@ -1889,14 +2093,13 @@ DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, Dqn_b32 comma_sep = true);
 
 struct Dqn_ThreadScratchData
 {
-    Dqn_Arena arena;
-    Dqn_u8    arena_stats_index; // Index into Dqn_Lib's thread context arena stats array
+    Dqn_Arena arena;          // The arena for this thread's scratch arena
+    Dqn_u8 arena_stats_index; // Index into the library's thread context array
 };
 
 struct Dqn_ThreadContext
 {
     Dqn_b32 init;
-
     // Thread data that is handed out when the thread context is requested.
     Dqn_ThreadScratchData scratch_data[DQN_THREAD_CONTEXT_ARENAS];
 };
@@ -1913,10 +2116,9 @@ struct Dqn_ThreadScratch
 
     ~Dqn_ThreadScratch()
     {
-    #if defined(DQN_DEBUG_THREAD_CONTEXT)
-        dqn_lib_.thread_context_arena_hwm_stats[arena_stats_index] = arena->hwm_stats;
+        #if defined(DQN_DEBUG_THREAD_CONTEXT)
         dqn_lib_.thread_context_arena_stats[arena_stats_index] = arena->stats;
-    #endif
+        #endif
 
         DQN_ASSERT(destructed == false);
         Dqn_ArenaEndTempMemory(arena_temp_memory);
@@ -1929,13 +2131,18 @@ struct Dqn_ThreadScratch
     Dqn_ArenaTempMemory  arena_temp_memory;
 };
 
-// A scratch thread context gives you a arena unique to the thread that is
-// temporarily scoped to the block of code it is requested in. On scope exit,
-// the arena will be freed. This is useful for very short-lived allocations.
-// conflict_arena: Pass in any of the arenas currently being used in the
-// function to ensure that the arena assigned to the new ThreadScratch
-// will not overwrite allocations belonging to another scratch.
-DQN_API Dqn_ThreadScratch Dqn_ThreadGetScratch(const Dqn_Arena *conflict_arena = nullptr);
+/// Retrieve the per-thread temporary arena allocator that is reset on scope
+/// exit.
+///
+/// The scratch arena must be deconflicted with any existing arenas in the
+/// function to avoid trampling over each other's memory. Consider the situation
+/// where the scratch arena is passed into the function. Inside the function, if
+/// the same arena is reused then, if both arenas allocate, when the inner arena
+/// is reset, this will undo the passed in arena's allocations in the function.
+///
+/// @param[in] conflict_arena A pointer to the arena currently being used in the
+/// function
+DQN_API Dqn_ThreadScratch Dqn_ThreadGetScratch(const void *conflict_arena = nullptr);
 
 // Get the current thread's context- this contains all the metadata for managing
 // the thread scratch data. In general you probably want Dqn_ThreadGetScratch()
@@ -1944,45 +2151,58 @@ DQN_API Dqn_ThreadScratch Dqn_ThreadGetScratch(const Dqn_Arena *conflict_arena =
 DQN_API Dqn_ThreadContext *Dqn_ThreadGetContext();
 
 #if defined(DQN_WITH_JSON_WRITER)
-
-#if !defined(DQN_WITH_FIXED_STRING)
-    #error JsonWriter requires DQN_WITH_FIXED_STRING to be defined
-#endif
-
-// NOTE: Dqn_JsonWriter
+// NOTE: Dqn_JSONWriter
 // -------------------------------------------------------------------------------------------------
 // TODO(dqn): We need to write tests for this
-struct Dqn_JsonWriter
+struct Dqn_JSONWriter
 {
-    Dqn_u16         parent_field_count_stack[32];
-    int             parent_field_count_stack_size;
-    Dqn_Arena      *arena;
-    Dqn_String8List  list;
-    int             indent_level;
-    int             spaces_per_indent;
+    Dqn_u16             parent_field_count_stack[32];
+    int                 parent_field_count_stack_size;
+    Dqn_String8Builder  builder;
+    int                 indent_level;
+    int                 spaces_per_indent;
 };
 
-DQN_API Dqn_JsonWriter Dqn_JsonWriterInit(Dqn_Arena *arena, int spaces_per_indent);
-DQN_API Dqn_String8     Dqn_JsonWriterBuild(Dqn_JsonWriter *writer, Dqn_Arena *arena);
+#define Dqn_JSONWriterObject(writer)                  \
+    DQN_DEFER_LOOP(Dqn_JSONWriterObjectBegin(writer), \
+                   Dqn_JSONWriterObjectEnd(writer))
 
-DQN_API void           Dqn_JsonWriterBeginNamedObject(Dqn_JsonWriter *writer, Dqn_String8 name);
-DQN_API void           Dqn_JsonWriterBeginObject(Dqn_JsonWriter *writer);
-DQN_API void           Dqn_JsonWriterEndObject(Dqn_JsonWriter *writer);
+#define Dqn_JSONWriterObjectNamed(writer, name)                  \
+    DQN_DEFER_LOOP(Dqn_JSONWriterObjectBeginNamed(writer, name), \
+                   Dqn_JSONWriterObjectEnd(writer))
 
-DQN_API void           Dqn_JsonWriterBeginNamedArray(Dqn_JsonWriter *writer, Dqn_String8 name);
-DQN_API void           Dqn_JsonWriterBeginArray(Dqn_JsonWriter *writer, Dqn_String8 name);
-DQN_API void           Dqn_JsonWriterEndArray(Dqn_JsonWriter *writer);
+#define Dqn_JSONWriterArray(writer)                  \
+    DQN_DEFER_LOOP(Dqn_JSONWriterArrayBegin(writer), \
+                   Dqn_JSONWriterArrayEnd(writer))
 
-DQN_API void           Dqn_JsonWriterNamedString(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_String8 value);
-DQN_API void           Dqn_JsonWriterString(Dqn_JsonWriter *writer, Dqn_String8 value);
+#define Dqn_JSONWriterArrayNamed(writer, name)                  \
+    DQN_DEFER_LOOP(Dqn_JSONWriterArrayBeginNamed(writer, name), \
+                   Dqn_JSONWriterArrayEnd(writer))
 
-DQN_API void           Dqn_JsonWriterNamedU64(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_u64 value);
-DQN_API void           Dqn_JsonWriterU64(Dqn_JsonWriter *writer, Dqn_u64 value);
+DQN_API Dqn_JSONWriter Dqn_JSONWriterInit(Dqn_Arena *arena, int spaces_per_indent);
+DQN_API Dqn_String8    Dqn_JSONWriterBuild(Dqn_JSONWriter *writer, Dqn_Arena *arena);
 
-// decimal_places: When < 0 show the maximum amount of decimal places
+DQN_API void           Dqn_JSONWriterObjectBeginNamed(Dqn_JSONWriter *writer, Dqn_String8 name);
+DQN_API void           Dqn_JSONWriterObjectBegin(Dqn_JSONWriter *writer);
+DQN_API void           Dqn_JSONWriterObjectEnd(Dqn_JSONWriter *writer);
+
+DQN_API void           Dqn_JSONWriterArrayBeginNamed(Dqn_JSONWriter *writer, Dqn_String8 name);
+DQN_API void           Dqn_JSONWriterArrayBegin(Dqn_JSONWriter *writer, Dqn_String8 name);
+DQN_API void           Dqn_JSONWriterArrayEnd(Dqn_JSONWriter *writer);
+
+DQN_API void           Dqn_JSONWriterStringNamed(Dqn_JSONWriter *writer, Dqn_String8 key, Dqn_String8 value);
+DQN_API void           Dqn_JSONWriterString(Dqn_JSONWriter *writer, Dqn_String8 value);
+
+DQN_API void           Dqn_JSONWriterU64Named(Dqn_JSONWriter *writer, Dqn_String8 key, Dqn_u64 value);
+DQN_API void           Dqn_JSONWriterU64(Dqn_JSONWriter *writer, Dqn_u64 value);
+
+DQN_API void           Dqn_JSONWriterI64Named(Dqn_JSONWriter *writer, Dqn_String8 key, Dqn_i64 value);
+DQN_API void           Dqn_JSONWriterI64(Dqn_JSONWriter *writer, Dqn_i64 value);
+
+// decimal_places: When < 0 show the default number of decimal places
 //                 When >=0 show the specified amount of decimal places
-DQN_API void           Dqn_JsonWriterNamedF64(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_f64 value, int decimal_places = -1);
-DQN_API void           Dqn_JsonWriterF64(Dqn_JsonWriter *writer, Dqn_f64 value, int decimal_places = -1);
+DQN_API void           Dqn_JSONWriterF64Named(Dqn_JSONWriter *writer, Dqn_String8 key, Dqn_f64 value, int decimal_places = -1);
+DQN_API void           Dqn_JSONWriterF64(Dqn_JSONWriter *writer, Dqn_f64 value, int decimal_places = -1);
 #endif // DQN_WITH_JSON_WRITER
 
 #if defined(DQN_OS_WIN32)
@@ -2001,10 +2221,6 @@ DQN_API Dqn_WinErrorMsg Dqn_WinLastError();
 // monitor.
 DQN_API void Dqn_WinMakeProcessDPIAware();
 
-// Automatically dumps to DQN_LOG_E
-#define Dqn_WinDumpLastError(fmt, ...) Dqn_WinDumpLastError_(DQN_STRING(__FILE__), DQN_STRING(__func__), __LINE__, fmt, ##__VA_ARGS__)
-DQN_API void Dqn_WinDumpLastError_(Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, ...);
-
 // NOTE: Windows String8 To String16
 // -----------------------------------------------------------------------------
 // @info   Convert a UTF8 to UTF16 string. The exact size buffer required for
@@ -2016,7 +2232,7 @@ DQN_API void Dqn_WinDumpLastError_(Dqn_String8 file, Dqn_String8 func, Dqn_uint 
 //         a conversion error and can be queried using 'Dqn_WinLastError'
 DQN_API int          Dqn_WinCString8ToCString16(const char *src, int src_size, wchar_t *dest, int dest_size);
 DQN_API int          Dqn_WinString8ToCString16(Dqn_String8 src, wchar_t* dest, int dest_size);
-DQN_API Dqn_String16 Dqn_WinString8ToString16Arena(Dqn_String8 src, Dqn_Arena *arena);
+DQN_API Dqn_String16 Dqn_WinString8ToString16Allocator(Dqn_String8 src, Dqn_Allocator allocator);
 
 // NOTE: Windows String16 To String8
 // -----------------------------------------------------------------------------
@@ -2027,10 +2243,10 @@ DQN_API Dqn_String16 Dqn_WinString8ToString16Arena(Dqn_String8 src, Dqn_Arena *a
 //         This function *always* null-terminates the input buffer.
 // @return The number of u8's written/required for conversion. 0 if there was
 //         a conversion error and can be queried using 'Dqn_WinLastError'
-DQN_API int        Dqn_WinCString16ToCString8(const wchar_t *src, int src_size, char *dest, int dest_size);
-DQN_API Dqn_String8 Dqn_WinCString16ToString8Arena(const wchar_t *src, int src_size, Dqn_Arena *arena);
-DQN_API int        Dqn_WinString16ToCString8(Dqn_String16 src, char *dest, int dest_size);
-DQN_API Dqn_String8 Dqn_WinString16ToString8Arena(Dqn_String16 src, Dqn_Arena *arena);
+DQN_API int         Dqn_WinCString16ToCString8(const wchar_t *src, int src_size, char *dest, int dest_size);
+DQN_API Dqn_String8 Dqn_WinCString16ToString8Allocator(const wchar_t *src, int src_size, Dqn_Allocator allocator);
+DQN_API int         Dqn_WinString16ToCString8(Dqn_String16 src, char *dest, int dest_size);
+DQN_API Dqn_String8 Dqn_WinString16ToString8Allocator(Dqn_String16 src, Dqn_Allocator allocator);
 
 // NOTE: Windows Executable Directory
 // -----------------------------------------------------------------------------
@@ -2048,8 +2264,8 @@ DQN_API Dqn_String16 Dqn_WinEXEDirWArena(Dqn_Arena *arena);
 // size: (Optional) The size of the current directory string returned
 // suffix: (Optional) A suffix to append to the current working directory
 // suffix_size: (Optional) The size of the suffix to append
-DQN_API Dqn_String8   Dqn_WinWorkingDir(Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String8 suffix);
-DQN_API Dqn_String16 Dqn_WinWorkingDirW(Dqn_Arena *arena, Dqn_String16 suffix);
+DQN_API Dqn_String8  Dqn_WinWorkingDir(Dqn_Allocator allocator, Dqn_String8 suffix);
+DQN_API Dqn_String16 Dqn_WinWorkingDirW(Dqn_Allocator allocator, Dqn_String16 suffix);
 
 struct Dqn_WinFolderIteratorW
 {
@@ -2256,7 +2472,7 @@ Dqn_Map<T> Dqn_MapInitWithArena(Dqn_Arena *arena, Dqn_isize size)
     result.arena      = arena;
 
     Dqn_isize final_size          = size == 0 ? 4096 : size;
-    result.slots                  = Dqn_ArenaNewArray(arena, Dqn_MapEntry<T> *, final_size, Dqn_ZeroMem::Yes);
+    result.slots                  = Dqn_ArenaNewArray(arena, Dqn_MapEntry<T> *, final_size, Dqn_ZeroMem_Yes);
     if (result.slots) result.size = final_size;
     return result;
 }
@@ -2267,31 +2483,23 @@ Dqn_MapEntry<T> *Dqn_MapFindOrAdd(Dqn_Map<T> *map, Dqn_u64 hash, Dqn_MapCollideR
     Dqn_isize         index = hash % map->size;
     Dqn_MapEntry<T> *result = map->slots[index];
 
-    if (result)
-    {
-        if (rule == Dqn_MapCollideRule::Chain)
-        {
-            while (result->hash != hash)
-            {
+    if (result) {
+        if (rule == Dqn_MapCollideRule::Chain) {
+            while (result->hash != hash) {
                 if (result->next)
                     result = result->next;
-                else
-                {
+                else {
                     map->chain_count++;
-                    result->next = Dqn_ArenaNew(map->arena, Dqn_MapEntry<T>, Dqn_ZeroMem::Yes);
+                    result->next = Dqn_ArenaNew(map->arena, Dqn_MapEntry<T>, Dqn_ZeroMem_Yes);
                     result       = result->next;
                     break;
                 }
             }
-        }
-        else if (rule == Dqn_MapCollideRule::Fail)
-        {
+        } else if (rule == Dqn_MapCollideRule::Fail) {
             result = nullptr;
         }
-    }
-    else
-    {
-        result = Dqn_ArenaNew(map->arena, Dqn_MapEntry<T>, Dqn_ZeroMem::Yes);
+    } else {
+        result = Dqn_ArenaNew(map->arena, Dqn_MapEntry<T>, Dqn_ZeroMem_Yes);
         map->count++;
         map->slots[index] = result;
     }
@@ -2327,14 +2535,11 @@ Dqn_MapEntry<T> *Dqn_MapGet(Dqn_Map<T> *map, Dqn_u64 hash)
 {
     Dqn_isize         index  = hash % map->size;
     Dqn_MapEntry<T> *result = nullptr;
-
-    for (Dqn_MapEntry<T> *entry = map->slots[index]; entry; entry = entry->next)
+    for (Dqn_MapEntry<T> *entry = map->slots[index];
+         !result && entry;
+         entry = entry->next)
     {
-        if (entry->hash == hash)
-        {
-            result = entry;
-            break;
-        }
+        result = (entry->hash == hash) ? entry : nullptr;
     }
 
     return result;
@@ -2345,7 +2550,7 @@ void Dqn_MapErase(Dqn_Map<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem)
 {
     Dqn_isize         index = hash % map->size;
     Dqn_MapEntry<T> **entry = &(map->slots[index]);
-    Dqn_b32 is_chain_entry = *entry && (*entry)->next;
+    bool is_chain_entry = *entry && (*entry)->next;
 
     while ((*entry) && (*entry)->hash != hash)
         entry = &((*entry)->next);
@@ -2355,7 +2560,7 @@ void Dqn_MapErase(Dqn_Map<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem)
         Dqn_MapEntry<T> *next        = erase_entry->next;
         (*entry)                      = next;
 
-        if (zero_mem == Dqn_ZeroMem::Yes)
+        if (zero_mem == Dqn_ZeroMem_Yes)
             DQN_MEMSET(erase_entry, DQN_MEMSET_BYTE, sizeof(*erase_entry));
 
         erase_entry->next = map->free_list;
@@ -2375,15 +2580,18 @@ Dqn_DSMap<T> Dqn_DSMapInit(Dqn_isize size)
 {
     DQN_ASSERT_MSG(((size & (size - 1)) == 0), "Require non-zero power of 2 table size");
     Dqn_DSMap<T> result = {};
-    result.slots       = Dqn_ArenaNewArray(&result.arena, Dqn_DSMapEntry<T>, size, Dqn_ZeroMem::Yes);
-    if (result.slots) result.size = size;
+    if (size > 0) {
+        result.slots = Dqn_ArenaNewArray(&result.arena, Dqn_DSMapEntry<T>, size, Dqn_ZeroMem_Yes);
+        if (result.slots)
+            result.size = size;
+    }
     return result;
 }
 
 template <typename T>
-void Dqn_DSMapFree(Dqn_DSMap<T> *map, bool clear_mem)
+void Dqn_DSMapFree(Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem)
 {
-    Dqn_ArenaFree(&map->arena, clear_mem);
+    Dqn_ArenaFree(&map->arena, zero_mem);
     *map = {};
 }
 
@@ -2395,8 +2603,11 @@ Dqn_DSMapEntry<T> *Dqn_DSMapFind(Dqn_DSMap<T> *map, Dqn_u64 hash)
 }
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMapFindOrAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_b32 find_only)
+Dqn_DSMapEntry<T> *Dqn_DSMapFindOrAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, bool find_only)
 {
+    if (!map)
+        return nullptr;
+
     if (!map->slots) {
         if (find_only)
             return nullptr;
@@ -2433,7 +2644,7 @@ Dqn_DSMapEntry<T> *Dqn_DSMapFindOrAdd(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_b32 f
                 }
             }
 
-            Dqn_DSMapFree(map, false /*clear_mem*/);
+            Dqn_DSMapFree(map, Dqn_ZeroMem_No);
             *map = new_map;
         }
     }
@@ -2471,6 +2682,9 @@ Dqn_DSMapEntry<T> *Dqn_DSMapGet(Dqn_DSMap<T> *map, Dqn_u64 hash)
 template <typename T>
 void Dqn_DSMapErase(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem)
 {
+    if (!map)
+        return;
+
     Dqn_isize          index  = hash % map->size;
     Dqn_DSMapEntry<T> *result = map->slots + index;
     if (!result || !result->occupied)
@@ -2478,15 +2692,13 @@ void Dqn_DSMapErase(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem)
 
     Dqn_isize start_index = index;
     Dqn_isize probe_index = index;
-    for (;;)
-    {
+    for (;;) {
         probe_index               = (probe_index + 1) % map->size;
         Dqn_DSMapEntry<T> *probe  = map->slots + probe_index;
         if (!probe->occupied) break;
 
         Dqn_isize desired_index = probe->hash % map->size;
-        if (desired_index != probe_index)
-        {
+        if (desired_index != probe_index) {
             map->slots[start_index] = map->slots[probe_index];
             start_index              = probe_index;
             DQN_ASSERT(map->slots[start_index].occupied);
@@ -2498,7 +2710,7 @@ void Dqn_DSMapErase(Dqn_DSMap<T> *map, Dqn_u64 hash, Dqn_ZeroMem zero_mem)
     map->slots[start_index].occupied = false;
     map->count -= 1;
 
-    if (zero_mem == Dqn_ZeroMem::Yes) {
+    if (zero_mem == Dqn_ZeroMem_Yes) {
         DQN_MEMSET(map->slots + start_index, DQN_MEMSET_BYTE, sizeof(map->slots[start_index]));
     }
 }
@@ -2529,14 +2741,14 @@ template <Dqn_isize MAX_>
 DQN_API void Dqn_FixedStringClear(Dqn_FixedString<MAX_> *str) { *str = {}; }
 
 template <Dqn_isize MAX_>
-DQN_API Dqn_b32 Dqn_FixedStringAppendFmtV(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va)
+DQN_API bool Dqn_FixedStringAppendFmtV(Dqn_FixedString<MAX_> *str, char const *fmt, va_list va)
 {
     va_list va2;
     va_copy(va2, va);
     Dqn_isize require = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, va2) + 1;
     va_end(va2);
-    Dqn_isize space   = MAX_ - str->size;
-    Dqn_b32 result    = require <= space;
+    Dqn_isize space = MAX_ - str->size;
+    bool result     = require <= space;
 
     if (!result)
     {
@@ -2549,21 +2761,21 @@ DQN_API Dqn_b32 Dqn_FixedStringAppendFmtV(Dqn_FixedString<MAX_> *str, char const
 }
 
 template <Dqn_isize MAX_>
-DQN_API Dqn_b32 Dqn_FixedStringAppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...)
+DQN_API bool Dqn_FixedStringAppendFmt(Dqn_FixedString<MAX_> *str, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    Dqn_b32 result = Dqn_FixedStringAppendFmtV(str, fmt, va);
+    bool result = Dqn_FixedStringAppendFmtV(str, fmt, va);
     va_end(va);
     return result;
 }
 
 template <Dqn_isize MAX_>
-DQN_API Dqn_b32 Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size)
+DQN_API bool Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, char const *src, Dqn_isize size)
 {
     if (size == -1) size = DQN_CAST(Dqn_isize)Dqn_CStringSize(src);
     Dqn_isize space = (MAX_ - 1 /*reserve byte for null terminator*/) - str->size;
-    Dqn_b32 result = size <= space;
+    bool result = size <= space;
 
     if (!result)
     {
@@ -2578,9 +2790,9 @@ DQN_API Dqn_b32 Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, char const *sr
 }
 
 template <Dqn_isize MAX_>
-DQN_API Dqn_b32 Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String8 src)
+DQN_API bool Dqn_FixedStringAppend(Dqn_FixedString<MAX_> *str, Dqn_String8 src)
 {
-    Dqn_b32 result = Dqn_FixedStringAppend(str, src.data, src.size);
+    bool result = Dqn_FixedStringAppend(str, src.data, src.size);
     return result;
 }
 
@@ -2657,7 +2869,7 @@ DQN_FIXED_ARRAY_TEMPLATE
 DQN_API void Dqn_FixedArrayClear(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_ZeroMem zero_mem)
 {
     a->size = 0;
-    if (zero_mem == Dqn_ZeroMem::Yes)
+    if (zero_mem == Dqn_ZeroMem_Yes)
         DQN_MEMSET(a->data, DQN_MEMSET_BYTE, sizeof(T));
 }
 
@@ -2683,7 +2895,7 @@ DQN_API void Dqn_FixedArrayPop(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, Dqn_isize num, 
     void *    begin = a->data + a->size;
     void *    end   = a->data + (a->size + num);
     Dqn_isize bytes = DQN_CAST(Dqn_isize) end - DQN_CAST(Dqn_isize) begin;
-    if (zero_mem == Dqn_ZeroMem::Yes)
+    if (zero_mem == Dqn_ZeroMem_Yes)
         DQN_MEMSET(begin, DQN_MEMSET_BYTE, bytes);
 }
 
@@ -2715,12 +2927,11 @@ DQN_API T *Dqn_FixedArrayFind(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, IsEqual IsEqualP
 
 // return: True if the entry was found, false if not- the entry is made using Dqn_FixedArrayMake() in this case
 template <typename T, int MAX_, typename IsEqual>
-DQN_API Dqn_b32 Dqn_FixedArrayFindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc)
+DQN_API bool Dqn_FixedArrayFindElseMake(DQN_FIXED_ARRAY_TEMPLATE_DECL *a, T **entry, IsEqual IsEqualProc)
 {
-    Dqn_b32 result = true;
+    bool result = true;
     T *search  = Dqn_FixedArrayFind(a, IsEqualProc);
-    if (!search)
-    {
+    if (!search) {
         result = false;
         search = Dqn_FixedArrayMake(a, 1);
     }
@@ -2757,22 +2968,20 @@ template <typename T>
 DQN_API Dqn_Array<T> Dqn_Array_InitWithArenaNoGrow(Dqn_Arena *arena, Dqn_isize max, Dqn_isize size, Dqn_ZeroMem zero_mem DQN_CALL_SITE_ARGS)
 {
     Dqn_Array<T> result = {};
-    if (max && arena)
-    {
+    if (max && arena) {
         auto *memory = DQN_CAST(T *)Dqn_ArenaAllocate_(arena, sizeof(T) * max, alignof(T), zero_mem DQN_CALL_SITE_ARGS_INPUT);
         result = Dqn_ArrayInitWithMemory(memory, max, size);
     }
-
     return result;
 }
 
 template <typename T>
-DQN_API bool Dqn_Array_Reserve(Dqn_Array<T> *a, Dqn_isize size DQN_CALL_SITE_ARGS)
+DQN_API bool Dqn_ArrayReserve_(Dqn_Array<T> *a, Dqn_isize size DQN_CALL_SITE_ARGS)
 {
     if (size <= a->size) return true;
     if (!a->arena) return false;
 
-    T *new_ptr = DQN_CAST(T *)Dqn_ArenaAllocate_(a->arena, sizeof(T) * size, alignof(T), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
+    T *new_ptr = DQN_CAST(T *)Dqn_ArenaAllocate_(a->arena, sizeof(T) * size, alignof(T), Dqn_ZeroMem_Yes DQN_CALL_SITE_ARGS_INPUT);
     if (!new_ptr) return false;
 
     if (a->data)
@@ -2791,17 +3000,16 @@ DQN_API bool Dqn_Array_GrowIfNeeded(Dqn_Array<T> *a, Dqn_isize num_to_add DQN_CA
 {
     Dqn_isize new_size = a->size + num_to_add;
     bool result        = true;
-    if (new_size > a->max)
-    {
+    if (new_size > a->max) {
         Dqn_isize num_items = DQN_MAX(4, DQN_MAX(new_size, (a->max * 2)));
-        result              = Dqn_Array_Reserve(a, num_items DQN_CALL_SITE_ARGS_INPUT);
+        result              = Dqn_ArrayReserve_(a, num_items DQN_CALL_SITE_ARGS_INPUT);
     }
 
     return result;
 }
 
 template <typename T>
-DQN_API T *Dqn_Array_AddArray(Dqn_Array<T> *a, T const *items, Dqn_isize num DQN_CALL_SITE_ARGS)
+DQN_API T *Dqn_ArrayAddArray_(Dqn_Array<T> *a, T const *items, Dqn_isize num DQN_CALL_SITE_ARGS)
 {
     if (!Dqn_Array_GrowIfNeeded(a, num DQN_CALL_SITE_ARGS_INPUT))
         return nullptr;
@@ -2811,7 +3019,7 @@ DQN_API T *Dqn_Array_AddArray(Dqn_Array<T> *a, T const *items, Dqn_isize num DQN
 }
 
 template <typename T>
-DQN_API T *Dqn_Array_Add(Dqn_Array<T> *a, T const &item DQN_CALL_SITE_ARGS)
+DQN_API T *Dqn_ArrayAdd_(Dqn_Array<T> *a, T const &item DQN_CALL_SITE_ARGS)
 {
     if (!Dqn_Array_GrowIfNeeded(a, 1 DQN_CALL_SITE_ARGS_INPUT))
         return nullptr;
@@ -2819,7 +3027,7 @@ DQN_API T *Dqn_Array_Add(Dqn_Array<T> *a, T const &item DQN_CALL_SITE_ARGS)
     return &a->data[a->size - 1];
 }
 template <typename T>
-DQN_API T *Dqn_Array_Make(Dqn_Array<T> *a, Dqn_isize num DQN_CALL_SITE_ARGS)
+DQN_API T *Dqn_ArrayMake_(Dqn_Array<T> *a, Dqn_isize num DQN_CALL_SITE_ARGS)
 {
     if (!Dqn_Array_GrowIfNeeded(a, num DQN_CALL_SITE_ARGS_INPUT))
         return nullptr;
@@ -2832,7 +3040,7 @@ template <typename T>
 DQN_API void Dqn_ArrayClear(Dqn_Array<T> *a, Dqn_ZeroMem zero_mem)
 {
     a->size = 0;
-    if (zero_mem == Dqn_ZeroMem::Yes)
+    if (zero_mem == Dqn_ZeroMem_Yes)
         DQN_MEMSET(a->data, DQN_MEMSET_BYTE, sizeof(T) * a->max);
 }
 
@@ -2859,7 +3067,7 @@ DQN_API void Dqn_ArrayPop(Dqn_Array<T> *a, Dqn_isize num, Dqn_ZeroMem zero_mem)
     void *begin     = a->data + a->size;
     void *end       = a->data + (a->size + num);
     Dqn_isize bytes = DQN_CAST(Dqn_isize) end - DQN_CAST(Dqn_isize) begin;
-    if (zero_mem == Dqn_ZeroMem::Yes)
+    if (zero_mem == Dqn_ZeroMem_Yes)
         DQN_MEMSET(begin, DQN_MEMSET_BYTE, bytes);
 }
 
@@ -2889,12 +3097,12 @@ DQN_API T *Dqn__ListMake(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
 
     if (!list->tail || (list->tail->count + count) > list->tail->size)
     {
-        auto *tail = (Dqn_ListChunk<T> * )Dqn_ArenaAllocate_(list->arena, sizeof(Dqn_ListChunk<T>), alignof(Dqn_ListChunk<T>), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
+        auto *tail = (Dqn_ListChunk<T> * )Dqn_ArenaAllocate_(list->arena, sizeof(Dqn_ListChunk<T>), alignof(Dqn_ListChunk<T>), Dqn_ZeroMem_Yes DQN_CALL_SITE_ARGS_INPUT);
         if (!tail)
           return nullptr;
 
         Dqn_isize items = DQN_MAX(list->chunk_size, count);
-        tail->data      = (T * )Dqn_ArenaAllocate_(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
+        tail->data      = (T * )Dqn_ArenaAllocate_(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem_Yes DQN_CALL_SITE_ARGS_INPUT);
         tail->size      = items;
 
         if (!tail->data)
@@ -2919,21 +3127,17 @@ DQN_API T *Dqn__ListMake(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
 }
 
 template <typename T>
-DQN_API Dqn_b32 Dqn_ListIterateFrom(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index)
+DQN_API bool Dqn_ListIterateFrom(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index)
 {
-    Dqn_b32 result = false;
+    bool result = false;
     if (!list || !iterator || start_index < 0 || list->chunk_size <= 0)
         return result;
 
-    if (!iterator->init)
-    {
+    if (!iterator->init) {
         *iterator = {};
-        if (start_index == 0)
-        {
+        if (start_index == 0) {
             iterator->chunk = list->head;
-        }
-        else
-        {
+        } else {
             Dqn_ListAt(list, start_index, &iterator->chunk);
             if (list->chunk_size > 0)
                 iterator->chunk_data_index = start_index % list->chunk_size;
@@ -2942,25 +3146,20 @@ DQN_API Dqn_b32 Dqn_ListIterateFrom(Dqn_List<T> *list, Dqn_ListIterator<T> *iter
         iterator->init = true;
     }
 
-    if (iterator->chunk)
-    {
-        if (iterator->chunk_data_index >= iterator->chunk->count)
-        {
+    if (iterator->chunk) {
+        if (iterator->chunk_data_index >= iterator->chunk->count) {
             iterator->chunk            = iterator->chunk->next;
             iterator->chunk_data_index = 0;
         }
 
-        if (iterator->chunk)
-        {
+        if (iterator->chunk) {
             iterator->data = iterator->chunk->data + iterator->chunk_data_index++;
             result         = true;
         }
     }
 
     if (!iterator->chunk)
-    {
         DQN_ASSERT(result == false);
-    }
     return result;
 }
 
@@ -3016,6 +3215,7 @@ DQN_API T *Dqn_ListAt(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_
 #endif
 #endif // DQN_H
 
+/// @cond NO_DOXYGEN
 // NOTE: Implementation
 // -------------------------------------------------------------------------------------------------
 #if defined(DQN_IMPLEMENTATION)
@@ -3368,7 +3568,7 @@ unsigned int Dqn_TicketMutexMakeTicket(Dqn_TicketMutex *mutex)
     return result;
 }
 
-void Dqn_TicketMutexBeginTicket(const Dqn_TicketMutex *mutex, unsigned int ticket)
+void Dqn_TicketMutexBeginTicket(Dqn_TicketMutex const *mutex, unsigned int ticket)
 {
     DQN_ASSERT_MSG(mutex->serving <= ticket,
                    "Mutex skipped ticket? Was ticket generated by the correct mutex via MakeTicket? ticket = %u, "
@@ -3382,10 +3582,39 @@ void Dqn_TicketMutexBeginTicket(const Dqn_TicketMutex *mutex, unsigned int ticke
     }
 }
 
-Dqn_b32 Dqn_TicketMutexCanLock(const Dqn_TicketMutex *mutex, unsigned int ticket)
+bool Dqn_TicketMutexCanLock(Dqn_TicketMutex const *mutex, unsigned int ticket)
 {
-    Dqn_b32 result = (ticket == mutex->serving);
+    bool result = (ticket == mutex->serving);
     return result;
+}
+
+// NOTE: Dqn_Allocator
+// -------------------------------------------------------------------------------------------------
+void *Dqn_AllocatorAlloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem)
+{
+    void *result = NULL;
+    if (allocator.alloc) {
+        result = allocator.alloc(DQN_CALL_SITE_ARGS_INPUT size, align, zero_mem, allocator.user_context);
+    } else {
+        #if !defined(DQN_MINIMAL_CRT)
+        if (zero_mem == Dqn_ZeroMem_Yes)
+            result = calloc(1 /*num*/, size);
+        else
+            result = malloc(size);
+        #endif
+    }
+    return result;
+}
+
+void Dqn_AllocatorDealloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, void *ptr, size_t size)
+{
+    if (allocator.dealloc) {
+        allocator.dealloc(DQN_CALL_SITE_ARGS_INPUT ptr, size, allocator.user_context);
+    } else {
+        #if !defined(DQN_MINIMAL_CRT)
+        free(ptr);
+        #endif
+    }
 }
 
 
@@ -3443,34 +3672,52 @@ DQN_API void Dqn_LogVDefault(Dqn_LogType type,
     Dqn_TicketMutexBegin(&dqn_lib_.log_file_mutex);
     if (!dqn_lib_.log_no_output_file) {
         if (!dqn_lib_.log_file) {
-            Dqn_ThreadScratch scratch  = Dqn_ThreadGetScratch();
-            Dqn_String8        exe_dir  = Dqn_OSEXEDir(scratch.arena);
-            Dqn_String8        log_file = Dqn_String8Fmt(scratch.arena, "%.*s/dqn.log", DQN_STRING_FMT(exe_dir));
+            Dqn_ThreadScratch scratch   = Dqn_ThreadGetScratch();
+            Dqn_String8        exe_dir  = Dqn_OSEXEDir(Dqn_ArenaAllocator(scratch.arena));
+            Dqn_String8        log_file = Dqn_String8Fmt(Dqn_ArenaAllocator(scratch.arena), "%.*s/dqn.log", DQN_STRING_FMT(exe_dir));
             fopen_s(DQN_CAST(FILE **)&dqn_lib_.log_file, log_file.data, "a");
         }
     }
     Dqn_TicketMutexEnd(&dqn_lib_.log_file_mutex);
 
-
     // NOTE: Construct log
-    Dqn_String8 file_name             = Dqn_String8FileNameFromPath(file);
-    Dqn_ThreadScratch scratch        = Dqn_ThreadGetScratch();
-    Dqn_DateHMSTimeString const time = Dqn_DateHMSLocalTimeStringNow();
-    Dqn_String8List string_list       = {};
-    Dqn_String8ListAppendFmt(&string_list,
-                            scratch.arena,
-                            "[%.*s|%.*s|%s|%.*s|%05u|%.*s] ",
-                            time.date_size,
-                            time.date,
-                            time.hms_size,
-                            time.hms,
-                            Dqn_LogTypeString[DQN_CAST(int) type],
-                            DQN_STRING_FMT(file_name),
-                            line,
-                            DQN_STRING_FMT(func));
+    Dqn_ThreadScratch scratch      = Dqn_ThreadGetScratch();
+    Dqn_String8Builder string_list = {};
+    string_list.allocator          = Dqn_ArenaAllocator(scratch.arena);
+    {
+        // NOTE: Generate the log header
+        Dqn_String8 file_name            = Dqn_String8FileNameFromPath(file);
+        Dqn_DateHMSTimeString const time = Dqn_DateHMSLocalTimeStringNow();
 
-    Dqn_String8ListAppendFmtV(&string_list, scratch.arena, fmt, va);
-    Dqn_String8 log_line = Dqn_String8ListBuild(&string_list, scratch.arena);
+        Dqn_String8BuilderAppendFmtArgs(&string_list,
+                                        "[%.*s|%.*s|%.*s|%.*s|%05u|%.*s",
+                                        time.date_size - 2,
+                                        time.date      + 2,
+                                        time.hms_size,
+                                        time.hms,
+                                        DQN_STRING_FMT(Dqn_LogTypeString8(type)),
+                                        DQN_STRING_FMT(file_name),
+                                        line,
+                                        DQN_STRING_FMT(func));
+
+        // NOTE: Pad the log header to the max header length so far
+        static Dqn_isize max_log_header_length = 0;
+        max_log_header_length                  = DQN_MAX(max_log_header_length, string_list.string_size);
+
+        if (string_list.string_size < max_log_header_length) {
+            int pad_size = DQN_CAST(int)(max_log_header_length - string_list.string_size);
+            Dqn_String8 padding = Dqn_String8Allocate(Dqn_ArenaAllocator(scratch.arena), pad_size, Dqn_ZeroMem_No);
+            DQN_MEMSET(padding.data, ' ', padding.size);
+            Dqn_String8BuilderAppendString8Ref(&string_list, padding);
+        }
+
+        // NOTE: Add the user message to the log line
+        Dqn_String8BuilderAppendString8Ref(&string_list, DQN_STRING8("] "));
+        Dqn_String8BuilderAppendFmtVArgs(&string_list, fmt, va);
+    }
+
+    // NOTE: Build the log line
+    Dqn_String8 log_line = Dqn_String8BuilderBuild(&string_list, Dqn_ArenaAllocator(scratch.arena));
 
     // NOTE: Print log to destinations
     FILE *handles[] = {
@@ -3484,24 +3731,25 @@ DQN_API void Dqn_LogVDefault(Dqn_LogType type,
     }
 }
 
-DQN_API void Dqn_LogV(Dqn_LogType type,
-                      void *      user_data,
+DQN_API void Dqn_LogV(Dqn_LogType  type,
+                      void        *user_data,
                       Dqn_String8  file,
                       Dqn_String8  func,
-                      Dqn_uint    line,
-                      char const *fmt,
-                      va_list     va)
+                      Dqn_uint     line,
+                      char const  *fmt,
+                      va_list      va)
 {
     Dqn_LogProc *logger = dqn_lib_.LogCallback ? dqn_lib_.LogCallback : Dqn_LogVDefault;
     logger(type, user_data, file, func, line, fmt, va);
 }
 
-DQN_API void Dqn_Log(Dqn_LogType type,
-                     void *user_data,
-                     Dqn_String8 file,
-                     Dqn_String8 func,
-                     Dqn_uint line,
-                     char const *fmt, ...)
+DQN_API void Dqn_Log(Dqn_LogType  type,
+                     void        *user_data,
+                     Dqn_String8  file,
+                     Dqn_String8  func,
+                     Dqn_uint     line,
+                     char const  *fmt,
+                     ...)
 {
     va_list va;
     va_start(va, fmt);
@@ -3511,7 +3759,7 @@ DQN_API void Dqn_Log(Dqn_LogType type,
 
 // NOTE: Dqn_Virtual
 // -------------------------------------------------------------------------------------------------
-DQN_API void *Dqn_VirtualReserve(Dqn_usize size, Dqn_b32 commit)
+DQN_API void *Dqn_VirtualReserve(Dqn_usize size, bool commit)
 {
 #if defined(DQN_OS_WIN32)
     unsigned long flags = MEM_RESERVE | (commit ? (MEM_COMMIT | MEM_RESERVE) : 0);
@@ -3530,12 +3778,12 @@ DQN_API void *Dqn_VirtualReserve(Dqn_usize size, Dqn_b32 commit)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_VirtualCommit(void *ptr, Dqn_usize size)
+DQN_API bool Dqn_VirtualCommit(void *ptr, Dqn_usize size)
 {
 #if defined(DQN_OS_WIN32)
-    Dqn_b32 result = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != nullptr;
+    bool result = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != nullptr;
 #elif defined(DQN_OS_UNIX)
-    Dqn_b32 result = mprotect(ptr, size, PROT_READ|PROT_WRITE) == 0;
+    bool result = mprotect(ptr, size, PROT_READ|PROT_WRITE) == 0;
 #else
     #error "Missing implementation for Dqn_VirtualCommit"
 #endif
@@ -3589,7 +3837,7 @@ void Dqn_AllocationTracerAdd(Dqn_AllocationTracer *tracer, void *ptr, Dqn_usize 
     }
 #endif
 
-    Dqn_b32 added = Dqn_MapAdd(&tracer->map, DQN_CAST(Dqn_u64) ptr, trace, Dqn_MapCollideRule::Chain);
+    bool added = Dqn_MapAdd(&tracer->map, DQN_CAST(Dqn_u64) ptr, trace, Dqn_MapCollideRule::Chain);
     if (!added)
     {
         // Dqn_AllocationTrace *other = Dqn_MapGet(&tracer->table, DQN_CAST(Dqn_u64) ptr);
@@ -3616,56 +3864,6 @@ void Dqn_AllocationTracerRemove(Dqn_AllocationTracer *tracer, void *ptr)
 #endif
 }
 
-#if defined(DQN_WITH_CRT_ALLOCATOR)
-// NOTE: Dqn_CRTAllocator
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_CRTAllocator Dqn_CRTAllocatorInitWithProcs(Dqn_CRTAllocatorMallocProc *malloc_proc, Dqn_CRTAllocatorReallocProc *realloc_proc, Dqn_CRTAllocatorFreeProc *free_proc)
-{
-    Dqn_CRTAllocator result = {};
-    result.malloc           = malloc_proc;
-    result.realloc          = realloc_proc;
-    result.free             = free_proc;
-    return result;
-}
-
-DQN_API void *Dqn__CRTAllocatorMalloc(Dqn_CRTAllocator *allocator, Dqn_usize size DQN_CALL_SITE_ARGS)
-{
-    void *result = allocator->malloc ? allocator->malloc(size) : DQN_MALLOC(size);
-    if (result)
-    {
-        Dqn_AtomicAddU64(&allocator->malloc_bytes, size);
-        Dqn_AtomicAddU64(&allocator->malloc_count, 1ULL);
-        Dqn_AllocationTracerAdd(allocator->tracer, result, size DQN_CALL_SITE_ARGS_INPUT);
-    }
-
-    return result;
-}
-
-DQN_API void *Dqn__CRTAllocatorRealloc(Dqn_CRTAllocator *allocator, void *ptr, Dqn_usize size DQN_CALL_SITE_ARGS)
-{
-    void *result = allocator->realloc ? allocator->realloc(ptr, size) : DQN_REALLOC(ptr, size);
-    if (result)
-    {
-        Dqn_AtomicAddU64(&allocator->realloc_bytes, size);
-        Dqn_AtomicAddU64(&allocator->realloc_count, 1ULL);
-        Dqn_AllocationTracerAdd(allocator->tracer, result, size DQN_CALL_SITE_ARGS_INPUT);
-        if (result != ptr) Dqn_AllocationTracerRemove(allocator->tracer, ptr);
-    }
-
-    return result;
-}
-
-DQN_API void Dqn__CRTAllocatorFree(Dqn_CRTAllocator *allocator, void *ptr)
-{
-    if (ptr)
-    {
-        Dqn_AtomicAddU64(&allocator->free_count, 1ULL);
-        Dqn_AllocationTracerRemove(allocator->tracer, ptr);
-    }
-    allocator->free ? allocator->free(ptr) : DQN_FREE(ptr);
-}
-#endif // DQN_WITH_CRT_ALLOCATOR
-
 // NOTE: Dqn_String8
 // -------------------------------------------------------------------------------------------------
 DQN_API Dqn_String8 Dqn_String8Init(char const *string, Dqn_isize size)
@@ -3679,7 +3877,7 @@ DQN_API Dqn_String8 Dqn_String8Init(char const *string, Dqn_isize size)
 DQN_API Dqn_String8 Dqn_String8InitCString(char const *string)
 {
     Dqn_isize size     = Dqn_CStringSize(string);
-    Dqn_String8 result  = Dqn_String8Init(string, size);
+    Dqn_String8 result = Dqn_String8Init(string, size);
     return result;
 }
 
@@ -3702,19 +3900,19 @@ DQN_API Dqn_String8 Dqn_String8Slice(Dqn_String8 string, Dqn_isize offset, Dqn_i
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8Fmt_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, ...)
+DQN_API Dqn_String8 Dqn_String8Fmt_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    Dqn_String8 result = Dqn_String8FmtV_(DQN_CALL_SITE_ARGS_INPUT arena, fmt, va);
+    Dqn_String8 result = Dqn_String8FmtV_(DQN_CALL_SITE_ARGS_INPUT allocator, fmt, va);
     va_end(va);
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8FmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *fmt, va_list va)
+DQN_API Dqn_String8 Dqn_String8FmtV_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *fmt, va_list va)
 {
     Dqn_String8 result = {};
-    if (!arena || !fmt)
+    if (!fmt)
         return result;
 
     va_list va2;
@@ -3722,7 +3920,7 @@ DQN_API Dqn_String8 Dqn_String8FmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char c
     int size = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, va2);
     va_end(va2);
 
-    result = Dqn_String8Allocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, Dqn_ZeroMem::No);
+    result = Dqn_String8Allocate_(DQN_CALL_SITE_ARGS_INPUT allocator, size, Dqn_ZeroMem_No);
     if (Dqn_String8IsValid(result)) {
         STB_SPRINTF_DECORATE(vsnprintf)(result.data, size + 1 /*null-terminator*/, fmt, va);
         result.data[result.size] = 0;
@@ -3730,23 +3928,23 @@ DQN_API Dqn_String8 Dqn_String8FmtV_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char c
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_ZeroMem zero_mem)
+DQN_API Dqn_String8 Dqn_String8Allocate_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, Dqn_isize size, Dqn_ZeroMem zero_mem)
 {
     Dqn_String8 result = {};
-    result.data       = DQN_CAST(char *)Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS_INPUT arena, size + 1, alignof(char), zero_mem);
+    result.data       = (char *)Dqn_AllocatorAlloc(DQN_CALL_SITE_ARGS_INPUT allocator, size + 1, alignof(char), zero_mem);
     if (result.data) {
         result.size = size;
     }
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, char const *string, Dqn_isize size)
+DQN_API Dqn_String8 Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *string, Dqn_isize size)
 {
     Dqn_String8 result = {};
-    if (!arena || !string || size <= 0)
+    if (!string || size <= 0)
         return result;
 
-    result = Dqn_String8Allocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, Dqn_ZeroMem::No);
+    result = Dqn_String8Allocate_(DQN_CALL_SITE_ARGS_INPUT allocator, size, Dqn_ZeroMem_No);
     if (Dqn_String8IsValid(result)) {
         DQN_MEMCOPY(result.data, string, DQN_CAST(size_t)size);
         result.data[size] = 0;
@@ -3754,9 +3952,9 @@ DQN_API Dqn_String8 Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS Dqn_Arena *arena,
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8Copy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_String8 string)
+DQN_API Dqn_String8 Dqn_String8Copy_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, Dqn_String8 string)
 {
-    Dqn_String8 result = Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS_INPUT arena, string.data, string.size);
+    Dqn_String8 result = Dqn_String8CopyCString_(DQN_CALL_SITE_ARGS_INPUT allocator, string.data, string.size);
     return result;
 }
 
@@ -3792,7 +3990,7 @@ DQN_API bool Dqn_String8StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_S
 
 DQN_API bool Dqn_String8StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix)
 {
-    Dqn_b32 result = Dqn_String8StartsWith(string, prefix, Dqn_String8EqCase::Insensitive);
+    bool result = Dqn_String8StartsWith(string, prefix, Dqn_String8EqCase::Insensitive);
     return result;
 }
 
@@ -3867,11 +4065,11 @@ DQN_API Dqn_String8 Dqn_String8TrimWhitespaceAround(Dqn_String8 string)
 DQN_API Dqn_String8 Dqn_String8TrimByteOrderMark(Dqn_String8 string)
 {
     // TODO(dqn): This is little endian
-    auto const UTF8_BOM     = DQN_STRING("\xEF\xBB\xBF");
-    auto const UTF16_BOM_BE = DQN_STRING("\xEF\xFF");
-    auto const UTF16_BOM_LE = DQN_STRING("\xFF\xEF");
-    auto const UTF32_BOM_BE = DQN_STRING("\x00\x00\xFE\xFF");
-    auto const UTF32_BOM_LE = DQN_STRING("\xFF\xFE\x00\x00");
+    auto const UTF8_BOM     = DQN_STRING8("\xEF\xBB\xBF");
+    auto const UTF16_BOM_BE = DQN_STRING8("\xEF\xFF");
+    auto const UTF16_BOM_LE = DQN_STRING8("\xFF\xEF");
+    auto const UTF32_BOM_BE = DQN_STRING8("\x00\x00\xFE\xFF");
+    auto const UTF32_BOM_LE = DQN_STRING8("\xFF\xFE\x00\x00");
     Dqn_String8 result       = string;
     result                  = Dqn_String8TrimPrefix(result, UTF8_BOM);
     result                  = Dqn_String8TrimPrefix(result, UTF16_BOM_BE);
@@ -3891,7 +4089,7 @@ DQN_API bool Dqn_String8IsAllDigits(Dqn_String8 string)
 
 DQN_API bool Dqn_String8IsAllHex(Dqn_String8 string)
 {
-    Dqn_String8 trimmed = Dqn_String8TrimPrefix(string, DQN_STRING("0x"), Dqn_String8EqCase::Insensitive);
+    Dqn_String8 trimmed = Dqn_String8TrimPrefix(string, DQN_STRING8("0x"), Dqn_String8EqCase::Insensitive);
     bool result        = Dqn_String8IsValid(trimmed) && trimmed.size > 0;
     for (Dqn_isize index = 0; result && index < trimmed.size; index++) {
         char ch = trimmed.data[index];
@@ -3957,40 +4155,41 @@ DQN_API Dqn_String8 Dqn_String8Replace(Dqn_String8 string,
                                        Dqn_Arena *temp_arena,
                                        Dqn_String8EqCase eq_case)
 {
-    auto temp_arena_scope      = Dqn_ArenaTempMemoryScope(temp_arena);
-    Dqn_String8List string_list = {};
-    Dqn_isize max              = string.size - find.size;
-    Dqn_isize head             = start_index;
+    auto temp_arena_scope             = Dqn_ArenaTempMemoryScope(temp_arena);
+    Dqn_String8Builder string_builder = {};
+    string_builder.allocator          = Dqn_ArenaAllocator(temp_arena);
+    Dqn_isize max                     = string.size - find.size;
+    Dqn_isize head                    = start_index;
 
     for (Dqn_isize tail = head; tail <= max; tail++) {
         Dqn_String8 check = Dqn_String8Slice(string, tail, find.size);
         if (!Dqn_String8Eq(check, find, eq_case))
             continue;
 
-        if (start_index > 0 && string_list.string_size == 0) {
+        if (start_index > 0 && string_builder.string_size == 0) {
             // User provided a hint in the string to start searching from, we
             // need to add the string up to the hint. We only do this if there's
             // a replacement action, otherwise we have a special case for no
             // replacements, where the entire string gets copied.
             Dqn_String8 slice = Dqn_String8Init(string.data, head);
-            Dqn_String8ListAppendString(&string_list, temp_arena, slice);
+            Dqn_String8BuilderAppendString8Ref(&string_builder, slice);
         }
 
         Dqn_String8 range = Dqn_String8Slice(string, head, (tail - head));
-        Dqn_String8ListAppendString(&string_list, temp_arena, range);
-        Dqn_String8ListAppendString(&string_list, temp_arena, replace);
+        Dqn_String8BuilderAppendString8Ref(&string_builder, range);
+        Dqn_String8BuilderAppendString8Ref(&string_builder, replace);
         head = tail + find.size;
         tail += find.size - 1; // NOTE: -1 since the for loop will post increment us past the end of the find string
     }
 
     Dqn_String8 result = {};
-    if (string_list.string_size == 0) {
+    if (string_builder.string_size == 0) {
         // NOTE: No replacement possible, so we just do a full-copy
-        result = Dqn_String8Copy(arena, string);
+        result = Dqn_String8Copy(Dqn_ArenaAllocator(arena), string);
     } else {
         Dqn_String8 remainder = Dqn_String8Init(string.data + head, string.size - head);
-        Dqn_String8ListAppendString(&string_list, temp_arena, remainder);
-        result = Dqn_String8ListBuild(&string_list, arena);
+        Dqn_String8BuilderAppendString8Ref(&string_builder, remainder);
+        result = Dqn_String8BuilderBuild(&string_builder, Dqn_ArenaAllocator(arena));
     }
 
     return result;
@@ -4031,137 +4230,102 @@ DQN_API Dqn_i64 Dqn_String8ToI64(Dqn_String8 string)
     return result;
 }
 
-// NOTE: Dqn_String8List Implementation
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_String8ListNode *Dqn_String8ListMakeNode(Dqn_Arena *arena, Dqn_isize size)
+// NOTE: Dqn_String8Builder Implementation
+// -----------------------------------------------------------------------------
+bool Dqn_String8BuilderAppendString8Ref(Dqn_String8Builder *builder, Dqn_String8 string)
 {
-    Dqn_String8ListNode *result = Dqn_ArenaNew(arena, Dqn_String8ListNode, Dqn_ZeroMem::Yes);
-    if (size) result->string = Dqn_String8Allocate(arena, size, Dqn_ZeroMem::Yes);
+    if (!builder || !string.data || string.size <= 0)
+        return false;
+
+    Dqn_String8Link *link = Dqn_AllocatorNew(builder->allocator, Dqn_String8Link, Dqn_ZeroMem_No);
+    if (!link)
+        return false;
+    link->string = string;
+    link->next   = NULL;
+
+    if (builder->head) {
+        builder->tail->next = link;
+    } else {
+        builder->head = link;
+    }
+
+    builder->tail = link;
+    builder->count++;
+    builder->string_size += string.size;
+    return true;
+}
+
+bool Dqn_String8BuilderAppendString8Copy(Dqn_String8Builder *builder, Dqn_String8 string)
+{
+    Dqn_String8 copy = Dqn_String8Copy(builder->allocator, string);
+    bool result      = Dqn_String8BuilderAppendString8Ref(builder, string);
     return result;
 }
 
-DQN_API void Dqn_String8ListAddNode(Dqn_String8List *list, Dqn_String8ListNode *node)
+bool Dqn_String8BuilderAppendFmtVArgs(Dqn_String8Builder *builder, char const *fmt, va_list args)
 {
-    if (list->curr)
-    {
-        list->curr->next = node;
-        list->curr       = list->curr->next;
-    }
-    else
-    {
-        list->head = node;
-        list->curr = node;
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int size_no_zero_terminate = vsnprintf(NULL /*buffer*/, 0 /*size*/, fmt, args_copy);
+    va_end(args_copy);
+
+    if (size_no_zero_terminate < 0)
+        return false;
+
+    if (size_no_zero_terminate == 0)
+        return true;
+
+    bool result        = false;
+    int alloc_size     = size_no_zero_terminate + 1;
+    Dqn_String8 string = DQN_ZERO_INIT;
+    string.data        = Dqn_AllocatorNewArray(builder->allocator, char, alloc_size, Dqn_ZeroMem_No);
+    if (string.data) {
+        vsnprintf(string.data, alloc_size, fmt, args);
+        string.size = size_no_zero_terminate;
+        result = Dqn_String8BuilderAppendString8Ref(builder, string);
     }
 
-    list->string_size += node->string.size;
+    if (!result) {
+        Dqn_AllocatorDealloc(builder->allocator, string.data, size_no_zero_terminate);
+    }
+
+    return result;
 }
 
-DQN_API void Dqn_String8ListAppendFmtV(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, va_list args)
-{
-    Dqn_String8ListNode *node = Dqn_String8ListMakeNode(arena, 0 /*size*/);
-    node->string             = Dqn_String8FmtV(arena, fmt, args);
-    Dqn_String8ListAddNode(list, node);
-}
-
-DQN_API void Dqn_String8ListAppendFmt(Dqn_String8List *list, Dqn_Arena *arena, char const *fmt, ...)
+bool Dqn_String8BuilderAppendFmtArgs(Dqn_String8Builder *builder, char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    Dqn_String8ListAppendFmtV(list, arena, fmt, args);
+    bool result = Dqn_String8BuilderAppendFmtVArgs(builder, fmt, args);
     va_end(args);
+    return result;
 }
 
-DQN_API void Dqn_String8ListAppendStringCopy(Dqn_String8List *list, Dqn_Arena *arena, Dqn_String8 string)
+Dqn_String8 Dqn_String8BuilderBuild(Dqn_String8Builder const *builder, Dqn_Allocator allocator)
 {
-    if (string.size <= 0)
-        return;
+    Dqn_String8 result = DQN_ZERO_INIT;
+    if (!builder || builder->string_size <= 0 || builder->count <= 0)
+        return result;
 
-    Dqn_String8ListNode *node = Dqn_String8ListMakeNode(arena, 0 /*size*/);
-    node->string              = Dqn_String8Copy(arena, string);
-    Dqn_String8ListAddNode(list, node);
-}
+    result.data = Dqn_AllocatorNewArray(allocator, char, builder->string_size + 1, Dqn_ZeroMem_No);
+    if (!result.data)
+        return result;
 
-DQN_API void Dqn_String8ListAppendString(Dqn_String8List *list, Dqn_Arena *arena, Dqn_String8 string)
-{
-    if (string.size <= 0)
-        return;
-
-    Dqn_String8ListNode *node = Dqn_String8ListMakeNode(arena, 0 /*size*/);
-    node->string             = string;
-    Dqn_String8ListAddNode(list, node);
-}
-
-DQN_API Dqn_String8 Dqn_String8ListBuild(Dqn_String8List const *list, Dqn_Arena *arena)
-{
-    Dqn_String8 result = Dqn_String8Allocate(arena, list->string_size, Dqn_ZeroMem::No);
-    for (Dqn_String8ListNode const *node = list->head; node; node = node->next) {
-        DQN_MEMCOPY(result.data + result.size, node->string.data, node->string.size);
-        result.size += node->string.size;
+    for (Dqn_String8Link *link = builder->head; link; link = link->next) {
+        DQN_MEMCOPY(result.data + result.size, link->string.data, link->string.size);
+        result.size += link->string.size;
     }
+
     result.data[result.size] = 0;
+    DQN_ASSERT(result.size == builder->string_size);
     return result;
 }
 
 // NOTE: Dqn_Arena
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_ArenaStatString Dqn_ArenaStatToString(Dqn_ArenaStat const *stat)
-{
-    // NOTE: We use a non-standard format string that is only usable via
-    // stb sprintf that GCC warns about as an error. This pragma mutes that.
-    #if defined(DQN_COMPILER_GCC)
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wformat="
-        #pragma GCC diagnostic ignored "-Wformat-extra-args"
-    #elif defined(DQN_COMPILER_W32_CLANG)
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wformat"
-        #pragma GCC diagnostic ignored "-Wformat-invalid-specifier"
-        #pragma GCC diagnostic ignored "-Wformat-extra-args"
-    #endif
-
-    Dqn_ArenaStatString result = {};
-    result.size = STB_SPRINTF_DECORATE(snprintf)(result.data, DQN_ARRAY_ICOUNT(result.data),
-                                                 "ArenaStat{"
-                                                     "used/hwm=%_$$zd/%_$$zd"
-                                                     "cap/hwm=%_$$zd/%_$$zd"
-                                                     "wasted/hwm=%_$$zd/%_$$zd"
-                                                     "blocks/hwm=%_$$zd/%_$$zd"
-                                                     "syscalls=%'zu"
-                                                 "}",
-                                                 stat->used,     stat->used_hwm,
-                                                 stat->capacity, stat->capacity_hwm,
-                                                 stat->wasted,   stat->wasted_hwm,
-                                                 stat->blocks,   stat->blocks_hwm,
-                                                 stat->blocks,   stat->blocks_hwm,
-                                                 stat->syscalls);
-
-    #if defined(DQN_COMPILER_GCC)
-        #pragma GCC diagnostic pop
-    #elif defined(DQN_COMPILER_W32_CLANG)
-        #pragma GCC diagnostic pop
-    #endif
-
-    return result;
-}
-
-DQN_API void *Dqn_ArenaCopyInternal(Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS)
-{
-    void *result = Dqn_ArenaAllocate_(arena, size, alignment, Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
-    DQN_MEMCOPY(result, src, size);
-    return result;
-}
-
-DQN_API void *Dqn_ArenaCopyZInternal(Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment DQN_CALL_SITE_ARGS)
-{
-    void *result = Dqn_ArenaAllocate_(arena, size + 1, alignment, Dqn_ZeroMem::Yes DQN_CALL_SITE_ARGS_INPUT);
-    DQN_MEMCOPY(result, src, size);
-    return result;
-}
-
 DQN_API bool Dqn_ArenaGrow_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit)
 {
     // TODO: Use the call site arguments
-
     if (!arena || size <= 0) {
         return false;
     }
@@ -4216,7 +4380,76 @@ DQN_API bool Dqn_ArenaGrow_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size,
     return result;
 }
 
-DQN_API void Dqn_ArenaFree(Dqn_Arena *arena, bool clear_mem)
+DQN_API void *Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_u8 align, Dqn_ZeroMem zero_mem)
+{
+    DQN_ASSERT_MSG((align & (align - 1)) == 0, "Power of two alignment required");
+    Dqn_isize allocation_size = size + (align - 1);
+    while (!arena->curr || (arena->curr->used + allocation_size) > arena->curr->size) {
+        if (arena->curr) {
+            arena->curr = arena->curr->next;
+        } else {
+            Dqn_isize grow_size = DQN_MAX(DQN_MAX(allocation_size, arena->min_block_size), DQN_ARENA_MIN_BLOCK_SIZE);
+            if (!Dqn_ArenaGrow_(DQN_CALL_SITE_ARGS_INPUT arena, grow_size /*size*/, grow_size /*commit*/)) {
+                return nullptr;
+            }
+        }
+    }
+
+    // NOTE: Calculate an aligned allocation pointer
+    Dqn_ArenaBlock *block        = arena->curr;
+    Dqn_uintptr const address    = DQN_CAST(Dqn_uintptr)block->memory + block->used;
+    Dqn_isize const align_offset = (align - (address & (align - 1))) & (align - 1);
+    void *result                 = DQN_CAST(char *)(address + align_offset);
+
+    DQN_ASSERT_MSG(block->committed >= block->used,
+                   "Internal error: Committed size must always be greater than the used size [commit=%_$$zd, used=%_$$zd]",
+                   block->committed, block->used);
+
+    // NOTE: Ensure that the allocation is backed by physical pages from the OS
+    Dqn_isize const commit_space = block->committed - block->used;
+    if (commit_space < allocation_size) {
+        Dqn_isize commit_size = allocation_size - commit_space;
+        Dqn_VirtualCommit(DQN_CAST(char *)result + commit_space, commit_size);
+        block->committed += commit_size;
+    }
+
+    if (zero_mem == Dqn_ZeroMem_Yes) {
+        // NOTE: Newly committed pages are always 0-ed out, we only need to
+        // memset the memory that was reused from the arena.
+        DQN_MEMSET(DQN_CAST(char *)result - align_offset,
+                   DQN_MEMSET_BYTE,
+                   align_offset + commit_space);
+    }
+
+    // NOTE: Update arena
+    arena->stats.used += allocation_size;
+    arena->stats.used_hwm = DQN_MAX(arena->stats.used_hwm, arena->stats.used);
+    block->used += allocation_size;
+
+    DQN_ASSERT_MSG(size + align_offset <= allocation_size, "Internal error: Alignment size calculation error [size=%_$$zd, offset=%zd, allocation_size=%_$$zd]", size, align_offset, allocation_size);
+    DQN_ASSERT_MSG(block->used <= block->committed, "Internal error: Committed size must be greater than used size [used=%_$$zd, committed=%_$$zd]", block->used, block->committed);
+    DQN_ASSERT_MSG(block->committed <= block->size, "Internal error: Allocation exceeded block capacity [committed=%_$$zd, size=%_$$zd]", block->committed, block->size);
+    DQN_ASSERT_MSG(((DQN_CAST(Dqn_uintptr)result) & (align - 1)) == 0, "Internal error: Pointer alignment failed [address=%p, align=%x]", result, align);
+
+    return result;
+}
+
+DQN_API void *Dqn_ArenaCopy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment)
+{
+    void *result = Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, alignment, Dqn_ZeroMem_No);
+    DQN_MEMCOPY(result, src, size);
+    return result;
+}
+
+DQN_API void *Dqn_ArenaCopyZ_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, void *src, Dqn_isize size, Dqn_u8 alignment)
+{
+    void *result = Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS_INPUT arena, size + 1, alignment, Dqn_ZeroMem_No);
+    DQN_MEMCOPY(result, src, size);
+    (DQN_CAST(char *)result)[size] = 0;
+    return result;
+}
+
+DQN_API void Dqn_ArenaFree(Dqn_Arena *arena, bool zero_mem)
 {
     if (!arena)
         return;
@@ -4224,7 +4457,7 @@ DQN_API void Dqn_ArenaFree(Dqn_Arena *arena, bool clear_mem)
     while (arena->tail) {
         Dqn_ArenaBlock *tail = arena->tail;
         arena->tail          = tail->prev;
-        if (clear_mem)
+        if (zero_mem)
             DQN_MEMSET(tail->memory, DQN_MEMSET_BYTE, tail->committed);
         Dqn_VirtualRelease(tail, sizeof(*tail) + tail->size);
     }
@@ -4236,7 +4469,7 @@ DQN_API void Dqn_ArenaFree(Dqn_Arena *arena, bool clear_mem)
     arena->stats.blocks   = 0;
 }
 
-DQN_API void Dqn_ArenaReset(Dqn_Arena *arena, bool clear_mem)
+DQN_API void Dqn_ArenaReset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
 {
     if (!arena)
         return;
@@ -4245,13 +4478,41 @@ DQN_API void Dqn_ArenaReset(Dqn_Arena *arena, bool clear_mem)
     for (Dqn_ArenaBlock *block = arena->tail; block; block = block->prev) {
         if (!block->prev)
             arena->curr = block;
-        if (clear_mem)
+        if (zero_mem == Dqn_ZeroMem_Yes)
             DQN_MEMSET(block->memory, DQN_MEMSET_BYTE, block->committed);
         block->used = 0;
     }
 
     arena->stats.used   = 0;
     arena->stats.wasted = 0;
+}
+
+static void *Dqn_ArenaAllocatorAlloc(DQN_CALL_SITE_ARGS size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context)
+{
+    void *result = NULL;
+    if (!user_context)
+        return result;
+
+    Dqn_Arena *arena = DQN_CAST(Dqn_Arena *)user_context;
+    result           = Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, align, zero_mem);
+    return result;
+}
+
+static void Dqn_ArenaAllocatorDealloc(DQN_CALL_SITE_ARGS void *ptr, size_t size, void *user_context)
+{
+    // NOTE: No-op, arenas batch allocate and batch deallocate. Call free on the
+    // underlying arena, since we can't free individual pointers.
+}
+
+DQN_API Dqn_Allocator Dqn_ArenaAllocator(Dqn_Arena *arena)
+{
+    Dqn_Allocator result = {};
+    if (arena) {
+        result.user_context = arena;
+        result.alloc        = Dqn_ArenaAllocatorAlloc;
+        result.dealloc      = Dqn_ArenaAllocatorDealloc;
+    }
+    return result;
 }
 
 DQN_API Dqn_ArenaTempMemory Dqn_ArenaBeginTempMemory(Dqn_Arena *arena)
@@ -4309,56 +4570,42 @@ Dqn_ArenaTempMemoryScope::~Dqn_ArenaTempMemoryScope()
     Dqn_ArenaEndTempMemory(temp_memory);
 }
 
-DQN_API void *Dqn_ArenaAllocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_u8 align, Dqn_ZeroMem zero_mem)
+DQN_API Dqn_ArenaStatString Dqn_ArenaStatToString(Dqn_ArenaStat const *stat)
 {
-    DQN_ASSERT_MSG((align & (align - 1)) == 0, "Power of two alignment required");
-    Dqn_isize allocation_size = size + (align - 1);
-    while (!arena->curr || (arena->curr->used + allocation_size) > arena->curr->size) {
-        if (arena->curr) {
-            arena->curr = arena->curr->next;
-        } else {
-            Dqn_isize grow_size = DQN_MAX(DQN_MAX(allocation_size, arena->min_block_size), DQN_ARENA_MIN_BLOCK_SIZE);
-            if (!Dqn_ArenaGrow_(DQN_CALL_SITE_ARGS_INPUT arena, grow_size /*size*/, grow_size /*commit*/)) {
-                return nullptr;
-            }
-        }
-    }
+    // NOTE: We use a non-standard format string that is only usable via
+    // stb sprintf that GCC warns about as an error. This pragma mutes that.
+    #if defined(DQN_COMPILER_GCC)
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wformat="
+        #pragma GCC diagnostic ignored "-Wformat-extra-args"
+    #elif defined(DQN_COMPILER_W32_CLANG)
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wformat"
+        #pragma GCC diagnostic ignored "-Wformat-invalid-specifier"
+        #pragma GCC diagnostic ignored "-Wformat-extra-args"
+    #endif
 
-    // NOTE: Calculate an aligned allocation pointer
-    Dqn_ArenaBlock *block        = arena->curr;
-    Dqn_uintptr const address    = DQN_CAST(Dqn_uintptr)block->memory + block->used;
-    Dqn_isize const align_offset = (align - (address & (align - 1))) & (align - 1);
-    void *result                 = DQN_CAST(char *)(address + align_offset);
+    Dqn_ArenaStatString result = {};
+    result.size = STB_SPRINTF_DECORATE(snprintf)(result.data, DQN_ARRAY_ICOUNT(result.data),
+                                                 "ArenaStat{"
+                                                     "used/hwm=%_$$zd/%_$$zd"
+                                                     "cap/hwm=%_$$zd/%_$$zd"
+                                                     "wasted/hwm=%_$$zd/%_$$zd"
+                                                     "blocks/hwm=%_$$zd/%_$$zd"
+                                                     "syscalls=%'zu"
+                                                 "}",
+                                                 stat->used,     stat->used_hwm,
+                                                 stat->capacity, stat->capacity_hwm,
+                                                 stat->wasted,   stat->wasted_hwm,
+                                                 stat->blocks,   stat->blocks_hwm,
+                                                 stat->blocks,   stat->blocks_hwm,
+                                                 stat->syscalls);
 
-    DQN_ASSERT_MSG(block->committed >= block->used,
-                   "Internal error: Committed size must always be greater than the used size [commit=%_$$zd, used=%_$$zd]",
-                   block->committed, block->used);
-
-    // NOTE: Ensure that the allocation is backed by physical pages from the OS
-    Dqn_isize const commit_space = block->committed - block->used;
-    if (commit_space < allocation_size) {
-        Dqn_isize commit_size = allocation_size - commit_space;
-        Dqn_VirtualCommit(DQN_CAST(char *)result + commit_space, commit_size);
-        block->committed += commit_size;
-    }
-
-    if (zero_mem == Dqn_ZeroMem::Yes) {
-        // NOTE: Newly committed pages are always 0-ed out, we only need to
-        // memset the memory that was reused from the arena.
-        DQN_MEMSET(DQN_CAST(char *)result - align_offset,
-                   DQN_MEMSET_BYTE,
-                   align_offset + commit_space);
-    }
-
-    // NOTE: Update arena
-    arena->stats.used += allocation_size;
-    arena->stats.used_hwm = DQN_MAX(arena->stats.used_hwm, arena->stats.used);
-    block->used += allocation_size;
-
-    DQN_ASSERT_MSG(size + align_offset <= allocation_size, "Internal error: Alignment size calculation error [size=%_$$zd, offset=%zd, allocation_size=%_$$zd]", size, align_offset, allocation_size);
-    DQN_ASSERT_MSG(block->used <= block->committed, "Internal error: Committed size must be greater than used size [used=%_$$zd, committed=%_$$zd]", block->used, block->committed);
-    DQN_ASSERT_MSG(block->committed <= block->size, "Internal error: Allocation exceeded block capacity [committed=%_$$zd, size=%_$$zd]", block->committed, block->size);
-    DQN_ASSERT_MSG(((DQN_CAST(Dqn_uintptr)result) & (align - 1)) == 0, "Internal error: Pointer alignment failed [address=%p, align=%x]", result, align);
+    #if defined(DQN_COMPILER_GCC)
+        #pragma GCC diagnostic pop
+    #elif defined(DQN_COMPILER_W32_CLANG)
+        #pragma GCC diagnostic pop
+    #endif
 
     return result;
 }
@@ -4717,15 +4964,15 @@ DQN_API Dqn_V2 Dqn_RectCenter(Dqn_Rect rect)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_RectContainsPoint(Dqn_Rect rect, Dqn_V2 p)
+DQN_API bool Dqn_RectContainsPoint(Dqn_Rect rect, Dqn_V2 p)
 {
-    Dqn_b32 result = (p.x >= rect.min.x && p.x <= rect.max.x && p.y >= rect.min.y && p.y <= rect.max.y);
+    bool result = (p.x >= rect.min.x && p.x <= rect.max.x && p.y >= rect.min.y && p.y <= rect.max.y);
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_RectContainsRect(Dqn_Rect a, Dqn_Rect b)
+DQN_API bool Dqn_RectContainsRect(Dqn_Rect a, Dqn_Rect b)
 {
-    Dqn_b32 result = (b.min >= a.min && b.max <= a.max);
+    bool result = (b.min >= a.min && b.max <= a.max);
     return result;
 }
 
@@ -4752,9 +4999,9 @@ DQN_API Dqn_Rect Dqn_RectMoveTo(Dqn_Rect src, Dqn_V2 dest)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_RectIntersects(Dqn_Rect a, Dqn_Rect b)
+DQN_API bool Dqn_RectIntersects(Dqn_Rect a, Dqn_Rect b)
 {
-    Dqn_b32 result = (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+    bool result = (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
                      (a.min.y <= b.max.y && a.max.y >= b.min.y);
     return result;
 }
@@ -4824,13 +5071,13 @@ DQN_API void Dqn_BitSetInplace(Dqn_u64 *flags, Dqn_u64 bitfield)
     *flags = (*flags | bitfield);
 }
 
-DQN_API Dqn_b32 Dqn_BitIsSet(Dqn_u64 bits, Dqn_u64 bits_to_set)
+DQN_API bool Dqn_BitIsSet(Dqn_u64 bits, Dqn_u64 bits_to_set)
 {
-    auto result = DQN_CAST(Dqn_b32)((bits & bits_to_set) == bits_to_set);
+    auto result = DQN_CAST(bool)((bits & bits_to_set) == bits_to_set);
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_BitIsNotSet(Dqn_u64 bits, Dqn_u64 bits_to_check)
+DQN_API bool Dqn_BitIsNotSet(Dqn_u64 bits, Dqn_u64 bits_to_check)
 {
     auto result = !Dqn_BitIsSet(bits, bits_to_check);
     return result;
@@ -4988,33 +5235,33 @@ DQN_API int Dqn_SafeTruncateU64ToInt(Dqn_u64 val)
 
 // NOTE: Dqn_Char
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32 Dqn_CharIsAlpha(char ch)
+DQN_API bool Dqn_CharIsAlpha(char ch)
 {
-    Dqn_b32 result = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+    bool result = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_CharIsDigit(char ch)
+DQN_API bool Dqn_CharIsDigit(char ch)
 {
-    Dqn_b32 result = (ch >= '0' && ch <= '9');
+    bool result = (ch >= '0' && ch <= '9');
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_CharIsAlphaNum(char ch)
+DQN_API bool Dqn_CharIsAlphaNum(char ch)
 {
-    Dqn_b32 result = Dqn_CharIsAlpha(ch) || Dqn_CharIsDigit(ch);
+    bool result = Dqn_CharIsAlpha(ch) || Dqn_CharIsDigit(ch);
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_CharIsWhitespace(char ch)
+DQN_API bool Dqn_CharIsWhitespace(char ch)
 {
-    Dqn_b32 result = (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r');
+    bool result = (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r');
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_CharIsHex(char ch)
+DQN_API bool Dqn_CharIsHex(char ch)
 {
-    Dqn_b32 result = ((ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') || (ch >= '0' && ch <= '9'));
+    bool result = ((ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') || (ch >= '0' && ch <= '9'));
     return result;
 }
 
@@ -5236,7 +5483,7 @@ DQN_API void Dqn_HexToBytes(char const *hex, int hex_size, void *dest, int dest_
 
 DQN_API char *Dqn_HexBytesToHexCStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena)
 {
-    char *result = size > 0 ? Dqn_ArenaNewArray(arena, char, (size * 2) + 1 /*null terminate*/, Dqn_ZeroMem::No) : nullptr;
+    char *result = size > 0 ? Dqn_ArenaNewArray(arena, char, (size * 2) + 1 /*null terminate*/, Dqn_ZeroMem_No) : nullptr;
     if (result)
     {
         Dqn_HexBytesToHex(bytes, size, result, size * 2);
@@ -5271,7 +5518,7 @@ DQN_API Dqn_u8 *Dqn_HexCStringToU8Bytes(char const *hex, Dqn_isize size, Dqn_isi
 {
     hex = Dqn_HexCStringTrimSpaceAnd0xPrefix(hex, size, &size);
     Dqn_isize binary_size = DQN_CAST(Dqn_isize)(size / 2.f + .5f);
-    Dqn_u8 *result = Dqn_ArenaNewArray(arena, Dqn_u8, binary_size, Dqn_ZeroMem::No);
+    Dqn_u8 *result = Dqn_ArenaNewArray(arena, Dqn_u8, binary_size, Dqn_ZeroMem_No);
     if (result)
         Dqn_HexToBytes(hex, size, result, binary_size);
 
@@ -5300,7 +5547,7 @@ DQN_API Dqn_Array<Dqn_u8> Dqn_HexStringToU8Array(Dqn_String8 const hex, Dqn_Aren
 
 // NOTE: Dqn_Str
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32 Dqn_CStringEquals(char const *a, char const *b, Dqn_isize a_size, Dqn_isize b_size)
+DQN_API bool Dqn_CStringEquals(char const *a, char const *b, Dqn_isize a_size, Dqn_isize b_size)
 {
     if (a_size == -1) a_size = DQN_CAST(Dqn_isize)Dqn_CStringSize(a);
     if (b_size == -1) b_size = DQN_CAST(Dqn_isize)Dqn_CStringSize(b);
@@ -5333,7 +5580,7 @@ DQN_API char const *Dqn_CStringFindMulti(char const *buf, char const *find_list[
     return result;
 }
 
-DQN_API char const *Dqn_CStringFind(char const *buf, char const *find, Dqn_isize buf_size, Dqn_isize find_size, Dqn_b32 case_insensitive)
+DQN_API char const *Dqn_CStringFind(char const *buf, char const *find, Dqn_isize buf_size, Dqn_isize find_size, bool case_insensitive)
 {
     if (find_size == 0) return nullptr;
     if (buf_size < 0) buf_size = DQN_CAST(Dqn_isize)Dqn_CStringSize(buf);
@@ -5346,7 +5593,7 @@ DQN_API char const *Dqn_CStringFind(char const *buf, char const *find, Dqn_isize
         Dqn_isize remaining = static_cast<Dqn_isize>(buf_end - buf);
         if (remaining < find_size) break;
 
-        Dqn_b32 matched = true;
+        bool matched = true;
         for (Dqn_isize index = 0; index < find_size; index++)
         {
             char lhs = buf[index];
@@ -5405,10 +5652,10 @@ DQN_API Dqn_isize Dqn_CStringSize(char const *src)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_CStringMatch(char const *src, char const *find, int find_size)
+DQN_API bool Dqn_CStringMatch(char const *src, char const *find, int find_size)
 {
     if (find_size == -1) find_size = Dqn_SafeTruncateUSizeToInt(Dqn_CStringSize(find));
-    Dqn_b32 result = (DQN_MEMCMP(src, find, DQN_CAST(size_t)find_size) == 0);
+    bool result = (DQN_MEMCMP(src, find, DQN_CAST(size_t)find_size) == 0);
     return result;
 }
 
@@ -5522,8 +5769,7 @@ DQN_API char const *Dqn_CStringTrimPrefix(char const *src, Dqn_isize size, char 
     if (prefix_size > size)
         return result;
 
-    if (DQN_MEMCMP(src, prefix, prefix_size) == 0)
-    {
+    if (DQN_MEMCMP(src, prefix, prefix_size) == 0) {
         result += prefix_size;
         if (trimmed_size) *trimmed_size = size - prefix_size;
     }
@@ -5531,16 +5777,15 @@ DQN_API char const *Dqn_CStringTrimPrefix(char const *src, Dqn_isize size, char 
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_CStringIsAllDigits(char const *src, Dqn_isize size)
+DQN_API bool Dqn_CStringIsAllDigits(char const *src, Dqn_isize size)
 {
     if (!src) return false;
     if (size <= -1) size = Dqn_CStringSize(src);
-    for (Dqn_isize ch_index = 0; ch_index < size; ch_index++)
-    {
+    for (Dqn_isize ch_index = 0; ch_index < size; ch_index++) {
         if (!(src[ch_index] >= '0' && src[ch_index] <= '9'))
             return false;
     }
-    Dqn_b32 result = src && size > 0;
+    bool result = src && size > 0;
     return result;
 }
 
@@ -5580,15 +5825,13 @@ DQN_API Dqn_i64 Dqn_CStringToI64(char const *buf, Dqn_isize size, char separator
         size = Dqn_CStringSize(buf);
 
     char const *buf_ptr = buf;
-    Dqn_b32 negative    = (buf[0] == '-');
-    if (negative)
-    {
+    bool negative    = (buf[0] == '-');
+    if (negative) {
         ++buf_ptr;
         --size;
     }
 
-    for (int buf_index = 0; buf_index < size; ++buf_index)
-    {
+    for (int buf_index = 0; buf_index < size; ++buf_index) {
         char ch = buf_ptr[buf_index];
         if (buf_index && ch == separator)
             continue;
@@ -5618,68 +5861,77 @@ DQN_API Dqn_isize Dqn_LStringSize(wchar_t const *src)
     return result;
 }
 
-// NOTE: Dqn_File
+// NOTE: Dqn_Fs
 // -------------------------------------------------------------------------------------------------
-DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena DQN_CALL_SITE_ARGS)
+DQN_API char *Dqn_FsReadFileCString8ToCString8Arena_(DQN_CALL_SITE_ARGS char const *path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Arena *arena)
 {
-#if defined(DQN_OS_WIN32)
-    if (file_path_size <= 0)
-        file_path_size = Dqn_CStringSize(file_path);
+    if (!path || !arena) {
+        return nullptr;
+    }
 
-    Dqn_ThreadScratch scratch            = Dqn_ThreadGetScratch(arena);
-    Dqn_String8        file_path_string   = Dqn_String8Init(file_path, file_path_size);
-    Dqn_String16      file_path_string_w = Dqn_WinString8ToString16Arena(file_path_string, scratch.arena);
+#if defined(DQN_OS_WIN32)
+    if (path_size <= 0)
+        path_size = Dqn_CStringSize(path);
+
+    Dqn_ThreadScratch scratch       = Dqn_ThreadGetScratch(arena);
+    Dqn_String8       path_string   = Dqn_String8Init(path, path_size);
+    Dqn_String16      path_string_w = Dqn_WinString8ToString16Allocator(path_string, Dqn_ArenaAllocator(scratch.arena));
 
     void *file_handle =
-        CreateFileW(file_path_string_w.data, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, nullptr);
+        CreateFileW(path_string_w.data, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, nullptr);
+
     if (file_handle == INVALID_HANDLE_VALUE) {
-        Dqn_WinDumpLastError("Failed to open file for reading [file=%.*s]", file_path_size, file_path);
+        DQN_LOG_E("Failed to open file for reading [file=%.*s, reason=%.*s]",
+                  DQN_STRING_FMT(path_string),
+                  DQN_STRING_FMT(Dqn_WinLastError()));
         return nullptr;
     }
 
     DQN_DEFER { CloseHandle(file_handle); };
     LARGE_INTEGER win_file_size;
     bool get_file_size_result = GetFileSizeEx(file_handle, &win_file_size);
-    if (!get_file_size_result || win_file_size.QuadPart > (unsigned long)-1)
-    {
-        if (!get_file_size_result)
-        {
-            Dqn_WinDumpLastError("GetFileSizeEx");
-        }
-        else
-        {
+    if (!get_file_size_result || win_file_size.QuadPart > (unsigned long)-1) {
+        if (!get_file_size_result) {
+            DQN_LOG_E("Failed to query file size [file=%.*s, reason=%.*s]",
+                      DQN_STRING_FMT(path_string),
+                      DQN_STRING_FMT(Dqn_WinLastError()));
+        } else {
             DQN_LOG_E(
                 "We don't support files larger than %$.2d yet, Win32 layer needs to use overlapped IO to chunk reading in "
                 "the data");
         }
-
         return nullptr;
     }
 
     Dqn_isize allocate_size = Dqn_SafeTruncateI64ToISize(win_file_size.QuadPart + 1);
     auto  arena_undo        = Dqn_ArenaBeginTempMemory(arena);
-    auto *result            = DQN_CAST(char *) Dqn_ArenaAllocate_(arena, allocate_size, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
+    auto *result            = DQN_CAST(char *) Dqn_ArenaAllocate_(arena, allocate_size, alignof(char), Dqn_ZeroMem_No DQN_CALL_SITE_ARGS_INPUT);
 
     // TODO(dqn): We need to chunk this and ensure that readfile read the bytes we wanted.
     unsigned long bytes_read = 0;
-    if (ReadFile(file_handle, result, DQN_CAST(unsigned long)win_file_size.QuadPart, &bytes_read, nullptr /*overlapped*/) == 0)
-    {
+    if (ReadFile(file_handle, result, DQN_CAST(unsigned long)win_file_size.QuadPart, &bytes_read, nullptr /*overlapped*/) == 0) {
         Dqn_ArenaEndTempMemory(arena_undo);
-        Dqn_WinDumpLastError("ReadFile");
+        DQN_LOG_E("Failed to read file to buffer [file=%.*s, reason=%.*s]",
+                  DQN_STRING_FMT(path_string),
+                  DQN_STRING_FMT(Dqn_WinLastError()));
         return nullptr;
     }
 
-    if (file_size) *file_size = Dqn_SafeTruncateI64ToISize(win_file_size.QuadPart);
+    if (file_size) {
+        *file_size = Dqn_SafeTruncateI64ToISize(win_file_size.QuadPart);
+    }
+
+    // TODO: Zero terminate doesn't look necessary, ever?
+    result[win_file_size.QuadPart] = 0;
     return result;
 #else
     Dqn_isize file_size_ = 0;
     if (!file_size)
         file_size = &file_size_;
 
-    FILE *file_handle = fopen(file_path, "rb");
-    if (!file_handle)
-    {
-        DQN_LOG_E("Failed to open file '%s' using fopen\n", file_path);
+    FILE *file_handle = fopen(path, "rb");
+    if (!file_handle) {
+        DQN_LOG_E("Failed to open file '%s' using fopen\n", path);
         return nullptr;
     }
 
@@ -5687,24 +5939,21 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
     fseek(file_handle, 0, SEEK_END);
     *file_size = ftell(file_handle);
 
-    if (DQN_CAST(long)(*file_size) == -1L)
-    {
+    if (DQN_CAST(long)(*file_size) == -1L) {
         DQN_LOG_E("Failed to determine '%s' file size using ftell\n", file);
         return nullptr;
     }
 
     rewind(file_handle);
     auto  arena_undo = Dqn_ArenaBeginTempMemory(arena);
-    auto *result     = DQN_CAST(char *) Dqn_ArenaAllocate_(arena, *file_size + 1, alignof(char), Dqn_ZeroMem::No DQN_CALL_SITE_ARGS_INPUT);
-    if (!result)
-    {
+    auto *result     = DQN_CAST(char *) Dqn_ArenaAllocate_(arena, *file_size + 1, alignof(char), Dqn_ZeroMem_No DQN_CALL_SITE_ARGS_INPUT);
+    if (!result) {
         DQN_LOG_M("Failed to allocate %td bytes to read file '%s'\n", *file_size + 1, file);
         return nullptr;
     }
 
     result[*file_size] = 0;
-    if (fread(result, DQN_CAST(size_t)(*file_size), 1, file_handle) != 1)
-    {
+    if (fread(result, DQN_CAST(size_t)(*file_size), 1, file_handle) != 1) {
         Dqn_ArenaEndTempMemory(arena_undo);
         DQN_LOG_E("Failed to read %td bytes into buffer from '%s'\n", *file_size, file);
         return nullptr;
@@ -5714,32 +5963,43 @@ DQN_API char *Dqn__FileRead(char const *file_path, Dqn_isize file_path_size, Dqn
 #endif
 }
 
-DQN_API Dqn_String8 Dqn__FileArenaReadToString(char const *     file_path,
-                                              Dqn_isize        file_path_size,
-                                              Dqn_Arena *arena DQN_CALL_SITE_ARGS)
+DQN_API Dqn_String8 Dqn_FsReadFileCString8ToString8Arena_(DQN_CALL_SITE_ARGS
+                                                      char const *path,
+                                                      Dqn_isize   path_size,
+                                                      Dqn_Arena  *arena)
 {
-    Dqn_isize     file_size = 0;
-    char *        string    = Dqn__FileRead(file_path, file_path_size, &file_size, arena DQN_CALL_SITE_ARGS_INPUT);
-    Dqn_String8    result    = Dqn_String8Init(string, file_size);
+    Dqn_isize   file_size = 0;
+    char *      string    = Dqn_FsReadFileCString8ToCString8Arena_(DQN_CALL_SITE_ARGS_INPUT path, path_size, &file_size, arena);
+    Dqn_String8 result    = Dqn_String8Init(string, file_size);
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size)
+DQN_API Dqn_String8 Dqn_FsReadFileString8ToString8Arena_(DQN_CALL_SITE_ARGS
+                                                     Dqn_String8 path,
+                                                     Dqn_Arena  *arena)
+{
+    Dqn_isize   file_size = 0;
+    char *      string    = Dqn_FsReadFileCString8ToCString8Arena_(DQN_CALL_SITE_ARGS_INPUT path.data, path.size, &file_size, arena);
+    Dqn_String8 result    = Dqn_String8Init(string, file_size);
+    return result;
+}
+
+DQN_API bool Dqn_FsWriteFileCString8(char const *path, Dqn_isize path_size, char const *buffer, Dqn_isize buffer_size)
 {
 #if defined(DQN_OS_WIN32)
-    if (!file_path || file_path_size <= 0 || !buffer || buffer_size <= 0)
+    if (!path || path_size <= 0 || !buffer || buffer_size <= 0)
         return false;
 
-    if (file_path_size == 0)
-        file_path_size = Dqn_CStringSize(file_path);
+    if (path_size == 0)
+        path_size = Dqn_CStringSize(path);
 
-    Dqn_ThreadScratch scratch       = Dqn_ThreadGetScratch();
-    Dqn_String8        file_path_str = Dqn_String8Init(file_path, file_path_size);
-    Dqn_String16      file_path16   = Dqn_WinString8ToString16Arena(file_path_str, scratch.arena);
+    Dqn_ThreadScratch scratch  = Dqn_ThreadGetScratch();
+    Dqn_String8       path_str = Dqn_String8Init(path, path_size);
+    Dqn_String16      path16   = Dqn_WinString8ToString16Allocator(path_str, Dqn_ArenaAllocator(scratch.arena));
 
-    Dqn_b32 result = false;
+    bool result = false;
     if (buffer_size > 0) {
-        void *file_handle = CreateFileW(file_path16.data,      // LPCWSTR               lpFileName,
+        void *file_handle = CreateFileW(path16.data,      // LPCWSTR               lpFileName,
                                         GENERIC_WRITE,         // DWORD                 dwDesiredAccess,
                                         0,                     // DWORD                 dwShareMode,
                                         nullptr,               // LPSECURITY_ATTRIBUTES lpSecurityAttributes,
@@ -5760,22 +6020,20 @@ DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_siz
     return result;
 #else
     // TODO(dqn): Use OS apis
-    (void)file_path_size;
+    (void)path_size;
 
     FILE *file_handle = nullptr;
-    fopen_s(&file_handle, file_path, "w+b");
-    if (!file_handle)
-    {
-        DQN_LOG_E("Failed to open file '%s' using fopen\n", file_path);
+    fopen_s(&file_handle, path, "w+b");
+    if (!file_handle) {
+        DQN_LOG_E("Failed to open file '%s' using fopen\n", path);
         return false;
     }
 
     DQN_DEFER { fclose(file_handle); };
     Dqn_usize write_count = fwrite(buffer, buffer_size, 1 /*count*/, file_handle);
 
-    if (write_count != 1)
-    {
-        DQN_LOG_E("Failed to write to file '%s' using fwrite\n", file_path);
+    if (write_count != 1) {
+        DQN_LOG_E("Failed to write to file '%s' using fwrite\n", path);
         return false;
     }
 
@@ -5783,7 +6041,13 @@ DQN_API Dqn_b32 Dqn_FileWriteFile(char const *file_path, Dqn_isize file_path_siz
 #endif
 }
 
-// NOTE: Dqn_File Implementation
+DQN_API bool Dqn_FsWriteFileString8(Dqn_String8 path, Dqn_String8 buffer)
+{
+    bool result = Dqn_FsWriteFileCString8(path.data, path.size, buffer.data, buffer.size);
+    return result;
+}
+
+// NOTE: Dqn_Fs Implementation
 // -------------------------------------------------------------------------------------------------
 #if defined(DQN_OS_WIN32)
 DQN_API Dqn_u64 Dqn__WinFileTimeToSeconds(FILETIME const *time)
@@ -5802,9 +6066,9 @@ DQN_API Dqn_u64 Dqn__WinFileTimeToSeconds(FILETIME const *time)
     #define DQN_OS_WIN32_MAX_PATH 32767 + 128 /*fudge*/
 #endif
 
-DQN_API Dqn_b32 Dqn_FileExists(Dqn_String8 path)
+DQN_API bool Dqn_FsExists(Dqn_String8 path)
 {
-    Dqn_b32 result = false;
+    bool result = false;
 #if defined(DQN_OS_WIN32)
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
     int path16_size = Dqn_WinString8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
@@ -5829,9 +6093,9 @@ DQN_API Dqn_b32 Dqn_FileExists(Dqn_String8 path)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileDirExists(Dqn_String8 path)
+DQN_API bool Dqn_FsDirExists(Dqn_String8 path)
 {
-    Dqn_b32 result = false;
+    bool result = false;
 #if defined(DQN_OS_WIN32)
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
     int path16_size = Dqn_WinString8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
@@ -5854,9 +6118,9 @@ DQN_API Dqn_b32 Dqn_FileDirExists(Dqn_String8 path)
     return result;
 }
 
-DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String8 path)
+DQN_API Dqn_FsInfo Dqn_FsGetInfo(Dqn_String8 path)
 {
-    Dqn_FileInfo result = {};
+    Dqn_FsInfo result = {};
 #if defined(DQN_OS_WIN32)
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
@@ -5895,44 +6159,40 @@ DQN_API Dqn_FileInfo Dqn_FileGetInfo(Dqn_String8 path)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileCopy(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrite)
+DQN_API bool Dqn_FsCopy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
 {
-    Dqn_b32 result = false;
+    bool result = false;
 #if defined(DQN_OS_WIN32)
-    wchar_t src_w [DQN_OS_WIN32_MAX_PATH];
-    wchar_t dest_w[DQN_OS_WIN32_MAX_PATH];
-    Dqn_WinString8ToCString16(src, src_w, DQN_CAST(int)Dqn_ArrayCountInt(src_w));
-    Dqn_WinString8ToCString16(dest, dest_w, DQN_CAST(int)Dqn_ArrayCountInt(dest_w));
+    Dqn_ThreadScratch scratch = Dqn_ThreadGetScratch();
+    Dqn_String16      src16   = Dqn_WinString8ToString16Allocator(src, Dqn_ArenaAllocator(scratch.arena));
+    Dqn_String16      dest16  = Dqn_WinString8ToString16Allocator(dest, Dqn_ArenaAllocator(scratch.arena));
 
     int fail_if_exists = overwrite == false;
-    result = CopyFileW(src_w, dest_w, fail_if_exists) != 0;
-    if (!result)
-        Dqn_WinDumpLastError("Failed to copy from %.*s to %.*s", DQN_STRING_FMT(src), DQN_STRING_FMT(dest));
+    result = CopyFileW(src16.data, dest16.data, fail_if_exists) != 0;
+
+    if (!result) {
+        DQN_LOG_E("Failed to copy file [from=%.*s, to=%.*s, reason=%.*s]",
+                  DQN_STRING_FMT(src16),
+                  DQN_STRING_FMT(dest16),
+                  DQN_STRING_FMT(Dqn_WinLastError()));
+    }
 
 #elif defined(DQN_OS_UNIX)
     int src_fd  = open(src.data, O_RDONLY);
     int dest_fd = open(dest.data, O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : 0));
-    if (src_fd != -1 && dest_fd != -1)
-    {
-        // NOTE: Do a shallow copy-on-write
-        // See: https://git.savannah.gnu.org/gitweb/?p=coreutils.git;a=blob;f=src/copy.c;h=159556d052158a6d3839b5b4ff69887471ff32da;hb=HEAD#l405
-        // See: https://man7.org/linux/man-pages/man2/ioctl_ficlonerange.2.html
-        int ioctl_result = ioctl(dest_fd, FICLONE, src_fd);
-        if (ioctl_result == -1)
-        {
-            // If it fails, try a binary copy- and if that fails we give up.
-            // Taken from: https://github.com/gingerBill/gb/blob/master/gb.h
-            struct stat stat_existing;
-            fstat(src_fd, &stat_existing);
 
-            Dqn_isize bytes_written = sendfile64(dest_fd, src_fd, 0, stat_existing.st_size);
-            result = (bytes_written == stat_existing.st_size);
-        }
+    if (src_fd != -1 && dest_fd != -1) {
+        struct stat stat_existing;
+        fstat(src_fd, &stat_existing);
+        Dqn_isize bytes_written = sendfile64(dest_fd, src_fd, 0, stat_existing.st_size);
+        result = (bytes_written == stat_existing.st_size);
     }
 
-    if (src_fd != -1) close(src_fd);
-    if (dest_fd != -1) close(dest_fd);
+    if (src_fd != -1)
+        close(src_fd);
 
+    if (dest_fd != -1)
+        close(dest_fd);
 #else
     #error Unimplemented
 #endif
@@ -5940,17 +6200,15 @@ DQN_API Dqn_b32 Dqn_FileCopy(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrit
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String8 path, Dqn_Arena *temp_arena)
+DQN_API bool Dqn_FsMakeDir(Dqn_String8 path)
 {
-    Dqn_b32 result           = true;
-    int path_indexes_size    = 0;
-    Dqn_u16 path_indexes[64] = {};
+    Dqn_ThreadScratch scratch = Dqn_ThreadGetScratch();
+    bool result               = true;
+    int path_indexes_size     = 0;
+    Dqn_u16 path_indexes[64]  = {};
 
 #if defined(DQN_OS_WIN32)
-    (void)temp_arena;
-
-    wchar_t src_w[DQN_OS_WIN32_MAX_PATH];
-    int src_w_size = Dqn_WinString8ToCString16(path, src_w, DQN_CAST(int)Dqn_ArrayCountI(src_w));
+    Dqn_String16 path16 = Dqn_WinString8ToString16Allocator(path, Dqn_ArenaAllocator(scratch.arena));
 
     // NOTE: Go back from the end of the string to all the directories in the
     // string, and try to create them. Since Win32 API cannot create
@@ -5964,38 +6222,30 @@ DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String8 path, Dqn_Arena *temp_arena)
     // If we find a file at some point in the path we fail out because the
     // series of directories can not be made if a file exists with the same
     // name.
-    for (Dqn_i32 index = src_w_size - 1; index >= 0; index--)
-    {
-        Dqn_b32 first_char = index == (src_w_size - 1);
-        wchar_t ch         = src_w[index];
-        if (ch == '/' || ch == '\\' || first_char)
-        {
+    for (Dqn_isize index = path16.size - 1; index >= 0; index--) {
+        bool first_char = index == (path16.size - 1);
+        wchar_t ch      = path16.data[index];
+        if (ch == '/' || ch == '\\' || first_char) {
             WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-            wchar_t temp = src_w[index];
+            wchar_t temp = path16.data[index];
 
-            if (!first_char) src_w[index] = 0; // Temporarily null terminate it
-            Dqn_b32 successful = GetFileAttributesExW(src_w, GetFileExInfoStandard, &attrib_data); // Check
-            if (!first_char) src_w[index] = temp; // Undo null termination
+            if (!first_char) path16.data[index] = 0; // Temporarily null terminate it
+            bool successful = GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data); // Check
+            if (!first_char) path16.data[index] = temp; // Undo null termination
 
-            if (successful)
-            {
-                if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-                {
+            if (successful) {
+                if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                     // NOTE: We found a directory, we can stop here and start
                     // building up all the directories that didn't exist up to
                     // this point.
                     break;
-                }
-                else
-                {
+                } else {
                     // NOTE: There's something that exists in at this path, but
                     // it's not a directory. This request to make a directory is
                     // invalid.
                     return false;
                 }
-            }
-            else
-            {
+            } else {
                 // NOTE: There's nothing that exists at this path, we can create
                 // a directory here
                 path_indexes[path_indexes_size++] = DQN_CAST(Dqn_u16)index;
@@ -6003,49 +6253,38 @@ DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String8 path, Dqn_Arena *temp_arena)
         }
     }
 
-    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--)
-    {
+    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--) {
         Dqn_u16 path_index = path_indexes[index];
-        wchar_t temp = src_w[path_index];
+        wchar_t temp = path16.data[path_index];
 
-        if (index != 0) src_w[path_index] = 0;
-        result |= (CreateDirectoryW(src_w, nullptr) == 0);
-        if (index != 0) src_w[path_index] = temp;
+        if (index != 0) path16.data[path_index] = 0;
+        result |= (CreateDirectoryW(path16.data, nullptr) == 0);
+        if (index != 0) path16.data[path_index] = temp;
     }
 
 #elif defined(DQN_OS_UNIX)
-    auto scoped_arena = Dqn_ArenaTempMemoryScope(temp_arena);
-    Dqn_String8 copy  = Dqn_String8Copy(temp_arena, path);
-
-    for (Dqn_i32 index = copy.size - 1; index >= 0; index--)
-    {
-        Dqn_b32 first_char = index == (copy.size - 1);
+    Dqn_String8 copy = Dqn_String8Copy(scratch.arena, path);
+    for (Dqn_i32 index = copy.size - 1; index >= 0; index--) {
+        bool first_char = index == (copy.size - 1);
         wchar_t ch         = copy.data[index];
-        if (ch == '/' || first_char)
-        {
+        if (ch == '/' || first_char) {
             char temp = copy.data[index];
             if (!first_char) copy.data[index] = 0; // Temporarily null terminate it
-            Dqn_b32 is_file = Dqn_FileExists(copy);
+            bool is_file = Dqn_FsExists(copy);
             if (!first_char) copy.data[index] = temp; // Undo null termination
 
-            if (is_file)
-            {
+            if (is_file) {
                 // NOTE: There's something that exists in at this path, but
                 // it's not a directory. This request to make a directory is
                 // invalid.
                 return false;
-            }
-            else
-            {
-                if (Dqn_FileDirExists(copy))
-                {
+            } else {
+                if (Dqn_FsDirExists(copy)) {
                     // NOTE: We found a directory, we can stop here and start
                     // building up all the directories that didn't exist up to
                     // this point.
                     break;
-                }
-                else
-                {
+                } else {
                     // NOTE: There's nothing that exists at this path, we can
                     // create a directory here
                     path_indexes[path_indexes_size++] = DQN_CAST(Dqn_u16)index;
@@ -6054,8 +6293,7 @@ DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String8 path, Dqn_Arena *temp_arena)
         }
     }
 
-    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--)
-    {
+    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--) {
         Dqn_u16 path_index = path_indexes[index];
         char temp = copy.data[path_index];
 
@@ -6071,21 +6309,27 @@ DQN_API Dqn_b32 Dqn_FileMakeDir(Dqn_String8 path, Dqn_Arena *temp_arena)
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileMove(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrite)
+DQN_API bool Dqn_FsMove(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
 {
-    Dqn_b32 result = false;
+    bool result = false;
 
 #if defined(DQN_OS_WIN32)
-    wchar_t src_w [DQN_OS_WIN32_MAX_PATH];
-    wchar_t dest_w[DQN_OS_WIN32_MAX_PATH];
-    Dqn_WinString8ToCString16(src, src_w, DQN_CAST(int)Dqn_ArrayCountI(src_w));
-    Dqn_WinString8ToCString16(dest, dest_w, DQN_CAST(int)Dqn_ArrayCountI(dest_w));
+    Dqn_ThreadScratch scratch = Dqn_ThreadGetScratch();
+    Dqn_String16      src16   = Dqn_WinString8ToString16Allocator(src, Dqn_ArenaAllocator(scratch.arena));
+    Dqn_String16      dest16  = Dqn_WinString8ToString16Allocator(dest, Dqn_ArenaAllocator(scratch.arena));
 
     unsigned long flags = MOVEFILE_COPY_ALLOWED;
-    if (overwrite) flags |= MOVEFILE_REPLACE_EXISTING;
+    if (overwrite) {
+        flags |= MOVEFILE_REPLACE_EXISTING;
+    }
 
-    result = MoveFileExW(src_w, dest_w, flags) != 0;
-    if (!result) Dqn_WinDumpLastError("Failed to move from %.*s to %.*s", DQN_STRING_FMT(src), DQN_STRING_FMT(dest));
+    result = MoveFileExW(src16.data, dest16.data, flags) != 0;
+    if (!result) {
+        DQN_LOG_E("Failed to move file [from=%.*s, to=%.*s, reason=%.*s]",
+                  DQN_STRING_FMT(src),
+                  DQN_STRING_FMT(dest),
+                  DQN_STRING_FMT(Dqn_WinLastError()));
+    }
 
 #elif defined(DQN_OS_UNIX)
     // See: https://github.com/gingerBill/gb/blob/master/gb.h
@@ -6094,7 +6338,7 @@ DQN_API Dqn_b32 Dqn_FileMove(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrit
     {
         // NOTE: Link can fail if we're trying to link across different volumes
         // so we fall back to a binary directory.
-        file_moved |= Dqn_FileCopy(src, dest, overwrite);
+        file_moved |= Dqn_FsCopy(src, dest, overwrite);
     }
 
     if (file_moved)
@@ -6108,9 +6352,9 @@ DQN_API Dqn_b32 Dqn_FileMove(Dqn_String8 src, Dqn_String8 dest, Dqn_b32 overwrit
     return result;
 }
 
-DQN_API Dqn_b32 Dqn_FileDelete(Dqn_String8 path)
+DQN_API bool Dqn_FsDelete(Dqn_String8 path)
 {
-    Dqn_b32 result = false;
+    bool result = false;
 #if defined(DQN_OS_WIN32)
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
     int path16_size = Dqn_WinString8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
@@ -6170,10 +6414,8 @@ DQN_API Dqn_DateHMSTime Dqn_DateHMSLocalTimeNow()
     return result;
 }
 
-DQN_API Dqn_DateHMSTimeString Dqn_DateHMSLocalTimeStringNow(char date_separator, char hms_separator)
+DQN_API Dqn_DateHMSTimeString Dqn_DateHMSLocalTimeString(Dqn_DateHMSTime time, char date_separator, char hms_separator)
 {
-    Dqn_DateHMSTime const time = Dqn_DateHMSLocalTimeNow();
-
     Dqn_DateHMSTimeString result = {};
     result.hms_size              = DQN_CAST(Dqn_i8) STB_SPRINTF_DECORATE(snprintf)(result.hms,
                                                                       DQN_CAST(int) Dqn_ArrayCountI(result.hms),
@@ -6193,6 +6435,13 @@ DQN_API Dqn_DateHMSTimeString Dqn_DateHMSLocalTimeStringNow(char date_separator,
                                                                        date_separator,
                                                                        time.day);
 
+    return result;
+}
+
+DQN_API Dqn_DateHMSTimeString Dqn_DateHMSLocalTimeStringNow(char date_separator, char hms_separator)
+{
+    Dqn_DateHMSTime time         = Dqn_DateHMSLocalTimeNow();
+    Dqn_DateHMSTimeString result = Dqn_DateHMSLocalTimeString(time, date_separator, hms_separator);
     return result;
 }
 
@@ -6221,7 +6470,7 @@ DQN_API Dqn_u64 Dqn_DateEpochTime()
 
 // NOTE: OS
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size)
+DQN_API bool Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size)
 {
     if (!buffer || size < 0)
         return false;
@@ -6272,14 +6521,14 @@ DQN_API Dqn_b32 Dqn_OSSecureRNGBytes(void *buffer, Dqn_u32 size)
     return true;
 }
 
-DQN_API Dqn_String8 Dqn_OSEXEDir(Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_OSEXEDir(Dqn_Allocator allocator)
 {
     Dqn_String8 result = {};
 
 #if defined(DQN_OS_WIN32)
     wchar_t exe_dir[DQN_OS_WIN32_MAX_PATH];
     Dqn_isize exe_dir_size = Dqn_WinEXEDirW(exe_dir, DQN_ARRAY_ICOUNT(exe_dir));
-    result = Dqn_WinCString16ToString8Arena(exe_dir, exe_dir_size, arena);
+    result = Dqn_WinCString16ToString8Allocator(exe_dir, DQN_CAST(int)exe_dir_size, allocator);
 
 #elif defined(DQN_OS_UNIX)
 
@@ -6289,7 +6538,7 @@ DQN_API Dqn_String8 Dqn_OSEXEDir(Dqn_Arena *arena)
          try_size *= 2)
     {
         auto scoped_arena = Dqn_ArenaTempMemoryScope(arena);
-        char *try_buf     = Dqn_ArenaNewArray(arena, char, try_size, Dqn_ZeroMem::No);
+        char *try_buf     = Dqn_ArenaNewArray(arena, char, try_size, Dqn_ZeroMem_No);
         int bytes_written = readlink("/proc/self/exe", try_buf, try_size);
         if (bytes_written == -1)
         {
@@ -6337,7 +6586,7 @@ DQN_API Dqn_String8 Dqn_OSEXEDir(Dqn_Arena *arena)
     if (required_size_wo_null_terminator)
     {
         Dqn_ArenaTempMemory scope = Dqn_ArenaBeginTempMemory(arena);
-        char *exe_path = Dqn_ArenaNewArray(arena, char, required_size_wo_null_terminator + 1, Dqn_ZeroMem::No);
+        char *exe_path = Dqn_ArenaNewArray(arena, char, required_size_wo_null_terminator + 1, Dqn_ZeroMem_No);
         exe_path[required_size_wo_null_terminator] = 0;
 
         int bytes_written = readlink("/proc/self/exe", exe_path, required_size_wo_null_terminator);
@@ -6485,7 +6734,7 @@ DQN_API Dqn_f64 Dqn_TimerNs(Dqn_Timer timer)
     return result;
 }
 
-DQN_API char *Dqn_U64ToStr(Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep)
+DQN_API char *Dqn_U64ToStr(Dqn_u64 val, Dqn_U64Str *result, bool comma_sep)
 {
     int buf_index            = (int)(Dqn_ArrayCount(result->buf) - 1);
     result->buf[buf_index--] = 0;
@@ -6515,7 +6764,7 @@ DQN_API char *Dqn_U64ToStr(Dqn_u64 val, Dqn_U64Str *result, Dqn_b32 comma_sep)
     return result->str;
 }
 
-DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, Dqn_b32 comma_sep)
+DQN_API char *Dqn_U64ToTempStr(Dqn_u64 val, bool comma_sep)
 {
     DQN_LOCAL_PERSIST Dqn_U64Str string;
     string = {};
@@ -6537,13 +6786,11 @@ DQN_API void Dqn_LibDumpThreadContextArenaStat(Dqn_String8 file_path)
         // NOTE: Extremely short critical section, copy the stats then do our
         // work on it.
         Dqn_ArenaStat stats[Dqn_ArrayCountI(dqn_lib_.thread_context_arena_stats)];
-        Dqn_ArenaStat hwm_stats[Dqn_ArrayCountI(dqn_lib_.thread_context_arena_hwm_stats)];
         int stats_size = 0;
 
         Dqn_TicketMutexBegin(&dqn_lib_.thread_context_mutex);
-        stats_size = dqn_lib_.thread_context_arena_stats_size;
+        stats_size = dqn_lib_.thread_context_arena_stats_count;
         DQN_MEMCOPY(stats, dqn_lib_.thread_context_arena_stats, sizeof(stats[0]) * stats_size);
-        DQN_MEMCOPY(hwm_stats, dqn_lib_.thread_context_arena_hwm_stats, sizeof(hwm_stats[0]) * stats_size);
         Dqn_TicketMutexEnd(&dqn_lib_.thread_context_mutex);
 
         // NOTE: Print the cumulative stat
@@ -6552,45 +6799,33 @@ DQN_API void Dqn_LibDumpThreadContextArenaStat(Dqn_String8 file_path)
                 "Time=%.*s %.*s | Thread Context Arenas | Count=%d\n",
                 now.date_size, now.date,
                 now.hms_size, now.hms,
-                dqn_lib_.thread_context_arena_stats_size);
+                dqn_lib_.thread_context_arena_stats_count);
 
         // NOTE: Write the cumulative thread arena data
         {
-            Dqn_ArenaStat stats = {};
-            Dqn_ArenaStat high_water_mark_stats = {};
-            for (Dqn_isize index = 0; index < stats_size; index++)
-            {
+            Dqn_ArenaStat stat = {};
+            for (Dqn_isize index = 0; index < stats_size; index++) {
                 Dqn_ArenaStat const *current = stats + index;
-                Dqn_ArenaStat const *highest = hwm_stats + index;
+                stat.capacity += current->capacity;
+                stat.used     += current->used;
+                stat.wasted   += current->wasted;
+                stat.blocks   += current->blocks;
 
-                stats.capacity    += current->capacity;
-                stats.used        += current->used;
-                stats.wasted      += current->wasted;
-                stats.block_count += current->block_count;
-
-                high_water_mark_stats.capacity    = DQN_MAX(high_water_mark_stats.capacity, highest->capacity);
-                high_water_mark_stats.used        = DQN_MAX(high_water_mark_stats.used, highest->used);
-                high_water_mark_stats.wasted      = DQN_MAX(high_water_mark_stats.wasted, highest->wasted);
-                high_water_mark_stats.block_count = DQN_MAX(high_water_mark_stats.block_count, highest->block_count);
+                stat.capacity_hwm = DQN_MAX(stat.capacity_hwm, current->capacity_hwm);
+                stat.used_hwm     = DQN_MAX(stat.used_hwm, current->used_hwm);
+                stat.wasted_hwm   = DQN_MAX(stat.wasted_hwm, current->wasted_hwm);
+                stat.blocks_hwm   = DQN_MAX(stat.blocks_hwm, current->blocks_hwm);
             }
 
-            Dqn_ArenaStatString stats_string                 = Dqn_ArenaStatToString(&stats);
-            Dqn_ArenaStatString high_water_mark_stats_string = Dqn_ArenaStatToString(&high_water_mark_stats);
+            Dqn_ArenaStatString stats_string = Dqn_ArenaStatToString(&stat);
             fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.data);
-            fprintf(file, "        HIGH %.*s\n", high_water_mark_stats_string.size, high_water_mark_stats_string.data);
         }
 
         // NOTE: Print individual thread arena data
-        for (Dqn_isize index = 0; index < stats_size; index++)
-        {
+        for (Dqn_isize index = 0; index < stats_size; index++) {
             Dqn_ArenaStat const *current = stats + index;
-            Dqn_ArenaStat const *highest = stats + index;
-
             Dqn_ArenaStatString current_string = Dqn_ArenaStatToString(current);
-            Dqn_ArenaStatString highest_string = Dqn_ArenaStatToString(highest);
-
             fprintf(file, "  [%03d] CURR %.*s\n", DQN_CAST(int)index, current_string.size, current_string.data);
-            fprintf(file, "         HIGH %.*s\n", highest_string.size, highest_string.data);
         }
 
         fclose(file);
@@ -6622,34 +6857,34 @@ DQN_API void Dqn_LibSetLogFile(FILE *file)
 DQN_API Dqn_ThreadContext *Dqn_ThreadGetContext()
 {
     thread_local Dqn_ThreadContext result = {};
-    if (!result.init)
-    {
-        result.init = true;
-        for (Dqn_ThreadScratchData &scratch_data : result.scratch_data) {
-            Dqn_ArenaGrow(&scratch_data.arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4));
-
-#if defined(DQN_DEBUG_THREAD_CONTEXT)
-            // NOTE: Allocate this arena a slot in the stats array that we use
-            // to record allocation statistics for each thread's arena.
-            Dqn_TicketMutexBegin(&dqn_lib_.thread_context_mutex);
-            scratch_data.arena_stats_index = dqn_lib_.thread_context_arena_stats_size++;
-            Dqn_TicketMutexEnd(&dqn_lib_.thread_context_mutex);
-            DQN_HARD_ASSERT(dqn_lib_.thread_context_arena_stats_size < Dqn_ArrayCountI(dqn_lib_.thread_context_arena_stats));
-#endif
-        }
+    if (result.init) {
+        return &result;
     }
 
+    result.init = true;
+    for (Dqn_ThreadScratchData &scratch_data : result.scratch_data) {
+        Dqn_ArenaGrow(&scratch_data.arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4));
+        #if defined(DQN_DEBUG_THREAD_CONTEXT)
+        // NOTE: Assign this arena a slot in the global library's context
+        // to allow recording of statistics of this thread's arena.
+        Dqn_TicketMutexBegin(&dqn_lib_.thread_context_mutex);
+        scratch_data.arena_stats_index = dqn_lib_.thread_context_arena_stats_count++;
+        DQN_HARD_ASSERT(dqn_lib_.thread_context_arena_stats_count <
+                        Dqn_ArrayCountI(dqn_lib_.thread_context_arena_stats));
+        Dqn_TicketMutexEnd(&dqn_lib_.thread_context_mutex);
+        #endif
+    }
     return &result;
 }
 
-DQN_API Dqn_ThreadScratch Dqn_ThreadGetScratch(const Dqn_Arena *conflict_arena)
+// TODO: Is there a way to handle conflict arenas without the user needing to
+// manually pass it in?
+DQN_API Dqn_ThreadScratch Dqn_ThreadGetScratch(const void *conflict_arena)
 {
     Dqn_ThreadContext     *thread = Dqn_ThreadGetContext();
     Dqn_ThreadScratchData *result = nullptr;
-    for (Dqn_ThreadScratchData &scratch_data : thread->scratch_data)
-    {
-        if (!conflict_arena || (&scratch_data.arena != conflict_arena))
-        {
+    for (Dqn_ThreadScratchData &scratch_data : thread->scratch_data) {
+        if (!conflict_arena || (&scratch_data.arena != conflict_arena)) {
             result = &scratch_data;
             break;
         }
@@ -6660,53 +6895,53 @@ DQN_API Dqn_ThreadScratch Dqn_ThreadGetScratch(const Dqn_Arena *conflict_arena)
 }
 
 #if defined(DQN_WITH_JSON_WRITER)
-// NOTE: Dqn_JsonWriter
+// NOTE: Dqn_JSONWriter
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_JsonWriter Dqn_JsonWriterInit(Dqn_Arena *arena, int spaces_per_indent)
+DQN_API Dqn_JSONWriter Dqn_JSONWriterInit(Dqn_Arena *arena, int spaces_per_indent)
 {
-    Dqn_JsonWriter result        = {};
-    result.arena             = arena;
+    Dqn_JSONWriter result    = {};
     result.spaces_per_indent = spaces_per_indent;
+    result.builder.allocator = Dqn_ArenaAllocator(arena);
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_JsonWriterBuild(Dqn_JsonWriter *writer, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_JSONWriterBuild(Dqn_JSONWriter *writer, Dqn_Allocator allocator)
 {
-    Dqn_String8 result = Dqn_String8ListBuild(&writer->list, arena);
+    Dqn_String8 result = Dqn_String8BuilderBuild(&writer->builder, allocator);
     return result;
 }
 
-DQN_API void Dqn_JsonWriter_DoIndent(Dqn_JsonWriter *writer)
+DQN_API void Dqn_JSONWriterDoIndent_(Dqn_JSONWriter *writer)
 {
     int spaces_per_indent = writer->spaces_per_indent ? writer->spaces_per_indent : 2;
     int spaces            = writer->indent_level * spaces_per_indent;
-    if (spaces)
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "%*s", spaces, "");
+    if (spaces) {
+        Dqn_String8 padding = Dqn_String8Allocate(writer->builder.allocator, spaces, Dqn_ZeroMem_No);
+        DQN_MEMSET(padding.data, ' ', padding.size);
+        Dqn_String8BuilderAppendString8Ref(&writer->builder, padding);
+    }
 }
 
-DQN_API void Dqn_JsonWriter_PreAddItem(Dqn_JsonWriter *writer)
+DQN_API void Dqn_JSONWriterPreAddItem_(Dqn_JSONWriter *writer)
 {
     if (writer->parent_field_count_stack_size <= 0)
         return;
 
     Dqn_u16 *parent_field_count = &writer->parent_field_count_stack[writer->parent_field_count_stack_size - 1];
-    if (*parent_field_count == 0)
-    {
+    if (*parent_field_count == 0) {
         // NOTE: First time we're adding an item to an object, we need to write
         // on a new line for nice formatting.
-        Dqn_String8ListAppendString(&writer->list, writer->arena, DQN_STRING("\n"));
-    }
-    else if (*parent_field_count > 0)
-    {
+        Dqn_String8BuilderAppendString8Ref(&writer->builder, DQN_STRING8("\n"));
+    } else if (*parent_field_count > 0) {
         // NOTE: We have items in the object already and we're adding another
         // item so we need to add a comma on the previous item.
-        Dqn_String8ListAppendString(&writer->list, writer->arena, DQN_STRING(",\n"));
+        Dqn_String8BuilderAppendString8Ref(&writer->builder, DQN_STRING8(",\n"));
     }
 
-    Dqn_JsonWriter_DoIndent(writer);
+    Dqn_JSONWriterDoIndent_(writer);
 }
 
-DQN_API void Dqn_JsonWriter_PostAddItem(Dqn_JsonWriter *writer)
+DQN_API void Dqn_JSONWriterPostAddItem_(Dqn_JSONWriter *writer)
 {
     if (writer->parent_field_count_stack_size <= 0)
         return;
@@ -6715,15 +6950,15 @@ DQN_API void Dqn_JsonWriter_PostAddItem(Dqn_JsonWriter *writer)
     (*parent_field_count)++;
 }
 
-DQN_API void Dqn_JsonWriter_BeginContainer(Dqn_JsonWriter *writer, Dqn_String8 name, bool array)
+DQN_API void Dqn_JSONWriterBeginContainer_(Dqn_JSONWriter *writer, Dqn_String8 name, bool array)
 {
-    Dqn_String8 container_ch = array ? DQN_STRING("[") : DQN_STRING("{");
-    Dqn_JsonWriter_PreAddItem(writer);
+    Dqn_String8 container_ch = array ? DQN_STRING8("[") : DQN_STRING8("{");
+    Dqn_JSONWriterPreAddItem_(writer);
     if (name.size)
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
     else
-        Dqn_String8ListAppendString(&writer->list, writer->arena, container_ch);
-    Dqn_JsonWriter_PostAddItem(writer);
+        Dqn_String8BuilderAppendString8Ref(&writer->builder, container_ch);
+    Dqn_JSONWriterPostAddItem_(writer);
 
     writer->indent_level++;
 
@@ -6733,14 +6968,13 @@ DQN_API void Dqn_JsonWriter_BeginContainer(Dqn_JsonWriter *writer, Dqn_String8 n
 
 }
 
-DQN_API void Dqn_JsonWriter_EndContainer(Dqn_JsonWriter *writer, Dqn_b32 array)
+DQN_API void Dqn_JSONWriterEndContainer_(Dqn_JSONWriter *writer, bool array)
 {
     Dqn_u16 *parent_field_count = &writer->parent_field_count_stack[writer->parent_field_count_stack_size - 1];
-    if (*parent_field_count > 0)
-    {
+    if (*parent_field_count > 0) {
         // NOTE: End of object/array should start on a new line if the
         // array/object has atleast one field in it.
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\n");
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, "\n");
     }
 
     writer->parent_field_count_stack_size--;
@@ -6749,92 +6983,123 @@ DQN_API void Dqn_JsonWriter_EndContainer(Dqn_JsonWriter *writer, Dqn_b32 array)
     writer->indent_level--;
     DQN_ASSERT(writer->indent_level >= 0);
 
-    Dqn_JsonWriter_DoIndent(writer);
-    Dqn_String8ListAppendString(&writer->list, writer->arena, array ? DQN_STRING("]") : DQN_STRING("}"));
+    Dqn_JSONWriterDoIndent_(writer);
+    Dqn_String8BuilderAppendString8Ref(&writer->builder, array ? DQN_STRING8("]") : DQN_STRING8("}"));
 }
 
-DQN_API void Dqn_JsonWriterBeginNamedObject(Dqn_JsonWriter *writer, Dqn_String8 name)
+DQN_API void Dqn_JSONWriterObjectBeginNamed(Dqn_JSONWriter *writer, Dqn_String8 name)
 {
-    Dqn_JsonWriter_BeginContainer(writer, name, false /*array*/);
+    Dqn_JSONWriterBeginContainer_(writer, name, false /*array*/);
 }
 
-DQN_API void Dqn_JsonWriterBeginObject(Dqn_JsonWriter *writer)
+DQN_API void Dqn_JSONWriterObjectBegin(Dqn_JSONWriter *writer)
 {
-    Dqn_JsonWriter_BeginContainer(writer, DQN_STRING(""), false /*array*/);
+    Dqn_JSONWriterBeginContainer_(writer, DQN_STRING8(""), false /*array*/);
 }
 
-DQN_API void Dqn_JsonWriterEndObject(Dqn_JsonWriter *writer)
+DQN_API void Dqn_JSONWriterObjectEnd(Dqn_JSONWriter *writer)
 {
-    Dqn_JsonWriter_EndContainer(writer, false /*array*/);
+    Dqn_JSONWriterEndContainer_(writer, false /*array*/);
 }
 
-DQN_API void Dqn_JsonWriterBeginNamedArray(Dqn_JsonWriter *writer, Dqn_String8 name)
+DQN_API void Dqn_JSONWriterArrayBeginNamed(Dqn_JSONWriter *writer, Dqn_String8 name)
 {
-    Dqn_JsonWriter_BeginContainer(writer, name, true /*array*/);
+    Dqn_JSONWriterBeginContainer_(writer, name, true /*array*/);
 }
 
-DQN_API void Dqn_JsonWriterBeginArray(Dqn_JsonWriter *writer)
+DQN_API void Dqn_JSONWriterArrayBegin(Dqn_JSONWriter *writer)
 {
-    Dqn_JsonWriter_BeginContainer(writer, DQN_STRING(""), false /*array*/);
+    Dqn_JSONWriterBeginContainer_(writer, DQN_STRING8(""), false /*array*/);
 }
 
-DQN_API void Dqn_JsonWriterEndArray(Dqn_JsonWriter *writer)
+DQN_API void Dqn_JSONWriterArrayEnd(Dqn_JSONWriter *writer)
 {
-    Dqn_JsonWriter_EndContainer(writer, true /*array*/);
+    Dqn_JSONWriterEndContainer_(writer, true /*array*/);
 }
 
-DQN_API void Dqn_JsonWriterNamedString(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_String8 value)
+DQN_API void Dqn_JSONWriterStringNamed(Dqn_JSONWriter *writer, Dqn_String8 key, Dqn_String8 value)
 {
-    Dqn_JsonWriter_PreAddItem(writer);
+    Dqn_JSONWriterPreAddItem_(writer);
     if (key.size)
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
     else
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\"%.*s\"", DQN_STRING_FMT(value));
-    Dqn_JsonWriter_PostAddItem(writer);
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, "\"%.*s\"", DQN_STRING_FMT(value));
+    Dqn_JSONWriterPostAddItem_(writer);
 }
 
-DQN_API void Dqn_JsonWriterString(Dqn_JsonWriter *writer, Dqn_String8 value)
+DQN_API void Dqn_JSONWriterString(Dqn_JSONWriter *writer, Dqn_String8 value)
 {
-    Dqn_JsonWriterNamedString(writer, DQN_STRING("") /*key*/, value);
+    Dqn_JSONWriterStringNamed(writer, DQN_STRING8("") /*key*/, value);
 }
 
-DQN_API void Dqn_JsonWriterNamedU64(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_u64 value)
+DQN_API void Dqn_JSONWriterU64Named(Dqn_JSONWriter *writer, Dqn_String8 key, Dqn_u64 value)
 {
-    Dqn_JsonWriter_PreAddItem(writer);
+    Dqn_JSONWriterPreAddItem_(writer);
     if (key.size)
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
     else
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, "%I64u", value);
-    Dqn_JsonWriter_PostAddItem(writer);
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, "%I64u", value);
+    Dqn_JSONWriterPostAddItem_(writer);
 }
 
-DQN_API void Dqn_JsonWriterU64(Dqn_JsonWriter *writer, Dqn_u64 value)
+DQN_API void Dqn_JSONWriterU64(Dqn_JSONWriter *writer, Dqn_u64 value)
 {
-    Dqn_JsonWriterNamedU64(writer, DQN_STRING("") /*key*/, value);
+    Dqn_JSONWriterU64Named(writer, DQN_STRING8("") /*key*/, value);
 }
 
-DQN_API void Dqn_JsonWriterNamedF64(Dqn_JsonWriter *writer, Dqn_String8 key, Dqn_f64 value, int decimal_places)
+DQN_API void Dqn_JSONWriterI64Named(Dqn_JSONWriter *writer, Dqn_String8 key, Dqn_i64 value)
 {
-    Dqn_FixedString<8> const float_fmt =
-        decimal_places > 0
-            ? Dqn_FixedStringFmt<8>("%%.%df", decimal_places) // %.<decimal_places>f i.e. %.1f
-            : Dqn_FixedStringFmt<8>("%%f");                   // %f
-
-    Dqn_FixedString<32> const fmt_string =
-        key.size ? Dqn_FixedStringFmt<32>(R"("%%.*s": %s)", float_fmt) :
-                   Dqn_FixedStringFmt<32>(R"(%s)",        float_fmt);
-
-    Dqn_JsonWriter_PreAddItem(writer);
+    Dqn_JSONWriterPreAddItem_(writer);
     if (key.size)
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, fmt_string.data, DQN_STRING_FMT(key), value);
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, "\"%.*s\": %I64d", DQN_STRING_FMT(key), value);
     else
-        Dqn_String8ListAppendFmt(&writer->list, writer->arena, fmt_string.data, value);
-    Dqn_JsonWriter_PostAddItem(writer);
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, "%I64d", value);
+    Dqn_JSONWriterPostAddItem_(writer);
 }
 
-DQN_API void Dqn_JsonWriterF64(Dqn_JsonWriter *writer, Dqn_f64 value, int decimal_places)
+DQN_API void Dqn_JSONWriterI64(Dqn_JSONWriter *writer, Dqn_i64 value)
 {
-    Dqn_JsonWriterNamedF64(writer, DQN_STRING("") /*key*/, value, decimal_places);
+    Dqn_JSONWriterI64Named(writer, DQN_STRING8("") /*key*/, value);
+}
+
+DQN_API void Dqn_JSONWriterF64Named(Dqn_JSONWriter *writer, Dqn_String8 key, Dqn_f64 value, int decimal_places)
+{
+    if (!writer)
+        return;
+
+    DQN_ASSERT(decimal_places <= 308);
+    decimal_places = DQN_MIN(decimal_places, 308);
+
+    // NOTE: Generate the format string for the float, depending on how many
+    // decimals places it wants.
+    char float_fmt[16];
+    Dqn_isize require = 1; // null-terminator
+    if (decimal_places > 0) {
+        // NOTE: Emit the format string "%.<decimal_places>f" i.e. %.1f
+        require += STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
+    } else {
+        // NOTE: Emit the format string "%f"
+        require += STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%f");
+    }
+
+    char fmt[32];
+    if (Dqn_String8IsValid(key)) {
+        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
+    } else {
+        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "%s", float_fmt);
+    }
+
+    Dqn_JSONWriterPreAddItem_(writer);
+    if (Dqn_String8IsValid(key))
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, fmt, DQN_STRING_FMT(key), value);
+    else
+        Dqn_String8BuilderAppendFmtArgs(&writer->builder, fmt, value);
+    Dqn_JSONWriterPostAddItem_(writer);
+}
+
+DQN_API void Dqn_JSONWriterF64(Dqn_JSONWriter *writer, Dqn_f64 value, int decimal_places)
+{
+    Dqn_JSONWriterF64Named(writer, DQN_STRING8("") /*key*/, value, decimal_places);
 }
 #endif // DQN_WITH_JSON_WRITER
 
@@ -6933,12 +7198,12 @@ DQN_API int Dqn_WinString8ToCString16(Dqn_String8 src, wchar_t *dest, int dest_s
     return result;
 }
 
-DQN_API Dqn_String16 Dqn_WinString8ToString16Arena(Dqn_String8 src, Dqn_Arena *arena)
+DQN_API Dqn_String16 Dqn_WinString8ToString16Allocator(Dqn_String8 src, Dqn_Allocator allocator)
 {
     Dqn_String16 result = {};
     int required = Dqn_WinString8ToCString16(src, nullptr, 0);
     if (required != 0) {
-        result.data = Dqn_ArenaNewArray(arena, wchar_t, required, Dqn_ZeroMem::No);
+        result.data = Dqn_AllocatorNewArray(allocator, wchar_t, required, Dqn_ZeroMem_No);
         if (result.data) {
             result.size = Dqn_WinString8ToCString16(src, result.data, required) - 1;
             DQN_ASSERT(result.size == required - 1);
@@ -6963,7 +7228,7 @@ DQN_API int Dqn_WinCString16ToCString8(const wchar_t* src, int src_size, char *d
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_WinCString16ToString8Arena(const wchar_t* src, int src_size, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_WinCString16ToString8Allocator(const wchar_t* src, int src_size, Dqn_Allocator allocator)
 {
     Dqn_String8 result = {};
     int required = Dqn_WinCString16ToCString8(src, src_size, nullptr, 0);
@@ -6971,7 +7236,7 @@ DQN_API Dqn_String8 Dqn_WinCString16ToString8Arena(const wchar_t* src, int src_s
         // NOTE: String allocate ensures there's one extra byte for
         // null-termination already so we need to undo the +1 from our
         // functions.
-        result = Dqn_String8Allocate(arena, required - 1, Dqn_ZeroMem::No);
+        result = Dqn_String8Allocate(allocator, required - 1, Dqn_ZeroMem_No);
         if (Dqn_String8IsValid(result)) {
             int next_required = Dqn_WinCString16ToCString8(src, src_size, result.data, required);
             DQN_ASSERT(required == next_required);
@@ -6990,12 +7255,12 @@ DQN_API int Dqn_WinString16ToCString8(Dqn_String16 src, char *dest, int dest_siz
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_WinString16ToString8Arena(Dqn_String16 src, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_WinString16ToString8Allocator(Dqn_String16 src, Dqn_Allocator allocator)
 {
     Dqn_String8 result = {};
     int src_size = Dqn_SafeTruncateISizeToInt(src.size);
     if (src_size) {
-        result = Dqn_WinCString16ToString8Arena(src.data, src_size, arena);
+        result = Dqn_WinCString16ToString8Allocator(src.data, src_size, allocator);
     }
     return result;
 }
@@ -7036,38 +7301,42 @@ DQN_API Dqn_String16 Dqn_WinEXEDirWArena(Dqn_Arena *arena)
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_WinWorkingDir(Dqn_Arena *arena, Dqn_Arena *temp_arena, Dqn_String8 suffix)
+DQN_API Dqn_String8 Dqn_WinWorkingDir(Dqn_Allocator allocator, Dqn_String8 suffix)
 {
-    Dqn_String16 w_suffix = Dqn_WinString8ToString16Arena(suffix, temp_arena);
-    Dqn_String16 curr_dir = Dqn_WinWorkingDirW(temp_arena, w_suffix);
-    Dqn_String8 result     = Dqn_WinString16ToString8Arena(curr_dir, arena);
+    Dqn_ThreadScratch scratch = Dqn_ThreadGetScratch(allocator.user_context);
+    Dqn_String16 suffix16     = Dqn_WinString8ToString16Allocator(suffix, Dqn_ArenaAllocator(scratch.arena));
+    Dqn_String16 dir16        = Dqn_WinWorkingDirW(Dqn_ArenaAllocator(scratch.arena), suffix16);
+    Dqn_String8 result        = Dqn_WinString16ToString8Allocator(dir16, allocator);
     return result;
 }
 
-DQN_API Dqn_String16 Dqn_WinWorkingDirW(Dqn_Arena *arena, Dqn_String16 suffix)
+DQN_API Dqn_String16 Dqn_WinWorkingDirW(Dqn_Allocator allocator, Dqn_String16 suffix)
 {
     DQN_ASSERT(suffix.size >= 0);
     Dqn_String16 result = {};
 
-    // NOTE: required_size is the size required *including* the null-terminator
-    unsigned long         required_size  = GetCurrentDirectoryW(0, nullptr);
-    unsigned long         desired_size   = required_size + DQN_CAST(unsigned long) suffix.size;
-    Dqn_ArenaTempMemory temp_state = Dqn_ArenaBeginTempMemory(arena);
+    Dqn_ThreadScratch scratch = Dqn_ThreadGetScratch(allocator.user_context);
 
-    wchar_t *w_path = Dqn_ArenaNewArray(arena, wchar_t, desired_size, Dqn_ZeroMem::No);
-    if (!w_path)
+    // NOTE: required_size is the size required *including* the null-terminator
+    unsigned long required_size = GetCurrentDirectoryW(0, nullptr);
+    unsigned long desired_size  = required_size + DQN_CAST(unsigned long) suffix.size;
+
+    wchar_t *scratch_w_path = Dqn_ArenaNewArray(scratch.arena, wchar_t, desired_size, Dqn_ZeroMem_No);
+    if (!scratch_w_path)
         return result;
 
-    unsigned long bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, w_path);
-    if ((bytes_written_wo_null_terminator + 1) != required_size)
-    {
+    unsigned long bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, scratch_w_path);
+    if ((bytes_written_wo_null_terminator + 1) != required_size) {
         // TODO(dqn): Error
-        Dqn_ArenaEndTempMemory(temp_state); // Undo allocations
         return result;
     }
 
-    if (suffix.size)
-    {
+    wchar_t *w_path = Dqn_AllocatorNewArray(allocator, wchar_t, desired_size, Dqn_ZeroMem_No);
+    if (!w_path)
+        return result;
+
+    if (suffix.size) {
+        DQN_MEMCOPY(w_path, scratch_w_path, sizeof(*scratch_w_path) * bytes_written_wo_null_terminator);
         DQN_MEMCOPY(w_path + bytes_written_wo_null_terminator, suffix.data, sizeof(suffix.data[0]) * suffix.size);
         w_path[desired_size] = 0;
     }
@@ -7326,7 +7595,7 @@ DQN_API char *Dqn_WinNetHandlePumpToCString(Dqn_WinNetHandle *handle, char const
     Dqn_WinNetChunk * first_chunk = nullptr;
     for (Dqn_WinNetChunk *last_chunk = nullptr;;)
     {
-        Dqn_WinNetChunk *chunk = Dqn_ArenaNew(scratch.arena, Dqn_WinNetChunk, Dqn_ZeroMem::Yes);
+        Dqn_WinNetChunk *chunk = Dqn_ArenaNew(scratch.arena, Dqn_WinNetChunk, Dqn_ZeroMem_Yes);
         bool pump_result       = Dqn_WinNetHandlePump(handle, http_verb, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
         if (chunk->size)
         {
@@ -7347,7 +7616,7 @@ DQN_API char *Dqn_WinNetHandlePumpToCString(Dqn_WinNetHandle *handle, char const
             break;
     }
 
-    char *result     = Dqn_ArenaNewArray(arena, char, total_size + 1 /*null-terminator*/, Dqn_ZeroMem::No);
+    char *result     = Dqn_ArenaNewArray(arena, char, total_size + 1 /*null-terminator*/, Dqn_ZeroMem_No);
     char *result_ptr = result;
     for (Dqn_WinNetChunk *chunk = first_chunk; chunk; chunk = chunk->next)
     {
@@ -9388,3 +9657,4 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         #undef _CRT_SECURE_NO_WARNINGS
     #endif
 #endif
+/// @endcond
