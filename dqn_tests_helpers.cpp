@@ -48,15 +48,14 @@ void Keccak(ui r, ui c, const u8 *in, u64 inLen, u8 sfx, u8 *out, u64 outLen)
 }
 
 
-// -----------------------------------------------------------------------------
 // PCG32 Random Number Generator
 // -----------------------------------------------------------------------------
 // NOTE: https://github.com/imneme/pcg-c-basic
 
 struct pcg_state_setseq_64
 {                   // Internals are *Private*.
-    Dqn_u64 state; // RNG state.  All values are possible.
-    Dqn_u64 inc;   // Controls which RNG sequence (stream) is
+    uint64_t state; // RNG state.  All values are possible.
+    uint64_t inc;   // Controls which RNG sequence (stream) is
                     // selected. Must *always* be odd.
 };
 typedef struct pcg_state_setseq_64 pcg32_random_t;
@@ -64,12 +63,12 @@ typedef struct pcg_state_setseq_64 pcg32_random_t;
 // pcg32_random_r(rng)
 //     Generate a uniformly distributed 32-bit random number
 
-Dqn_u32 pcg32_random_r(pcg32_random_t* rng)
+uint32_t pcg32_random_r(pcg32_random_t* rng)
 {
-    Dqn_u64 oldstate = rng->state;
+    uint64_t oldstate = rng->state;
     rng->state = oldstate * 6364136223846793005ULL + rng->inc;
-    Dqn_u32 xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
-    Dqn_u32 rot = oldstate >> 59u;
+    uint32_t xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
+    uint32_t rot = oldstate >> 59u;
     return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
 }
 
@@ -77,7 +76,7 @@ Dqn_u32 pcg32_random_r(pcg32_random_t* rng)
 //     Seed the rng.  Specified in two parts, state initializer and a
 //     sequence selection constant (a.k.a. stream id)
 
-void pcg32_srandom_r(pcg32_random_t* rng, Dqn_u64 initstate, Dqn_u64 initseq)
+void pcg32_srandom_r(pcg32_random_t* rng, uint64_t initstate, uint64_t initseq)
 {
     rng->state = 0U;
     rng->inc = (initseq << 1u) | 1u;
@@ -89,11 +88,11 @@ void pcg32_srandom_r(pcg32_random_t* rng, Dqn_u64 initstate, Dqn_u64 initseq)
 // pcg32_boundedrand_r(rng, bound):
 //     Generate a uniformly distributed number, r, where 0 <= r < bound
 
-Dqn_u32 pcg32_boundedrand_r(pcg32_random_t* rng, Dqn_u32 bound)
+uint32_t pcg32_boundedrand_r(pcg32_random_t* rng, uint32_t bound)
 {
-    Dqn_u32 threshold = -bound % bound;
+    uint32_t threshold = -bound % bound;
     for (;;) {
-        Dqn_u32 r = pcg32_random_r(rng);
+        uint32_t r = pcg32_random_r(rng);
         if (r >= threshold)
             return r % bound;
     }

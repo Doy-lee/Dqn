@@ -16,7 +16,7 @@ pushd Build
     REM Tp     Treat header file as CPP source file
     set compile_flags=-MT -EHa -GR- -Od -Oi -Z7 -wd4201 -D DQN_TEST_WITH_MAIN -nologo
     set linker_flags=-link -nologo
-    set msvc_flags=-fsanitize=address -D STBSP__ASAN=__declspec(no_sanitize_address)
+    set msvc_flags=
     set clang_flags=-fsanitize=address -fsanitize=undefined
 
     REM Compiler: MSVC cl

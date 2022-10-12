@@ -716,7 +716,7 @@ Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_String8 hex)
 {
     DQN_KECCAK_ASSERT(hex.size == 64);
     Dqn_KeccakBytes32 result;
-    Dqn_HexToBytes(hex.data, hex.size, result.data, sizeof(result));
+    Dqn_Hex_ToBytes(hex.data, hex.size, result.data, sizeof(result));
     return result;
 }
 #endif // DQN_H && DQN_WITH_HEX
