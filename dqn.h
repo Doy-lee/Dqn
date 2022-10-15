@@ -1327,14 +1327,14 @@ void Dqn_AllocationTracer_Remove(Dqn_AllocationTracer *tracer, void *ptr);
 // -------------------------------------------------------------------------------------------------
 Dqn_isize const DQN_ARENA_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
 
-struct Dqn_Arena_Block
+struct Dqn_ArenaBlock
 {
     void           *memory;    ///< The backing memory of the block
     Dqn_isize       size;      ///< The size of the block
     Dqn_isize       used;      ///< The number of bytes used up in the block. Always less than the committed amount.
     Dqn_isize       committed; ///< The number of physically backed bytes by the OS.
-    Dqn_Arena_Block *prev;      ///< The previous linked block
-    Dqn_Arena_Block *next;      ///< The next linked block
+    Dqn_ArenaBlock *prev;      ///< The previous linked block
+    Dqn_ArenaBlock *next;      ///< The next linked block
 };
 
 struct Dqn_ArenaStatString
@@ -1360,16 +1360,16 @@ struct Dqn_ArenaStat
 struct Dqn_Arena
 {
     Dqn_isize       min_block_size;
-    Dqn_Arena_Block *curr;          ///< The current memory block of the arena
-    Dqn_Arena_Block *tail;          ///< The tail memory block of the arena
+    Dqn_ArenaBlock *curr;          ///< The current memory block of the arena
+    Dqn_ArenaBlock *tail;          ///< The tail memory block of the arena
     Dqn_ArenaStat  stats;           ///< Current arena stats, reset when reset usage is invoked.
 };
 
 struct Dqn_ArenaTempMemory
 {
     Dqn_Arena      *arena;     ///< The arena the scope is for
-    Dqn_Arena_Block *curr;     ///< The current block of the arena at the beginning of the scope
-    Dqn_Arena_Block *tail;     ///< The tail block of the arena at the beginning of the scope
+    Dqn_ArenaBlock *curr;     ///< The current block of the arena at the beginning of the scope
+    Dqn_ArenaBlock *tail;     ///< The tail block of the arena at the beginning of the scope
     Dqn_isize       curr_used; ///< The current used amount of the current block
     Dqn_ArenaStat   stats;     ///< The stats of the arena at the beginning of the scope
 };
@@ -4979,7 +4979,7 @@ DQN_API bool Dqn_Arena_Grow_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size
     // the OS to reserve+commit in one call.
     bool commit_on_reserve     = size == commit;
     auto const allocation_size = DQN_CAST(Dqn_isize)(sizeof(*arena->curr) + size);
-    auto *result               = DQN_CAST(Dqn_Arena_Block *)Dqn_VirtualMem_Reserve(allocation_size, commit_on_reserve);
+    auto *result               = DQN_CAST(Dqn_ArenaBlock *)Dqn_VirtualMem_Reserve(allocation_size, commit_on_reserve);
     if (result) {
         // NOTE: Sanity check memory is zero-ed out
         DQN_ASSERT(result->used == 0);
@@ -5024,7 +5024,7 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize
     DQN_ASSERT_MSG((align & (align - 1)) == 0, "Power of two alignment required");
     Dqn_isize allocation_size = size + (align - 1);
     while (!arena->curr || (arena->curr->used + allocation_size) > arena->curr->size) {
-        if (arena->curr) {
+        if (arena->curr && arena->curr->next) {
             arena->curr = arena->curr->next;
         } else {
             Dqn_isize grow_size = DQN_MAX(DQN_MAX(allocation_size, arena->min_block_size), DQN_ARENA_MIN_BLOCK_SIZE);
@@ -5035,7 +5035,7 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize
     }
 
     // NOTE: Calculate an aligned allocation pointer
-    Dqn_Arena_Block *block        = arena->curr;
+    Dqn_ArenaBlock *block        = arena->curr;
     uintptr_t const address      = DQN_CAST(uintptr_t)block->memory + block->used;
     Dqn_isize const align_offset = (align - (address & (align - 1))) & (align - 1);
     void *result                 = DQN_CAST(char *)(address + align_offset);
@@ -5094,7 +5094,7 @@ DQN_API void Dqn_Arena_Free(Dqn_Arena *arena, bool zero_mem)
         return;
 
     while (arena->tail) {
-        Dqn_Arena_Block *tail = arena->tail;
+        Dqn_ArenaBlock *tail = arena->tail;
         arena->tail          = tail->prev;
         if (zero_mem)
             DQN_MEMSET(tail->memory, DQN_MEMSET_BYTE, tail->committed);
@@ -5114,7 +5114,7 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
         return;
 
     // NOTE: Zero all the blocks until we reach the first block in the list
-    for (Dqn_Arena_Block *block = arena->tail; block; block = block->prev) {
+    for (Dqn_ArenaBlock *block = arena->tail; block; block = block->prev) {
         if (!block->prev)
             arena->curr = block;
         if (zero_mem == Dqn_ZeroMem_Yes)
@@ -5184,7 +5184,7 @@ DQN_API void Dqn_Arena_EndTempMemory(Dqn_ArenaTempMemory scope)
 
     // NOTE: Free the tail blocks until we reach the scope's tail block
     while (arena->tail != scope.tail) {
-        Dqn_Arena_Block *tail = arena->tail;
+        Dqn_ArenaBlock *tail = arena->tail;
         arena->tail          = tail->prev;
         DQN_FREE(tail);
     }
@@ -5193,7 +5193,7 @@ DQN_API void Dqn_Arena_EndTempMemory(Dqn_ArenaTempMemory scope)
     if (arena->tail)
     {
         arena->tail->next = nullptr;
-        for (Dqn_Arena_Block *block = arena->tail; block && block != arena->curr; block = block->prev)
+        for (Dqn_ArenaBlock *block = arena->tail; block && block != arena->curr; block = block->prev)
             block->used = 0;
     }
 
