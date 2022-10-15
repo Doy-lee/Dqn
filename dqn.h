@@ -4016,9 +4016,8 @@ DQN_API char const *Dqn_CString8_BinarySplit(char const *string, Dqn_isize strin
         *lhs_size = 0;
     if (rhs_size)
         *rhs_size = 0;
-    if (rhs && *rhs) {
+    if (rhs)
         *rhs = nullptr;
-    }
 
     if (!Dqn_CString8_Validate_(string, &string_size)) {
         return result;
@@ -4035,7 +4034,7 @@ DQN_API char const *Dqn_CString8_BinarySplit(char const *string, Dqn_isize strin
         *lhs_size = offset;
 
     // NOTE: RHS, the string after the delimiter
-    if (rhs && *rhs) {
+    if (rhs) {
         *rhs      = DQN_CAST(char *)(string + offset + 1);
         *rhs_size = (string + string_size) - (*rhs);
     }

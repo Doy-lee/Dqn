@@ -1003,7 +1003,7 @@ Dqn_Tester Dqn_Test_CString8()
 {
     Dqn_Tester test = {};
     DQN_TESTER_BEGIN_GROUP("Dqn_CString8");
-    // ---------------------------------------------------------------------------------------------
+
     // NOTE: Dqn_CString8_ToI64
     // ---------------------------------------------------------------------------------------------
     {
@@ -1069,7 +1069,6 @@ Dqn_Tester Dqn_Test_CString8()
         Dqn_Tester_End(&test);
     }
 
-    // ---------------------------------------------------------------------------------------------
     // NOTE: Dqn_CString8_ToU64
     // ---------------------------------------------------------------------------------------------
     {
@@ -1135,7 +1134,6 @@ Dqn_Tester Dqn_Test_CString8()
         Dqn_Tester_End(&test);
     }
 
-    // ---------------------------------------------------------------------------------------------
     // NOTE: Dqn_CString8_Find
     // ---------------------------------------------------------------------------------------------
     {
@@ -1279,9 +1277,9 @@ Dqn_Tester Dqn_Test_String8()
 
     {
         Dqn_Tester_Begin(&test, "Copy string");
-        Dqn_Arena arena  = {};
-        Dqn_String8         string = DQN_STRING8("AB");
-        Dqn_String8         copy   = Dqn_String8_Copy(Dqn_Arena_Allocator(&arena), string);
+        Dqn_Arena arena    = {};
+        Dqn_String8 string = DQN_STRING8("AB");
+        Dqn_String8 copy   = Dqn_String8_Copy(Dqn_Arena_Allocator(&arena), string);
         DQN_TESTER_ASSERTF(&test, copy.size == 2, "size: %I64d", copy.size);
         DQN_TESTER_ASSERTF(&test, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
         DQN_TESTER_ASSERTF(&test, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
@@ -1292,11 +1290,8 @@ Dqn_Tester Dqn_Test_String8()
 
     {
         Dqn_Tester_Begin(&test, "Trim whitespace around string");
-        Dqn_String8         string = Dqn_String8_TrimWhitespaceAround(DQN_STRING8(" AB "));
-        DQN_TESTER_ASSERTF(&test, string.size == 2, "size: %I64d", string.size);
-        DQN_TESTER_ASSERTF(&test, string.data[0] == 'A', "string[0]: %c", string.data[0]);
-        DQN_TESTER_ASSERTF(&test, string.data[1] == 'B', "string[1]: %c", string.data[1]);
-        DQN_TESTER_ASSERTF(&test, string.data[2] == ' ', "string[1]: %c", string.data[1]);
+        Dqn_String8 string = Dqn_String8_TrimWhitespaceAround(DQN_STRING8(" AB "));
+        DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(string, DQN_STRING8("AB")), "[string=%.*s]", DQN_STRING_FMT(string));
         Dqn_Tester_End(&test);
     }
 
@@ -1343,8 +1338,6 @@ Dqn_Tester Dqn_Test_String8()
         Dqn_Tester_End(&test);
     }
 
-
-    // ---------------------------------------------------------------------------------------------
     // NOTE: Dqn_String8_IsAllDigits
     // ---------------------------------------------------------------------------------------------
     {
@@ -1389,6 +1382,51 @@ Dqn_Tester Dqn_Test_String8()
         DQN_TESTER_ASSERT(&test, DQN_CAST(bool)result == false);
         Dqn_Tester_End(&test);
     }
+
+    // NOTE: Dqn_String8_BinarySplit
+    // ---------------------------------------------------------------------------------------------
+    {
+        char const *TEST_FMT = "Dqn_String8_BinarySplit: with '%.*s' with '%c'";
+        {
+            Dqn_String8 input = DQN_STRING8("abcdef");
+            char delimiter    = '/';
+            Dqn_Tester_Begin(&test, TEST_FMT, DQN_STRING_FMT(input), delimiter);
+
+            Dqn_String8 rhs = {};
+            Dqn_String8 lhs = Dqn_String8_BinarySplit(input, delimiter, &rhs);
+
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(lhs, DQN_STRING8("abcdef")), "[lhs=%.*s]", DQN_STRING_FMT(lhs));
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(rhs, DQN_STRING8("")), "[rhs=%.*s]", DQN_STRING_FMT(rhs));
+            Dqn_Tester_End(&test);
+        }
+
+        {
+            Dqn_String8 input = DQN_STRING8("abc/def");
+            char delimiter    = '/';
+            Dqn_Tester_Begin(&test, TEST_FMT, DQN_STRING_FMT(input), delimiter);
+
+            Dqn_String8 rhs = {};
+            Dqn_String8 lhs = Dqn_String8_BinarySplit(input, delimiter, &rhs);
+
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(lhs, DQN_STRING8("abc")), "[lhs=%.*s]", DQN_STRING_FMT(lhs));
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(rhs, DQN_STRING8("def")), "[rhs=%.*s]", DQN_STRING_FMT(rhs));
+            Dqn_Tester_End(&test);
+        }
+
+        {
+            Dqn_String8 input = DQN_STRING8("/abcdef");
+            char delimiter    = '/';
+            Dqn_Tester_Begin(&test, TEST_FMT, DQN_STRING_FMT(input), delimiter);
+
+            Dqn_String8 rhs = {};
+            Dqn_String8 lhs = Dqn_String8_BinarySplit(input, delimiter, &rhs);
+
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(lhs, DQN_STRING8("")), "[lhs=%.*s]", DQN_STRING_FMT(lhs));
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(rhs, DQN_STRING8("abcdef")), "[rhs=%.*s]", DQN_STRING_FMT(rhs));
+            Dqn_Tester_End(&test);
+        }
+    }
+
     DQN_TESTER_END_GROUP(&test);
     return test;
 }
