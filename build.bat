@@ -28,7 +28,7 @@ pushd Build
 
     if not exist msvc mkdir msvc
     pushd msvc
-    cl %compile_flags% %msvc_flags% %code_dir%Dqn_Tests.cpp %link_flags%
+    cl %compile_flags% %msvc_flags% %code_dir%dqn_unit_tests.cpp %link_flags%
     popd
 
     REM Compiler: clang-cl
@@ -40,6 +40,6 @@ pushd Build
 
     if not exist clang mkdir clang
     pushd clang
-    clang-cl %compile_flags% %clang_flags% %code_dir%Dqn_Tests.cpp %link_flags%
+    clang-cl %compile_flags% %clang_flags% %code_dir%dqn_unit_tests.cpp %link_flags%
     popd
 popd

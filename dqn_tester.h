@@ -146,9 +146,9 @@ typedef struct Dqn_Tester {
     Dqn_TesterState state;
 } Dqn_Tester;
 
-void Dqn_TesterBeginV(Dqn_Tester *test, char const *fmt, va_list args);
-void Dqn_TesterBegin(Dqn_Tester *test, char const *fmt, ...);
-void Dqn_TesterEnd(Dqn_Tester *test);
+void Dqn_Tester_BeginV(Dqn_Tester *test, char const *fmt, va_list args);
+void Dqn_Tester_Begin(Dqn_Tester *test, char const *fmt, ...);
+void Dqn_Tester_End(Dqn_Tester *test);
 
 #if defined(__cplusplus)
 struct Dqn_TesterBeginScopedTest {
@@ -162,11 +162,11 @@ struct Dqn_TesterBeginScopedTest {
 // NOTE: Implementation
 // -----------------------------------------------------------------------------
 #if defined(DQN_TESTER_IMPLEMENTATION)
-void Dqn_TesterBeginV(Dqn_Tester *test, char const *fmt, va_list args)
+void Dqn_Tester_BeginV(Dqn_Tester *test, char const *fmt, va_list args)
 {
     assert(test->state == Dqn_TesterState_Nil &&
            "Nesting a unit test within another unit test is not allowed, ensure"
-           "the first test has finished by calling Dqn_TesterEnd");
+           "the first test has finished by calling Dqn_Tester_End");
 
     test->num_tests_in_group++;
     test->state     = Dqn_TesterState_TestBegun;
@@ -186,17 +186,17 @@ void Dqn_TesterBeginV(Dqn_Tester *test, char const *fmt, va_list args)
         putc(DQN_TESTER_RESULT_PAD_CHAR, stdout);
 }
 
-void Dqn_TesterBegin(Dqn_Tester *test, char const *fmt, ...)
+void Dqn_Tester_Begin(Dqn_Tester *test, char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    Dqn_TesterBeginV(test, fmt, args);
+    Dqn_Tester_BeginV(test, fmt, args);
     va_end(args);
 }
 
-void Dqn_TesterEnd(Dqn_Tester *test)
+void Dqn_Tester_End(Dqn_Tester *test)
 {
-    assert(test->state != Dqn_TesterState_Nil && "Test was marked as ended but a test was never commenced using Dqn_TesterBegin");
+    assert(test->state != Dqn_TesterState_Nil && "Test was marked as ended but a test was never commenced using Dqn_Tester_Begin");
     if (test->log_count != 0) {
         // NOTE: We try and print the result on the same line as the test name,
         // but if there were logs printed throughout the test then we must print
@@ -227,12 +227,12 @@ Dqn_TesterBeginScopedTest::Dqn_TesterBeginScopedTest(Dqn_Tester *test, char cons
 {
     va_list args;
     va_start(args, fmt);
-    Dqn_TesterBeginV(test, fmt, args);
+    Dqn_Tester_BeginV(test, fmt, args);
     va_end(args);
 }
 
 Dqn_TesterBeginScopedTest::~Dqn_TesterBeginScopedTest() {
-    Dqn_TesterEnd(test);
+    Dqn_Tester_End(test);
 }
 #endif // __cplusplus
 #endif // DQN_TESTER_IMPLEMENTATION
