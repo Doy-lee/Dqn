@@ -14,7 +14,7 @@
 // #define DQN_WITH_FIXED_ARRAY    // Dqn_FixedArray
 // #define DQN_WITH_FIXED_STRING   // Dqn_FixedString
 // #define DQN_WITH_HEX            // Dqn_Hex_ and friends ...
-// #define DQN_WITH_JSON_WRITER    // Dqn_JSONWriter_
+// #define DQN_WITH_JSON_BUILDER   // Dqn_JSONBuilder
 // #define DQN_WITH_MAP            // Dqn_Map
 // #define DQN_WITH_MATH           // Dqn_V2/3/4/Mat4 and friends ...
 // #define DQN_WITH_WIN_NET        // Dqn_Win_Net
@@ -738,7 +738,7 @@ typedef void *Dqn_Allocator_AllocProc(DQN_CALL_SITE_ARGS size_t size, uint8_t al
 typedef void Dqn_Allocator_DeallocProc(DQN_CALL_SITE_ARGS void *ptr, size_t size, void *user_context);
 
 typedef struct Dqn_Allocator {
-    void                     *user_context; ///< User assigned pointer that is passed into the allocator functions
+    void                      *user_context; ///< User assigned pointer that is passed into the allocator functions
     Dqn_Allocator_AllocProc   *alloc;        ///< Memory allocating routine
     Dqn_Allocator_DeallocProc *dealloc;      ///< Memory deallocating routine
 } Dqn_Allocator;
@@ -2303,60 +2303,66 @@ DQN_API Dqn_ThreadTempArena Dqn_Thread_TempArena(const void *conflict_arena = nu
 // without having to worry about selecting the right arena from the state.
 DQN_API Dqn_ThreadContext *Dqn_Thread_Context();
 
-#if defined(DQN_WITH_JSON_WRITER)
-// NOTE: Dqn_JSONWriter_
+#if defined(DQN_WITH_JSON_BUILDER)
+// NOTE: Dqn_JsonBuilder
 // -------------------------------------------------------------------------------------------------
 // TODO(dqn): We need to write tests for this
-struct Dqn_JSONWriter_
+struct Dqn_JSONBuilder
 {
-    uint16_t             parent_field_count_stack[32];
+    uint16_t            parent_field_count_stack[32];
     int                 parent_field_count_stack_size;
     Dqn_String8Builder  builder;
     int                 indent_level;
     int                 spaces_per_indent;
 };
 
-#define Dqn_JSONWriter_Object(writer)                  \
-    DQN_DEFER_LOOP(Dqn_JSONWriter_ObjectBegin(writer), \
-                   Dqn_JSONWriter_ObjectEnd(writer))
+#define Dqn_JSONBuilder_Object(writer)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBegin(writer), \
+                   Dqn_JSONBuilder_ObjectEnd(writer))
 
-#define Dqn_JSONWriter_ObjectNamed(writer, name)                  \
-    DQN_DEFER_LOOP(Dqn_JSONWriter_ObjectBeginNamed(writer, name), \
-                   Dqn_JSONWriter_ObjectEnd(writer))
+#define Dqn_JSONBuilder_ObjectNamed(writer, name)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBeginNamed(writer, name), \
+                   Dqn_JSONBuilder_ObjectEnd(writer))
 
-#define Dqn_JSONWriter_Array(writer)                  \
-    DQN_DEFER_LOOP(Dqn_JSONWriter_ArrayBegin(writer), \
-                   Dqn_JSONWriter_ArrayEnd(writer))
+#define Dqn_JSONBuilder_Array(writer)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBegin(writer), \
+                   Dqn_JSONBuilder_ArrayEnd(writer))
 
-#define Dqn_JSONWriter_ArrayNamed(writer, name)                  \
-    DQN_DEFER_LOOP(Dqn_JSONWriter_ArrayBeginNamed(writer, name), \
-                   Dqn_JSONWriter_ArrayEnd(writer))
+#define Dqn_JSONBuilder_ArrayNamed(writer, name)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBeginNamed(writer, name), \
+                   Dqn_JSONBuilder_ArrayEnd(writer))
 
-DQN_API Dqn_JSONWriter_ Dqn_JSONWriter_Init(Dqn_Arena *arena, int spaces_per_indent);
-DQN_API Dqn_String8    Dqn_JSONWriter_Build(Dqn_JSONWriter_ *writer, Dqn_Arena *arena);
+DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Arena *arena, int spaces_per_indent);
+DQN_API Dqn_String8     Dqn_JSONBuilder_Build(Dqn_JSONBuilder *builder, Dqn_Arena *arena);
 
-DQN_API void           Dqn_JSONWriter_ObjectBeginNamed(Dqn_JSONWriter_ *writer, Dqn_String8 name);
-DQN_API void           Dqn_JSONWriter_ObjectBegin(Dqn_JSONWriter_ *writer);
-DQN_API void           Dqn_JSONWriter_ObjectEnd(Dqn_JSONWriter_ *writer);
+DQN_API void             Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
+DQN_API void             Dqn_JSONBuilder_ObjectBegin(Dqn_JSONBuilder *builder);
+DQN_API void             Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder);
 
-DQN_API void           Dqn_JSONWriter_ArrayBeginNamed(Dqn_JSONWriter_ *writer, Dqn_String8 name);
-DQN_API void           Dqn_JSONWriter_ArrayBegin(Dqn_JSONWriter_ *writer, Dqn_String8 name);
-DQN_API void           Dqn_JSONWriter_ArrayEnd(Dqn_JSONWriter_ *writer);
+DQN_API void             Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
+DQN_API void             Dqn_JSONBuilder_ArrayBegin(Dqn_JSONBuilder *builder);
+DQN_API void             Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder);
 
-DQN_API void           Dqn_JSONWriter_StringNamed(Dqn_JSONWriter_ *writer, Dqn_String8 key, Dqn_String8 value);
-DQN_API void           Dqn_JSONWriter_String(Dqn_JSONWriter_ *writer, Dqn_String8 value);
+DQN_API void             Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+DQN_API void             Dqn_JSONBuilder_String(Dqn_JSONBuilder *builder, Dqn_String8 value);
 
-DQN_API void           Dqn_JSONWriter_U64Named(Dqn_JSONWriter_ *writer, Dqn_String8 key, uint64_t value);
-DQN_API void           Dqn_JSONWriter_U64(Dqn_JSONWriter_ *writer, uint64_t value);
+DQN_API void             Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+DQN_API void             Dqn_JSONBuilder_Literal(Dqn_JSONBuilder *builder, Dqn_String8 value);
 
-DQN_API void           Dqn_JSONWriter_I64Named(Dqn_JSONWriter_ *writer, Dqn_String8 key, uint64_t value);
-DQN_API void           Dqn_JSONWriter_I64(Dqn_JSONWriter_ *writer, uint64_t value);
+DQN_API void             Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
+DQN_API void             Dqn_JSONBuilder_U64(Dqn_JSONBuilder *builder, uint64_t value);
+
+DQN_API void             Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
+DQN_API void             Dqn_JSONBuilder_I64(Dqn_JSONBuilder *builder, uint64_t value);
 
 // decimal_places: When < 0 show the default number of decimal places
 //                 When >=0 show the specified amount of decimal places
-DQN_API void           Dqn_JSONWriter_F64Named(Dqn_JSONWriter_ *writer, Dqn_String8 key, Dqn_f64 value, int decimal_places = -1);
-DQN_API void           Dqn_JSONWriter_F64(Dqn_JSONWriter_ *writer, Dqn_f64 value, int decimal_places = -1);
-#endif // DQN_WITH_JSON_WRITER
+DQN_API void             Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places);
+DQN_API void             Dqn_JSONBuilder_F64(Dqn_JSONBuilder *builder, double value, int decimal_places);
+
+DQN_API void             Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value);
+DQN_API void             Dqn_JSONBuilder_Bool(Dqn_JSONBuilder *builder, bool value);
+#endif // DQN_WITH_JSON_BUILDER
 
 #if defined(DQN_OS_WIN32)
 // NOTE: Dqn_Win_
@@ -7218,214 +7224,273 @@ DQN_API Dqn_ThreadTempArena Dqn_Thread_TempArena(const void *conflict_arena)
     return Dqn_ThreadTempArena(result);
 }
 
-#if defined(DQN_WITH_JSON_WRITER)
-// NOTE: Dqn_JSONWriter_
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_JSONWriter_ Dqn_JSONWriter_Init(Dqn_Arena *arena, int spaces_per_indent)
+#if defined(DQN_WITH_JSON_BUILDER)
+Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Arena *arena, int spaces_per_indent)
 {
-    Dqn_JSONWriter_ result    = {};
+    Dqn_JSONBuilder result   = {};
     result.spaces_per_indent = spaces_per_indent;
     result.builder.allocator = Dqn_Arena_Allocator(arena);
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_JSONWriter_Build(Dqn_JSONWriter_ *writer, Dqn_Allocator allocator)
+Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder *builder, Dqn_Arena *arena)
 {
-    Dqn_String8 result = Dqn_String8Builder_Build(&writer->builder, allocator);
+    Dqn_String8 result = Dqn_String8Builder_Build(&builder->builder, Dqn_Arena_Allocator(arena));
     return result;
 }
 
-DQN_API void Dqn_JSONWriter_DoIndent_(Dqn_JSONWriter_ *writer)
+void Dqn_JSONBuilder_AppendFmtVArgs_(Dqn_JSONBuilder *builder, char const *fmt, va_list args)
 {
-    int spaces_per_indent = writer->spaces_per_indent ? writer->spaces_per_indent : 2;
-    int spaces            = writer->indent_level * spaces_per_indent;
-    if (spaces) {
-        Dqn_String8 padding = Dqn_String8_Allocate(writer->builder.allocator, spaces, Dqn_ZeroMem_No);
-        DQN_MEMSET(padding.data, ' ', padding.size);
-        Dqn_String8Builder_AppendString8Ref(&writer->builder, padding);
-    }
-}
-
-DQN_API void Dqn_JSONWriter_PreAddItem_(Dqn_JSONWriter_ *writer)
-{
-    if (writer->parent_field_count_stack_size <= 0)
+    if (!builder || !fmt)
         return;
 
-    uint16_t *parent_field_count = &writer->parent_field_count_stack[writer->parent_field_count_stack_size - 1];
+    if (builder->builder.allocator.alloc)
+        Dqn_String8Builder_AppendFmtArgs(&builder->builder, fmt, args);
+    else
+        vfprintf(stdout, fmt, args);
+}
+
+void Dqn_JSONBuilder_AppendFmtArgs_(Dqn_JSONBuilder *builder, char const *fmt, ...)
+{
+    if (!builder || !fmt)
+        return;
+
+    va_list args;
+    va_start(args, fmt);
+    Dqn_JSONBuilder_AppendFmtVArgs_(builder, fmt, args);
+    va_end(args);
+}
+
+void Dqn_JSONBuilder_AppendString8Ref_(Dqn_JSONBuilder *builder, Dqn_String8 string)
+{
+    if (builder->builder.allocator.alloc)
+        Dqn_String8Builder_AppendString8Ref(&builder->builder, string);
+    else
+        fprintf(stdout, "%.*s", DQN_STRING_FMT(string));
+}
+
+void Dqn_JSONBuilder_DoIndent_(Dqn_JSONBuilder *builder)
+{
+    int spaces_per_indent = builder->spaces_per_indent ? builder->spaces_per_indent : 2;
+    int spaces            = builder->indent_level * spaces_per_indent;
+    if (spaces)
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%*c", spaces, ' ');
+}
+
+void Dqn_JSONBuilder_PreAddItem_(Dqn_JSONBuilder *builder)
+{
+    if (builder->parent_field_count_stack_size <= 0)
+        return;
+
+    uint16_t *parent_field_count = &builder->parent_field_count_stack[builder->parent_field_count_stack_size - 1];
     if (*parent_field_count == 0) {
         // NOTE: First time we're adding an item to an object, we need to write
         // on a new line for nice formatting.
-        Dqn_String8Builder_AppendString8Ref(&writer->builder, DQN_STRING8("\n"));
+        Dqn_JSONBuilder_AppendString8Ref_(builder, DQN_STRING8("\n"));
     } else if (*parent_field_count > 0) {
         // NOTE: We have items in the object already and we're adding another
         // item so we need to add a comma on the previous item.
-        Dqn_String8Builder_AppendString8Ref(&writer->builder, DQN_STRING8(",\n"));
+        Dqn_JSONBuilder_AppendString8Ref_(builder, DQN_STRING8(",\n"));
     }
 
-    Dqn_JSONWriter_DoIndent_(writer);
+    Dqn_JSONBuilder_DoIndent_(builder);
 }
 
-DQN_API void Dqn_JSONWriter_PostAddItem_(Dqn_JSONWriter_ *writer)
+void Dqn_JSONBuilder_PostAddItem_(Dqn_JSONBuilder *builder)
 {
-    if (writer->parent_field_count_stack_size <= 0)
+    if (builder->parent_field_count_stack_size <= 0)
         return;
 
-    uint16_t *parent_field_count = &writer->parent_field_count_stack[writer->parent_field_count_stack_size - 1];
+    uint16_t *parent_field_count = &builder->parent_field_count_stack[builder->parent_field_count_stack_size - 1];
     (*parent_field_count)++;
 }
 
-DQN_API void Dqn_JSONWriter_BeginContainer_(Dqn_JSONWriter_ *writer, Dqn_String8 name, bool array)
+void Dqn_JSONBuilder_BeginContainer_(Dqn_JSONBuilder *builder, Dqn_String8 name, bool array)
 {
     Dqn_String8 container_ch = array ? DQN_STRING8("[") : DQN_STRING8("{");
-    Dqn_JSONWriter_PreAddItem_(writer);
+    Dqn_JSONBuilder_PreAddItem_(builder);
     if (name.size)
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
     else
-        Dqn_String8Builder_AppendString8Ref(&writer->builder, container_ch);
-    Dqn_JSONWriter_PostAddItem_(writer);
+        Dqn_JSONBuilder_AppendString8Ref_(builder, container_ch);
+    Dqn_JSONBuilder_PostAddItem_(builder);
 
-    writer->indent_level++;
+    builder->indent_level++;
 
-    DQN_ASSERT(writer->parent_field_count_stack_size < DQN_ARRAY_UCOUNT(writer->parent_field_count_stack));
-    uint16_t *parent_field_count = &writer->parent_field_count_stack[writer->parent_field_count_stack_size++];
-    *parent_field_count         = 0;
-
+    DQN_ASSERT(builder->parent_field_count_stack_size < DQN_ARRAY_UCOUNT(builder->parent_field_count_stack));
+    uint16_t *parent_field_count = &builder->parent_field_count_stack[builder->parent_field_count_stack_size++];
+    *parent_field_count          = 0;
 }
 
-DQN_API void Dqn_JSONWriter_EndContainer_(Dqn_JSONWriter_ *writer, bool array)
+void Dqn_JSONBuilder_EndContainer_(Dqn_JSONBuilder *builder, bool array)
 {
-    uint16_t *parent_field_count = &writer->parent_field_count_stack[writer->parent_field_count_stack_size - 1];
+    uint16_t *parent_field_count = &builder->parent_field_count_stack[builder->parent_field_count_stack_size - 1];
     if (*parent_field_count > 0) {
         // NOTE: End of object/array should start on a new line if the
         // array/object has atleast one field in it.
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, "\n");
+        Dqn_JSONBuilder_AppendString8Ref_(builder, DQN_STRING8("\n"));
     }
 
-    writer->parent_field_count_stack_size--;
-    DQN_ASSERT(writer->parent_field_count_stack_size >= 0);
+    builder->parent_field_count_stack_size--;
+    DQN_ASSERT(builder->parent_field_count_stack_size >= 0);
 
-    writer->indent_level--;
-    DQN_ASSERT(writer->indent_level >= 0);
+    builder->indent_level--;
+    DQN_ASSERT(builder->indent_level >= 0);
 
-    Dqn_JSONWriter_DoIndent_(writer);
-    Dqn_String8Builder_AppendString8Ref(&writer->builder, array ? DQN_STRING8("]") : DQN_STRING8("}"));
+    Dqn_JSONBuilder_DoIndent_(builder);
+    Dqn_JSONBuilder_AppendString8Ref_(builder, array ? DQN_STRING8("]") : DQN_STRING8("}"));
+
+    // NOTE: Root object got closed, what ever that we write next has to start
+    // on a new line.
+    if (builder->parent_field_count_stack_size == 0) {
+        Dqn_JSONBuilder_AppendString8Ref_(builder, DQN_STRING8("\n"));
+    }
 }
 
-DQN_API void Dqn_JSONWriter_ObjectBeginNamed(Dqn_JSONWriter_ *writer, Dqn_String8 name)
+void Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
 {
-    Dqn_JSONWriter_BeginContainer_(writer, name, false /*array*/);
+    Dqn_JSONBuilder_BeginContainer_(builder, name, false /*array*/);
 }
 
-DQN_API void Dqn_JSONWriter_ObjectBegin(Dqn_JSONWriter_ *writer)
+void Dqn_JSONBuilder_ObjectBegin(Dqn_JSONBuilder *builder)
 {
-    Dqn_JSONWriter_BeginContainer_(writer, DQN_STRING8(""), false /*array*/);
+    Dqn_JSONBuilder_BeginContainer_(builder, DQN_STRING8(""), false /*array*/);
 }
 
-DQN_API void Dqn_JSONWriter_ObjectEnd(Dqn_JSONWriter_ *writer)
+void Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder)
 {
-    Dqn_JSONWriter_EndContainer_(writer, false /*array*/);
+    Dqn_JSONBuilder_EndContainer_(builder, false /*array*/);
 }
 
-DQN_API void Dqn_JSONWriter_ArrayBeginNamed(Dqn_JSONWriter_ *writer, Dqn_String8 name)
+void Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
 {
-    Dqn_JSONWriter_BeginContainer_(writer, name, true /*array*/);
+    Dqn_JSONBuilder_BeginContainer_(builder, name, true /*array*/);
 }
 
-DQN_API void Dqn_JSONWriter_ArrayBegin(Dqn_JSONWriter_ *writer)
+void Dqn_JSONBuilder_ArrayBegin(Dqn_JSONBuilder *builder)
 {
-    Dqn_JSONWriter_BeginContainer_(writer, DQN_STRING8(""), false /*array*/);
+    Dqn_JSONBuilder_BeginContainer_(builder, DQN_STRING8(""), false /*array*/);
 }
 
-DQN_API void Dqn_JSONWriter_ArrayEnd(Dqn_JSONWriter_ *writer)
+void Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder)
 {
-    Dqn_JSONWriter_EndContainer_(writer, true /*array*/);
+    Dqn_JSONBuilder_EndContainer_(builder, true /*array*/);
 }
 
-DQN_API void Dqn_JSONWriter_StringNamed(Dqn_JSONWriter_ *writer, Dqn_String8 key, Dqn_String8 value)
+void Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
 {
-    Dqn_JSONWriter_PreAddItem_(writer);
+    Dqn_JSONBuilder_PreAddItem_(builder);
     if (key.size)
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
     else
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, "\"%.*s\"", DQN_STRING_FMT(value));
-    Dqn_JSONWriter_PostAddItem_(writer);
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\"", DQN_STRING_FMT(value));
+    Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
-DQN_API void Dqn_JSONWriter_String(Dqn_JSONWriter_ *writer, Dqn_String8 value)
+void Dqn_JSONBuilder_String(Dqn_JSONBuilder *builder, Dqn_String8 value)
 {
-    Dqn_JSONWriter_StringNamed(writer, DQN_STRING8("") /*key*/, value);
+    Dqn_JSONBuilder_StringNamed(builder, DQN_STRING8("") /*key*/, value);
 }
 
-DQN_API void Dqn_JSONWriter_U64Named(Dqn_JSONWriter_ *writer, Dqn_String8 key, uint64_t value)
+void Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
 {
-    Dqn_JSONWriter_PreAddItem_(writer);
+    Dqn_JSONBuilder_PreAddItem_(builder);
     if (key.size)
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
     else
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, "%I64u", value);
-    Dqn_JSONWriter_PostAddItem_(writer);
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%.*s", DQN_STRING_FMT(value));
+    Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
-DQN_API void Dqn_JSONWriter_U64(Dqn_JSONWriter_ *writer, uint64_t value)
+void Dqn_JSONBuilder_Literal(Dqn_JSONBuilder *builder, Dqn_String8 value)
 {
-    Dqn_JSONWriter_U64Named(writer, DQN_STRING8("") /*key*/, value);
+    Dqn_JSONBuilder_LiteralNamed(builder, DQN_STRING8("") /*key*/, value);
 }
 
-DQN_API void Dqn_JSONWriter_I64Named(Dqn_JSONWriter_ *writer, Dqn_String8 key, uint64_t value)
+void Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value)
 {
-    Dqn_JSONWriter_PreAddItem_(writer);
+    Dqn_JSONBuilder_PreAddItem_(builder);
     if (key.size)
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, "\"%.*s\": %I64d", DQN_STRING_FMT(key), value);
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
     else
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, "%I64d", value);
-    Dqn_JSONWriter_PostAddItem_(writer);
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%I64u", value);
+    Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
-DQN_API void Dqn_JSONWriter_I64(Dqn_JSONWriter_ *writer, uint64_t value)
+void Dqn_JSONBuilder_U64(Dqn_JSONBuilder *builder, uint64_t value)
 {
-    Dqn_JSONWriter_I64Named(writer, DQN_STRING8("") /*key*/, value);
+    Dqn_JSONBuilder_U64Named(builder, DQN_STRING8("") /*key*/, value);
 }
 
-DQN_API void Dqn_JSONWriter_F64Named(Dqn_JSONWriter_ *writer, Dqn_String8 key, Dqn_f64 value, int decimal_places)
+void Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value)
 {
-    if (!writer)
+    Dqn_JSONBuilder_PreAddItem_(builder);
+    if (key.size)
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %I64d", DQN_STRING_FMT(key), value);
+    else
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%I64d", value);
+    Dqn_JSONBuilder_PostAddItem_(builder);
+}
+
+void Dqn_JSONBuilder_I64(Dqn_JSONBuilder *builder, uint64_t value)
+{
+    Dqn_JSONBuilder_I64Named(builder, DQN_STRING8("") /*key*/, value);
+}
+
+void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places)
+{
+    if (!builder)
         return;
 
-    DQN_ASSERT(decimal_places <= 308);
-    decimal_places = DQN_MIN(decimal_places, 308);
+    if (decimal_places >= 16)
+        decimal_places = 16;
 
     // NOTE: Generate the format string for the float, depending on how many
     // decimals places it wants.
     char float_fmt[16];
-    Dqn_isize require = 1; // null-terminator
     if (decimal_places > 0) {
         // NOTE: Emit the format string "%.<decimal_places>f" i.e. %.1f
-        require += STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
+        snprintf(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
     } else {
         // NOTE: Emit the format string "%f"
-        require += STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%f");
+        snprintf(float_fmt, sizeof(float_fmt), "%%f");
     }
 
     char fmt[32];
-    if (Dqn_String8_IsValid(key)) {
-        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
-    } else {
-        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "%s", float_fmt);
-    }
-
-    Dqn_JSONWriter_PreAddItem_(writer);
-    if (Dqn_String8_IsValid(key))
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, fmt, DQN_STRING_FMT(key), value);
+    if (key.size)
+        snprintf(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
     else
-        Dqn_String8Builder_AppendFmtArgs(&writer->builder, fmt, value);
-    Dqn_JSONWriter_PostAddItem_(writer);
+        snprintf(fmt, sizeof(fmt), "%s", float_fmt);
+
+    Dqn_JSONBuilder_PreAddItem_(builder);
+    if (key.size)
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, fmt, DQN_STRING_FMT(key), value);
+    else
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, fmt, value);
+    Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
-DQN_API void Dqn_JSONWriter_F64(Dqn_JSONWriter_ *writer, Dqn_f64 value, int decimal_places)
+void Dqn_JSONBuilder_F64(Dqn_JSONBuilder *builder, double value, int decimal_places)
 {
-    Dqn_JSONWriter_F64Named(writer, DQN_STRING8("") /*key*/, value, decimal_places);
+    Dqn_JSONBuilder_F64Named(builder, DQN_STRING8("") /*key*/, value, decimal_places);
 }
-#endif // DQN_WITH_JSON_WRITER
+
+void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value)
+{
+    Dqn_JSONBuilder_PreAddItem_(builder);
+    Dqn_String8 value_string = value ? DQN_STRING8("true") : DQN_STRING8("false");
+    if (key.size)
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(key), DQN_STRING_FMT(value_string));
+    else
+        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%Boold", value);
+    Dqn_JSONBuilder_PostAddItem_(builder);
+}
+
+void Dqn_JSONBuilder_Bool(Dqn_JSONBuilder *builder, bool value)
+{
+    Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8("") /*key*/, value);
+}
+#endif // DQN_WITH_JSON_BUILDER
 
 #if defined(DQN_OS_WIN32)
 
