@@ -8,15 +8,14 @@
 
 #if defined(DQN_TEST_WITH_MAIN)
     #define DQN_IMPLEMENTATION
-    #define DQN_WITH_CRT_ALLOCATOR  // Dqn_CRTAllocator
     #define DQN_WITH_DSMAP          // Dqn_DSMap
-    #define DQN_WITH_FIXED_ARRAY    // Dqn_FixedArray
-    #define DQN_WITH_FIXED_STRING   // Dqn_FixedString
+    #define DQN_WITH_FIXED_ARRAY    // Dqn_FArray
+    #define DQN_WITH_FIXED_STRING   // Dqn_FString8
     #define DQN_WITH_HEX            // Dqn_Hex and friends ...
     #define DQN_WITH_JSON_BUILDER   // Dqn_JSONBuilder
     #define DQN_WITH_MAP            // Dqn_Map
     #define DQN_WITH_MATH           // Dqn_V2/3/4/Mat4 and friends ...
-    #define DQN_WITH_THREAD_CONTEXT // Dqn_ThreadContext and friends ...
+    #define DQN_WITH_WIN_NET        //
     #include "dqn.h"
 
     #define DQN_KECCAK_IMPLEMENTATION
@@ -27,134 +26,6 @@
 
 #define DQN_TESTER_IMPLEMENTATION
 #include "dqn_tester.h"
-
-Dqn_Tester Dqn_Test_Array()
-{
-    Dqn_Tester test = {};
-    DQN_TESTER_BEGIN_GROUP("Dqn_Array");
-    // NOTE: Dqn_Array_InitWithMemory
-    {
-        {
-            Dqn_Tester_Begin(&test, "Fixed Memory: Test add single item and can't allocate more");
-            int memory[4]        = {};
-            Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_CArray_Count(memory), 0 /*size*/);
-            Dqn_Array_Add(&array, 1);
-            Dqn_Array_Add(&array, 2);
-            Dqn_Array_Add(&array, 3);
-            Dqn_Array_Add(&array, 4);
-            DQN_TESTER_ASSERTF(&test, array.data[0] == 1, "array.data %d", array.data[0]);
-            DQN_TESTER_ASSERTF(&test, array.data[1] == 2, "array.data %d", array.data[1]);
-            DQN_TESTER_ASSERTF(&test, array.data[2] == 3, "array.data %d", array.data[2]);
-            DQN_TESTER_ASSERTF(&test, array.data[3] == 4, "array.data %d", array.data[3]);
-            DQN_TESTER_ASSERTF(&test, array.size    == 4, "array.size: %zu", array.size);
-
-            int *added_item = Dqn_Array_Add(&array, 5);
-            DQN_TESTER_ASSERTF(&test, added_item == nullptr, "Failed to add item to array");
-            DQN_TESTER_ASSERTF(&test, array.size == 4, "array.size: %zu", array.size);
-            DQN_TESTER_ASSERTF(&test, array.max == 4, "array.max: %zu", array.max);
-            Dqn_Tester_End(&test);
-        }
-
-        {
-            Dqn_Tester_Begin(&test, "Fixed Memory: Test add array of items");
-            int memory[4]        = {};
-            int DATA[]           = {1, 2, 3};
-            Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_CArray_Count(memory), 0 /*size*/);
-            Dqn_Array_AddArray(&array, DATA, Dqn_CArray_Count(DATA));
-            DQN_TESTER_ASSERTF(&test, array.data[0] == 1, "array.data %d", array.data[0]);
-            DQN_TESTER_ASSERTF(&test, array.data[1] == 2, "array.data %d", array.data[1]);
-            DQN_TESTER_ASSERTF(&test, array.data[2] == 3, "array.data %d", array.data[2]);
-            DQN_TESTER_ASSERTF(&test, array.size == 3, "array.size: %zu", array.size);
-            DQN_TESTER_ASSERTF(&test, array.max == 4, "array.max: %zu", array.max);
-            Dqn_Tester_End(&test);
-        }
-
-        {
-            Dqn_Tester_Begin(&test, "Fixed Memory: Test clear and clear with memory zeroed");
-            int memory[4]        = {};
-            int DATA[]           = {1, 2, 3};
-            Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_CArray_Count(memory), 0 /*size*/);
-            Dqn_Array_AddArray(&array, DATA, Dqn_CArray_Count(DATA));
-            Dqn_Array_Clear(&array, Dqn_ZeroMem_No);
-            DQN_TESTER_ASSERTF(&test, array.size == 0, "array.size: %zu", array.size);
-            DQN_TESTER_ASSERTF(&test, array.max == 4, "array.max: %zu", array.max);
-            DQN_TESTER_ASSERTF(&test, array.data[0] == 1, "array.data %d. Clear but don't zero memory so old values should still remain", array.data[0]);
-
-            Dqn_Array_Clear(&array, Dqn_ZeroMem_Yes);
-            DQN_TESTER_ASSERTF(&test, array.data[0] == 0, "array.data %d. Clear but zero memory old values should not remain", array.data[0]);
-            Dqn_Tester_End(&test);
-        }
-
-        {
-            Dqn_Tester_Begin(&test, "Fixed Memory: Test erase stable and erase unstable");
-            int memory[4]        = {};
-            int DATA[]           = {1, 2, 3, 4};
-            Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_CArray_Count(memory), 0 /*size*/);
-            Dqn_Array_AddArray(&array, DATA, Dqn_CArray_Count(DATA));
-            Dqn_Array_EraseUnstable(&array, 1);
-            DQN_TESTER_ASSERTF(&test, array.data[0] == 1, "array.data %d", array.data[0]);
-            DQN_TESTER_ASSERTF(&test, array.data[1] == 4, "array.data %d", array.data[1]);
-            DQN_TESTER_ASSERTF(&test, array.data[2] == 3, "array.data %d", array.data[2]);
-            DQN_TESTER_ASSERTF(&test, array.size == 3, "array.size: %zu", array.size);
-
-            Dqn_Array_EraseStable(&array, 0);
-            DQN_TESTER_ASSERTF(&test, array.data[0] == 4, "array.data: %d", array.data[0]);
-            DQN_TESTER_ASSERTF(&test, array.data[1] == 3, "array.data: %d", array.data[1]);
-            DQN_TESTER_ASSERTF(&test, array.size == 2, "array.size: %zu", array.size);
-            Dqn_Tester_End(&test);
-        }
-
-        {
-            Dqn_Tester_Begin(&test, "Fixed Memory: Test array pop and peek");
-            int memory[4]        = {};
-            int DATA[]           = {1, 2, 3};
-            Dqn_Array<int> array = Dqn_Array_InitWithMemory(memory, Dqn_CArray_Count(memory), 0 /*size*/);
-            Dqn_Array_AddArray(&array, DATA, Dqn_CArray_Count(DATA));
-            Dqn_Array_Pop(&array, 2);
-            DQN_TESTER_ASSERTF(&test, array.data[0] == 1, "array.data: %d", array.data[0]);
-            DQN_TESTER_ASSERTF(&test, array.size == 1, "array.size: %zu", array.size);
-            DQN_TESTER_ASSERTF(&test, array.max == 4, "array.max: %zu", array.max);
-
-            int *peek_item = Dqn_Array_Peek(&array);
-            DQN_TESTER_ASSERTF(&test, *peek_item == 1, "peek: %d", *peek_item);
-            DQN_TESTER_ASSERTF(&test, array.size == 1, "array.size: %zu", array.size);
-            DQN_TESTER_ASSERTF(&test, array.max == 4, "array.max: %zu", array.max);
-            Dqn_Tester_End(&test);
-        }
-    }
-
-    // NOTE: Dynamic Memory: Dqn_Array
-    {
-        Dqn_Tester_Begin(&test, "Dynamic Memory: Reserve and check over commit reallocates");
-        Dqn_Arena arena = {};
-        Dqn_Array<int> array = {};
-        array.arena = &arena;
-
-        Dqn_Array_Reserve(&array, 4);
-        DQN_TESTER_ASSERTF(&test, array.size == 0, "array.size: %zu", array.size);
-        DQN_TESTER_ASSERTF(&test, array.max == 4, "array.max: %zu", array.max);
-
-        int DATA[] = {1, 2, 3, 4};
-        Dqn_Array_AddArray(&array, DATA, Dqn_CArray_Count(DATA));
-        DQN_TESTER_ASSERTF(&test, array.data[0] == 1, "array.data: %d", array.data[0]);
-        DQN_TESTER_ASSERTF(&test, array.data[1] == 2, "array.data: %d", array.data[1]);
-        DQN_TESTER_ASSERTF(&test, array.data[2] == 3, "array.data: %d", array.data[2]);
-        DQN_TESTER_ASSERTF(&test, array.data[3] == 4, "array.data: %d", array.data[3]);
-        DQN_TESTER_ASSERTF(&test, array.size == 4, "array.size: %zu", array.size);
-
-        int *added_item = Dqn_Array_Add(&array, 5);
-        DQN_TESTER_ASSERTF(&test, *added_item == 5, "added_item: %d", *added_item);
-        DQN_TESTER_ASSERTF(&test, array.data[4] == 5, "array.data: %d", array.data[4]);
-        DQN_TESTER_ASSERTF(&test, array.size == 5, "array.size: %zu", array.size);
-        DQN_TESTER_ASSERTF(&test, array.max >= 5, "array.max: %zu", array.max);
-
-        Dqn_Arena_Free(&arena, false /*clear_mem*/);
-        Dqn_Tester_End(&test);
-    }
-
-    DQN_TESTER_END_GROUP(&test);
-    return test;
-}
 
 Dqn_Tester Dqn_Test_File()
 {
@@ -226,61 +97,61 @@ Dqn_Tester Dqn_Test_FixedArray()
 {
     Dqn_Tester test = {};
 #if defined(DQN_WITH_FIXED_ARRAY)
-    DQN_TESTER_BEGIN_GROUP("Dqn_FixedArray");
-    // NOTE: Dqn_FixedArray_Init
+    DQN_TESTER_BEGIN_GROUP("Dqn_FArray");
+    // NOTE: Dqn_FArray_Init
     {
         Dqn_Tester_Begin(&test, "Initialise from raw array");
         int raw_array[] = {1, 2};
-        auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+        auto array = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
         DQN_TESTER_ASSERT(&test, array.size == 2);
-        DQN_TESTER_ASSERT(&test, array[0] == 1);
-        DQN_TESTER_ASSERT(&test, array[1] == 2);
+        DQN_TESTER_ASSERT(&test, array.data[0] == 1);
+        DQN_TESTER_ASSERT(&test, array.data[1] == 2);
         Dqn_Tester_End(&test);
     }
 
-    // NOTE: Dqn_FixedArray_EraseStable
+    // NOTE: Dqn_FArray_EraseStable
     {
         Dqn_Tester_Begin(&test, "Erase stable 1 element from array");
         int raw_array[] = {1, 2, 3};
-        auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
-        Dqn_FixedArray_EraseStable(&array, 1);
+        auto array = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+        Dqn_FArray_EraseStable(&array, 1);
         DQN_TESTER_ASSERT(&test, array.size == 2);
-        DQN_TESTER_ASSERT(&test, array[0] == 1);
-        DQN_TESTER_ASSERT(&test, array[1] == 3);
+        DQN_TESTER_ASSERT(&test, array.data[0] == 1);
+        DQN_TESTER_ASSERT(&test, array.data[1] == 3);
         Dqn_Tester_End(&test);
     }
 
-    // NOTE: Dqn_FixedArray_EraseUnstable
+    // NOTE: Dqn_FArray_EraseUnstable
     {
         Dqn_Tester_Begin(&test, "Erase unstable 1 element from array");
         int raw_array[] = {1, 2, 3};
-        auto array = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
-        Dqn_FixedArray_EraseUnstable(&array, 0);
+        auto array = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+        DQN_TESTER_ASSERT(&test, Dqn_FArray_EraseUnstable(&array, 0));
         DQN_TESTER_ASSERT(&test, array.size == 2);
-        DQN_TESTER_ASSERT(&test, array[0] == 3);
-        DQN_TESTER_ASSERT(&test, array[1] == 2);
+        DQN_TESTER_ASSERT(&test, array.data[0] == 3);
+        DQN_TESTER_ASSERT(&test, array.data[1] == 2);
         Dqn_Tester_End(&test);
     }
 
-    // NOTE: Dqn_FixedArray_Add
+    // NOTE: Dqn_FArray_Add
     {
         Dqn_Tester_Begin(&test, "Add 1 element to array");
         int const ITEM  = 2;
         int raw_array[] = {1};
-        auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
-        Dqn_FixedArray_Add(&array, ITEM);
+        auto array      = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+        Dqn_FArray_Add(&array, ITEM);
         DQN_TESTER_ASSERT(&test, array.size == 2);
-        DQN_TESTER_ASSERT(&test, array[0] == 1);
-        DQN_TESTER_ASSERT(&test, array[1] == ITEM);
+        DQN_TESTER_ASSERT(&test, array.data[0] == 1);
+        DQN_TESTER_ASSERT(&test, array.data[1] == ITEM);
         Dqn_Tester_End(&test);
     }
 
-    // NOTE: Dqn_FixedArray_Clear
+    // NOTE: Dqn_FArray_Clear
     {
         Dqn_Tester_Begin(&test, "Clear array");
         int raw_array[] = {1};
-        auto array      = Dqn_FixedArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
-        Dqn_FixedArray_Clear(&array);
+        auto array      = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+        Dqn_FArray_Clear(&array, Dqn_ZeroMem_No);
         DQN_TESTER_ASSERT(&test, array.size == 0);
         Dqn_Tester_End(&test);
     }
@@ -289,25 +160,25 @@ Dqn_Tester Dqn_Test_FixedArray()
     return test;
 }
 
-Dqn_Tester Dqn_Test_FixedString()
+Dqn_Tester Dqn_Test_FString8()
 {
     Dqn_Tester test = {};
 #if defined(DQN_WITH_FIXED_STRING)
-    DQN_TESTER_BEGIN_GROUP("Dqn_FixedString");
+    DQN_TESTER_BEGIN_GROUP("Dqn_FString8");
 
-    // NOTE: Dqn_FixedString_Append
+    // NOTE: Dqn_FString8_Append
     {
         Dqn_Tester_Begin(&test, "Append too much fails");
-        Dqn_FixedString<4> str = {};
-        DQN_TESTER_ASSERTF(&test, Dqn_FixedString_Append(&str, "abcd") == false, "We need space for the null-terminator");
+        Dqn_FString8<4> str = {};
+        DQN_TESTER_ASSERTF(&test, Dqn_FString8_AppendCString8(&str, "abcd") == false, "We need space for the null-terminator");
         Dqn_Tester_End(&test);
     }
 
-    // NOTE: Dqn_FixedString_AppendFmt
+    // NOTE: Dqn_FString8_AppendFmt
     {
         Dqn_Tester_Begin(&test, "Append format string too much fails");
-        Dqn_FixedString<4> str = {};
-        DQN_TESTER_ASSERTF(&test, Dqn_FixedString_AppendFmt(&str, "abcd") == false, "We need space for the null-terminator");
+        Dqn_FString8<4> str = {};
+        DQN_TESTER_ASSERTF(&test, Dqn_FString8_AppendFmt(&str, "abcd") == false, "We need space for the null-terminator");
         Dqn_Tester_End(&test);
     }
     DQN_TESTER_END_GROUP(&test);
@@ -1767,10 +1638,9 @@ void Dqn_Test_RunSuite()
 {
     Dqn_Tester tests[]
     {
-        Dqn_Test_Array(),
         Dqn_Test_File(),
         Dqn_Test_FixedArray(),
-        Dqn_Test_FixedString(),
+        Dqn_Test_FString8(),
         Dqn_Test_Hex(),
         Dqn_Test_Intrinsics(),
         Dqn_Test_M4(),

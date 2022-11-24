@@ -185,11 +185,6 @@ Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String8 string);
 Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String8 string);
 Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String8 string);
 
-Dqn_KeccakBytes28 Dqn_SHA3_224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array);
-Dqn_KeccakBytes32 Dqn_SHA3_256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array);
-Dqn_KeccakBytes48 Dqn_SHA3_384_U8ArrayToBytes48(Dqn_Array<Dqn_KeccakU8> array);
-Dqn_KeccakBytes64 Dqn_SHA3_512_U8ArrayToBytes64(Dqn_Array<Dqn_KeccakU8> array);
-
 // -----------------------------------------------------------------------------
 // NOTE: Keccak - Helpers for Dqn data structures
 // -----------------------------------------------------------------------------
@@ -197,11 +192,6 @@ Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String8 string);
 Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String8 string);
 Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String8 string);
 Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String8 string);
-
-Dqn_KeccakBytes28 Dqn_Keccak224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array);
-Dqn_KeccakBytes32 Dqn_Keccak256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array);
-Dqn_KeccakBytes48 Dqn_Keccak384_U8ArrayToBytes48(Dqn_Array<Dqn_KeccakU8> array);
-Dqn_KeccakBytes64 Dqn_Keccak512_U8ArrayToBytes64(Dqn_Array<Dqn_KeccakU8> array);
 #endif // DQN_H
 
 // -----------------------------------------------------------------------------
@@ -519,24 +509,10 @@ Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_String8 string)
     return result;
 }
 
-Dqn_KeccakBytes28 Dqn_SHA3_224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array)
-{
-    Dqn_KeccakBytes28 result;
-    Dqn_SHA3_224(array.data, array.size, result.data, sizeof(result));
-    return result;
-}
-
 Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String8 string)
 {
     Dqn_KeccakBytes32 result;
     Dqn_SHA3_256(string.data, string.size, result.data, sizeof(result));
-    return result;
-}
-
-Dqn_KeccakBytes32 Dqn_SHA3_256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array)
-{
-    Dqn_KeccakBytes32 result;
-    Dqn_SHA3_256(array.data, array.size, result.data, sizeof(result));
     return result;
 }
 
@@ -547,24 +523,10 @@ Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String8 string)
     return result;
 }
 
-Dqn_KeccakBytes48 Dqn_SHA3_384_U8ArrayToBytes48(Dqn_Array<Dqn_KeccakU8> array)
-{
-    Dqn_KeccakBytes48 result;
-    Dqn_SHA3_384(array.data, array.size, result.data, sizeof(result));
-    return result;
-}
-
 Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String8 string)
 {
     Dqn_KeccakBytes64 result;
     Dqn_SHA3_512(string.data, string.size, result.data, sizeof(result));
-    return result;
-}
-
-Dqn_KeccakBytes64 Dqn_SHA3_512_U8ArrayToBytes64(Dqn_Array<Dqn_KeccakU8> array)
-{
-    Dqn_KeccakBytes64 result;
-    Dqn_SHA3_512(array.data, array.size, result.data, sizeof(result));
     return result;
 }
 #endif // DQN_H
@@ -580,27 +542,12 @@ Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String8 string)
     return result;
 }
 
-Dqn_KeccakBytes28 Dqn_Keccak224_U8ArrayToBytes28(Dqn_Array<Dqn_KeccakU8> array)
-{
-    Dqn_KeccakBytes28 result;
-    Dqn_Keccak224(array.data, array.size, result.data, sizeof(result));
-    return result;
-}
-
 Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String8 string)
 {
     Dqn_KeccakBytes32 result;
     Dqn_Keccak256(string.data, string.size, result.data, sizeof(result));
     return result;
 }
-
-Dqn_KeccakBytes32 Dqn_Keccak256_U8ArrayToBytes32(Dqn_Array<Dqn_KeccakU8> array)
-{
-    Dqn_KeccakBytes32 result;
-    Dqn_Keccak256(array.data, array.size, result.data, sizeof(result));
-    return result;
-}
-
 
 Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String8 string)
 {
@@ -609,24 +556,10 @@ Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String8 string)
     return result;
 }
 
-Dqn_KeccakBytes48 Dqn_Keccak384_U8ArrayToBytes48(Dqn_Array<Dqn_KeccakU8> array)
-{
-    Dqn_KeccakBytes48 result;
-    Dqn_Keccak384(array.data, array.size, result.data, sizeof(result));
-    return result;
-}
-
 Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String8 string)
 {
     Dqn_KeccakBytes64 result;
     Dqn_Keccak512(string.data, string.size, result.data, sizeof(result));
-    return result;
-}
-
-Dqn_KeccakBytes64 Dqn_Keccak512_U8ArrayToBytes64(Dqn_Array<Dqn_KeccakU8> array)
-{
-    Dqn_KeccakBytes64 result;
-    Dqn_Keccak512(array.data, array.size, result.data, sizeof(result));
     return result;
 }
 #endif // DQN_H
