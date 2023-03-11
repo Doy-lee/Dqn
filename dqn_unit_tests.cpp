@@ -42,7 +42,7 @@ Dqn_Tester Dqn_Test_File()
         DQN_TESTER_ASSERTF(&test, Dqn_Fs_Exists(DQN_STRING8("abcd/efgh")) == false, "This function should only return true for files");
         DQN_TESTER_ASSERTF(&test, Dqn_Fs_Delete(DQN_STRING8("abcd/efgh")), "Failed to delete directory");
         DQN_TESTER_ASSERTF(&test, Dqn_Fs_Delete(DQN_STRING8("abcd")), "Failed to cleanup directory");
-        Dqn_Arena_Free(&arena, false /*clear_mem*/);
+        Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
     }
 
@@ -50,13 +50,13 @@ Dqn_Tester Dqn_Test_File()
         // NOTE: Write step
         Dqn_String8 const SRC_FILE = DQN_STRING8("dqn_test_file");
         Dqn_Tester_Begin(&test, "Write file, read it, copy it, move it and delete it");
-        Dqn_b32 write_result = Dqn_Fs_WriteCString8ToFileCString8(SRC_FILE.data, SRC_FILE.size, "test", 4);
+        Dqn_b32 write_result = Dqn_Fs_WriteCString8(SRC_FILE.data, SRC_FILE.size, "test", 4);
         DQN_TESTER_ASSERT(&test, write_result);
         DQN_TESTER_ASSERT(&test, Dqn_Fs_Exists(SRC_FILE));
 
         // NOTE: Read step
         Dqn_Arena arena = {};
-        Dqn_String8 read_file = Dqn_Fs_ReadFileCString8ToString8Arena(SRC_FILE.data, SRC_FILE.size, &arena);
+        Dqn_String8 read_file = Dqn_Fs_ReadString8(SRC_FILE, Dqn_Arena_Allocator(&arena));
         DQN_TESTER_ASSERTF(&test, Dqn_String8_IsValid(read_file), "Failed to load file");
         DQN_TESTER_ASSERTF(&test, read_file.size == 4, "File read wrong amount of bytes");
         DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(read_file, DQN_STRING8("test")), "read(%zu): %.*s", read_file.size, DQN_STRING_FMT(read_file));
@@ -86,7 +86,7 @@ Dqn_Tester Dqn_Test_File()
         DQN_TESTER_ASSERT(&test, delete_non_existent_moved_file == false);
         DQN_TESTER_ASSERT(&test, delete_non_existent_src_file == false);
 
-        Dqn_Arena_Free(&arena, false /*clear_mem*/);
+        Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
     }
     DQN_TESTER_END_GROUP(&test);
@@ -178,7 +178,7 @@ Dqn_Tester Dqn_Test_FString8()
     {
         Dqn_Tester_Begin(&test, "Append format string too much fails");
         Dqn_FString8<4> str = {};
-        DQN_TESTER_ASSERTF(&test, Dqn_FString8_AppendFmt(&str, "abcd") == false, "We need space for the null-terminator");
+        DQN_TESTER_ASSERTF(&test, Dqn_FString8_AppendF(&str, "abcd") == false, "We need space for the null-terminator");
         Dqn_Tester_End(&test);
     }
     DQN_TESTER_END_GROUP(&test);
@@ -193,77 +193,77 @@ Dqn_Tester Dqn_Test_Hex()
     DQN_TESTER_BEGIN_GROUP("Dqn_Hex");
     {
         Dqn_Tester_Begin(&test, "Convert 0x123");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("0x123"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0x123"));
         DQN_TESTER_ASSERTF(&test, result == 0x123, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert 0xFFFF");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("0xFFFF"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0xFFFF"));
         DQN_TESTER_ASSERTF(&test, result == 0xFFFF, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert FFFF");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("FFFF"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("FFFF"));
         DQN_TESTER_ASSERTF(&test, result == 0xFFFF, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert abCD");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("abCD"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("abCD"));
         DQN_TESTER_ASSERTF(&test, result == 0xabCD, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert 0xabCD");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("0xabCD"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0xabCD"));
         DQN_TESTER_ASSERTF(&test, result == 0xabCD, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert 0x");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("0x"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0x"));
         DQN_TESTER_ASSERTF(&test, result == 0x0, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert 0X");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("0X"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0X"));
         DQN_TESTER_ASSERTF(&test, result == 0x0, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert 3");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("3"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("3"));
         DQN_TESTER_ASSERTF(&test, result == 3, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert f");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("f"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("f"));
         DQN_TESTER_ASSERTF(&test, result == 0xf, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert g");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("g"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("g"));
         DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Convert -0x3");
-        uint64_t result = Dqn_Hex_StringToU64(DQN_STRING8("-0x3"));
+        uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("-0x3"));
         DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
         Dqn_Tester_End(&test);
     }
@@ -310,7 +310,7 @@ Dqn_Tester Dqn_Test_DSMap()
     {
         Dqn_Tester_Begin(&test, "Add r-value item to map");
         Dqn_DSMap<int> map         = Dqn_DSMap_Init<int>(128);
-        Dqn_DSMapEntry<int> *entry = Dqn_DSMap_AddCopy(&map, 3 /*hash*/, 5 /*value*/);
+        Dqn_DSMapItem<int> *entry = Dqn_DSMap_Add(&map, 3 /*hash*/, 5 /*value*/);
         DQN_TESTER_ASSERTF(&test, map.size == 128, "size: %I64d", map.size);
         DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
         DQN_TESTER_ASSERTF(&test, entry->hash == 3, "hash: %zu", entry->hash);
@@ -323,7 +323,7 @@ Dqn_Tester Dqn_Test_DSMap()
         Dqn_Tester_Begin(&test, "Add l-value item to map");
         Dqn_DSMap<int>       map   = Dqn_DSMap_Init<int>(128);
         int                  value = 5;
-        Dqn_DSMapEntry<int> *entry = Dqn_DSMap_Add(&map, 3 /*hash*/, value);
+        Dqn_DSMapItem<int> *entry = Dqn_DSMap_Add(&map, 3 /*hash*/, value);
         DQN_TESTER_ASSERTF(&test, map.size == 128, "size: %I64d", map.size);
         DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
         DQN_TESTER_ASSERTF(&test, entry->hash == 3, "hash: %zu", entry->hash);
@@ -335,8 +335,8 @@ Dqn_Tester Dqn_Test_DSMap()
     {
         Dqn_Tester_Begin(&test, "Get item from map");
         Dqn_DSMap<int> map         = Dqn_DSMap_Init<int>(128);
-        Dqn_DSMapEntry<int> *entry = Dqn_DSMap_AddCopy(&map, 3 /*hash*/, 5 /*value*/);
-        Dqn_DSMapEntry<int> *get_entry = Dqn_DSMap_Get(&map, 3 /*hash*/);
+        Dqn_DSMapItem<int> *entry = Dqn_DSMap_Add(&map, 3 /*hash*/, 5 /*value*/);
+        Dqn_DSMapItem<int> *get_entry = Dqn_DSMap_Get(&map, 3 /*hash*/);
         DQN_TESTER_ASSERTF(&test, get_entry == entry, "get_entry: %p, entry: %p", get_entry, entry);
         Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
@@ -344,8 +344,8 @@ Dqn_Tester Dqn_Test_DSMap()
 
     {
         Dqn_Tester_Begin(&test, "Get non-existent item from map");
-        Dqn_DSMap<int> map         = Dqn_DSMap_Init<int>(128);
-        Dqn_DSMapEntry<int> *entry = Dqn_DSMap_Get(&map, 3 /*hash*/);
+        Dqn_DSMap<int> map        = Dqn_DSMap_Init<int>(128);
+        Dqn_DSMapItem<int> *entry = Dqn_DSMap_Get(&map, 3 /*hash*/);
         DQN_TESTER_ASSERT(&test, entry == nullptr);
         Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
@@ -354,7 +354,7 @@ Dqn_Tester Dqn_Test_DSMap()
     {
         Dqn_Tester_Begin(&test, "Erase item from map");
         Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(128);
-        Dqn_DSMap_AddCopy(&map, 3 /*hash*/, 5 /*value*/);
+        Dqn_DSMap_Add(&map, 3 /*hash*/, 5 /*value*/);
         DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %I64d", map.count);
         Dqn_DSMap_Erase(&map, 3 /*hash*/, Dqn_ZeroMem_No);
         DQN_TESTER_ASSERTF(&test, map.count == 0, "count: %I64d", map.count);
@@ -375,12 +375,12 @@ Dqn_Tester Dqn_Test_DSMap()
         Dqn_Tester_Begin(&test, "Test resize on maximum load");
         const Dqn_isize INIT_SIZE = 4;
         Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(INIT_SIZE);
-        Dqn_DSMap_AddCopy(&map, 0 /*hash*/, 5 /*value*/);
-        Dqn_DSMap_AddCopy(&map, 1 /*hash*/, 5 /*value*/);
+        Dqn_DSMap_Add(&map, 0 /*hash*/, 5 /*value*/);
+        Dqn_DSMap_Add(&map, 1 /*hash*/, 5 /*value*/);
         DQN_TESTER_ASSERTF(&test, map.count == 2, "count: %I64d", map.count);
 
         // This *should* cause a resize because 3/4 slots filled is 75% load
-        Dqn_DSMap_AddCopy(&map, 6 /*hash*/, 5 /*value*/);
+        Dqn_DSMap_Add(&map, 6 /*hash*/, 5 /*value*/);
         DQN_TESTER_ASSERTF(&test, map.count == 3, "count: %I64d", map.count);
         DQN_TESTER_ASSERTF(&test, map.size == INIT_SIZE * 2, "size: %I64d", map.size);
 
@@ -792,31 +792,31 @@ Dqn_Tester Dqn_Test_Rect()
 Dqn_Tester Dqn_Test_PerfCounter()
 {
     Dqn_Tester test = {};
-    DQN_TESTER_BEGIN_GROUP("Dqn_Perf_Counter");
+    DQN_TESTER_BEGIN_GROUP("Dqn_OS_PerfCounter");
     {
-        Dqn_Tester_Begin(&test, "Dqn_Perf_CounterNow");
-        uint64_t result = Dqn_Perf_CounterNow();
+        Dqn_Tester_Begin(&test, "Dqn_OS_PerfCounterNow");
+        uint64_t result = Dqn_OS_PerfCounterNow();
         DQN_TESTER_ASSERT(&test, result != 0);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Consecutive ticks are ordered");
-        uint64_t a = Dqn_Perf_CounterNow();
-        uint64_t b = Dqn_Perf_CounterNow();
+        uint64_t a = Dqn_OS_PerfCounterNow();
+        uint64_t b = Dqn_OS_PerfCounterNow();
         DQN_TESTER_ASSERTF(&test, b >= a, "a: %zu, b: %zu", a, b);
         Dqn_Tester_End(&test);
     }
 
     {
         Dqn_Tester_Begin(&test, "Ticks to time are a correct order of magnitude");
-        uint64_t a = Dqn_Perf_CounterNow();
-        uint64_t b = Dqn_Perf_CounterNow();
+        uint64_t a = Dqn_OS_PerfCounterNow();
+        uint64_t b = Dqn_OS_PerfCounterNow();
 
-        Dqn_f64 s       = Dqn_Perf_CounterS(a, b);
-        Dqn_f64 ms      = Dqn_Perf_CounterMs(a, b);
-        Dqn_f64 micro_s = Dqn_Perf_CounterMicroS(a, b);
-        Dqn_f64 ns      = Dqn_Perf_CounterNs(a, b);
+        Dqn_f64 s       = Dqn_OS_PerfCounterS(a, b);
+        Dqn_f64 ms      = Dqn_OS_PerfCounterMs(a, b);
+        Dqn_f64 micro_s = Dqn_OS_PerfCounterMicroS(a, b);
+        Dqn_f64 ns      = Dqn_OS_PerfCounterNs(a, b);
         DQN_TESTER_ASSERTF(&test, s <= ms, "s: %f, ms: %f", s, ms);
         DQN_TESTER_ASSERTF(&test, ms <= micro_s, "ms: %f, micro_s: %f", ms, micro_s);
         DQN_TESTER_ASSERTF(&test, micro_s <= ns, "micro_s: %f, ns: %f", micro_s, ns);
@@ -1137,12 +1137,12 @@ Dqn_Tester Dqn_Test_String8()
     {
         Dqn_Tester_Begin(&test, "Initialise with format string");
         Dqn_Arena arena   = {};
-        Dqn_String8 string = Dqn_String8_Fmt(Dqn_Arena_Allocator(&arena), "%s", "AB");
+        Dqn_String8 string = Dqn_String8_InitF(Dqn_Arena_Allocator(&arena), "%s", "AB");
         DQN_TESTER_ASSERTF(&test, string.size == 2, "size: %I64d", string.size);
         DQN_TESTER_ASSERTF(&test, string.data[0] == 'A', "string[0]: %c", string.data[0]);
         DQN_TESTER_ASSERTF(&test, string.data[1] == 'B', "string[1]: %c", string.data[1]);
         DQN_TESTER_ASSERTF(&test, string.data[2] == 0, "string[2]: %c", string.data[2]);
-        Dqn_Arena_Free(&arena, false /*clear_mem*/);
+        Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
     }
 
@@ -1155,7 +1155,7 @@ Dqn_Tester Dqn_Test_String8()
         DQN_TESTER_ASSERTF(&test, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
         DQN_TESTER_ASSERTF(&test, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
         DQN_TESTER_ASSERTF(&test, copy.data[2] ==  0,  "copy[2]: %c", copy.data[2]);
-        Dqn_Arena_Free(&arena, false /*clear_mem*/);
+        Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
     }
 
@@ -1171,7 +1171,7 @@ Dqn_Tester Dqn_Test_String8()
         Dqn_Arena arena   = {};
         Dqn_String8 string = Dqn_String8_Allocate(Dqn_Arena_Allocator(&arena), 2, Dqn_ZeroMem_No);
         DQN_TESTER_ASSERTF(&test, string.size == 2, "size: %I64d", string.size);
-        Dqn_Arena_Free(&arena, false /*clear_mem*/);
+        Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
     }
 
@@ -1388,7 +1388,7 @@ Dqn_Tester Dqn_Test_Win()
         DQN_TESTER_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
         DQN_TESTER_ASSERTF(&test, size_returned == Dqn_CArray_Count(EXPECTED), "string_size: %d, expected: %zu", size_returned, Dqn_CArray_Count(EXPECTED));
         DQN_TESTER_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
-        Dqn_Arena_Free(&arena, false /*clear_mem*/);
+        Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
     }
 
@@ -1408,7 +1408,7 @@ Dqn_Tester Dqn_Test_Win()
         DQN_TESTER_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
         DQN_TESTER_ASSERTF(&test, size_returned == Dqn_CArray_Count(EXPECTED), "string_size: %d, expected: %zu", size_returned, Dqn_CArray_Count(EXPECTED));
         DQN_TESTER_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
-        Dqn_Arena_Free(&arena, false /*clear_mem*/);
+        Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
         Dqn_Tester_End(&test);
     }
     DQN_TESTER_END_GROUP(&test);
@@ -1445,8 +1445,8 @@ Dqn_String8 const DQN_TESTS__HASH_STRING[] =
 void Dqn_Test__KeccakDispatch(Dqn_Tester *test, int hash_type, Dqn_String8 input)
 {
 #if defined(DQN_KECCAK_H)
-    Dqn_ThreadTempArena scratch = Dqn_Thread_TempArena();
-    Dqn_String8 input_hex = Dqn_Hex_BytesToHexStringArena(input.data, input.size, scratch.arena);
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_String8 input_hex     = Dqn_Hex_BytesToString8Arena(scratch.arena, input.data, input.size);
 
     switch(hash_type)
     {

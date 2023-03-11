@@ -1,25 +1,55 @@
 /// @file dqn.h
 #if !defined(DQN_H)
 #define DQN_H
-// NOTE: Dqn
-// -----------------------------------------------------------------------------
-// General all-purpose utility library.
+// ---------------------------------+-----------------------------+---------------------------------
+// Table Of Contents                | Compile out with #define    | Description
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-CFGM] Config macros        |                             | Compile time customisation of library
+// [SECT-CMAC] Compiler macros      |                             | Macros for the compiler
+// [SECT-INCL] Include files        |                             | Standard library Include dependencies
+// [SECT-MACR] Macros               |                             | Define macros used in the library
+// [SECT-TYPE] Typedefs             |                             | Typedefs used in the library
+// [SECT-GSTR] Global Structs       |                             | Forward declare useful structs
+// [SECT-W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
+// [SECT-INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
+// [SECT-CARR] Dqn_CArray           |                             | Compile time C-array size
+// [SECT-STBS] stb_sprintf          |                             | Portable sprintf
+// [SECT-CALL] Dqn_CallSite         |                             | Source code location/tracing
+// [SECT-ALLO] Dqn_Allocator        |                             | Generic allocator interface
+// [SECT-CSTR] Dqn_CString8         |                             | C-string helpers
+// [SECT-STR8] Dqn_String8          |                             | Pointer and length strings
+// [SECT-PRIN] Dqn_Print            |                             | Console printing
+// [SECT-LLOG] Dqn_Log              |                             | Library logging
+// [SECT-VMEM] Dqn_VMem             |                             | Virtual memory allocation
+// [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
+// [SECT-AMAP] Dqn_Map              | DQN_NO_MAP                  | Hashtable, collision=chain
+// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, collision=linear, tombstoneless deletes
+// [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
+// [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
+// [SECT-STRB] Dqn_String8Builder   |                             |
+// [SECT-FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
+// [SECT-LIST] Dqn_List             |                             | Chunked linked lists, append only
+// [SECT-MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
+// [SECT-BITS] Dqn_Bit              |                             | Bitset manipulation
+// [SECT-SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
+// [SECT-CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
+// [SECT-UTFX] Dqn_UTF              |                             | Unicode helpers
+// [SECT-BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
+// [SECT-DATE] Dqn_Date             |                             | Date-time helpers
+// [SECT-WIND] Dqn_Win              |                             | Windows OS helpers
+// [SECT-WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
+// [SECT-OSYS] Dqn_OS               |                             | Operating-system APIs
+// [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
+// [SECT-MISC] Miscellaneous        |                             | General purpose helpers
+// [SECT-TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
+// [SECT-JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
+// [SECT-FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
+// [SECT-MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
+// ---------------------------------+-----------------------------+---------------------------------
 //
-// NOTE: Enabling Library Primitives
-// -----------------------------------------------------------------------------
-// Access to library primitives must be enabled using the following macros
-//
-// #define DQN_WITH_DSMAP          // Dqn_DSMap
-// #define DQN_WITH_FIXED_ARRAY    // Dqn_FArray
-// #define DQN_WITH_FIXED_STRING   // Dqn_FString8
-// #define DQN_WITH_HEX            // Dqn_Hex_ and friends ...
-// #define DQN_WITH_JSON_BUILDER   // Dqn_JSONBuilder
-// #define DQN_WITH_MAP            // Dqn_Map
-// #define DQN_WITH_MATH           // Dqn_V2/3/4/Mat4 and friends ...
-// #define DQN_WITH_WIN_NET        // Dqn_Win_Net
-//
-// NOTE: Configuration
-// -----------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-CFGM] Config macros        |                             | Compile time customisation of library
+// -------------------------------------------------------------------------------------------------
 // #define DQN_IMPLEMENTATION
 //     Define this in one and only one C++ file to enable the implementation
 //     code of the header file
@@ -46,26 +76,18 @@
 //     is set to 0. Some of this library API accepts are clear memory parameter
 //     to scrub memory after certain operations.
 //
-// #define DQN_ALLOCATION_TRACING 1
-//     When defined to 0 all tracing code is compiled out.
-//
-//     When defined to 1, some allocating calls in the library will automatically
-//     get passed in the file name, function name, line number and an optional tag.
-//
-//     For data structures that have a 'Dqn_AllocationTracer_' member, the caller
-//     can set the 'Dqn_AllocationTracer_' to log allocations every time they are
-//     made in the data structure.
-//
-//     'Tagged' variants of functions accept as the last parameter, a 'tag' that is
-//     the descriptor/name to describe the allocation. All extra parameters and
-//     tags are compiled out when tracing is disabled.
+// #define DQN_LEAK_TRACKING
+//     When defined to some allocating calls in the library will automatically
+//     get passed in the file name, function name, line number and an optional
+//     leak_msg.
 //
 // #define DQN_DEBUG_THREAD_CONTEXT
 //     Define this macro to record allocation stats for arenas used in the
 //     thread context. The thread context arena stats can be printed by using
-//     Dqn_Lib_DumpThreadContextArenaStat.
+//     Dqn_Library_DumpThreadContextArenaStat.
 //
-// NOTE: Compiler
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-CMAC] Compiler macros      |                             | Macros for the compiler
 // -------------------------------------------------------------------------------------------------
 // NOTE: Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
@@ -96,13 +118,20 @@
     #endif
 #endif
 
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-INCL] Include files        |                             | Standard library Include dependencies
+// ---------------------------------+-----------------------------+---------------------------------
 #include <stdarg.h> // va_list
 #include <stdio.h>  // fprintf, FILE, stdout, stderr
 #include <stdint.h> // [u]int_*, ...
 #include <limits.h> // [U]INT_MAX, ...
 
-// NOTE: Macros
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-MACR] Macros               |                             | Define macros used in the library
+// ---------------------------------+-----------------------------+---------------------------------
+
+// NOTE: Memory allocation dependencies
+// -----------------------------------------------------------------------------
 #if !defined(DQN_ALLOC)
     #define DQN_ALLOC(size) Dqn_VMem_Reserve(size, true /*commit*/)
 #endif
@@ -111,56 +140,77 @@
     #define DQN_DEALLOC(ptr, size) Dqn_VMem_Release(ptr, size)
 #endif
 
-#if !defined(DQN_MEMCOPY)
+// NOTE: string.h dependencies
+// -----------------------------------------------------------------------------
+#if !defined(DQN_MEMCPY) || !defined(DQN_MEMSET) || !defined(DQN_MEMCMP) || !defined(DQN_MEMMOVE)
     #include <string.h>
-    #define DQN_MEMCOPY(dest, src, count) memcpy(dest, src, count)
+    #if !defined(DQN_MEMCPY)
+        #define DQN_MEMCPY(dest, src, count) memcpy(dest, src, count)
+    #endif
+    #if !defined(DQN_MEMSET)
+        #define DQN_MEMSET(dest, value, count) memset(dest, value, count)
+    #endif
+    #if !defined(DQN_MEMCMP)
+        #define DQN_MEMCMP(ptr1, ptr2, num) memcmp(ptr1, ptr2, num)
+    #endif
+    #if !defined(DQN_MEMMOVE)
+        #define DQN_MEMMOVE(dest, src, num) memmove(dest, src, num)
+    #endif
 #endif
 
-#if !defined(DQN_MEMSET)
-    #include <string.h>
-    #define DQN_MEMSET(dest, value, count) memset(dest, value, count)
-#endif
-
-#if !defined(DQN_MEMCMP)
-    #include <string.h>
-    #define DQN_MEMCMP(ptr1, ptr2, num) memcmp(ptr1, ptr2, num)
-#endif
-
-#if !defined(DQN_MEMMOVE)
-    #include <string.h>
-    #define DQN_MEMMOVE(dest, src, num) memmove(dest, src, num)
-#endif
-
-#if !defined(DQN_SQRTF)
+// NOTE: math.h dependencies
+// -----------------------------------------------------------------------------
+#if !defined(DQN_SQRTF) || !defined(DQN_SINF) || !defined(DQN_COSF) || !defined(DQN_TANF)
     #include <math.h>
     #define DQN_SQRTF(val) sqrtf(val)
+    #if !defined(DQN_SINF)
+        #define DQN_SINF(val) sinf(val)
+    #endif
+    #if !defined(DQN_COSF)
+        #define DQN_COSF(val) cosf(val)
+    #endif
+    #if !defined(DQN_TANF)
+        #define DQN_TANF(val) tanf(val)
+    #endif
 #endif
 
-#if !defined(DQN_MEMSET_BYTE)
-    #define DQN_MEMSET_BYTE 0
-#endif
+// NOTE: Math macros
+// -----------------------------------------------------------------------------
+#define DQN_PI 3.14159265359f
 
-#if DQN_ALLOCATION_TRACING
-    #define DQN_CALL_SITE(msg)       __FILE__, __func__, __LINE__, msg,
-    #define DQN_CALL_SITE_ARGS       char const *file_, char const *func_, int line_, char const *msg_,
-    #define DQN_CALL_SITE_ARGS_INPUT file_, func_, line_, msg_,
-#else
-    #define DQN_CALL_SITE(msg)
-    #define DQN_CALL_SITE_ARGS
-    #define DQN_CALL_SITE_ARGS_INPUT
-#endif
+#define DQN_DEGREE_TO_RADIAN(degrees) ((degrees) * (DQN_PI / 180.0f))
+#define DQN_RADIAN_TO_DEGREE(radians) ((radians) * (180.f * DQN_PI))
 
+#define DQN_ABS(val) (((val) < 0) ? (-(val)) : (val))
+#define DQN_MAX(a, b) ((a > b) ? (a) : (b))
+#define DQN_MIN(a, b) ((a < b) ? (a) : (b))
+#define DQN_CLAMP(val, lo, hi) DQN_MAX(DQN_MIN(val, hi), lo)
+#define DQN_SQUARED(val) ((val) * (val))
+
+// NOTE: Function/variable annotations
+// -----------------------------------------------------------------------------
 #if defined(DQN_STATIC_API)
     #define DQN_API static
 #else
     #define DQN_API
 #endif
+
 #define DQN_LOCAL_PERSIST static
 #define DQN_FILE_SCOPE static
-
-// NOTE: Utility Macros
-// -------------------------------------------------------------------------------------------------
 #define DQN_CAST(val) (val)
+
+#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+    #define DQN_FORCE_INLINE __forceinline
+#else
+    #define DQN_FORCE_INLINE inline __attribute__((always_inline))
+#endif
+
+// NOTE: Preprocessor token tricks
+// -----------------------------------------------------------------------------
+#define DQN_TOKEN_COMBINE2(x, y) x ## y
+#define DQN_TOKEN_COMBINE(x, y) DQN_TOKEN_COMBINE2(x, y)
+#define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
+
 #define DQN_SWAP(a, b)   \
     do                   \
     {                    \
@@ -169,27 +219,30 @@
         b        = temp; \
     } while (0)
 
-// NOTE: Prefer the templated Dqn_Array/CString8ArrayCount function for type-safety. I prefer
-// the macro version for embedding within macros for debuggers. When we step
-// into a function call using the macro like, DQN_STRING8("...") which is very
-// common, the debugger jumps into the templated functions which is a waste of
-// time (they're bug free by virtue of templatizing).
+// NOTE: Compile time evaluation macros
+// -----------------------------------------------------------------------------
+#define DQN_ISIZEOF(val) DQN_CAST(ptrdiff_t)sizeof(val)
 #define DQN_ARRAY_UCOUNT(array) (sizeof(array)/(sizeof((array)[0])))
 #define DQN_ARRAY_ICOUNT(array) (Dqn_isize)DQN_ARRAY_UCOUNT(array)
 #define DQN_CHAR_COUNT(string) (sizeof(string) - 1)
 
+// NOTE: SI byte units
+// -----------------------------------------------------------------------------
 #define DQN_BYTES(val) (val)
 #define DQN_KILOBYTES(val) (1024ULL * DQN_BYTES(val))
 #define DQN_MEGABYTES(val) (1024ULL * DQN_KILOBYTES(val))
 #define DQN_GIGABYTES(val) (1024ULL * DQN_MEGABYTES(val))
 
+// NOTE: Duration to sections
+// -----------------------------------------------------------------------------
 #define DQN_SECONDS_TO_MS(val) ((val) * 1000.0f)
 #define DQN_MINS_TO_S(val) ((val) * 60ULL)
 #define DQN_HOURS_TO_S(val) (DQN_MINS_TO_S(val) * 60ULL)
 #define DQN_DAYS_TO_S(val) (DQN_HOURS_TO_S(val) * 24ULL)
 #define DQN_YEARS_TO_S(val) (DQN_DAYS_TO_S(val) * 365ULL)
-#define DQN_ISIZEOF(val) DQN_CAST(ptrdiff_t)sizeof(val)
 
+// NOTE: Debug macros
+// -----------------------------------------------------------------------------
 #if !defined(DQN_DEBUG_BREAK)
     #if defined(NDEBUG)
         #define DQN_DEBUG_BREAK
@@ -205,42 +258,17 @@
     #endif
 #endif
 
+#if !defined(DQN_MEMSET_BYTE)
+    #define DQN_MEMSET_BYTE 0
+#endif
 
-// NOTE: Math Macros
-// ------------------------------------------------------------------------------------------------
-#ifndef DQN_SINF
-    #include <math.h>
-    #define DQN_SINF(val) sinf(val)
-#endif // DQN_SINF
-
-#ifndef DQN_COSF
-    #include <math.h>
-    #define DQN_COSF(val) cosf(val)
-#endif // DQN_COSF
-
-#ifndef DQN_TANF
-    #include <math.h>
-    #define DQN_TANF(val) tanf(val)
-#endif // DQN_TANF
-
-#define DQN_PI 3.14159265359f
-
-#define DQN_DEGREE_TO_RADIAN(degrees) ((degrees) * (DQN_PI / 180.0f))
-#define DQN_RADIAN_TO_DEGREE(radians) ((radians) * (180.f * DQN_PI))
-
-#define DQN_ABS(val) (((val) < 0) ? (-(val)) : (val))
-#define DQN_MAX(a, b) ((a > b) ? (a) : (b))
-#define DQN_MIN(a, b) ((a < b) ? (a) : (b))
-#define DQN_CLAMP(val, lo, hi) DQN_MAX(DQN_MIN(val, hi), lo)
-#define DQN_SQUARED(val) ((val) * (val))
-
-// NOTE: Assert Macro
+// NOTE: Assert macros
 // ------------------------------------------------------------------------------------------------
 #define DQN_HARD_ASSERT(expr) DQN_HARD_ASSERT_MSG(expr, "")
-#define DQN_HARD_ASSERT_MSG(expr, fmt, ...)                    \
-    if (!(expr)) {                                             \
-        DQN_LOG_E("Assert: [" #expr "] " fmt, ##__VA_ARGS__);  \
-        DQN_DEBUG_BREAK;                                       \
+#define DQN_HARD_ASSERT_MSG(expr, fmt, ...)                         \
+    if (!(expr)) {                                                  \
+        Dqn_Log_ErrorF("Hard assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
+        DQN_DEBUG_BREAK;                                            \
     }
 
 #if defined(__cplusplus__)
@@ -263,8 +291,48 @@
 #define DQN_HARD_INVALID_CODE_PATH_MSG(fmt, ...) DQN_HARD_ASSERT_MSG(0, fmt, ##__VA_ARGS__)
 #define DQN_HARD_INVALID_CODE_PATH DQN_HARD_INVALID_CODE_PATH_MSG("Invalid code path triggered")
 
-// NOTE: Typedefs
+// NOTE: Defer macros
 // ------------------------------------------------------------------------------------------------
+#if 0
+#include <stdio.h>
+int main()
+{
+    DQN_DEFER { printf("Three ..\n"); };
+    printf("One ..\n");
+    printf("Two ..\n");
+
+    // One ..
+    // Two ..
+    // Three ..
+
+    return 0;
+}
+#endif
+
+template <typename Procedure>
+struct Dqn_Defer
+{
+    Procedure proc;
+    Dqn_Defer(Procedure p) : proc(p) {}
+    ~Dqn_Defer() { proc(); }
+};
+
+struct Dqn_DeferHelper
+{
+    template <typename Lambda>
+    Dqn_Defer<Lambda> operator+(Lambda lambda) { return Dqn_Defer<Lambda>(lambda); };
+};
+
+#define DQN_DEFER const auto DQN_UNIQUE_NAME(defer_lambda_) = Dqn_DeferHelper() + [&]()
+
+#define DQN_DEFER_LOOP(begin, end)                   \
+    for (bool DQN_UNIQUE_NAME(once) = (begin, true); \
+         DQN_UNIQUE_NAME(once);                      \
+         end, DQN_UNIQUE_NAME(once) = false)
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-TYPE] Typedefs             |                             | Typedefs used in the library
+// ---------------------------------+-----------------------------+---------------------------------
 typedef intptr_t Dqn_isize;
 typedef uintptr_t Dqn_usize;
 typedef intptr_t Dqn_isize;
@@ -275,13 +343,27 @@ typedef int32_t Dqn_b32;
 
 #define DQN_USIZE_MAX UINTPTR_MAX
 #define DQN_ISIZE_MAX INTPTR_MAX
+#define DQN_ISIZE_MIN INTPTR_MIN
 
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-GSTR] Global Structs       |                             | Forward declare useful structs
+// ---------------------------------+-----------------------------+---------------------------------
+struct Dqn_String8 ///< Pointer and length style UTF8 strings
+{
+    char      *data; ///< The UTF8 bytes of the string
+    Dqn_isize  size; ///< The number of bytes in the string
 
-// NOTE: Win32 Minimal Header
-// ------------------------------------------------------------------------------------------------
+    char const *begin() const { return data; }        ///< Const begin iterator for range-for loops
+    char const *end  () const { return data + size; } ///< Const end iterator for range-for loops
+    char       *begin()       { return data; }        ///< Begin iterator for range-for loops
+    char       *end  ()       { return data + size; } ///< End iterator for range-for loops
+};
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
+// ---------------------------------+-----------------------------+---------------------------------
 #if defined(DQN_OS_WIN32)
-    #if defined(DQN_NO_WIN32_MINIMAL_HEADER)
-    #else
+    #if !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
         // Taken from Windows.h
         // typedef unsigned long DWORD;
         // typedef unsigned short WORD;
@@ -302,59 +384,17 @@ typedef int32_t Dqn_b32;
             } u;
             uint64_t QuadPart;
         } LARGE_INTEGER;
-    #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
+    #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
 #endif // !defined(DQN_OS_WIN32)
 
-// NOTE: Defer Macro
-// ------------------------------------------------------------------------------------------------
-/*
-    #include <stdio.h>
-    int main()
-    {
-        DQN_DEFER { printf("Three ..\n"); };
-        printf("One ..\n");
-        printf("Two ..\n");
-
-        // One ..
-        // Two ..
-        // Three ..
-
-        return 0;
-    }
-*/
-template <typename Procedure>
-struct Dqn_Defer
-{
-    Procedure proc;
-    Dqn_Defer(Procedure p) : proc(p) {}
-    ~Dqn_Defer() { proc(); }
-};
-
-struct Dqn_DeferHelper
-{
-    template <typename Lambda>
-    Dqn_Defer<Lambda> operator+(Lambda lambda) { return Dqn_Defer<Lambda>(lambda); };
-};
-
-#define DQN_TOKEN_COMBINE2(x, y) x ## y
-#define DQN_TOKEN_COMBINE(x, y) DQN_TOKEN_COMBINE2(x, y)
-#define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
-#define DQN_DEFER const auto DQN_UNIQUE_NAME(defer_lambda_) = Dqn_DeferHelper() + [&]()
-
-#define DQN_DEFER_LOOP(begin, end)                   \
-    for (bool DQN_UNIQUE_NAME(once) = (begin, true); \
-         DQN_UNIQUE_NAME(once);                      \
-         end, DQN_UNIQUE_NAME(once) = false)
-
-// NOTE: Utility Enums
-// ------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
+// ---------------------------------+-----------------------------+---------------------------------
 typedef enum Dqn_ZeroMem {
     Dqn_ZeroMem_No,  ///< Memory can be handed out without zero-ing it out
     Dqn_ZeroMem_Yes, ///< Memory should be zero-ed out before giving to the callee
 } Dqn_ZeroMem;
 
-// NOTE: Intrinsics
-// -------------------------------------------------------------------------------------------------
 // NOTE: Dqn_Atomic_Add/Exchange return the previous value store in the target
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #include <intrin.h>
@@ -385,18 +425,17 @@ typedef enum Dqn_ZeroMem {
 #endif
 
 /// Atomically set the value into the target using an atomic compare and swap.
-/// @todo(dqn): Force inline
 /// @param[in,out] target The target pointer to set atomically
 /// @param[in] value The value to set atomically into the target
 /// @return The value that was last stored in the target
-inline uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint64_t value)
+DQN_FORCE_INLINE uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint64_t value)
 {
     #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
-    uint64_t result;
+    __int64 result;
     do {
         result = *target;
     } while (Dqn_Atomic_CompareExchange64(target, value, result) != result);
-    return result;
+    return DQN_CAST(uint64_t)result;
     #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     uint64_t result = __sync_lock_test_and_set(target, value);
     return result;
@@ -406,11 +445,10 @@ inline uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint64_t value)
 }
 
 /// Atomically set the value into the target using an atomic compare and swap.
-/// @todo(dqn): Force inline
 /// @param[in,out] target The target pointer to set atomically
 /// @param[in] value The value to set atomically into the target
 /// @return The value that was last stored in the target
-inline long Dqn_Atomic_SetValue32(long volatile *target, long value)
+DQN_FORCE_INLINE long Dqn_Atomic_SetValue32(long volatile *target, long value)
 {
     #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     long result;
@@ -479,8 +517,9 @@ void Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 /// Determine if the mutex can be locked using the given ticket number.
 bool Dqn_TicketMutex_CanLock(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 
-// NOTE: Dqn_CArray
-// ------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-CARR] Dqn_CArray           |                             | Compile time C-array size
+// ---------------------------------+-----------------------------+---------------------------------
 /// Calculate the size of a C-array at compile time
 /// @param array The C-array to calculate the size for
 /// @return The size of the c-array buffer
@@ -488,9 +527,10 @@ template <typename T, Dqn_isize N> constexpr Dqn_usize Dqn_CArray_Count   (T con
 template <typename T, Dqn_isize N> constexpr Dqn_isize Dqn_CArray_CountI  (T const (&array)[N]) { (void)array; return N; }
 template <typename T, int N>       constexpr Dqn_isize Dqn_CArray_CountInt(T const (&array)[N]) { (void)array; return N; }
 
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-STBS] stb_sprintf          |                             | Portable sprintf
+// ---------------------------------+-----------------------------+---------------------------------
 /// @cond NO_DOXYYGEN
-// NOTE: stb_sprintf
-// -------------------------------------------------------------------------------------------------
 // stb_sprintf - v1.10 - public domain snprintf() implementation
 // originally by Jeff Roberts / RAD Game Tools, 2015/10/20
 // http://github.com/nothings/stb
@@ -709,19 +749,61 @@ STBSP__PUBLICDEC void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #endif // STB_SPRINTF_H_INCLUDE
 /// @endcond
 
-// NOTE: Allocator API
-// -----------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-CALL] Dqn_CallSite         |                             | Source code location/tracing
+// ---------------------------------+-----------------------------+---------------------------------
+typedef struct Dqn_CallSite {
+    Dqn_String8  file;
+    Dqn_String8  function;
+    unsigned int line;
+} Dqn_CalSite;
+
+#define DQN_CALL_SITE Dqn_CallSite{DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__}
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-ALLO] Dqn_Allocator        |                             | Generic allocator interface
+// ---------------------------------+-----------------------------+---------------------------------
+#if defined(DQN_LEAK_TRACKING)
+    #if defined(DQN_NO_DSMAP)
+        #error "DSMap is required for allocation tracing"
+    #endif
+    #define DQN_LEAK_TRACE DQN_CALL_SITE,
+    #define DQN_LEAK_TRACE_NO_COMMA DQN_CALL_SITE
+    #define DQN_LEAK_TRACE_FUNCTION Dqn_CallSite leak_site_,
+    #define DQN_LEAK_TRACE_FUNCTION_NO_COMMA Dqn_CallSite leak_site_
+    #define DQN_LEAK_TRACE_ARG leak_site_,
+    #define DQN_LEAK_TRACE_ARG_NO_COMMA leak_site_
+    #define DQN_LEAK_TRACE_UNUSED (void)leak_site_;
+#else
+    #define DQN_LEAK_TRACE
+    #define DQN_LEAK_TRACE_NO_COMMA
+    #define DQN_LEAK_TRACE_FUNCTION
+    #define DQN_LEAK_TRACE_FUNCTION_NO_COMMA
+    #define DQN_LEAK_TRACE_ARG
+    #define DQN_LEAK_TRACE_ARG_NO_COMMA
+    #define DQN_LEAK_TRACE_UNUSED
+#endif
+
+typedef struct Dqn_LeakTrace {
+    void         *ptr;             ///< The pointer we are tracking
+    Dqn_isize     size;            ///< Size of the allocation
+    Dqn_CallSite  call_site;       ///< Call site where the allocation was allocated
+    bool          freed;           ///< True if this pointer has been freed
+    Dqn_isize     freed_size;      ///< Size of the allocation that has been freed
+    Dqn_CallSite  freed_call_site; ///< Call site where the allocation was freed
+} Dqn_LeakTrace;
+
 /// Allocate memory
 /// @param size The number of bytes to allocate
 /// @param zero_mem Flag to indicate if the allocated memory should be zero-ed out
 /// @param user_context The user assigned pointer in the allocator
-typedef void *Dqn_Allocator_AllocProc(DQN_CALL_SITE_ARGS size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context);
+typedef void *Dqn_Allocator_AllocProc(DQN_LEAK_TRACE_FUNCTION size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context);
 
 /// Deallocate memory
 /// @param ptr The pointer to deallocate memory for
 /// @param size The number of bytes to deallocate
 /// @param user_context The user assigned pointer in the allocator
-typedef void Dqn_Allocator_DeallocProc(DQN_CALL_SITE_ARGS void *ptr, size_t size, void *user_context);
+typedef void Dqn_Allocator_DeallocProc(DQN_LEAK_TRACE_FUNCTION void *ptr, size_t size, void *user_context);
 
 typedef struct Dqn_Allocator {
     void                      *user_context; ///< User assigned pointer that is passed into the allocator functions
@@ -733,7 +815,8 @@ typedef struct Dqn_Allocator {
 /// @param[in] allocator The allocator to allocate bytes from
 /// @param[in] size The amount of bytes to allocator
 /// @param[in] zero_mem Flag to indicate if the allocated must be zero-ed out
-void *Dqn_Allocator_Alloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem);
+#define Dqn_Allocator_Alloc(allocator, size, align, zero_mem)                  Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, size, align, zero_mem)
+void *Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem);
 
 /// Deallocate the memory from the pointer using the allocator
 ///
@@ -743,16 +826,15 @@ void *Dqn_Allocator_Alloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, size_t siz
 /// @param[in] allocator The allocator to allocate bytes from
 /// @param[in] ptr The pointer to deallocate
 /// @param[in] size The amount of bytes to deallocate.
-void  Dqn_Allocator_Dealloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, void *ptr, size_t size);
+#define Dqn_Allocator_Dealloc(allocator, ptr, size)                  Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE allocator, ptr, size)
+void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, void *ptr, size_t size);
 
-#define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) Dqn_Allocator_NewArrayTagged("", allocator, Type, count, zero_mem)
-#define Dqn_Allocator_NewArrayTagged(tag, allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc(DQN_CALL_SITE(tag) allocator, sizeof(Type) * count, alignof(Type), zero_mem)
+#define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type) * count, alignof(Type), zero_mem)
+#define Dqn_Allocator_New(allocator, Type, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type), alignof(Type), zero_mem)
 
-#define Dqn_Allocator_New(allocator, Type, zero_mem) Dqn_Allocator_NewTagged(nullptr, allocator, Type, zero_mem)
-#define Dqn_Allocator_NewTagged(tag, allocator, Type, zero_mem) Dqn_Allocator_NewArrayTagged(tag, allocator, Type, 1 /*count*/, zero_mem)
-
-// NOTE: Dqn_CString8
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-CSTR] Dqn_CString8         |                             | C-string helpers
+// ---------------------------------+-----------------------------+---------------------------------
 /// Calculate the size of a cstring literal/array at compile time
 /// @param literal The cstring literal/array to calculate the size for
 /// @return The size of the cstring not including the null-terminating byte
@@ -768,11 +850,11 @@ template <int N>       constexpr Dqn_isize Dqn_CString8_ArrayCountInt(char const
 /// @param[in] fmt The format string to calculate the size for
 /// @return The size required to format the string, not including the null
 /// terminator.
-DQN_API Dqn_isize Dqn_CString8_FmtSize(char const *fmt, ...);
+DQN_API Dqn_isize Dqn_CString8_FSize(char const *fmt, ...);
 
-/// @copydoc Dqn_CString8_FmtSize
+/// @copydoc Dqn_CString8_FSize
 /// @param[in] args The variable argument list to use to format the string
-DQN_API Dqn_isize Dqn_CString8_FmtSizeV(char const *fmt, va_list args);
+DQN_API Dqn_isize Dqn_CString8_FVSize(char const *fmt, va_list args);
 
 /// Split a string into the substring occuring prior and after the first
 /// occurence of the `delimiter`.
@@ -972,8 +1054,9 @@ DQN_API bool        Dqn_CString8_IsAllDigits(char const *src, Dqn_isize size);
 
 DQN_API Dqn_isize Dqn_CString16_Size(wchar_t const *a);
 
-// NOTE: Dqn_String8
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-STR8] Dqn_String8          |                             | Pointer and length strings
+// ---------------------------------+-----------------------------+---------------------------------
 /// Construct a UTF8 c-string literal into a Dqn_String8 referencing a string
 /// stored in the data-segment. This string is read-only.
 #define DQN_STRING8(string) Dqn_String8{(char *)(string), sizeof(string) - 1}
@@ -985,17 +1068,6 @@ DQN_API Dqn_isize Dqn_CString16_Size(wchar_t const *a);
 /// Unpack a string into arguments for printing a string into a printf style
 /// format string.
 #define DQN_STRING_FMT(string) (int)((string).size), (string).data
-
-struct Dqn_String8 /// A pointer and length style string that holds slices to UTF8 bytes.
-{
-    char      *data; ///< The UTF8 bytes of the string
-    Dqn_isize  size; ///< The number of bytes in the string
-
-    char const *begin() const { return data; }        ///< Const begin iterator for range-for loops
-    char const *end  () const { return data + size; } ///< Const end iterator for range-for loops
-    char       *begin()       { return data; }        ///< Begin iterator for range-for loops
-    char       *end  ()       { return data + size; } ///< End iterator for range-for loops
-};
 
 struct Dqn_String8Link {
     Dqn_String8      string; ///< The string
@@ -1024,6 +1096,19 @@ DQN_API Dqn_String8 Dqn_String8_Init(char const *string, Dqn_isize size);
 /// size is negative or the string is null.
 DQN_API Dqn_String8 Dqn_String8_InitCString(char const *string);
 
+/// Create a string from a printf style format string
+/// @param[in] allocator The allocator the string will be allocated from
+/// @param[in] fmt The printf style format cstring
+#define Dqn_String8_InitF(allocator, fmt, ...) Dqn_String8_InitF_(DQN_LEAK_TRACE allocator, fmt, ## __VA_ARGS__)
+DQN_API Dqn_String8 Dqn_String8_InitF_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, ...);
+
+/// Create a string from a printf style format string using a va_list
+/// @param[in] arena The allocator the string will be allocated from
+/// @param[in] fmt The printf style format cstring
+/// @param[in] va The variable argument list
+#define Dqn_String8_InitFV(allocator, fmt, args) Dqn_String8_InitFV_(DQN_LEAK_TRACE allocator, fmt, args)
+DQN_API Dqn_String8 Dqn_String8_InitFV_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, va_list args);
+
 /// Determine if the values of the given string are valid
 /// A string is invalid if size is negative or the string is null.
 /// @return True if the string is valid, false otherwise.
@@ -1037,111 +1122,27 @@ DQN_API bool Dqn_String8_IsValid(Dqn_String8 string);
 /// @return The sliced string
 DQN_API Dqn_String8 Dqn_String8_Slice(Dqn_String8 string, Dqn_isize offset, Dqn_isize size);
 
-/// Create a string from a printf style format string
-/// @param[in] allocator The allocator the string will be allocated from
-/// @param[in] fmt The printf style format cstring
-#define Dqn_String8_Fmt(allocator, fmt, ...) Dqn_String8_FmtTagged(nullptr, allocator, fmt, ## __VA_ARGS__)
-
-/// @copybrief Dqn_String8_Fmt The tagged variant takes a cstring to describe
-/// the purpose of the allocation.
-/// Tagged variants can be used to describe the nature of the allocation for
-/// allocation tracking purposes in the leak tracker or memory analytics.
-/// @param[in] tag A cstring to describe the nature of the allocation
-/// @copydetails Dqn_String8_Fmt
-#define Dqn_String8_FmtTagged(tag, allocator, fmt, ...) Dqn_String8_Fmt_(DQN_CALL_SITE(tag) allocator, fmt, ## __VA_ARGS__)
-
-/// @copybrief Dqn_String8_Fmt Internal function, prefer Dqn_String8_Fmt()
-/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
-/// site information is not enabled. Exposes call site information on
-/// allocation.
-/// @copydetails Dqn_String8_Fmt
-DQN_API Dqn_String8 Dqn_String8_Fmt_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *fmt, ...);
-
-/// Create a string from a printf style format string using a va_list
-/// @param[in] arena The allocator the string will be allocated from
-/// @param[in] fmt The printf style format cstring
-/// @param[in] va The variable argument list
-#define Dqn_String8_FmtV(allocator, fmt, args) Dqn_String8_FmtVTagged(nullptr, allocator, fmt, args)
-
-/// @copybrief Dqn_String8_FmtV The tagged variant takes a cstring to describe the
-/// purpose of the allocation.
-/// @param[in] tag A cstring to describe the nature of the allocation
-/// @copydetails Dqn_String8_FmtV
-#define Dqn_String8_FmtVTagged(tag, allocator, fmt, args) Dqn_String8_FmtV_(DQN_CALL_SITE(tag) allocator, fmt, args)
-
-/// @copybrief Dqn_String8_FmtV Internal function, prefer Dqn_String8_FmtV()
-/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
-/// site information is not enabled. Exposes call site information on
-/// allocation.
-/// @copydetails Dqn_String8_FmtV
-DQN_API Dqn_String8 Dqn_String8_FmtV_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *fmt, va_list args);
-
 /// Create an empty string with the requested size
 /// @param[in] allocator The allocator the string will be allocated from
 /// @param[in] size The size in bytes of the string to allocate
 /// @param[in] zero_mem Enum to indicate if the string's memory should be cleared
-#define Dqn_String8_Allocate(allocator, size, zero_mem) Dqn_String8_AllocateTagged(nullptr, allocator, size, zero_mem)
-
-/// @copybrief Dqn_String8_Allocate The tagged variant takes a cstring to
-/// describe the purpose of the allocation.
-/// Tagged variants can be used to describe the nature of the allocation for
-/// allocation tracking purposes in the leak tracker or memory analytics.
-/// @param[in] tag A cstring to describe the nature of the allocation
-/// @copydetails Dqn_String8_Allocate
-#define Dqn_String8_AllocateTagged(tag, allocator, size, zero_mem) Dqn_String8_Allocate_(DQN_CALL_SITE(tag) allocator, size, zero_mem)
-
-/// @copybrief Dqn_String8_Allocate Internal function, prefer
-/// Dqn_String8_Allocate()
-/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
-/// site information is not enabled. Exposes call site information on
-/// allocation.
-/// @copydetails Dqn_String8_Allocate
-DQN_API Dqn_String8 Dqn_String8_Allocate_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, Dqn_isize size, Dqn_ZeroMem zero_mem);
+#define Dqn_String8_Allocate(allocator, size, zero_mem) Dqn_String8_Allocate_(DQN_LEAK_TRACE allocator, size, zero_mem)
+DQN_API Dqn_String8 Dqn_String8_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_isize size, Dqn_ZeroMem zero_mem);
 
 /// Create a copy of the given cstring
 /// @param[in] allocator The allocator the string will be allocated from
 /// @param[in] string The cstring to copy
 /// @param[in] size The size of the cstring to copy. This cannot be <= 0
 /// @return A copy of the string, invalid string if any argument was invalid.
-#define Dqn_String8_CopyCString(allocator, string, size) Dqn_String8_CopyCStringTagged(nullptr, allocator, string, size)
-
-/// @copybrief Dqn_String8_CopyCString The tagged variant takes a cstring to
-/// describe the purpose of the allocation.
-/// Tagged variants can be used to describe the nature of the allocation for
-/// allocation tracking purposes in the leak tracker or memory analytics.
-/// @param[in] tag A cstring to describe the nature of the allocation
-/// @copydetails Dqn_String8_CopyCString
-#define Dqn_String8_CopyCStringTagged(tag, allocator, string, size) Dqn_String8_CopyCString_(DQN_CALL_SITE(tag) allocator, string, size)
-
-/// @copybrief Dqn_String8_CopyCString Internal function, prefer
-/// Dqn_String8_CopyCString()
-/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
-/// site information is not enabled. Exposes call site information on
-/// allocation.
-/// @copydetails Dqn_String8_CopyCString
-DQN_API Dqn_String8 Dqn_String8_CopyCString_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *string, Dqn_isize size);
+#define Dqn_String8_CopyCString(allocator, string, size) Dqn_String8_CopyCString_(DQN_LEAK_TRACE allocator, string, size)
+DQN_API Dqn_String8 Dqn_String8_CopyCString_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *string, Dqn_isize size);
 
 /// Create a copy of the given string
 /// @param[in] allocator The allocator the string will be allocated from
 /// @param[in] string The string to copy
 /// @return A copy of the string, invalid string if any argument was invalid.
-#define Dqn_String8_Copy(allocator, string) Dqn_String8_CopyTagged(nullptr, allocator, string)
-
-/// @copybrief Dqn_String8_Copy The tagged variant takes a cstring to
-/// describe the purpose of the allocation.
-/// Tagged variants can be used to describe the nature of the allocation for
-/// allocation tracking purposes in the leak tracker or memory analytics.
-/// @param[in] tag A cstring to describe the nature of the allocation
-/// @copydetails Dqn_String8_Copy
-#define Dqn_String8_CopyTagged(tag, allocator, string) Dqn_String8_Copy_(DQN_CALL_SITE(tag) allocator, string)
-
-/// @copybrief Dqn_String8_Copy Internal function, prefer
-/// Dqn_String8_Copy()
-/// @param[in] DQN_CALL_SITE_ARGS Call site macro that is compiled out if call
-/// site information is not enabled. Exposes call site information on
-/// allocation.
-/// @copydetails Dqn_String8_Copy
-DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, Dqn_String8 string);
+#define Dqn_String8_Copy(allocator, string) Dqn_String8_Copy_(DQN_LEAK_TRACE allocator, string)
+DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_String8 string);
 
 /// @see Dqn_CString8_BinarySplit
 DQN_API Dqn_String8 Dqn_String8_BinarySplit(Dqn_String8 string, char delimiter, Dqn_String8 *rhs);
@@ -1227,90 +1228,81 @@ DQN_API Dqn_String8 Dqn_String8_Find(Dqn_String8 string, Dqn_String8 find, Dqn_i
 DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
 DQN_API Dqn_String8 Dqn_String8_ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator);
 
-// NOTE: Dqn_Log
-// -------------------------------------------------------------------------------------------------
-#define X_MACRO                                                                                                        \
-    X_ENTRY(Debug,   "DBUG") \
-    X_ENTRY(Error,   "ERR ") \
-    X_ENTRY(Warning, "WARN") \
-    X_ENTRY(Info,    "INFO") \
-    X_ENTRY(Profile, "PROF") \
-    X_ENTRY(Memory,  "MEM ")
-
-enum struct Dqn_LogType
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-PRIN] Dqn_Print            |                             | Console printing
+// ---------------------------------+-----------------------------+---------------------------------
+enum Dqn_PrintStd
 {
-    #define X_ENTRY(enum_val, string) enum_val,
-    X_MACRO
-    #undef X_ENTRY
+    Dqn_PrintStd_Out,
+    Dqn_PrintStd_Err,
 };
 
-inline Dqn_String8 Dqn_Log_TypeString8(Dqn_LogType type)
+DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string);
+DQN_API void Dqn_Print_StdFV(Dqn_PrintStd std_handle, char const *fmt, va_list args);
+DQN_API void Dqn_Print_StdF(Dqn_PrintStd std_handle, char const *fmt, ...);
+
+DQN_API void Dqn_Print_StdLn(Dqn_PrintStd std_handle, Dqn_String8 string);
+DQN_API void Dqn_Print_StdLnFV(Dqn_PrintStd std_handle, char const *fmt, va_list args);
+DQN_API void Dqn_Print_StdLnF(Dqn_PrintStd std_handle, char const *fmt, ...);
+
+#define Dqn_Print(string) Dqn_Print_Std(Dqn_PrintStd_Out, string)
+#define Dqn_Print_FV(fmt, args) Dqn_Print_StdFV(Dqn_PrintStd_Out, fmt, args)
+#define Dqn_Print_F(fmt, ...) Dqn_Print_StdF(Dqn_PrintStd_Out, fmt, ## __VA_ARGS__)
+
+#define Dqn_Print_Ln(string) Dqn_Print_StdLn(Dqn_PrintStd_Out, string)
+#define Dqn_Print_LnFV(fmt, args) Dqn_Print_StdLnFV(Dqn_PrintStd_Out, fmt, args)
+#define Dqn_Print_LnF(fmt, ...) Dqn_Print_StdLnF(Dqn_PrintStd_Out, fmt, ## __VA_ARGS__)
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-LLOG] Dqn_Log              |                             | Library logging
+// ---------------------------------+-----------------------------+---------------------------------
+enum Dqn_LogType
 {
-    switch (type) {
-        #define X_ENTRY(enum_val, string) case Dqn_LogType::enum_val: return DQN_STRING8(string);
-        X_MACRO
-        #undef X_ENTRY
-    }
-    return DQN_STRING8("Internal error: Bad log type enum");
+    Dqn_LogType_Error,
+    Dqn_LogType_Info,
+    Dqn_LogType_Warning,
+    Dqn_LogType_Debug,
 };
-#undef X_MACRO
 
-typedef void Dqn_LogProc(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, va_list va);
+/// The logging procedure of the library. Users can override the default logging
+/// function by setting the logging function pointer in Dqn_Library. This
+/// function will be invoked every time a log is recorded using the following
+/// functions.
+///
+/// @param[in] log_type This value is one of the Dqn_LogType values if the log
+/// was generated from one of the default categories. -1 if the log is not from
+/// one of the default categories.
+typedef void Dqn_LogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list va);
 
-// NOTE: Logging Macros
-// ------------------------------------------------------------------------------------------------
-// Macro logging functions, prefer this is you want to log messages
-#define DQN_LOG_E(fmt, ...) Dqn_Log(Dqn_LogType::Error,   dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_D(fmt, ...) Dqn_Log(Dqn_LogType::Debug,   dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_W(fmt, ...) Dqn_Log(Dqn_LogType::Warning, dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_I(fmt, ...) Dqn_Log(Dqn_LogType::Info,    dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_M(fmt, ...) Dqn_Log(Dqn_LogType::Memory,  dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG_P(fmt, ...) Dqn_Log(Dqn_LogType::Profile, dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
-#define DQN_LOG(log_type, fmt, ...) Dqn_Log(log_type,     dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, ## __VA_ARGS__)
+#define Dqn_Log_ErrorF(fmt, ...) Dqn_Log_TypeFCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define Dqn_Log_DebugF(fmt, ...) Dqn_Log_TypeFCallSite(Dqn_LogType_Debug, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define Dqn_Log_WarningF(fmt, ...) Dqn_Log_TypeFCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define Dqn_Log_InfoF(fmt, ...) Dqn_Log_TypeFCallSite(Dqn_LogType_Info, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
 
-#define DQN_LOGV_E(fmt, va) Dqn_LogV(Dqn_LogType::Error,   dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_D(fmt, va) Dqn_LogV(Dqn_LogType::Debug,   dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_W(fmt, va) Dqn_LogV(Dqn_LogType::Warning, dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_I(fmt, va) Dqn_LogV(Dqn_LogType::Info,    dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_M(fmt, va) Dqn_LogV(Dqn_LogType::Memory,  dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
-#define DQN_LOGV_P(fmt, va) Dqn_LogV(Dqn_LogType::Profile, dqn_lib_.log_user_data, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, fmt, va)
+#define Dqn_Log_ErrorFV(fmt, args) Dqn_Log_TypeFVCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_DebugFV(fmt, args) Dqn_Log_TypeFVCallSite(Dqn_LogType_Debug, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_WarningFV(fmt, args) Dqn_Log_TypeFVCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_InfoFV(fmt, args) Dqn_Log_TypeFVCallSite(Dqn_LogType_Info, DQN_CALL_SITE, fmt, args)
 
-// Internal logging functions, prefer the logging macros above
-DQN_API void Dqn_LogVDefault(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, va_list va);
-DQN_API void Dqn_LogV(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, va_list va);
-DQN_API void Dqn_Log(Dqn_LogType type, void *user_data, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, ...);
+#define Dqn_Log_FV(type, fmt, args) Dqn_Log_FVCallSite(type, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_F(type, fmt, ...) Dqn_Log_FVCallSite(type, fmt, ## __VA_ARGS__)
 
-// NOTE: Dqn_VMem_
-// -------------------------------------------------------------------------------------------------
+DQN_API void Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, va_list va);
+DQN_API void Dqn_Log_TypeFCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, ...);
+DQN_API void Dqn_Log_FVCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, va_list va);
+DQN_API void Dqn_Log_FCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, ...);
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-VMEM] Dqn_VMem             |                             | Virtual memory allocation
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, bool commit);
 DQN_API bool Dqn_VMem_Commit(void *ptr, Dqn_usize size);
 DQN_API void Dqn_VMem_Decommit(void *ptr, Dqn_usize size);
 DQN_API void Dqn_VMem_Release(void *ptr, Dqn_usize size);
 
-// NOTE: Dqn_AllocationTracer_
-// -------------------------------------------------------------------------------------------------
-struct Dqn_AllocationTrace
-{
-    void       *ptr;
-    Dqn_usize   size;
-    char const *file;
-    char const *func;
-    int         line;
-    char const *msg;
-};
-
-struct Dqn_AllocationTracer
-{
-    // NOTE: Read only fields
-    Dqn_TicketMutex              mutex;
-    // Dqn_Map<Dqn_AllocationTrace> map;
-};
-
-void Dqn_AllocationTracer_Add   (Dqn_AllocationTracer *tracer, void *ptr, Dqn_usize size DQN_CALL_SITE_ARGS);
-void Dqn_AllocationTracer_Remove(Dqn_AllocationTracer *tracer, void *ptr);
-
-// NOTE: Dqn_Arena
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
+// ---------------------------------+-----------------------------+---------------------------------
 Dqn_isize const DQN_ARENA_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
 
 struct Dqn_ArenaBlock
@@ -1325,8 +1317,8 @@ struct Dqn_ArenaBlock
 
 struct Dqn_ArenaStatString
 {
-    char data[256];
-    int  size;
+    char     data[256];
+    uint16_t size;
 };
 
 struct Dqn_ArenaStat
@@ -1346,27 +1338,31 @@ struct Dqn_ArenaStat
 struct Dqn_Arena
 {
     Dqn_isize       min_block_size;
-    Dqn_ArenaBlock *curr;          ///< The current memory block of the arena
-    Dqn_ArenaBlock *tail;          ///< The tail memory block of the arena
-    Dqn_ArenaStat  stats;           ///< Current arena stats, reset when reset usage is invoked.
+    Dqn_ArenaBlock *curr;           ///< The current memory block of the arena
+    Dqn_ArenaBlock *tail;           ///< The tail memory block of the arena
+    Dqn_ArenaStat   stats;          ///< Current arena stats, reset when reset usage is invoked.
 };
 
 struct Dqn_ArenaTempMemory
 {
     Dqn_Arena      *arena;     ///< The arena the scope is for
-    Dqn_ArenaBlock *curr;     ///< The current block of the arena at the beginning of the scope
-    Dqn_ArenaBlock *tail;     ///< The tail block of the arena at the beginning of the scope
+    Dqn_ArenaBlock *curr;      ///< The current block of the arena at the beginning of the scope
+    Dqn_ArenaBlock *tail;      ///< The tail block of the arena at the beginning of the scope
     Dqn_isize       curr_used; ///< The current used amount of the current block
     Dqn_ArenaStat   stats;     ///< The stats of the arena at the beginning of the scope
 };
 
 // Automatically begin and end a temporary memory scope on object construction
 // and destruction respectively.
-struct Dqn_ArenaTempMemoryScope
+#define Dqn_ArenaTempMemoryScope(arena) Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE arena)
+struct Dqn_ArenaTempMemoryScope_
 {
-    Dqn_ArenaTempMemoryScope(Dqn_Arena *arena);
-    ~Dqn_ArenaTempMemoryScope();
+    Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena);
+    ~Dqn_ArenaTempMemoryScope_();
     Dqn_ArenaTempMemory temp_memory;
+    #if defined(DQN_LEAK_TRACKING)
+    Dqn_CallSite        leak_site__;
+    #endif
 };
 
 /// Grow the arena's capacity by the requested size
@@ -1374,43 +1370,37 @@ struct Dqn_ArenaTempMemoryScope
 /// @param[in] commit The amount of bytes to request to be physically backed by
 /// pages from the OS.
 /// @return True if the arena was successfully grown, false otherwise.
-#define      Dqn_Arena_GrowTagged(tag, arena, size, commit) Dqn_Arena_Grow_(DQN_CALL_SITE(tag) arena, size, commit)
-#define      Dqn_Arena_Grow(arena, size, commit) Dqn_Arena_GrowTagged(nullptr, arena, size, commit)
-DQN_API bool Dqn_Arena_Grow_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit);
+#define Dqn_Arena_Grow(arena, size, commit) Dqn_Arena_Grow_(DQN_LEAK_TRACE arena, size, commit)
+DQN_API bool Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit);
 
 /// Allocate bytes from the given arena
 /// @return A pointer to the allocated bytes. Null if the arena failed to
 /// allocate memory
-#define       Dqn_Arena_AllocateTagged(tag, arena, size, align, zero_mem) Dqn_Arena_Allocate_(DQN_CALL_SITE(tag) arena, size, align, zero_mem)
-#define       Dqn_Arena_Allocate(arena, size, align, zero_mem) Dqn_Arena_AllocateTagged(nullptr, arena, size, align, zero_mem)
-DQN_API void *Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem);
+#define Dqn_Arena_Allocate(arena, size, align, zero_mem) Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, size, align, zero_mem)
+DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem);
 
 /// Allocate a single object from the arena. No constructor is called.
 /// @return A pointer to the allocated object. Null if the arena failed to
 /// allocate memory
-#define       Dqn_Arena_New(arena, Type, zero_mem) Dqn_Arena_NewTagged(nullptr, arena, Type, zero_mem)
-#define       Dqn_Arena_NewTagged(tag, arena, Type, zero_mem) (Type *)Dqn_Arena_Allocate_(DQN_CALL_SITE(tag) arena, sizeof(Type), alignof(Type), zero_mem)
+#define Dqn_Arena_New(arena, Type, zero_mem) (Type *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, sizeof(Type), alignof(Type), zero_mem)
 
 /// Allocate an array of objects from the arena.
 /// @return A pointer to the allocated object. Null if the arena failed to
 /// allocate memory
-#define       Dqn_Arena_NewArray(arena, Type, count, zero_mem) Dqn_Arena_NewArrayTagged(nullptr, arena, Type, count, zero_mem)
-#define       Dqn_Arena_NewArrayTagged(tag, arena, Type, count, zero_mem) (Type *)Dqn_Arena_Allocate_(DQN_CALL_SITE(tag) arena, sizeof(Type) * count, alignof(Type), zero_mem)
+#define Dqn_Arena_NewArray(arena, Type, count, zero_mem) (Type *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, sizeof(Type) * count, alignof(Type), zero_mem)
 
 /// Copy an object by allocating memory for the copy from the arena
 /// @return A pointer to the allocated object. Null if the arena failed to
 /// allocate memory
-#define       Dqn_Arena_Copy(arena, Type, src, count) Dqn_Arena_CopyTagged(nullptr, arena, Type, src, count)
-#define       Dqn_Arena_CopyTagged(tag, arena, Type, src, count) (Type *)Dqn_Arena_Copy_(DQN_CALL_SITE_TAG(tag) arena, src, sizeof(*src) * count, alignof(Type))
-DQN_API void *Dqn_Arena_Copy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
+#define Dqn_Arena_Copy(arena, Type, src, count) (Type *)Dqn_Arena_Copy_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
+DQN_API void *Dqn_Arena_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
 
 /// Copy an object by allocating memory for the copy from the arena. The object
 /// has a null-terminating byte at the end of the stream.
 /// @return A pointer to the allocated object. Null if the arena failed to
 /// allocate memory
-#define       Dqn_Arena_CopyZ(arena, Type, src, count) Dqn_Arena_CopyZTagged(nullptr, arena, Type, src, count)
-#define       Dqn_Arena_CopyZTagged(tag, arena, Type, src, count) (Type *)Dqn_Arena_CopyZ_(DQN_CALL_SITE(tag) arena, src, sizeof(*src) * count, alignof(Type))
-DQN_API void *Dqn_Arena_CopyZ_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
+#define Dqn_Arena_CopyZ(arena, Type, src, count) (Type *)Dqn_Arena_CopyZ_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
+DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
 
 /// Set the arena's current block to the first block in the linked list of blocks
 /// and mark all blocks free.
@@ -1421,7 +1411,8 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
 /// Free the arena returning all memory back to the OS
 /// @param[in] zero_mem: When true, the memory is cleared using DQN_MEMSET with
 /// the value of DQN_MEMSET_BYTE
-DQN_API void Dqn_Arena_Free(Dqn_Arena *arena, bool zero_mem);
+#define Dqn_Arena_Free(arena, zero_mem) Dqn_Arena_Free_(DQN_LEAK_TRACE arena, zero_mem)
+DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
 
 DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena);
 
@@ -1432,7 +1423,8 @@ DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena);
 DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena);
 
 /// End an allocation scope previously begun by calling begin scope.
-DQN_API void Dqn_Arena_EndTempMemory(Dqn_ArenaTempMemory arena_temp_memory);
+#define Dqn_Arena_EndTempMemory(arena_temp_memory) Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE arena_temp_memory)
+DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory arena_temp_memory);
 
 /// Dump the stats of the given arena to a string
 /// @param[in] arena The arena to dump stats for
@@ -1443,10 +1435,10 @@ DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat);
 /// @param[in] arena The arena to dump stats for
 DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena);
 
-#if defined(DQN_WITH_MAP)
-// NOTE: Dqn_Map
-// -------------------------------------------------------------------------------------------------
-/// A hash-table implementation that uses a linked-list for collisions.
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-AMAP] Dqn_Map              | DQN_NO_MAP                  | Hashtable, collision=chain
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_DSMAP)
 template <typename T>
 struct Dqn_MapEntry
 {
@@ -1455,6 +1447,8 @@ struct Dqn_MapEntry
     Dqn_MapEntry *next;
 };
 
+/// A hash-table implementation that uses a linked-list allocated by an arena
+/// for collisions.
 template <typename T>
 struct Dqn_Map
 {
@@ -1475,53 +1469,66 @@ enum struct Dqn_MapCollideRule
     Fail,
 };
 
-template <typename T>
-Dqn_Map<T> Dqn_Map_InitWithArena(Dqn_Arena *arena, Dqn_isize size = 0);
+template <typename T> Dqn_Map<T> Dqn_Map_InitWithArena(Dqn_Arena *arena, Dqn_isize size = 0);
 
-template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_FindOrAdd(Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollideRule rule);
+#define Dqn_Map_FindOrAdd(map, hash, rule) Dqn_Map_FindOrAdd_(DQN_LEAK_TRACE map, hash, rule)
+template <typename T> Dqn_MapEntry<T> *Dqn_Map_FindOrAdd_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollideRule rule);
 
-template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_Add(Dqn_Map<T> *map, uint64_t hash, T *value, Dqn_MapCollideRule rule);
+#define Dqn_Map_Add(map, hash, value, rule) Dqn_Map_Add_(DQN_LEAK_TRACE map, hash, value, rule)
+template <typename T> Dqn_MapEntry<T> *Dqn_Map_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, T *value, Dqn_MapCollideRule rule);
 
-template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_AddCopy(Dqn_Map<T> *map, uint64_t hash, const T &value, Dqn_MapCollideRule rule);
+#define Dqn_Map_AddCopy(map, hash, value, rule) Dqn_Map_AddCopy_(DQN_LEAK_TRACE map, hash, value, rule)
+template <typename T> Dqn_MapEntry<T> *Dqn_Map_AddCopy_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, const T &value, Dqn_MapCollideRule rule);
 
-template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_Get(Dqn_Map<T> *map, uint64_t hash);
+template <typename T> Dqn_MapEntry<T> *Dqn_Map_Get(Dqn_Map<T> *map, uint64_t hash);
 
-template <typename T>
-void Dqn_Map_Erase(Dqn_Map<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem);
-#endif // DQN_WITH_MAP
+template <typename T> void Dqn_Map_Erase(Dqn_Map<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem);
+#endif // !defined DQN_NO_MAP
 
-#if defined(DQN_WITH_DSMAP)
-// Demitri Spanos (HMN) Hash Table
-// 70% Max Load, PoT size, Linear Probing, Tombstoneless Deletes
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, collision=linear, tombstoneless deletes
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_DSMAP)
 
-#if !defined(DQN_DS_MAP_MIN_SIZE)
-    #define DQN_DS_MAP_MIN_SIZE 4096
+/// If a DSMap is initialized to zero and does *not* call the init function then
+/// the table with be lazily initialised to this capacity on first write to the
+/// hash table. This size must be a power of two.
+#if !defined(DQN_DSMAP_MIN_SIZE)
+    #define DQN_DSMAP_MIN_SIZE 4096
+    static_assert((DQN_DSMAP_MIN_SIZE & (DQN_DSMAP_MIN_SIZE - 1)) == 0, "DSMap lazy initialisation size must be a power of two");
 #endif
 
 template <typename T>
-struct Dqn_DSMapEntry
+struct Dqn_DSMapItem
 {
-    uint64_t hash;
-    T        value;
-    uint8_t  occupied;
+    uint64_t          hash;
+    T                 value;
+    uint8_t           occupied;
+    Dqn_DSMapItem<T> *next;
+    Dqn_DSMapItem<T> *prev;
 };
 
+/// A hash table configured using the presets recommended by Demitri Spanos from
+/// the Handmade Network,
+/// - 70% max load
+/// - power of two capacity
+/// - linear probing on collision
+/// - tombstoneless deletes (e.g. deletes slots get filled with linear probed
+/// entries if there are any).
 template <typename T>
 struct Dqn_DSMap
 {
-    Dqn_Arena           arena;
-    Dqn_DSMapEntry<T>  *slots;
-    Dqn_isize           size;  // The number of slots
-    Dqn_isize           count; // The number of slots occupied in the list
+    Dqn_Arena         arena;
+    Dqn_DSMapItem<T> *slots;
+    Dqn_isize         size;      ///< The number of slots
+    Dqn_isize         count;     ///< The number of slots occupied in the list
+    Dqn_DSMapItem<T> *link_head; ///< Linked list of items allocated in the map
+    Dqn_DSMapItem<T> *link_tail; ///< Linked list of items allocated in the map
 };
 
 /// Initialise a hash table with a given size. The given size must be a power of
 /// two. Initialisation is optional and the map can be zero-initialised in which
-/// the hash table will default to the size specified in DQN_DS_MAP_MIN_SIZE.
+/// the hash table will default to the size specified in DQN_DSMAP_MIN_SIZE.
 /// @param[in] size The number of slots in the hash-table. This value must be
 /// a power of two.
 template <typename T>
@@ -1531,33 +1538,39 @@ template <typename T>
 void Dqn_DSMap_Free(Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem);
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_Find(Dqn_DSMap<T> *map, uint64_t hash);
+Dqn_DSMapItem<T> *Dqn_DSMap_Find(Dqn_DSMap<T> *map, uint64_t hash);
+
+enum Dqn_DSMapFindOnly    { Dqn_DSMapFindOnly_No,    Dqn_DSMapFindOnly_Yes };
+enum Dqn_DSMapItemCreated { Dqn_DSMapItemCreated_No, Dqn_DSMapItemCreated_Yes };
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, bool find_only);
+Dqn_DSMapItem<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, Dqn_DSMapFindOnly find_only, Dqn_DSMapItemCreated *created);
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_Add(Dqn_DSMap<T> *map, uint64_t hash, T &value);
+Dqn_DSMapItem<T> *Dqn_DSMap_Add(Dqn_DSMap<T> *map, uint64_t hash, T const &value);
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_AddCopy(Dqn_DSMap<T> *map, uint64_t hash, T const &value);
-
-template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_Get(Dqn_DSMap<T> *map, uint64_t hash);
+Dqn_DSMapItem<T> *Dqn_DSMap_Get(Dqn_DSMap<T> *map, uint64_t hash);
 
 template <typename T>
 void Dqn_DSMap_Erase(Dqn_DSMap<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem);
-#endif // DQN_WITH_DSMAP
+#endif // !defined(DQN_NO_DSMAP)
 
-// NOTE: Dqn_Lib_: Library book-keeping
-// ------------------------------------------------------------------------------------------------
-struct Dqn_Lib_
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
+// ---------------------------------+-----------------------------+---------------------------------
+struct Dqn_Library
 {
-    Dqn_LogProc       *LogCallback;
+    Dqn_LogProc       *log_callback;   ///< Set this pointer to override the logging routine
     void *             log_user_data;
-    bool               log_no_output_file; // When true, stop the library from writing to a log file
-    void *             log_file;           // TODO(dqn): Hmmm, how should we do this... ?
-    Dqn_TicketMutex    log_file_mutex;     // Is locked when instantiating the log_file for the first time
+    bool               log_to_file;    ///< Output logs to file as well as standard out
+    void *             log_file;       ///< TODO(dqn): Hmmm, how should we do this... ?
+    Dqn_TicketMutex    log_file_mutex; ///< Is locked when instantiating the log_file for the first time
+
+#if defined(DQN_LEAK_TRACKING)
+    Dqn_TicketMutex          alloc_table_mutex;
+    Dqn_DSMap<Dqn_LeakTrace> alloc_table;
+#endif
 
 #if defined(DQN_OS_WIN32)
     LARGE_INTEGER     win32_qpc_frequency;
@@ -1570,23 +1583,34 @@ struct Dqn_Lib_
     Dqn_ArenaStat   thread_context_arena_stats[256];
     uint8_t         thread_context_arena_stats_count;
 #endif
-};
+} extern dqn_library;
 
-extern Dqn_Lib_ dqn_lib_;
+/// Update the default logging function, all logging functions will run through
+/// this callback
+/// @param[in] proc The new logging function, set to nullptr to revert back to
+/// the default logger.
+/// @param[in] user_data A user defined parameter to pass to the callback
+DQN_API void Dqn_Library_SetLogCallback(Dqn_LogProc *proc, void *user_data);
 
-// Update the default logging function, all logging functions will run through this callback
-// proc: The new logging function, set to nullptr to revert back to the default logger.
-// user_data: A user defined parameter to pass to the callback
-DQN_API void Dqn_Lib_SetLogCallback(Dqn_LogProc *proc, void *user_data);
+/// @param[in] file Pass in nullptr to turn off writing logs to disk, otherwise
+/// point it to the FILE that you wish to write to.
+DQN_API void Dqn_Library_SetLogFile(void *file);
 
-// file: Pass in nullptr to turn off writing logs to disk, otherwise point it to
-// the FILE that you wish to write to.
-DQN_API void Dqn_Lib_SetLogFile(void *file);
-DQN_API void Dqn_Lib_DumpThreadContextArenaStat(Dqn_String8 file_path);
+/// Dump the per-thread arena statistics to the specified file
+DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path);
 
-#if defined(DQN_WITH_FIXED_STRING)
-// NOTE: Dqn_FString8
-// -------------------------------------------------------------------------------------------------
+#if defined(DQN_LEAK_TRACKING)
+void Dqn_Library_LeakTraceAdd(Dqn_CallSite call_site, void *ptr, Dqn_usize size);
+void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr);
+#else
+#define Dqn_Library_LeakTraceAdd(...)
+#define Dqn_Library_LeakTraceMarkFree(...)
+#endif
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_FSTRING8)
 #define DQN_FSTRING8_API template <Dqn_isize N> DQN_API
 #define DQN_FSTRING8 Dqn_FString8<N>
 DQN_FSTRING8_API struct Dqn_FString8
@@ -1612,7 +1636,7 @@ DQN_FSTRING8_API struct Dqn_FString8
 /// null-terminated.
 /// @param fmt[in] Format string specifier to create the fixed string from
 /// @return The created string, truncated if there was insufficient space
-DQN_FSTRING8_API DQN_FSTRING8 Dqn_FString8_Fmt(char const *fmt, ...);
+DQN_FSTRING8_API DQN_FSTRING8 Dqn_FString8_InitF(char const *fmt, ...);
 
 /// @param string[in] The string to query the maximum capacity of
 /// @return Maximum capacity of the fixed string
@@ -1627,10 +1651,10 @@ DQN_FSTRING8_API void Dqn_FString8_Clear(DQN_FSTRING8 *string);
 /// @param string[in] The string to append to
 /// @param fmt[in] Format string to append to the fixed string
 /// @return True if append was successful, false otherwise.
-DQN_FSTRING8_API bool Dqn_FString8_AppendFmtV(DQN_FSTRING8 *string, char const *fmt, va_list va);
+DQN_FSTRING8_API bool Dqn_FString8_AppendFV(DQN_FSTRING8 *string, char const *fmt, va_list va);
 
-/// @copydocs Dqn_FString8_AppendFmtV
-DQN_FSTRING8_API bool Dqn_FString8_AppendFmt(DQN_FSTRING8 *string, char const *fmt, ...);
+/// @copydocs Dqn_FString8_AppendF
+DQN_FSTRING8_API bool Dqn_FString8_AppendF(DQN_FSTRING8 *string, char const *fmt, ...);
 
 /// Append a cstring to the fixed string. On failure the string is
 /// appended to but truncated ensuring null-termination.
@@ -1653,12 +1677,14 @@ DQN_FSTRING8_API bool Dqn_FString8_AppendString8(DQN_FSTRING8 *string, Dqn_Strin
 /// fixed string and is invalidated once fixed string is deleted.
 /// @param string[in] The fixed string to create a string from
 /// @return String referencing the contents of `string`
-DQN_FSTRING8_API Dqn_String8  Dqn_FString8_ToString(DQN_FSTRING8 const *string);
-#endif // DQN_WITH_FIXED_STRING
+DQN_FSTRING8_API Dqn_String8  Dqn_FString8_ToString8(DQN_FSTRING8 const *string);
+#endif // !defined(DQN_NO_FSTRING8)
 
-// NOTE: Dqn_String8Builder API
-// -----------------------------------------------------------------------------
-struct Dqn_String8Builder {
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-STRB] Dqn_String8Builder   |                             |
+// ---------------------------------+-----------------------------+---------------------------------
+struct Dqn_String8Builder
+{
     Dqn_Allocator    allocator;   ///< Allocator to use to back the string list
     Dqn_String8Link *head;        ///< First string in the linked list of strings
     Dqn_String8Link *tail;        ///< Last string in the linked list of strings
@@ -1682,16 +1708,17 @@ bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String
 /// or memory allocation failure.
 bool Dqn_String8Builder_AppendString8Copy(Dqn_String8Builder *builder, Dqn_String8 string);
 
-/// @copydoc Dqn_String8Builder_AppendFmtArgs
+/// @copydoc Dqn_String8Builder_AppendF
 /// @param args The variable argument list to use in the format string
-bool Dqn_String8Builder_AppendFmtVArgs(Dqn_String8Builder *builder, char const *fmt, va_list args);
+#define Dqn_String8Builder_AppendFV(builder, fmt, args) Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE builder, fmt, args)
+bool Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *builder, char const *fmt, va_list args);
 
 /// Append a printf-style format string to the list of strings in the builder.
 /// @param builder The builder to append the string to
 /// @param fmt The format string to use
 /// @return True if append was successful, false if parameters are invalid
 /// or memory allocation failure.
-bool Dqn_String8Builder_AppendFmtArgs(Dqn_String8Builder *builder, char const *fmt, ...);
+bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ...);
 
 /// Build the list of strings into the final composite string from the string
 /// builder
@@ -1701,9 +1728,10 @@ bool Dqn_String8Builder_AppendFmtArgs(Dqn_String8Builder *builder, char const *f
 /// invalid or memory allocation failure.
 Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allocator allocator);
 
-#if defined(DQN_WITH_FIXED_ARRAY)
-// NOTE: Dqn_FArray
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_FARRAY)
 #define DQN_FARRAY_API template <typename T, Dqn_isize N> DQN_API
 #define DQN_FARRAY Dqn_FArray<T, N>
 DQN_FARRAY_API struct Dqn_FArray
@@ -1807,10 +1835,11 @@ DQN_API T *Dqn_FArray_FindProcElseMake(DQN_FARRAY *array, IsEqualProc IsEqual, b
 /// @param find[in] Item to find in the array
 /// @return Pointer to the item if found, null pointer otherwise
 DQN_FARRAY_API T *Dqn_FArray_Find(DQN_FARRAY *array, T const *find);
-#endif // DQN_WITH_FIXED_ARRAY
+#endif // !defined(DQN_NO_FARRAY)
 
-// NOTE: Dqn_List - Chunked Linked Lists
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-LIST] Dqn_List             |                             | Chunked linked lists, append only
+// ---------------------------------+-----------------------------+---------------------------------
 template <typename T>
 struct Dqn_ListChunk
 {
@@ -1851,19 +1880,19 @@ template <typename T> DQN_API Dqn_List<T>  Dqn_List_InitWithArena(Dqn_Arena *are
    }
 */
 // start_index: The index to start iterating from
-template <typename T> DQN_API bool     Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index);
+template <typename T> DQN_API bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index);
 
 // at_chunk: (Optional) The chunk that the index belongs to will be set in this parameter if given
 // return: The element, or null pointer if it is not a valid index.
-template <typename T> DQN_API T       *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> *at_chunk);
+template <typename T> DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> *at_chunk);
 
-#define                                Dqn_List_TaggedMake(list, count, tag) Dqn_List_Make_(list, count DQN_CALL_SITE(tag))
-#define                                Dqn_List_Make(list, count) Dqn_List_Make_(list, count DQN_CALL_SITE(""))
-template <typename T> DQN_API T       *Dqn_List_Make_(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS);
+#define Dqn_List_Make(list, count) Dqn_List_Make_(DQN_LEAK_TRACE list, count)
+template <typename T> DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize count);
 
-#if defined(DQN_WITH_MATH)
-// NOTE: Math
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_MATH)
 struct Dqn_V2I
 {
     int32_t x, y;
@@ -2071,46 +2100,287 @@ DQN_API Dqn_Rect Dqn_Rect_Union(Dqn_Rect a, Dqn_Rect b);
 DQN_API Dqn_Rect Dqn_Rect_FromRectI32(Dqn_RectI32 a);
 DQN_API Dqn_V2I  Dqn_RectI32_Size(Dqn_RectI32 rect);
 
-// NOTE: Math Utils
-// -------------------------------------------------------------------------------------------------
 DQN_API Dqn_V2  Dqn_Lerp_V2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
 DQN_API Dqn_f32 Dqn_Lerp_F32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b);
-#endif // DQN_WITH_MATH
+#endif // !defined(DQN_NO_MATH)
 
-// NOTE: Dqn_Bit_
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-BITS] Dqn_Bit              |                             | Bitset manipulation
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API void    Dqn_Bit_UnsetInplace(uint32_t *flags, uint32_t bitfield);
 DQN_API void    Dqn_Bit_SetInplace(uint32_t *flags, uint32_t bitfield);
 DQN_API bool    Dqn_Bit_IsSet(uint32_t bits, uint32_t bits_to_set);
 DQN_API bool    Dqn_Bit_IsNotSet(uint32_t bits, uint32_t bits_to_check);
 
-// NOTE: Safe Arithmetic
-// -------------------------------------------------------------------------------------------------
-DQN_API int64_t   Dqn_Safe_AddI64              (int64_t a,  int64_t b);
-DQN_API int64_t   Dqn_Safe_MulI64              (int64_t a,  int64_t b);
-DQN_API uint64_t  Dqn_Safe_AddU64              (uint64_t a, uint64_t b);
-DQN_API uint64_t  Dqn_Safe_SubU64              (uint64_t a, uint64_t b);
-DQN_API uint32_t  Dqn_Safe_SubU32              (uint32_t a, uint32_t b);
-DQN_API uint64_t  Dqn_Safe_MulU64              (uint64_t a, uint64_t b);
-DQN_API int       Dqn_Safe_TruncateISizeToInt  (Dqn_isize val);
-DQN_API int32_t   Dqn_Safe_TruncateISizeToI32  (Dqn_isize val);
-DQN_API uint8_t   Dqn_Safe_TruncateISizeToI8   (Dqn_isize val);
-DQN_API uint32_t  Dqn_Safe_TruncateUSizeToU32  (Dqn_usize val);
-DQN_API int32_t   Dqn_Safe_TruncateUSizeToI32  (Dqn_usize val);
-DQN_API int       Dqn_Safe_TruncateUSizeToInt  (Dqn_usize val);
-DQN_API Dqn_isize Dqn_Safe_TruncateUSizeToISize(Dqn_usize val);
-DQN_API Dqn_isize Dqn_Safe_TruncateI64ToISize  (uint64_t val);
-DQN_API uint32_t  Dqn_Safe_TruncateU64ToU32    (uint64_t val);
-DQN_API uint16_t  Dqn_Safe_TruncateU64ToU16    (uint64_t val);
-DQN_API uint8_t   Dqn_Safe_TruncateU64ToU8     (uint64_t val);
-DQN_API int64_t   Dqn_Safe_TruncateU64ToI64    (uint64_t val);
-DQN_API int32_t   Dqn_Safe_TruncateU64ToI32    (uint64_t val);
-DQN_API int16_t   Dqn_Safe_TruncateU64ToI16    (uint64_t val);
-DQN_API uint8_t   Dqn_Safe_TruncateU64ToI8     (uint64_t val);
-DQN_API int       Dqn_Safe_TruncateU64ToInt    (uint64_t val);
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
+// ---------------------------------+-----------------------------+---------------------------------
+#if defined(NDEBUG)
+    #define Dqn_Safe_AssertF(expr, fmt, ...)
+    #define Dqn_Safe_Assert(expr, fmt, ...)
+#else
+    #define Dqn_Safe_AssertF(expr, fmt, ...) \
+        Dqn_Safe_AssertF_(expr, DQN_CALL_SITE, "Safe assert triggered " #expr ": " fmt, ## __VA_ARGS__)
+    #define Dqn_Safe_Assert(expr) Dqn_Safe_AssertF(expr, "")
+#endif
 
-// NOTE: Dqn_Char_
-// -------------------------------------------------------------------------------------------------
+/// Assert the expression given in debug, whilst in release- assertion is
+/// removed and the expression is evaluated and returned.
+///
+/// This function provides dual logic which allows handling of the condition
+/// gracefully in release mode, but asserting in debug mode. This is an internal
+/// function, prefer the @see Dqn_Safe_Assert macros.
+///
+/// @param assertion_expr[in] Expressin to assert on
+/// @param fmt[in] Format string for providing a message on assertion
+/// @return True if the expression evaluated to true, false otherwise.
+DQN_API bool Dqn_Safe_AssertF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...);
+
+// NOTE: Dqn_Safe Arithmetic
+// -----------------------------------------------------------------------------
+/// Add 2 I64's together, safe asserting that the operation does not overflow.
+/// @return The result of operation, INT64_MAX if it overflowed.
+DQN_API int64_t  Dqn_Safe_AddI64(int64_t a,  int64_t b);
+
+/// Multiply 2 I64's together, safe asserting that the operation does not
+/// overflow.
+/// @return The result of operation, IINT64_MAX if it overflowed.
+DQN_API int64_t Dqn_Safe_MulI64(int64_t a,  int64_t b);
+
+/// Add 2 U64's together, safe asserting that the operation does not overflow.
+/// @return The result of operation, UINT64_MAX if it overflowed.
+DQN_API uint64_t Dqn_Safe_AddU64(uint64_t a, uint64_t b);
+
+/// Subtract 2 U64's together, safe asserting that the operation does not
+/// overflow.
+/// @return The result of operation, 0 if it overflowed.
+DQN_API uint64_t Dqn_Safe_SubU64(uint64_t a, uint64_t b);
+
+/// Multiple 2 U64's together, safe asserting that the operation does not
+/// overflow.
+/// @return The result of operation, UINT64_MAX if it overflowed.
+DQN_API uint64_t Dqn_Safe_MulU64(uint64_t a, uint64_t b);
+
+/// Subtract 2 U32's together, safe asserting that the operation does not
+/// overflow.
+/// @return The result of operation, 0 if it overflowed.
+DQN_API uint32_t Dqn_Safe_SubU32(uint32_t a, uint32_t b);
+
+// NOTE: Dqn_Safe_SaturateCastUSizeToI*
+// -----------------------------------------------------------------------------
+/// Truncate a usize to int clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API int Dqn_Safe_SaturateCastUSizeToInt(Dqn_usize val);
+
+/// Truncate a usize to I8 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT8_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API int8_t Dqn_Safe_SaturateCastUSizeToI8(Dqn_usize val);
+
+/// Truncate a usize to I16 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT16_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API int16_t Dqn_Safe_SaturateCastUSizeToI16(Dqn_usize val);
+
+/// Truncate a usize to I32 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT32_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API int32_t Dqn_Safe_SaturateCastUSizeToI32(Dqn_usize val);
+
+/// Truncate a usize to I64 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT64_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API int64_t Dqn_Safe_SaturateCastUSizeToI64(Dqn_usize val);
+
+// NOTE: Dqn_Safe_SaturateCastU64ToU*
+// -----------------------------------------------------------------------------
+/// Truncate a u64 to uint clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or UINT_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API unsigned int Dqn_Safe_SaturateCastU64ToUInt(uint64_t val);
+
+/// Truncate a u64 to u8 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or UINT8_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API uint8_t Dqn_Safe_SaturateCastU64ToU8(uint64_t val);
+
+/// Truncate a u64 to u16 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or UINT16_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API uint16_t Dqn_Safe_SaturateCastU64ToU16(uint64_t val);
+
+/// Truncate a u64 to u32 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or UINT32_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API uint32_t Dqn_Safe_SaturateCastU64ToU32(uint64_t val);
+
+// NOTE: Dqn_Safe_SaturateCastUSizeToU*
+// -----------------------------------------------------------------------------
+/// Truncate a usize to U8 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or UINT8_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API uint8_t Dqn_Safe_SaturateCastUSizeToU8(Dqn_usize val);
+
+/// Truncate a usize to U16 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or UINT16_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API uint16_t Dqn_Safe_SaturateCastUSizeToU16(Dqn_usize val);
+
+/// Truncate a usize to U32 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or UINT32_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API uint32_t Dqn_Safe_SaturateCastUSizeToU32(Dqn_usize val);
+
+/// Truncate a usize to U64 clamping the result to the max value of the desired
+/// data type. Safe asserts if clamping occurs.
+/// @return The truncated value or UINT64_MAX if the value would go out of the
+/// valid range when casted.
+DQN_API uint64_t Dqn_Safe_SaturateCastUSizeToU64(Dqn_usize val);
+
+// NOTE: Dqn_Safe_SaturateCastISizeToI*
+// -----------------------------------------------------------------------------
+/// Truncate an isize to int clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT_MIN or INT_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API int Dqn_Safe_SaturateCastISizeToInt(Dqn_isize val);
+
+/// Truncate an isize to I8 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT8_MIN or INT8_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API int8_t Dqn_Safe_SaturateCastISizeToI8(Dqn_isize val);
+
+/// Truncate an isize to I16 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT16_MIN or INT16_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API int16_t Dqn_Safe_SaturateCastISizeToI16(Dqn_isize val);
+
+/// Truncate an isize to I32 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT32_MIN or INT32_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API int32_t Dqn_Safe_SaturateCastISizeToI32(Dqn_isize val);
+
+/// Truncate an isize to I64 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT64_MIN or INT64_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API int64_t Dqn_Safe_SaturateCastISizeToI64(Dqn_isize val);
+
+// NOTE: Dqn_Safe_SaturateCastISizeToU*
+// -----------------------------------------------------------------------------
+/// Truncate an isize to uint clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API unsigned int Dqn_Safe_SaturateCastISizeToUInt(Dqn_isize val);
+
+/// Truncate an isize to U8 clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT8_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API uint8_t Dqn_Safe_SaturateCastISizeToU8(Dqn_isize val);
+
+/// Truncate an isize to U16 clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT16_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API uint16_t Dqn_Safe_SaturateCastISizeToU16(Dqn_isize val);
+
+/// Truncate an isize to U32 clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT32_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API uint32_t Dqn_Safe_SaturateCastISizeToU32(Dqn_isize val);
+
+/// Truncate an isize to U64 clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT64_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API uint64_t Dqn_Safe_SaturateCastISizeToU64(Dqn_isize val);
+
+// NOTE: Dqn_Safe_SaturateCastI64To*
+// -----------------------------------------------------------------------------
+/// Truncate an I64 to isize clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or DQN_ISIZE_MIN or DQN_ISIZE_MAX if the value
+/// would go out of the valid range when casted.
+DQN_API Dqn_isize Dqn_Safe_SaturateCastI64ToISize(Dqn_isize val);
+
+/// Truncate an I64 to I8 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT8_MIN or INT8_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API int8_t Dqn_Safe_SaturateCastI64ToI8(int64_t val);
+
+/// Truncate an I64 to I16 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT16_MIN or INT16_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API int16_t Dqn_Safe_SaturateCastI64ToI16(int64_t val);
+
+/// Truncate an I64 to I32 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT32_MIN or INT32_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API int32_t Dqn_Safe_SaturateCastI64ToI32(int64_t val);
+
+// NOTE: Dqn_Safe_SaturateCastIntTo*
+// -----------------------------------------------------------------------------
+/// Truncate an int to I8 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT8_MIN or INT8_MAX if the value
+/// would go out of the valid range when casted.
+DQN_API int8_t Dqn_Safe_SaturateCastIntToI8(int val);
+
+/// Truncate an int to I16 clamping the result to the min and max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or INT16_MIN or INT16_MAX if the value
+/// would go out of the valid range when casted.
+DQN_API int16_t Dqn_Safe_SaturateCastIntToI16(int val);
+
+/// Truncate an int to U8 clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT8_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API uint8_t Dqn_Safe_SaturateCastIntToU8(int val);
+
+/// Truncate an int to U16 clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT16_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API uint16_t Dqn_Safe_SaturateCastIntToU16(int val);
+
+/// Truncate an int to U32 clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT32_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API uint32_t Dqn_Safe_SaturateCastIntToU32(int val);
+
+/// Truncate an int to U64 clamping the result to 0 and the max value of the
+/// desired data type. Safe asserts if clamping occurs.
+/// @return The truncated value or 0 or UINT64_MAX if the value would go
+/// out of the valid range when casted.
+DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val);
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API bool    Dqn_Char_IsAlpha       (char ch);
 DQN_API bool    Dqn_Char_IsDigit       (char ch);
 DQN_API bool    Dqn_Char_IsAlphaNum    (char ch);
@@ -2121,87 +2391,130 @@ DQN_API char    Dqn_Char_ToHex         (char ch);
 DQN_API char    Dqn_Char_ToHexUnchecked(char ch);
 DQN_API char    Dqn_Char_ToLower       (char ch);
 
-// NOTE: Dqn_UTF
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-UTFX] Dqn_UTF              |                             | Unicode helpers
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint);
 DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 
-#if defined(DQN_WITH_HEX)
-// NOTE: Dqn_Hex_
-// -------------------------------------------------------------------------------------------------
-DQN_API char const  *Dqn_Hex_CStringTrimSpaceAnd0xPrefix(char const *hex, Dqn_isize size, Dqn_isize *real_size);
-DQN_API Dqn_String8  Dqn_Hex_StringTrimSpaceAnd0xPrefix (Dqn_String8 const string);
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_HEX)
+DQN_API char const  *Dqn_Hex_TrimSpaceAnd0xPrefixCString8(char const *hex, Dqn_isize size, Dqn_isize *real_size);
+DQN_API Dqn_String8  Dqn_Hex_TrimSpaceAnd0xPrefixString8(Dqn_String8 const string);
 
-// Convert a hexadecimal string a 64 bit value. Asserts if the hex string is too
-// big to be converted into a 64 bit number.
-DQN_API uint64_t Dqn_Hex_CStringToU64(char const *hex, Dqn_isize size);
-DQN_API uint64_t Dqn_Hex_StringToU64(Dqn_String8 hex);
-
-// Convert a binary buffer into its hex representation into dest. The dest
-// buffer must be large enough to contain the hex representation, i.e.
-// atleast src_size * 2).
-DQN_API void Dqn_Hex_BytesToHex(void const *src, int src_size, char *dest, int dest_size);
-
-// Convert a hex buffer into its binary representation into dest. The dest
-// buffer must be large enough to contain the binary representation, i.e.
-// atleast ceil(hex_size / 2).
-// hex_size: The size of the hex buffer. This function can handle an odd size
-// hex string i.e. parsing "fff" works.
-DQN_API void Dqn_Hex_ToBytes(char const *hex, int hex_size, void *dest, int dest_size);
-
-// Convert a series of bytes into a string. The CString variant returns a string
-// with length (size * 2) with 1 extra byte for the null-terminator. The
-// return: nullptr/invalid Dqn_String8 if the allocation failed, otherwise the hex string in ASCII.
-DQN_API char        *Dqn_Hex_BytesToHexCStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena);
-DQN_API Dqn_String8  Dqn_Hex_BytesToHexStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena);
-
-// Convert a char string to a binary representation without any checks except assertions in debug.
-// A leading "0x" is permitted and will be skipped as well as odd-sized strings.
-DQN_API uint8_t *Dqn_Hex_CStringToU8Bytes(char const *hex, Dqn_isize size, Dqn_isize *real_size, Dqn_Arena *arena);
-#endif // DQN_WITH_HEX
-
-// NOTE: Dqn_Fs_
-// -------------------------------------------------------------------------------------------------
-struct Dqn_Fs_Info
+// NOTE: Byte to string conversions
+// -----------------------------------------------------------------------------
+struct Dqn_HexNumberString
 {
-    uint64_t create_time_in_s;
-    uint64_t last_write_time_in_s;
-    uint64_t last_access_time_in_s;
-    uint64_t size;
-    operator bool() const { return size > 0; }
+    char   data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
+    int8_t size;
 };
 
-// TODO(dqn): We should have a Dqn_String8 interface and a CString interface
-DQN_API bool         Dqn_Fs_Exists(Dqn_String8 path);
-DQN_API bool         Dqn_Fs_DirExists(Dqn_String8 path);
-DQN_API Dqn_Fs_Info  Dqn_Fs_GetInfo(Dqn_String8 path);
-DQN_API bool         Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+enum Dqn_HexNumberStringFlags
+{
+    Dqn_HexNumberStringFlags_No0xPrefix   = 1 << 0, /// Remove the 0x prefix from the string
+    Dqn_HexNumberStringFlags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
+};
 
-DQN_API bool         Dqn_Fs_MakeDir(Dqn_String8 path);
-DQN_API bool         Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+/// Convert a 64 bit number to a hex string
+///
+/// @param[in] number Number to convert to hexadecimal representation
+/// @param[in] flags Bit flags from Dqn_HexNumberStringFlags to customise the
+/// output of the hexadecimal string.
+///
+/// @return The hexadecimal representation of the number. This string is always
+/// null-terminated.
+DQN_API Dqn_HexNumberString Dqn_Hex_U64ToNumberString(uint64_t number, uint32_t flags);
 
-// TODO(dqn): This doesn't work on directories unless you delete the files
-// in that directory first.
-DQN_API bool         Dqn_Fs_Delete(Dqn_String8 path);
+/// @copybrief Dqn_Hex_U64ToNumberString
+///
+/// @param[in] allocator The memory allocator to use for the memory of the
+/// hexadecimal string.
+/// @copyparams Dqn_Hex_U64ToNumberString
+DQN_API Dqn_String8 Dqn_Hex_U64ToString8(Dqn_Allocator allocator, uint64_t number, uint32_t flags);
 
-// file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
-DQN_API bool         Dqn_Fs_WriteCString8ToFileCString8(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size);
-DQN_API bool         Dqn_Fs_WriteString8ToFileString8(Dqn_String8 file_path, Dqn_String8 buffer);
+/// Convert a hexadecimal string a 64 bit value.
+///
+/// Asserts if the hex string is too big to be converted into a 64 bit number.
+DQN_API uint64_t Dqn_Hex_CString8ToU64(char const *hex, Dqn_isize size);
 
-#define              Dqn_Fs_ReadFileCString8ToCString8Arena(file_path, file_path_size, file_size, arena) Dqn_Fs_ReadFileCString8ToCString8ArenaTagged(nullptr, file_path, file_path_size, file_size, arena)
-#define              Dqn_Fs_ReadFileCString8ToCString8ArenaTagged(tag, path, file_path_size, arena) Dqn_Fs_ReadFileCString8ToCString8Arena_(DQN_CALL_SITE(tag) file_path, file_path_size, arena)
-DQN_API char        *Dqn_Fs_ReadFileCString8ToCString8Arena_(DQN_CALL_SITE_ARGS char const *file_path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Arena *arena);
+/// @copydoc Dqn_Hex_String8ToU64
+DQN_API uint64_t Dqn_Hex_String8ToU64(Dqn_String8 hex);
 
-#define              Dqn_Fs_ReadFileCString8ToString8Arena(file_path, file_path_size, arena) Dqn_Fs_ReadFileCString8ToString8ArenaTagged(nullptr, file_path, file_path_size, arena)
-#define              Dqn_Fs_ReadFileCString8ToString8ArenaTagged(tag, file_path, file_path_size, arena) Dqn_Fs_ReadFileCString8ToString8Arena_(DQN_CALL_SITE(tag) file_path, file_path_size, arena)
-DQN_API Dqn_String8  Dqn_Fs_ReadFileCString8ToString8Arena_(DQN_CALL_SITE_ARGS  char const *file_path, Dqn_isize path_size, Dqn_Arena *arena);
+/// Convert a binary buffer into its hex representation into dest.
+///
+/// The dest buffer must be large enough to contain the hex representation, i.e.
+/// atleast (src_size * 2).
+///
+/// @return True if the conversion into the dest buffer was successful, false
+/// otherwise (e.g. invalid arguments).
+DQN_API bool Dqn_Hex_BytesToCString8Buffer(void const *src, Dqn_isize src_size, char *dest, Dqn_isize dest_size);
 
-#define              Dqn_Fs_ReadFileString8ToString8Arena(file_path, arena) Dqn_Fs_ReadFileString8ToString8ArenaTagged(nullptr, file_path, arena)
-#define              Dqn_Fs_ReadFileString8ToString8ArenaTagged(tag, file_path, arena) Dqn_Fs_ReadFileString8ToString8Arena_(DQN_CALL_SITE(tag) file_path, arena)
-DQN_API Dqn_String8  Dqn_Fs_ReadFileString8ToString8Arena_(DQN_CALL_SITE_ARGS Dqn_String8 file_path, Dqn_Arena *arena);
+/// Convert a series of bytes into a string
+///
+/// @return A null-terminated hex string, null pointer if allocation failed
+DQN_API char *Dqn_Hex_BytesToCString8Arena(Dqn_Arena *arena, void const *bytes, Dqn_isize size);
 
-// NOTE: Date
-// -------------------------------------------------------------------------------------------------
+/// @copydoc Dqn_Hex_BytesToCString8Arena
+///
+/// @return A hex string, the string is invalid if conversion failed.
+DQN_API Dqn_String8 Dqn_Hex_BytesToString8Arena(Dqn_Arena *arena, void const *bytes, Dqn_isize size);
+
+// NOTE: String to byte conversions
+// -----------------------------------------------------------------------------
+/// Convert a hex string into binary at `dest`.
+///
+/// The dest buffer must be large enough to contain the binary representation,
+/// i.e. atleast ceil(hex_size / 2). This function will strip whitespace,
+/// leading 0x/0X prefix from the string before conversion.
+///
+/// @param[in] hex The hexadecimal string to convert
+/// @param[in] hex_size Size of the hex buffer. This function can handle an odd
+/// size hex string i.e. "fff" produces 0xfff0.
+/// @param[out] dest Buffer to write the bytes to
+/// @param[out] dest_size Maximum number of bytes to write to dest
+///
+/// @return The number of bytes written to `dest_size`, this value will *never*
+/// be greater than `dest_size`.
+DQN_API Dqn_isize Dqn_Hex_CString8ToByteBuffer(char const *hex, Dqn_isize hex_size, void *dest, Dqn_isize dest_size);
+
+/// String8 variant of @see Dqn_Hex_CString8ToByteBuffer
+DQN_API Dqn_isize Dqn_Hex_String8ToByteBuffer(Dqn_String8 hex, void *dest, Dqn_isize dest_size);
+
+/// Unchecked variant of @see Dqn_Hex_CString8ToByteBuffer
+///
+/// This function skips some string checks, it assumes the hex is a valid hex
+/// stream and that the arguments are valid e.g. no trimming or 0x prefix
+/// stripping is performed
+DQN_API Dqn_isize Dqn_Hex_CString8ToByteBufferUnchecked(char const *hex, Dqn_isize hex_size, void *dest, Dqn_isize dest_size);
+
+/// String8 variant of @see Dqn_Hex_CString8ToByteBufferUnchecked
+DQN_API Dqn_isize Dqn_Hex_String8ToByteBufferUnchecked(Dqn_String8 hex, void *dest, Dqn_isize dest_size);
+
+/// Dynamic allocating variant of @see Dqn_Hex_CString8ToByteBufferUnchecked
+///
+/// @param[in] arena The arena to allocate the bytes from
+/// @param[in] hex Hex string to convert into bytes
+/// @param[in] size Size of the hex string
+/// @param[out] real_size The size of the buffer returned by the function
+///
+/// @return The byte representation of the hex string.
+DQN_API char *Dqn_Hex_CString8ToBytesArena(Dqn_Arena *arena, char const *hex, Dqn_isize hex_size, Dqn_isize *real_size);
+
+/// @copybrief Dqn_Hex_CString8ToBytesArena
+///
+/// @param[in] arena The arena to allocate the bytes from
+/// @param[in] hex Hex string to convert into bytes
+///
+/// @return The byte representation of the hex string.
+DQN_API Dqn_String8 Dqn_Hex_String8ToBytesArena(Dqn_Arena *arena, Dqn_String8 hex);
+#endif // !defined(DQN_NO_HEX)
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-DATE] Dqn_Date             |                             | Date-time helpers
+// ---------------------------------+-----------------------------+---------------------------------
 struct Dqn_DateHMSTimeString
 {
     char    date[DQN_ARRAY_UCOUNT("YYYY-MM-SS")];
@@ -2230,103 +2543,404 @@ DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString(Dqn_DateHMSTime time, 
 // return: The time elapsed since Unix epoch (1970-01-01T00:00:00Z) in seconds
 DQN_API uint64_t Dqn_Date_EpochTime();
 
-// NOTE: OS
-// -------------------------------------------------------------------------------------------------
-// Generate cryptographically secure bytes
+#if defined(DQN_OS_WIN32)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-WIND] Dqn_Win              |                             | Windows OS helpers
+// ---------------------------------+-----------------------------+---------------------------------
+struct Dqn_Win_ErrorMsg
+{
+    unsigned long code;
+    char          data[DQN_KILOBYTES(64) - 1]; // Maximum error size
+    unsigned long size;
+};
+DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_Win_ErrorMsg *msg);
+DQN_API Dqn_Win_ErrorMsg Dqn_Win_LastError();
+
+/// Call once at application start-up to ensure that the application is DPI
+/// aware on Windows and ensure that application UI is scaled up appropriately
+/// for the monitor.
+DQN_API void Dqn_Win_MakeProcessDPIAware();
+
+// NOTE: Windows String8 To String16
+// -----------------------------------------------------------------------------
+/// Convert a UTF8 to UTF16 string.
+///
+/// The exact size buffer required for this function can be determined by
+/// calling this function with the 'dest' set to null and 'dest_size' set to 0,
+/// the return size is the size required for conversion not-including space for
+/// the null-terminator. This function *always* null-terminates the input
+/// buffer.
+///
+/// @return The number of u16's written/required for conversion. 0 if there was
+/// a conversion error and can be queried using 'Dqn_Win_LastError'
+DQN_API int          Dqn_Win_CString8ToCString16(const char *src, int src_size, wchar_t *dest, int dest_size);
+DQN_API int          Dqn_Win_String8ToCString16(Dqn_String8 src, wchar_t *dest, int dest_size);
+DQN_API Dqn_String16 Dqn_Win_String8ToString16Allocator(Dqn_String8 src, Dqn_Allocator allocator);
+
+// NOTE: Windows String16 To String8
+// -----------------------------------------------------------------------------
+/// Convert a UTF16 to UTF8 string.
+///
+/// The exact size buffer required for this function can be determined by
+/// calling this function with the 'dest' set to null and 'dest_size' set to 0,
+/// the return size is the size required for conversion not-including space for
+/// the null-terminator. This function *always* null-terminates the input
+/// buffer.
+///
+/// @return The number of u8's written/required for conversion. 0 if there was
+/// a conversion error and can be queried using 'Dqn_Win_LastError'
+DQN_API int         Dqn_Win_CString16ToCString8(const wchar_t *src, int src_size, char *dest, int dest_size);
+DQN_API Dqn_String8 Dqn_Win_CString16ToString8Allocator(const wchar_t *src, int src_size, Dqn_Allocator allocator);
+DQN_API int         Dqn_Win_String16ToCString8(Dqn_String16 src, char *dest, int dest_size);
+DQN_API Dqn_String8 Dqn_Win_String16ToString8Allocator(Dqn_String16 src, Dqn_Allocator allocator);
+
+// NOTE: Windows Executable Directory
+// -----------------------------------------------------------------------------
+/// Evaluate the current executable's directory that is running when this
+/// function is called.
+/// @param[out] buffer The buffer to write the executable directory into. Set
+/// this to null to calculate the required buffer size for the directory.
+/// @param[in] size The size of the buffer given. Set this to 0 to calculate the
+/// required buffer size for the directory.
+/// @return The length of the executable directory string. If this return value
+/// exceeds the capacity of the 'buffer', the 'buffer' is untouched.
+DQN_API Dqn_isize    Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_isize size);
+DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena);
+
+// @param[in] size (Optional) The size of the current directory string returned
+// @param[in] suffix (Optional) A suffix to append to the current working directory
+// @param[in] suffix_size (Optional) The size of the suffix to append
+DQN_API Dqn_String8  Dqn_Win_WorkingDir(Dqn_Allocator allocator, Dqn_String8 suffix);
+DQN_API Dqn_String16 Dqn_Win_WorkingDirW(Dqn_Allocator allocator, Dqn_String16 suffix);
+
+struct Dqn_Win_FolderIteratorW
+{
+    void         *handle;
+    Dqn_String16 file_name;
+    wchar_t      file_name_buf[512];
+};
+
+struct Dqn_Win_FolderIterator
+{
+    void        *handle;
+    Dqn_String8  file_name;
+    char         file_name_buf[512];
+};
+
+DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it);
+DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it);
+
+#if !defined(DQN_NO_WINNET)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
+// ---------------------------------+-----------------------------+---------------------------------
+enum struct Dqn_WinNetHandleState
+{
+    Invalid,
+    Initialised,
+    HttpMethodReady,
+    RequestFailed,
+    RequestGood,
+};
+
+// The number of bytes each pump of the connection downloads at most. If this is
+// zero we default to DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE.
+#if !defined(DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE)
+    #define DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE 4096
+#endif
+
+struct Dqn_WinNetHandle
+{
+    // NOTE: We copy out the host name because it needs to be null-terminated.
+    // Luckily, we can assume a DNS domain won't exceed 256 characters so this
+    // will generally always work.
+    char host_name[256];
+    int  host_name_size;
+
+    // NOTE: Everything after the domain/host name part of the string i.e. the
+    // '/test' part of the full url 'mywebsite.com/test'.
+    // TODO(dqn): I don't want to make our network API allocate here so we don't
+    // copy the string since we require that the string is null-terminated so
+    // then taking a pointer to the input string should work .. maybe this is
+    // ok?
+    char *url;
+    int url_size;
+
+    // NOTE: docs.microsoft.com/en-us/windows/win32/wininet/setting-and-retrieving-internet-options#scope-of-hinternet-handle
+    // These handles have three levels:
+    //
+    // The root HINTERNET handle (created by a call to InternetOpen) would contain all the Internet options that affect this instance of WinINet.
+    // HINTERNET handles that connect to a server (created by a call to InternetConnect)
+    // HINTERNET handles associated with a resource or enumeration of resources on a particular server.
+    //
+    // More detailed information about the HINTERNET dependency is listed here
+    // NOTE: https://docs.microsoft.com/en-us/windows/win32/wininet/appendix-a-hinternet-handles
+    void *internet_open_handle;
+    void *internet_connect_handle;
+    void *http_handle;
+    Dqn_WinNetHandleState state;
+};
+
+// TODO(dqn): Useful options to expose in the handle
+// https://docs.microsoft.com/en-us/windows/win32/wininet/option-flags
+// INTERNET_OPTION_CONNECT_RETRIES -- default is 5 retries
+// INTERNET_OPTION_CONNECT_TIMEOUT -- milliseconds
+// INTERNET_OPTION_RECEIVE_TIMEOUT
+// INTERNET_OPTION_SEND_TIMEOUT
+
+// Initialise a new networking handle that is pointing to the specified URL.
+// The URL string must be null-terminated because Windows is a C API and
+// requires null-termination.
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenCString(char const *url, int url_size);
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenString(Dqn_String8 url);
+DQN_API void             Dqn_Win_NetHandleClose(Dqn_WinNetHandle *handle);
+DQN_API bool             Dqn_Win_NetHandleIsValid(Dqn_WinNetHandle const *handle);
+
+DQN_API void             Dqn_Win_NetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
+DQN_API bool             Dqn_Win_NetHandleSetHTTPMethod(Dqn_WinNetHandle *handle, char const *data);
+
+enum Dqn_WinNetHandleRequestHeaderFlag
+{
+    Dqn_WinNetHandleRequestHeaderFlag_Add,
+    Dqn_WinNetHandleRequestHeaderFlag_AddIfNew,
+    Dqn_WinNetHandleRequestHeaderFlag_Replace,
+    Dqn_WinNetHandleRequestHeaderFlag_Count,
+};
+
+DQN_API bool             Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle, char const *header, int header_size, uint32_t mode);
+DQN_API bool             Dqn_Win_NetHandleSetRequestHeaderString8(Dqn_WinNetHandle *handle, Dqn_String8 header, uint32_t mode);
+
+DQN_API bool             Dqn_Win_NetHandlePump(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size);
+DQN_API char *           Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size);
+DQN_API Dqn_String8      Dqn_Win_NetHandlePumpString8(Dqn_WinNetHandle *handle, Dqn_String8 post_data, Dqn_Arena *arena);
+
+DQN_API void             Dqn_Win_NetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, FILE *file);
+DQN_API char            *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, size_t *download_size);
+DQN_API Dqn_String8      Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle, char *post_data, int post_data_size);
+#endif // !defined(DQN_NO_WINNET)
+#endif // defined(DQN_OS_WIN32)
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-OSYS] Dqn_OS               | DQN_NO_WIN                  | Operating-system APIs
+// ---------------------------------+-----------------------------+---------------------------------
+/// Generate cryptographically secure bytes
 DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size);
 
 // return: The directory without the trailing '/' or ('\' for windows). Empty
 //         string with a nullptr if it fails.
 DQN_API Dqn_String8 Dqn_OS_EXEDir(Dqn_Allocator allocator);
 
-// NOTE: Utiltiies
-// -------------------------------------------------------------------------------------------------
-DQN_API void Dqn_SleepMs(Dqn_uint milliseconds);
+DQN_API void Dqn_OS_SleepMs(Dqn_uint milliseconds);
 
-DQN_API uint64_t Dqn_Perf_CounterNow   ();
-DQN_API Dqn_f64  Dqn_Perf_CounterS     (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64  Dqn_Perf_CounterMs    (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64  Dqn_Perf_CounterMicroS(uint64_t begin, uint64_t end);
-DQN_API Dqn_f64  Dqn_Perf_CounterNs    (uint64_t begin, uint64_t end);
+DQN_API uint64_t Dqn_OS_PerfCounterNow   ();
+DQN_API Dqn_f64  Dqn_OS_PerfCounterS     (uint64_t begin, uint64_t end);
+DQN_API Dqn_f64  Dqn_OS_PerfCounterMs    (uint64_t begin, uint64_t end);
+DQN_API Dqn_f64  Dqn_OS_PerfCounterMicroS(uint64_t begin, uint64_t end);
+DQN_API Dqn_f64  Dqn_OS_PerfCounterNs    (uint64_t begin, uint64_t end);
 
-struct Dqn_Timer // NOTE: Uses the PerfCounter API
+/// Record time between two time-points using the OS's performance counter.
+struct Dqn_OSTimer
 {
     uint64_t start;
     uint64_t end;
 };
 
-DQN_API Dqn_Timer Dqn_Timer_Begin ();
-DQN_API void      Dqn_Timer_End   (Dqn_Timer *timer);
-DQN_API Dqn_f64   Dqn_Timer_S     (Dqn_Timer timer);
-DQN_API Dqn_f64   Dqn_Timer_Ms    (Dqn_Timer timer);
-DQN_API Dqn_f64   Dqn_Timer_MicroS(Dqn_Timer timer);
-DQN_API Dqn_f64   Dqn_Timer_Ns    (Dqn_Timer timer);
+DQN_API Dqn_OSTimer Dqn_OS_TimerBegin();
+DQN_API void        Dqn_OS_TimerEnd    (Dqn_OSTimer *timer);
+DQN_API Dqn_f64     Dqn_OS_TimerS      (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerMs     (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerMicroS (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerNs     (Dqn_OSTimer timer);
 
-struct Dqn_U64Str
+// OS_TimedBlock provides a extremely primitive way of measuring the duration of
+// code blocks, by sprinkling DQN_OS_TIMED_BLOCK_RECORD("record label"), you can
+// measure the time between the macro and the next record call.
+//
+// Example: Record the duration of the for-loop below and print it at the end.
+/*
+   int main()
+   {
+       DQN_OS_TIMED_BLOCK_INIT("Profiling Region", 32); // name, records to allocate
+       DQN_OS_TIMED_BLOCK_RECORD("a");
+       for (int unused1_ = 0; unused1_ < 1000000; unused1_++)
+       {
+           for (int unused2_ = 0; unused2_ < 1000000; unused2_++)
+           {
+               (void)unused1_;
+               (void)unused2_;
+           }
+       }
+       DQN_OS_TIMED_BLOCK_RECORD("b");
+       DQN_OS_TIMED_BLOCK_DUMP;
+       return 0;
+   }
+*/
+struct Dqn_OSTimedBlock
 {
-    // Points to the start of the str in the buffer, not necessarily buf since
-    // we write into the buffer in reverse
-    char *str;
-    char  buf[27]; // NOTE(dqn): 27 is the maximum size of uint64_t including commas
-    int   len;
+    char const *label;
+    uint64_t     tick;
 };
 
-// TODO(dqn): We need to rewrite this so that we just return a Dqn_U64Str which
-// makes this a lot more ergonomic to use. Although the typical way we convert
-// a number to a string is in reverse order, so I thought it'd be smart to write
-// into the string buffer backwards and return a the char pointer to it, we
-// should just write it in and memory copy it back so that it's at the start of
-// the buffer. See Dqn_MoneyString for an example of this.
-DQN_API char *Dqn_U64ToStr    (uint64_t val, Dqn_U64Str *result, bool comma_sep);
-DQN_API char *Dqn_U64ToTempStr(uint64_t val, bool comma_sep = true);
+// Initialise a timing block region,
+#define DQN_OS_TIMED_BLOCK_INIT(label, size) \
+    Dqn_OSTimedBlock timings_[size];        \
+    Dqn_usize timings_size_ = 0;          \
+    DQN_OS_TIMED_BLOCK_RECORD(label)
 
-// NOTE: Dqn_ThreadContext
-// -------------------------------------------------------------------------------------------------
+// Add a timing record at the current location this macro is invoked.
+// DQN_OS_TIMED_BLOCK_INIT must have been called in a scope visible to the macro
+// prior.
+// label: The label to give to the timing record
+#define DQN_OS_TIMED_BLOCK_RECORD(label) timings_[timings_size_++] = {label, Dqn_OS_PerfCounterNow()}
+
+// Dump the timing block via Dqn_Log
+#define DQN_OS_TIMED_BLOCK_DUMP                                                                         \
+    DQN_ASSERT_MSG(timings_size_ < sizeof(timings_) / sizeof(timings_[0]),                              \
+                   "Timings array indexed out-of-bounds, use a bigger size");                           \
+    for (int timings_index_ = 0; timings_index_ < (timings_size_ - 1); timings_index_++) {              \
+        Dqn_OSTimedBlock t1 = timings_[timings_index_ + 0];                                             \
+        Dqn_OSTimedBlock t2 = timings_[timings_index_ + 1];                                             \
+        DQN_LOG_D("%s -> %s: %fms", t1.label, t2.label, Dqn_OS_PerfCounterMs(t1.tick, t2.tick));        \
+    }                                                                                                   \
+                                                                                                        \
+    if (timings_size_ >= 1) {                                                                           \
+        Dqn_OSTimedBlock t1 = timings_[0];                                                              \
+        Dqn_OSTimedBlock t2 = timings_[timings_size_ - 1];                                              \
+        DQN_LOG_D("%s -> %s (total): %fms", t1.label, t2.label, Dqn_OS_PerfCounterMs(t1.tick, t2.tick));\
+    }
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
+// ---------------------------------+-----------------------------+---------------------------------
+struct Dqn_Fs_Info
+{
+    uint64_t create_time_in_s;
+    uint64_t last_write_time_in_s;
+    uint64_t last_access_time_in_s;
+    uint64_t size;
+    operator bool() const { return size > 0; }
+};
+
+// TODO(dqn): We should have a Dqn_String8 interface and a CString interface
+DQN_API bool         Dqn_Fs_Exists(Dqn_String8 path);
+DQN_API bool         Dqn_Fs_DirExists(Dqn_String8 path);
+DQN_API Dqn_Fs_Info  Dqn_Fs_GetInfo(Dqn_String8 path);
+DQN_API bool         Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+
+DQN_API bool         Dqn_Fs_MakeDir(Dqn_String8 path);
+DQN_API bool         Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+
+// TODO(dqn): This doesn't work on directories unless you delete the files
+// in that directory first.
+DQN_API bool         Dqn_Fs_Delete(Dqn_String8 path);
+
+// file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
+DQN_API bool         Dqn_Fs_WriteCString8(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size);
+DQN_API bool         Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer);
+
+/// Read a file at the specified path into memory.
+/// @param[in] path Path to the file to read
+/// @param[in] path_size The string size of the file path
+/// @param[out] file_size (Optional) Pass a pointer to receive the number of bytes read
+/// @param[in] allocator Allocator used to read the file to memory with
+/// @return A cstring with the read file, null pointer on failure.
+#define              Dqn_Fs_ReadCString8(path, path_size, file_size, allocator) Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE path, path_size, file_size, allocator)
+DQN_API char        *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Allocator allocator);
+
+/// Read a file at the specified path into memory.
+/// @param[in] file_path Path to the file to read
+/// @param[in] allocator Allocator used to read the file to memory with
+/// @return A string with the read file, invalid string on failure.
+#define              Dqn_Fs_ReadString8(path, allocator) Dqn_Fs_ReadString8_(DQN_LEAK_TRACE path, allocator)
+DQN_API Dqn_String8  Dqn_Fs_ReadString8_(DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator);
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-MISC] Miscellaneous        |                             | General purpose helpers
+// ---------------------------------+-----------------------------+---------------------------------
+struct Dqn_U64String
+{
+    char    data[27+1]; // NOTE(dqn): 27 is the maximum size of uint64_t including a separtor
+    uint8_t size;
+};
+
+/// Convert a 64 bit unsigned value to its string representation.
+/// @param[in] val Value to convert into a string
+/// @param[in] separator The separator to insert every 3 digits. Set this to
+/// 0 if no separator is desired.
+DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator);
+
+// NOTE: Binary Search
+// -----------------------------------------------------------------------------
+template <typename T>
+using Dqn_BinarySearchLessThanProc = bool(T const &lhs, T const &rhs);
+
+template <typename T>
+DQN_FORCE_INLINE bool Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
+
+enum Dqn_BinarySearchType
+{
+    Dqn_BinarySearchType_Match,
+    Dqn_BinarySearchType_OnePastMatch,
+};
+
+template <typename T>
+Dqn_isize
+Dqn_BinarySearch(T const                        *array,
+                 Dqn_isize                       array_size,
+                 T const                        &find,
+                 Dqn_BinarySearchType            type      = Dqn_BinarySearchType_Match,
+                 Dqn_BinarySearchLessThanProc<T> less_than = Dqn_BinarySearch_DefaultLessThan);
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
+// ---------------------------------+-----------------------------+---------------------------------
 // Utility functions for building applications by providing an in-built thread
 // context that gives the user access to a temporary arena automatically without
 // explicit setup on the end application's side.
+
 #if !defined(DQN_THREAD_CONTEXT_ARENAS)
     #define DQN_THREAD_CONTEXT_ARENAS 2
 #endif
 
-struct Dqn_ThreadArena
-{
-    Dqn_Arena arena;             ///< The arena for this thread's scratch arena
-    uint8_t   arena_stats_index; ///< Index into the library's thread context array
-};
-
 struct Dqn_ThreadContext
 {
-    Dqn_b32         init;
-    Dqn_ThreadArena temp_arenas[DQN_THREAD_CONTEXT_ARENAS]; ///< Temporary arena's for the calling thread
+    Dqn_b32       init;
+
+    /// Temp memory arena's for the calling thread
+    Dqn_Arena     temp_arenas[DQN_THREAD_CONTEXT_ARENAS];
+
+    /// Allocators that use the corresponding arena from the thread context.
+    /// Provided for convenience when interfacing with allocator interfaces.
+    Dqn_Allocator temp_allocators[DQN_THREAD_CONTEXT_ARENAS];
+
+    #if defined(DQN_DEBUG_THREAD_CONTEXT)
+    Dqn_ArenaStat temp_arenas_stat[DQN_THREAD_CONTEXT_ARENAS];
+    #endif
 };
 
-struct Dqn_ThreadTempArena
+struct Dqn_ThreadScratch
 {
-    Dqn_ThreadTempArena(Dqn_ThreadArena *data)
-    {
-        destructed        = false;
-        arena             = &data->arena;
-        arena_stats_index = data->arena_stats_index;
-        arena_temp_memory = Dqn_Arena_BeginTempMemory(arena);
-    }
+    Dqn_ThreadScratch(DQN_LEAK_TRACE_FUNCTION Dqn_ThreadContext *context, uint8_t context_index);
+    ~Dqn_ThreadScratch();
 
-    ~Dqn_ThreadTempArena()
-    {
-        #if defined(DQN_DEBUG_THREAD_CONTEXT)
-        dqn_lib_.thread_context_arena_stats[arena_stats_index] = arena->stats;
-        #endif
-
-        DQN_ASSERT(destructed == false);
-        Dqn_Arena_EndTempMemory(arena_temp_memory);
-        destructed = true;
-    }
-
-    Dqn_b32              destructed;
+    /// Index into the arena/allocator/stat array in the thread context
+    /// specifying what arena was assigned.
+    uint8_t              index;
+    Dqn_Allocator        allocator;
     Dqn_Arena           *arena;
-    int                  arena_stats_index;
-    Dqn_ArenaTempMemory  arena_temp_memory;
+    Dqn_b32              destructed = false; /// Detect copies of the scratch
+    Dqn_ArenaTempMemory  temp_memory;
+    #if defined(DQN_LEAK_TRACKING)
+    Dqn_CallSite         leak_site__;
+    #endif
 };
+
+// Get the current thread's context- this contains all the metadata for managing
+// the thread scratch data. In general you probably want Dqn_Thread_GetScratch()
+// which ensures you get a usable scratch arena for temporary allocations
+// without having to worry about selecting the right arena from the state.
+#define Dqn_Thread_GetContext() Dqn_Thread_GetContext_(DQN_LEAK_TRACE_NO_COMMA)
+DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COMMA);
 
 /// Retrieve the per-thread temporary arena allocator that is reset on scope
 /// exit.
@@ -2339,17 +2953,13 @@ struct Dqn_ThreadTempArena
 ///
 /// @param[in] conflict_arena A pointer to the arena currently being used in the
 /// function
-DQN_API Dqn_ThreadTempArena Dqn_Thread_TempArena(const void *conflict_arena = nullptr);
+#define Dqn_Thread_GetScratch(conflict_arena) Dqn_Thread_GetScratch_(DQN_LEAK_TRACE conflict_arena)
+DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void const *conflict_arena);
 
-// Get the current thread's context- this contains all the metadata for managing
-// the thread scratch data. In general you probably want Dqn_Thread_TempArena()
-// which ensures you get a usable scratch arena for temporary allocations
-// without having to worry about selecting the right arena from the state.
-DQN_API Dqn_ThreadContext *Dqn_Thread_Context();
-
-#if defined(DQN_WITH_JSON_BUILDER)
-// NOTE: Dqn_JsonBuilder
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_JSON_BUILDER)
 // TODO(dqn): We need to write tests for this
 struct Dqn_JSONBuilder
 {
@@ -2379,254 +2989,38 @@ struct Dqn_JSONBuilder
 DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Arena *arena, int spaces_per_indent);
 DQN_API Dqn_String8     Dqn_JSONBuilder_Build(Dqn_JSONBuilder *builder, Dqn_Arena *arena);
 
-DQN_API void             Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
-DQN_API void             Dqn_JSONBuilder_ObjectBegin(Dqn_JSONBuilder *builder);
-DQN_API void             Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder);
+DQN_API void            Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
+DQN_API void            Dqn_JSONBuilder_ObjectBegin(Dqn_JSONBuilder *builder);
+DQN_API void            Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder);
 
-DQN_API void             Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
-DQN_API void             Dqn_JSONBuilder_ArrayBegin(Dqn_JSONBuilder *builder);
-DQN_API void             Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder);
+DQN_API void            Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
+DQN_API void            Dqn_JSONBuilder_ArrayBegin(Dqn_JSONBuilder *builder);
+DQN_API void            Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder);
 
-DQN_API void             Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-DQN_API void             Dqn_JSONBuilder_String(Dqn_JSONBuilder *builder, Dqn_String8 value);
+DQN_API void            Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+DQN_API void            Dqn_JSONBuilder_String(Dqn_JSONBuilder *builder, Dqn_String8 value);
 
-DQN_API void             Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-DQN_API void             Dqn_JSONBuilder_Literal(Dqn_JSONBuilder *builder, Dqn_String8 value);
+DQN_API void            Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+DQN_API void            Dqn_JSONBuilder_Literal(Dqn_JSONBuilder *builder, Dqn_String8 value);
 
-DQN_API void             Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
-DQN_API void             Dqn_JSONBuilder_U64(Dqn_JSONBuilder *builder, uint64_t value);
+DQN_API void            Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
+DQN_API void            Dqn_JSONBuilder_U64(Dqn_JSONBuilder *builder, uint64_t value);
 
-DQN_API void             Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
-DQN_API void             Dqn_JSONBuilder_I64(Dqn_JSONBuilder *builder, uint64_t value);
+DQN_API void            Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
+DQN_API void            Dqn_JSONBuilder_I64(Dqn_JSONBuilder *builder, uint64_t value);
 
-// decimal_places: When < 0 show the default number of decimal places
-//                 When >=0 show the specified amount of decimal places
-DQN_API void             Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places);
-DQN_API void             Dqn_JSONBuilder_F64(Dqn_JSONBuilder *builder, double value, int decimal_places);
+/// @param[in] decimal_places When < 0 show the default number of decimal places
+/// When >=0 show the specified amount of decimal places
+DQN_API void            Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places);
+DQN_API void            Dqn_JSONBuilder_F64(Dqn_JSONBuilder *builder, double value, int decimal_places);
 
-DQN_API void             Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value);
-DQN_API void             Dqn_JSONBuilder_Bool(Dqn_JSONBuilder *builder, bool value);
-#endif // DQN_WITH_JSON_BUILDER
+DQN_API void            Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value);
+DQN_API void            Dqn_JSONBuilder_Bool(Dqn_JSONBuilder *builder, bool value);
+#endif // !defiend(DQN_NO_JSON_BUIDLER)
 
-#if defined(DQN_OS_WIN32)
-// NOTE: Dqn_Win_
-// -------------------------------------------------------------------------------------------------
-struct Dqn_Win_ErrorMsg
-{
-    unsigned long code;
-    char          data[DQN_KILOBYTES(64) - 1]; // Maximum error size
-    unsigned long size;
-};
-DQN_API Dqn_Win_ErrorMsg Dqn_Win_LastError();
-
-// Call once at application start-up to ensure that the application is DPI aware
-// on Windows and ensure that application UI is scaled up appropriately for the
-// monitor.
-DQN_API void Dqn_Win_MakeProcessDPIAware();
-
-// NOTE: Windows String8 To String16
-// -----------------------------------------------------------------------------
-// @info   Convert a UTF8 to UTF16 string. The exact size buffer required for
-//         this function can be determined by calling this function with the
-//         'dest' set to null and 'dest_size' set to 0, the return size is the
-//         size required for conversion including space for the null-terminator.
-//         This function *always* null-terminates the input buffer.
-// @return The number of u16's written/required for conversion. 0 if there was
-//         a conversion error and can be queried using 'Dqn_Win_LastError'
-DQN_API int          Dqn_Win_CString8ToCString16(const char *src, int src_size, wchar_t *dest, int dest_size);
-DQN_API int          Dqn_Win_String8ToCString16(Dqn_String8 src, wchar_t* dest, int dest_size);
-DQN_API Dqn_String16 Dqn_Win_String8ToString16Allocator(Dqn_String8 src, Dqn_Allocator allocator);
-
-// NOTE: Windows String16 To String8
-// -----------------------------------------------------------------------------
-// @info   Convert a UTF16 to UTF8 string. The exact size buffer required for
-//         this function can be determined by calling this function with the
-//         'dest' set to null and 'dest_size' set to 0, the return size is the
-//         size required for conversion including space for the null-terminator.
-//         This function *always* null-terminates the input buffer.
-// @return The number of u8's written/required for conversion. 0 if there was
-//         a conversion error and can be queried using 'Dqn_Win_LastError'
-DQN_API int         Dqn_Win_CString16ToCString8(const wchar_t *src, int src_size, char *dest, int dest_size);
-DQN_API Dqn_String8 Dqn_Win_CString16ToString8Allocator(const wchar_t *src, int src_size, Dqn_Allocator allocator);
-DQN_API int         Dqn_Win_String16ToCString8(Dqn_String16 src, char *dest, int dest_size);
-DQN_API Dqn_String8 Dqn_Win_String16ToString8Allocator(Dqn_String16 src, Dqn_Allocator allocator);
-
-// NOTE: Windows Executable Directory
-// -----------------------------------------------------------------------------
-// @info   Evaluate the current executable's directory that is running when this
-//         function is called.
-// @out    buffer: The buffer to write the executable directory into. Set this
-//         to null to calculate the required buffer size for the directory.
-// @in     size: The size of the buffer given. Set this to 0 to calculate the
-//         required buffer size for the directory.
-// @return The length of the executable directory string. If this return value
-//         exceeds the capacity of the 'buffer', the 'buffer' is untouched.
-DQN_API Dqn_isize    Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_isize size);
-DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena);
-
-// size: (Optional) The size of the current directory string returned
-// suffix: (Optional) A suffix to append to the current working directory
-// suffix_size: (Optional) The size of the suffix to append
-DQN_API Dqn_String8  Dqn_Win_WorkingDir(Dqn_Allocator allocator, Dqn_String8 suffix);
-DQN_API Dqn_String16 Dqn_Win_WorkingDirW(Dqn_Allocator allocator, Dqn_String16 suffix);
-
-struct Dqn_Win_FolderIteratorW
-{
-    void         *handle;
-    Dqn_String16 file_name;
-    wchar_t      file_name_buf[512];
-};
-
-struct Dqn_Win_FolderIterator
-{
-    void       *handle;
-    Dqn_String8 file_name;
-    char       file_name_buf[512];
-};
-
-DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it);
-DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it);
-
-#if defined(DQN_WITH_WIN_NET)
-enum struct Dqn_Win_NetHandleState
-{
-    Invalid,
-    Initialised,
-    RequestFailed,
-    RequestGood,
-};
-
-// The number of bytes each pump of the connection downloads at most. If this is
-// zero we default to DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE.
-#if !defined(DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE)
-    #define DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE 4096
-#endif
-
-struct Dqn_Win_NetHandle
-{
-    // NOTE: We copy out the host name because it needs to be null-terminated.
-    // Luckily, we can assume a DNS domain won't exceed 256 characters so this
-    // will generally always work.
-    char host_name[256];
-    int  host_name_size;
-
-    // NOTE: Everything after the domain/host name part of the string i.e. the
-    // '/test' part of the full url 'mywebsite.com/test'.
-    // TODO(dqn): I don't want to make our network API allocate here so we don't
-    // copy the string since we require that the string is null-terminated so
-    // then taking a pointer to the input string should work .. maybe this is
-    // ok?
-    char *url;
-    int url_size;
-
-    // NOTE: docs.microsoft.com/en-us/windows/win32/wininet/setting-and-retrieving-internet-options#scope-of-hinternet-handle
-    // These handles have three levels:
-    //
-    // The root HINTERNET handle (created by a call to InternetOpen) would contain all the Internet options that affect this instance of WinINet.
-    // HINTERNET handles that connect to a server (created by a call to InternetConnect)
-    // HINTERNET handles associated with a resource or enumeration of resources on a particular server.
-    //
-    // More detailed information about the HINTERNET dependency is listed here
-    // NOTE: https://docs.microsoft.com/en-us/windows/win32/wininet/appendix-a-hinternet-handles
-    void *internet_open_handle;
-    void *internet_connect_handle;
-    void *http_handle;
-    Dqn_Win_NetHandleState state;
-};
-
-// TODO(dqn): Useful options to expose in the handle
-// https://docs.microsoft.com/en-us/windows/win32/wininet/option-flags
-// INTERNET_OPTION_CONNECT_RETRIES -- default is 5 retries
-// INTERNET_OPTION_CONNECT_TIMEOUT -- milliseconds
-// INTERNET_OPTION_RECEIVE_TIMEOUT
-// INTERNET_OPTION_SEND_TIMEOUT
-
-// Initialise a new networking handle that is pointing to the specified URL.
-// The URL string must be null-terminated because Windows is a C API and
-// requires null-termination.
-DQN_API Dqn_Win_NetHandle Dqn_Win_NetHandleInitCString(char const *url, int url_size);
-DQN_API Dqn_Win_NetHandle Dqn_Win_NetHandleInitString(Dqn_String8 url);
-
-DQN_API void             Dqn_Win_NetHandleFinish(Dqn_Win_NetHandle *handle);
-DQN_API bool             Dqn_Win_NetHandleIsValid(Dqn_Win_NetHandle const *handle);
-DQN_API void             Dqn_Win_NetHandleSetUserAgentCString(Dqn_Win_NetHandle *handle, char const *user_agent, int user_agent_size);
-DQN_API bool             Dqn_Win_NetHandlePump(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size);
-DQN_API char *           Dqn_Win_NetHandlePumpToCString(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size);
-DQN_API Dqn_String8      Dqn_Win_NetHandlePumpToString(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena);
-
-DQN_API void             Dqn_Win_NetHandlePumpToCRTFile(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, FILE *file);
-DQN_API char            *Dqn_Win_NetHandlePumpToAllocCString(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, size_t *download_size);
-DQN_API Dqn_String8      Dqn_Win_NetHandlePumpToAllocString(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size);
-#endif // DQN_WITH_WIN_NET
-#endif // DQN_OS_WIN32
-
-// NOTE: Dqn_TimedBlock
-// ------------------------------------------------------------------------------------------------
-// TimedBlock provides a extremely primitive way of measuring the duration of
-// code blocks, by sprinkling DQN_TIMED_BLOCK_RECORD("record label"), you can
-// measure the time between the macro and the next record call.
-//
-// Example: Record the duration of the for-loop below and print it at the end.
-/*
-   int main()
-   {
-       DQN_TIMED_BLOCK_INIT("Profiling Region", 32); // name, records to allocate
-       DQN_TIMED_BLOCK_RECORD("a");
-       for (int unused1_ = 0; unused1_ < 1000000; unused1_++)
-       {
-           for (int unused2_ = 0; unused2_ < 1000000; unused2_++)
-           {
-               (void)unused1_;
-               (void)unused2_;
-           }
-       }
-       DQN_TIMED_BLOCK_RECORD("b");
-       DQN_TIMED_BLOCK_DUMP;
-       return 0;
-   }
-*/
-struct Dqn_TimedBlock
-{
-    char const *label;
-    uint64_t     tick;
-};
-
-// Initialise a timing block region,
-#define DQN_TIMED_BLOCK_INIT(label, size) \
-    Dqn_TimedBlock timings_[size];        \
-    Dqn_usize timings_size_ = 0;          \
-    DQN_TIMED_BLOCK_RECORD(label)
-
-// Add a timing record at the current location this macro is invoked.
-// DQN_TIMED_BLOCK_INIT must have been called in a scope visible to the macro
-// prior.
-// label: The label to give to the timing record
-#define DQN_TIMED_BLOCK_RECORD(label) timings_[timings_size_++] = {label, Dqn_Perf_CounterNow()}
-
-// Dump the timing block via Dqn_Log
-#define DQN_TIMED_BLOCK_DUMP                                                                            \
-    DQN_ASSERT_MSG(timings_size_ < sizeof(timings_) / sizeof(timings_[0]),                              \
-                   "Timings array indexed out-of-bounds, use a bigger size");                           \
-    for (int timings_index_ = 0; timings_index_ < (timings_size_ - 1); timings_index_++) {              \
-        Dqn_TimedBlock t1 = timings_[timings_index_ + 0];                                               \
-        Dqn_TimedBlock t2 = timings_[timings_index_ + 1];                                               \
-        DQN_LOG_P("%s -> %s: %fms", t1.label, t2.label, Dqn_Perf_CounterMs(t1.tick, t2.tick));          \
-    }                                                                                                   \
-                                                                                                        \
-    if (timings_size_ >= 1) {                                                                           \
-        Dqn_TimedBlock t1 = timings_[0];                                                                \
-        Dqn_TimedBlock t2 = timings_[timings_size_ - 1];                                                \
-        DQN_LOG_P("%s -> %s (total): %fms", t1.label, t2.label, Dqn_Perf_CounterMs(t1.tick, t2.tick));  \
-    }
-
-// NOTE: Hashing - Dqn_FNV1A[32|64]
-// -------------------------------------------------------------------------------------------------
-//
-// char buffer1[128] = {random bytes};
-// char buffer2[128] = {random bytes};
-// uint64_t hash     = Dqn_FNV1A64_Hash(buffer1, sizeof(buffer1));
-// hash              = Dqn_FNV1A64_Iterate(buffer2, sizeof(buffer2), hash); // subsequent hashing
-//
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
+// ---------------------------------+-----------------------------+---------------------------------
 #ifndef DQN_FNV1A32_SEED
     #define DQN_FNV1A32_SEED 2166136261U
 #endif
@@ -2635,35 +3029,37 @@ struct Dqn_TimedBlock
     #define DQN_FNV1A64_SEED 14695981039346656037ULL
 #endif
 
+/// @begincode
+/// char buffer1[128] = {random bytes};
+/// char buffer2[128] = {random bytes};
+/// uint64_t hash     = Dqn_FNV1A64_Hash(buffer1, sizeof(buffer1));
+/// hash              = Dqn_FNV1A64_Iterate(buffer2, sizeof(buffer2), hash); // subsequent hashing
+/// @endcode
 DQN_API uint32_t Dqn_FNV1A32_Hash   (void const *bytes, Dqn_isize size);
 DQN_API uint64_t Dqn_FNV1A64_Hash   (void const *bytes, Dqn_isize size);
 DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_isize size, uint32_t hash);
 DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_isize size, uint64_t hash);
 
-// NOTE: Hashing - Dqn_MurmurHash3
-// -------------------------------------------------------------------------------------------------
-//
-// MurmurHash3 was written by Austin Appleby, and is placed in the public
-// domain. The author (Austin Appleby) hereby disclaims copyright to this source
-// code.
-//
-// Note - The x86 and x64 versions do _not_ produce the same results, as the
-// algorithms are optimized for their respective platforms. You can still
-// compile and run any of them on any platform, but your performance with the
-// non-native version will be less than optimal.
-
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
+// ---------------------------------+-----------------------------+---------------------------------
+/// MurmurHash3 was written by Austin Appleby, and is placed in the public
+/// domain. The author (Austin Appleby) hereby disclaims copyright to this source
+/// code.
+///
+/// Note - The x86 and x64 versions do _not_ produce the same results, as the
+/// algorithms are optimized for their respective platforms. You can still
+/// compile and run any of them on any platform, but your performance with the
+/// non-native version will be less than optimal.
 struct Dqn_MurmurHash3128 { uint64_t e[2]; };
 
 DQN_API uint32_t           Dqn_MurmurHash3x86_32 (void const *key, int len, uint32_t seed);
 DQN_API Dqn_MurmurHash3128 Dqn_MurmurHash3x64_128(void const *key, int len, uint32_t seed);
 #define DQN_MURMUR_HASH3_U128_AS_U64(key, len, seed) (Dqn_MurmurHash3x64_128(key, len, seed).e[0])
 
-// NOTE: Template Implementation
-// -------------------------------------------------------------------------------------------------
-
-#if defined(DQN_WITH_MAP)
 // NOTE: Dqn_Map Template Implementation
 // -------------------------------------------------------------------------------------------------
+#if !defined(DQN_NO_MAP)
 template <typename T>
 Dqn_Map<T> Dqn_Map_InitWithArena(Dqn_Arena *arena, Dqn_isize size)
 {
@@ -2677,7 +3073,7 @@ Dqn_Map<T> Dqn_Map_InitWithArena(Dqn_Arena *arena, Dqn_isize size)
 }
 
 template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_FindOrAdd(Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollideRule rule)
+Dqn_MapEntry<T> *Dqn_Map_FindOrAdd_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollideRule rule)
 {
     Dqn_isize         index = hash % map->size;
     Dqn_MapEntry<T> *result = map->slots[index];
@@ -2689,7 +3085,7 @@ Dqn_MapEntry<T> *Dqn_Map_FindOrAdd(Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollid
                     result = result->next;
                 else {
                     map->chain_count++;
-                    result->next = Dqn_Arena_New(map->arena, Dqn_MapEntry<T>, Dqn_ZeroMem_Yes);
+                    result->next = (Dqn_MapEntry<T> *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG map->arena, sizeof(Dqn_MapEntry<T>), alignof(Dqn_MapEntry<T>), Dqn_ZeroMem_Yes);
                     result       = result->next;
                     break;
                 }
@@ -2698,7 +3094,7 @@ Dqn_MapEntry<T> *Dqn_Map_FindOrAdd(Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollid
             result = nullptr;
         }
     } else {
-        result = Dqn_Arena_New(map->arena, Dqn_MapEntry<T>, Dqn_ZeroMem_Yes);
+        result = (Dqn_MapEntry<T> *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG map->arena, sizeof(Dqn_MapEntry<T>), alignof(Dqn_MapEntry<T>), Dqn_ZeroMem_Yes);
         map->count++;
         map->slots[index] = result;
     }
@@ -2710,9 +3106,9 @@ Dqn_MapEntry<T> *Dqn_Map_FindOrAdd(Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollid
 }
 
 template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_Add(Dqn_Map<T> *map, uint64_t hash, T &value, Dqn_MapCollideRule rule)
+Dqn_MapEntry<T> *Dqn_Map_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, T &value, Dqn_MapCollideRule rule)
 {
-    Dqn_MapEntry<T> *result = Dqn_Map_FindOrAdd(map, hash, rule);
+    Dqn_MapEntry<T> *result = Dqn_Map_FindOrAdd(DQN_LEAK_TRACE_ARG map, hash, rule);
     if (result)
         result->value = value;
 
@@ -2720,9 +3116,9 @@ Dqn_MapEntry<T> *Dqn_Map_Add(Dqn_Map<T> *map, uint64_t hash, T &value, Dqn_MapCo
 }
 
 template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_AddCopy(Dqn_Map<T> *map, uint64_t hash, T const &value, Dqn_MapCollideRule rule)
+Dqn_MapEntry<T> *Dqn_Map_AddCopy_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, T const &value, Dqn_MapCollideRule rule)
 {
-    Dqn_MapEntry<T> *result = Dqn_Map_FindOrAdd(map, hash, rule);
+    Dqn_MapEntry<T> *result = Dqn_Map_FindOrAdd(DQN_LEAK_TRACE_ARG map, hash, rule);
     if (result)
         result->value = value;
 
@@ -2754,7 +3150,9 @@ void Dqn_Map_Erase(Dqn_Map<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem)
     while ((*entry) && (*entry)->hash != hash)
         entry = &((*entry)->next);
 
+    bool result = false;
     if ((*entry) && (*entry)->hash == hash) {
+        result = true;
         Dqn_MapEntry<T> *erase_entry = *entry;
         Dqn_MapEntry<T> *next        = erase_entry->next;
         (*entry)                     = next;
@@ -2769,18 +3167,17 @@ void Dqn_Map_Erase(Dqn_Map<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem)
         else map->count--;
     }
 }
-#endif // DQN_WITH_MAP
+#endif // !defined(DQN_NO_MAP)
 
-#if defined(DQN_WITH_DSMAP)
 // NOTE: Dqn_DSMap Template Implementation
 // -------------------------------------------------------------------------------------------------
+#if !defined(DQN_NO_DSMAP)
 template <typename T>
 Dqn_DSMap<T> Dqn_DSMap_Init(Dqn_isize size)
 {
-    DQN_ASSERT_MSG(((size & (size - 1)) == 0), "Require non-zero power of 2 table size");
     Dqn_DSMap<T> result = {};
-    if (size > 0) {
-        result.slots = Dqn_Arena_NewArray(&result.arena, Dqn_DSMapEntry<T>, size, Dqn_ZeroMem_Yes);
+    if (Dqn_Safe_AssertF(size > 0 && (size & (size - 1)) == 0, "Non-zero & power of 2 table size required")) {
+        result.slots = Dqn_Arena_NewArray(&result.arena, Dqn_DSMapItem<T>, size, Dqn_ZeroMem_Yes);
         if (result.slots)
             result.size = size;
     }
@@ -2795,15 +3192,18 @@ void Dqn_DSMap_Free(Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem)
 }
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_Find(Dqn_DSMap<T> *map, uint64_t hash)
+Dqn_DSMapItem<T> *Dqn_DSMap_Find(Dqn_DSMap<T> *map, uint64_t hash)
 {
-    Dqn_DSMapEntry<T> *result = Dqn_DSMap_FindOrAdd(map, hash, true /*find_only*/);
+    Dqn_DSMapItem<T> *result = Dqn_DSMap_FindOrAdd(map, hash, true /*find_only*/);
     return result;
 }
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, bool find_only)
+Dqn_DSMapItem<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, Dqn_DSMapFindOnly find_only, Dqn_DSMapItemCreated *created)
 {
+    if (created)
+        *created = Dqn_DSMapItemCreated_No;
+
     if (!map)
         return nullptr;
 
@@ -2811,11 +3211,12 @@ Dqn_DSMapEntry<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, bool fi
         if (find_only)
             return nullptr;
         else
-            *map = Dqn_DSMap_Init<T>(DQN_DS_MAP_MIN_SIZE);
+            *map = Dqn_DSMap_Init<T>(DQN_DSMAP_MIN_SIZE);
     }
 
+    // NOTE: Search for a vacant entry, linear probe if hash collision
     Dqn_isize          index  = hash % map->size;
-    Dqn_DSMapEntry<T> *result = map->slots + index;
+    Dqn_DSMapItem<T> *result = map->slots + index;
     while (result->occupied && result->hash != hash) {
         index  = (index + 1) % map->size;
         result = map->slots + index;
@@ -2825,22 +3226,37 @@ Dqn_DSMapEntry<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, bool fi
         DQN_ASSERT_MSG(result->hash == hash,
                        "We have a max load factor of 70%% so we should never get an occupied slot that doesn't match "
                        "the hash we were searching for");
-    } else if (find_only) {
+    } else if (find_only == Dqn_DSMapFindOnly_Yes) {
         result = nullptr;
     } else {
+        // NOTE: Fill the entry
         result->hash     = hash;
         result->occupied = true;
 
+        if (created)
+            *created = Dqn_DSMapItemCreated_Yes;
+
+        // NOTE: Add the entry to the linked list of items (for iterability)
+        if (map->link_tail) {
+            map->link_tail->next = result;
+            result->prev         = map->link_tail;
+        } else {
+            map->link_head = result;
+        }
+        map->link_tail = result;
+
+        // NOTE: Grow the hashtable if we hit the loading limit
         Dqn_f32 load_factor = ++map->count / DQN_CAST(Dqn_f32)map->size;
         if (load_factor >= 0.7f) {
+
             auto new_map = Dqn_DSMap_Init<T>(map->size << 1);
-            for (Dqn_isize map_index = 0; map_index < map->size; map_index++) {
-                Dqn_DSMapEntry<T> *entry = map->slots + map_index;
-                if (entry->occupied) {
-                    Dqn_DSMapEntry<T> *new_entry = Dqn_DSMap_AddCopy(&new_map, entry->hash, entry->value);
-                    if (new_entry->hash == hash)
-                        result = new_entry;
-                }
+            for (Dqn_DSMapItem<T> *entry = map->link_head; entry; entry = entry->next) {
+                if (!entry->occupied)
+                    continue;
+
+                Dqn_DSMapItem<T> *new_entry = Dqn_DSMap_Add(&new_map, entry->hash, entry->value);
+                if (new_entry->hash == hash)
+                    result = new_entry;
             }
 
             Dqn_DSMap_Free(map, Dqn_ZeroMem_No);
@@ -2852,9 +3268,9 @@ Dqn_DSMapEntry<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, bool fi
 }
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_Add(Dqn_DSMap<T> *map, uint64_t hash, T &value)
+Dqn_DSMapItem<T> *Dqn_DSMap_Add(Dqn_DSMap<T> *map, uint64_t hash, T const &value)
 {
-    Dqn_DSMapEntry<T> *result = Dqn_DSMap_FindOrAdd(map, hash, false /*find_only*/);
+    Dqn_DSMapItem<T> *result = Dqn_DSMap_FindOrAdd(map, hash, Dqn_DSMapFindOnly_No, nullptr /*added*/);
     if (result)
         result->value = value;
 
@@ -2862,19 +3278,9 @@ Dqn_DSMapEntry<T> *Dqn_DSMap_Add(Dqn_DSMap<T> *map, uint64_t hash, T &value)
 }
 
 template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_AddCopy(Dqn_DSMap<T> *map, uint64_t hash, T const &value)
+Dqn_DSMapItem<T> *Dqn_DSMap_Get(Dqn_DSMap<T> *map, uint64_t hash)
 {
-    Dqn_DSMapEntry<T> *result = Dqn_DSMap_FindOrAdd(map, hash, false /*find_only*/);
-    if (result)
-        result->value = value;
-
-    return result;
-}
-
-template <typename T>
-Dqn_DSMapEntry<T> *Dqn_DSMap_Get(Dqn_DSMap<T> *map, uint64_t hash)
-{
-    Dqn_DSMapEntry<T> *result = Dqn_DSMap_FindOrAdd(map, hash, true /*find_only*/);
+    Dqn_DSMapItem<T> *result = Dqn_DSMap_FindOrAdd(map, hash, Dqn_DSMapFindOnly_Yes, nullptr /*added*/);
     return result;
 }
 
@@ -2884,27 +3290,42 @@ void Dqn_DSMap_Erase(Dqn_DSMap<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem)
     if (!map)
         return;
 
-    Dqn_isize          index  = hash % map->size;
-    Dqn_DSMapEntry<T> *result = map->slots + index;
+    Dqn_isize          index = hash % map->size;
+    Dqn_DSMapItem<T> *result = map->slots + index;
     if (!result || !result->occupied)
         return;
 
+    // NOTE: Unlink the item
+    if (result->prev)
+        result->prev->next = result->next;
+    if (result->next)
+        result->next->prev = result->prev;
+
+    result->next = nullptr;
+    result->prev = nullptr;
+
+    // NOTE: Probe forward in the hash table and fill the gap with adjacent
+    // entries that were linear-probed on the entry we just deleted
     Dqn_isize start_index = index;
     Dqn_isize probe_index = index;
     for (;;) {
-        probe_index               = (probe_index + 1) % map->size;
-        Dqn_DSMapEntry<T> *probe  = map->slots + probe_index;
-        if (!probe->occupied) break;
+        probe_index              = (probe_index + 1) % map->size;
+        Dqn_DSMapItem<T> *probe = map->slots + probe_index;
+        if (!probe->occupied)
+            break;
 
         Dqn_isize desired_index = probe->hash % map->size;
         if (desired_index != probe_index) {
             map->slots[start_index] = map->slots[probe_index];
-            start_index              = probe_index;
+            start_index             = probe_index;
             DQN_ASSERT(map->slots[start_index].occupied);
             DQN_ASSERT(map->slots[probe_index].occupied);
         }
     }
 
+    // NOTE: Delete the entry, note that if there were probes, this will end up
+    // deleting the last item in the chain which is what we want because
+    // essentially every entry gets shifted up the chain by 1 spot.
     DQN_ASSERT(map->slots[start_index].occupied);
     map->slots[start_index].occupied = false;
     map->count -= 1;
@@ -2913,19 +3334,162 @@ void Dqn_DSMap_Erase(Dqn_DSMap<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem)
         DQN_MEMSET(map->slots + start_index, DQN_MEMSET_BYTE, sizeof(map->slots[start_index]));
     }
 }
-#endif // DQN_WITH_DSMAP
+#endif // !defined(DQN_NO_DSMAP)
 
-#if defined(DQN_WITH_FIXED_STRING)
-// NOTE: Dqn_FString8 Template Implementation
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API void Dqn_Library_SetLogCallback(Dqn_LogProc *proc, void *user_data)
+{
+    dqn_library.log_callback  = proc;
+    dqn_library.log_user_data = user_data;
+}
+
+DQN_API void Dqn_Library_SetLogFile(FILE *file)
+{
+    Dqn_TicketMutex_Begin(&dqn_library.log_file_mutex);
+    dqn_library.log_file    = file;
+    dqn_library.log_to_file = file ? true : false;
+    Dqn_TicketMutex_End(&dqn_library.log_file_mutex);
+}
+
+DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
+{
+    #if defined(DQN_DEBUG_THREAD_CONTEXT)
+    // NOTE: Open a file to write the arena stats to
+    FILE *file = nullptr;
+    fopen_s(&file, file_path.data, "a+b");
+    if (file) {
+        Dqn_Log_ErrorF("Failed to dump thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
+        return;
+    }
+
+    // NOTE: Copy the stats from library book-keeping
+    // NOTE: Extremely short critical section, copy the stats then do our
+    // work on it.
+    Dqn_ArenaStat stats[Dqn_CArray_CountI(dqn_library.thread_context_arena_stats)];
+    int stats_size = 0;
+
+    Dqn_TicketMutex_Begin(&dqn_library.thread_context_mutex);
+    stats_size = dqn_library.thread_context_arena_stats_count;
+    DQN_MEMCPY(stats, dqn_library.thread_context_arena_stats, sizeof(stats[0]) * stats_size);
+    Dqn_TicketMutex_End(&dqn_library.thread_context_mutex);
+
+    // NOTE: Print the cumulative stat
+    Dqn_DateHMSTimeString now = Dqn_Date_HMSLocalTimeStringNow();
+    fprintf(file,
+            "Time=%.*s %.*s | Thread Context Arenas | Count=%d\n",
+            now.date_size, now.date,
+            now.hms_size, now.hms,
+            dqn_library.thread_context_arena_stats_count);
+
+    // NOTE: Write the cumulative thread arena data
+    {
+        Dqn_ArenaStat stat = {};
+        for (Dqn_isize index = 0; index < stats_size; index++) {
+            Dqn_ArenaStat const *current = stats + index;
+            stat.capacity += current->capacity;
+            stat.used     += current->used;
+            stat.wasted   += current->wasted;
+            stat.blocks   += current->blocks;
+
+            stat.capacity_hwm = DQN_MAX(stat.capacity_hwm, current->capacity_hwm);
+            stat.used_hwm     = DQN_MAX(stat.used_hwm, current->used_hwm);
+            stat.wasted_hwm   = DQN_MAX(stat.wasted_hwm, current->wasted_hwm);
+            stat.blocks_hwm   = DQN_MAX(stat.blocks_hwm, current->blocks_hwm);
+        }
+
+        Dqn_ArenaStatString stats_string = Dqn_Arena_StatString(&stat);
+        fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.data);
+    }
+
+    // NOTE: Print individual thread arena data
+    for (Dqn_isize index = 0; index < stats_size; index++) {
+        Dqn_ArenaStat const *current = stats + index;
+        Dqn_ArenaStatString current_string = Dqn_Arena_StatString(current);
+        fprintf(file, "  [%03d] CURR %.*s\n", DQN_CAST(int)index, current_string.size, current_string.data);
+    }
+
+    fclose(file);
+    DQN_LOG_I("Dumped thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
+    #else
+    (void)file_path;
+    #endif // #if defined(DQN_DEBUG_THREAD_CONTEXT)
+}
+
+#if defined(DQN_LEAK_TRACKING)
+DQN_API void Dqn_Library_LeakTraceAdd(Dqn_CallSite call_site, void *ptr, Dqn_usize size)
+{
+    if (!ptr)
+        return;
+
+    Dqn_TicketMutex_Begin(&dqn_library.alloc_table_mutex);
+    Dqn_DSMapItemCreated created       = Dqn_DSMapItemCreated_No;
+    Dqn_DSMapItem<Dqn_LeakTrace> *item = Dqn_DSMap_FindOrAdd(&dqn_library.alloc_table, (uintptr_t)ptr, Dqn_DSMapFindOnly_No, &created);
+
+    // NOTE: If the entry was not added, we are reusing a pointer that has been freed.
+    Dqn_LeakTrace *trace = &item->value;
+    if (created == Dqn_DSMapItemCreated_No) {
+        DQN_HARD_ASSERT_MSG(trace->freed, "This pointer is already in the leak tracker, however it"
+                                          " has not been freed yet. Somehow this pointer has been"
+                                          " given to the allocation table and has not being marked"
+                                          " freed with an equivalent call to LeakTraceMarkFree()"
+                                          " [ptr=%p, size=%_$$d, file=\"%.*s:%u\","
+                                          " function=\"%.*s\"]",
+                                          ptr,
+                                          size,
+                                          DQN_STRING_FMT(trace->call_site.file),
+                                          trace->call_site.line,
+                                          DQN_STRING_FMT(trace->call_site.function));
+    }
+
+    trace->ptr       = ptr;
+    trace->size      = size;
+    trace->call_site = call_site;
+    Dqn_TicketMutex_End(&dqn_library.alloc_table_mutex);
+}
+
+DQN_API void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr)
+{
+    if (!ptr)
+        return;
+
+    Dqn_TicketMutex_Begin(&dqn_library.alloc_table_mutex);
+
+    Dqn_DSMapItem<Dqn_LeakTrace> *item = Dqn_DSMap_Get(&dqn_library.alloc_table, DQN_CAST(uintptr_t)ptr);
+    DQN_HARD_ASSERT_MSG(item, "Allocated pointer can not be removed as it does not exist in the"
+                              " allocation table. When this memory was allocated, the pointer was"
+                              " not added to the allocation table [ptr=%p]",
+                              ptr);
+
+    Dqn_LeakTrace *trace = &item->value;
+    DQN_HARD_ASSERT_MSG(!trace->freed,
+                        "Double free detected, pointer was previously allocated at [ptr=%p, %_$$d, file=\"%.*s:%u\", function=\"%.*s\"]",
+                        ptr,
+                        trace->size,
+                        DQN_STRING_FMT(trace->call_site.file),
+                        trace->call_site.line,
+                        DQN_STRING_FMT(trace->call_site.function));
+
+    trace->freed           = true;
+    trace->freed_size      = trace->size;
+    trace->freed_call_site = call_site;
+    Dqn_TicketMutex_End(&dqn_library.alloc_table_mutex);
+}
+#endif /// defined(DQN_LEAK_TRACKING)
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_FSTRING8)
 DQN_FSTRING8_API
-DQN_FSTRING8 Dqn_FString8_Fmt(char const *fmt, ...)
+DQN_FSTRING8 Dqn_FString8_InitF(char const *fmt, ...)
 {
     DQN_FSTRING8 result = {};
     if (fmt) {
         va_list args;
         va_start(args, fmt);
-        Dqn_FString8_AppendFmtV(&result, fmt, args);
+        Dqn_FString8_AppendFV(&result, fmt, args);
         va_end(args);
     }
     return result;
@@ -2945,27 +3509,22 @@ void Dqn_FString8_Clear(DQN_FSTRING8 *string)
 }
 
 DQN_FSTRING8_API
-bool Dqn_FString8_AppendFmtV(DQN_FSTRING8 *string, char const *fmt, va_list args)
+bool Dqn_FString8_AppendFV(DQN_FSTRING8 *string, char const *fmt, va_list args)
 {
     bool result = false;
     if (!string || !fmt)
         return result;
 
     DQN_HARD_ASSERT(string->size >= 0);
-
-    va_list args_copy;
-    va_copy(args_copy, args);
-    Dqn_isize require = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, args_copy) + 1;
-    va_end(args_copy);
-
-    Dqn_isize space = N - string->size;
-    result          = require <= space;
-    string->size   += STB_SPRINTF_DECORATE(vsnprintf)(string->data + string->size, DQN_CAST(int)space, fmt, args);
+    Dqn_isize require = Dqn_CString8_FVSize(fmt, args) + 1 /*null_terminate*/;
+    Dqn_isize space   = N - string->size;
+    result            = require <= space;
+    string->size     += STB_SPRINTF_DECORATE(vsnprintf)(string->data + string->size, DQN_CAST(int)space, fmt, args);
     return result;
 }
 
 DQN_FSTRING8_API
-bool Dqn_FString8_AppendFmt(DQN_FSTRING8 *string, char const *fmt, ...)
+bool Dqn_FString8_AppendF(DQN_FSTRING8 *string, char const *fmt, ...)
 {
     bool result = false;
     if (!string || !fmt)
@@ -2975,7 +3534,7 @@ bool Dqn_FString8_AppendFmt(DQN_FSTRING8 *string, char const *fmt, ...)
 
     va_list args;
     va_start(args, fmt);
-    result = Dqn_FString8_AppendFmtV(string, fmt, args);
+    result = Dqn_FString8_AppendFV(string, fmt, args);
     va_end(args);
     return result;
 }
@@ -2993,7 +3552,7 @@ bool Dqn_FString8_AppendCString8(DQN_FSTRING8 *string, char const *src, Dqn_isiz
 
     Dqn_isize space = (N - 1 /*reserve byte for null terminator*/) - string->size;
     result          = size <= space;
-    DQN_MEMCOPY(string->data + string->size, src, DQN_MIN(space, size));
+    DQN_MEMCPY(string->data + string->size, src, DQN_MIN(space, size));
     string->size = DQN_MIN(string->size + size, N);
     string->data[string->size] = 0;
     return result;
@@ -3007,22 +3566,22 @@ bool Dqn_FString8_AppendString8(DQN_FSTRING8 *string, Dqn_String8 src)
 }
 
 DQN_FSTRING8_API
-Dqn_String8 Dqn_FString8_ToString(DQN_FSTRING8 const *string)
+Dqn_String8 Dqn_FString8_ToString8(DQN_FSTRING8 const *string)
 {
     Dqn_String8 result = {};
     if (!string)
         return result;
 
-    DQN_HARD_ASSERT(string->size > 0);
-    result.data = string->data;
+    DQN_HARD_ASSERT(string->size >= 0);
+    result.data = DQN_CAST(char *)string->data;
     result.size = string->size;
     return result;
 }
-#endif // DQN_WITH_FIXED_STRING
+#endif // !defined(DQN_NO_FSTRING8)
 
-#if defined(DQN_WITH_FIXED_ARRAY)
 // NOTE: Dqn_FArray Template Implementation
 // -------------------------------------------------------------------------------------------------
+#if !defined(DQN_NO_FARRAY)
 DQN_FARRAY_API
 DQN_FARRAY Dqn_FArray_Init(T const *item, Dqn_isize count)
 {
@@ -3038,28 +3597,6 @@ Dqn_isize Dqn_FArray_Max(DQN_FARRAY const *)
     return result;
 }
 
-#if defined(NDEBUG)
-    #define Dqn_Safe_AssertF(expr, fmt, ...) expr
-    #define Dqn_Safe_Assert(expr, fmt, ...) expr
-#else
-    #define Dqn_Safe_AssertF(expr, fmt, ...) \
-        Dqn_Safe_AssertF_(expr, #expr, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__, "Safe assert triggered: " fmt, ## __VA_ARGS__)
-    #define Dqn_Safe_Assert(expr) Dqn_Safe_AssertF(expr, "")
-#endif
-
-bool Dqn_Safe_AssertF_(bool assertion_expr, char const *expr, Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, ...)
-{
-    bool result = assertion_expr;
-    if (!result) {
-        va_list args;
-        va_start(args, fmt);
-        Dqn_LogV(Dqn_LogType::Error, dqn_lib_.log_user_data, file, func, line, fmt, args);
-        va_end(args);
-        DQN_DEBUG_BREAK;
-    }
-    return result;
-}
-
 DQN_FARRAY_API
 T *Dqn_FArray_AddArray(DQN_FARRAY *array, T const *items, Dqn_isize count)
 {
@@ -3067,11 +3604,11 @@ T *Dqn_FArray_AddArray(DQN_FARRAY *array, T const *items, Dqn_isize count)
     if (!array || !items || count <= 0)
         return result;
 
-    DQN_ASSERT(array->size > 0);
+    DQN_ASSERT(array->size >= 0);
     if (Dqn_Safe_AssertF(array->size + count < N, "Array out of space")) {
         result = array->data + array->size;
         array->size += count;
-        DQN_MEMCOPY(result, items, sizeof(T) * count);
+        DQN_MEMCPY(result, items, sizeof(T) * count);
     }
     return result;
 }
@@ -3083,7 +3620,7 @@ T *Dqn_FArray_Add(DQN_FARRAY *array, T const &item)
     if (!array)
         return result;
 
-    DQN_ASSERT(array->size > 0);
+    DQN_ASSERT(array->size >= 0);
     if (Dqn_Safe_AssertF(array->size < N, "Array out of space")) {
         array->data[array->size++] = item;
         result = array->data + (array->size - 1);
@@ -3098,6 +3635,7 @@ T *Dqn_FArray_Make(DQN_FARRAY *array, Dqn_isize count)
     if (!array || count <= 0)
         return result;
 
+    DQN_ASSERT(array->size >= 0);
     if (Dqn_Safe_AssertF(array->size + count <= N, "Array out of space")) {
         result = array->data + array->size;
         array->size += count;
@@ -3130,7 +3668,7 @@ bool Dqn_FArray_EraseStable(DQN_FARRAY *array, Dqn_isize index)
     T *end  = array->data + array->size;
     T *dest = array->data + index;
     T *src  = DQN_MIN(dest + 1, end);
-    DQN_MEMCOPY(dest, src, DQN_CAST(size_t)(end - src));
+    DQN_MEMCPY(dest, src, DQN_CAST(size_t)(end - src));
     array->size--;
     return true;
 }
@@ -3215,7 +3753,7 @@ DQN_API T *Dqn_FArray_FindProcElseMake(DQN_FARRAY *array, IsEqualProc IsEqual, b
 DQN_FARRAY_API
 T *Dqn_FArray_Find(DQN_FARRAY *array, T const *find)
 {
-    if (!array || !IsEqualProc)
+    if (!array || !find)
         return nullptr;
 
     for (const T &entry : (*array)) {
@@ -3224,7 +3762,7 @@ T *Dqn_FArray_Find(DQN_FARRAY *array, T const *find)
     }
     return nullptr;
 }
-#endif // DQN_WITH_FIXED_ARRAY
+#endif // !defined(DQN_NO_FARRAY)
 
 // NOTE: Dqn_List Template Implementation
 // -------------------------------------------------------------------------------------------------
@@ -3238,19 +3776,19 @@ DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_isize chunk_siz
 }
 
 template <typename T>
-DQN_API T *Dqn_List_Make_(Dqn_List<T> *list, Dqn_isize count DQN_CALL_SITE_ARGS)
+DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize count)
 {
     if (list->chunk_size == 0)
         list->chunk_size = 128;
 
     if (!list->tail || (list->tail->count + count) > list->tail->size)
     {
-        auto *tail = (Dqn_ListChunk<T> * )Dqn_Arena_Allocate_(list->arena, sizeof(Dqn_ListChunk<T>), alignof(Dqn_ListChunk<T>), Dqn_ZeroMem_Yes DQN_CALL_SITE_ARGS_INPUT);
+        auto *tail = (Dqn_ListChunk<T> * )Dqn_Arena_Allocate_(list->arena, sizeof(Dqn_ListChunk<T>), alignof(Dqn_ListChunk<T>), Dqn_ZeroMem_Yes DQN_LEAK_TRACE_ARG);
         if (!tail)
           return nullptr;
 
         Dqn_isize items = DQN_MAX(list->chunk_size, count);
-        tail->data      = (T * )Dqn_Arena_Allocate_(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem_Yes DQN_CALL_SITE_ARGS_INPUT);
+        tail->data      = (T * )Dqn_Arena_Allocate_(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem_Yes DQN_LEAK_TRACE_ARG);
         tail->size      = items;
 
         if (!tail->data)
@@ -3358,6 +3896,51 @@ DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at
     return result;
 }
 
+// NOTE: Dqn_BinarySearch Template Implementation
+// -------------------------------------------------------------------------------------------------
+template <typename T>
+DQN_FORCE_INLINE bool Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
+{
+    bool result = lhs < rhs;
+    return result;
+}
+
+template <typename T>
+Dqn_isize
+Dqn_BinarySearch(T const                        *array,
+                 Dqn_isize                       array_size,
+                 T const                        &find,
+                 Dqn_BinarySearchType            type,
+                 Dqn_BinarySearchLessThanProc<T> less_than)
+{
+    Dqn_isize result = -1;
+    Dqn_isize head   = 0;
+    Dqn_isize tail   = array_size - 1;
+
+    if (array && array_size >= 0) {
+        while (result == -1 && head <= tail) {
+            Dqn_isize mid  = (head + tail) / 2;
+            T const &value = array[mid];
+            if (less_than(find, value)) {
+                tail = mid - 1;
+            } else if (less_than(value, find)) {
+                head = mid + 1;
+            } else {
+                result = mid;
+            }
+        }
+    }
+
+    if (type == Dqn_BinarySearchType_OnePastMatch) {
+        result = (result == -1) ? tail + 1 : result + 1;
+        result = DQN_MAX(result, 0);
+    } else {
+        DQN_ASSERT(type == Dqn_BinarySearchType_Match);
+    }
+
+    return result;
+}
+
 #if defined(DQN_COMPILER_W32_MSVC)
     #pragma warning(pop)
 #endif
@@ -3372,7 +3955,7 @@ DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "wininet")
 
-    #if defined(DQN_NO_WIN32_MINIMAL_HEADER)
+    #if defined(DQN_NO_WIN32_MINIMAL_HEADER) || defined(_INC_WINDOWS)
         #include <bcrypt.h>          // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
         #include <shellscalingapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
         #if defined(DQN_WITH_WIN_NET)
@@ -3445,10 +4028,23 @@ DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at
         #define OPEN_ALWAYS         4
         #define TRUNCATE_EXISTING   5
 
+        #define STD_INPUT_HANDLE ((unsigned long)-10)
+        #define STD_OUTPUT_HANDLE ((unsigned long)-11)
+        #define STD_ERROR_HANDLE ((unsigned long)-12)
+
         #define INVALID_FILE_SIZE ((unsigned long)0xFFFFFFFF)
 
-        typedef enum PROCESS_DPI_AWARENESS
-        {
+        // NOTE: HttpAddRequestHeadersA
+        #define HTTP_ADDREQ_FLAG_ADD_IF_NEW 0x10000000
+        #define HTTP_ADDREQ_FLAG_ADD        0x20000000
+        #define HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA       0x40000000
+        #define HTTP_ADDREQ_FLAG_COALESCE_WITH_SEMICOLON   0x01000000
+        #define HTTP_ADDREQ_FLAG_COALESCE                  HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA
+        #define HTTP_ADDREQ_FLAG_REPLACE    0x80000000
+
+        #define SW_SHOW 5
+
+        typedef enum PROCESS_DPI_AWARENESS {
             PROCESS_DPI_UNAWARE           = 0,
             PROCESS_SYSTEM_DPI_AWARE      = 1,
             PROCESS_PER_MONITOR_DPI_AWARE = 2
@@ -3598,69 +4194,79 @@ DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at
         // ---------------------------------------------------------------------
         extern "C"
         {
-        /*BOOL*/     int            __stdcall CreateDirectoryW           (wchar_t const *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
-        /*BOOL*/     int            __stdcall RemoveDirectoryW           (wchar_t const *lpPathName);
-        /*DWORD*/    unsigned long  __stdcall GetCurrentDirectoryW       (unsigned long nBufferLength, wchar_t *lpBuffer);
+        /*BOOL*/      int            __stdcall CreateDirectoryW           (wchar_t const *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
+        /*BOOL*/      int            __stdcall RemoveDirectoryW           (wchar_t const *lpPathName);
+        /*DWORD*/     unsigned long  __stdcall GetCurrentDirectoryW       (unsigned long nBufferLength, wchar_t *lpBuffer);
 
-        /*BOOL*/     int            __stdcall FindNextFileW              (void *hFindFile, WIN32_FIND_DATAW *lpFindFileData);
-        /*HANDLE*/   void *         __stdcall FindFirstFileExW           (wchar_t const *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, unsigned long dwAdditionalFlags);
-        /*DWORD*/    unsigned long  __stdcall GetFileAttributesExW       (wchar_t const *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, WIN32_FILE_ATTRIBUTE_DATA *lpFileInformation);
-        /*BOOL*/     int            __stdcall GetFileSizeEx              (void *hFile, LARGE_INTEGER *lpFileSize);
+        /*BOOL*/      int            __stdcall FindNextFileW              (void *hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+        /*HANDLE*/    void *         __stdcall FindFirstFileExW           (wchar_t const *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, unsigned long dwAdditionalFlags);
+        /*DWORD*/     unsigned long  __stdcall GetFileAttributesExW       (wchar_t const *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, WIN32_FILE_ATTRIBUTE_DATA *lpFileInformation);
+        /*BOOL*/      int            __stdcall GetFileSizeEx              (void *hFile, LARGE_INTEGER *lpFileSize);
 
-        /*BOOL*/     int            __stdcall MoveFileExW                (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, unsigned long dwFlags);
-        /*BOOL*/     int            __stdcall CopyFileW                  (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, int bFailIfExists);
-        /*BOOL*/     int            __stdcall DeleteFileW                (wchar_t const *lpExistingFileName);
-        /*HANDLE*/   void *         __stdcall CreateFileW                (wchar_t const *lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void *hTemplateFile);
-        /*BOOL*/     int            __stdcall ReadFile                   (void *hFile, void *lpBuffer, unsigned long nNumberOfBytesToRead, unsigned long *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
-        /*BOOL*/     int            __stdcall WriteFile                  (void *hFile, void const *lpBuffer, unsigned long nNumberOfBytesToWrite, unsigned long *lpNumberOfBytesWritten, struct OVERLAPPED *lpOverlapped);
-        /*BOOL*/     int            __stdcall CloseHandle                (void *hObject);
+        /*BOOL*/      int            __stdcall MoveFileExW                (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, unsigned long dwFlags);
+        /*BOOL*/      int            __stdcall CopyFileW                  (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, int bFailIfExists);
+        /*BOOL*/      int            __stdcall DeleteFileW                (wchar_t const *lpExistingFileName);
+        /*HANDLE*/    void *         __stdcall CreateFileW                (wchar_t const *lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void *hTemplateFile);
+        /*BOOL*/      int            __stdcall ReadFile                   (void *hFile, void *lpBuffer, unsigned long nNumberOfBytesToRead, unsigned long *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
+        /*BOOL*/      int            __stdcall WriteFile                  (void *hFile, void const *lpBuffer, unsigned long nNumberOfBytesToWrite, unsigned long *lpNumberOfBytesWritten, struct OVERLAPPED *lpOverlapped);
+        /*BOOL*/      int            __stdcall CloseHandle                (void *hObject);
 
-        /*HMODULE*/  void *         __stdcall LoadLibraryA               (char const *lpFileName);
-        /*BOOL*/     int            __stdcall FreeLibrary                (void *hModule);
-        /*FARPROC*/  void *         __stdcall GetProcAddress             (void *hModule, char const *lpProcName);
+        /*BOOL*/      int            __stdcall WriteConsoleA              (void *hConsoleOutput, const char *lpBuffer, unsigned long nNumberOfCharsToWrite, unsigned long *lpNumberOfCharsWritten, void *lpReserved);
+        /*BOOL*/      int            __stdcall AllocConsole               ();
+        /*BOOL*/      int            __stdcall FreeConsole                ();
+        /*BOOL*/      int            __stdcall AttachConsole              (unsigned long dwProcessId);
+        /*HANDLE*/    void *         __stdcall GetStdHandle               (unsigned long nStdHandle);
+        /*BOOL*/      int            __stdcall GetConsoleMode             (void *hConsoleHandle, unsigned long *lpMode);
 
-        /*DWORD*/    unsigned long  __stdcall GetWindowModuleFileNameA   (void *hwnd, char *pszFileName, unsigned int cchFileNameMax);
-        /*HMODULE*/  void *         __stdcall GetModuleHandleA           (char const *lpModuleName);
-        /*DWORD*/    unsigned long  __stdcall GetModuleFileNameW         (void *hModule, wchar_t *lpFilename, unsigned long nSize);
+        /*HMODULE*/   void *         __stdcall LoadLibraryA               (char const *lpFileName);
+        /*BOOL*/      int            __stdcall FreeLibrary                (void *hModule);
+        /*FARPROC*/   void *         __stdcall GetProcAddress             (void *hModule, char const *lpProcName);
 
-        /*DWORD*/    unsigned long  __stdcall WaitForSingleObject        (void *hHandle, unsigned long dwMilliseconds);
+        /*DWORD*/     unsigned long  __stdcall GetWindowModuleFileNameA   (void *hwnd, char *pszFileName, unsigned int cchFileNameMax);
+        /*HMODULE*/   void *         __stdcall GetModuleHandleA           (char const *lpModuleName);
+        /*DWORD*/     unsigned long  __stdcall GetModuleFileNameW         (void *hModule, wchar_t *lpFilename, unsigned long nSize);
 
-        /*BOOL*/     int            __stdcall QueryPerformanceCounter    (LARGE_INTEGER *lpPerformanceCount);
-        /*BOOL*/     int            __stdcall QueryPerformanceFrequency  (LARGE_INTEGER *lpFrequency);
+        /*DWORD*/     unsigned long  __stdcall WaitForSingleObject        (void *hHandle, unsigned long dwMilliseconds);
 
-        /*HANDLE*/   void *         __stdcall CreateThread               (SECURITY_ATTRIBUTES *lpThreadAttributes, size_t dwStackSize, unsigned long (*lpStartAddress)(void *), void *lpParameter, unsigned long dwCreationFlags, unsigned long *lpThreadId);
-        /*HANDLE*/   void *         __stdcall CreateSemaphoreA           (SECURITY_ATTRIBUTES *lpSecurityAttributes, long lInitialCount, long lMaxCount, char *lpName);
-        /*BOOL*/     int            __stdcall ReleaseSemaphore           (void *semaphore, long lReleaseCount, long *lpPreviousCount);
-                     void           __stdcall Sleep                      (unsigned long dwMilliseconds);
+        /*BOOL*/      int            __stdcall QueryPerformanceCounter    (LARGE_INTEGER *lpPerformanceCount);
+        /*BOOL*/      int            __stdcall QueryPerformanceFrequency  (LARGE_INTEGER *lpFrequency);
 
-                     void *         __stdcall VirtualAlloc               (void *lpAddress, size_t dwSize, unsigned long flAllocationType, unsigned long flProtect);
-        /*BOOL*/     int            __stdcall VirtualProtect             (void *lpAddress, size_t dwSize, unsigned long flNewProtect, unsigned long *lpflOldProtect);
-        /*BOOL*/     int            __stdcall VirtualFree                (void *lpAddress, size_t dwSize, unsigned long dwFreeType);
+        /*HANDLE*/    void *         __stdcall CreateThread               (SECURITY_ATTRIBUTES *lpThreadAttributes, size_t dwStackSize, unsigned long (*lpStartAddress)(void *), void *lpParameter, unsigned long dwCreationFlags, unsigned long *lpThreadId);
+        /*HANDLE*/    void *         __stdcall CreateSemaphoreA           (SECURITY_ATTRIBUTES *lpSecurityAttributes, long lInitialCount, long lMaxCount, char *lpName);
+        /*BOOL*/      int            __stdcall ReleaseSemaphore           (void *semaphore, long lReleaseCount, long *lpPreviousCount);
+                      void           __stdcall Sleep                      (unsigned long dwMilliseconds);
+        /*DWORD*/     unsigned long  __stdcall GetCurrentThreadId         ();
 
-                     void           __stdcall GetSystemInfo              (SYSTEM_INFO *system_info);
-                     void           __stdcall GetSystemTime              (SYSTEMTIME  *lpSystemTime);
-                     void           __stdcall GetSystemTimeAsFileTime    (FILETIME    *lpFileTime);
-                     void           __stdcall GetLocalTime               (SYSTEMTIME  *lpSystemTime);
+                      void *         __stdcall VirtualAlloc               (void *lpAddress, size_t dwSize, unsigned long flAllocationType, unsigned long flProtect);
+        /*BOOL*/      int            __stdcall VirtualProtect             (void *lpAddress, size_t dwSize, unsigned long flNewProtect, unsigned long *lpflOldProtect);
+        /*BOOL*/      int            __stdcall VirtualFree                (void *lpAddress, size_t dwSize, unsigned long dwFreeType);
 
-        /*DWORD*/    unsigned long  __stdcall FormatMessageA             (unsigned long dwFlags, void *lpSource, unsigned long dwMessageId, unsigned long dwLanguageId, char *lpBuffer, unsigned long nSize, va_list *Arguments);
-        /*DWORD*/    unsigned long  __stdcall GetLastError               ();
+                      void           __stdcall GetSystemInfo              (SYSTEM_INFO *system_info);
+                      void           __stdcall GetSystemTime              (SYSTEMTIME  *lpSystemTime);
+                      void           __stdcall GetSystemTimeAsFileTime    (FILETIME    *lpFileTime);
+                      void           __stdcall GetLocalTime               (SYSTEMTIME  *lpSystemTime);
 
-                     int            __stdcall MultiByteToWideChar        (unsigned int CodePage, unsigned long dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
-                     int            __stdcall WideCharToMultiByte        (unsigned int CodePage, unsigned long dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
+        /*DWORD*/     unsigned long  __stdcall FormatMessageA             (unsigned long dwFlags, void *lpSource, unsigned long dwMessageId, unsigned long dwLanguageId, char *lpBuffer, unsigned long nSize, va_list *Arguments);
+        /*DWORD*/     unsigned long  __stdcall GetLastError               ();
 
-        /*NTSTATUS*/ long           __stdcall BCryptOpenAlgorithmProvider(void *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
-        /*NTSTATUS*/ long           __stdcall BCryptGenRandom            (void *hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
+                      int            __stdcall MultiByteToWideChar        (unsigned int CodePage, unsigned long dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
+                      int            __stdcall WideCharToMultiByte        (unsigned int CodePage, unsigned long dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
 
-        /*BOOLAPI*/  int            __stdcall InternetCrackUrlA          (char const *lpszUrl, unsigned long dwUrlLength, unsigned long dwFlags, URL_COMPONENTSA *lpUrlComponents);
-        /*HANDLE*/   void *         __stdcall InternetOpenA              (char const *lpszAgent, unsigned long dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, unsigned long dwFlags);
-        /*HANDLE*/   void *         __stdcall InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, unsigned long dwService, unsigned long dwFlags, unsigned long *dwContext);
-        /*BOOLAPI*/  int            __stdcall InternetSetOptionA         (void *hInternet, unsigned long dwOption, void *lpBuffer, unsigned long dwBufferLength);
-        /*BOOLAPI*/  int            __stdcall InternetReadFile           (void *hFile, void *lpBuffer, unsigned long dwNumberOfBytesToRead, unsigned long *lpdwNumberOfBytesRead);
-        /*BOOLAPI*/  int            __stdcall InternetCloseHandle        (void *hInternet);
-        /*HANDLE*/   void *         __stdcall HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, unsigned long dwFlags, unsigned long *dwContext);
-        /*BOOLAPI*/  int            __stdcall HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
+        /*NTSTATUS*/  long           __stdcall BCryptOpenAlgorithmProvider(void *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
+        /*NTSTATUS*/  long           __stdcall BCryptGenRandom            (void *hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
+
+        /*BOOLAPI*/   int            __stdcall InternetCrackUrlA          (char const *lpszUrl, unsigned long dwUrlLength, unsigned long dwFlags, URL_COMPONENTSA *lpUrlComponents);
+        /*HANDLE*/    void *         __stdcall InternetOpenA              (char const *lpszAgent, unsigned long dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, unsigned long dwFlags);
+        /*HANDLE*/    void *         __stdcall InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, unsigned long dwService, unsigned long dwFlags, unsigned long *dwContext);
+        /*BOOLAPI*/   int            __stdcall InternetSetOptionA         (void *hInternet, unsigned long dwOption, void *lpBuffer, unsigned long dwBufferLength);
+        /*BOOLAPI*/   int            __stdcall InternetReadFile           (void *hFile, void *lpBuffer, unsigned long dwNumberOfBytesToRead, unsigned long *lpdwNumberOfBytesRead);
+        /*BOOLAPI*/   int            __stdcall InternetCloseHandle        (void *hInternet);
+        /*HANDLE*/    void *         __stdcall HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, unsigned long dwFlags, unsigned long *dwContext);
+        /*BOOLAPI*/   int            __stdcall HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
+        /*BOOLAPI*/   int            __stdcall HttpAddRequestHeadersA     (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, unsigned long dwModifiers);
+        /*HINSTANCE*/ void *         __stdcall ShellExecuteA              (void *hwnd, char const *lpOperation, char const *lpFile, char const *lpParameters, char const *lpDirectory, int nShowCmd);
         }
-    #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER)
+    #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
 #elif defined(DQN_OS_UNIX)
     #include <errno.h>        // errno
     #include <fcntl.h>        // O_RDONLY ... etc
@@ -3674,7 +4280,7 @@ DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at
     #include <unistd.h>       // access
 #endif
 
-Dqn_Lib_ dqn_lib_;
+Dqn_Library dqn_library;
 
 // NOTE: Intrinsics
 // -------------------------------------------------------------------------------------------------
@@ -3699,38 +4305,37 @@ Dqn_CPUIDRegisters Dqn_CPUID(int function_id)
 
 // NOTE: Dqn_TicketMutex_
 // -------------------------------------------------------------------------------------------------
-void Dqn_TicketMutex_Begin(Dqn_TicketMutex *mutex)
+DQN_API void Dqn_TicketMutex_Begin(Dqn_TicketMutex *mutex)
 {
     unsigned int ticket = Dqn_Atomic_AddU32(&mutex->ticket, 1);
     Dqn_TicketMutex_BeginTicket(mutex, ticket);
 }
 
-void Dqn_TicketMutex_End(Dqn_TicketMutex *mutex)
+DQN_API void Dqn_TicketMutex_End(Dqn_TicketMutex *mutex)
 {
     Dqn_Atomic_AddU32(&mutex->serving, 1);
 }
 
-Dqn_uint Dqn_TicketMutex_MakeTicket(Dqn_TicketMutex *mutex)
+DQN_API Dqn_uint Dqn_TicketMutex_MakeTicket(Dqn_TicketMutex *mutex)
 {
     Dqn_uint result = Dqn_Atomic_AddU32(&mutex->ticket, 1);
     return result;
 }
 
-void Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket)
+DQN_API void Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket)
 {
     DQN_ASSERT_MSG(mutex->serving <= ticket,
                    "Mutex skipped ticket? Was ticket generated by the correct mutex via MakeTicket? ticket = %u, "
                    "mutex->serving = %u",
                    ticket,
                    mutex->serving);
-    while(ticket != mutex->serving)
-    {
+    while (ticket != mutex->serving) {
         // NOTE: Use spinlock intrinsic
         _mm_pause();
     }
 }
 
-bool Dqn_TicketMutex_CanLock(Dqn_TicketMutex const *mutex, Dqn_uint ticket)
+DQN_API bool Dqn_TicketMutex_CanLock(Dqn_TicketMutex const *mutex, Dqn_uint ticket)
 {
     bool result = (ticket == mutex->serving);
     return result;
@@ -3738,237 +4343,192 @@ bool Dqn_TicketMutex_CanLock(Dqn_TicketMutex const *mutex, Dqn_uint ticket)
 
 // NOTE: Dqn_Allocator
 // -------------------------------------------------------------------------------------------------
-void *Dqn_Allocator_Alloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem)
+DQN_API void *Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
     void *result = NULL;
     if (allocator.alloc) {
-        result = allocator.alloc(DQN_CALL_SITE_ARGS_INPUT size, align, zero_mem, allocator.user_context);
+        result = allocator.alloc(DQN_LEAK_TRACE_ARG size, align, zero_mem, allocator.user_context);
     } else {
         result = DQN_ALLOC(size);
+        Dqn_Library_LeakTraceAdd(DQN_LEAK_TRACE_ARG result, size);
     }
     return result;
 }
 
-void Dqn_Allocator_Dealloc(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, void *ptr, size_t size)
+DQN_API void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, void *ptr, size_t size)
 {
     if (allocator.dealloc) {
-        allocator.dealloc(DQN_CALL_SITE_ARGS_INPUT ptr, size, allocator.user_context);
+        allocator.dealloc(DQN_LEAK_TRACE_ARG ptr, size, allocator.user_context);
     } else {
         DQN_DEALLOC(ptr, size);
+        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG ptr);
     }
 }
 
-// NOTE: Dqn_Log
-// -------------------------------------------------------------------------------------------------
-DQN_API void Dqn_LogVDefault(Dqn_LogType type,
-                             void *      user_data,
-                             Dqn_String8  file,
-                             Dqn_String8  func,
-                             Dqn_uint    line,
-                             char const  *fmt,
-                             va_list     va)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-LLOG] Dqn_Log              |                             | Library logging
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
 {
+    (void)log_type;
     (void)user_data;
 
-    // NOTE: Ensure log-file is opened for appending, ultra-lightweight spinlock mutex
-    Dqn_TicketMutex_Begin(&dqn_lib_.log_file_mutex);
-    if (!dqn_lib_.log_no_output_file) {
-        if (!dqn_lib_.log_file) {
-            Dqn_ThreadTempArena scratch = Dqn_Thread_TempArena();
-            Dqn_String8        exe_dir  = Dqn_OS_EXEDir(Dqn_Arena_Allocator(scratch.arena));
-            Dqn_String8        log_file = Dqn_String8_Fmt(Dqn_Arena_Allocator(scratch.arena), "%.*s/dqn.log", DQN_STRING_FMT(exe_dir));
-            fopen_s(DQN_CAST(FILE **)&dqn_lib_.log_file, log_file.data, "a");
-        }
+    // NOTE: Open log file for appending if requested
+    // =========================================================================
+    Dqn_TicketMutex_Begin(&dqn_library.log_file_mutex);
+    if (dqn_library.log_to_file && !dqn_library.log_file) {
+        Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(nullptr);
+        Dqn_String8        exe_dir  = Dqn_OS_EXEDir(scratch.allocator);
+        Dqn_String8        log_file = Dqn_String8_InitF(scratch.allocator, "%.*s/dqn.log", DQN_STRING_FMT(exe_dir));
+        fopen_s(DQN_CAST(FILE **)&dqn_library.log_file, log_file.data, "a");
     }
-    Dqn_TicketMutex_End(&dqn_lib_.log_file_mutex);
+    Dqn_TicketMutex_End(&dqn_library.log_file_mutex);
 
-    // NOTE: Construct log
-    Dqn_ThreadTempArena scratch      = Dqn_Thread_TempArena();
-    Dqn_String8Builder string_list = {};
-    string_list.allocator          = Dqn_Arena_Allocator(scratch.arena);
+    // NOTE: Generate the log header
+    // =========================================================================
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_String8 header        = {};
     {
-        // NOTE: Generate the log header
-        Dqn_String8 file_name            = Dqn_String8_FileNameFromPath(file);
+        Dqn_String8 file_name            = Dqn_String8_FileNameFromPath(call_site.file);
         Dqn_DateHMSTimeString const time = Dqn_Date_HMSLocalTimeStringNow();
+        header                           = Dqn_String8_InitF(scratch.allocator, "%.*s %.*s %.*s %.*s %05u %.*s: ",
+                                                             time.date_size - 2,
+                                                             time.date      + 2,
+                                                             time.hms_size,
+                                                             time.hms,
+                                                             DQN_STRING_FMT(type),
+                                                             DQN_STRING_FMT(file_name),
+                                                             call_site.line,
+                                                             DQN_STRING_FMT(call_site.function));
 
-        Dqn_String8Builder_AppendFmtArgs(&string_list,
-                                        "[%.*s|%.*s|%.*s|%.*s|%05u|%.*s",
-                                        time.date_size - 2,
-                                        time.date      + 2,
-                                        time.hms_size,
-                                        time.hms,
-                                        DQN_STRING_FMT(Dqn_Log_TypeString8(type)),
-                                        DQN_STRING_FMT(file_name),
-                                        line,
-                                        DQN_STRING_FMT(func));
-
-        // NOTE: Pad the log header to the max header length so far
-        static Dqn_isize max_log_header_length = 0;
-        max_log_header_length                  = DQN_MAX(max_log_header_length, string_list.string_size);
-
-        if (string_list.string_size < max_log_header_length) {
-            int pad_size = DQN_CAST(int)(max_log_header_length - string_list.string_size);
-            Dqn_String8 padding = Dqn_String8_Allocate(Dqn_Arena_Allocator(scratch.arena), pad_size, Dqn_ZeroMem_No);
-            DQN_MEMSET(padding.data, ' ', padding.size);
-            Dqn_String8Builder_AppendString8Ref(&string_list, padding);
-        }
-
-        // NOTE: Add the user message to the log line
-        Dqn_String8Builder_AppendString8Ref(&string_list, DQN_STRING8("] "));
-        Dqn_String8Builder_AppendFmtVArgs(&string_list, fmt, va);
     }
 
-    // NOTE: Build the log line
-    Dqn_String8 log_line = Dqn_String8Builder_Build(&string_list, Dqn_Arena_Allocator(scratch.arena));
-
-    // NOTE: Print log to destinations
-    FILE *handles[] = {
-        type == Dqn_LogType::Error ? stderr : stdout,
-        DQN_CAST(FILE *)dqn_lib_.log_file,
-    };
-
-    for (FILE *handle : handles) {
-        if (handle)
-            fprintf(handle, "%.*s\n", DQN_STRING_FMT(log_line));
+    // NOTE: Header padding
+    // =========================================================================
+    Dqn_isize padding_size = 0;
+    {
+        DQN_LOCAL_PERSIST Dqn_isize max_header_length = 0;
+        max_header_length                             = DQN_MAX(max_header_length, header.size);
+        padding_size                                  = DQN_MAX(0, max_header_length - header.size);
     }
+
+    // NOTE: Construct final log
+    // =========================================================================
+    Dqn_String8 msg = Dqn_String8_InitFV(scratch.allocator, fmt, args);
+
+    Dqn_String8 log_line = Dqn_String8_Allocate(scratch.allocator, header.size + padding_size + msg.size, Dqn_ZeroMem_No);
+    DQN_MEMCPY(log_line.data,                              header.data, header.size);
+    DQN_MEMSET(log_line.data + header.size,                ' ',         padding_size);
+    DQN_MEMCPY(log_line.data + header.size + padding_size, msg.data,    msg.size);
+
+    // NOTE: Print log
+    // =========================================================================
+    Dqn_Print_StdLn(Dqn_PrintStd_Out, log_line);
+
+    Dqn_TicketMutex_Begin(&dqn_library.log_file_mutex);
+    if (dqn_library.log_to_file) {
+        fprintf(DQN_CAST(FILE *)dqn_library.log_file, "%.*s\n", DQN_STRING_FMT(log_line));
+    }
+    Dqn_TicketMutex_End(&dqn_library.log_file_mutex);
 }
 
-DQN_API void Dqn_LogV(Dqn_LogType  type,
-                      void        *user_data,
-                      Dqn_String8  file,
-                      Dqn_String8  func,
-                      Dqn_uint     line,
-                      char const  *fmt,
-                      va_list      va)
+DQN_API void Dqn_Log_FVCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, va_list args)
 {
-    Dqn_LogProc *logger = dqn_lib_.LogCallback ? dqn_lib_.LogCallback : Dqn_LogVDefault;
-    logger(type, user_data, file, func, line, fmt, va);
+    Dqn_LogProc *logging_function = dqn_library.log_callback ? dqn_library.log_callback : Dqn_Log_FVDefault_;
+    logging_function(type, -1 /*log_type*/, dqn_library.log_user_data, call_site, fmt, args);
 }
 
-DQN_API void Dqn_Log(Dqn_LogType  type,
-                     void        *user_data,
-                     Dqn_String8  file,
-                     Dqn_String8  func,
-                     Dqn_uint     line,
-                     char const  *fmt,
-                     ...)
+DQN_API void Dqn_Log_FCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const  *fmt, ...)
 {
-    va_list va;
-    va_start(va, fmt);
-    Dqn_LogV(type, user_data, file, func, line, fmt, va);
-    va_end(va);
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Log_FVCallSite(type, call_site, fmt, args);
+    va_end(args);
+}
+
+DQN_API void Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, va_list args)
+{
+    Dqn_String8 type_string = DQN_STRING8("DQN-BAD-LOG-TYPE");
+    switch (type)
+    {
+        case Dqn_LogType_Error: type_string = DQN_STRING8("ERROR");
+        case Dqn_LogType_Info: type_string = DQN_STRING8("INFO");
+        case Dqn_LogType_Warning: type_string = DQN_STRING8("WARN");
+        case Dqn_LogType_Debug: type_string = DQN_STRING8("DEBUG");
+    }
+
+    Dqn_LogProc *logging_function = dqn_library.log_callback ? dqn_library.log_callback : Dqn_Log_FVDefault_;
+    logging_function(type_string, type /*log_type*/, dqn_library.log_user_data, call_site, fmt, args);
+}
+
+DQN_API void Dqn_Log_TypeFCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const  *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Log_TypeFVCallSite(type, call_site, fmt, args);
+    va_end(args);
 }
 
 // NOTE: Dqn_VMem_
 // -------------------------------------------------------------------------------------------------
 DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, bool commit)
 {
-#if defined(DQN_OS_WIN32)
-    unsigned long flags = MEM_RESERVE | (commit ? (MEM_COMMIT | MEM_RESERVE) : 0);
+    #if defined(DQN_OS_WIN32)
+    unsigned long flags = MEM_RESERVE | (commit ? MEM_COMMIT : 0);
     void *result = VirtualAlloc(nullptr, size, flags, PAGE_READWRITE);
 
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
 
     unsigned flags = PROT_NONE | (commit ? (PROT_READ | PROT_WRITE) : 0);
     void *result = mmap(nullptr, size, flags, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     if (result == MAP_FAILED)
         result = nullptr;
 
-#else
-    #error "Missing implementation for Dqn_VMem_Reserve"
-#endif
+    #else
+        #error "Missing implementation for Dqn_VMem_Reserve"
+    #endif
     return result;
 }
 
 DQN_API bool Dqn_VMem_Commit(void *ptr, Dqn_usize size)
 {
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     bool result = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != nullptr;
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     bool result = mprotect(ptr, size, PROT_READ|PROT_WRITE) == 0;
-#else
-    #error "Missing implementation for Dqn_VMem_Commit"
-#endif
+    #else
+        #error "Missing implementation for Dqn_VMem_Commit"
+    #endif
     return result;
 }
 
 DQN_API void Dqn_VMem_Decommit(void *ptr, Dqn_usize size)
 {
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     VirtualFree(ptr, size, MEM_DECOMMIT);
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     mprotect(ptr, size, PROT_NONE)
     madvise(ptr, size, MADV_FREE)
-#else
-    #error "Missing implementation for Dqn_VMem_Decommit"
-#endif
+    #else
+        #error "Missing implementation for Dqn_VMem_Decommit"
+    #endif
 }
 
 DQN_API void Dqn_VMem_Release(void *ptr, Dqn_usize size)
 {
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     (void)size;
     VirtualFree(ptr, 0, MEM_RELEASE);
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     munmap(ptr, size);
-#else
-    #error "Missing implementation for Dqn_VMem_Release"
-#endif
-}
-
-// NOTE: Dqn_AllocationTracer_
-// -------------------------------------------------------------------------------------------------
-void Dqn_AllocationTracer_Add(Dqn_AllocationTracer *tracer, void *ptr, Dqn_usize size DQN_CALL_SITE_ARGS)
-{
-#if DQN_ALLOCATION_TRACING
-    if (!tracer) return;
-    Dqn_AllocationTrace trace = {};
-    trace.ptr                 = ptr;
-    trace.size                = size;
-    trace.file                = file_;
-    trace.func                = func_;
-    trace.line                = line_;
-    trace.msg                 = msg_;
-
-    Dqn_TicketMutex_Begin(&tracer->mutex);
-#if 0 // TODO(dqn): We need to revisit this
-    if (!trace->map.values)
-    {
-        trace->arena = Dqn_ArenaInitWithCRT();
-        trace->map   = Dqn_Map_InitWithArena(&trace->arena, 16192);
-    }
-#endif
-
-    bool added = Dqn_Map_Add(&tracer->map, DQN_CAST(uint64_t) ptr, trace, Dqn_MapCollideRule::Chain);
-    if (!added)
-    {
-        // Dqn_AllocationTrace *other = Dqn_Map_Get(&tracer->table, DQN_CAST(uint64_t) ptr);
-        DQN_ASSERT_MSG(added, "Hash table collision on %Ix", ptr);
-    }
-    Dqn_TicketMutex_End(&tracer->mutex);
-#else
-    (void)tracer; (void)ptr; (void)size;
-#endif
-}
-
-void Dqn_AllocationTracer_Remove(Dqn_AllocationTracer *tracer, void *ptr)
-{
-#if DQN_ALLOCATION_TRACING
-    if (!tracer) return;
-    Dqn_TicketMutex_Begin(&tracer->mutex);
-    Dqn_AllocationTrace *trace = Dqn_Map_Get(&tracer->map, DQN_CAST(uint64_t) ptr);
-    DQN_ASSERT_MSG(trace->ptr == ptr, "(trace->ptr = %Ix, raw_ptr = %Ix", trace->ptr, ptr);
-
-    Dqn_Map_Erase(&tracer->map, DQN_CAST(uint64_t) ptr);
-    Dqn_TicketMutex_End(&tracer->mutex);
-#else
-    (void)tracer; (void)ptr;
-#endif
+    #else
+        #error "Missing implementation for Dqn_VMem_Release"
+    #endif
 }
 
 // NOTE: Dqn_CString8
 // -------------------------------------------------------------------------------------------------
-DQN_API Dqn_isize Dqn_CString8_FmtSize(char const *fmt, ...)
+DQN_API Dqn_isize Dqn_CString8_FSize(char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -3977,7 +4537,7 @@ DQN_API Dqn_isize Dqn_CString8_FmtSize(char const *fmt, ...)
     return result;
 }
 
-DQN_API Dqn_isize Dqn_CString8_FmtSizeV(char const *fmt, va_list args)
+DQN_API Dqn_isize Dqn_CString8_FVSize(char const *fmt, va_list args)
 {
     va_list args_copy;
     va_copy(args_copy, args);
@@ -4007,14 +4567,12 @@ DQN_API char const *Dqn_CString8_BinarySplit(char const *string, Dqn_isize strin
     if (rhs)
         *rhs = nullptr;
 
-    if (!Dqn_CString8_Validate_(string, &string_size)) {
+    if (!Dqn_CString8_Validate_(string, &string_size))
         return result;
-    }
 
     Dqn_isize offset = 0;
-    while (offset < string_size && string[offset] != delimiter) {
+    while (offset < string_size && string[offset] != delimiter)
         offset++;
-    }
 
     // NOTE: LHS, the string before the delimiter
     result = string;
@@ -4023,8 +4581,9 @@ DQN_API char const *Dqn_CString8_BinarySplit(char const *string, Dqn_isize strin
 
     // NOTE: RHS, the string after the delimiter
     if (rhs) {
-        *rhs      = DQN_CAST(char *)(string + offset + 1);
-        *rhs_size = (string + string_size) - (*rhs);
+        char const *end = string + string_size;
+        *rhs      = DQN_CAST(char *)DQN_MIN((string + offset + 1), end);
+        *rhs_size = end - (*rhs);
     }
 
     return result;
@@ -4052,7 +4611,7 @@ DQN_API bool Dqn_CString8_Eq(char const *lhs, char const *rhs, Dqn_isize lhs_siz
     return result;
 }
 
-DQN_API bool Dqn_CString8_EqInsensitive(char const *lhs, char const *rhs, Dqn_isize lhs_size, Dqn_isize rhs_size, Dqn_CString8EqCase eq_case)
+DQN_API bool Dqn_CString8_EqInsensitive(char const *lhs, char const *rhs, Dqn_isize lhs_size, Dqn_isize rhs_size)
 {
     bool result = Dqn_CString8_Eq(lhs, rhs, lhs_size, rhs_size, Dqn_CString8EqCase::Insensitive);
     return result;
@@ -4395,7 +4954,7 @@ DQN_API Dqn_isize Dqn_CString8_Size(char const *src)
 
 DQN_API bool Dqn_CString8_Match(char const *src, char const *find, int find_size)
 {
-    if (find_size == -1) find_size = Dqn_Safe_TruncateUSizeToInt(Dqn_CString8_Size(find));
+    if (find_size == -1) find_size = Dqn_Safe_SaturateCastUSizeToInt(Dqn_CString8_Size(find));
     bool result = (DQN_MEMCMP(src, find, DQN_CAST(size_t)find_size) == 0);
     return result;
 }
@@ -4527,6 +5086,32 @@ DQN_API Dqn_String8 Dqn_String8_InitCString(char const *string)
     return result;
 }
 
+DQN_API Dqn_String8 Dqn_String8_InitF_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, ...)
+{
+    va_list va;
+    va_start(va, fmt);
+    Dqn_String8 result = Dqn_String8_InitFV_(DQN_LEAK_TRACE_ARG allocator, fmt, va);
+    va_end(va);
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_InitFV_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, va_list args)
+{
+    Dqn_String8 result = {};
+    if (!fmt)
+        return result;
+
+    Dqn_isize size = Dqn_CString8_FVSize(fmt, args);
+    if (size) {
+        result = Dqn_String8_Allocate_(DQN_LEAK_TRACE_ARG allocator, size, Dqn_ZeroMem_No);
+        if (Dqn_String8_IsValid(result)) {
+            STB_SPRINTF_DECORATE(vsnprintf)(result.data, Dqn_Safe_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
+            result.data[result.size] = 0;
+        }
+    }
+    return result;
+}
+
 DQN_API bool Dqn_String8_IsValid(Dqn_String8 string)
 {
     bool result = string.size >= 0 && string.data;
@@ -4546,61 +5131,33 @@ DQN_API Dqn_String8 Dqn_String8_Slice(Dqn_String8 string, Dqn_isize offset, Dqn_
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8_Fmt_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *fmt, ...)
-{
-    va_list va;
-    va_start(va, fmt);
-    Dqn_String8 result = Dqn_String8_FmtV_(DQN_CALL_SITE_ARGS_INPUT allocator, fmt, va);
-    va_end(va);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_FmtV_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *fmt, va_list args)
+DQN_API Dqn_String8 Dqn_String8_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_isize size, Dqn_ZeroMem zero_mem)
 {
     Dqn_String8 result = {};
-    if (!fmt)
-        return result;
-
-    va_list args_copy;
-    va_copy(args_copy, args);
-    Dqn_isize size = Dqn_CString8_FmtSizeV(fmt, args_copy);
-    va_end(args_copy);
-
-    result = Dqn_String8_Allocate_(DQN_CALL_SITE_ARGS_INPUT allocator, size, Dqn_ZeroMem_No);
-    if (Dqn_String8_IsValid(result)) {
-        STB_SPRINTF_DECORATE(vsnprintf)(result.data, size + 1 /*null-terminator*/, fmt, args);
-        result.data[result.size] = 0;
-    }
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_Allocate_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, Dqn_isize size, Dqn_ZeroMem zero_mem)
-{
-    Dqn_String8 result = {};
-    result.data       = (char *)Dqn_Allocator_Alloc(DQN_CALL_SITE_ARGS_INPUT allocator, size + 1, alignof(char), zero_mem);
+    result.data       = (char *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_ARG allocator, size + 1, alignof(char), zero_mem);
     if (result.data) {
         result.size = size;
     }
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8_CopyCString_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, char const *string, Dqn_isize size)
+DQN_API Dqn_String8 Dqn_String8_CopyCString_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *string, Dqn_isize size)
 {
     Dqn_String8 result = {};
     if (!string || size <= 0)
         return result;
 
-    result = Dqn_String8_Allocate_(DQN_CALL_SITE_ARGS_INPUT allocator, size, Dqn_ZeroMem_No);
+    result = Dqn_String8_Allocate_(DQN_LEAK_TRACE_ARG allocator, size, Dqn_ZeroMem_No);
     if (Dqn_String8_IsValid(result)) {
-        DQN_MEMCOPY(result.data, string, DQN_CAST(size_t)size);
+        DQN_MEMCPY(result.data, string, DQN_CAST(size_t)size);
         result.data[size] = 0;
     }
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_CALL_SITE_ARGS Dqn_Allocator allocator, Dqn_String8 string)
+DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_String8 string)
 {
-    Dqn_String8 result = Dqn_String8_CopyCString_(DQN_CALL_SITE_ARGS_INPUT allocator, string.data, string.size);
+    Dqn_String8 result = Dqn_String8_CopyCString_(DQN_LEAK_TRACE_ARG allocator, string.data, string.size);
     return result;
 }
 
@@ -4857,6 +5414,98 @@ DQN_API Dqn_String8 Dqn_String8_ReplaceInsensitive(Dqn_String8 string, Dqn_Strin
     return result;
 }
 
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-PRIN] Dqn_Print            |                             | Printing
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string)
+{
+    DQN_ASSERT(std_handle == Dqn_PrintStd_Out || std_handle == Dqn_PrintStd_Err);
+
+    #if defined(DQN_OS_WIN32)
+    // NOTE: Get the output handles from kernel
+    // =========================================================================
+    thread_local void *std_out_print_handle     = nullptr;
+    thread_local void *std_err_print_handle     = nullptr;
+    thread_local bool  std_out_print_to_console = false;
+    thread_local bool  std_err_print_to_console = false;
+
+    if (!std_out_print_handle) {
+        unsigned long mode = 0; (void)mode;
+        std_out_print_handle     = GetStdHandle(STD_OUTPUT_HANDLE);
+        std_out_print_to_console = GetConsoleMode(std_out_print_handle, &mode) != 0;
+
+        std_err_print_handle     = GetStdHandle(STD_ERROR_HANDLE);
+        std_err_print_to_console = GetConsoleMode(std_err_print_handle, &mode) != 0;
+    }
+
+    // NOTE: Select the output handle
+    // =========================================================================
+    void *print_handle    = std_out_print_handle;
+    bool print_to_console = std_out_print_to_console;
+    if (std_handle == Dqn_PrintStd_Err) {
+        print_handle     = std_err_print_handle;
+        print_to_console = std_err_print_to_console;
+    }
+
+    // NOTE: Write the string
+    // =========================================================================
+    DQN_ASSERT(string.size < DQN_CAST(unsigned long)-1);
+    unsigned long bytes_written = 0; (void)bytes_written;
+    if (print_to_console) {
+        WriteConsoleA(print_handle, string.data, DQN_CAST(unsigned long)string.size, &bytes_written, nullptr);
+    } else {
+        WriteFile(print_handle, string.data, DQN_CAST(unsigned long)string.size, &bytes_written, nullptr);
+    }
+    #else
+    fprintf(std_handle == Dqn_PrintStd_Out ? stdout : stderr, "%.*s", DQN_STRING8_FMT(string));
+    #endif
+}
+
+DQN_FILE_SCOPE char *Dqn_Print_VSPrintfChunker_(const char *buf, void *user, int len)
+{
+    Dqn_String8 string = {};
+    string.data        = DQN_CAST(char *)buf;
+    string.size        = len;
+
+    Dqn_PrintStd std_handle = DQN_CAST(Dqn_PrintStd)DQN_CAST(uintptr_t)user;
+    Dqn_Print_Std(std_handle, string);
+    return (char *)buf;
+}
+
+DQN_API void Dqn_Print_StdFV(Dqn_PrintStd std_handle, char const *fmt, va_list args)
+{
+    char buffer[STB_SPRINTF_MIN];
+    stbsp_vsprintfcb(Dqn_Print_VSPrintfChunker_, DQN_CAST(void *)DQN_CAST(uintptr_t)std_handle, buffer, fmt, args);
+}
+
+DQN_API void Dqn_Print_StdF(Dqn_PrintStd std_handle, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Print_StdFV(std_handle, fmt, args);
+    va_end(args);
+}
+
+DQN_API void Dqn_Print_StdLn(Dqn_PrintStd std_handle, Dqn_String8 string)
+{
+    Dqn_Print_Std(std_handle, string);
+    Dqn_Print_Std(std_handle, DQN_STRING8("\n"));
+}
+
+DQN_API void Dqn_Print_StdLnFV(Dqn_PrintStd std_handle, char const *fmt, va_list args)
+{
+    Dqn_Print_StdFV(std_handle, fmt, args);
+    Dqn_Print_Std(std_handle, DQN_STRING8("\n"));
+}
+
+DQN_API void Dqn_Print_StdLnF(Dqn_PrintStd std_handle, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Print_StdLnFV(std_handle, fmt, args);
+    va_end(args);
+}
+
 // NOTE: Dqn_String8Builder Implementation
 // -----------------------------------------------------------------------------
 bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String8 string)
@@ -4867,14 +5516,14 @@ bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String
     Dqn_String8Link *link = Dqn_Allocator_New(builder->allocator, Dqn_String8Link, Dqn_ZeroMem_No);
     if (!link)
         return false;
+
     link->string = string;
     link->next   = NULL;
 
-    if (builder->head) {
+    if (builder->head)
         builder->tail->next = link;
-    } else {
+    else
         builder->head = link;
-    }
 
     builder->tail = link;
     builder->count++;
@@ -4885,45 +5534,27 @@ bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String
 bool Dqn_String8Builder_AppendString8Copy(Dqn_String8Builder *builder, Dqn_String8 string)
 {
     Dqn_String8 copy = Dqn_String8_Copy(builder->allocator, string);
-    bool result      = Dqn_String8Builder_AppendString8Ref(builder, string);
+    bool result      = Dqn_String8Builder_AppendString8Ref(builder, copy);
     return result;
 }
 
-bool Dqn_String8Builder_AppendFmtVArgs(Dqn_String8Builder *builder, char const *fmt, va_list args)
+bool Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *builder, char const *fmt, va_list args)
 {
-    va_list args_copy;
-    va_copy(args_copy, args);
-    int size_no_zero_terminate = vsnprintf(NULL /*buffer*/, 0 /*size*/, fmt, args_copy);
-    va_end(args_copy);
-
-    if (size_no_zero_terminate < 0)
-        return false;
-
-    if (size_no_zero_terminate == 0)
+    Dqn_String8 string = Dqn_String8_InitFV(builder->allocator, fmt, args);
+    if (string.size == 0)
         return true;
 
-    bool result        = false;
-    int alloc_size     = size_no_zero_terminate + 1;
-    Dqn_String8 string = DQN_ZERO_INIT;
-    string.data        = Dqn_Allocator_NewArray(builder->allocator, char, alloc_size, Dqn_ZeroMem_No);
-    if (string.data) {
-        vsnprintf(string.data, alloc_size, fmt, args);
-        string.size = size_no_zero_terminate;
-        result = Dqn_String8Builder_AppendString8Ref(builder, string);
-    }
-
-    if (!result) {
-        Dqn_Allocator_Dealloc(builder->allocator, string.data, size_no_zero_terminate);
-    }
-
+    bool result = Dqn_String8Builder_AppendString8Ref(builder, string);
+    if (!result)
+        Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_ARG builder->allocator, string.data, string.size + 1);
     return result;
 }
 
-bool Dqn_String8Builder_AppendFmtArgs(Dqn_String8Builder *builder, char const *fmt, ...)
+bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    bool result = Dqn_String8Builder_AppendFmtVArgs(builder, fmt, args);
+    bool result = Dqn_String8Builder_AppendFV(builder, fmt, args);
     va_end(args);
     return result;
 }
@@ -4939,7 +5570,7 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
         return result;
 
     for (Dqn_String8Link *link = builder->head; link; link = link->next) {
-        DQN_MEMCOPY(result.data + result.size, link->string.data, link->string.size);
+        DQN_MEMCPY(result.data + result.size, link->string.data, link->string.size);
         result.size += link->string.size;
     }
 
@@ -4950,15 +5581,15 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
 
 // NOTE: Dqn_Arena
 // -------------------------------------------------------------------------------------------------
-DQN_API bool Dqn_Arena_Grow_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit)
+DQN_API bool Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit)
 {
     // TODO: Use the call site arguments
-    if (!arena || size <= 0) {
+    if (!arena || size <= 0 || commit < 0)
         return false;
-    }
 
-    if (commit > size) {
-        DQN_ASSERT_MSG(commit < size, "Commit must be less than the size requested [size=%zd, commit=%zd]", size, commit);
+    if (!Dqn_Safe_AssertF(commit <= size,
+                          "Commit must be less than or equal to the size requested [size=%zd, commit=%zd]",
+                          size, commit)) {
         commit = size;
     }
 
@@ -4969,16 +5600,16 @@ DQN_API bool Dqn_Arena_Grow_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size
     auto const allocation_size = DQN_CAST(Dqn_isize)(sizeof(*arena->curr) + size);
     auto *result               = DQN_CAST(Dqn_ArenaBlock *)Dqn_VMem_Reserve(allocation_size, commit_on_reserve);
     if (result) {
-        // NOTE: Sanity check memory is zero-ed out
-        DQN_ASSERT(result->used == 0);
-        DQN_ASSERT(result->next == nullptr);
-        DQN_ASSERT(result->prev == nullptr);
-
         // NOTE: If we didn't commit on reserve, commit the amount requested by
         // the user.
         if (!commit_on_reserve) {
             Dqn_VMem_Commit(result, sizeof(*result) + commit);
         }
+
+        // NOTE: Sanity check memory is zero-ed out
+        DQN_ASSERT(result->used == 0);
+        DQN_ASSERT(result->next == nullptr);
+        DQN_ASSERT(result->prev == nullptr);
 
         // NOTE: Setup the block
         result->size      = size;
@@ -5002,12 +5633,14 @@ DQN_API bool Dqn_Arena_Grow_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size
 
         arena->stats.blocks_hwm   = DQN_MAX(arena->stats.blocks_hwm,   arena->stats.blocks);
         arena->stats.capacity_hwm = DQN_MAX(arena->stats.capacity_hwm, arena->stats.capacity);
+
+        Dqn_Library_LeakTraceAdd(DQN_LEAK_TRACE_ARG result, size);
     }
 
     return result;
 }
 
-DQN_API void *Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
+DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
     DQN_ASSERT_MSG((align & (align - 1)) == 0, "Power of two alignment required");
     Dqn_isize allocation_size = size + (align - 1);
@@ -5016,7 +5649,7 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize
             arena->curr = arena->curr->next;
         } else {
             Dqn_isize grow_size = DQN_MAX(DQN_MAX(allocation_size, arena->min_block_size), DQN_ARENA_MIN_BLOCK_SIZE);
-            if (!Dqn_Arena_Grow_(DQN_CALL_SITE_ARGS_INPUT arena, grow_size /*size*/, grow_size /*commit*/)) {
+            if (!Dqn_Arena_Grow_(DQN_LEAK_TRACE_ARG arena, grow_size /*size*/, grow_size /*commit*/)) {
                 return nullptr;
             }
         }
@@ -5061,22 +5694,22 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, Dqn_isize
     return result;
 }
 
-DQN_API void *Dqn_Arena_Copy_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
+DQN_API void *Dqn_Arena_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
 {
-    void *result = Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, alignment, Dqn_ZeroMem_No);
-    DQN_MEMCOPY(result, src, size);
+    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, alignment, Dqn_ZeroMem_No);
+    DQN_MEMCPY(result, src, size);
     return result;
 }
 
-DQN_API void *Dqn_Arena_CopyZ_(DQN_CALL_SITE_ARGS Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
+DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
 {
-    void *result = Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS_INPUT arena, size + 1, alignment, Dqn_ZeroMem_No);
-    DQN_MEMCOPY(result, src, size);
+    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size + 1, alignment, Dqn_ZeroMem_No);
+    DQN_MEMCPY(result, src, size);
     (DQN_CAST(char *)result)[size] = 0;
     return result;
 }
 
-DQN_API void Dqn_Arena_Free(Dqn_Arena *arena, bool zero_mem)
+DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
 {
     if (!arena)
         return;
@@ -5084,9 +5717,10 @@ DQN_API void Dqn_Arena_Free(Dqn_Arena *arena, bool zero_mem)
     while (arena->tail) {
         Dqn_ArenaBlock *tail = arena->tail;
         arena->tail          = tail->prev;
-        if (zero_mem)
+        if (zero_mem == Dqn_ZeroMem_Yes)
             DQN_MEMSET(tail->memory, DQN_MEMSET_BYTE, tail->committed);
         Dqn_VMem_Release(tail, sizeof(*tail) + tail->size);
+        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG tail);
     }
 
     arena->curr           = arena->tail = nullptr;
@@ -5114,21 +5748,25 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
     arena->stats.wasted = 0;
 }
 
-static void *Dqn_Arena_AllocatorAlloc(DQN_CALL_SITE_ARGS size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context)
+DQN_FILE_SCOPE void *Dqn_Arena_AllocatorAlloc(DQN_LEAK_TRACE_FUNCTION size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context)
 {
     void *result = NULL;
     if (!user_context)
         return result;
 
     Dqn_Arena *arena = DQN_CAST(Dqn_Arena *)user_context;
-    result           = Dqn_Arena_Allocate_(DQN_CALL_SITE_ARGS_INPUT arena, size, align, zero_mem);
+    result           = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, align, zero_mem);
     return result;
 }
 
-static void Dqn_Arena_AllocatorDealloc(DQN_CALL_SITE_ARGS void *ptr, size_t size, void *user_context)
+DQN_FILE_SCOPE void Dqn_Arena_AllocatorDealloc(DQN_LEAK_TRACE_FUNCTION void *ptr, size_t size, void *user_context)
 {
     // NOTE: No-op, arenas batch allocate and batch deallocate. Call free on the
     // underlying arena, since we can't free individual pointers.
+    DQN_LEAK_TRACE_UNUSED;
+    (void)ptr;
+    (void)size;
+    (void)user_context;
 }
 
 DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena)
@@ -5153,11 +5791,10 @@ DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena)
     return result;
 }
 
-DQN_API void Dqn_Arena_EndTempMemory(Dqn_ArenaTempMemory scope)
+DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory scope)
 {
-    if (!scope.arena) {
+    if (!scope.arena)
         return;
-    }
 
     // NOTE: Revert arena stats
     Dqn_Arena *arena      = scope.arena;
@@ -5175,25 +5812,32 @@ DQN_API void Dqn_Arena_EndTempMemory(Dqn_ArenaTempMemory scope)
         Dqn_ArenaBlock *tail = arena->tail;
         arena->tail          = tail->prev;
         Dqn_VMem_Release(tail, sizeof(*tail) + tail->size);
+        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG tail);
     }
 
     // NOTE: Reset the usage of all the blocks between the tail and current block's
-    if (arena->tail)
-    {
+    if (arena->tail) {
         arena->tail->next = nullptr;
         for (Dqn_ArenaBlock *block = arena->tail; block && block != arena->curr; block = block->prev)
             block->used = 0;
     }
 }
 
-Dqn_ArenaTempMemoryScope::Dqn_ArenaTempMemoryScope(Dqn_Arena *arena)
+Dqn_ArenaTempMemoryScope_::Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena)
 {
     temp_memory = Dqn_Arena_BeginTempMemory(arena);
+    #if defined(DQN_LEAK_TRACKING)
+    leak_site__ = DQN_LEAK_TRACE_ARG_NO_COMMA;
+    #endif
 }
 
-Dqn_ArenaTempMemoryScope::~Dqn_ArenaTempMemoryScope()
+Dqn_ArenaTempMemoryScope_::~Dqn_ArenaTempMemoryScope_()
 {
-    Dqn_Arena_EndTempMemory(temp_memory);
+    #if defined(DQN_LEAK_TRACING)
+    Dqn_Arena_EndTempMemory_(leak_site__, temp_memory);
+    #else
+    Dqn_Arena_EndTempMemory_(temp_memory);
+    #endif
 }
 
 DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat)
@@ -5212,20 +5856,20 @@ DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat)
     #endif
 
     Dqn_ArenaStatString result = {};
-    result.size = STB_SPRINTF_DECORATE(snprintf)(result.data, DQN_ARRAY_ICOUNT(result.data),
-                                                 "ArenaStat{"
-                                                     "used/hwm=%_$$zd/%_$$zd"
-                                                     "cap/hwm=%_$$zd/%_$$zd"
-                                                     "wasted/hwm=%_$$zd/%_$$zd"
-                                                     "blocks/hwm=%_$$zd/%_$$zd"
-                                                     "syscalls=%'zu"
-                                                 "}",
-                                                 stat->used,     stat->used_hwm,
-                                                 stat->capacity, stat->capacity_hwm,
-                                                 stat->wasted,   stat->wasted_hwm,
-                                                 stat->blocks,   stat->blocks_hwm,
-                                                 stat->blocks,   stat->blocks_hwm,
-                                                 stat->syscalls);
+    int size16 = STB_SPRINTF_DECORATE(snprintf)(result.data, DQN_ARRAY_ICOUNT(result.data),
+                                                "ArenaStat{"
+                                                    "used/hwm=%_$$zd/%_$$zd, "
+                                                    "cap/hwm=%_$$zd/%_$$zd, "
+                                                    "wasted/hwm=%_$$zd/%_$$zd, "
+                                                    "blocks/hwm=%_$$u/%_$$u, "
+                                                    "syscalls=%'zd"
+                                                "}",
+                                                stat->used,     stat->used_hwm,
+                                                stat->capacity, stat->capacity_hwm,
+                                                stat->wasted,   stat->wasted_hwm,
+                                                stat->blocks,   stat->blocks_hwm,
+                                                stat->syscalls);
+    result.size = Dqn_Safe_SaturateCastIntToU16(size16);
 
     #if defined(DQN_COMPILER_GCC)
         #pragma GCC diagnostic pop
@@ -5239,12 +5883,13 @@ DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat)
 DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena)
 {
     Dqn_ArenaStatString string = Dqn_Arena_StatString(&arena->stats);
-    DQN_LOG_M("%.*s\n", DQN_STRING_FMT(string));
+    Dqn_Log_InfoF("%.*s\n", DQN_STRING_FMT(string));
 }
 
-#if defined(DQN_WITH_MATH)
-// NOTE: Dqn_V2 Implementation
-// -------------------------------------------------------------------------------------------------
+#if !defined(DQN_NO_MATH)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API Dqn_V2I Dqn_V2ToV2I(Dqn_V2 a)
 {
     Dqn_V2I result = Dqn_V2I(DQN_CAST(int32_t)a.x, DQN_CAST(int32_t)a.y);
@@ -5433,6 +6078,14 @@ DQN_API Dqn_M4 Dqn_M4_Rotate(Dqn_V3 axis01, Dqn_f32 radians)
 
 DQN_API Dqn_M4 Dqn_M4_Orthographic(Dqn_f32 left, Dqn_f32 right, Dqn_f32 bottom, Dqn_f32 top, Dqn_f32 z_near, Dqn_f32 z_far)
 {
+    // NOTE: Here is the matrix in column major for readability. Below it's
+    // transposed due to how you have to declare column major matrices in C/C++.
+    //
+    // m = [2/r-l, 0,      0,     -1*(r+l)/(r-l)]
+    //     [0,     2/t-b,  0,      1*(t+b)/(t-b)]
+    //     [0,     0,     -2/f-n, -1*(f+n)/(f-n)]
+    //     [0,     0,      0,      1            ]
+
     Dqn_M4 result =
     {{
          {2.f / (right - left),                     0.f,                                      0.f,                                          0.f},
@@ -5561,7 +6214,7 @@ DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
         for (int it = 0; it < 4; it++)
         {
             if (it == 0) Dqn_FString8_AppendCString8(&result, "|");
-            Dqn_FString8_AppendFmt(&result, "%.5f", mat.columns[it][row]);
+            Dqn_FString8_AppendF(&result, "%.5f", mat.columns[it][row]);
             if (it != 3) Dqn_FString8_AppendCString8(&result, ", ");
             else         Dqn_FString8_AppendCString8(&result, "|\n");
         }
@@ -5683,10 +6336,11 @@ DQN_API Dqn_f32 Dqn_Lerp_F32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b)
     Dqn_f32 result = a + ((b - a) * t);
     return result;
 }
-#endif // DQN_WITH_MATH
+#endif // !defined(DQN_NO_MATH)
 
-// NOTE: Dqn_Bit_
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-BITS] Dqn_Bit              |                             | Bitset manipulation
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API void Dqn_Bit_UnsetInplace(uint64_t *flags, uint64_t bitfield)
 {
     *flags = (*flags & ~bitfield);
@@ -5709,158 +6363,346 @@ DQN_API bool Dqn_Bit_IsNotSet(uint64_t bits, uint64_t bits_to_check)
     return result;
 }
 
-// NOTE: Safe Arithmetic
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API bool Dqn_Safe_AssertF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...)
+{
+    bool result = assertion_expr;
+    if (!result) {
+        va_list args;
+        va_start(args, fmt);
+        Dqn_Log_TypeFVCallSite(Dqn_LogType_Error, call_site, fmt, args);
+        va_end(args);
+        DQN_DEBUG_BREAK;
+    }
+    return result;
+}
+
 DQN_API int64_t Dqn_Safe_AddI64(int64_t a, int64_t b)
 {
-    DQN_ASSERT_MSG(a <= INT64_MAX - b, "%I64d <= %I64d", a, INT64_MAX - b);
-    int64_t result = (a <= INT64_MAX - b) ? (a + b) : INT64_MAX;
+    int64_t result = Dqn_Safe_AssertF(a <= INT64_MAX - b, "a=%zd, b=%zd", a, b) ? (a + b) : INT64_MAX;
     return result;
 }
 
 DQN_API int64_t Dqn_Safe_MulI64(int64_t a, int64_t b)
 {
-    DQN_ASSERT_MSG(a <= INT64_MAX / b , "%I64d <= %I64d", a, INT64_MAX / b);
-    int64_t result = (a <= INT64_MAX / b) ? (a * b) : INT64_MAX;
+    int64_t result = Dqn_Safe_AssertF(a <= INT64_MAX / b, "a=%zd, b=%zd", a, b) ? (a * b) : INT64_MAX;
     return result;
 }
 
 DQN_API uint64_t Dqn_Safe_AddU64(uint64_t a, uint64_t b)
 {
-    DQN_ASSERT_MSG(a <= UINT64_MAX - b, "%I64u <= %I64u", a, UINT64_MAX - b);
-    uint64_t result = (a <= UINT64_MAX - b) ? (a + b) : UINT64_MAX;
+    uint64_t result = Dqn_Safe_AssertF(a <= UINT64_MAX - b, "a=%zu, b=%zu", a, b) ? (a + b) : UINT64_MAX;
     return result;
 }
 
 DQN_API uint64_t Dqn_Safe_SubU64(uint64_t a, uint64_t b)
 {
-    DQN_ASSERT_MSG(a >= b, "%I64u >= %I64u", a, b);
-    uint64_t result = (a >= b) ? (a - b) : 0;
-    return result;
-}
-
-DQN_API uint32_t Dqn_Safe_SubU32(uint32_t a, uint32_t b)
-{
-    DQN_ASSERT_MSG(a >= b, "%I32u >= %I32u", a, b);
-    uint32_t result = (a >= b) ? (a - b) : 0;
+    uint64_t result = Dqn_Safe_AssertF(a >= b, "a=%zu, b=%zu", a, b) ? (a - b) : 0;
     return result;
 }
 
 DQN_API uint64_t Dqn_Safe_MulU64(uint64_t a, uint64_t b)
 {
-    DQN_ASSERT_MSG(a <= UINT64_MAX / b , "%I64u <= %I64u", a, UINT64_MAX / b);
-    uint64_t result = (a <= UINT64_MAX / b) ? (a * b) : UINT64_MAX;
+    uint64_t result = Dqn_Safe_AssertF(a <= UINT64_MAX / b, "a=%zu, b=%zu", a, b) ? (a * b) : UINT64_MAX;
     return result;
 }
 
-DQN_API int Dqn_Safe_TruncateISizeToInt(Dqn_isize val)
+DQN_API uint32_t Dqn_Safe_SubU32(uint32_t a, uint32_t b)
 {
-    DQN_ASSERT_MSG(val >= INT32_MIN && val <= INT32_MAX, "%zd >= %zd && %zd <= %zd", val, INT32_MAX, val, INT32_MAX);
-    auto result = (val >= INT32_MIN && val <= INT32_MAX) ? DQN_CAST(int)val : 0;
+    uint32_t result = Dqn_Safe_AssertF(a >= b, "a=%u, b=%u", a, b) ? (a - b) : 0;
     return result;
 }
 
-DQN_API int32_t Dqn_Safe_TruncateISizeToI32(Dqn_isize val)
+// NOTE: Dqn_Safe_SaturateCastUSizeToI*
+// -----------------------------------------------------------------------------
+// INT*_MAX literals will be promoted to the type of uintmax_t as uintmax_t is
+// the highest possible rank (unsigned > signed).
+DQN_API int Dqn_Safe_SaturateCastUSizeToInt(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val >= INT32_MIN && val <= INT32_MAX, "%zd >= %zd && %zd <= %zd", val, INT32_MIN, val, INT32_MAX);
-    auto result = (val >= INT32_MIN && val <= INT32_MAX) ? DQN_CAST(int32_t)val : 0;
+    int result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT_MAX) ? DQN_CAST(int)val : INT_MAX;
     return result;
 }
 
-DQN_API uint32_t Dqn_Safe_TruncateUSizeToU32(Dqn_usize val)
+DQN_API int8_t Dqn_Safe_SaturateCastUSizeToI8(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= UINT32_MAX, "%zu <= %zu", val, UINT32_MAX);
-    auto result = (val <= UINT32_MAX) ? DQN_CAST(uint32_t)val : UINT32_MAX;
+    int8_t result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT8_MAX) ? DQN_CAST(int8_t)val : INT8_MAX;
     return result;
 }
 
-DQN_API int32_t Dqn_Safe_TruncateUSizeToI32(Dqn_usize val)
+DQN_API int16_t Dqn_Safe_SaturateCastUSizeToI16(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= INT32_MAX, "%zu <= %zu", val, INT32_MAX);
-    auto result = (val <= INT32_MAX) ? DQN_CAST(int)val : INT32_MAX;
+    int16_t result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT16_MAX) ? DQN_CAST(int16_t)val : INT16_MAX;
     return result;
 }
 
-DQN_API int Dqn_Safe_TruncateUSizeToInt(Dqn_usize val)
+DQN_API int32_t Dqn_Safe_SaturateCastUSizeToI32(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= INT32_MAX, "%zu <= %zu", val, INT32_MAX);
-    auto result = (val <= INT32_MAX) ? DQN_CAST(int)val : INT32_MAX;
+    int32_t result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT32_MAX) ? DQN_CAST(int32_t)val : INT32_MAX;
     return result;
 }
 
-DQN_API Dqn_isize Dqn_Safe_TruncateUSizeToISize(Dqn_usize val)
+DQN_API int64_t Dqn_Safe_SaturateCastUSizeToI64(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= DQN_ISIZE_MAX, "%zu <= %zu", val, DQN_CAST(Dqn_usize)DQN_ISIZE_MAX);
-    auto result = (val <= DQN_ISIZE_MAX) ? DQN_CAST(Dqn_isize)val : DQN_ISIZE_MAX;
+    int64_t result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT64_MAX) ? DQN_CAST(int64_t)val : INT64_MAX;
     return result;
 }
 
-DQN_API Dqn_isize Dqn_Safe_TruncateI64ToISize(uint64_t val)
+// NOTE: Dqn_Safe_SaturateCastUSizeToU*
+// -----------------------------------------------------------------------------
+// Both operands are unsigned and the lowest rank operand will be promoted to
+// match the highest rank operand.
+DQN_API uint8_t Dqn_Safe_SaturateCastUSizeToU8(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= DQN_ISIZE_MAX, "[val=%zu, max=%zu]", val, DQN_ISIZE_MAX);
-    auto result = (val <= DQN_ISIZE_MAX) ? DQN_CAST(Dqn_isize)val : DQN_ISIZE_MAX;
+    uint8_t result = Dqn_Safe_Assert(val <= UINT8_MAX) ? DQN_CAST(uint8_t)val : UINT8_MAX;
     return result;
 }
 
-DQN_API uint32_t Dqn_Safe_TruncateU64ToU32(uint64_t val)
+DQN_API uint16_t Dqn_Safe_SaturateCastUSizeToU16(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= UINT32_MAX, "%I64u <= %I64u", val, UINT32_MAX);
-    auto result = (val <= UINT32_MAX) ? DQN_CAST(uint32_t)val : UINT32_MAX;
+    uint16_t result = Dqn_Safe_Assert(val <= UINT16_MAX) ? DQN_CAST(uint16_t)val : UINT16_MAX;
     return result;
 }
 
-DQN_API uint16_t Dqn_Safe_TruncateU64ToU16(uint64_t val)
+DQN_API uint32_t Dqn_Safe_SaturateCastUSizeToU32(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= UINT16_MAX, "%I64u <= %I64u", val, UINT16_MAX);
-    auto result = (val <= UINT16_MAX) ? DQN_CAST(uint16_t)val : UINT16_MAX;
+    uint32_t result = Dqn_Safe_Assert(val <= UINT32_MAX) ? DQN_CAST(uint32_t)val : UINT32_MAX;
     return result;
 }
 
-DQN_API uint8_t Dqn_Safe_TruncateU64ToU8(uint64_t val)
+DQN_API uint64_t Dqn_Safe_SaturateCastUSizeToU64(Dqn_usize val)
 {
-    DQN_ASSERT_MSG(val <= UINT8_MAX, "%I64u <= %I64u", val, UINT8_MAX);
-    auto result = (val <= UINT8_MAX) ? DQN_CAST(uint8_t)val : UINT8_MAX;
+    uint64_t result = Dqn_Safe_Assert(val <= UINT64_MAX) ? DQN_CAST(uint64_t)val : UINT64_MAX;
     return result;
 }
 
-DQN_API int64_t Dqn_Safe_TruncateU64ToI64(uint64_t val)
+// NOTE: Dqn_Safe_SaturateCastU64ToU*
+// -----------------------------------------------------------------------------
+// Both operands are unsigned and the lowest rank operand will be promoted to
+// match the highest rank operand.
+DQN_API unsigned int Dqn_Safe_SaturateCastU64ToUInt(uint64_t val)
 {
-    DQN_ASSERT_MSG(val <= INT64_MAX, "%I64u <= %I64d", val, INT64_MAX);
-    auto result = (val <= INT64_MAX) ? DQN_CAST(uint64_t)val : INT64_MAX;
+    unsigned int result = Dqn_Safe_Assert(val <= UINT8_MAX) ? DQN_CAST(unsigned int)val : UINT_MAX;
     return result;
 }
 
-
-DQN_API int32_t Dqn_Safe_TruncateU64ToI32(uint64_t val)
+DQN_API uint8_t Dqn_Safe_SaturateCastU64ToU8(uint64_t val)
 {
-    DQN_ASSERT_MSG(val <= INT32_MAX, "%I64u <= %I64d", val, INT32_MAX);
-    auto result = (val <= INT32_MAX) ? DQN_CAST(int32_t)val : INT32_MAX;
+    uint8_t result = Dqn_Safe_Assert(val <= UINT8_MAX) ? DQN_CAST(uint8_t)val : UINT8_MAX;
     return result;
 }
 
-DQN_API int16_t Dqn_Safe_TruncateU64ToI16(uint64_t val)
+DQN_API uint16_t Dqn_Safe_SaturateCastU64ToU16(uint64_t val)
 {
-    DQN_ASSERT_MSG(val <= UINT16_MAX, "%I64u <= %I64d", val, UINT16_MAX);
-    auto result = (val <= UINT16_MAX) ? DQN_CAST(int16_t)val : UINT16_MAX;
+    uint16_t result = Dqn_Safe_Assert(val <= UINT16_MAX) ? DQN_CAST(uint16_t)val : UINT16_MAX;
     return result;
 }
 
-DQN_API uint8_t Dqn_Safe_TruncateU64ToI8(uint64_t val)
+DQN_API uint32_t Dqn_Safe_SaturateCastU64ToU32(uint64_t val)
 {
-    DQN_ASSERT_MSG(val <= UINT8_MAX, "%I64u <= %I64d", val, UINT8_MAX);
-    auto result = (val <= UINT8_MAX) ? DQN_CAST(uint8_t)val : UINT8_MAX;
+    uint32_t result = Dqn_Safe_Assert(val <= UINT32_MAX) ? DQN_CAST(uint32_t)val : UINT32_MAX;
     return result;
 }
 
-DQN_API int Dqn_Safe_TruncateU64ToInt(uint64_t val)
+
+// NOTE: Dqn_Safe_SaturateCastISizeToI*
+// -----------------------------------------------------------------------------
+// Both operands are signed so the lowest rank operand will be promoted to
+// match the highest rank operand.
+DQN_API int Dqn_Safe_SaturateCastISizeToInt(Dqn_isize val)
 {
-    DQN_ASSERT_MSG(val <= INT32_MAX, "%I64u <= %I64d", val, INT32_MAX);
-    auto result = (val <= INT32_MAX) ? DQN_CAST(int)val : INT32_MAX;
+    Dqn_Safe_Assert(val >= INT_MIN && val <= INT_MAX);
+    int result = DQN_CAST(int)DQN_CLAMP(val, INT_MIN, INT_MAX);
     return result;
 }
 
-// NOTE: Dqn_Char_
-// -------------------------------------------------------------------------------------------------
+DQN_API int8_t Dqn_Safe_SaturateCastISizeToI8(Dqn_isize val)
+{
+    Dqn_Safe_Assert(val >= INT8_MIN && val <= INT8_MAX);
+    int8_t result = DQN_CAST(int8_t)DQN_CLAMP(val, INT8_MIN, INT8_MAX);
+    return result;
+}
+
+DQN_API int16_t Dqn_Safe_SaturateCastISizeToI16(Dqn_isize val)
+{
+    Dqn_Safe_Assert(val >= INT16_MIN && val <= INT16_MAX);
+    int16_t result = DQN_CAST(int16_t)DQN_CLAMP(val, INT16_MIN, INT16_MAX);
+    return result;
+}
+
+DQN_API int32_t Dqn_Safe_SaturateCastISizeToI32(Dqn_isize val)
+{
+    Dqn_Safe_Assert(val >= INT32_MIN && val <= INT32_MAX);
+    int32_t result = DQN_CAST(int32_t)DQN_CLAMP(val, INT32_MIN, INT32_MAX);
+    return result;
+}
+
+DQN_API int64_t Dqn_Safe_SaturateCastISizeToI64(Dqn_isize val)
+{
+    Dqn_Safe_Assert(val >= INT64_MIN && val <= INT64_MAX);
+    int64_t result = DQN_CAST(int64_t)DQN_CLAMP(val, INT64_MIN, INT64_MAX);
+    return result;
+}
+
+// NOTE: Dqn_Safe_SaturateCastISizeToU*
+// -----------------------------------------------------------------------------
+// If the value is a negative integer, we clamp to 0. Otherwise, we know that
+// the value is >=0, we can upcast safely to bounds check against the maximum
+// allowed value.
+DQN_API unsigned int Dqn_Safe_SaturateCastISizeToUInt(Dqn_isize val)
+{
+    unsigned int result = 0;
+    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
+        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT_MAX))
+            result = DQN_CAST(unsigned int)val;
+        else
+            result = UINT_MAX;
+    }
+    return result;
+}
+
+DQN_API uint8_t Dqn_Safe_SaturateCastISizeToU8(Dqn_isize val)
+{
+    uint8_t result = 0;
+    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
+        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT8_MAX))
+            result = DQN_CAST(uint8_t)val;
+        else
+            result = UINT8_MAX;
+    }
+    return result;
+}
+
+DQN_API uint16_t Dqn_Safe_SaturateCastISizeToU16(Dqn_isize val)
+{
+    uint16_t result = 0;
+    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
+        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT16_MAX))
+            result = DQN_CAST(uint16_t)val;
+        else
+            result = UINT16_MAX;
+    }
+    return result;
+}
+
+DQN_API uint32_t Dqn_Safe_SaturateCastISizeToU32(Dqn_isize val)
+{
+    uint32_t result = 0;
+    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
+        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT32_MAX))
+            result = DQN_CAST(uint32_t)val;
+        else
+            result = UINT32_MAX;
+    }
+    return result;
+}
+
+DQN_API uint64_t Dqn_Safe_SaturateCastISizeToU64(Dqn_isize val)
+{
+    uint64_t result = 0;
+    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
+        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT64_MAX))
+            result = DQN_CAST(uint64_t)val;
+        else
+            result = UINT64_MAX;
+    }
+    return result;
+}
+
+// NOTE: Dqn_Safe_SaturateCastI64To*
+// -----------------------------------------------------------------------------
+// Both operands are signed so the lowest rank operand will be promoted to
+// match the highest rank operand.
+DQN_API Dqn_isize Dqn_Safe_SaturateCastI64ToISize(int64_t val)
+{
+    Dqn_Safe_Assert(val >= DQN_ISIZE_MIN && val <= DQN_ISIZE_MAX);
+    Dqn_isize result = DQN_CAST(int64_t)DQN_CLAMP(val, DQN_ISIZE_MIN, DQN_ISIZE_MAX);
+    return result;
+}
+
+DQN_API int8_t Dqn_Safe_SaturateCastI64ToI8(int64_t val)
+{
+    Dqn_Safe_Assert(val >= INT8_MIN && val <= INT8_MAX);
+    int8_t result = DQN_CAST(int8_t)DQN_CLAMP(val, INT8_MIN, INT8_MAX);
+    return result;
+}
+
+DQN_API int16_t Dqn_Safe_SaturateCastI64ToI16(int64_t val)
+{
+    Dqn_Safe_Assert(val >= INT16_MIN && val <= INT16_MAX);
+    int16_t result = DQN_CAST(int16_t)DQN_CLAMP(val, INT16_MIN, INT16_MAX);
+    return result;
+}
+
+DQN_API int32_t Dqn_Safe_SaturateCastI64ToI32(int64_t val)
+{
+    Dqn_Safe_Assert(val >= INT32_MIN && val <= INT32_MAX);
+    int32_t result = DQN_CAST(int32_t)DQN_CLAMP(val, INT32_MIN, INT32_MAX);
+    return result;
+}
+
+// NOTE: Dqn_Safe_SaturateCastIntTo*
+// -----------------------------------------------------------------------------
+DQN_API int8_t Dqn_Safe_SaturateCastIntToI8(int val)
+{
+    Dqn_Safe_Assert(val >= INT8_MIN && val <= INT8_MAX);
+    int8_t result = DQN_CAST(int8_t)DQN_CLAMP(val, INT8_MIN, INT8_MAX);
+    return result;
+}
+
+DQN_API int16_t Dqn_Safe_SaturateCastIntToI16(int val)
+{
+    Dqn_Safe_Assert(val >= INT16_MIN && val <= INT16_MAX);
+    int16_t result = DQN_CAST(int16_t)DQN_CLAMP(val, INT16_MIN, INT16_MAX);
+    return result;
+}
+
+DQN_API uint8_t Dqn_Safe_SaturateCastIntToU8(int val)
+{
+    uint8_t result = 0;
+    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
+        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT8_MAX))
+            result = DQN_CAST(uint8_t)val;
+        else
+            result = UINT8_MAX;
+    }
+    return result;
+}
+
+DQN_API uint16_t Dqn_Safe_SaturateCastIntToU16(int val)
+{
+    uint16_t result = 0;
+    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
+        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT16_MAX))
+            result = DQN_CAST(uint16_t)val;
+        else
+            result = UINT16_MAX;
+    }
+    return result;
+}
+
+DQN_API uint32_t Dqn_Safe_SaturateCastIntToU32(int val)
+{
+    static_assert(sizeof(val) <= sizeof(uint32_t), "Sanity check to allow simplifying of casting");
+    uint32_t result = 0;
+    if (Dqn_Safe_Assert(val >= 0))
+        result = DQN_CAST(uint32_t)val;
+    return result;
+}
+
+DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val)
+{
+    static_assert(sizeof(val) <= sizeof(uint64_t), "Sanity check to allow simplifying of casting");
+    uint64_t result = 0;
+    if (Dqn_Safe_Assert(val >= 0))
+        result = DQN_CAST(uint64_t)val;
+    return result;
+}
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API bool Dqn_Char_IsAlpha(char ch)
 {
     bool result = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
@@ -5927,8 +6769,9 @@ DQN_API char Dqn_Char_ToLower(char ch)
     return result;
 }
 
-// NOTE: Dqn_UTF
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-UTFX] Dqn_UTF              |                             | Unicode helpers
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
 {
     // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
@@ -6001,39 +6844,74 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
     return 0;
 }
 
-#if defined(DQN_WITH_HEX)
-// NOTE: Dqn_Hex_
-// -------------------------------------------------------------------------------------------------
-DQN_API char const *Dqn_Hex_CStringTrimSpaceAnd0xPrefix(char const *hex, Dqn_isize size, Dqn_isize *real_size)
+#if !defined(DQN_NO_HEX)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API char const *Dqn_Hex_TrimSpaceAnd0xPrefixCString8(char const *hex, Dqn_isize size, Dqn_isize *real_size)
 {
-    Dqn_isize   trimmed_size = 0;
-    char const *trimmed_hex  = Dqn_CString8_TrimWhitespaceAround(hex, size, &trimmed_size);
-    char const *result       = Dqn_CString8_TrimPrefix(trimmed_hex, /*string*/
-                                                       "0x", /*prefix*/
-                                                       trimmed_size, /*string_size*/
-                                                       2 /*prefix_size*/,
-                                                       Dqn_CString8EqCase::Insensitive,
-                                                       &trimmed_size);
-    if (real_size) *real_size = trimmed_size;
+    Dqn_isize   trim_size = 0;
+    char const *result    = Dqn_CString8_TrimWhitespaceAround(hex, size, &trim_size);
+    if (trim_size >= 2) {
+        if (result[0] == '0' && (result[1] == 'x' || result[1] == 'X')) {
+            trim_size -= 2;
+            result += 2;
+        }
+    }
+
+    if (real_size)
+        *real_size = trim_size;
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Hex_StringTrimSpaceAnd0xPrefix(Dqn_String8 const string)
+DQN_API Dqn_String8 Dqn_Hex_TrimSpaceAnd0xPrefixString8(Dqn_String8 const string)
 {
     Dqn_isize trimmed_size = 0;
-    char const *trimmed    = Dqn_Hex_CStringTrimSpaceAnd0xPrefix(string.data, string.size, &trimmed_size);
-    Dqn_String8 result      = Dqn_String8_Init(trimmed, trimmed_size);
+    char const *trimmed    = Dqn_Hex_TrimSpaceAnd0xPrefixCString8(string.data, string.size, &trimmed_size);
+    Dqn_String8 result     = Dqn_String8_Init(trimmed, trimmed_size);
     return result;
 }
 
-DQN_API uint64_t Dqn_Hex_CStringToU64(char const *hex, Dqn_isize size)
+DQN_API Dqn_HexNumberString Dqn_Hex_U64ToNumberString(uint64_t number, uint32_t flags)
+{
+    Dqn_String8 prefix = {};
+    if (!(flags & Dqn_HexNumberStringFlags_No0xPrefix))
+        prefix = DQN_STRING8("0x");
+
+    Dqn_HexNumberString result = {};
+    DQN_MEMCPY(result.data, prefix.data, prefix.size);
+    result.size += DQN_CAST(int8_t)prefix.size;
+
+    char const *fmt = (flags & Dqn_HexNumberStringFlags_UppercaseHex) ? "%I64X" : "%I64x";
+    int size        = STB_SPRINTF_DECORATE(snprintf)(result.data + result.size, sizeof(result.data) - result.size, fmt, number);
+    result.size    += Dqn_Safe_SaturateCastIntToI8(size);
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_Hex_U64ToString8(Dqn_Allocator allocator, uint64_t number, uint32_t flags)
+{
+    Dqn_String8 prefix = {};
+    if (!(flags & Dqn_HexNumberStringFlags_No0xPrefix))
+        prefix = DQN_STRING8("0x");
+
+    char const *fmt         = (flags & Dqn_HexNumberStringFlags_UppercaseHex) ? "%I64X" : "%I64x";
+    Dqn_isize required_size = Dqn_CString8_FSize(fmt, number) + prefix.size;
+    Dqn_String8 result      = Dqn_String8_Allocate(allocator, required_size, Dqn_ZeroMem_No);
+
+    if (Dqn_String8_IsValid(result)) {
+        DQN_MEMCPY(result.data, prefix.data, prefix.size);
+        int space = DQN_CAST(int)DQN_MAX((result.size - prefix.size) + 1, 0); /*null-terminator*/
+        STB_SPRINTF_DECORATE(snprintf)(result.data + prefix.size, space, fmt, number);
+    }
+    return result;
+}
+
+DQN_API uint64_t Dqn_Hex_CString8ToU64(char const *hex, Dqn_isize size)
 {
     Dqn_isize   trim_size = size;
     char const *trim_hex  = hex;
-    if (trim_size >= 2)
-    {
-        if (trim_hex[0] == '0' && (trim_hex[1] == 'x' || trim_hex[1] == 'X'))
-        {
+    if (trim_size >= 2) {
+        if (trim_hex[0] == '0' && (trim_hex[1] == 'x' || trim_hex[1] == 'X')) {
             trim_size -= 2;
             trim_hex += 2;
         }
@@ -6041,12 +6919,13 @@ DQN_API uint64_t Dqn_Hex_CStringToU64(char const *hex, Dqn_isize size)
 
     DQN_ASSERT(DQN_CAST(Dqn_usize)(trim_size * 4 / 8) /*maximum amount of bytes represented in the hex string*/ <= sizeof(uint64_t));
 
-    uint64_t   result    = 0;
+    uint64_t   result      = 0;
     Dqn_usize bits_written = 0;
-    for (Dqn_isize hex_index = 0; hex_index < size; hex_index++, bits_written += 4)
-    {
+    Dqn_isize max_size     = DQN_MIN(size, 8 /*bytes*/ * 2 /*hex chars per byte*/);
+    for (Dqn_isize hex_index = 0; hex_index < max_size; hex_index++, bits_written += 4) {
         char ch = trim_hex[hex_index];
-        if (!Dqn_Char_IsHex(ch)) break;
+        if (!Dqn_Char_IsHex(ch))
+            break;
         uint8_t val = Dqn_Char_HexToU8(ch);
         Dqn_usize bit_shift = 60 - bits_written;
         result |= (DQN_CAST(uint64_t)val << bit_shift);
@@ -6056,42 +6935,84 @@ DQN_API uint64_t Dqn_Hex_CStringToU64(char const *hex, Dqn_isize size)
     return result;
 }
 
-DQN_API uint64_t Dqn_Hex_StringToU64(Dqn_String8 hex)
+DQN_API uint64_t Dqn_Hex_String8ToU64(Dqn_String8 hex)
 {
-    uint64_t result = Dqn_Hex_CStringToU64(hex.data, hex.size);
+    uint64_t result = Dqn_Hex_CString8ToU64(hex.data, hex.size);
     return result;
 }
 
-DQN_API void Dqn_Hex_BytesToHex(void const *src, int src_size, char *dest, int dest_size)
+DQN_API bool Dqn_Hex_BytesToCString8Buffer(void const *src, Dqn_isize src_size, char *dest, Dqn_isize dest_size)
 {
-    (void)src_size; (void)dest_size;
-    DQN_ASSERT(dest_size >= src_size * 2);
+    if (!src || !dest || src_size < 0)
+        return false;
 
-    unsigned char *src_u8 = DQN_CAST(unsigned char *)src;
-    for (int src_index = 0, dest_index = 0;
-         src_index < src_size;
-         src_index += 1, dest_index += 2)
-    {
-        char byte            = src_u8[src_index];
-        char hex01           = (byte >> 4) & 0b1111;
-        char hex02           = (byte >> 0) & 0b1111;
-        dest[dest_index + 0] = hex01 < 10 ? (hex01 + '0') : (hex01 - 10) + 'a';
-        dest[dest_index + 1] = hex02 < 10 ? (hex02 + '0') : (hex02 - 10) + 'a';
+    if (!Dqn_Safe_Assert(dest_size >= src_size * 2))
+        return false;
+
+    char const *HEX             = "0123456789abcdef";
+    unsigned char const *src_u8 = DQN_CAST(unsigned char const *)src;
+    for (Dqn_isize src_index = 0, dest_index = 0; src_index < src_size; src_index++) {
+        char byte          = src_u8[src_index];
+        char hex01         = (byte >> 4) & 0b1111;
+        char hex02         = (byte >> 0) & 0b1111;
+        dest[dest_index++] = HEX[(int)hex01];
+        dest[dest_index++] = HEX[(int)hex02];
     }
+
+    return true;
 }
 
-DQN_API void Dqn_Hex_ToBytes(char const *hex, int hex_size, void *dest, int dest_size)
+DQN_API char *Dqn_Hex_BytesToCString8Arena(Dqn_Arena *arena, void const *bytes, Dqn_isize size)
 {
-    (void)hex_size; (void)dest_size;
-    DQN_ASSERT(dest_size >= DQN_CAST(int)((hex_size / 2.f) + .5f));
+    char *result = size > 0 ? Dqn_Arena_NewArray(arena, char, (size * 2) + 1 /*null terminate*/, Dqn_ZeroMem_No) : nullptr;
+    if (result) {
+        bool converted = Dqn_Hex_BytesToCString8Buffer(bytes, size, result, size * 2);
+        DQN_ASSERT(converted);
+        result[size * 2] = 0;
+    }
+    return result;
+}
 
+DQN_API Dqn_String8 Dqn_Hex_BytesToString8Arena(Dqn_Arena *arena, void const *bytes, Dqn_isize size)
+{
+    Dqn_String8 result = {};
+    result.data        = Dqn_Hex_BytesToCString8Arena(arena, bytes, size);
+    if (result.data)
+        result.size = size * 2;
+    return result;
+}
+
+DQN_API Dqn_isize Dqn_Hex_CString8ToByteBuffer(char const *hex, Dqn_isize hex_size, void *dest, Dqn_isize dest_size)
+{
+    Dqn_isize result = 0;
+    if (!hex || hex_size <= 0)
+        return result;
+
+    Dqn_isize trim_size  = 0;
+    char const *trim_hex = Dqn_Hex_TrimSpaceAnd0xPrefixCString8(hex,
+                                                                hex_size,
+                                                                &trim_size);
+    if (dest_size < (trim_size / 2))
+        return result;
+
+    result = Dqn_Hex_CString8ToByteBufferUnchecked(trim_hex,
+                                                   trim_size,
+                                                   dest,
+                                                   dest_size);
+    return result;
+}
+
+DQN_API Dqn_isize Dqn_Hex_CString8ToByteBufferUnchecked(char const *hex, Dqn_isize hex_size, void *dest, Dqn_isize dest_size)
+{
+    Dqn_isize result       = 0;
     unsigned char *dest_u8 = DQN_CAST(unsigned char *)dest;
-    for (int hex_index = 0, dest_index = 0;
+
+    for (Dqn_isize hex_index = 0;
          hex_index < hex_size;
-         hex_index += 2, dest_index += 1)
+         hex_index += 2, result += 1)
     {
-        char hex01 = hex[hex_index];
-        char hex02 = (hex_index + 1 < hex_size) ? hex[hex_index + 1] : 0;
+        char hex01   = hex[hex_index];
+        char hex02   = (hex_index + 1 < hex_size) ? hex[hex_index + 1] : 0;
 
         char bit4_01 =   (hex01 >= '0' && hex01 <= '9') ?  0 + (hex01 - '0')
                        : (hex01 >= 'a' && hex01 <= 'f') ? 10 + (hex01 - 'a')
@@ -6103,558 +7024,58 @@ DQN_API void Dqn_Hex_ToBytes(char const *hex, int hex_size, void *dest, int dest
                        : (hex02 >= 'A' && hex02 <= 'F') ? 10 + (hex02 - 'A')
                        : 0;
 
-        char byte = (bit4_01 << 4) | (bit4_02 << 0);
-        dest_u8[dest_index] = byte;
-    }
-}
-
-DQN_API char *Dqn_Hex_BytesToHexCStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena)
-{
-    char *result = size > 0 ? Dqn_Arena_NewArray(arena, char, (size * 2) + 1 /*null terminate*/, Dqn_ZeroMem_No) : nullptr;
-    if (result)
-    {
-        Dqn_Hex_BytesToHex(bytes, size, result, size * 2);
-        result[size * 2] = 0;
+        char byte       = (bit4_01 << 4) | (bit4_02 << 0);
+        dest_u8[result] = byte;
     }
 
+    DQN_ASSERT(result <= dest_size);
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Hex_BytesToHexStringArena(void const *bytes, Dqn_isize size, Dqn_Arena *arena)
+DQN_API Dqn_isize Dqn_Hex_String8ToByteBufferUnchecked(Dqn_String8 hex, void *dest, Dqn_isize dest_size)
 {
-    char *c_string = Dqn_Hex_BytesToHexCStringArena(bytes, size, arena);
-    Dqn_String8 result = {};
-    if (c_string)
-        result = Dqn_String8_Init(c_string, size * 2);
+    Dqn_isize result = Dqn_Hex_CString8ToByteBufferUnchecked(hex.data, hex.size, dest, dest_size);
     return result;
 }
 
-DQN_API uint8_t *Dqn_Hex_CStringToU8Bytes(char const *hex, Dqn_isize size, Dqn_isize *real_size, Dqn_Arena *arena)
+DQN_API Dqn_isize Dqn_Hex_String8ToByteBuffer(Dqn_String8 hex, void *dest, Dqn_isize dest_size)
 {
-    hex = Dqn_Hex_CStringTrimSpaceAnd0xPrefix(hex, size, &size);
-    Dqn_isize binary_size = DQN_CAST(Dqn_isize)(size / 2.f + .5f);
-    uint8_t *result = Dqn_Arena_NewArray(arena, uint8_t, binary_size, Dqn_ZeroMem_No);
-    if (result)
-        Dqn_Hex_ToBytes(hex, size, result, binary_size);
-
-    if (real_size) *real_size = binary_size;
-    return result;
-}
-#endif // DQN_WITH_HEX
-
-// NOTE: Dqn_Fs_
-// -------------------------------------------------------------------------------------------------
-DQN_API char *Dqn_Fs_ReadFileCString8ToCString8Arena_(DQN_CALL_SITE_ARGS char const *file_path, Dqn_isize file_path_size, Dqn_isize *file_size, Dqn_Arena *arena)
-{
-    if (!file_path || !arena) {
-        return nullptr;
-    }
-
-#if defined(DQN_OS_WIN32)
-    if (file_path_size <= 0)
-        file_path_size = Dqn_CString8_Size(file_path);
-
-    Dqn_ThreadTempArena scratch          = Dqn_Thread_TempArena(arena);
-    Dqn_String8       file_path_string   = Dqn_String8_Init(file_path, file_path_size);
-    Dqn_String16      file_path_string_w = Dqn_Win_String8ToString16Allocator(file_path_string, Dqn_Arena_Allocator(scratch.arena));
-
-    void *file_handle =
-        CreateFileW(file_path_string_w.data, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, nullptr);
-
-    if (file_handle == INVALID_HANDLE_VALUE) {
-        DQN_LOG_E("Failed to open file for reading [file=%.*s, reason=%.*s]",
-                  DQN_STRING_FMT(file_path_string),
-                  DQN_STRING_FMT(Dqn_Win_LastError()));
-        return nullptr;
-    }
-
-    DQN_DEFER { CloseHandle(file_handle); };
-    LARGE_INTEGER win_file_size;
-    bool get_file_size_result = GetFileSizeEx(file_handle, &win_file_size);
-    if (!get_file_size_result || win_file_size.QuadPart > (unsigned long)-1) {
-        if (!get_file_size_result) {
-            DQN_LOG_E("Failed to query file size [file=%.*s, reason=%.*s]",
-                      DQN_STRING_FMT(file_path_string),
-                      DQN_STRING_FMT(Dqn_Win_LastError()));
-        } else {
-            DQN_LOG_E(
-                "We don't support files larger than %$.2d yet, Win32 layer needs to use overlapped IO to chunk reading in "
-                "the data");
-        }
-        return nullptr;
-    }
-
-    Dqn_isize allocate_size = Dqn_Safe_TruncateI64ToISize(win_file_size.QuadPart + 1);
-    auto  arena_undo        = Dqn_Arena_BeginTempMemory(arena);
-    auto *result            = DQN_CAST(char *) Dqn_Arena_Allocate_(arena, allocate_size, alignof(char), Dqn_ZeroMem_No DQN_CALL_SITE_ARGS_INPUT);
-
-    // TODO(dqn): We need to chunk this and ensure that readfile read the bytes we wanted.
-    unsigned long bytes_read = 0;
-    if (ReadFile(file_handle, result, DQN_CAST(unsigned long)win_file_size.QuadPart, &bytes_read, nullptr /*overlapped*/) == 0) {
-        Dqn_Arena_EndTempMemory(arena_undo);
-        DQN_LOG_E("Failed to read file to buffer [file=%.*s, reason=%.*s]",
-                  DQN_STRING_FMT(file_path_string),
-                  DQN_STRING_FMT(Dqn_Win_LastError()));
-        return nullptr;
-    }
-
-    if (file_size) {
-        *file_size = Dqn_Safe_TruncateI64ToISize(win_file_size.QuadPart);
-    }
-
-    // TODO: Zero terminate doesn't look necessary, ever?
-    result[win_file_size.QuadPart] = 0;
-    return result;
-#else
-    Dqn_isize file_size_ = 0;
-    if (!file_size)
-        file_size = &file_size_;
-
-    FILE *file_handle = fopen(file_path, "rb");
-    if (!file_handle) {
-        DQN_LOG_E("Failed to open file '%s' using fopen\n", file_path);
-        return nullptr;
-    }
-
-    DQN_DEFER { fclose(file_handle); };
-    fseek(file_handle, 0, SEEK_END);
-    *file_size = ftell(file_handle);
-
-    if (DQN_CAST(long)(*file_size) == -1L) {
-        DQN_LOG_E("Failed to determine '%s' file size using ftell\n", file);
-        return nullptr;
-    }
-
-    rewind(file_handle);
-    auto  arena_undo = Dqn_Arena_BeginTempMemory(arena);
-    auto *result     = DQN_CAST(char *) Dqn_Arena_Allocate_(arena, *file_size + 1, alignof(char), Dqn_ZeroMem_No DQN_CALL_SITE_ARGS_INPUT);
-    if (!result) {
-        DQN_LOG_M("Failed to allocate %td bytes to read file '%s'\n", *file_size + 1, file);
-        return nullptr;
-    }
-
-    result[*file_size] = 0;
-    if (fread(result, DQN_CAST(size_t)(*file_size), 1, file_handle) != 1) {
-        Dqn_Arena_EndTempMemory(arena_undo);
-        DQN_LOG_E("Failed to read %td bytes into buffer from '%s'\n", *file_size, file);
-        return nullptr;
-    }
-
-    return result;
-#endif
-}
-
-DQN_API Dqn_String8 Dqn_Fs_ReadFileCString8ToString8Arena_(DQN_CALL_SITE_ARGS
-                                                      char const *file_path,
-                                                      Dqn_isize   file_path_size,
-                                                      Dqn_Arena  *arena)
-{
-    Dqn_isize   file_size = 0;
-    char *      string    = Dqn_Fs_ReadFileCString8ToCString8Arena_(DQN_CALL_SITE_ARGS_INPUT file_path, file_path_size, &file_size, arena);
-    Dqn_String8 result    = Dqn_String8_Init(string, file_size);
+    Dqn_isize result = Dqn_Hex_CString8ToByteBuffer(hex.data, hex.size, dest, dest_size);
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Fs_ReadFileString8ToString8Arena_(DQN_CALL_SITE_ARGS
-                                                     Dqn_String8 file_path,
-                                                     Dqn_Arena  *arena)
+DQN_API char *Dqn_Hex_CString8ToBytesArena(Dqn_Arena *arena, char const *hex, Dqn_isize size, Dqn_isize *real_size)
 {
-    Dqn_isize   file_size = 0;
-    char *      string    = Dqn_Fs_ReadFileCString8ToCString8Arena_(DQN_CALL_SITE_ARGS_INPUT file_path.data, file_path.size, &file_size, arena);
-    Dqn_String8 result    = Dqn_String8_Init(string, file_size);
-    return result;
-}
-
-DQN_API bool Dqn_Fs_WriteCString8ToFileCString8(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size)
-{
-#if defined(DQN_OS_WIN32)
-    if (!file_path || file_path_size <= 0 || !buffer || buffer_size <= 0)
-        return false;
-
-    if (file_path_size == 0)
-        file_path_size = Dqn_CString8_Size(file_path);
-
-    Dqn_ThreadTempArena scratch     = Dqn_Thread_TempArena();
-    Dqn_String8       file_path_str = Dqn_String8_Init(file_path, file_path_size);
-    Dqn_String16      file_path16   = Dqn_Win_String8ToString16Allocator(file_path_str, Dqn_Arena_Allocator(scratch.arena));
-
-    bool result = false;
-    if (buffer_size > 0) {
-        void *file_handle = CreateFileW(file_path16.data,      // LPCWSTR               lpFileName,
-                                        GENERIC_WRITE,         // DWORD                 dwDesiredAccess,
-                                        0,                     // DWORD                 dwShareMode,
-                                        nullptr,               // LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-                                        CREATE_ALWAYS,         // DWORD                 dwCreationDisposition,
-                                        FILE_ATTRIBUTE_NORMAL, // DWORD                 dwFlagsAndAttributes,
-                                        nullptr                // HANDLE                hTemplateFile
-        );
-
-        if (file_handle == INVALID_HANDLE_VALUE)
-            return result;
-
-        unsigned long bytes_written = 0;
-        result                      = WriteFile(file_handle, buffer, DQN_CAST(unsigned long)buffer_size, &bytes_written, nullptr /*lpOverlapped*/);
-        CloseHandle(file_handle);
-        DQN_ASSERT(bytes_written == buffer_size);
-    }
-
-    return result;
-#else
-    // TODO(dqn): Use OS apis
-    (void)file_path_size;
-
-    FILE *file_handle = nullptr;
-    fopen_s(&file_handle, file_path, "w+b");
-    if (!file_handle) {
-        DQN_LOG_E("Failed to open file '%s' using fopen\n", file_path);
-        return false;
-    }
-
-    DQN_DEFER { fclose(file_handle); };
-    Dqn_usize write_count = fwrite(buffer, buffer_size, 1 /*count*/, file_handle);
-
-    if (write_count != 1) {
-        DQN_LOG_E("Failed to write to file '%s' using fwrite\n", file_path);
-        return false;
-    }
-
-    return true;
-#endif
-}
-
-DQN_API bool Dqn_Fs_WriteString8ToFileString8(Dqn_String8 file_path, Dqn_String8 buffer)
-{
-    bool result = Dqn_Fs_WriteCString8ToFileCString8(file_path.data, file_path.size, buffer.data, buffer.size);
-    return result;
-}
-
-// NOTE: Dqn_Fs_ Implementation
-// -------------------------------------------------------------------------------------------------
-#if defined(DQN_OS_WIN32)
-DQN_API uint64_t Dqn__WinFileTimeToSeconds(FILETIME const *time)
-{
-    ULARGE_INTEGER time_large_int = {};
-    time_large_int.u.LowPart      = time->dwLowDateTime;
-    time_large_int.u.HighPart     = time->dwHighDateTime;
-    uint64_t result                = (time_large_int.QuadPart / 10000000ULL) - 11644473600ULL;
-    return result;
-}
-#endif
-
-// NOTE: Max size from MSDN, using \\? syntax, but the ? bit can be expanded
-// even more so the max size is kind of not well defined.
-#if defined(DQN_OS_WIN32) && !defined(DQN_OS_WIN32_MAX_PATH)
-    #define DQN_OS_WIN32_MAX_PATH 32767 + 128 /*fudge*/
-#endif
-
-DQN_API bool Dqn_Fs_Exists(Dqn_String8 path)
-{
-    bool result = false;
-#if defined(DQN_OS_WIN32)
-    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
-    int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
-    if (path16_size) {
-        WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-        if (GetFileAttributesExW(path16, GetFileExInfoStandard, &attrib_data)) {
-            result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
-                     !(attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-        }
-    }
-
-#elif defined(DQN_OS_UNIX)
-    struct stat stat_result;
-    if (lstat(path.data, &stat_result) != -1)
-        result = S_ISREG(stat_result.st_mode) || S_ISLNK(stat_result.st_mode);
-
-#else
-    #error Unimplemented
-
-#endif
-
-    return result;
-}
-
-DQN_API bool Dqn_Fs_DirExists(Dqn_String8 path)
-{
-    bool result = false;
-#if defined(DQN_OS_WIN32)
-    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
-    int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
-    if (path16_size) {
-        WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-        if (GetFileAttributesExW(path16, GetFileExInfoStandard, &attrib_data)) {
-            result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
-                     (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-        }
-    }
-
-#elif defined(DQN_OS_UNIX)
-    struct stat stat_result;
-    if (lstat(path.data, &stat_result) != -1)
-        result = S_ISDIR(stat_result.st_mode);
-#else
-    #error Unimplemented
-#endif
-
-    return result;
-}
-
-DQN_API Dqn_Fs_Info Dqn_Fs_GetInfo(Dqn_String8 path)
-{
-    Dqn_Fs_Info result = {};
-#if defined(DQN_OS_WIN32)
-    WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
-    Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
-    if (!GetFileAttributesExW(path16, GetFileExInfoStandard, &attrib_data))
+    char *result = nullptr;
+    if (!arena || !hex || size <= 0)
         return result;
 
+    Dqn_isize trim_size  = 0;
+    char const *trim_hex = Dqn_Hex_TrimSpaceAnd0xPrefixCString8(hex,
+                                                                size,
+                                                                &trim_size);
+
+    Dqn_isize binary_size = trim_size / 2;
+    result                = Dqn_Arena_NewArray(arena, char, binary_size, Dqn_ZeroMem_No);
     if (result) {
-        result.create_time_in_s      = Dqn__WinFileTimeToSeconds(&attrib_data.ftCreationTime);
-        result.last_access_time_in_s = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastAccessTime);
-        result.last_write_time_in_s  = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastWriteTime);
-
-        LARGE_INTEGER large_int = {};
-        large_int.u.HighPart    = DQN_CAST(int32_t)attrib_data.nFileSizeHigh;
-        large_int.u.LowPart     = attrib_data.nFileSizeLow;
-        result.size             = (uint64_t)large_int.QuadPart;
+        Dqn_isize convert_size = Dqn_Hex_CString8ToByteBufferUnchecked(trim_hex, trim_size, result, binary_size);
+        if (real_size)
+            *real_size = convert_size;
     }
-#elif defined(DQN_OS_UNIX)
-    struct stat file_stat;
-    if (lstat(path.data, &file_stat) != -1)
-    {
-        result.size                  = file_stat.st_size;
-        result.last_access_time_in_s = file_stat.st_atime;
-        result.last_write_time_in_s  = file_stat.st_mtime;
-
-        // TODO(dqn): Seems linux does not support creation time via stat. We
-        // shoddily deal with this.
-        result.create_time_in_s = DQN_MIN(result.last_access_time_in_s, result.last_write_time_in_s);
-    }
-
-#else
-    #error Unimplemented
-
-#endif
-
     return result;
 }
 
-DQN_API bool Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
+DQN_API Dqn_String8 Dqn_Hex_String8ToBytesString8Arena(Dqn_Arena *arena, Dqn_String8 hex)
 {
-    bool result = false;
-#if defined(DQN_OS_WIN32)
-    Dqn_ThreadTempArena scratch = Dqn_Thread_TempArena();
-    Dqn_String16      src16     = Dqn_Win_String8ToString16Allocator(src, Dqn_Arena_Allocator(scratch.arena));
-    Dqn_String16      dest16    = Dqn_Win_String8ToString16Allocator(dest, Dqn_Arena_Allocator(scratch.arena));
-
-    int fail_if_exists = overwrite == false;
-    result = CopyFileW(src16.data, dest16.data, fail_if_exists) != 0;
-
-    if (!result) {
-        DQN_LOG_E("Failed to copy file [from=%.*s, to=%.*s, reason=%.*s]",
-                  DQN_STRING_FMT(src16),
-                  DQN_STRING_FMT(dest16),
-                  DQN_STRING_FMT(Dqn_Win_LastError()));
-    }
-
-#elif defined(DQN_OS_UNIX)
-    int src_fd  = open(src.data, O_RDONLY);
-    int dest_fd = open(dest.data, O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : 0));
-
-    if (src_fd != -1 && dest_fd != -1) {
-        struct stat stat_existing;
-        fstat(src_fd, &stat_existing);
-        Dqn_isize bytes_written = sendfile64(dest_fd, src_fd, 0, stat_existing.st_size);
-        result = (bytes_written == stat_existing.st_size);
-    }
-
-    if (src_fd != -1)
-        close(src_fd);
-
-    if (dest_fd != -1)
-        close(dest_fd);
-#else
-    #error Unimplemented
-#endif
-
+    Dqn_String8 result = {};
+    result.data        = Dqn_Hex_CString8ToBytesArena(arena, hex.data, hex.size, &result.size);
     return result;
 }
+#endif // !defined(DQN_NO_HEX)
 
-DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
-{
-    Dqn_ThreadTempArena scratch = Dqn_Thread_TempArena();
-    bool result                 = true;
-    int path_indexes_size       = 0;
-    uint16_t path_indexes[64]   = {};
-
-#if defined(DQN_OS_WIN32)
-    Dqn_String16 path16 = Dqn_Win_String8ToString16Allocator(path, Dqn_Arena_Allocator(scratch.arena));
-
-    // NOTE: Go back from the end of the string to all the directories in the
-    // string, and try to create them. Since Win32 API cannot create
-    // intermediate directories that don't exist in a path we need to go back
-    // and record all the directories until we encounter one that exists.
-    //
-    // From that point onwards go forwards and make all the directories
-    // inbetween by null-terminating the string temporarily, creating the
-    // directory and so forth until we reach the end.
-    //
-    // If we find a file at some point in the path we fail out because the
-    // series of directories can not be made if a file exists with the same
-    // name.
-    for (Dqn_isize index = path16.size - 1; index >= 0; index--) {
-        bool first_char = index == (path16.size - 1);
-        wchar_t ch      = path16.data[index];
-        if (ch == '/' || ch == '\\' || first_char) {
-            WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-            wchar_t temp = path16.data[index];
-
-            if (!first_char) path16.data[index] = 0; // Temporarily null terminate it
-            bool successful = GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data); // Check
-            if (!first_char) path16.data[index] = temp; // Undo null termination
-
-            if (successful) {
-                if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-                    // NOTE: We found a directory, we can stop here and start
-                    // building up all the directories that didn't exist up to
-                    // this point.
-                    break;
-                } else {
-                    // NOTE: There's something that exists in at this path, but
-                    // it's not a directory. This request to make a directory is
-                    // invalid.
-                    return false;
-                }
-            } else {
-                // NOTE: There's nothing that exists at this path, we can create
-                // a directory here
-                path_indexes[path_indexes_size++] = DQN_CAST(uint16_t)index;
-            }
-        }
-    }
-
-    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--) {
-        uint16_t path_index = path_indexes[index];
-        wchar_t temp = path16.data[path_index];
-
-        if (index != 0) path16.data[path_index] = 0;
-        result |= (CreateDirectoryW(path16.data, nullptr) == 0);
-        if (index != 0) path16.data[path_index] = temp;
-    }
-
-#elif defined(DQN_OS_UNIX)
-    Dqn_String8 copy = Dqn_String8_Copy(scratch.arena, path);
-    for (int32_t index = copy.size - 1; index >= 0; index--) {
-        bool first_char = index == (copy.size - 1);
-        wchar_t ch         = copy.data[index];
-        if (ch == '/' || first_char) {
-            char temp = copy.data[index];
-            if (!first_char) copy.data[index] = 0; // Temporarily null terminate it
-            bool is_file = Dqn_Fs_Exists(copy);
-            if (!first_char) copy.data[index] = temp; // Undo null termination
-
-            if (is_file) {
-                // NOTE: There's something that exists in at this path, but
-                // it's not a directory. This request to make a directory is
-                // invalid.
-                return false;
-            } else {
-                if (Dqn_Fs_DirExists(copy)) {
-                    // NOTE: We found a directory, we can stop here and start
-                    // building up all the directories that didn't exist up to
-                    // this point.
-                    break;
-                } else {
-                    // NOTE: There's nothing that exists at this path, we can
-                    // create a directory here
-                    path_indexes[path_indexes_size++] = DQN_CAST(uint16_t)index;
-                }
-            }
-        }
-    }
-
-    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--) {
-        uint16_t path_index = path_indexes[index];
-        char temp = copy.data[path_index];
-
-        if (index != 0) copy.data[path_index] = 0;
-        result |= mkdir(copy.data, 0774) == 0;
-        if (index != 0) copy.data[path_index] = temp;
-    }
-
-#else
-    #error Unimplemented
-#endif
-
-    return result;
-}
-
-DQN_API bool Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
-{
-    bool result = false;
-
-#if defined(DQN_OS_WIN32)
-    Dqn_ThreadTempArena scratch = Dqn_Thread_TempArena();
-    Dqn_String16      src16   = Dqn_Win_String8ToString16Allocator(src, Dqn_Arena_Allocator(scratch.arena));
-    Dqn_String16      dest16  = Dqn_Win_String8ToString16Allocator(dest, Dqn_Arena_Allocator(scratch.arena));
-
-    unsigned long flags = MOVEFILE_COPY_ALLOWED;
-    if (overwrite) {
-        flags |= MOVEFILE_REPLACE_EXISTING;
-    }
-
-    result = MoveFileExW(src16.data, dest16.data, flags) != 0;
-    if (!result) {
-        DQN_LOG_E("Failed to move file [from=%.*s, to=%.*s, reason=%.*s]",
-                  DQN_STRING_FMT(src),
-                  DQN_STRING_FMT(dest),
-                  DQN_STRING_FMT(Dqn_Win_LastError()));
-    }
-
-#elif defined(DQN_OS_UNIX)
-    // See: https://github.com/gingerBill/gb/blob/master/gb.h
-    bool file_moved = true;
-    if (link(src.data, dest.data) == -1)
-    {
-        // NOTE: Link can fail if we're trying to link across different volumes
-        // so we fall back to a binary directory.
-        file_moved |= Dqn_Fs_Copy(src, dest, overwrite);
-    }
-
-    if (file_moved)
-        result = (unlink(src.data) != -1); // Remove original file
-
-#else
-    #error Unimplemented
-
-#endif
-
-    return result;
-}
-
-DQN_API bool Dqn_Fs_Delete(Dqn_String8 path)
-{
-    bool result = false;
-#if defined(DQN_OS_WIN32)
-    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
-    int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
-    if (path16_size) {
-        result = DeleteFileW(path16);
-        if (!result)
-            result = RemoveDirectoryW(path16);
-    }
-#elif defined(DQN_OS_UNIX)
-    result = remove(path.data) == 0;
-#else
-    #error Unimplemented
-#endif
-
-    return result;
-}
-
-// NOTE: Dqn_Date
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-DATE] Dqn_Date             |                             | Date-time helpers
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API Dqn_DateHMSTime Dqn_Date_HMSLocalTimeNow()
 {
     Dqn_DateHMSTime result = {};
@@ -6749,8 +7170,667 @@ DQN_API uint64_t Dqn_Date_EpochTime()
     return result;
 }
 
-// NOTE: OS
-// -------------------------------------------------------------------------------------------------
+// NOTE: Max size from MSDN, using \\? syntax, but the ? bit can be expanded
+// even more so the max size is kind of not well defined.
+#if defined(DQN_OS_WIN32) && !defined(DQN_OS_WIN32_MAX_PATH)
+    #define DQN_OS_WIN32_MAX_PATH 32767 + 128 /*fudge*/
+#endif
+
+#if defined(DQN_OS_WIN32)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-WIND] Dqn_Win              |                             | Windows OS helpers
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_Win_ErrorMsg *msg)
+{
+    msg->code    = GetLastError();
+    msg->data[0] = 0;
+
+    unsigned long flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    void *module_to_get_errors_from = nullptr;
+
+    if (msg->code >= 12000 && msg->code <= 12175) // WinINET Errors
+    {
+        flags |= FORMAT_MESSAGE_FROM_HMODULE;
+        module_to_get_errors_from = GetModuleHandleA("wininet.dll");
+    }
+
+    msg->size = FormatMessageA(flags,
+                                 module_to_get_errors_from,   // LPCVOID lpSource,
+                                 msg->code,                   // unsigned long   dwMessageId,
+                                 0,                           // unsigned long   dwLanguageId,
+                                 msg->data,                   // LPSTR   lpBuffer,
+                                 DQN_ARRAY_ICOUNT(msg->data), // unsigned long   nSize,
+                                 nullptr);                    // va_list * Arguments
+}
+
+DQN_API Dqn_Win_ErrorMsg Dqn_Win_LastError()
+{
+    Dqn_Win_ErrorMsg result = {};
+    Dqn_Win_LastErrorToBuffer(&result);
+    return result;
+}
+
+
+DQN_API void Dqn_Win_MakeProcessDPIAware()
+{
+    typedef bool SetProcessDpiAwareProc(void);
+    typedef bool SetProcessDpiAwarenessProc(PROCESS_DPI_AWARENESS);
+    typedef bool SetProcessDpiAwarenessContextProc(void * /*DPI_AWARENESS_CONTEXT*/);
+
+    // NOTE(doyle): Taken from cmuratori/refterm snippet on DPI awareness. It
+    // appears we can make this robust by just loading user32.dll and using
+    // GetProcAddress on the DPI function. If it's not there, we're on an old
+    // version of windows, so we can call an older version of the API.
+    void *lib_handle = LoadLibraryA("user32.dll");
+    if (auto *set_process_dpi_awareness_context = DQN_CAST(SetProcessDpiAwarenessContextProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAwarenessContext")) {
+        set_process_dpi_awareness_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    } else if (auto *set_process_dpi_awareness = DQN_CAST(SetProcessDpiAwarenessProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAwareness")) {
+        set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
+    } else if (auto *set_process_dpi_aware = DQN_CAST(SetProcessDpiAwareProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAware")) {
+        set_process_dpi_aware();
+    }
+}
+
+DQN_API void Dqn_Win_DumpLastError_(Dqn_CallSite call_site, char const *fmt, ...)
+{
+    // TODO(dqn): Hmmm .. should this be a separate log or part of the above
+    // macro. If so we need to make the logging macros more flexible.
+    Dqn_Win_ErrorMsg msg = Dqn_Win_LastError();
+    if (fmt) {
+        va_list args;
+        va_start(args, fmt);
+        Dqn_Log_TypeFVCallSite(Dqn_LogType_Error, call_site, fmt, args);
+        va_end(args);
+    }
+
+    if (msg.size)
+        Dqn_Log_TypeFCallSite(Dqn_LogType_Error, call_site, "Last Windows error [msg=%.*s]", DQN_STRING_FMT(msg));
+    else
+        Dqn_Log_TypeFCallSite(Dqn_LogType_Error, call_site, "Failed to dump last error, no error message found [format_message_error=%d, msg_error=%d]", GetLastError(), msg.code);
+}
+
+// NOTE: Windows UTF8 to String16
+// -----------------------------------------------------------------------------
+DQN_API int Dqn_Win_CString8ToCString16(const char *src, int src_size, wchar_t *dest, int dest_size)
+{
+    int result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src, src_size, dest, dest_size);
+    if (result && dest && dest_size > 0)
+        dest[DQN_MIN(result, dest_size - 1)] = 0; // Null-terminate the buffer
+    return result;
+}
+
+DQN_API int Dqn_Win_String8ToCString16(Dqn_String8 src, wchar_t *dest, int dest_size)
+{
+    int result   = 0;
+    int src_size = Dqn_Safe_SaturateCastISizeToInt(src.size);
+    if (src_size)
+        result = Dqn_Win_CString8ToCString16(src.data, src_size, dest, dest_size);
+    return result;
+}
+
+DQN_API Dqn_String16 Dqn_Win_String8ToString16Allocator(Dqn_String8 src, Dqn_Allocator allocator)
+{
+    Dqn_String16 result = {};
+    int required = Dqn_Win_String8ToCString16(src, nullptr, 0);
+    if (required != 0) {
+        result.data = Dqn_Allocator_NewArray(allocator, wchar_t, required + 1, Dqn_ZeroMem_No);
+        if (result.data) {
+            result.size = Dqn_Win_String8ToCString16(src, result.data, required + 1);
+            DQN_ASSERT(result.size == required);
+        }
+    }
+    return result;
+}
+
+// NOTE: Windows String16 To UTF8
+// -----------------------------------------------------------------------------
+DQN_API int Dqn_Win_CString16ToCString8(const wchar_t* src, int src_size, char *dest, int dest_size)
+{
+    int result = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src, src_size, dest, dest_size, nullptr, nullptr);
+    if (result && dest && dest_size > 0)
+        dest[DQN_MIN(result, dest_size - 1)] = 0;
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_Win_CString16ToString8Allocator(const wchar_t* src, int src_size, Dqn_Allocator allocator)
+{
+    Dqn_String8 result = {};
+    int required = Dqn_Win_CString16ToCString8(src, src_size, nullptr, 0);
+    if (required != 0) {
+        // NOTE: String allocate ensures there's one extra byte for
+        // null-termination already so no-need to +1 the required size
+        result = Dqn_String8_Allocate(allocator, required, Dqn_ZeroMem_No);
+        if (Dqn_String8_IsValid(result)) {
+            int next_required = Dqn_Win_CString16ToCString8(src, src_size, result.data, required + 1);
+            DQN_ASSERT(required == next_required);
+        }
+    }
+    return result;
+}
+
+DQN_API int Dqn_Win_String16ToCString8(Dqn_String16 src, char *dest, int dest_size)
+{
+    int result = 0;
+    int src_size = Dqn_Safe_SaturateCastISizeToInt(src.size);
+    if (src_size) {
+        result = Dqn_Win_CString16ToCString8(src.data, src_size, dest, dest_size);
+    }
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_Win_String16ToString8Allocator(Dqn_String16 src, Dqn_Allocator allocator)
+{
+    Dqn_String8 result = {};
+    int src_size = Dqn_Safe_SaturateCastISizeToInt(src.size);
+    if (src_size) {
+        result = Dqn_Win_CString16ToString8Allocator(src.data, src_size, allocator);
+    }
+    return result;
+}
+
+// NOTE: Windows Executable Directory
+// -----------------------------------------------------------------------------
+DQN_API Dqn_isize Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_isize size)
+{
+    wchar_t module_path[DQN_OS_WIN32_MAX_PATH];
+    int module_size = GetModuleFileNameW(nullptr /*module*/, module_path, DQN_ARRAY_UCOUNT(module_path));
+    DQN_HARD_ASSERT_MSG(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
+
+    Dqn_isize result = 0;
+    for (int index = module_size - 1; !result && index >= 0; index--)
+        result = module_path[index] == '\\' ? index : 0;
+
+    if (!buffer || size < result) {
+        return result;
+    }
+
+    DQN_MEMCPY(buffer, module_path, sizeof(wchar_t) * result);
+    return result;
+}
+
+DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena)
+{
+    wchar_t dir[DQN_OS_WIN32_MAX_PATH];
+    Dqn_isize dir_size = Dqn_Win_EXEDirW(dir, DQN_ARRAY_ICOUNT(dir));
+    DQN_HARD_ASSERT_MSG(dir_size <= DQN_ARRAY_ICOUNT(dir), "How the hell?");
+
+    Dqn_String16 result = {};
+    if (dir_size > 0) {
+        result.data = Dqn_Arena_CopyZ(arena, wchar_t, dir, dir_size);
+        if (result.data) {
+            result.size = dir_size;
+        }
+    }
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_Win_WorkingDir(Dqn_Allocator allocator, Dqn_String8 suffix)
+{
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(allocator.user_context);
+    Dqn_String16 suffix16     = Dqn_Win_String8ToString16Allocator(suffix, Dqn_Arena_Allocator(scratch.arena));
+    Dqn_String16 dir16        = Dqn_Win_WorkingDirW(Dqn_Arena_Allocator(scratch.arena), suffix16);
+    Dqn_String8 result        = Dqn_Win_String16ToString8Allocator(dir16, allocator);
+    return result;
+}
+
+DQN_API Dqn_String16 Dqn_Win_WorkingDirW(Dqn_Allocator allocator, Dqn_String16 suffix)
+{
+    DQN_ASSERT(suffix.size >= 0);
+    Dqn_String16 result = {};
+
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(allocator.user_context);
+
+    // NOTE: required_size is the size required *including* the null-terminator
+    unsigned long required_size = GetCurrentDirectoryW(0, nullptr);
+    unsigned long desired_size  = required_size + DQN_CAST(unsigned long) suffix.size;
+
+    wchar_t *scratch_w_path = Dqn_Arena_NewArray(scratch.arena, wchar_t, desired_size, Dqn_ZeroMem_No);
+    if (!scratch_w_path)
+        return result;
+
+    unsigned long bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, scratch_w_path);
+    if ((bytes_written_wo_null_terminator + 1) != required_size) {
+        // TODO(dqn): Error
+        return result;
+    }
+
+    wchar_t *w_path = Dqn_Allocator_NewArray(allocator, wchar_t, desired_size, Dqn_ZeroMem_No);
+    if (!w_path)
+        return result;
+
+    if (suffix.size) {
+        DQN_MEMCPY(w_path, scratch_w_path, sizeof(*scratch_w_path) * bytes_written_wo_null_terminator);
+        DQN_MEMCPY(w_path + bytes_written_wo_null_terminator, suffix.data, sizeof(suffix.data[0]) * suffix.size);
+        w_path[desired_size] = 0;
+    }
+
+    result = Dqn_String16{w_path, DQN_CAST(Dqn_isize)(desired_size - 1)};
+    return result;
+}
+
+DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it)
+{
+    WIN32_FIND_DATAW find_data = {};
+    if (it->handle) {
+        if (FindNextFileW(it->handle, &find_data) == 0)
+            return false;
+    } else {
+        it->handle = FindFirstFileExW(path.data,             /*LPCWSTR lpFileName,*/
+                                      FindExInfoStandard,    /*FINDEX_INFO_LEVELS fInfoLevelId,*/
+                                      &find_data,            /*LPVOID lpFindFileData,*/
+                                      FindExSearchNameMatch, /*FINDEX_SEARCH_OPS fSearchOp,*/
+                                      nullptr,               /*LPVOID lpSearchFilter,*/
+                                      FIND_FIRST_EX_LARGE_FETCH /*unsigned long dwAdditionalFlags)*/);
+
+        if (it->handle == INVALID_HANDLE_VALUE)
+            return false;
+    }
+
+    it->file_name_buf[0] = 0;
+    it->file_name        = Dqn_String16{it->file_name_buf, 0};
+
+    do {
+        if (find_data.cFileName[0] == '.' || (find_data.cFileName[0] == '.' && find_data.cFileName[1] == '.'))
+            continue;
+
+        if (find_data.dwFileAttributes & ~FILE_ATTRIBUTE_DIRECTORY) {
+            it->file_name.size = Dqn_CString16_Size(find_data.cFileName);
+            DQN_ASSERT(it->file_name.size < (Dqn_CArray_CountI(it->file_name_buf) - 1));
+
+            DQN_MEMCPY(it->file_name.data, find_data.cFileName, it->file_name.size * sizeof(wchar_t));
+            it->file_name_buf[it->file_name.size] = 0;
+
+            break;
+        }
+    } while (FindNextFileW(it->handle, &find_data) != 0);
+
+    return true;
+}
+
+DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
+{
+    if (!Dqn_String8_IsValid(path) || !it || path.size <= 0)
+        return false;
+
+    wchar_t path16[DQN_OS_WIN32_MAX_PATH + 1];
+    path16[0] = 0;
+    int path16_size = 0;
+
+    Dqn_Win_FolderIteratorW wide_it = {};
+    if (it->handle) {
+        wide_it.handle = it->handle;
+    } else {
+        bool needs_asterisks = Dqn_String8_EndsWith(path, DQN_STRING8("\\")) ||
+                               Dqn_String8_EndsWith(path, DQN_STRING8("/"));
+        bool has_glob        = Dqn_String8_EndsWith(path, DQN_STRING8("\\*")) ||
+                               Dqn_String8_EndsWith(path, DQN_STRING8("/*"));
+
+        path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_UCOUNT(path16));
+        if (path16_size <= 0) // Conversion error
+            return false;
+
+        if (!has_glob) {
+            // NOTE: We are missing the glob for enumerating the files, we will
+            // add those characters in this branch, so overwrite the null
+            // character, add the glob and re-null terminate the buffer.
+            int space = DQN_OS_WIN32_MAX_PATH - path16_size;
+            if (needs_asterisks) {
+                if (space < 2)
+                    return false;
+                path16[path16_size++] = L'*';
+            } else {
+                if (space < 3)
+                    return false;
+                path16[path16_size++] = L'\\';
+                path16[path16_size++] = L'*';
+            }
+            path16[path16_size++] = 0;
+        }
+        DQN_ASSERT(path16_size <= DQN_OS_WIN32_MAX_PATH);
+    }
+
+    bool result = Dqn_Win_FolderWIterate(Dqn_String16{path16, path16_size}, &wide_it);
+    it->handle = wide_it.handle;
+    if (result) {
+        int size = Dqn_Win_String16ToCString8(wide_it.file_name, it->file_name_buf, DQN_ARRAY_ICOUNT(it->file_name_buf));
+        it->file_name = Dqn_String8_Init(it->file_name_buf, size);
+    }
+
+    return result;
+}
+
+#if !defined(DQN_NO_WIN_NET)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenCString(char const *url, int url_size)
+{
+    URL_COMPONENTSA components  = {};
+    components.dwStructSize     = sizeof(components);
+    components.dwHostNameLength = url_size;
+    components.dwUrlPathLength  = url_size;
+
+    // Seperate the URL into bits and bobs
+    Dqn_WinNetHandle result = {};
+    if (!InternetCrackUrlA(url, url_size, 0 /*flags*/, &components)) {
+        Dqn_Log_ErrorF("InternetCrackUrlA failed [reason=%.*s]", DQN_STRING_FMT(Dqn_Win_LastError()));
+        return result;
+    }
+
+    if (url[url_size] != 0) {
+        Dqn_Log_ErrorF("URL '%.*s' must be null-terminated", url_size, url);
+        return result;
+    }
+
+    if (components.dwHostNameLength > (DQN_ARRAY_UCOUNT(result.host_name) - 1)) {
+        Dqn_Log_ErrorF("Host name is longer than the maximum supported [max=%d]", DQN_ARRAY_UCOUNT(result.host_name) - 1);
+        return result;
+    }
+
+    result.host_name_size = components.dwHostNameLength;
+    DQN_MEMCPY(result.host_name, components.lpszHostName, result.host_name_size);
+    result.host_name[result.host_name_size] = 0;
+
+    result.url_size = components.dwUrlPathLength;
+    result.url      = components.lpszUrlPath;
+
+    // Create the Win32 networking handles we need
+    result.internet_open_handle = InternetOpenA("Generic/Win32",
+                                                INTERNET_OPEN_TYPE_PRECONFIG,
+                                                nullptr /*proxy*/,
+                                                nullptr /*proxy bypass*/,
+                                                0 /*flags*/);
+
+    result.internet_connect_handle = InternetConnectA(result.internet_open_handle,
+                                                      result.host_name,
+                                                      INTERNET_DEFAULT_HTTPS_PORT,
+                                                      nullptr /*username*/,
+                                                      nullptr /*password*/,
+                                                      INTERNET_SERVICE_HTTP,
+                                                      0 /*flags*/,
+                                                      0 /*context*/);
+
+    result.state = Dqn_WinNetHandleState::Initialised;
+    return result;
+}
+
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenString(Dqn_String8 url)
+{
+    Dqn_WinNetHandle result = Dqn_Win_NetHandleOpenCString(url.data, DQN_CAST(int)url.size);
+    return result;
+}
+
+DQN_API void Dqn_Win_NetHandleClose(Dqn_WinNetHandle *handle)
+{
+    if (!Dqn_Win_NetHandleIsValid(handle))
+        return;
+
+    InternetCloseHandle(handle->internet_open_handle);
+    InternetCloseHandle(handle->internet_connect_handle);
+    InternetCloseHandle(handle->http_handle);
+    handle->internet_open_handle    = nullptr;
+    handle->internet_connect_handle = nullptr;
+    handle->http_handle             = nullptr;
+}
+
+DQN_API bool Dqn_Win_NetHandleIsValid(Dqn_WinNetHandle const *handle)
+{
+    bool result = handle && handle->state >= Dqn_WinNetHandleState::Initialised;
+    return result;
+}
+
+DQN_API void Dqn_Win_NetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size)
+{
+    if (!Dqn_Win_NetHandleIsValid(handle))
+        return;
+
+    InternetSetOptionA(handle->internet_open_handle, INTERNET_OPTION_USER_AGENT, (void *)user_agent, user_agent_size);
+}
+
+DQN_API bool Dqn_Win_NetHandleSetHTTPMethod(Dqn_WinNetHandle *handle,
+                                            char const *http_verb)
+{
+    if (!Dqn_Win_NetHandleIsValid(handle))
+        return false;
+
+    if (handle->http_handle) {
+        InternetCloseHandle(handle->http_handle);
+        handle->http_handle = nullptr;
+        handle->state       = Dqn_WinNetHandleState::Initialised;
+    }
+
+    if (handle->state != Dqn_WinNetHandleState::Initialised)
+        return false;
+
+    handle->http_handle = HttpOpenRequestA(handle->internet_connect_handle,
+                                           http_verb,
+                                           handle->url,
+                                           nullptr /*http version*/,
+                                           nullptr /*referrer*/,
+                                           nullptr,
+                                           INTERNET_FLAG_NO_AUTH | INTERNET_FLAG_SECURE,
+                                           0 /*context*/);
+    handle->state = Dqn_WinNetHandleState::HttpMethodReady;
+    return true;
+}
+
+DQN_API bool Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle,
+                                                       char const *header,
+                                                       uint32_t header_size,
+                                                       uint32_t mode)
+{
+    if (!Dqn_Win_NetHandleIsValid(handle) || !header || header_size <= 0)
+        return false;
+
+    if (mode >= Dqn_WinNetHandleRequestHeaderFlag_Count)
+        return false;
+
+    if (handle->state < Dqn_WinNetHandleState::HttpMethodReady)
+        return false;
+
+    if (!Dqn_Safe_Assert(handle->http_handle))
+        return false;
+
+    unsigned long modifier = 0;
+    if (mode == 0) {
+    } else if (mode == Dqn_WinNetHandleRequestHeaderFlag_Add) {
+        modifier = HTTP_ADDREQ_FLAG_ADD;
+    } else if (mode == Dqn_WinNetHandleRequestHeaderFlag_AddIfNew) {
+        modifier = HTTP_ADDREQ_FLAG_ADD_IF_NEW;
+    } else if (mode == Dqn_WinNetHandleRequestHeaderFlag_Replace) {
+        modifier = HTTP_ADDREQ_FLAG_REPLACE;
+    } else {
+        Dqn_Log_ErrorF("Unrecognised flag for adding a request header");
+        return false;
+    }
+
+    bool result = HttpAddRequestHeadersA(
+      handle->http_handle,
+      header,
+      header_size,
+      modifier
+    );
+
+    return result;
+}
+
+DQN_API bool Dqn_Win_NetHandleSetRequestHeaderString8(Dqn_WinNetHandle *handle, Dqn_String8 header, uint32_t mode)
+{
+    bool result = Dqn_Win_NetHandleSetRequestHeaderCString8(handle, header.data, Dqn_Safe_SaturateCastISizeToUInt(header.size), mode);
+    return result;
+}
+
+DQN_API bool Dqn_Win_NetHandlePump(Dqn_WinNetHandle *handle,
+                                   char *post_data,
+                                   int post_data_size,
+                                   char *dest,
+                                   int dest_size,
+                                   size_t *download_size)
+{
+    if (!Dqn_Win_NetHandleIsValid(handle))
+        return false;
+
+    if (handle->state < Dqn_WinNetHandleState::HttpMethodReady)
+        return false;
+
+    if (handle->state == Dqn_WinNetHandleState::HttpMethodReady) {
+        if (Dqn_Safe_Assert(handle->http_handle)) {
+            if (HttpSendRequestA(handle->http_handle, nullptr /*headers*/, 0 /*headers length*/, post_data, post_data_size)) {
+                handle->state = Dqn_WinNetHandleState::RequestGood;
+                return true;
+            } else {
+                handle->state = Dqn_WinNetHandleState::RequestFailed;
+                Dqn_Log_ErrorF("Failed to send request for %.*s [reason=%.*s]",
+                          handle->host_name_size,
+                          handle->host_name,
+                          DQN_STRING_FMT(Dqn_Win_LastError()));
+            }
+        }
+    }
+
+    if (handle->state == Dqn_WinNetHandleState::RequestFailed)
+        return false;
+
+    bool result = true;
+    unsigned long bytes_read;
+    if (InternetReadFile(handle->http_handle, dest, dest_size, &bytes_read)) {
+        if (bytes_read == 0)
+            result = false;
+        *download_size = bytes_read;
+    } else {
+        *download_size = 0;
+        result = false;
+    }
+
+    if (!result) {
+        // NOTE: If it's false here, we've finished downloading/the pumping the
+        // handled finished. We can reset the handle state to allow the user to
+        // re-use this handle by calling the function again with new post data.
+        // IF they need to set a new URL/resource location then they need to
+        // make a new handle for that otherwise they can re-use this handle to
+        // hit that same end point.
+        handle->state = Dqn_WinNetHandleState::Initialised;
+        InternetCloseHandle(handle->http_handle);
+        handle->http_handle = nullptr;
+    }
+
+    return result;
+}
+
+struct Dqn_Win_NetChunk
+{
+    char             data[DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE];
+    size_t           size;
+    Dqn_Win_NetChunk *next;
+};
+
+DQN_API char *Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size)
+{
+    Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(arena);
+    size_t total_size             = 0;
+    Dqn_Win_NetChunk *first_chunk = nullptr;
+    for (Dqn_Win_NetChunk *last_chunk = nullptr;;)
+    {
+        Dqn_Win_NetChunk *chunk = Dqn_Arena_New(scratch.arena, Dqn_Win_NetChunk, Dqn_ZeroMem_Yes);
+        bool pump_result        = Dqn_Win_NetHandlePump(handle, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
+        if (chunk->size) {
+            total_size += chunk->size;
+            if (first_chunk) {
+                last_chunk->next = chunk;
+                last_chunk       = chunk;
+            } else {
+                first_chunk = chunk;
+                last_chunk  = chunk;
+            }
+        }
+
+        if (!pump_result)
+            break;
+    }
+
+    char *result     = Dqn_Arena_NewArray(arena, char, total_size + 1 /*null-terminator*/, Dqn_ZeroMem_No);
+    char *result_ptr = result;
+    for (Dqn_Win_NetChunk *chunk = first_chunk; chunk; chunk = chunk->next)
+    {
+        DQN_MEMCPY(result_ptr, chunk->data, chunk->size);
+        result_ptr += chunk->size;
+    }
+
+    *download_size     = total_size;
+    result[total_size] = 0;
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_Win_NetHandlePumpString8(Dqn_WinNetHandle *handle, Dqn_String8 post_data, Dqn_Arena *arena)
+{
+    size_t     size     = 0;
+    char *     download = Dqn_Win_NetHandlePumpCString8(handle, post_data.data, Dqn_Safe_SaturateCastISizeToInt(post_data.size), arena, &size);
+    Dqn_String8 result  = Dqn_String8_Init(download, size);
+    return result;
+}
+
+DQN_API void Dqn_Win_NetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, FILE *file)
+{
+    for (bool keep_pumping = true; keep_pumping;)
+    {
+        char buffer[DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE];
+        size_t buffer_size = 0;
+        keep_pumping = Dqn_Win_NetHandlePump(handle, post_data, post_data_size, buffer, sizeof(buffer), &buffer_size);
+        fprintf(file, "%.*s", (int)buffer_size, buffer);
+    }
+}
+
+DQN_API char *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, size_t *download_size)
+{
+    size_t            total_size  = 0;
+    Dqn_Win_NetChunk *first_chunk = nullptr;
+    for (Dqn_Win_NetChunk *last_chunk = nullptr;;) {
+        auto *chunk      = DQN_CAST(Dqn_Win_NetChunk *)Dqn_VMem_Reserve(sizeof(Dqn_Win_NetChunk), true /*commit*/);
+        bool pump_result = Dqn_Win_NetHandlePump(handle, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
+        if (chunk->size) {
+            total_size += chunk->size;
+            if (first_chunk) {
+                last_chunk->next = chunk;
+                last_chunk       = chunk;
+            } else {
+                first_chunk = chunk;
+                last_chunk  = chunk;
+            }
+        }
+
+        if (!pump_result)
+            break;
+    }
+
+    auto *result     = DQN_CAST(char *)Dqn_VMem_Reserve(total_size * sizeof(char), true /*commit*/);
+    char *result_ptr = result;
+    for (Dqn_Win_NetChunk *chunk = first_chunk; chunk;) {
+        DQN_MEMCPY(result_ptr, chunk->data, chunk->size);
+        result_ptr += chunk->size;
+
+        Dqn_Win_NetChunk *prev_chunk = chunk;
+        chunk                        = chunk->next;
+        Dqn_VMem_Release(prev_chunk, sizeof(*prev_chunk));
+    }
+
+    *download_size     = total_size;
+    result[total_size] = 0;
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle, char *post_data, int post_data_size)
+{
+    size_t     download_size = 0;
+    char *     download      = Dqn_Win_NetHandlePumpToAllocCString(handle, post_data, post_data_size, &download_size);
+    Dqn_String8 result       = Dqn_String8_Init(download, download_size);
+    return result;
+}
+#endif // !defined(DQN_NO_WINNET)
+#endif // defined(DQN_OS_WIN32)
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-OSYS] Dqn_OS               | DQN_NO_WIN                  | Operating-system APIs
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
 {
     if (!buffer || size < 0)
@@ -6761,26 +7841,26 @@ DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
 
 #if defined(DQN_OS_WIN32)
     bool init = true;
-    Dqn_TicketMutex_Begin(&dqn_lib_.win32_bcrypt_rng_mutex);
-    if (!dqn_lib_.win32_bcrypt_rng_handle)
+    Dqn_TicketMutex_Begin(&dqn_library.win32_bcrypt_rng_mutex);
+    if (!dqn_library.win32_bcrypt_rng_handle)
     {
         wchar_t const BCRYPT_ALGORITHM[] = L"RNG";
-        long /*NTSTATUS*/ init_status = BCryptOpenAlgorithmProvider(&dqn_lib_.win32_bcrypt_rng_handle, BCRYPT_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
-        if (!dqn_lib_.win32_bcrypt_rng_handle || init_status != 0)
+        long /*NTSTATUS*/ init_status = BCryptOpenAlgorithmProvider(&dqn_library.win32_bcrypt_rng_handle, BCRYPT_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
+        if (!dqn_library.win32_bcrypt_rng_handle || init_status != 0)
         {
-            DQN_LOG_E("Failed to initialise random number generator, error: %d", init_status);
+            Dqn_Log_ErrorF("Failed to initialise random number generator, error: %d", init_status);
             init = false;
         }
     }
-    Dqn_TicketMutex_End(&dqn_lib_.win32_bcrypt_rng_mutex);
+    Dqn_TicketMutex_End(&dqn_library.win32_bcrypt_rng_mutex);
 
     if (!init)
         return false;
 
-    long gen_status = BCryptGenRandom(dqn_lib_.win32_bcrypt_rng_handle, DQN_CAST(unsigned char *)buffer, size, 0 /*flags*/);
+    long gen_status = BCryptGenRandom(dqn_library.win32_bcrypt_rng_handle, DQN_CAST(unsigned char *)buffer, size, 0 /*flags*/);
     if (gen_status != 0)
     {
-        DQN_LOG_E("Failed to generate random bytes: %d", gen_status);
+        Dqn_Log_ErrorF("Failed to generate random bytes: %d", gen_status);
         return false;
     }
 
@@ -6891,9 +7971,7 @@ DQN_API Dqn_String8 Dqn_OS_EXEDir(Dqn_Allocator allocator)
     return result;
 }
 
-// NOTE: Utilities
-// -------------------------------------------------------------------------------------------------
-DQN_API void Dqn_SleepMs(Dqn_uint milliseconds)
+DQN_API void Dqn_OS_SleepMs(Dqn_uint milliseconds)
 {
 #if defined(DQN_OS_WIN32)
     Sleep(milliseconds);
@@ -6905,63 +7983,63 @@ DQN_API void Dqn_SleepMs(Dqn_uint milliseconds)
 #endif
 }
 
-DQN_FILE_SCOPE void Dqn_Perf_Counter_Init()
+DQN_FILE_SCOPE void Dqn_OS_PerfCounter_Init()
 {
 #if defined(DQN_OS_WIN32)
-    if (dqn_lib_.win32_qpc_frequency.QuadPart == 0)
-        QueryPerformanceFrequency(&dqn_lib_.win32_qpc_frequency);
+    if (dqn_library.win32_qpc_frequency.QuadPart == 0)
+        QueryPerformanceFrequency(&dqn_library.win32_qpc_frequency);
 #endif
 }
 
-DQN_API Dqn_f64 Dqn_Perf_CounterS(uint64_t begin, uint64_t end)
+DQN_API Dqn_f64 Dqn_OS_PerfCounterS(uint64_t begin, uint64_t end)
 {
-    Dqn_Perf_Counter_Init();
+    Dqn_OS_PerfCounter_Init();
     uint64_t ticks  = end - begin;
 #if defined(DQN_OS_WIN32)
-    Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)dqn_lib_.win32_qpc_frequency.QuadPart;
+    Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)dqn_library.win32_qpc_frequency.QuadPart;
 #else
     Dqn_f64 result = ticks / 1'000'000'000;
 #endif
     return result;
 }
 
-DQN_API Dqn_f64 Dqn_Perf_CounterMs(uint64_t begin, uint64_t end)
+DQN_API Dqn_f64 Dqn_OS_PerfCounterMs(uint64_t begin, uint64_t end)
 {
-    Dqn_Perf_Counter_Init();
+    Dqn_OS_PerfCounter_Init();
     uint64_t ticks  = end - begin;
 #if defined(DQN_OS_WIN32)
-    Dqn_f64 result = (ticks * 1'000) / DQN_CAST(Dqn_f64)dqn_lib_.win32_qpc_frequency.QuadPart;
+    Dqn_f64 result = (ticks * 1'000) / DQN_CAST(Dqn_f64)dqn_library.win32_qpc_frequency.QuadPart;
 #else
     Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)1'000'000;
 #endif
     return result;
 }
 
-DQN_API Dqn_f64 Dqn_Perf_CounterMicroS(uint64_t begin, uint64_t end)
+DQN_API Dqn_f64 Dqn_OS_PerfCounterMicroS(uint64_t begin, uint64_t end)
 {
-    Dqn_Perf_Counter_Init();
+    Dqn_OS_PerfCounter_Init();
     uint64_t ticks  = end - begin;
 #if defined(DQN_OS_WIN32)
-    Dqn_f64 result = (ticks * 1'000'000) / DQN_CAST(Dqn_f64)dqn_lib_.win32_qpc_frequency.QuadPart;
+    Dqn_f64 result = (ticks * 1'000'000) / DQN_CAST(Dqn_f64)dqn_library.win32_qpc_frequency.QuadPart;
 #else
     Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)1'000;
 #endif
     return result;
 }
 
-DQN_API Dqn_f64 Dqn_Perf_CounterNs(uint64_t begin, uint64_t end)
+DQN_API Dqn_f64 Dqn_OS_PerfCounterNs(uint64_t begin, uint64_t end)
 {
-    Dqn_Perf_Counter_Init();
+    Dqn_OS_PerfCounter_Init();
     uint64_t ticks  = end - begin;
 #if defined(DQN_OS_WIN32)
-    Dqn_f64 result = (ticks * 1'000'000'000) / DQN_CAST(Dqn_f64)dqn_lib_.win32_qpc_frequency.QuadPart;
+    Dqn_f64 result = (ticks * 1'000'000'000) / DQN_CAST(Dqn_f64)dqn_library.win32_qpc_frequency.QuadPart;
 #else
     Dqn_f64 result = ticks;
 #endif
     return result;
 }
 
-DQN_API uint64_t Dqn_Perf_CounterNow()
+DQN_API uint64_t Dqn_OS_PerfCounterNow()
 {
     uint64_t result = 0;
 #if defined(DQN_OS_WIN32)
@@ -6979,203 +8057,649 @@ DQN_API uint64_t Dqn_Perf_CounterNow()
     return result;
 }
 
-DQN_API Dqn_Timer Dqn_Timer_Begin()
+DQN_API Dqn_OSTimer Dqn_OS_TimerBegin()
 {
-    Dqn_Timer result = {};
-    result.start     = Dqn_Perf_CounterNow();
+    Dqn_OSTimer result = {};
+    result.start     = Dqn_OS_PerfCounterNow();
     return result;
 }
 
-DQN_API void Dqn_Timer_End(Dqn_Timer *timer)
+DQN_API void Dqn_OS_TimerEnd(Dqn_OSTimer *timer)
 {
-    timer->end = Dqn_Perf_CounterNow();
+    timer->end = Dqn_OS_PerfCounterNow();
 }
 
-DQN_API Dqn_f64 Dqn_Timer_S(Dqn_Timer timer)
+DQN_API Dqn_f64 Dqn_OS_TimerS(Dqn_OSTimer timer)
 {
-    Dqn_f64 result = Dqn_Perf_CounterS(timer.start, timer.end);
+    Dqn_f64 result = Dqn_OS_PerfCounterS(timer.start, timer.end);
     return result;
 }
 
-DQN_API Dqn_f64 Dqn_Timer_Ms(Dqn_Timer timer)
+DQN_API Dqn_f64 Dqn_OS_TimerMs(Dqn_OSTimer timer)
 {
-    Dqn_f64 result = Dqn_Perf_CounterMs(timer.start, timer.end);
+    Dqn_f64 result = Dqn_OS_PerfCounterMs(timer.start, timer.end);
     return result;
 }
 
-DQN_API Dqn_f64 Dqn_Timer_MicroS(Dqn_Timer timer)
+DQN_API Dqn_f64 Dqn_OS_TimerMicroS(Dqn_OSTimer timer)
 {
-    Dqn_f64 result = Dqn_Perf_CounterMicroS(timer.start, timer.end);
+    Dqn_f64 result = Dqn_OS_PerfCounterMicroS(timer.start, timer.end);
     return result;
 }
 
-DQN_API Dqn_f64 Dqn_Timer_Ns(Dqn_Timer timer)
+DQN_API Dqn_f64 Dqn_OS_TimerNs(Dqn_OSTimer timer)
 {
-    Dqn_f64 result = Dqn_Perf_CounterNs(timer.start, timer.end);
+    Dqn_f64 result = Dqn_OS_PerfCounterNs(timer.start, timer.end);
     return result;
 }
 
-DQN_API char *Dqn_U64ToStr(uint64_t val, Dqn_U64Str *result, bool comma_sep)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Allocator allocator)
 {
-    int buf_index            = (int)(Dqn_CArray_Count(result->buf) - 1);
-    result->buf[buf_index--] = 0;
+    char *result = nullptr;
+    if (!path)
+        return result;
 
-    if (val == 0)
-    {
-        result->buf[buf_index--] = '0';
-        result->len              = 1;
+    if (path_size <= 0)
+        path_size = Dqn_CString8_Size(path);
+
+    (void)allocator;
+    (void)file_size;
+
+#if defined(DQN_OS_WIN32)
+    // NOTE: Convert to UTF16
+    // -------------------------------------------------------------------------
+    Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(allocator.user_context);
+    Dqn_String8       path8     = Dqn_String8_Init(path, path_size);
+    Dqn_String16      path16    = Dqn_Win_String8ToString16Allocator(path8, scratch.allocator);
+    Dqn_Win_ErrorMsg  error_msg = {};
+
+    // NOTE: Get the file handle
+    // -------------------------------------------------------------------------
+    void *file_handle = CreateFileW(/*LPCWSTR               lpFileName*/            path16.data,
+                                    /*DWORD                 dwDesiredAccess*/       GENERIC_READ,
+                                    /*DWORD                 dwShareMode*/           0,
+                                    /*LPSECURITY_ATTRIBUTES lpSecurityAttributes*/  nullptr,
+                                    /*DWORD                 dwCreationDisposition*/ OPEN_EXISTING,
+                                    /*DWORD                 dwFlagsAndAttributes*/  FILE_ATTRIBUTE_READONLY,
+                                    /*HANDLE                hTemplateFile*/         nullptr);
+    if (file_handle == INVALID_HANDLE_VALUE) {
+        Dqn_Win_LastErrorToBuffer(&error_msg);
+        Dqn_Log_ErrorF("Failed to open file for reading [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
+        return nullptr;
     }
-    else
+    DQN_DEFER { CloseHandle(file_handle); };
+
+    // NOTE: Query the file size
+    // -------------------------------------------------------------------------
+    LARGE_INTEGER win_file_size;
+    if (!GetFileSizeEx(file_handle, &win_file_size)) {
+        Dqn_Win_LastErrorToBuffer(&error_msg);
+        Dqn_Log_ErrorF("Failed to query file size [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
+        return nullptr;
+    }
+
+    unsigned long const bytes_desired = DQN_CAST(unsigned long)win_file_size.QuadPart;
+    if (!Dqn_Safe_AssertF(bytes_desired == win_file_size.QuadPart,
+                          "Current implementation doesn't support >4GiB, implement Win32 overlapped IO")) {
+        return nullptr;
+    }
+
+    // NOTE: Read the file from disk
+    // -------------------------------------------------------------------------
+    result = DQN_CAST(char *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_ARG allocator,
+                                                  bytes_desired,
+                                                  alignof(char),
+                                                  Dqn_ZeroMem_No);
+    unsigned long bytes_read    = 0;
+    unsigned long read_result   = ReadFile(/*HANDLE hFile*/               file_handle,
+                                           /*LPVOID lpBuffer*/            result,
+                                           /*DWORD nNumberOfBytesToRead*/ bytes_desired,
+                                           /*LPDWORD lpNumberOfByesRead*/ &bytes_read,
+                                           /*LPOVERLAPPED lpOverlapped*/  nullptr);
+
+    if (read_result == 0) {
+        Dqn_Allocator_Dealloc(allocator, result, bytes_desired);
+        Dqn_Win_LastErrorToBuffer(&error_msg);
+        Dqn_Log_ErrorF("'ReadFile' failed to load file to memory [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
+        return nullptr;
+    }
+
+    if (bytes_read != bytes_desired) {
+        Dqn_Win_LastErrorToBuffer(&error_msg);
+        Dqn_Allocator_Dealloc(allocator, result, bytes_desired);
+        Dqn_Log_ErrorF("'ReadFile' failed to read all bytes into file [file=%.*s, bytes_desired=%u, bytes_read=%u, reason=%.*s]",
+                  DQN_STRING_FMT(path8),
+                  bytes_desired,
+                  bytes_read,
+                  DQN_STRING_FMT(error_msg));
+        return nullptr;
+    }
+
+    if (file_size) {
+        *file_size = Dqn_Safe_SaturateCastI64ToISize(bytes_read);
+    }
+#else
+    Dqn_isize file_size_ = 0;
+    if (!file_size)
+        file_size = &file_size_;
+
+    FILE *file_handle = fopen(path, "rb");
+    if (!file_handle) {
+        Dqn_Log_ErrorF("Failed to open file '%s' using fopen\n", path);
+        return result;
+    }
+
+    DQN_DEFER { fclose(file_handle); };
+    fseek(file_handle, 0, SEEK_END);
+    *file_size = ftell(file_handle);
+
+    if (DQN_CAST(long)(*file_size) == -1L) {
+        Dqn_Log_ErrorF("Failed to determine '%s' file size using ftell\n", file);
+        return result;
+    }
+
+    rewind(file_handle);
+    result = DQN_CAST(char *)Dqn_Allocator_Alloc(DQN_LEAK_TRACE_ARG allocator,
+                                                 *file_size,
+                                                 alignof(char),
+                                                 Dqn_ZeroMem_No);
+    if (!result) {
+        Dqn_Log_ErrorF("Failed to allocate %td bytes to read file '%s'\n", *file_size + 1, file);
+        return result;
+    }
+
+    result[*file_size] = 0;
+    if (fread(result, DQN_CAST(size_t)(*file_size), 1, file_handle) != 1) {
+        Dqn_Allocator_Dealloc(allocator, result, *file_size);
+        Dqn_Log_ErrorF("Failed to read %td bytes into buffer from '%s'\n", *file_size, file);
+        return result;
+    }
+#endif
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_Fs_ReadString8_(DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator)
+{
+    Dqn_isize   file_size = 0;
+    char *      string    = Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_ARG path.data, path.size, &file_size, allocator);
+    Dqn_String8 result    = Dqn_String8_Init(string, file_size);
+    return result;
+}
+
+DQN_API bool Dqn_Fs_WriteCString8(char const *path, Dqn_isize path_size, char const *buffer, Dqn_isize buffer_size)
+{
+    bool result = false;
+    if (!path || !buffer || buffer_size <= 0)
+        return result;
+
+#if defined(DQN_OS_WIN32)
+    if (path_size <= 0)
+        path_size = Dqn_CString8_Size(path);
+
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_String8       path8   = Dqn_String8_Init(path, path_size);
+    Dqn_String16      path16  = Dqn_Win_String8ToString16Allocator(path8, scratch.allocator);
+
+    void *file_handle = CreateFileW(/*LPCWSTR               lpFileName*/            path16.data,
+                                    /*DWORD                 dwDesiredAccess*/       GENERIC_WRITE,
+                                    /*DWORD                 dwShareMode*/           0,
+                                    /*LPSECURITY_ATTRIBUTES lpSecurityAttributes*/  nullptr,
+                                    /*DWORD                 dwCreationDisposition*/ CREATE_ALWAYS,
+                                    /*DWORD                 dwFlagsAndAttributes*/  FILE_ATTRIBUTE_NORMAL,
+                                    /*HANDLE                hTemplateFile*/         nullptr);
+
+    if (file_handle == INVALID_HANDLE_VALUE) {
+        Dqn_Log_ErrorF("Failed to open file for writing [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(Dqn_Win_LastError()));
+        return result;
+    }
+    DQN_DEFER { CloseHandle(file_handle); };
+
+    unsigned long bytes_written = 0;
+    result                      = WriteFile(file_handle, buffer, DQN_CAST(unsigned long)buffer_size, &bytes_written, nullptr /*lpOverlapped*/);
+    DQN_ASSERT(bytes_written == buffer_size);
+    return result;
+#else
+    // TODO(dqn): Use OS apis
+    (void)path_size;
+
+    FILE *file_handle = nullptr;
+    fopen_s(&file_handle, path, "w+b");
+    if (!file_handle) {
+        Dqn_Log_ErrorF("Failed to 'fopen' to get the file handle [file=%s]", path);
+        return result;
+    }
+    DQN_DEFER { fclose(file_handle); };
+
+    result = fwrite(buffer, buffer_size, 1 /*count*/, file_handle) == 1 /*count*/;
+    if (!result)
+        Dqn_Log_ErrorF("Failed to 'fwrite' memory to file [file=%s]", path);
+
+    return result;
+#endif
+}
+
+DQN_API bool Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer)
+{
+    bool result = Dqn_Fs_WriteCString8(file_path.data, file_path.size, buffer.data, buffer.size);
+    return result;
+}
+
+#if defined(DQN_OS_WIN32)
+DQN_API uint64_t Dqn__WinFileTimeToSeconds(FILETIME const *time)
+{
+    ULARGE_INTEGER time_large_int = {};
+    time_large_int.u.LowPart      = time->dwLowDateTime;
+    time_large_int.u.HighPart     = time->dwHighDateTime;
+    uint64_t result                = (time_large_int.QuadPart / 10000000ULL) - 11644473600ULL;
+    return result;
+}
+#endif
+
+DQN_API bool Dqn_Fs_Exists(Dqn_String8 path)
+{
+    bool result = false;
+#if defined(DQN_OS_WIN32)
+    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
+    int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
+    if (path16_size) {
+        WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+        if (GetFileAttributesExW(path16, GetFileExInfoStandard, &attrib_data)) {
+            result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
+                     !(attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+        }
+    }
+
+#elif defined(DQN_OS_UNIX)
+    struct stat stat_result;
+    if (lstat(path.data, &stat_result) != -1)
+        result = S_ISREG(stat_result.st_mode) || S_ISLNK(stat_result.st_mode);
+
+#else
+    #error Unimplemented
+
+#endif
+
+    return result;
+}
+
+DQN_API bool Dqn_Fs_DirExists(Dqn_String8 path)
+{
+    bool result = false;
+#if defined(DQN_OS_WIN32)
+    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
+    int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
+    if (path16_size) {
+        WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+        if (GetFileAttributesExW(path16, GetFileExInfoStandard, &attrib_data)) {
+            result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
+                     (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+        }
+    }
+
+#elif defined(DQN_OS_UNIX)
+    struct stat stat_result;
+    if (lstat(path.data, &stat_result) != -1)
+        result = S_ISDIR(stat_result.st_mode);
+#else
+    #error Unimplemented
+#endif
+
+    return result;
+}
+
+DQN_API Dqn_Fs_Info Dqn_Fs_GetInfo(Dqn_String8 path)
+{
+    Dqn_Fs_Info result = {};
+#if defined(DQN_OS_WIN32)
+    WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
+    Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
+    if (!GetFileAttributesExW(path16, GetFileExInfoStandard, &attrib_data))
+        return result;
+
+    if (result) {
+        result.create_time_in_s      = Dqn__WinFileTimeToSeconds(&attrib_data.ftCreationTime);
+        result.last_access_time_in_s = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastAccessTime);
+        result.last_write_time_in_s  = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastWriteTime);
+
+        LARGE_INTEGER large_int = {};
+        large_int.u.HighPart    = DQN_CAST(int32_t)attrib_data.nFileSizeHigh;
+        large_int.u.LowPart     = attrib_data.nFileSizeLow;
+        result.size             = (uint64_t)large_int.QuadPart;
+    }
+#elif defined(DQN_OS_UNIX)
+    struct stat file_stat;
+    if (lstat(path.data, &file_stat) != -1)
     {
-        for (int digit_count = 0; val > 0; result->len++, digit_count++)
-        {
-            if (comma_sep && (digit_count != 0) && (digit_count % 3 == 0))
-            {
-                result->buf[buf_index--] = ',';
-                result->len++;
+        result.size                  = file_stat.st_size;
+        result.last_access_time_in_s = file_stat.st_atime;
+        result.last_write_time_in_s  = file_stat.st_mtime;
+
+        // TODO(dqn): Seems linux does not support creation time via stat. We
+        // shoddily deal with this.
+        result.create_time_in_s = DQN_MIN(result.last_access_time_in_s, result.last_write_time_in_s);
+    }
+
+#else
+    #error Unimplemented
+
+#endif
+
+    return result;
+}
+
+DQN_API bool Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
+{
+    bool result = false;
+#if defined(DQN_OS_WIN32)
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_String16      src16   = Dqn_Win_String8ToString16Allocator(src, Dqn_Arena_Allocator(scratch.arena));
+    Dqn_String16      dest16  = Dqn_Win_String8ToString16Allocator(dest, Dqn_Arena_Allocator(scratch.arena));
+
+    int fail_if_exists = overwrite == false;
+    result = CopyFileW(src16.data, dest16.data, fail_if_exists) != 0;
+
+    if (!result) {
+        Dqn_Log_ErrorF("Failed to copy file [from=%.*s, to=%.*s, reason=%.*s]",
+                  DQN_STRING_FMT(src16),
+                  DQN_STRING_FMT(dest16),
+                  DQN_STRING_FMT(Dqn_Win_LastError()));
+    }
+
+#elif defined(DQN_OS_UNIX)
+    int src_fd  = open(src.data, O_RDONLY);
+    int dest_fd = open(dest.data, O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : 0));
+
+    if (src_fd != -1 && dest_fd != -1) {
+        struct stat stat_existing;
+        fstat(src_fd, &stat_existing);
+        Dqn_isize bytes_written = sendfile64(dest_fd, src_fd, 0, stat_existing.st_size);
+        result = (bytes_written == stat_existing.st_size);
+    }
+
+    if (src_fd != -1)
+        close(src_fd);
+
+    if (dest_fd != -1)
+        close(dest_fd);
+#else
+    #error Unimplemented
+#endif
+
+    return result;
+}
+
+DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
+{
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    bool result               = true;
+    int path_indexes_size     = 0;
+    uint16_t path_indexes[64] = {};
+
+#if defined(DQN_OS_WIN32)
+    Dqn_String16 path16 = Dqn_Win_String8ToString16Allocator(path, Dqn_Arena_Allocator(scratch.arena));
+
+    // NOTE: Go back from the end of the string to all the directories in the
+    // string, and try to create them. Since Win32 API cannot create
+    // intermediate directories that don't exist in a path we need to go back
+    // and record all the directories until we encounter one that exists.
+    //
+    // From that point onwards go forwards and make all the directories
+    // inbetween by null-terminating the string temporarily, creating the
+    // directory and so forth until we reach the end.
+    //
+    // If we find a file at some point in the path we fail out because the
+    // series of directories can not be made if a file exists with the same
+    // name.
+    for (Dqn_isize index = path16.size - 1; index >= 0; index--) {
+        bool first_char = index == (path16.size - 1);
+        wchar_t ch      = path16.data[index];
+        if (ch == '/' || ch == '\\' || first_char) {
+            WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+            wchar_t temp = path16.data[index];
+
+            if (!first_char) path16.data[index] = 0; // Temporarily null terminate it
+            bool successful = GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data); // Check
+            if (!first_char) path16.data[index] = temp; // Undo null termination
+
+            if (successful) {
+                if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                    // NOTE: We found a directory, we can stop here and start
+                    // building up all the directories that didn't exist up to
+                    // this point.
+                    break;
+                } else {
+                    // NOTE: There's something that exists in at this path, but
+                    // it's not a directory. This request to make a directory is
+                    // invalid.
+                    return false;
+                }
+            } else {
+                // NOTE: There's nothing that exists at this path, we can create
+                // a directory here
+                path_indexes[path_indexes_size++] = DQN_CAST(uint16_t)index;
+            }
+        }
+    }
+
+    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--) {
+        uint16_t path_index = path_indexes[index];
+        wchar_t temp = path16.data[path_index];
+
+        if (index != 0) path16.data[path_index] = 0;
+        result |= (CreateDirectoryW(path16.data, nullptr) == 0);
+        if (index != 0) path16.data[path_index] = temp;
+    }
+
+#elif defined(DQN_OS_UNIX)
+    Dqn_String8 copy = Dqn_String8_Copy(scratch.arena, path);
+    for (int32_t index = copy.size - 1; index >= 0; index--) {
+        bool first_char = index == (copy.size - 1);
+        wchar_t ch         = copy.data[index];
+        if (ch == '/' || first_char) {
+            char temp = copy.data[index];
+            if (!first_char) copy.data[index] = 0; // Temporarily null terminate it
+            bool is_file = Dqn_Fs_Exists(copy);
+            if (!first_char) copy.data[index] = temp; // Undo null termination
+
+            if (is_file) {
+                // NOTE: There's something that exists in at this path, but
+                // it's not a directory. This request to make a directory is
+                // invalid.
+                return false;
+            } else {
+                if (Dqn_Fs_DirExists(copy)) {
+                    // NOTE: We found a directory, we can stop here and start
+                    // building up all the directories that didn't exist up to
+                    // this point.
+                    break;
+                } else {
+                    // NOTE: There's nothing that exists at this path, we can
+                    // create a directory here
+                    path_indexes[path_indexes_size++] = DQN_CAST(uint16_t)index;
+                }
+            }
+        }
+    }
+
+    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--) {
+        uint16_t path_index = path_indexes[index];
+        char temp = copy.data[path_index];
+
+        if (index != 0) copy.data[path_index] = 0;
+        result |= mkdir(copy.data, 0774) == 0;
+        if (index != 0) copy.data[path_index] = temp;
+    }
+
+#else
+    #error Unimplemented
+#endif
+
+    return result;
+}
+
+DQN_API bool Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
+{
+    bool result = false;
+
+#if defined(DQN_OS_WIN32)
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_String16      src16   = Dqn_Win_String8ToString16Allocator(src, Dqn_Arena_Allocator(scratch.arena));
+    Dqn_String16      dest16  = Dqn_Win_String8ToString16Allocator(dest, Dqn_Arena_Allocator(scratch.arena));
+
+    unsigned long flags = MOVEFILE_COPY_ALLOWED;
+    if (overwrite) {
+        flags |= MOVEFILE_REPLACE_EXISTING;
+    }
+
+    result = MoveFileExW(src16.data, dest16.data, flags) != 0;
+    if (!result) {
+        Dqn_Log_ErrorF("Failed to move file [from=%.*s, to=%.*s, reason=%.*s]",
+                  DQN_STRING_FMT(src),
+                  DQN_STRING_FMT(dest),
+                  DQN_STRING_FMT(Dqn_Win_LastError()));
+    }
+
+#elif defined(DQN_OS_UNIX)
+    // See: https://github.com/gingerBill/gb/blob/master/gb.h
+    bool file_moved = true;
+    if (link(src.data, dest.data) == -1)
+    {
+        // NOTE: Link can fail if we're trying to link across different volumes
+        // so we fall back to a binary directory.
+        file_moved |= Dqn_Fs_Copy(src, dest, overwrite);
+    }
+
+    if (file_moved)
+        result = (unlink(src.data) != -1); // Remove original file
+
+#else
+    #error Unimplemented
+
+#endif
+
+    return result;
+}
+
+DQN_API bool Dqn_Fs_Delete(Dqn_String8 path)
+{
+    bool result = false;
+#if defined(DQN_OS_WIN32)
+    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
+    int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
+    if (path16_size) {
+        result = DeleteFileW(path16);
+        if (!result)
+            result = RemoveDirectoryW(path16);
+    }
+#elif defined(DQN_OS_UNIX)
+    result = remove(path.data) == 0;
+#else
+    #error Unimplemented
+#endif
+
+    return result;
+}
+
+
+DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator)
+{
+    Dqn_U64String result = {};
+    if (val == 0) {
+        result.data[result.size++] = '0';
+    } else {
+        // NOTE: The number is written in reverse because we form the string by
+        // dividing by 10, so we write it in, then reverse it out after all is
+        // done.
+        Dqn_U64String temp = {};
+        for (size_t digit_count = 0; val > 0; digit_count++) {
+            if (separator && (digit_count != 0) && (digit_count % 3 == 0)) {
+                temp.data[temp.size++] = separator;
             }
 
-            auto digit               = DQN_CAST(char)(val % 10);
-            result->buf[buf_index--] = '0' + digit;
+            auto digit             = DQN_CAST(char)(val % 10);
+            temp.data[temp.size++] = '0' + digit;
             val /= 10;
         }
+
+        // NOTE: Reverse the string
+        for (size_t temp_index = temp.size - 1; temp_index < temp.size; temp_index--) {
+            char ch = temp.data[temp_index];
+            result.data[result.size++] = ch;
+        }
     }
 
-    result->str = result->buf + (buf_index + 1);
-    return result->str;
-}
-
-DQN_API char *Dqn_U64ToTempStr(uint64_t val, bool comma_sep)
-{
-    DQN_LOCAL_PERSIST Dqn_U64Str string;
-    string = {};
-    char *result = Dqn_U64ToStr(val, &string, comma_sep);
     return result;
 }
 
-// NOTE: Dqn_Lib_
-// -------------------------------------------------------------------------------------------------
-DQN_API void Dqn_Lib_DumpThreadContextArenaStat(Dqn_String8 file_path)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
+// ---------------------------------+-----------------------------+---------------------------------
+Dqn_ThreadScratch::Dqn_ThreadScratch(DQN_LEAK_TRACE_FUNCTION Dqn_ThreadContext *context, uint8_t context_index)
 {
-    (void)file_path;
-#if defined(DQN_DEBUG_THREAD_CONTEXT)
-    FILE *file = nullptr;
-    fopen_s(&file, file_path.data, "a+b");
-    if (file)
-    {
-        // NOTE: Copy the stats from library book-keeping
-        // NOTE: Extremely short critical section, copy the stats then do our
-        // work on it.
-        Dqn_ArenaStat stats[Dqn_CArray_CountI(dqn_lib_.thread_context_arena_stats)];
-        int stats_size = 0;
-
-        Dqn_TicketMutex_Begin(&dqn_lib_.thread_context_mutex);
-        stats_size = dqn_lib_.thread_context_arena_stats_count;
-        DQN_MEMCOPY(stats, dqn_lib_.thread_context_arena_stats, sizeof(stats[0]) * stats_size);
-        Dqn_TicketMutex_End(&dqn_lib_.thread_context_mutex);
-
-        // NOTE: Print the cumulative stat
-        Dqn_DateHMSTimeString now = Dqn_Date_HMSLocalTimeStringNow();
-        fprintf(file,
-                "Time=%.*s %.*s | Thread Context Arenas | Count=%d\n",
-                now.date_size, now.date,
-                now.hms_size, now.hms,
-                dqn_lib_.thread_context_arena_stats_count);
-
-        // NOTE: Write the cumulative thread arena data
-        {
-            Dqn_ArenaStat stat = {};
-            for (Dqn_isize index = 0; index < stats_size; index++) {
-                Dqn_ArenaStat const *current = stats + index;
-                stat.capacity += current->capacity;
-                stat.used     += current->used;
-                stat.wasted   += current->wasted;
-                stat.blocks   += current->blocks;
-
-                stat.capacity_hwm = DQN_MAX(stat.capacity_hwm, current->capacity_hwm);
-                stat.used_hwm     = DQN_MAX(stat.used_hwm, current->used_hwm);
-                stat.wasted_hwm   = DQN_MAX(stat.wasted_hwm, current->wasted_hwm);
-                stat.blocks_hwm   = DQN_MAX(stat.blocks_hwm, current->blocks_hwm);
-            }
-
-            Dqn_ArenaStatString stats_string = Dqn_Arena_StatString(&stat);
-            fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.data);
-        }
-
-        // NOTE: Print individual thread arena data
-        for (Dqn_isize index = 0; index < stats_size; index++) {
-            Dqn_ArenaStat const *current = stats + index;
-            Dqn_ArenaStatString current_string = Dqn_Arena_StatString(current);
-            fprintf(file, "  [%03d] CURR %.*s\n", DQN_CAST(int)index, current_string.size, current_string.data);
-        }
-
-        fclose(file);
-        DQN_LOG_I("Dumped thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
-    }
-    else
-    {
-        DQN_LOG_E("Failed to dump thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
-    }
-#endif // #if defined(DQN_DEBUG_THREAD_CONTEXT)
+    index       = context_index;
+    allocator   = context->temp_allocators[index];
+    arena       = &context->temp_arenas[index];
+    temp_memory = Dqn_Arena_BeginTempMemory(arena);
+    #if defined(DQN_LEAK_TRACKING)
+    leak_site__ = DQN_LEAK_TRACE_ARG_NO_COMMA;
+    #endif
 }
 
-DQN_API void Dqn_Lib_SetLogCallback(Dqn_LogProc *proc, void *user_data)
+Dqn_ThreadScratch::~Dqn_ThreadScratch()
 {
-    dqn_lib_.LogCallback   = proc;
-    dqn_lib_.log_user_data = user_data;
+    #if defined(DQN_DEBUG_THREAD_CONTEXT)
+    temp_arenas_stat[index] = arena->stats;
+    #endif
+    DQN_ASSERT(destructed == false);
+    #if defined(DQN_LEAK_TRACING)
+    Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_ARG_NO_COMMA temp_memory);
+    #else
+    Dqn_Arena_EndTempMemory_(temp_memory);
+    #endif
+    destructed = true;
 }
 
-DQN_API void Dqn_Lib_SetLogFile(FILE *file)
-{
-    Dqn_TicketMutex_Begin(&dqn_lib_.log_file_mutex);
-    dqn_lib_.log_file           = file;
-    dqn_lib_.log_no_output_file = file ? false : true;
-    Dqn_TicketMutex_End(&dqn_lib_.log_file_mutex);
-}
-
-// NOTE: Dqn_ThreadContext
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_ThreadContext *Dqn_Thread_Context()
+DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COMMA)
 {
     thread_local Dqn_ThreadContext result = {};
-    if (result.init) {
-        return &result;
-    }
-
-    result.init = true;
-    for (Dqn_ThreadArena &temp_arena : result.temp_arenas) {
-        Dqn_Arena_Grow(&temp_arena.arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4));
-        #if defined(DQN_DEBUG_THREAD_CONTEXT)
-        // NOTE: Assign this arena a slot in the global library's context
-        // to allow recording of statistics of this thread's arena.
-        Dqn_TicketMutex_Begin(&dqn_lib_.thread_context_mutex);
-        temp_arena.arena_stats_index = dqn_lib_.thread_context_arena_stats_count++;
-        DQN_HARD_ASSERT(dqn_lib_.thread_context_arena_stats_count <
-                        Dqn_CArray_CountI(dqn_lib_.thread_context_arena_stats));
-        Dqn_TicketMutex_End(&dqn_lib_.thread_context_mutex);
-        #endif
+    if (!result.init) {
+        result.init = true;
+        for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
+            Dqn_Arena *arena              = result.temp_arenas + index;
+            result.temp_allocators[index] = Dqn_Arena_Allocator(arena);
+            Dqn_Arena_Grow_(DQN_LEAK_TRACE_ARG arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4));
+        }
     }
     return &result;
 }
 
 // TODO: Is there a way to handle conflict arenas without the user needing to
 // manually pass it in?
-DQN_API Dqn_ThreadTempArena Dqn_Thread_TempArena(const void *conflict_arena)
+DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void const *conflict_arena)
 {
-    Dqn_ThreadContext *thread = Dqn_Thread_Context();
-    Dqn_ThreadArena   *result = nullptr;
-    for (Dqn_ThreadArena &temp_arena : thread->temp_arenas) {
-        if (!conflict_arena || (&temp_arena.arena != conflict_arena)) {
-            result = &temp_arena;
+    static_assert(DQN_THREAD_CONTEXT_ARENAS < (uint8_t)-1, "We use UINT8_MAX as a sentinel value");
+    Dqn_ThreadContext *context = Dqn_Thread_GetContext_(DQN_LEAK_TRACE_ARG_NO_COMMA);
+    uint8_t context_index      = (uint8_t)-1;
+    for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
+        Dqn_Arena *arena = context->temp_arenas + index;
+        if (!conflict_arena || (&arena != conflict_arena)) {
+            context_index = index;
             break;
         }
     }
 
-    DQN_HARD_ASSERT(result);
-    return Dqn_ThreadTempArena(result);
+    DQN_ASSERT(context_index != (uint8_t)-1);
+    return Dqn_ThreadScratch(context, context_index);
 }
 
-#if defined(DQN_WITH_JSON_BUILDER)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
+// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_JSON_BUILDER)
 Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Arena *arena, int spaces_per_indent)
 {
     Dqn_JSONBuilder result   = {};
@@ -7190,25 +8714,25 @@ Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder *builder, Dqn_Arena *arena)
     return result;
 }
 
-void Dqn_JSONBuilder_AppendFmtVArgs_(Dqn_JSONBuilder *builder, char const *fmt, va_list args)
+void Dqn_JSONBuilder_AppendFV_(Dqn_JSONBuilder *builder, char const *fmt, va_list args)
 {
     if (!builder || !fmt)
         return;
 
     if (builder->builder.allocator.alloc)
-        Dqn_String8Builder_AppendFmtArgs(&builder->builder, fmt, args);
+        Dqn_String8Builder_AppendFV(&builder->builder, fmt, args);
     else
         vfprintf(stdout, fmt, args);
 }
 
-void Dqn_JSONBuilder_AppendFmtArgs_(Dqn_JSONBuilder *builder, char const *fmt, ...)
+void Dqn_JSONBuilder_AppendF_(Dqn_JSONBuilder *builder, char const *fmt, ...)
 {
     if (!builder || !fmt)
         return;
 
     va_list args;
     va_start(args, fmt);
-    Dqn_JSONBuilder_AppendFmtVArgs_(builder, fmt, args);
+    Dqn_JSONBuilder_AppendFV_(builder, fmt, args);
     va_end(args);
 }
 
@@ -7225,7 +8749,7 @@ void Dqn_JSONBuilder_DoIndent_(Dqn_JSONBuilder *builder)
     int spaces_per_indent = builder->spaces_per_indent ? builder->spaces_per_indent : 2;
     int spaces            = builder->indent_level * spaces_per_indent;
     if (spaces)
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%*c", spaces, ' ');
+        Dqn_JSONBuilder_AppendF_(builder, "%*c", spaces, ' ');
 }
 
 void Dqn_JSONBuilder_PreAddItem_(Dqn_JSONBuilder *builder)
@@ -7261,7 +8785,7 @@ void Dqn_JSONBuilder_BeginContainer_(Dqn_JSONBuilder *builder, Dqn_String8 name,
     Dqn_String8 container_ch = array ? DQN_STRING8("[") : DQN_STRING8("{");
     Dqn_JSONBuilder_PreAddItem_(builder);
     if (name.size)
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
+        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
     else
         Dqn_JSONBuilder_AppendString8Ref_(builder, container_ch);
     Dqn_JSONBuilder_PostAddItem_(builder);
@@ -7332,9 +8856,9 @@ void Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_
 {
     Dqn_JSONBuilder_PreAddItem_(builder);
     if (key.size)
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
+        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
     else
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\"", DQN_STRING_FMT(value));
+        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\"", DQN_STRING_FMT(value));
     Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
@@ -7347,9 +8871,9 @@ void Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn
 {
     Dqn_JSONBuilder_PreAddItem_(builder);
     if (key.size)
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
+        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
     else
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%.*s", DQN_STRING_FMT(value));
+        Dqn_JSONBuilder_AppendF_(builder, "%.*s", DQN_STRING_FMT(value));
     Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
@@ -7362,9 +8886,9 @@ void Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_
 {
     Dqn_JSONBuilder_PreAddItem_(builder);
     if (key.size)
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
+        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
     else
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%I64u", value);
+        Dqn_JSONBuilder_AppendF_(builder, "%I64u", value);
     Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
@@ -7377,9 +8901,9 @@ void Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_
 {
     Dqn_JSONBuilder_PreAddItem_(builder);
     if (key.size)
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %I64d", DQN_STRING_FMT(key), value);
+        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %I64d", DQN_STRING_FMT(key), value);
     else
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%I64d", value);
+        Dqn_JSONBuilder_AppendF_(builder, "%I64d", value);
     Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
@@ -7401,23 +8925,23 @@ void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double 
     char float_fmt[16];
     if (decimal_places > 0) {
         // NOTE: Emit the format string "%.<decimal_places>f" i.e. %.1f
-        snprintf(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
+        STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
     } else {
         // NOTE: Emit the format string "%f"
-        snprintf(float_fmt, sizeof(float_fmt), "%%f");
+        STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%f");
     }
 
     char fmt[32];
     if (key.size)
-        snprintf(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
+        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
     else
-        snprintf(fmt, sizeof(fmt), "%s", float_fmt);
+        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "%s", float_fmt);
 
     Dqn_JSONBuilder_PreAddItem_(builder);
     if (key.size)
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, fmt, DQN_STRING_FMT(key), value);
+        Dqn_JSONBuilder_AppendF_(builder, fmt, DQN_STRING_FMT(key), value);
     else
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, fmt, value);
+        Dqn_JSONBuilder_AppendF_(builder, fmt, value);
     Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
@@ -7431,9 +8955,9 @@ void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool v
     Dqn_JSONBuilder_PreAddItem_(builder);
     Dqn_String8 value_string = value ? DQN_STRING8("true") : DQN_STRING8("false");
     if (key.size)
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(key), DQN_STRING_FMT(value_string));
+        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(key), DQN_STRING_FMT(value_string));
     else
-        Dqn_JSONBuilder_AppendFmtArgs_(builder, "%Boold", value);
+        Dqn_JSONBuilder_AppendF_(builder, "%Boold", value);
     Dqn_JSONBuilder_PostAddItem_(builder);
 }
 
@@ -7441,595 +8965,8 @@ void Dqn_JSONBuilder_Bool(Dqn_JSONBuilder *builder, bool value)
 {
     Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8("") /*key*/, value);
 }
-#endif // DQN_WITH_JSON_BUILDER
+#endif // !defined(DQN_NO_JSON_BUILDER)
 
-#if defined(DQN_OS_WIN32)
-
-// NOTE: Dqn_Win_ Implementation
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_Win_ErrorMsg Dqn_Win_LastError()
-{
-    Dqn_Win_ErrorMsg result;
-    result.code    = GetLastError();
-    result.data[0] = 0;
-
-    unsigned long flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-    void *module_to_get_errors_from = nullptr;
-
-    if (result.code >= 12000 && result.code <= 12175) // WinINET Errors
-    {
-        flags |= FORMAT_MESSAGE_FROM_HMODULE;
-        module_to_get_errors_from = GetModuleHandleA("wininet.dll");
-    }
-
-    result.size = FormatMessageA(flags,
-                                 module_to_get_errors_from,     // LPCVOID lpSource,
-                                 result.code,                   // unsigned long   dwMessageId,
-                                 0,                             // unsigned long   dwLanguageId,
-                                 result.data,                   // LPSTR   lpBuffer,
-                                 DQN_ARRAY_ICOUNT(result.data), // unsigned long   nSize,
-                                 nullptr);                      // va_list * Arguments
-
-    return result;
-}
-
-DQN_API void Dqn_Win_MakeProcessDPIAware()
-{
-    typedef bool SetProcessDpiAwareProc(void);
-    typedef bool SetProcessDpiAwarenessProc(PROCESS_DPI_AWARENESS);
-    typedef bool SetProcessDpiAwarenessContextProc(void * /*DPI_AWARENESS_CONTEXT*/);
-
-    // NOTE(doyle): Taken from cmuratori/refterm snippet on DPI awareness. It
-    // appears we can make this robust by just loading user32.dll and using
-    // GetProcAddress on the DPI function. If it's not there, we're on an old
-    // version of windows, so we can call an older version of the API.
-    void *lib_handle = LoadLibraryA("user32.dll");
-    if (auto *set_process_dpi_awareness_context = DQN_CAST(SetProcessDpiAwarenessContextProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAwarenessContext")) {
-        set_process_dpi_awareness_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-    } else if (auto *set_process_dpi_awareness = DQN_CAST(SetProcessDpiAwarenessProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAwareness")) {
-        set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
-    } else if (auto *set_process_dpi_aware = DQN_CAST(SetProcessDpiAwareProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAware")) {
-        set_process_dpi_aware();
-    }
-}
-
-DQN_API void Dqn_Win_DumpLastError_(Dqn_String8 file, Dqn_String8 func, Dqn_uint line, char const *fmt, ...)
-{
-    Dqn_Win_ErrorMsg msg  = Dqn_Win_LastError();
-    Dqn_String8 file_name = Dqn_String8_FileNameFromPath(file);
-
-    // TODO(dqn): Hmmm .. should this be a separate log or part of the above
-    // macro. If so we need to make the logging macros more flexible.
-    if (fmt) {
-        va_list args;
-        va_start(args, fmt);
-        Dqn_LogV(Dqn_LogType::Error, dqn_lib_.log_user_data, file_name, func, line, fmt, args);
-        va_end(args);
-    }
-
-    if (msg.size)
-        Dqn_Log(Dqn_LogType::Error, dqn_lib_.log_user_data, file_name, func, line, "Last Windows error [msg=%.*s]", DQN_STRING_FMT(msg));
-    else
-        Dqn_Log(Dqn_LogType::Error, dqn_lib_.log_user_data, file_name, func, line, "Failed to dump last error, no error message found [format_message_error=%d, msg_error=%d]", GetLastError(), msg.code);
-}
-
-// NOTE: Windows UTF8 to String16
-// -----------------------------------------------------------------------------
-DQN_API int Dqn_Win_CString8ToCString16(const char *src, int src_size, wchar_t *dest, int dest_size)
-{
-    int result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src, src_size, dest, dest_size);
-    if (result) {
-        result += 1; // Null terminator
-
-        // NOTE: Null-terminate the buffer
-        if (dest && dest_size > 0) {
-            dest[DQN_MIN(result - 1, dest_size)] = 0;
-        }
-    }
-    return result;
-}
-
-DQN_API int Dqn_Win_String8ToCString16(Dqn_String8 src, wchar_t *dest, int dest_size)
-{
-    int result   = 0;
-    int src_size = Dqn_Safe_TruncateISizeToInt(src.size);
-    if (src_size)
-        result = Dqn_Win_CString8ToCString16(src.data, src_size, dest, dest_size);
-    return result;
-}
-
-DQN_API Dqn_String16 Dqn_Win_String8ToString16Allocator(Dqn_String8 src, Dqn_Allocator allocator)
-{
-    Dqn_String16 result = {};
-    int required = Dqn_Win_String8ToCString16(src, nullptr, 0);
-    if (required != 0) {
-        result.data = Dqn_Allocator_NewArray(allocator, wchar_t, required, Dqn_ZeroMem_No);
-        if (result.data) {
-            result.size = Dqn_Win_String8ToCString16(src, result.data, required) - 1;
-            DQN_ASSERT(result.size == required - 1);
-        }
-    }
-    return result;
-}
-
-// NOTE: Windows String16 To UTF8
-// -----------------------------------------------------------------------------
-DQN_API int Dqn_Win_CString16ToCString8(const wchar_t* src, int src_size, char *dest, int dest_size)
-{
-    int result = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src, src_size, dest, dest_size, nullptr, nullptr);
-    if (result) {
-        result += 1; // Null-terminator
-
-        // NOTE: Null-terminate the buffer
-        if (dest && dest_size > 0) {
-            dest[DQN_MIN(result - 1, dest_size)] = 0;
-        }
-    }
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_Win_CString16ToString8Allocator(const wchar_t* src, int src_size, Dqn_Allocator allocator)
-{
-    Dqn_String8 result = {};
-    int required = Dqn_Win_CString16ToCString8(src, src_size, nullptr, 0);
-    if (required != 0) {
-        // NOTE: String allocate ensures there's one extra byte for
-        // null-termination already so we need to undo the +1 from our
-        // functions.
-        result = Dqn_String8_Allocate(allocator, required - 1, Dqn_ZeroMem_No);
-        if (Dqn_String8_IsValid(result)) {
-            int next_required = Dqn_Win_CString16ToCString8(src, src_size, result.data, required);
-            DQN_ASSERT(required == next_required);
-        }
-    }
-    return result;
-}
-
-DQN_API int Dqn_Win_String16ToCString8(Dqn_String16 src, char *dest, int dest_size)
-{
-    int result = 0;
-    int src_size = Dqn_Safe_TruncateISizeToInt(src.size);
-    if (src_size) {
-        result = Dqn_Win_CString16ToCString8(src.data, src_size, dest, dest_size);
-    }
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_Win_String16ToString8Allocator(Dqn_String16 src, Dqn_Allocator allocator)
-{
-    Dqn_String8 result = {};
-    int src_size = Dqn_Safe_TruncateISizeToInt(src.size);
-    if (src_size) {
-        result = Dqn_Win_CString16ToString8Allocator(src.data, src_size, allocator);
-    }
-    return result;
-}
-
-// NOTE: Windows Executable Directory
-// -----------------------------------------------------------------------------
-DQN_API Dqn_isize Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_isize size)
-{
-    wchar_t module_path[DQN_OS_WIN32_MAX_PATH];
-    int module_size = GetModuleFileNameW(nullptr /*module*/, module_path, DQN_ARRAY_UCOUNT(module_path));
-    DQN_HARD_ASSERT_MSG(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
-
-    Dqn_isize result = 0;
-    for (int index = module_size - 1; !result && index >= 0; index--)
-        result = module_path[index] == '\\' ? index : 0;
-
-    if (!buffer || size < result) {
-        return result;
-    }
-
-    DQN_MEMCOPY(buffer, module_path, sizeof(wchar_t) * result);
-    return result;
-}
-
-DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena)
-{
-    wchar_t dir[DQN_OS_WIN32_MAX_PATH];
-    Dqn_isize dir_size = Dqn_Win_EXEDirW(dir, DQN_ARRAY_ICOUNT(dir));
-    DQN_HARD_ASSERT_MSG(dir_size <= DQN_ARRAY_ICOUNT(dir), "How the hell?");
-
-    Dqn_String16 result = {};
-    if (dir_size > 0) {
-        result.data = Dqn_Arena_CopyZ(arena, wchar_t, dir, dir_size);
-        if (result.data) {
-            result.size = dir_size;
-        }
-    }
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_Win_WorkingDir(Dqn_Allocator allocator, Dqn_String8 suffix)
-{
-    Dqn_ThreadTempArena scratch = Dqn_Thread_TempArena(allocator.user_context);
-    Dqn_String16 suffix16     = Dqn_Win_String8ToString16Allocator(suffix, Dqn_Arena_Allocator(scratch.arena));
-    Dqn_String16 dir16        = Dqn_Win_WorkingDirW(Dqn_Arena_Allocator(scratch.arena), suffix16);
-    Dqn_String8 result        = Dqn_Win_String16ToString8Allocator(dir16, allocator);
-    return result;
-}
-
-DQN_API Dqn_String16 Dqn_Win_WorkingDirW(Dqn_Allocator allocator, Dqn_String16 suffix)
-{
-    DQN_ASSERT(suffix.size >= 0);
-    Dqn_String16 result = {};
-
-    Dqn_ThreadTempArena scratch = Dqn_Thread_TempArena(allocator.user_context);
-
-    // NOTE: required_size is the size required *including* the null-terminator
-    unsigned long required_size = GetCurrentDirectoryW(0, nullptr);
-    unsigned long desired_size  = required_size + DQN_CAST(unsigned long) suffix.size;
-
-    wchar_t *scratch_w_path = Dqn_Arena_NewArray(scratch.arena, wchar_t, desired_size, Dqn_ZeroMem_No);
-    if (!scratch_w_path)
-        return result;
-
-    unsigned long bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, scratch_w_path);
-    if ((bytes_written_wo_null_terminator + 1) != required_size) {
-        // TODO(dqn): Error
-        return result;
-    }
-
-    wchar_t *w_path = Dqn_Allocator_NewArray(allocator, wchar_t, desired_size, Dqn_ZeroMem_No);
-    if (!w_path)
-        return result;
-
-    if (suffix.size) {
-        DQN_MEMCOPY(w_path, scratch_w_path, sizeof(*scratch_w_path) * bytes_written_wo_null_terminator);
-        DQN_MEMCOPY(w_path + bytes_written_wo_null_terminator, suffix.data, sizeof(suffix.data[0]) * suffix.size);
-        w_path[desired_size] = 0;
-    }
-
-    result = Dqn_String16{w_path, DQN_CAST(Dqn_isize)(desired_size - 1)};
-    return result;
-}
-
-DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it)
-{
-    WIN32_FIND_DATAW find_data = {};
-    if (it->handle)
-    {
-        if (FindNextFileW(it->handle, &find_data) == 0)
-            return false;
-    }
-    else
-    {
-        it->handle = FindFirstFileExW(path.data,             /*LPCWSTR lpFileName,*/
-                                      FindExInfoStandard,    /*FINDEX_INFO_LEVELS fInfoLevelId,*/
-                                      &find_data,            /*LPVOID lpFindFileData,*/
-                                      FindExSearchNameMatch, /*FINDEX_SEARCH_OPS fSearchOp,*/
-                                      nullptr,               /*LPVOID lpSearchFilter,*/
-                                      FIND_FIRST_EX_LARGE_FETCH /*unsigned long dwAdditionalFlags)*/);
-
-        if (it->handle == INVALID_HANDLE_VALUE)
-            return false;
-    }
-
-    it->file_name_buf[0] = 0;
-    it->file_name        = Dqn_String16{it->file_name_buf, 0};
-
-    do
-    {
-        if (find_data.cFileName[0] == '.' || (find_data.cFileName[0] == '.' && find_data.cFileName[1] == '.'))
-            continue;
-
-        if (find_data.dwFileAttributes & ~FILE_ATTRIBUTE_DIRECTORY)
-        {
-            it->file_name.size = Dqn_CString16_Size(find_data.cFileName);
-            DQN_ASSERT(it->file_name.size < (Dqn_CArray_CountI(it->file_name_buf) - 1));
-
-            DQN_MEMCOPY(it->file_name.data, find_data.cFileName, it->file_name.size * sizeof(wchar_t));
-            it->file_name_buf[it->file_name.size] = 0;
-
-            break;
-        }
-    } while (FindNextFileW(it->handle, &find_data) != 0);
-
-    return true;
-}
-
-DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
-{
-    wchar_t path16[DQN_OS_WIN32_MAX_PATH];
-    path16[0] = 0;
-    int path16_size = 0;
-
-    Dqn_Win_FolderIteratorW wide_it = {};
-    if (it->handle)
-        wide_it.handle = it->handle;
-    else {
-        path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_OS_WIN32_MAX_PATH);
-        if (path16[path16_size - 2] != L'\\' &&
-            path16[path16_size - 1] != L'*')
-        {
-            if ((path16_size + 2) < (DQN_OS_WIN32_MAX_PATH - 1)) {
-                path16[path16_size++] = L'\\';
-                path16[path16_size++] = L'*';
-            }
-        } else if (path16[path16_size - 1] == L'\\') {
-            if ((path16_size + 1) < (DQN_OS_WIN32_MAX_PATH - 1)) {
-                path16[path16_size++] = L'*';
-            }
-        }
-
-        path16[path16_size++] = 0;
-        DQN_ASSERT(path16_size <= DQN_OS_WIN32_MAX_PATH);
-    }
-
-    bool result = Dqn_Win_FolderWIterate(Dqn_String16{path16, path16_size}, &wide_it);
-    it->handle = wide_it.handle;
-    if (result) {
-        int size = Dqn_Win_String16ToCString8(wide_it.file_name, it->file_name_buf, DQN_ARRAY_ICOUNT(it->file_name_buf));
-        it->file_name = Dqn_String8_Init(it->file_name_buf, size);
-    }
-
-    return result;
-}
-
-#if defined(DQN_WITH_WIN_NET)
-DQN_API Dqn_Win_NetHandle Dqn_Win_NetHandleInitCString(char const *url, int url_size)
-{
-    URL_COMPONENTSA components  = {};
-    components.dwStructSize     = sizeof(components);
-    components.dwHostNameLength = url_size;
-    components.dwUrlPathLength  = url_size;
-
-    // Seperate the URL into bits and bobs
-    Dqn_Win_NetHandle result = {};
-    if (!InternetCrackUrlA(url, url_size, 0 /*flags*/, &components)) {
-        DQN_LOG_E("InternetCrackUrlA failed [reason=%.*s]", DQN_STRING_FMT(Dqn_Win_LastError()));
-        return result;
-    }
-
-    if (url[url_size] != 0) {
-        DQN_LOG_E("URL '%.*s' must be null-terminated", url_size, url);
-        return result;
-    }
-
-    if (components.dwHostNameLength > (DQN_ARRAY_UCOUNT(result.host_name) - 1)) {
-        DQN_LOG_E("Host name is longer than the maximum supported [max=%d]", DQN_ARRAY_UCOUNT(result.host_name) - 1);
-        return result;
-    }
-
-    result.host_name_size = components.dwHostNameLength;
-    DQN_MEMCOPY(result.host_name, components.lpszHostName, result.host_name_size);
-    result.host_name[result.host_name_size] = 0;
-
-    result.url_size = components.dwUrlPathLength;
-    result.url      = components.lpszUrlPath;
-
-    // Create the Win32 networking handles we need
-    result.internet_open_handle = InternetOpenA("Generic/Win32",
-                                                INTERNET_OPEN_TYPE_PRECONFIG,
-                                                nullptr /*proxy*/,
-                                                nullptr /*proxy bypass*/,
-                                                0 /*flags*/);
-
-    result.internet_connect_handle = InternetConnectA(result.internet_open_handle,
-                                                      result.host_name,
-                                                      INTERNET_DEFAULT_HTTPS_PORT,
-                                                      nullptr /*username*/,
-                                                      nullptr /*password*/,
-                                                      INTERNET_SERVICE_HTTP,
-                                                      0 /*flags*/,
-                                                      0 /*context*/);
-
-    result.state = Dqn_Win_NetHandleState::Initialised;
-    return result;
-}
-
-DQN_API Dqn_Win_NetHandle Dqn_Win_NetHandleInitString(Dqn_String8 url)
-{
-    Dqn_Win_NetHandle result = Dqn_Win_NetHandleInitCString(url.data, DQN_CAST(int)url.size);
-    return result;
-}
-
-DQN_API void Dqn_Win_NetHandleFinish(Dqn_Win_NetHandle *handle)
-{
-    if (!Dqn_Win_NetHandleIsValid(handle))
-        return;
-
-    InternetCloseHandle(handle->internet_open_handle);
-    InternetCloseHandle(handle->internet_connect_handle);
-    InternetCloseHandle(handle->http_handle);
-    handle->internet_open_handle    = nullptr;
-    handle->internet_connect_handle = nullptr;
-    handle->http_handle             = nullptr;
-}
-
-DQN_API bool Dqn_Win_NetHandleIsValid(Dqn_Win_NetHandle const *handle)
-{
-    bool result = handle->state >= Dqn_Win_NetHandleState::Initialised;
-    return result;
-}
-
-DQN_API void Dqn_Win_NetHandleSetUserAgentCString(Dqn_Win_NetHandle *handle, char const *user_agent, int user_agent_size)
-{
-    if (!Dqn_Win_NetHandleIsValid(handle))
-        return;
-
-    InternetSetOptionA(handle->internet_open_handle, INTERNET_OPTION_USER_AGENT, (void *)user_agent, user_agent_size);
-}
-
-DQN_API bool Dqn_Win_NetHandlePump(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size)
-{
-    if (!Dqn_Win_NetHandleIsValid(handle))
-        return false;
-
-    if (handle->state == Dqn_Win_NetHandleState::Initialised) {
-        DQN_ASSERT(handle->http_handle == nullptr);
-        handle->http_handle = HttpOpenRequestA(handle->internet_connect_handle,
-                                               http_verb,
-                                               handle->url,
-                                               nullptr /*http version*/,
-                                               nullptr /*referrer*/,
-                                               nullptr,
-                                               INTERNET_FLAG_NO_AUTH | INTERNET_FLAG_SECURE,
-                                               0 /*context*/);
-
-        if (HttpSendRequestA(handle->http_handle,
-                             nullptr /*headers*/,
-                             0 /*headers length*/,
-                             post_data,
-                             post_data_size))
-        {
-            handle->state = Dqn_Win_NetHandleState::RequestGood;
-            return true;
-        }
-        else
-        {
-            handle->state = Dqn_Win_NetHandleState::RequestFailed;
-            DQN_LOG_E("Failed to send request for %.*s [reason=%.*s]",
-                      handle->host_name_size,
-                      handle->host_name,
-                      DQN_STRING_FMT(Dqn_Win_LastError()));
-        }
-    }
-
-    if (handle->state == Dqn_Win_NetHandleState::RequestFailed)
-        return false;
-
-    bool result = true;
-    unsigned long bytes_read;
-    if (InternetReadFile(handle->http_handle, dest, dest_size, &bytes_read)) {
-        if (bytes_read == 0)
-            result = false;
-        *download_size = bytes_read;
-    } else {
-        *download_size = 0;
-        result = false;
-    }
-
-    if (!result) {
-        // NOTE: If it's false here, we've finished downloading/the pumping the
-        // handled finished. We can reset the handle state to allow the user to
-        // re-use this handle by calling the function again with new post data.
-        // IF they need to set a new URL/resource location then they need to
-        // make a new handle for that otherwise they can re-use this handle to
-        // hit that same end point.
-        handle->state = Dqn_Win_NetHandleState::Initialised;
-        InternetCloseHandle(handle->http_handle);
-        handle->http_handle = nullptr;
-    }
-
-    return result;
-}
-
-struct Dqn_Win_NetChunk
-{
-    char             data[DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE];
-    size_t           size;
-    Dqn_Win_NetChunk *next;
-};
-
-DQN_API char *Dqn_Win_NetHandlePumpToCString(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size)
-{
-    Dqn_ThreadTempArena scratch   = Dqn_Thread_TempArena(arena);
-    size_t total_size             = 0;
-    Dqn_Win_NetChunk *first_chunk = nullptr;
-    for (Dqn_Win_NetChunk *last_chunk = nullptr;;)
-    {
-        Dqn_Win_NetChunk *chunk = Dqn_Arena_New(scratch.arena, Dqn_Win_NetChunk, Dqn_ZeroMem_Yes);
-        bool pump_result       =  Dqn_Win_NetHandlePump(handle, http_verb, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
-        if (chunk->size)
-        {
-            total_size += chunk->size;
-            if (first_chunk)
-            {
-                last_chunk->next = chunk;
-                last_chunk       = chunk;
-            }
-            else
-            {
-                first_chunk = chunk;
-                last_chunk  = chunk;
-            }
-        }
-
-        if (!pump_result)
-            break;
-    }
-
-    char *result     = Dqn_Arena_NewArray(arena, char, total_size + 1 /*null-terminator*/, Dqn_ZeroMem_No);
-    char *result_ptr = result;
-    for (Dqn_Win_NetChunk *chunk = first_chunk; chunk; chunk = chunk->next)
-    {
-        DQN_MEMCOPY(result_ptr, chunk->data, chunk->size);
-        result_ptr += chunk->size;
-    }
-
-    *download_size     = total_size;
-    result[total_size] = 0;
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_Win_NetHandlePumpToString(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, Dqn_Arena *arena)
-{
-    size_t     size     = 0;
-    char *     download = Dqn_Win_NetHandlePumpToCString(handle, http_verb, post_data, post_data_size, arena, &size);
-    Dqn_String8 result   = Dqn_String8_Init(download, size);
-    return result;
-}
-
-DQN_API void Dqn_Win_NetHandlePumpToCRTFile(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, FILE *file)
-{
-    for (bool keep_pumping = true; keep_pumping;)
-    {
-        char buffer[DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE];
-        size_t buffer_size = 0;
-        keep_pumping = Dqn_Win_NetHandlePump(handle, http_verb, post_data, post_data_size, buffer, sizeof(buffer), &buffer_size);
-        fprintf(file, "%.*s", (int)buffer_size, buffer);
-    }
-}
-
-DQN_API char *Dqn_Win_NetHandlePumpToAllocCString(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size, size_t *download_size)
-{
-    size_t            total_size  = 0;
-    Dqn_Win_NetChunk *first_chunk = nullptr;
-    for (Dqn_Win_NetChunk *last_chunk = nullptr;;) {
-        auto *chunk      = DQN_CAST(Dqn_Win_NetChunk *)Dqn_VMem_Reserve(sizeof(Dqn_Win_NetChunk), true /*commit*/);
-        bool pump_result = Dqn_Win_NetHandlePump(handle, http_verb, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
-        if (chunk->size) {
-            total_size += chunk->size;
-            if (first_chunk) {
-                last_chunk->next = chunk;
-                last_chunk       = chunk;
-            } else {
-                first_chunk = chunk;
-                last_chunk  = chunk;
-            }
-        }
-
-        if (!pump_result)
-            break;
-    }
-
-    auto *result     = DQN_CAST(char *)Dqn_VMem_Reserve(total_size * sizeof(char), true /*commit*/);
-    char *result_ptr = result;
-    for (Dqn_Win_NetChunk *chunk = first_chunk; chunk;) {
-        DQN_MEMCOPY(result_ptr, chunk->data, chunk->size);
-        result_ptr += chunk->size;
-
-        Dqn_Win_NetChunk *prev_chunk = chunk;
-        chunk                        = chunk->next;
-        Dqn_VMem_Release(prev_chunk, sizeof(*prev_chunk));
-    }
-
-    *download_size     = total_size;
-    result[total_size] = 0;
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_Win_NetHandlePumpToAllocString(Dqn_Win_NetHandle *handle, char const *http_verb, char *post_data, int post_data_size)
-{
-    size_t     download_size = 0;
-    char *     download      = Dqn_Win_NetHandlePumpToAllocCString(handle, http_verb, post_data, post_data_size, &download_size);
-    Dqn_String8 result       = Dqn_String8_Init(download, download_size);
-    return result;
-}
-#endif // DQN_WITH_WIN_NET
-#endif // DQN_OS_WIN32
 
 // NOTE: Hashing - Dqn_FNV1A[32|64]
 // -------------------------------------------------------------------------------------------------
@@ -8068,11 +9005,9 @@ DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_isize size)
 // -------------------------------------------------------------------------------------------------
 
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
-    #define DQN_MMH3_FORCE_INLINE __forceinline
     #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
     #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)
 #else
-    #define DQN_MMH3_FORCE_INLINE inline __attribute__((always_inline))
     #define DQN_MMH3_ROTL32(x, y) ((x) << (y)) | ((x) >> (32 - (y)))
     #define DQN_MMH3_ROTL64(x, y) ((x) << (y)) | ((x) >> (64 - (y)))
 #endif
@@ -8081,12 +9016,12 @@ DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_isize size)
 // Block read - if your platform needs to do endian-swapping or can only
 // handle aligned reads, do the conversion here
 
-DQN_MMH3_FORCE_INLINE uint32_t Dqn_MurmurHash3_GetBlock32(uint32_t const *p, int i)
+DQN_FORCE_INLINE uint32_t Dqn_MurmurHash3_GetBlock32(uint32_t const *p, int i)
 {
     return p[i];
 }
 
-DQN_MMH3_FORCE_INLINE uint64_t Dqn_MurmurHash3_GetBlock64(uint64_t const *p, int i)
+DQN_FORCE_INLINE uint64_t Dqn_MurmurHash3_GetBlock64(uint64_t const *p, int i)
 {
     return p[i];
 }
@@ -8094,7 +9029,7 @@ DQN_MMH3_FORCE_INLINE uint64_t Dqn_MurmurHash3_GetBlock64(uint64_t const *p, int
 //-----------------------------------------------------------------------------
 // Finalization mix - force all bits of a hash block to avalanche
 
-DQN_MMH3_FORCE_INLINE uint32_t Dqn_MurmurHash3_FMix32(uint32_t h)
+DQN_FORCE_INLINE uint32_t Dqn_MurmurHash3_FMix32(uint32_t h)
 {
     h ^= h >> 16;
     h *= 0x85ebca6b;
@@ -8104,7 +9039,7 @@ DQN_MMH3_FORCE_INLINE uint32_t Dqn_MurmurHash3_FMix32(uint32_t h)
     return h;
 }
 
-DQN_MMH3_FORCE_INLINE uint64_t Dqn_MurmurHash3_FMix64(uint64_t k)
+DQN_FORCE_INLINE uint64_t Dqn_MurmurHash3_FMix64(uint64_t k)
 {
     k ^= k >> 33;
     k *= 0xff51afd7ed558ccd;
