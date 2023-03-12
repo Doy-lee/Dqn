@@ -2066,7 +2066,7 @@ DQN_API Dqn_M4  Dqn_M4_SubF(Dqn_M4 lhs, Dqn_f32 rhs);
 DQN_API Dqn_M4  Dqn_M4_MulF(Dqn_M4 lhs, Dqn_f32 rhs);
 DQN_API Dqn_M4  Dqn_M4_DivF(Dqn_M4 lhs, Dqn_f32 rhs);
 
-#if defined(DQN_WITH_FIXED_STRING)
+#if !defined(DQN_NO_FSTRING8)
 DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat);
 #endif
 
@@ -6205,7 +6205,7 @@ DQN_API Dqn_M4 Dqn_M4_DivF(Dqn_M4 lhs, Dqn_f32 rhs)
     return result;
 }
 
-#if defined(DQN_WITH_FIXED_STRING)
+#if !defined(DQN_NO_FSTRING8)
 DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
 {
     Dqn_FString8<256> result = {};

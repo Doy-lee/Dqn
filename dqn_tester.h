@@ -60,18 +60,22 @@
 #endif
 
 #define DQN_TESTER_COLOR_RESET "\x1b[0m"
+#define DQN_TESTER_TOKEN_COMBINE2(x, y) x ## y_
+#define DQN_TESTER_TOKEN_COMBINE(x, y) DQN_TESTER_TOKEN_COMBINE2(x, y)
 
-#define DQN_TESTER_BEGIN_GROUP(fmt, ...) fprintf(stdout, fmt "\n", ##__VA_ARGS__)
-#define DQN_TESTER_END_GROUP(test)                                                    \
-    do {                                                                              \
-        bool all_clear = (test)->num_tests_ok_in_group == (test)->num_tests_in_group; \
-        fprintf(stdout,                                                               \
-                "%s\n  %02d/%02d tests passed -- %s\n\n" DQN_TESTER_COLOR_RESET,      \
-                all_clear ? DQN_TESTER_GOOD_COLOR : DQN_TESTER_BAD_COLOR,             \
-                (test)->num_tests_ok_in_group,                                        \
-                (test)->num_tests_in_group,                                           \
-                all_clear ? "OK" : "FAILED");                                         \
-    } while (0)
+/// Creates <prefix><line_number>_ .e. group_123_
+#define DQN_TESTER_UNIQUE_NAME(prefix) \
+    DQN_TESTER_TOKEN_COMBINE(DQN_TESTER_TOKEN_COMBINE(prefix, __LINE__), _)
+
+#define DQN_TESTER_GROUP(group, fmt, ...) \
+    for (Dqn_Tester *test_group_ = (group = Dqn_Tester_BeginGroup(fmt, ## __VA_ARGS__), &group); \
+         !test_group_->finished; \
+         Dqn_Tester_EndGroup(test_group_))
+
+#define DQN_TESTER_TEST(fmt, ...) \
+    for (int DQN_TESTER_UNIQUE_NAME(dummy_) = (Dqn_Tester_Begin(test_group_, fmt, ## __VA_ARGS__), 0); \
+         (void)DQN_TESTER_UNIQUE_NAME(dummy_), test_group_->state == Dqn_TesterTestState_TestBegun; \
+         Dqn_Tester_End(test_group_))
 
 #define DQN_TESTER_ASSERTF(test, expr, fmt, ...) \
     DQN_TESTER_ASSERTF_AT((test), __FILE__, __LINE__, (expr), fmt, ##__VA_ARGS__)
@@ -92,7 +96,7 @@
             if ((test)->log_count++ == 0) {                     \
                 fprintf(stdout, "\n");                          \
             }                                                   \
-            (test)->state = Dqn_TesterState_TestFailed;         \
+            (test)->state = Dqn_TesterTestState_TestFailed;         \
             fprintf(stderr,                                     \
                     "%*sAssertion Triggered\n"                  \
                     "%*sFile: %s:%d\n"                          \
@@ -118,7 +122,7 @@
             if ((test)->log_count++ == 0) {             \
                 fprintf(stdout, "\n");                  \
             }                                           \
-            (test)->state = Dqn_TesterState_TestFailed; \
+            (test)->state = Dqn_TesterTestState_TestFailed; \
             fprintf(stderr,                             \
                     "%*sFile: %s:%d\n"                  \
                     "%*sExpression: [" #expr "]\n",     \
@@ -133,43 +137,71 @@
 
 // NOTE: Header
 // -----------------------------------------------------------------------------
-enum Dqn_TesterState {
-    Dqn_TesterState_Nil,
-    Dqn_TesterState_TestBegun,
-    Dqn_TesterState_TestFailed,
-};
+typedef enum Dqn_TesterTestState {
+    Dqn_TesterTestState_Nil,
+    Dqn_TesterTestState_TestBegun,
+    Dqn_TesterTestState_TestFailed,
+} Dqn_TesterTestState;
 
 typedef struct Dqn_Tester {
-    int             num_tests_in_group;
-    int             num_tests_ok_in_group;
-    int             log_count;
-    Dqn_TesterState state;
+    int                 num_tests_in_group;
+    int                 num_tests_ok_in_group;
+    int                 log_count;
+    Dqn_TesterTestState state;
+    bool                finished;
 } Dqn_Tester;
+
+Dqn_Tester Dqn_Tester_BeginGroupV(char const *fmt, va_list args);
+Dqn_Tester Dqn_Tester_BeginGroup(char const *fmt, ...);
+void Dqn_Tester_EndGroup(Dqn_Tester *test);
 
 void Dqn_Tester_BeginV(Dqn_Tester *test, char const *fmt, va_list args);
 void Dqn_Tester_Begin(Dqn_Tester *test, char const *fmt, ...);
 void Dqn_Tester_End(Dqn_Tester *test);
 
-#if defined(__cplusplus)
-struct Dqn_TesterBeginScopedTest {
-    Dqn_TesterBeginScopedTest(Dqn_Tester *test, char const *fmt, ...);
-    ~Dqn_TesterBeginScopedTest();
-    Dqn_Tester *test;
-};
-#endif // __cplusplus
-#endif // DQN_TESTER_H
-
 // NOTE: Implementation
 // -----------------------------------------------------------------------------
 #if defined(DQN_TESTER_IMPLEMENTATION)
+Dqn_Tester Dqn_Tester_BeginGroupV(char const *fmt, va_list args)
+{
+    fprintf(stdout, fmt, args);
+    fputc('\n', stdout);
+    Dqn_Tester result = {};
+    return result;
+}
+
+Dqn_Tester Dqn_Tester_BeginGroup(char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Tester result = Dqn_Tester_BeginGroupV(fmt, args);
+    va_end(args);
+    return result;
+}
+
+void Dqn_Tester_EndGroup(Dqn_Tester *test)
+{
+    if (test->finished)
+        return;
+
+    test->finished = true;
+    bool all_clear = test->num_tests_ok_in_group == test->num_tests_in_group;
+    fprintf(stdout,
+            "%s\n  %02d/%02d tests passed -- %s\n\n" DQN_TESTER_COLOR_RESET,
+            all_clear ? DQN_TESTER_GOOD_COLOR : DQN_TESTER_BAD_COLOR,
+            test->num_tests_ok_in_group,
+            test->num_tests_in_group,
+            all_clear ? "OK" : "FAILED");
+}
+
 void Dqn_Tester_BeginV(Dqn_Tester *test, char const *fmt, va_list args)
 {
-    assert(test->state == Dqn_TesterState_Nil &&
+    assert(test->state == Dqn_TesterTestState_Nil &&
            "Nesting a unit test within another unit test is not allowed, ensure"
            "the first test has finished by calling Dqn_Tester_End");
 
     test->num_tests_in_group++;
-    test->state     = Dqn_TesterState_TestBegun;
+    test->state     = Dqn_TesterTestState_TestBegun;
     test->log_count = 0;
 
     int size_required = 0;
@@ -196,7 +228,7 @@ void Dqn_Tester_Begin(Dqn_Tester *test, char const *fmt, ...)
 
 void Dqn_Tester_End(Dqn_Tester *test)
 {
-    assert(test->state != Dqn_TesterState_Nil && "Test was marked as ended but a test was never commenced using Dqn_Tester_Begin");
+    assert(test->state != Dqn_TesterTestState_Nil && "Test was marked as ended but a test was never commenced using Dqn_Tester_Begin");
     if (test->log_count != 0) {
         // NOTE: We try and print the result on the same line as the test name,
         // but if there were logs printed throughout the test then we must print
@@ -206,7 +238,7 @@ void Dqn_Tester_End(Dqn_Tester *test)
             putc(DQN_TESTER_RESULT_PAD_CHAR, stdout);
     }
 
-    if (test->state == Dqn_TesterState_TestFailed) {
+    if (test->state == Dqn_TesterTestState_TestFailed) {
         fprintf(stdout, DQN_TESTER_BAD_COLOR " FAILED");
     } else {
         fprintf(stdout, DQN_TESTER_GOOD_COLOR " OK");
@@ -218,21 +250,7 @@ void Dqn_Tester_End(Dqn_Tester *test)
         putc('\n', stdout);
     }
 
-    test->state = Dqn_TesterState_Nil;
+    test->state = Dqn_TesterTestState_Nil;
 }
-
-#if defined(__cplusplus)
-Dqn_TesterBeginScopedTest::Dqn_TesterBeginScopedTest(Dqn_Tester *test, char const *fmt, ...)
-: test(test)
-{
-    va_list args;
-    va_start(args, fmt);
-    Dqn_Tester_BeginV(test, fmt, args);
-    va_end(args);
-}
-
-Dqn_TesterBeginScopedTest::~Dqn_TesterBeginScopedTest() {
-    Dqn_Tester_End(test);
-}
-#endif // __cplusplus
 #endif // DQN_TESTER_IMPLEMENTATION
+#endif // DQN_TESTER_H
