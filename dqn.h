@@ -2834,7 +2834,7 @@ struct Dqn_OSTimedBlock
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
 // ---------------------------------+-----------------------------+---------------------------------
-struct Dqn_Fs_Info
+struct Dqn_FsInfo
 {
     uint64_t create_time_in_s;
     uint64_t last_write_time_in_s;
@@ -2844,21 +2844,21 @@ struct Dqn_Fs_Info
 };
 
 // TODO(dqn): We should have a Dqn_String8 interface and a CString interface
-DQN_API bool         Dqn_Fs_Exists(Dqn_String8 path);
-DQN_API bool         Dqn_Fs_DirExists(Dqn_String8 path);
-DQN_API Dqn_Fs_Info  Dqn_Fs_GetInfo(Dqn_String8 path);
-DQN_API bool         Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+DQN_API bool       Dqn_Fs_Exists(Dqn_String8 path);
+DQN_API bool       Dqn_Fs_DirExists(Dqn_String8 path);
+DQN_API Dqn_FsInfo Dqn_Fs_GetInfo(Dqn_String8 path);
+DQN_API bool       Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
 
-DQN_API bool         Dqn_Fs_MakeDir(Dqn_String8 path);
-DQN_API bool         Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+DQN_API bool       Dqn_Fs_MakeDir(Dqn_String8 path);
+DQN_API bool       Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
 
 // TODO(dqn): This doesn't work on directories unless you delete the files
 // in that directory first.
-DQN_API bool         Dqn_Fs_Delete(Dqn_String8 path);
+DQN_API bool       Dqn_Fs_Delete(Dqn_String8 path);
 
 // file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
-DQN_API bool         Dqn_Fs_WriteCString8(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size);
-DQN_API bool         Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer);
+DQN_API bool       Dqn_Fs_WriteCString8(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size);
+DQN_API bool       Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer);
 
 /// Read a file at the specified path into memory.
 /// @param[in] path Path to the file to read
@@ -8455,9 +8455,9 @@ DQN_API bool Dqn_Fs_DirExists(Dqn_String8 path)
     return result;
 }
 
-DQN_API Dqn_Fs_Info Dqn_Fs_GetInfo(Dqn_String8 path)
+DQN_API Dqn_FsInfo Dqn_Fs_GetInfo(Dqn_String8 path)
 {
-    Dqn_Fs_Info result = {};
+    Dqn_FsInfo result = {};
 #if defined(DQN_OS_WIN32)
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
