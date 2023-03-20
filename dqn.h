@@ -2725,6 +2725,10 @@ struct Dqn_WinNetHandleResponse
     Dqn_String8  raw_headers;
     Dqn_String8 *headers;
     Dqn_isize    headers_size;
+
+    // NOTE: Headers pulled from the 'raw_headers' for convenience
+    uint64_t     content_length;
+    Dqn_String8  content_type;
 };
 DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *handle, Dqn_Allocator allocator, char const *post_data, unsigned long post_data_size);
 
@@ -7749,6 +7753,35 @@ DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *
     Dqn_isize splits_required = Dqn_String8_Split(result.raw_headers, delimiter, nullptr, 0);
     result.headers            = Dqn_Allocator_NewArray(allocator, Dqn_String8, splits_required, Dqn_ZeroMem_No);
     result.headers_size       = Dqn_String8_Split(result.raw_headers, delimiter, result.headers, splits_required);
+
+    bool found_content_type   = false;
+    bool found_content_length = false;
+    for (Dqn_isize header_index = 0; header_index < result.headers_size; header_index++) {
+        Dqn_String8 header = result.headers[header_index];
+        Dqn_String8 value  = {};
+        Dqn_String8 key    = Dqn_String8_BinarySplit(header, ':', &value);
+
+        key   = Dqn_String8_TrimWhitespaceAround(key);
+        value = Dqn_String8_TrimWhitespaceAround(value);
+
+        if (Dqn_String8_EqInsensitive(key, DQN_STRING8("Content-Type"))) {
+            DQN_ASSERT(!found_content_type);
+            if (!found_content_type) {
+                found_content_type  = true;
+                result.content_type = value;
+            }
+        } else if (Dqn_String8_EqInsensitive(key, DQN_STRING8("Content-Length"))) {
+            DQN_ASSERT(!found_content_length);
+            if (!found_content_length) {
+                found_content_length = true;
+                result.content_length = Dqn_String8_ToU64(value, 0 /*separator*/);
+            }
+        }
+
+        if (found_content_type && found_content_length)
+            break;
+    }
+
     return result;
 }
 
