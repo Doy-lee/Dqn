@@ -1196,7 +1196,7 @@ DQN_API int64_t Dqn_String8_ToI64(Dqn_String8 string, char separator);
 /// This function can evaluate the number of splits required in the return value
 /// by setting `splits` to null and `splits_count` to 0.
 /// @param[in] string The source string to split
-/// @param[in] delimiter The character to split the string on
+/// @param[in] delimiter The substring to split the string on
 /// @param[out] splits (Optional) The destination array to write the splits to.
 /// @param[in] splits_count The number of splits that can be written into the
 /// `splits` array.
@@ -1205,7 +1205,7 @@ DQN_API int64_t Dqn_String8_ToI64(Dqn_String8 string, char separator);
 /// to the `splits` array. The number of splits written is capped to the
 /// capacity given by the caller, i.e. `splits_count`. This function should be
 /// called again with a sufficiently sized array if all splits are desired.
-DQN_API Dqn_isize   Dqn_String8_Split(Dqn_String8 string, char delimiter, Dqn_String8 *splits, Dqn_isize splits_count);
+DQN_API Dqn_isize   Dqn_String8_Split(Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_isize splits_count);
 
 DQN_API bool        Dqn_String8_IsAllDigits(Dqn_String8 string);
 DQN_API bool        Dqn_String8_IsAllHex(Dqn_String8 string);
@@ -2634,13 +2634,13 @@ DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
 // ---------------------------------+-----------------------------+---------------------------------
-enum struct Dqn_WinNetHandleState
+enum Dqn_WinNetHandleState
 {
-    Invalid,
-    Initialised,
-    HttpMethodReady,
-    RequestFailed,
-    RequestGood,
+    Dqn_WinNetHandleState_Invalid,
+    Dqn_WinNetHandleState_Initialised,
+    Dqn_WinNetHandleState_HttpMethodReady,
+    Dqn_WinNetHandleState_RequestFailed,
+    Dqn_WinNetHandleState_RequestGood,
 };
 
 // The number of bytes each pump of the connection downloads at most. If this is
@@ -2688,16 +2688,26 @@ struct Dqn_WinNetHandle
 // INTERNET_OPTION_RECEIVE_TIMEOUT
 // INTERNET_OPTION_SEND_TIMEOUT
 
-// Initialise a new networking handle that is pointing to the specified URL.
-// The URL string must be null-terminated because Windows is a C API and
-// requires null-termination.
-DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenCString(char const *url, int url_size);
-DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenString(Dqn_String8 url);
+// Setup a handle to the URL with the given HTTP verb.
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitCString(char const *url, int url_size);
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInit(Dqn_String8 url);
+
+// Setup a handle to the URL with the given HTTP verb.
+//
+// This function is the same as calling Dqn_Win_NetHandleInit() followed by
+// Dqn_Win_NetHandleSetHTTPMethod().
+//
+// @param http_method The HTTP request type, e.g. "GET" or "POST" e.t.c
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitHTTPMethodCString(char const *url, int url_size, char const *http_method);
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitHTTPMethod(Dqn_String8 url, Dqn_String8 http_method);
+
 DQN_API void             Dqn_Win_NetHandleClose(Dqn_WinNetHandle *handle);
 DQN_API bool             Dqn_Win_NetHandleIsValid(Dqn_WinNetHandle const *handle);
-
 DQN_API void             Dqn_Win_NetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
-DQN_API bool             Dqn_Win_NetHandleSetHTTPMethod(Dqn_WinNetHandle *handle, char const *data);
+
+// Set the HTTP request method for the given handle. This function can be used
+// on a pre-existing valid handle that has at the minimum been initialised.
+DQN_API bool             Dqn_Win_NetHandleSetHTTPMethod(Dqn_WinNetHandle *handle, char const *method);
 
 enum Dqn_WinNetHandleRequestHeaderFlag
 {
@@ -2707,16 +2717,24 @@ enum Dqn_WinNetHandleRequestHeaderFlag
     Dqn_WinNetHandleRequestHeaderFlag_Count,
 };
 
-DQN_API bool             Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle, char const *header, int header_size, uint32_t mode);
-DQN_API bool             Dqn_Win_NetHandleSetRequestHeaderString8(Dqn_WinNetHandle *handle, Dqn_String8 header, uint32_t mode);
+DQN_API bool Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle, char const *header, int header_size, uint32_t mode);
+DQN_API bool Dqn_Win_NetHandleSetRequestHeaderString8(Dqn_WinNetHandle *handle, Dqn_String8 header, uint32_t mode);
 
-DQN_API bool             Dqn_Win_NetHandlePump(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, char *dest, int dest_size, size_t *download_size);
-DQN_API char *           Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size);
-DQN_API Dqn_String8      Dqn_Win_NetHandlePumpString8(Dqn_WinNetHandle *handle, Dqn_String8 post_data, Dqn_Arena *arena);
+struct Dqn_WinNetHandleResponse
+{
+    Dqn_String8  raw_headers;
+    Dqn_String8 *headers;
+    Dqn_isize    headers_size;
+};
+DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *handle, Dqn_Allocator allocator, char const *post_data, unsigned long post_data_size);
 
-DQN_API void             Dqn_Win_NetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, FILE *file);
-DQN_API char            *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, size_t *download_size);
-DQN_API Dqn_String8      Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle, char *post_data, int post_data_size);
+DQN_API bool             Dqn_Win_NetHandlePump(Dqn_WinNetHandle *handle, char *dest, int dest_size, size_t *download_size);
+DQN_API char *           Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, Dqn_Arena *arena, size_t *download_size);
+DQN_API Dqn_String8      Dqn_Win_NetHandlePumpString8(Dqn_WinNetHandle *handle, Dqn_Arena *arena);
+
+DQN_API void             Dqn_Win_NetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, FILE *file);
+DQN_API char            *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, size_t *download_size);
+DQN_API Dqn_String8      Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle);
 #endif // !defined(DQN_NO_WINNET)
 #endif // defined(DQN_OS_WIN32)
 
@@ -3952,6 +3970,9 @@ Dqn_BinarySearch(T const                        *array,
 #if defined(DQN_IMPLEMENTATION)
 
 #if defined(DQN_OS_WIN32)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
+// ---------------------------------+-----------------------------+---------------------------------
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "wininet")
 
@@ -4033,6 +4054,9 @@ Dqn_BinarySearch(T const                        *array,
         #define STD_ERROR_HANDLE ((unsigned long)-12)
 
         #define INVALID_FILE_SIZE ((unsigned long)0xFFFFFFFF)
+
+        #define HTTP_QUERY_RAW_HEADERS 21
+        #define HTTP_QUERY_RAW_HEADERS_CRLF 22
 
         // NOTE: HttpAddRequestHeadersA
         #define HTTP_ADDREQ_FLAG_ADD_IF_NEW 0x10000000
@@ -4264,6 +4288,7 @@ Dqn_BinarySearch(T const                        *array,
         /*HANDLE*/    void *         __stdcall HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, unsigned long dwFlags, unsigned long *dwContext);
         /*BOOLAPI*/   int            __stdcall HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
         /*BOOLAPI*/   int            __stdcall HttpAddRequestHeadersA     (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, unsigned long dwModifiers);
+        /*BOOL*/      int            __stdcall HttpQueryInfoA             (void *hRequest, unsigned long dwInfoLevel, void *lpBuffer, unsigned long *lpdwBufferLength, unsigned long *lpdwIndex);
         /*HINSTANCE*/ void *         __stdcall ShellExecuteA              (void *hwnd, char const *lpOperation, char const *lpFile, char const *lpParameters, char const *lpDirectory, int nShowCmd);
         }
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
@@ -5266,27 +5291,36 @@ DQN_API int64_t Dqn_String8_ToI64(Dqn_String8 string, char separator)
 }
 
 
-DQN_API Dqn_isize Dqn_String8_Split(Dqn_String8 string, char delimiter, Dqn_String8 *splits, Dqn_isize splits_count)
+DQN_API Dqn_isize Dqn_String8_Split(Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_isize splits_count)
 {
     Dqn_isize result = 0; // The number of splits in the actual string.
-    if (!Dqn_String8_IsValid(string))
+    if (!Dqn_String8_IsValid(string) || !Dqn_String8_IsValid(delimiter) || delimiter.size <= 0)
         return result;
 
     Dqn_isize splits_index = 0; // The number of splits written.
     Dqn_isize begin        = 0;
-    for (Dqn_isize index = 0; index < string.size; index++) {
-        bool last_char = index + 1 == string.size;
-        if (string.data[index] != delimiter && !last_char) {
+    for (Dqn_isize index = 0; index < string.size; ) {
+        // NOTE: Check if we encountered the substring that is the delimiter
+        Dqn_String8 check = Dqn_String8_Slice(string, index, delimiter.size);
+        if (!Dqn_String8_Eq(check, delimiter)) {
+            index++;
             continue;
         }
 
-        if (splits && splits_index < splits_count) {
-            auto split = Dqn_String8_Init(string.data + begin, index - begin);
+        // NOTE: Generate the split
+        Dqn_String8 split = Dqn_String8_Init(string.data + begin, index - begin);
+        if (splits && splits_index < splits_count && split.size)
             splits[splits_index++] = split;
-        }
 
-        begin   = index + 1;
-        result += 1;
+        // NOTE: Advance the iterators
+        result += (split.size > 0);
+        index  += delimiter.size;
+        begin   = index;
+
+        // NOTE: Exit early if space in string is less than the delimiter size
+        Dqn_isize space = string.size - index;
+        if (space < delimiter.size)
+            break;
     }
 
     return result;
@@ -7503,7 +7537,7 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
 // ---------------------------------+-----------------------------+---------------------------------
-DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenCString(char const *url, int url_size)
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitCString(char const *url, int url_size)
 {
     URL_COMPONENTSA components  = {};
     components.dwStructSize     = sizeof(components);
@@ -7550,13 +7584,27 @@ DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenCString(char const *url, int url_s
                                                       0 /*flags*/,
                                                       0 /*context*/);
 
-    result.state = Dqn_WinNetHandleState::Initialised;
+    result.state = Dqn_WinNetHandleState_Initialised;
     return result;
 }
 
-DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleOpenString(Dqn_String8 url)
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInit(Dqn_String8 url)
 {
-    Dqn_WinNetHandle result = Dqn_Win_NetHandleOpenCString(url.data, DQN_CAST(int)url.size);
+    Dqn_WinNetHandle result = Dqn_Win_NetHandleInitCString(url.data, DQN_CAST(int)url.size);
+    return result;
+}
+
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitHTTPMethodCString(char const *url, int url_size, char const *http_method)
+{
+    Dqn_WinNetHandle result = Dqn_Win_NetHandleInitCString(url, url_size);
+    Dqn_Win_NetHandleSetHTTPMethod(&result, http_method);
+    return result;
+}
+
+DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitHTTPMethod(Dqn_String8 url, Dqn_String8 http_method)
+{
+    Dqn_WinNetHandle result = Dqn_Win_NetHandleInit(url);
+    Dqn_Win_NetHandleSetHTTPMethod(&result, http_method.data);
     return result;
 }
 
@@ -7575,7 +7623,7 @@ DQN_API void Dqn_Win_NetHandleClose(Dqn_WinNetHandle *handle)
 
 DQN_API bool Dqn_Win_NetHandleIsValid(Dqn_WinNetHandle const *handle)
 {
-    bool result = handle && handle->state >= Dqn_WinNetHandleState::Initialised;
+    bool result = handle && handle->state >= Dqn_WinNetHandleState_Initialised;
     return result;
 }
 
@@ -7596,10 +7644,10 @@ DQN_API bool Dqn_Win_NetHandleSetHTTPMethod(Dqn_WinNetHandle *handle,
     if (handle->http_handle) {
         InternetCloseHandle(handle->http_handle);
         handle->http_handle = nullptr;
-        handle->state       = Dqn_WinNetHandleState::Initialised;
+        handle->state       = Dqn_WinNetHandleState_Initialised;
     }
 
-    if (handle->state != Dqn_WinNetHandleState::Initialised)
+    if (handle->state != Dqn_WinNetHandleState_Initialised)
         return false;
 
     handle->http_handle = HttpOpenRequestA(handle->internet_connect_handle,
@@ -7610,7 +7658,7 @@ DQN_API bool Dqn_Win_NetHandleSetHTTPMethod(Dqn_WinNetHandle *handle,
                                            nullptr,
                                            INTERNET_FLAG_NO_AUTH | INTERNET_FLAG_SECURE,
                                            0 /*context*/);
-    handle->state = Dqn_WinNetHandleState::HttpMethodReady;
+    handle->state = Dqn_WinNetHandleState_HttpMethodReady;
     return true;
 }
 
@@ -7625,7 +7673,7 @@ DQN_API bool Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle,
     if (mode >= Dqn_WinNetHandleRequestHeaderFlag_Count)
         return false;
 
-    if (handle->state < Dqn_WinNetHandleState::HttpMethodReady)
+    if (handle->state < Dqn_WinNetHandleState_HttpMethodReady)
         return false;
 
     if (!Dqn_Safe_Assert(handle->http_handle))
@@ -7660,9 +7708,51 @@ DQN_API bool Dqn_Win_NetHandleSetRequestHeaderString8(Dqn_WinNetHandle *handle, 
     return result;
 }
 
+DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *handle, Dqn_Allocator allocator, char const *post_data, unsigned long post_data_size)
+{
+    Dqn_WinNetHandleResponse result = {};
+    if (!Dqn_Win_NetHandleIsValid(handle))
+        return result;
+
+    if (handle->state != Dqn_WinNetHandleState_HttpMethodReady)
+        return result;
+
+    if (!handle->http_handle)
+        return result;
+
+    if (!HttpSendRequestA(handle->http_handle, nullptr /*headers*/, 0 /*headers length*/, (char *)post_data, post_data_size)) {
+        handle->state = Dqn_WinNetHandleState_RequestFailed;
+        Dqn_Log_ErrorF("Failed to send request for %.*s [reason=%.*s]",
+                       handle->host_name_size,
+                       handle->host_name,
+                       DQN_STRING_FMT(Dqn_Win_LastError()));
+        return result;
+    }
+
+    handle->state = Dqn_WinNetHandleState_RequestGood;
+    unsigned long buffer_size = 0;
+    int query_result          = HttpQueryInfoA(handle->http_handle, HTTP_QUERY_RAW_HEADERS_CRLF, nullptr, &buffer_size, nullptr);
+    if (!Dqn_Safe_Assert(query_result != ERROR_INSUFFICIENT_BUFFER))
+        return result;
+
+    result.raw_headers = Dqn_String8_Allocate(allocator, buffer_size, Dqn_ZeroMem_No);
+    if (!result.raw_headers.data)
+        return result;
+
+    query_result = HttpQueryInfoA(handle->http_handle, HTTP_QUERY_RAW_HEADERS_CRLF, result.raw_headers.data, &buffer_size, nullptr);
+    if (!query_result) {
+        Dqn_Allocator_Dealloc(allocator, result.raw_headers.data, buffer_size);
+        return result;
+    }
+
+    Dqn_String8 delimiter     = DQN_STRING8("\r\n");
+    Dqn_isize splits_required = Dqn_String8_Split(result.raw_headers, delimiter, nullptr, 0);
+    result.headers            = Dqn_Allocator_NewArray(allocator, Dqn_String8, splits_required, Dqn_ZeroMem_No);
+    result.headers_size       = Dqn_String8_Split(result.raw_headers, delimiter, result.headers, splits_required);
+    return result;
+}
+
 DQN_API bool Dqn_Win_NetHandlePump(Dqn_WinNetHandle *handle,
-                                   char *post_data,
-                                   int post_data_size,
                                    char *dest,
                                    int dest_size,
                                    size_t *download_size)
@@ -7670,25 +7760,7 @@ DQN_API bool Dqn_Win_NetHandlePump(Dqn_WinNetHandle *handle,
     if (!Dqn_Win_NetHandleIsValid(handle))
         return false;
 
-    if (handle->state < Dqn_WinNetHandleState::HttpMethodReady)
-        return false;
-
-    if (handle->state == Dqn_WinNetHandleState::HttpMethodReady) {
-        if (Dqn_Safe_Assert(handle->http_handle)) {
-            if (HttpSendRequestA(handle->http_handle, nullptr /*headers*/, 0 /*headers length*/, post_data, post_data_size)) {
-                handle->state = Dqn_WinNetHandleState::RequestGood;
-                return true;
-            } else {
-                handle->state = Dqn_WinNetHandleState::RequestFailed;
-                Dqn_Log_ErrorF("Failed to send request for %.*s [reason=%.*s]",
-                          handle->host_name_size,
-                          handle->host_name,
-                          DQN_STRING_FMT(Dqn_Win_LastError()));
-            }
-        }
-    }
-
-    if (handle->state == Dqn_WinNetHandleState::RequestFailed)
+    if (handle->state != Dqn_WinNetHandleState_RequestGood)
         return false;
 
     bool result = true;
@@ -7709,7 +7781,7 @@ DQN_API bool Dqn_Win_NetHandlePump(Dqn_WinNetHandle *handle,
         // IF they need to set a new URL/resource location then they need to
         // make a new handle for that otherwise they can re-use this handle to
         // hit that same end point.
-        handle->state = Dqn_WinNetHandleState::Initialised;
+        handle->state = Dqn_WinNetHandleState_Initialised;
         InternetCloseHandle(handle->http_handle);
         handle->http_handle = nullptr;
     }
@@ -7724,7 +7796,7 @@ struct Dqn_Win_NetChunk
     Dqn_Win_NetChunk *next;
 };
 
-DQN_API char *Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, Dqn_Arena *arena, size_t *download_size)
+DQN_API char *Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, Dqn_Arena *arena, size_t *download_size)
 {
     Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(arena);
     size_t total_size             = 0;
@@ -7732,7 +7804,7 @@ DQN_API char *Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, char *post
     for (Dqn_Win_NetChunk *last_chunk = nullptr;;)
     {
         Dqn_Win_NetChunk *chunk = Dqn_Arena_New(scratch.arena, Dqn_Win_NetChunk, Dqn_ZeroMem_Yes);
-        bool pump_result        = Dqn_Win_NetHandlePump(handle, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
+        bool pump_result        = Dqn_Win_NetHandlePump(handle, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
         if (chunk->size) {
             total_size += chunk->size;
             if (first_chunk) {
@@ -7761,32 +7833,32 @@ DQN_API char *Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, char *post
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Win_NetHandlePumpString8(Dqn_WinNetHandle *handle, Dqn_String8 post_data, Dqn_Arena *arena)
+DQN_API Dqn_String8 Dqn_Win_NetHandlePumpString8(Dqn_WinNetHandle *handle, Dqn_Arena *arena)
 {
     size_t     size     = 0;
-    char *     download = Dqn_Win_NetHandlePumpCString8(handle, post_data.data, Dqn_Safe_SaturateCastISizeToInt(post_data.size), arena, &size);
+    char *     download = Dqn_Win_NetHandlePumpCString8(handle, arena, &size);
     Dqn_String8 result  = Dqn_String8_Init(download, size);
     return result;
 }
 
-DQN_API void Dqn_Win_NetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, FILE *file)
+DQN_API void Dqn_Win_NetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, FILE *file)
 {
     for (bool keep_pumping = true; keep_pumping;)
     {
         char buffer[DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE];
         size_t buffer_size = 0;
-        keep_pumping = Dqn_Win_NetHandlePump(handle, post_data, post_data_size, buffer, sizeof(buffer), &buffer_size);
+        keep_pumping = Dqn_Win_NetHandlePump(handle, buffer, sizeof(buffer), &buffer_size);
         fprintf(file, "%.*s", (int)buffer_size, buffer);
     }
 }
 
-DQN_API char *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, char *post_data, int post_data_size, size_t *download_size)
+DQN_API char *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, size_t *download_size)
 {
     size_t            total_size  = 0;
     Dqn_Win_NetChunk *first_chunk = nullptr;
     for (Dqn_Win_NetChunk *last_chunk = nullptr;;) {
         auto *chunk      = DQN_CAST(Dqn_Win_NetChunk *)Dqn_VMem_Reserve(sizeof(Dqn_Win_NetChunk), true /*commit*/);
-        bool pump_result = Dqn_Win_NetHandlePump(handle, post_data, post_data_size, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
+        bool pump_result = Dqn_Win_NetHandlePump(handle, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
         if (chunk->size) {
             total_size += chunk->size;
             if (first_chunk) {
@@ -7818,10 +7890,10 @@ DQN_API char *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, char
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle, char *post_data, int post_data_size)
+DQN_API Dqn_String8 Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle)
 {
     size_t     download_size = 0;
-    char *     download      = Dqn_Win_NetHandlePumpToAllocCString(handle, post_data, post_data_size, &download_size);
+    char *     download      = Dqn_Win_NetHandlePumpToAllocCString(handle, &download_size);
     Dqn_String8 result       = Dqn_String8_Init(download, download_size);
     return result;
 }
@@ -8686,7 +8758,7 @@ DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void co
     uint8_t context_index      = (uint8_t)-1;
     for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
         Dqn_Arena *arena = context->temp_arenas + index;
-        if (!conflict_arena || (&arena != conflict_arena)) {
+        if (!conflict_arena || arena != conflict_arena) {
             context_index = index;
             break;
         }
