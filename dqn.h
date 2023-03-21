@@ -2843,6 +2843,8 @@ struct Dqn_FsInfo
     operator bool() const { return size > 0; }
 };
 
+// NOTE: File System API
+// =============================================================================
 // TODO(dqn): We should have a Dqn_String8 interface and a CString interface
 DQN_API bool       Dqn_Fs_Exists(Dqn_String8 path);
 DQN_API bool       Dqn_Fs_DirExists(Dqn_String8 path);
@@ -2856,6 +2858,8 @@ DQN_API bool       Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite
 // in that directory first.
 DQN_API bool       Dqn_Fs_Delete(Dqn_String8 path);
 
+// NOTE: Read/Write Entire File API
+// =============================================================================
 // file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
 DQN_API bool       Dqn_Fs_WriteCString8(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size);
 DQN_API bool       Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer);
@@ -2876,9 +2880,46 @@ DQN_API char        *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *pa
 #define              Dqn_Fs_ReadString8(path, allocator) Dqn_Fs_ReadString8_(DQN_LEAK_TRACE path, allocator)
 DQN_API Dqn_String8  Dqn_Fs_ReadString8_(DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator);
 
+// NOTE: Read/Write File Stream API
+// =============================================================================
+struct Dqn_FsFile
+{
+    void    *handle;
+    char     error[512];
+    uint16_t error_size;
+};
+
+enum Dqn_FsFileOpen
+{
+    Dqn_FsFileOpen_CreateAlways, ///< Create file if it does not exist, otherwise, zero out the file and open
+    Dqn_FsFileOpen_OpenIfExist,  ///< Open file at path only if it exists
+    Dqn_FsFileOpen_OpenAlways,   ///< Open file at path, create file if it does not exist
+};
+
+enum Dqn_FsFileAccess
+{
+    Dqn_FsFileAccess_Read       = 1 << 0,
+    Dqn_FsFileAccess_Write      = 1 << 1,
+    Dqn_FsFileAccess_Execute    = 1 << 2,
+    Dqn_FsFileAccess_AppendOnly = 1 << 3, ///< This flag cannot be combined with any other acess mode
+    Dqn_FsFileAccess_ReadWrite  = Dqn_FsFileAccess_Read      | Dqn_FsFileAccess_Write,
+    Dqn_FsFileAccess_All        = Dqn_FsFileAccess_ReadWrite | Dqn_FsFileAccess_Execute,
+};
+
+DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access);
+DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_isize size);
+DQN_API void Dqn_Fs_CloseFile(Dqn_FsFile *file);
+
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-MISC] Miscellaneous        |                             | General purpose helpers
 // ---------------------------------+-----------------------------+---------------------------------
+/// Write the format string to the buffer truncating with a trailing ".." if
+/// there is insufficient space in the buffer followed by null-terminating the
+/// buffer (uses stb_sprintf underneath).
+/// @return The size of the string written to the buffer *not* including the
+/// null-terminator.
+DQN_API int Dqn_SNPrintF2DotsOnOverflow(char *buffer, int size, char const *fmt, ...);
+
 struct Dqn_U64String
 {
     char    data[27+1]; // NOTE(dqn): 27 is the maximum size of uint64_t including a separtor
@@ -3541,7 +3582,12 @@ bool Dqn_FString8_AppendFV(DQN_FSTRING8 *string, char const *fmt, va_list args)
     Dqn_isize require = Dqn_CString8_FVSize(fmt, args) + 1 /*null_terminate*/;
     Dqn_isize space   = N - string->size;
     result            = require <= space;
-    string->size     += STB_SPRINTF_DECORATE(vsnprintf)(string->data + string->size, DQN_CAST(int)space, fmt, args);
+    string->size += STB_SPRINTF_DECORATE(vsnprintf)(string->data + string->size, DQN_CAST(int)space, fmt, args);
+
+    // NOTE: snprintf returns the required size of the format string
+    // irrespective of if there's space or not, but, always null terminates so
+    // the last byte is wasted.
+    string->size = DQN_MIN(string->size, N - 1);
     return result;
 }
 
@@ -4046,6 +4092,7 @@ Dqn_BinarySearch(T const                        *array,
         #define GENERIC_EXECUTE (0x20000000L)
         #define GENERIC_ALL (0x10000000L)
         #define FILE_ATTRIBUTE_NORMAL 0x00000080
+        #define FILE_APPEND_DATA 4
 
         #define CREATE_NEW          1
         #define CREATE_ALWAYS       2
@@ -5133,10 +5180,8 @@ DQN_API Dqn_String8 Dqn_String8_InitFV_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator al
     Dqn_isize size = Dqn_CString8_FVSize(fmt, args);
     if (size) {
         result = Dqn_String8_Allocate_(DQN_LEAK_TRACE_ARG allocator, size, Dqn_ZeroMem_No);
-        if (Dqn_String8_IsValid(result)) {
+        if (Dqn_String8_IsValid(result))
             STB_SPRINTF_DECORATE(vsnprintf)(result.data, Dqn_Safe_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
-            result.data[result.size] = 0;
-        }
     }
     return result;
 }
@@ -6921,8 +6966,14 @@ DQN_API Dqn_HexNumberString Dqn_Hex_U64ToNumberString(uint64_t number, uint32_t 
     result.size += DQN_CAST(int8_t)prefix.size;
 
     char const *fmt = (flags & Dqn_HexNumberStringFlags_UppercaseHex) ? "%I64X" : "%I64x";
-    int size        = STB_SPRINTF_DECORATE(snprintf)(result.data + result.size, sizeof(result.data) - result.size, fmt, number);
+    int size        = STB_SPRINTF_DECORATE(snprintf)(result.data + result.size, DQN_ARRAY_UCOUNT(result.data) - result.size, fmt, number);
     result.size    += Dqn_Safe_SaturateCastIntToI8(size);
+    DQN_ASSERT(result.size < DQN_ARRAY_UCOUNT(result.data));
+
+    // NOTE: snprintf returns the required size of the format string
+    // irrespective of if there's space or not, but, always null terminates so
+    // the last byte is wasted.
+    result.size = DQN_MIN(result.size, DQN_ARRAY_UCOUNT(result.data) - 1);
     return result;
 }
 
@@ -7175,6 +7226,8 @@ DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString(Dqn_DateHMSTime time, 
                                                                        date_separator,
                                                                        time.day);
 
+    DQN_ASSERT(result.hms_size < DQN_ARRAY_UCOUNT(result.hms));
+    DQN_ASSERT(result.date_size < DQN_ARRAY_UCOUNT(result.date));
     return result;
 }
 
@@ -8201,197 +8254,6 @@ DQN_API Dqn_f64 Dqn_OS_TimerNs(Dqn_OSTimer timer)
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
 // ---------------------------------+-----------------------------+---------------------------------
-DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Allocator allocator)
-{
-    char *result = nullptr;
-    if (!path)
-        return result;
-
-    if (path_size <= 0)
-        path_size = Dqn_CString8_Size(path);
-
-    (void)allocator;
-    (void)file_size;
-
-#if defined(DQN_OS_WIN32)
-    // NOTE: Convert to UTF16
-    // -------------------------------------------------------------------------
-    Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(allocator.user_context);
-    Dqn_String8       path8     = Dqn_String8_Init(path, path_size);
-    Dqn_String16      path16    = Dqn_Win_String8ToString16Allocator(path8, scratch.allocator);
-    Dqn_Win_ErrorMsg  error_msg = {};
-
-    // NOTE: Get the file handle
-    // -------------------------------------------------------------------------
-    void *file_handle = CreateFileW(/*LPCWSTR               lpFileName*/            path16.data,
-                                    /*DWORD                 dwDesiredAccess*/       GENERIC_READ,
-                                    /*DWORD                 dwShareMode*/           0,
-                                    /*LPSECURITY_ATTRIBUTES lpSecurityAttributes*/  nullptr,
-                                    /*DWORD                 dwCreationDisposition*/ OPEN_EXISTING,
-                                    /*DWORD                 dwFlagsAndAttributes*/  FILE_ATTRIBUTE_READONLY,
-                                    /*HANDLE                hTemplateFile*/         nullptr);
-    if (file_handle == INVALID_HANDLE_VALUE) {
-        Dqn_Win_LastErrorToBuffer(&error_msg);
-        Dqn_Log_ErrorF("Failed to open file for reading [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
-        return nullptr;
-    }
-    DQN_DEFER { CloseHandle(file_handle); };
-
-    // NOTE: Query the file size
-    // -------------------------------------------------------------------------
-    LARGE_INTEGER win_file_size;
-    if (!GetFileSizeEx(file_handle, &win_file_size)) {
-        Dqn_Win_LastErrorToBuffer(&error_msg);
-        Dqn_Log_ErrorF("Failed to query file size [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
-        return nullptr;
-    }
-
-    unsigned long const bytes_desired = DQN_CAST(unsigned long)win_file_size.QuadPart;
-    if (!Dqn_Safe_AssertF(bytes_desired == win_file_size.QuadPart,
-                          "Current implementation doesn't support >4GiB, implement Win32 overlapped IO")) {
-        return nullptr;
-    }
-
-    // NOTE: Read the file from disk
-    // -------------------------------------------------------------------------
-    result = DQN_CAST(char *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_ARG allocator,
-                                                  bytes_desired,
-                                                  alignof(char),
-                                                  Dqn_ZeroMem_No);
-    unsigned long bytes_read    = 0;
-    unsigned long read_result   = ReadFile(/*HANDLE hFile*/               file_handle,
-                                           /*LPVOID lpBuffer*/            result,
-                                           /*DWORD nNumberOfBytesToRead*/ bytes_desired,
-                                           /*LPDWORD lpNumberOfByesRead*/ &bytes_read,
-                                           /*LPOVERLAPPED lpOverlapped*/  nullptr);
-
-    if (read_result == 0) {
-        Dqn_Allocator_Dealloc(allocator, result, bytes_desired);
-        Dqn_Win_LastErrorToBuffer(&error_msg);
-        Dqn_Log_ErrorF("'ReadFile' failed to load file to memory [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
-        return nullptr;
-    }
-
-    if (bytes_read != bytes_desired) {
-        Dqn_Win_LastErrorToBuffer(&error_msg);
-        Dqn_Allocator_Dealloc(allocator, result, bytes_desired);
-        Dqn_Log_ErrorF("'ReadFile' failed to read all bytes into file [file=%.*s, bytes_desired=%u, bytes_read=%u, reason=%.*s]",
-                  DQN_STRING_FMT(path8),
-                  bytes_desired,
-                  bytes_read,
-                  DQN_STRING_FMT(error_msg));
-        return nullptr;
-    }
-
-    if (file_size) {
-        *file_size = Dqn_Safe_SaturateCastI64ToISize(bytes_read);
-    }
-#else
-    Dqn_isize file_size_ = 0;
-    if (!file_size)
-        file_size = &file_size_;
-
-    FILE *file_handle = fopen(path, "rb");
-    if (!file_handle) {
-        Dqn_Log_ErrorF("Failed to open file '%s' using fopen\n", path);
-        return result;
-    }
-
-    DQN_DEFER { fclose(file_handle); };
-    fseek(file_handle, 0, SEEK_END);
-    *file_size = ftell(file_handle);
-
-    if (DQN_CAST(long)(*file_size) == -1L) {
-        Dqn_Log_ErrorF("Failed to determine '%s' file size using ftell\n", file);
-        return result;
-    }
-
-    rewind(file_handle);
-    result = DQN_CAST(char *)Dqn_Allocator_Alloc(DQN_LEAK_TRACE_ARG allocator,
-                                                 *file_size,
-                                                 alignof(char),
-                                                 Dqn_ZeroMem_No);
-    if (!result) {
-        Dqn_Log_ErrorF("Failed to allocate %td bytes to read file '%s'\n", *file_size + 1, file);
-        return result;
-    }
-
-    result[*file_size] = 0;
-    if (fread(result, DQN_CAST(size_t)(*file_size), 1, file_handle) != 1) {
-        Dqn_Allocator_Dealloc(allocator, result, *file_size);
-        Dqn_Log_ErrorF("Failed to read %td bytes into buffer from '%s'\n", *file_size, file);
-        return result;
-    }
-#endif
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_Fs_ReadString8_(DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator)
-{
-    Dqn_isize   file_size = 0;
-    char *      string    = Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_ARG path.data, path.size, &file_size, allocator);
-    Dqn_String8 result    = Dqn_String8_Init(string, file_size);
-    return result;
-}
-
-DQN_API bool Dqn_Fs_WriteCString8(char const *path, Dqn_isize path_size, char const *buffer, Dqn_isize buffer_size)
-{
-    bool result = false;
-    if (!path || !buffer || buffer_size <= 0)
-        return result;
-
-#if defined(DQN_OS_WIN32)
-    if (path_size <= 0)
-        path_size = Dqn_CString8_Size(path);
-
-    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-    Dqn_String8       path8   = Dqn_String8_Init(path, path_size);
-    Dqn_String16      path16  = Dqn_Win_String8ToString16Allocator(path8, scratch.allocator);
-
-    void *file_handle = CreateFileW(/*LPCWSTR               lpFileName*/            path16.data,
-                                    /*DWORD                 dwDesiredAccess*/       GENERIC_WRITE,
-                                    /*DWORD                 dwShareMode*/           0,
-                                    /*LPSECURITY_ATTRIBUTES lpSecurityAttributes*/  nullptr,
-                                    /*DWORD                 dwCreationDisposition*/ CREATE_ALWAYS,
-                                    /*DWORD                 dwFlagsAndAttributes*/  FILE_ATTRIBUTE_NORMAL,
-                                    /*HANDLE                hTemplateFile*/         nullptr);
-
-    if (file_handle == INVALID_HANDLE_VALUE) {
-        Dqn_Log_ErrorF("Failed to open file for writing [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(Dqn_Win_LastError()));
-        return result;
-    }
-    DQN_DEFER { CloseHandle(file_handle); };
-
-    unsigned long bytes_written = 0;
-    result                      = WriteFile(file_handle, buffer, DQN_CAST(unsigned long)buffer_size, &bytes_written, nullptr /*lpOverlapped*/);
-    DQN_ASSERT(bytes_written == buffer_size);
-    return result;
-#else
-    // TODO(dqn): Use OS apis
-    (void)path_size;
-
-    FILE *file_handle = nullptr;
-    fopen_s(&file_handle, path, "w+b");
-    if (!file_handle) {
-        Dqn_Log_ErrorF("Failed to 'fopen' to get the file handle [file=%s]", path);
-        return result;
-    }
-    DQN_DEFER { fclose(file_handle); };
-
-    result = fwrite(buffer, buffer_size, 1 /*count*/, file_handle) == 1 /*count*/;
-    if (!result)
-        Dqn_Log_ErrorF("Failed to 'fwrite' memory to file [file=%s]", path);
-
-    return result;
-#endif
-}
-
-DQN_API bool Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer)
-{
-    bool result = Dqn_Fs_WriteCString8(file_path.data, file_path.size, buffer.data, buffer.size);
-    return result;
-}
-
 #if defined(DQN_OS_WIN32)
 DQN_API uint64_t Dqn__WinFileTimeToSeconds(FILETIME const *time)
 {
@@ -8709,6 +8571,373 @@ DQN_API bool Dqn_Fs_Delete(Dqn_String8 path)
     return result;
 }
 
+// NOTE: Read/Write Entire File API
+// =============================================================================
+DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Allocator allocator)
+{
+    char *result = nullptr;
+    if (!path)
+        return result;
+
+    if (path_size <= 0)
+        path_size = Dqn_CString8_Size(path);
+
+    (void)allocator;
+    (void)file_size;
+
+#if defined(DQN_OS_WIN32)
+    // NOTE: Convert to UTF16
+    // -------------------------------------------------------------------------
+    Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(allocator.user_context);
+    Dqn_String8       path8     = Dqn_String8_Init(path, path_size);
+    Dqn_String16      path16    = Dqn_Win_String8ToString16Allocator(path8, scratch.allocator);
+    Dqn_Win_ErrorMsg  error_msg = {};
+
+    // NOTE: Get the file handle
+    // -------------------------------------------------------------------------
+    void *file_handle = CreateFileW(/*LPCWSTR               lpFileName*/            path16.data,
+                                    /*DWORD                 dwDesiredAccess*/       GENERIC_READ,
+                                    /*DWORD                 dwShareMode*/           0,
+                                    /*LPSECURITY_ATTRIBUTES lpSecurityAttributes*/  nullptr,
+                                    /*DWORD                 dwCreationDisposition*/ OPEN_EXISTING,
+                                    /*DWORD                 dwFlagsAndAttributes*/  FILE_ATTRIBUTE_READONLY,
+                                    /*HANDLE                hTemplateFile*/         nullptr);
+    if (file_handle == INVALID_HANDLE_VALUE) {
+        Dqn_Win_LastErrorToBuffer(&error_msg);
+        Dqn_Log_ErrorF("Failed to open file for reading [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
+        return nullptr;
+    }
+    DQN_DEFER { CloseHandle(file_handle); };
+
+    // NOTE: Query the file size
+    // -------------------------------------------------------------------------
+    LARGE_INTEGER win_file_size;
+    if (!GetFileSizeEx(file_handle, &win_file_size)) {
+        Dqn_Win_LastErrorToBuffer(&error_msg);
+        Dqn_Log_ErrorF("Failed to query file size [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
+        return nullptr;
+    }
+
+    unsigned long const bytes_desired = DQN_CAST(unsigned long)win_file_size.QuadPart;
+    if (!Dqn_Safe_AssertF(bytes_desired == win_file_size.QuadPart,
+                          "Current implementation doesn't support >4GiB, implement Win32 overlapped IO")) {
+        return nullptr;
+    }
+
+    // NOTE: Read the file from disk
+    // -------------------------------------------------------------------------
+    result = DQN_CAST(char *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_ARG allocator,
+                                                  bytes_desired,
+                                                  alignof(char),
+                                                  Dqn_ZeroMem_No);
+    unsigned long bytes_read    = 0;
+    unsigned long read_result   = ReadFile(/*HANDLE hFile*/               file_handle,
+                                           /*LPVOID lpBuffer*/            result,
+                                           /*DWORD nNumberOfBytesToRead*/ bytes_desired,
+                                           /*LPDWORD lpNumberOfByesRead*/ &bytes_read,
+                                           /*LPOVERLAPPED lpOverlapped*/  nullptr);
+
+    if (read_result == 0) {
+        Dqn_Allocator_Dealloc(allocator, result, bytes_desired);
+        Dqn_Win_LastErrorToBuffer(&error_msg);
+        Dqn_Log_ErrorF("'ReadFile' failed to load file to memory [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(error_msg));
+        return nullptr;
+    }
+
+    if (bytes_read != bytes_desired) {
+        Dqn_Win_LastErrorToBuffer(&error_msg);
+        Dqn_Allocator_Dealloc(allocator, result, bytes_desired);
+        Dqn_Log_ErrorF("'ReadFile' failed to read all bytes into file [file=%.*s, bytes_desired=%u, bytes_read=%u, reason=%.*s]",
+                  DQN_STRING_FMT(path8),
+                  bytes_desired,
+                  bytes_read,
+                  DQN_STRING_FMT(error_msg));
+        return nullptr;
+    }
+
+    if (file_size) {
+        *file_size = Dqn_Safe_SaturateCastI64ToISize(bytes_read);
+    }
+#else
+    Dqn_isize file_size_ = 0;
+    if (!file_size)
+        file_size = &file_size_;
+
+    FILE *file_handle = fopen(path, "rb");
+    if (!file_handle) {
+        Dqn_Log_ErrorF("Failed to open file '%s' using fopen\n", path);
+        return result;
+    }
+
+    DQN_DEFER { fclose(file_handle); };
+    fseek(file_handle, 0, SEEK_END);
+    *file_size = ftell(file_handle);
+
+    if (DQN_CAST(long)(*file_size) == -1L) {
+        Dqn_Log_ErrorF("Failed to determine '%s' file size using ftell\n", file);
+        return result;
+    }
+
+    rewind(file_handle);
+    result = DQN_CAST(char *)Dqn_Allocator_Alloc(DQN_LEAK_TRACE_ARG allocator,
+                                                 *file_size,
+                                                 alignof(char),
+                                                 Dqn_ZeroMem_No);
+    if (!result) {
+        Dqn_Log_ErrorF("Failed to allocate %td bytes to read file '%s'\n", *file_size + 1, file);
+        return result;
+    }
+
+    result[*file_size] = 0;
+    if (fread(result, DQN_CAST(size_t)(*file_size), 1, file_handle) != 1) {
+        Dqn_Allocator_Dealloc(allocator, result, *file_size);
+        Dqn_Log_ErrorF("Failed to read %td bytes into buffer from '%s'\n", *file_size, file);
+        return result;
+    }
+#endif
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_Fs_ReadString8_(DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator)
+{
+    Dqn_isize   file_size = 0;
+    char *      string    = Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_ARG path.data, path.size, &file_size, allocator);
+    Dqn_String8 result    = Dqn_String8_Init(string, file_size);
+    return result;
+}
+
+DQN_API bool Dqn_Fs_WriteCString8(char const *path, Dqn_isize path_size, char const *buffer, Dqn_isize buffer_size)
+{
+    bool result = false;
+    if (!path || !buffer || buffer_size <= 0)
+        return result;
+
+#if defined(DQN_OS_WIN32)
+    if (path_size <= 0)
+        path_size = Dqn_CString8_Size(path);
+
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_String8       path8   = Dqn_String8_Init(path, path_size);
+    Dqn_String16      path16  = Dqn_Win_String8ToString16Allocator(path8, scratch.allocator);
+
+    void *file_handle = CreateFileW(/*LPCWSTR               lpFileName*/            path16.data,
+                                    /*DWORD                 dwDesiredAccess*/       GENERIC_WRITE,
+                                    /*DWORD                 dwShareMode*/           0,
+                                    /*LPSECURITY_ATTRIBUTES lpSecurityAttributes*/  nullptr,
+                                    /*DWORD                 dwCreationDisposition*/ CREATE_ALWAYS,
+                                    /*DWORD                 dwFlagsAndAttributes*/  FILE_ATTRIBUTE_NORMAL,
+                                    /*HANDLE                hTemplateFile*/         nullptr);
+
+    if (file_handle == INVALID_HANDLE_VALUE) {
+        Dqn_Log_ErrorF("Failed to open file for writing [file=%.*s, reason=%.*s]", DQN_STRING_FMT(path8), DQN_STRING_FMT(Dqn_Win_LastError()));
+        return result;
+    }
+    DQN_DEFER { CloseHandle(file_handle); };
+
+    unsigned long bytes_written = 0;
+    result                      = WriteFile(file_handle, buffer, DQN_CAST(unsigned long)buffer_size, &bytes_written, nullptr /*lpOverlapped*/);
+    DQN_ASSERT(bytes_written == buffer_size);
+    return result;
+#else
+    // TODO(dqn): Use OS apis
+    (void)path_size;
+
+    FILE *file_handle = nullptr;
+    fopen_s(&file_handle, path, "w+b");
+    if (!file_handle) {
+        Dqn_Log_ErrorF("Failed to 'fopen' to get the file handle [file=%s]", path);
+        return result;
+    }
+    DQN_DEFER { fclose(file_handle); };
+
+    result = fwrite(buffer, buffer_size, 1 /*count*/, file_handle) == 1 /*count*/;
+    if (!result)
+        Dqn_Log_ErrorF("Failed to 'fwrite' memory to file [file=%s]", path);
+
+    return result;
+#endif
+}
+
+DQN_API bool Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer)
+{
+    bool result = Dqn_Fs_WriteCString8(file_path.data, file_path.size, buffer.data, buffer.size);
+    return result;
+}
+
+// NOTE: Read/Write File Stream API
+// =============================================================================
+DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access)
+{
+    Dqn_FsFile result = {};
+    if (!Dqn_String8_IsValid(path) || path.size <= 0)
+        return result;
+
+    if ((access & ~Dqn_FsFileAccess_All) || ((access & Dqn_FsFileAccess_All) == 0)) {
+        DQN_INVALID_CODE_PATH;
+        return result;
+    }
+
+    #if defined(DQN_OS_WIN32)
+    unsigned long create_flag = 0;
+    switch (open_mode) {
+        case Dqn_FsFileOpen_CreateAlways: create_flag = CREATE_ALWAYS; break;
+        case Dqn_FsFileOpen_OpenIfExist:  create_flag = OPEN_EXISTING; break;
+        case Dqn_FsFileOpen_OpenAlways:   create_flag = OPEN_ALWAYS;   break;
+        default: DQN_INVALID_CODE_PATH; return result;
+    }
+
+    unsigned long access_mode = 0;
+    if (access & Dqn_FsFileAccess_AppendOnly) {
+        DQN_ASSERT_MSG(
+            (access & ~Dqn_FsFileAccess_AppendOnly) == 0,
+            "Append can only be applied exclusively to the file, other access modes not permitted");
+        access_mode = FILE_APPEND_DATA;
+    } else {
+        if (access & Dqn_FsFileAccess_Read)
+            access_mode |= GENERIC_READ;
+        if (access & Dqn_FsFileAccess_Write)
+            access_mode |= GENERIC_WRITE;
+        if (access & Dqn_FsFileAccess_Execute)
+            access_mode |= GENERIC_EXECUTE;
+    }
+
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_String16      path16  = Dqn_Win_String8ToString16Allocator(path, scratch.allocator);
+    void *handle              = CreateFileW(/*LPCWSTR               lpFileName*/            path16.data,
+                                            /*DWORD                 dwDesiredAccess*/       access_mode,
+                                            /*DWORD                 dwShareMode*/           0,
+                                            /*LPSECURITY_ATTRIBUTES lpSecurityAttributes*/  nullptr,
+                                            /*DWORD                 dwCreationDisposition*/ create_flag,
+                                            /*DWORD                 dwFlagsAndAttributes*/  FILE_ATTRIBUTE_NORMAL,
+                                            /*HANDLE                hTemplateFile*/         nullptr);
+
+    if (handle == INVALID_HANDLE_VALUE) {
+        Dqn_Win_ErrorMsg msg = Dqn_Win_LastError();
+        result.error_size =
+            DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(result.error,
+                                                           DQN_ARRAY_UCOUNT(result.error),
+                                                           "Open file failed: %.*s for \"%.*s\"",
+                                                           DQN_STRING_FMT(msg),
+                                                           DQN_STRING_FMT(path));
+        return result;
+    }
+    #else
+    if (access & Dqn_FsFileAccess_Execute) {
+        result.error_size = DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(
+            result.error,
+            DQN_ARRAY_UCOUNT(result.error),
+            "Open file failed: execute access not supported for \"%.*s\"",
+            DQN_STRING8_FMT(path));
+        DQN_INVALID_CODE_PATH; // TODO: Not supported via fopen
+        return result;
+    }
+
+    // NOTE: fopen interface is not as expressive as the Win32
+    // We will fopen the file beforehand to setup the state/check for validity
+    // before closing and reopening it if valid with the correct request access
+    // permissions.
+    {
+        void *handle = nullptr;
+        switch (open_mode) {
+            case Dqn_FsFileOpen_CreateAlways: handle = fopen(path, "w"); break;
+            case Dqn_FsFileOpen_OpenIfExist:  handle = fopen(path, "r"); break;
+            case Dqn_FsFileOpen_OpenAlways:   handle = fopen(path, "a"); break;
+            default: DQN_INVALID_CODE_PATH; break;
+        }
+        if (!handle) {
+            result.error_size = DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(
+                result.error,
+                DQN_ARRAY_UCOUNT(result.error),
+                "Open file failed: Could not open file in requested mode %d for \"%.*s\"",
+                open_mode,
+                DQN_STRING8_FMT(path));
+            return result;
+        }
+        fclose(handle);
+    }
+
+    char const *fopen_mode = nullptr;
+    if (access & Dqn_FsFileAccess_AppendOnly) {
+        fopen_mode = "a+";
+    } else if (access & Dqn_FsFileAccess_Write) {
+        fopen_mode = "w+";
+    } else if (access & Dqn_FsFileAccess_Read) {
+        fopen_mode = "r+";
+    }
+
+    void *handle = fopen(path, fopen_mode);
+    if (!handle) {
+        result.error_size = DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(
+            result.error,
+            DQN_ARRAY_UCOUNT(result.error),
+            "Open file failed: Could not open file in fopen mode \"%s\" for \"%.*s\"",
+            fopen_mode,
+            DQN_STRING8_FMT(path));
+        return result;
+    }
+    #endif
+    result.handle = handle;
+    return result;
+}
+
+DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_isize size)
+{
+    if (!file || !file->handle || !buffer || size <= 0 || file->error_size)
+        return false;
+
+    bool result = true;
+    #if defined(DQN_OS_WIN32)
+    char const *end = buffer + size;
+    for (char const *ptr = buffer; result && ptr != end; ) {
+        unsigned long write_size = DQN_CAST(unsigned long)DQN_MIN((unsigned long)-1, end - ptr);
+        unsigned long bytes_written  = 0;
+        result = WriteFile(file->handle, ptr, write_size, &bytes_written, nullptr /*lpOverlapped*/) != 0;
+        ptr   += bytes_written;
+    }
+
+    if (!result) {
+        Dqn_Win_ErrorMsg msg = Dqn_Win_LastError();
+        file->error_size =
+            DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(file->error,
+                                                           DQN_ARRAY_UCOUNT(file->error),
+                                                           "Write file failed: %.*s for %.*s",
+                                                           DQN_STRING_FMT(msg));
+    }
+    #else
+    result = fwrite(buffer, DQN_CAST(Dqn_usize)size, 1 /*count*/, file->handle) == 1 /*count*/;
+    #endif
+    return result;
+}
+
+DQN_API void Dqn_Fs_CloseFile(Dqn_FsFile *file)
+{
+    if (!file || !file->handle || file->error_size)
+        return;
+
+    #if defined(DQN_OS_WIN32)
+    CloseHandle(file->handle);
+    #else
+    fclose(file->handle);
+    #endif
+    *file = {};
+}
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-MISC] Miscellaneous        |                             | General purpose helpers
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API int Dqn_SNPrintF2DotsOnOverflow(char *buffer, int size, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    int size_required = STB_SPRINTF_DECORATE(vsnprintf)(buffer, size, fmt, args);
+    int result        = DQN_MAX(DQN_MIN(size_required, size - 1), 0);
+    if (result == size - 1) {
+        buffer[size - 2] = '.';
+        buffer[size - 3] = '.';
+    }
+    va_end(args);
+    return result;
+}
 
 DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator)
 {
