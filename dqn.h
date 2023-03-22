@@ -353,10 +353,12 @@ struct Dqn_String8 ///< Pointer and length style UTF8 strings
     char      *data; ///< The UTF8 bytes of the string
     Dqn_isize  size; ///< The number of bytes in the string
 
+    #if defined(__cplusplus)
     char const *begin() const { return data; }        ///< Const begin iterator for range-for loops
     char const *end  () const { return data + size; } ///< Const end iterator for range-for loops
     char       *begin()       { return data; }        ///< Begin iterator for range-for loops
     char       *end  ()       { return data + size; } ///< End iterator for range-for loops
+    #endif
 };
 
 // ---------------------------------+-----------------------------+---------------------------------
@@ -870,10 +872,10 @@ DQN_API Dqn_isize Dqn_CString8_FVSize(char const *fmt, va_list args);
 /// returned if the arguments were invalid.
 DQN_API char const *Dqn_CString8_BinarySplit(char const *string, Dqn_isize string_size, char delimiter, Dqn_isize *lhs_size, char **rhs, Dqn_isize *rhs_size);
 
-enum struct Dqn_CString8EqCase
+enum Dqn_CString8EqCase
 {
-    Sensitive,
-    Insensitive,
+    Dqn_CString8EqCase_Sensitive,
+    Dqn_CString8EqCase_Insensitive,
 };
 
 /// Compare a string for equality with or without case sensitivity.
@@ -884,7 +886,7 @@ enum struct Dqn_CString8EqCase
 /// @param[in] eq_case Set the comparison to be case sensitive or insensitive
 /// @return True if the arguments are valid, non-null and the strings
 /// are equal, false otherwise.
-DQN_API bool Dqn_CString8_Eq(char const *lhs, char const *rhs, Dqn_isize lhs_size = -1, Dqn_isize rhs_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API bool Dqn_CString8_Eq(char const *lhs, char const *rhs, Dqn_isize lhs_size = -1, Dqn_isize rhs_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// Compare a string for equality, case insensitive
 /// @see Dqn_CString8_Eq
@@ -898,7 +900,7 @@ DQN_API bool Dqn_CString8_EqInsensitive(char const *lhs, char const *rhs, Dqn_is
 /// @param[in] eq_case Set the comparison to be case sensitive or insensitive
 /// @return True if the string is valid, non-null and has the specified prefix,
 /// false otherwise.
-DQN_API bool Dqn_CString8_StartsWith(char const *string, char const *prefix, Dqn_isize string_size = -1, Dqn_isize prefix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API bool Dqn_CString8_StartsWith(char const *string, char const *prefix, Dqn_isize string_size = -1, Dqn_isize prefix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// Check if a string starts with the specified prefix, case insensitive
 /// @see Dqn_CString8_StartsWith
@@ -909,7 +911,7 @@ DQN_API bool Dqn_CString8_StartsWithInsensitive(char const *string, char const *
 /// @param[in] suffix The suffix to check against the string
 /// @param[in] eq_case Set the comparison to be case sensitive or insensitive
 /// @return True if the string has the specified suffix, false otherwise
-DQN_API bool Dqn_CString8_EndsWith(char const *string, char const *suffix, Dqn_isize string_size = -1, Dqn_isize suffix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API bool Dqn_CString8_EndsWith(char const *string, char const *suffix, Dqn_isize string_size = -1, Dqn_isize suffix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// Check if a string ends with the specified suffix, case insensitive
 /// @param[in] string The string to check for the suffix
@@ -929,7 +931,7 @@ DQN_API bool Dqn_CString8_EndsWithInsensitive(char const *string, char const *su
 ///
 /// @return The trimmed string. The original input string is returned if
 /// arguments are invalid or no trim was possible.
-DQN_API char const *Dqn_CString8_TrimPrefix(char const *string, char const *prefix, Dqn_isize string_size = -1, Dqn_isize prefix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive, Dqn_isize *trimmed_size = nullptr);
+DQN_API char const *Dqn_CString8_TrimPrefix(char const *string, char const *prefix, Dqn_isize string_size = -1, Dqn_isize prefix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive, Dqn_isize *trimmed_size = nullptr);
 
 /// Remove the prefix from the given `string` if it ends with it by
 /// adjusting the input string size.
@@ -943,7 +945,7 @@ DQN_API char const *Dqn_CString8_TrimPrefix(char const *string, char const *pref
 ///
 /// @return The trimmed string. The original input string is returned if
 /// arguments are invalid or no trim was possible.
-DQN_API char const *Dqn_CString8_TrimSuffix(char const *string, char const *suffix, Dqn_isize string_size = -1, Dqn_isize suffix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive, Dqn_isize *trimmed_size = nullptr);
+DQN_API char const *Dqn_CString8_TrimSuffix(char const *string, char const *suffix, Dqn_isize string_size = -1, Dqn_isize suffix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive, Dqn_isize *trimmed_size = nullptr);
 
 /// Trim whitespace from the prefix and suffix of the string
 ///
@@ -1079,10 +1081,12 @@ struct Dqn_String16 /// A pointer and length style string that holds slices to U
     wchar_t   *data; ///< The UTF16 bytes of the string
     Dqn_isize  size; ///< The number of bytes in the string
 
+    #if defined(__cplusplus)
     wchar_t const *begin() const { return data; }        ///< Const begin iterator for range-for loops
     wchar_t const *end  () const { return data + size; } ///< Const end iterator for range-for loops
     wchar_t       *begin()       { return data; }        ///< Begin iterator for range-for loops
     wchar_t       *end  ()       { return data + size; } ///< End iterator for range-for loops
+    #endif
 };
 
 /// Initialise a string from a pointer and length
@@ -1148,28 +1152,28 @@ DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allo
 DQN_API Dqn_String8 Dqn_String8_BinarySplit(Dqn_String8 string, char delimiter, Dqn_String8 *rhs);
 
 /// @see Dqn_CString8_Eq
-DQN_API bool Dqn_String8_Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API bool Dqn_String8_Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// @see Dqn_CString8_EqInsensitive
 DQN_API bool Dqn_String8_EqInsensitive(Dqn_String8 lhs, Dqn_String8 rhs);
 
 /// @see Dqn_CString8_StartsWith
-DQN_API bool Dqn_String8_StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API bool Dqn_String8_StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// @see Dqn_CString8_StartsWithInsensitive
 DQN_API bool Dqn_String8_StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix);
 
 /// @see Dqn_CString8_EndsWith
-DQN_API bool Dqn_String8_EndsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API bool Dqn_String8_EndsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// @see Dqn_CString8_EndsWithInsensitive
 DQN_API bool Dqn_String8_EndsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix);
 
 /// @see Dqn_CString8_TrimPrefix
-DQN_API Dqn_String8 Dqn_String8_TrimPrefix(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8_TrimPrefix(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// @see Dqn_CString8_TrimSuffix
-DQN_API Dqn_String8 Dqn_String8_TrimSuffix(Dqn_String8 string, Dqn_String8 suffix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8_TrimSuffix(Dqn_String8 string, Dqn_String8 suffix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// @see Dqn_CString8_TrimWhitespaceAround
 DQN_API Dqn_String8 Dqn_String8_TrimWhitespaceAround(Dqn_String8 string);
@@ -1218,15 +1222,20 @@ DQN_API void        Dqn_String8_Remove(Dqn_String8 *string, Dqn_isize begin, Dqn
 /// @param[in] start_index Set an index within the string string to start the
 /// search from, if not desired, set to 0
 /// @return The index of the matching find, -1 if it is not found
-DQN_API Dqn_isize   Dqn_String8_FindOffset(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API Dqn_isize   Dqn_String8_FindOffset(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
 /// @param start_index Set an index within the string string to start the search
 /// from, if not desired, set to 0
 /// @return A string that points to the matching find, otherwise a 0 length string.
-DQN_API Dqn_String8 Dqn_String8_Find(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8_Find(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 
-DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase::Sensitive);
+DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
 DQN_API Dqn_String8 Dqn_String8_ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator);
+
+#if defined(__cplusplus)
+bool operator==(Dqn_String8 const &lhs, Dqn_String8 const &rhs);
+bool operator!=(Dqn_String8 const &lhs, Dqn_String8 const &rhs);
+#endif
 
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-PRIN] Dqn_Print            |                             | Console printing
@@ -1498,15 +1507,21 @@ template <typename T> void Dqn_Map_Erase(Dqn_Map<T> *map, uint64_t hash, Dqn_Zer
     static_assert((DQN_DSMAP_MIN_SIZE & (DQN_DSMAP_MIN_SIZE - 1)) == 0, "DSMap lazy initialisation size must be a power of two");
 #endif
 
-template <typename T>
+#define DQN_DS_MAP_API template <typename K, typename V> DQN_API
+#define DQN_DS_MAP     Dqn_DSMap<K, V>
+
+template <typename K, typename V>
 struct Dqn_DSMapItem
 {
-    uint64_t          hash;
-    T                 value;
-    uint8_t           occupied;
-    Dqn_DSMapItem<T> *next;
-    Dqn_DSMapItem<T> *prev;
+    K                    key;
+    V                    value;
+    uint8_t              occupied;
+    Dqn_DSMapItem<K, V> *next;
+    Dqn_DSMapItem<K, V> *prev;
 };
+
+/// The hashing function prototype
+using Dqn_DSMapHashProc = uint64_t(void *data, size_t size);
 
 /// A hash table configured using the presets recommended by Demitri Spanos from
 /// the Handmade Network,
@@ -1515,15 +1530,16 @@ struct Dqn_DSMapItem
 /// - linear probing on collision
 /// - tombstoneless deletes (e.g. deletes slots get filled with linear probed
 /// entries if there are any).
-template <typename T>
+template <typename K, typename V>
 struct Dqn_DSMap
 {
-    Dqn_Arena         arena;
-    Dqn_DSMapItem<T> *slots;
-    Dqn_isize         size;      ///< The number of slots
-    Dqn_isize         count;     ///< The number of slots occupied in the list
-    Dqn_DSMapItem<T> *link_head; ///< Linked list of items allocated in the map
-    Dqn_DSMapItem<T> *link_tail; ///< Linked list of items allocated in the map
+    Dqn_Arena            arena;
+    Dqn_DSMapItem<K, V> *slots;
+    Dqn_isize            size;      ///< The number of slots
+    Dqn_isize            count;     ///< The number of slots occupied in the list
+    Dqn_DSMapItem<K, V> *link_head; ///< Linked list of items allocated in the map
+    Dqn_DSMapItem<K, V> *link_tail; ///< Linked list of items allocated in the map
+    Dqn_DSMapHashProc   *hash_function;
 };
 
 /// Initialise a hash table with a given size. The given size must be a power of
@@ -1531,29 +1547,32 @@ struct Dqn_DSMap
 /// the hash table will default to the size specified in DQN_DSMAP_MIN_SIZE.
 /// @param[in] size The number of slots in the hash-table. This value must be
 /// a power of two.
-template <typename T>
-Dqn_DSMap<T> Dqn_DSMap_Init(Dqn_isize size);
+DQN_DS_MAP_API
+DQN_DS_MAP Dqn_DSMap_Init(Dqn_isize size);
 
-template <typename T>
-void Dqn_DSMap_Free(Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem);
+DQN_DS_MAP_API
+void Dqn_DSMap_Free(DQN_DS_MAP *map, Dqn_ZeroMem zero_mem);
 
-template <typename T>
-Dqn_DSMapItem<T> *Dqn_DSMap_Find(Dqn_DSMap<T> *map, uint64_t hash);
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_Find(DQN_DS_MAP *map, K const &key);
 
 enum Dqn_DSMapFindOnly    { Dqn_DSMapFindOnly_No,    Dqn_DSMapFindOnly_Yes };
 enum Dqn_DSMapItemCreated { Dqn_DSMapItemCreated_No, Dqn_DSMapItemCreated_Yes };
 
-template <typename T>
-Dqn_DSMapItem<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, Dqn_DSMapFindOnly find_only, Dqn_DSMapItemCreated *created);
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_FindOrAdd(DQN_DS_MAP *map, K const &key, Dqn_DSMapFindOnly find_only, Dqn_DSMapItemCreated *created);
 
-template <typename T>
-Dqn_DSMapItem<T> *Dqn_DSMap_Add(Dqn_DSMap<T> *map, uint64_t hash, T const &value);
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_Add(DQN_DS_MAP *map, K const &key, V const &value);
 
-template <typename T>
-Dqn_DSMapItem<T> *Dqn_DSMap_Get(Dqn_DSMap<T> *map, uint64_t hash);
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_Make(DQN_DS_MAP *map, K const &key);
 
-template <typename T>
-void Dqn_DSMap_Erase(Dqn_DSMap<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem);
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_Get(DQN_DS_MAP *map, K const &key);
+
+DQN_DS_MAP_API
+void Dqn_DSMap_Erase(DQN_DS_MAP *map, K const &key, Dqn_ZeroMem zero_mem);
 #endif // !defined(DQN_NO_DSMAP)
 
 // ---------------------------------+-----------------------------+---------------------------------
@@ -1869,25 +1888,37 @@ struct Dqn_List
     Dqn_ListChunk<T> *tail;
 };
 
-template <typename T> DQN_API Dqn_List<T>  Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_isize chunk_size = 128);
-
-// Produce an iterator for the data in the list
-/*
-   Dqn_List<int> list = {};
-   for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);)
-   {
-       int *item = it.data;
-   }
-*/
-// start_index: The index to start iterating from
-template <typename T> DQN_API bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index);
-
-// at_chunk: (Optional) The chunk that the index belongs to will be set in this parameter if given
-// return: The element, or null pointer if it is not a valid index.
-template <typename T> DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> *at_chunk);
+template <typename T> DQN_API
+Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_isize chunk_size = 128);
 
 #define Dqn_List_Make(list, count) Dqn_List_Make_(DQN_LEAK_TRACE list, count)
-template <typename T> DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize count);
+template <typename T> DQN_API
+T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize count);
+
+#define Dqn_List_Add(list, count) Dqn_List_Add_(DQN_LEAK_TRACE list, count)
+template <typename T> DQN_API
+T *Dqn_List_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize count);
+
+/// @param at_chunk[out] (Optional) The chunk that the index belongs to will 
+/// be set in this parameter if given
+/// @return The element, or null pointer if it is not a valid index.
+template <typename T> DQN_API
+T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> *at_chunk);
+
+/// Produce an iterator for the data in the list
+///
+/// @param[in] start_index The index to start iterating from
+///
+/// @begincode
+/// Dqn_List<int> list = {};
+/// for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);)
+/// {
+///     int *item = it.data;
+/// }
+/// @endcode
+///
+template <typename T> DQN_API
+bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_isize start_index);
 
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
@@ -2547,14 +2578,14 @@ DQN_API uint64_t Dqn_Date_EpochTime();
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-WIND] Dqn_Win              |                             | Windows OS helpers
 // ---------------------------------+-----------------------------+---------------------------------
-struct Dqn_Win_ErrorMsg
+struct Dqn_WinErrorMsg
 {
     unsigned long code;
     char          data[DQN_KILOBYTES(64) - 1]; // Maximum error size
     unsigned long size;
 };
-DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_Win_ErrorMsg *msg);
-DQN_API Dqn_Win_ErrorMsg Dqn_Win_LastError();
+DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_WinErrorMsg *msg);
+DQN_API Dqn_WinErrorMsg Dqn_Win_LastError();
 
 /// Call once at application start-up to ensure that the application is DPI
 /// aware on Windows and ensure that application UI is scaled up appropriately
@@ -3114,11 +3145,11 @@ DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_isize size, uint64_t
 /// algorithms are optimized for their respective platforms. You can still
 /// compile and run any of them on any platform, but your performance with the
 /// non-native version will be less than optimal.
-struct Dqn_MurmurHash3128 { uint64_t e[2]; };
+struct Dqn_MurmurHash3 { uint64_t e[2]; };
 
-DQN_API uint32_t           Dqn_MurmurHash3x86_32 (void const *key, int len, uint32_t seed);
-DQN_API Dqn_MurmurHash3128 Dqn_MurmurHash3x64_128(void const *key, int len, uint32_t seed);
-#define DQN_MURMUR_HASH3_U128_AS_U64(key, len, seed) (Dqn_MurmurHash3x64_128(key, len, seed).e[0])
+DQN_API uint32_t        Dqn_MurmurHash3_x86U32 (void const *key, int len, uint32_t seed);
+DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32_t seed);
+#define Dqn_MurmurHash3_x64U128AsU64(key, len, seed) (Dqn_MurmurHash3_x64U128(key, len, seed).e[0])
 
 // NOTE: Dqn_Map Template Implementation
 // -------------------------------------------------------------------------------------------------
@@ -3235,34 +3266,48 @@ void Dqn_Map_Erase(Dqn_Map<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem)
 // NOTE: Dqn_DSMap Template Implementation
 // -------------------------------------------------------------------------------------------------
 #if !defined(DQN_NO_DSMAP)
-template <typename T>
-Dqn_DSMap<T> Dqn_DSMap_Init(Dqn_isize size)
+DQN_DS_MAP_API
+DQN_DS_MAP Dqn_DSMap_Init(Dqn_isize size)
 {
-    Dqn_DSMap<T> result = {};
+    DQN_DS_MAP result = {};
     if (Dqn_Safe_AssertF(size > 0 && (size & (size - 1)) == 0, "Non-zero & power of 2 table size required")) {
-        result.slots = Dqn_Arena_NewArray(&result.arena, Dqn_DSMapItem<T>, size, Dqn_ZeroMem_Yes);
+        // TODO: We need to use placement new for C++ crap
+        result.slots = (Dqn_DSMapItem<K, V> *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE &result.arena,
+                                                                  sizeof(Dqn_DSMapItem<K, V>) * size,
+                                                                  alignof(Dqn_DSMapItem<K, V>),
+                                                                  Dqn_ZeroMem_Yes);
         if (result.slots)
             result.size = size;
     }
     return result;
 }
 
-template <typename T>
-void Dqn_DSMap_Free(Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem)
+DQN_DS_MAP_API
+void Dqn_DSMap_Free(DQN_DS_MAP *map, Dqn_ZeroMem zero_mem)
 {
     Dqn_Arena_Free(&map->arena, zero_mem);
     *map = {};
 }
 
-template <typename T>
-Dqn_DSMapItem<T> *Dqn_DSMap_Find(Dqn_DSMap<T> *map, uint64_t hash)
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_Find(DQN_DS_MAP *map, uint64_t hash)
 {
-    Dqn_DSMapItem<T> *result = Dqn_DSMap_FindOrAdd(map, hash, true /*find_only*/);
+    Dqn_DSMapItem<K, V> *result = Dqn_DSMap_FindOrAdd(map, hash, true /*find_only*/);
     return result;
 }
 
-template <typename T>
-Dqn_DSMapItem<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, Dqn_DSMapFindOnly find_only, Dqn_DSMapItemCreated *created)
+DQN_FILE_SCOPE uint64_t Dqn_DSMap_KeyHash_(Dqn_DSMapHashProc *hash_function, void const *key, int key_size)
+{
+    uint64_t result;
+    if (hash_function)
+        result = hash_function(&key, key_size);
+    else
+        result = Dqn_MurmurHash3_x64U128AsU64(&key, key_size, 0xc8f451ac/*seed*/);
+    return result;
+}
+
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_FindOrAdd(DQN_DS_MAP *map, K const &key, Dqn_DSMapFindOnly find_only, Dqn_DSMapItemCreated *created)
 {
     if (created)
         *created = Dqn_DSMapItemCreated_No;
@@ -3274,26 +3319,27 @@ Dqn_DSMapItem<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, Dqn_DSMa
         if (find_only)
             return nullptr;
         else
-            *map = Dqn_DSMap_Init<T>(DQN_DSMAP_MIN_SIZE);
+            *map = Dqn_DSMap_Init<K, V>(DQN_DSMAP_MIN_SIZE);
     }
 
     // NOTE: Search for a vacant entry, linear probe if hash collision
-    Dqn_isize          index  = hash % map->size;
-    Dqn_DSMapItem<T> *result = map->slots + index;
-    while (result->occupied && result->hash != hash) {
+    uint64_t hash               = Dqn_DSMap_KeyHash_(map->hash_function, &key, sizeof(key));
+    Dqn_isize            index  = hash % map->size;
+    Dqn_DSMapItem<K, V> *result = map->slots + index;
+    while (result->occupied && result->key != key) {
         index  = (index + 1) % map->size;
         result = map->slots + index;
     }
 
     if (result->occupied) {
-        DQN_ASSERT_MSG(result->hash == hash,
+        DQN_ASSERT_MSG(result->key == key,
                        "We have a max load factor of 70%% so we should never get an occupied slot that doesn't match "
                        "the hash we were searching for");
     } else if (find_only == Dqn_DSMapFindOnly_Yes) {
         result = nullptr;
     } else {
         // NOTE: Fill the entry
-        result->hash     = hash;
+        result->key      = key;
         result->occupied = true;
 
         if (created)
@@ -3312,13 +3358,13 @@ Dqn_DSMapItem<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, Dqn_DSMa
         Dqn_f32 load_factor = ++map->count / DQN_CAST(Dqn_f32)map->size;
         if (load_factor >= 0.7f) {
 
-            auto new_map = Dqn_DSMap_Init<T>(map->size << 1);
-            for (Dqn_DSMapItem<T> *entry = map->link_head; entry; entry = entry->next) {
+            auto new_map = Dqn_DSMap_Init<K, V>(map->size << 1);
+            for (Dqn_DSMapItem<K, V> *entry = map->link_head; entry; entry = entry->next) {
                 if (!entry->occupied)
                     continue;
 
-                Dqn_DSMapItem<T> *new_entry = Dqn_DSMap_Add(&new_map, entry->hash, entry->value);
-                if (new_entry->hash == hash)
+                Dqn_DSMapItem<K, V> *new_entry = Dqn_DSMap_Add(&new_map, entry->key, entry->value);
+                if (new_entry->key == key)
                     result = new_entry;
             }
 
@@ -3330,31 +3376,39 @@ Dqn_DSMapItem<T> *Dqn_DSMap_FindOrAdd(Dqn_DSMap<T> *map, uint64_t hash, Dqn_DSMa
     return result;
 }
 
-template <typename T>
-Dqn_DSMapItem<T> *Dqn_DSMap_Add(Dqn_DSMap<T> *map, uint64_t hash, T const &value)
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_Add(DQN_DS_MAP *map, K const &key, V const &value)
 {
-    Dqn_DSMapItem<T> *result = Dqn_DSMap_FindOrAdd(map, hash, Dqn_DSMapFindOnly_No, nullptr /*added*/);
+    Dqn_DSMapItem<K, V> *result = Dqn_DSMap_FindOrAdd(map, key, Dqn_DSMapFindOnly_No, nullptr /*added*/);
     if (result)
         result->value = value;
 
     return result;
 }
 
-template <typename T>
-Dqn_DSMapItem<T> *Dqn_DSMap_Get(Dqn_DSMap<T> *map, uint64_t hash)
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_Make(DQN_DS_MAP *map, K const &key)
 {
-    Dqn_DSMapItem<T> *result = Dqn_DSMap_FindOrAdd(map, hash, Dqn_DSMapFindOnly_Yes, nullptr /*added*/);
+    Dqn_DSMapItem<K, V> *result = Dqn_DSMap_FindOrAdd(map, key, Dqn_DSMapFindOnly_No, nullptr /*added*/);
     return result;
 }
 
-template <typename T>
-void Dqn_DSMap_Erase(Dqn_DSMap<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem)
+DQN_DS_MAP_API
+Dqn_DSMapItem<K, V> *Dqn_DSMap_Get(DQN_DS_MAP *map, K const &key)
+{
+    Dqn_DSMapItem<K, V> *result = Dqn_DSMap_FindOrAdd(map, key, Dqn_DSMapFindOnly_Yes, nullptr /*added*/);
+    return result;
+}
+
+DQN_DS_MAP_API
+void Dqn_DSMap_Erase(DQN_DS_MAP *map, K const &key, Dqn_ZeroMem zero_mem)
 {
     if (!map)
         return;
 
-    Dqn_isize          index = hash % map->size;
-    Dqn_DSMapItem<T> *result = map->slots + index;
+    uint64_t hash               = Dqn_DSMap_KeyHash_(map, &key, sizeof(key));
+    Dqn_isize            index  = hash % map->size;
+    Dqn_DSMapItem<K, V> *result = map->slots + index;
     if (!result || !result->occupied)
         return;
 
@@ -3372,8 +3426,8 @@ void Dqn_DSMap_Erase(Dqn_DSMap<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem)
     Dqn_isize start_index = index;
     Dqn_isize probe_index = index;
     for (;;) {
-        probe_index              = (probe_index + 1) % map->size;
-        Dqn_DSMapItem<T> *probe = map->slots + probe_index;
+        probe_index                = (probe_index + 1) % map->size;
+        Dqn_DSMapItem<K, V> *probe = map->slots + probe_index;
         if (!probe->occupied)
             break;
 
@@ -3881,38 +3935,46 @@ DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize c
 }
 
 template <typename T>
-DQN_API bool Dqn_List_IterateFrom(Dqn_List<T> *list, Dqn_ListIterator<T> *iterator, Dqn_isize start_index)
+DQN_API T *Dqn_List_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, T const &value)
+{
+    T *result = Dqn_List_Make_(list, 1);
+    *result = value;
+    return result;
+}
+
+template <typename T>
+DQN_API bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_isize start_index)
 {
     bool result = false;
-    if (!list || !iterator || start_index < 0 || list->chunk_size <= 0)
+    if (!list || !it || start_index < 0 || list->chunk_size <= 0)
         return result;
 
-    if (!iterator->init) {
-        *iterator = {};
+    if (!it->init) {
+        *it = {};
         if (start_index == 0) {
-            iterator->chunk = list->head;
+            it->chunk = list->head;
         } else {
-            Dqn_List_At(list, start_index, &iterator->chunk);
+            Dqn_List_At(list, start_index, &it->chunk);
             if (list->chunk_size > 0)
-                iterator->chunk_data_index = start_index % list->chunk_size;
+                it->chunk_data_index = start_index % list->chunk_size;
         }
 
-        iterator->init = true;
+        it->init = true;
     }
 
-    if (iterator->chunk) {
-        if (iterator->chunk_data_index >= iterator->chunk->count) {
-            iterator->chunk            = iterator->chunk->next;
-            iterator->chunk_data_index = 0;
+    if (it->chunk) {
+        if (it->chunk_data_index >= it->chunk->count) {
+            it->chunk            = it->chunk->next;
+            it->chunk_data_index = 0;
         }
 
-        if (iterator->chunk) {
-            iterator->data = iterator->chunk->data + iterator->chunk_data_index++;
+        if (it->chunk) {
+            it->data = it->chunk->data + it->chunk_data_index++;
             result         = true;
         }
     }
 
-    if (!iterator->chunk)
+    if (!it->chunk)
         DQN_ASSERT(result == false);
     return result;
 }
@@ -4676,7 +4738,7 @@ DQN_API bool Dqn_CString8_Eq(char const *lhs, char const *rhs, Dqn_isize lhs_siz
 
     bool result = lhs_size == rhs_size;
     if (result) {
-        if (eq_case == Dqn_CString8EqCase::Sensitive) {
+        if (eq_case == Dqn_CString8EqCase_Sensitive) {
             result = (DQN_MEMCMP(lhs, rhs, DQN_CAST(size_t)lhs_size) == 0);
         } else {
             for (Dqn_isize index = 0; index < lhs_size && result; index++)
@@ -4689,7 +4751,7 @@ DQN_API bool Dqn_CString8_Eq(char const *lhs, char const *rhs, Dqn_isize lhs_siz
 
 DQN_API bool Dqn_CString8_EqInsensitive(char const *lhs, char const *rhs, Dqn_isize lhs_size, Dqn_isize rhs_size)
 {
-    bool result = Dqn_CString8_Eq(lhs, rhs, lhs_size, rhs_size, Dqn_CString8EqCase::Insensitive);
+    bool result = Dqn_CString8_Eq(lhs, rhs, lhs_size, rhs_size, Dqn_CString8EqCase_Insensitive);
     return result;
 }
 
@@ -4708,7 +4770,7 @@ DQN_API bool Dqn_CString8_StartsWith(char const *string, char const *prefix, Dqn
 
 DQN_API bool Dqn_CString8_StartsWithInsensitive(char const *string, char const *prefix, Dqn_isize string_size, Dqn_isize prefix_size)
 {
-    bool result = Dqn_CString8_StartsWith(string, prefix, string_size, prefix_size, Dqn_CString8EqCase::Insensitive);
+    bool result = Dqn_CString8_StartsWith(string, prefix, string_size, prefix_size, Dqn_CString8EqCase_Insensitive);
     return result;
 }
 
@@ -4729,7 +4791,7 @@ DQN_API bool Dqn_CString8_EndsWith(char const *string, char const *suffix, Dqn_i
 
 DQN_API bool Dqn_CString8_EndsWithInsensitive(char const *string, char const *suffix, Dqn_isize string_size, Dqn_isize suffix_size)
 {
-    bool result = Dqn_CString8_EndsWith(string, suffix, string_size, suffix_size, Dqn_CString8EqCase::Insensitive);
+    bool result = Dqn_CString8_EndsWith(string, suffix, string_size, suffix_size, Dqn_CString8EqCase_Insensitive);
     return result;
 }
 
@@ -4813,11 +4875,11 @@ DQN_API char const *Dqn_CString8_TrimByteOrderMark(char const *string, Dqn_isize
     char const UTF32_BOM_LE[] = "\xFF\xFE\x00\x00";
 
     Dqn_isize result_size = string_size;
-    result = Dqn_CString8_TrimPrefix(result, UTF8_BOM,     result_size, DQN_CHAR_COUNT(UTF8_BOM),     Dqn_CString8EqCase::Sensitive, &result_size);
-    result = Dqn_CString8_TrimPrefix(result, UTF16_BOM_BE, result_size, DQN_CHAR_COUNT(UTF16_BOM_BE), Dqn_CString8EqCase::Sensitive, &result_size);
-    result = Dqn_CString8_TrimPrefix(result, UTF16_BOM_LE, result_size, DQN_CHAR_COUNT(UTF16_BOM_LE), Dqn_CString8EqCase::Sensitive, &result_size);
-    result = Dqn_CString8_TrimPrefix(result, UTF32_BOM_BE, result_size, DQN_CHAR_COUNT(UTF32_BOM_BE), Dqn_CString8EqCase::Sensitive, &result_size);
-    result = Dqn_CString8_TrimPrefix(result, UTF32_BOM_LE, result_size, DQN_CHAR_COUNT(UTF32_BOM_LE), Dqn_CString8EqCase::Sensitive, &result_size);
+    result = Dqn_CString8_TrimPrefix(result, UTF8_BOM,     result_size, DQN_CHAR_COUNT(UTF8_BOM),     Dqn_CString8EqCase_Sensitive, &result_size);
+    result = Dqn_CString8_TrimPrefix(result, UTF16_BOM_BE, result_size, DQN_CHAR_COUNT(UTF16_BOM_BE), Dqn_CString8EqCase_Sensitive, &result_size);
+    result = Dqn_CString8_TrimPrefix(result, UTF16_BOM_LE, result_size, DQN_CHAR_COUNT(UTF16_BOM_LE), Dqn_CString8EqCase_Sensitive, &result_size);
+    result = Dqn_CString8_TrimPrefix(result, UTF32_BOM_BE, result_size, DQN_CHAR_COUNT(UTF32_BOM_BE), Dqn_CString8EqCase_Sensitive, &result_size);
+    result = Dqn_CString8_TrimPrefix(result, UTF32_BOM_LE, result_size, DQN_CHAR_COUNT(UTF32_BOM_LE), Dqn_CString8EqCase_Sensitive, &result_size);
 
     if (trimmed_size)
         *trimmed_size = result_size;
@@ -5252,7 +5314,7 @@ DQN_API bool Dqn_String8_Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_CString8EqCase
 
 DQN_API bool Dqn_String8_EqInsensitive(Dqn_String8 lhs, Dqn_String8 rhs)
 {
-    bool result = Dqn_String8_Eq(lhs, rhs, Dqn_CString8EqCase::Insensitive);
+    bool result = Dqn_String8_Eq(lhs, rhs, Dqn_CString8EqCase_Insensitive);
     return result;
 }
 
@@ -5264,7 +5326,7 @@ DQN_API bool Dqn_String8_StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_
 
 DQN_API bool Dqn_String8_StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix)
 {
-    bool result = Dqn_String8_StartsWith(string, prefix, Dqn_CString8EqCase::Insensitive);
+    bool result = Dqn_String8_StartsWith(string, prefix, Dqn_CString8EqCase_Insensitive);
     return result;
 }
 
@@ -5276,7 +5338,7 @@ DQN_API bool Dqn_String8_EndsWith(Dqn_String8 string, Dqn_String8 suffix, Dqn_CS
 
 DQN_API bool Dqn_String8_EndsWithInsensitive(Dqn_String8 string, Dqn_String8 suffix)
 {
-    bool result = Dqn_String8_EndsWith(string, suffix, Dqn_CString8EqCase::Insensitive);
+    bool result = Dqn_String8_EndsWith(string, suffix, Dqn_CString8EqCase_Insensitive);
     return result;
 }
 
@@ -5385,7 +5447,7 @@ DQN_API bool Dqn_String8_IsAllDigits(Dqn_String8 string)
 
 DQN_API bool Dqn_String8_IsAllHex(Dqn_String8 string)
 {
-    Dqn_String8 trimmed = Dqn_String8_TrimPrefix(string, DQN_STRING8("0x"), Dqn_CString8EqCase::Insensitive);
+    Dqn_String8 trimmed = Dqn_String8_TrimPrefix(string, DQN_STRING8("0x"), Dqn_CString8EqCase_Insensitive);
     bool result        = Dqn_String8_IsValid(trimmed) && trimmed.size > 0;
     for (Dqn_isize index = 0; result && index < trimmed.size; index++) {
         char ch = trimmed.data[index];
@@ -5493,9 +5555,23 @@ DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string,
 
 DQN_API Dqn_String8 Dqn_String8_ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena)
 {
-    Dqn_String8 result = Dqn_String8_Replace(string, find, replace, start_index, arena, temp_arena, Dqn_CString8EqCase::Insensitive);
+    Dqn_String8 result = Dqn_String8_Replace(string, find, replace, start_index, arena, temp_arena, Dqn_CString8EqCase_Insensitive);
     return result;
 }
+
+#if defined(__cplusplus)
+bool operator==(Dqn_String8 const &lhs, Dqn_String8 const &rhs)
+{
+    bool result = Dqn_String8_Eq(lhs, rhs, Dqn_CString8EqCase_Sensitive);
+    return result;
+}
+
+bool operator!=(Dqn_String8 const &lhs, Dqn_String8 const &rhs)
+{
+    bool result = !(lhs == rhs);
+    return result;
+}
+#endif
 
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-PRIN] Dqn_Print            |                             | Printing
@@ -7271,7 +7347,7 @@ DQN_API uint64_t Dqn_Date_EpochTime()
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-WIND] Dqn_Win              |                             | Windows OS helpers
 // ---------------------------------+-----------------------------+---------------------------------
-DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_Win_ErrorMsg *msg)
+DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_WinErrorMsg *msg)
 {
     msg->code    = GetLastError();
     msg->data[0] = 0;
@@ -7279,8 +7355,7 @@ DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_Win_ErrorMsg *msg)
     unsigned long flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
     void *module_to_get_errors_from = nullptr;
 
-    if (msg->code >= 12000 && msg->code <= 12175) // WinINET Errors
-    {
+    if (msg->code >= 12000 && msg->code <= 12175) { // WinINET Errors
         flags |= FORMAT_MESSAGE_FROM_HMODULE;
         module_to_get_errors_from = GetModuleHandleA("wininet.dll");
     }
@@ -7292,11 +7367,16 @@ DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_Win_ErrorMsg *msg)
                                  msg->data,                   // LPSTR   lpBuffer,
                                  DQN_ARRAY_ICOUNT(msg->data), // unsigned long   nSize,
                                  nullptr);                    // va_list * Arguments
+
+    if (msg->size >= 2 &&
+        (msg->data[msg->size - 2] == '\r' && msg->data[msg->size - 1] == '\n')) {
+        msg->size -= 2;
+    }
 }
 
-DQN_API Dqn_Win_ErrorMsg Dqn_Win_LastError()
+DQN_API Dqn_WinErrorMsg Dqn_Win_LastError()
 {
-    Dqn_Win_ErrorMsg result = {};
+    Dqn_WinErrorMsg result = {};
     Dqn_Win_LastErrorToBuffer(&result);
     return result;
 }
@@ -7326,7 +7406,7 @@ DQN_API void Dqn_Win_DumpLastError_(Dqn_CallSite call_site, char const *fmt, ...
 {
     // TODO(dqn): Hmmm .. should this be a separate log or part of the above
     // macro. If so we need to make the logging macros more flexible.
-    Dqn_Win_ErrorMsg msg = Dqn_Win_LastError();
+    Dqn_WinErrorMsg msg = Dqn_Win_LastError();
     if (fmt) {
         va_list args;
         va_start(args, fmt);
@@ -8370,10 +8450,11 @@ DQN_API bool Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
     result = CopyFileW(src16.data, dest16.data, fail_if_exists) != 0;
 
     if (!result) {
-        Dqn_Log_ErrorF("Failed to copy file [from=%.*s, to=%.*s, reason=%.*s]",
-                  DQN_STRING_FMT(src16),
-                  DQN_STRING_FMT(dest16),
-                  DQN_STRING_FMT(Dqn_Win_LastError()));
+        Dqn_WinErrorMsg error = Dqn_Win_LastError();
+        Dqn_Log_ErrorF("Copy file failed [src=\"%.*s\", dest=\"%.*s\", reason=\"%.*s\"]",
+                       DQN_STRING_FMT(src),
+                       DQN_STRING_FMT(dest),
+                       DQN_STRING_FMT(error));
     }
 
 #elif defined(DQN_OS_UNIX)
@@ -8591,7 +8672,7 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
     Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(allocator.user_context);
     Dqn_String8       path8     = Dqn_String8_Init(path, path_size);
     Dqn_String16      path16    = Dqn_Win_String8ToString16Allocator(path8, scratch.allocator);
-    Dqn_Win_ErrorMsg  error_msg = {};
+    Dqn_WinErrorMsg   error_msg = {};
 
     // NOTE: Get the file handle
     // -------------------------------------------------------------------------
@@ -8812,7 +8893,7 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
                                             /*HANDLE                hTemplateFile*/         nullptr);
 
     if (handle == INVALID_HANDLE_VALUE) {
-        Dqn_Win_ErrorMsg msg = Dqn_Win_LastError();
+        Dqn_WinErrorMsg msg = Dqn_Win_LastError();
         result.error_size =
             DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(result.error,
                                                            DQN_ARRAY_UCOUNT(result.error),
@@ -8896,7 +8977,7 @@ DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_isize si
     }
 
     if (!result) {
-        Dqn_Win_ErrorMsg msg = Dqn_Win_LastError();
+        Dqn_WinErrorMsg msg = Dqn_Win_LastError();
         file->error_size =
             DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(file->error,
                                                            DQN_ARRAY_UCOUNT(file->error),
@@ -9302,11 +9383,10 @@ void Dqn_JSONBuilder_Bool(Dqn_JSONBuilder *builder, bool value)
 #endif // !defined(DQN_NO_JSON_BUILDER)
 
 
-// NOTE: Hashing - Dqn_FNV1A[32|64]
-// -------------------------------------------------------------------------------------------------
-//
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
+// ---------------------------------+-----------------------------+---------------------------------
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
-//
 DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_isize size, uint32_t hash)
 {
     auto buffer = DQN_CAST(uint8_t const *)bytes;
@@ -9335,9 +9415,9 @@ DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_isize size)
     return result;
 }
 
-// NOTE: Hashing - Dqn_MurmurHash3
-// -------------------------------------------------------------------------------------------------
-
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
+// ---------------------------------+-----------------------------+---------------------------------
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
     #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)
@@ -9383,7 +9463,7 @@ DQN_FORCE_INLINE uint64_t Dqn_MurmurHash3_FMix64(uint64_t k)
     return k;
 }
 
-DQN_API uint32_t Dqn_MurmurHash3x86_32(void const *key, int len, uint32_t seed)
+DQN_API uint32_t Dqn_MurmurHash3_x86U32(void const *key, int len, uint32_t seed)
 {
     const uint8_t *data = (const uint8_t *)key;
     const int nblocks   = len / 4;
@@ -9442,7 +9522,7 @@ DQN_API uint32_t Dqn_MurmurHash3x86_32(void const *key, int len, uint32_t seed)
     return h1;
 }
 
-DQN_API Dqn_MurmurHash3128 Dqn_MurmurHash3x64_128(void const *key, int len, uint32_t seed)
+DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32_t seed)
 {
     const uint8_t *data = (const uint8_t *)key;
     const int nblocks   = len / 16;
@@ -9548,9 +9628,9 @@ DQN_API Dqn_MurmurHash3128 Dqn_MurmurHash3x64_128(void const *key, int len, uint
     h1 += h2;
     h2 += h1;
 
-    Dqn_MurmurHash3128 result = {};
-    result.e[0]               = h1;
-    result.e[1]               = h2;
+    Dqn_MurmurHash3 result = {};
+    result.e[0]            = h1;
+    result.e[1]            = h2;
     return result;
 }
 
