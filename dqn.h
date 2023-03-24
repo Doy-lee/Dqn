@@ -2865,13 +2865,20 @@ struct Dqn_OSTimedBlock
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
 // ---------------------------------+-----------------------------+---------------------------------
+enum Dqn_FsInfoType
+{
+    Dqn_FsInfoType_Unknown,
+    Dqn_FsInfoType_Directory,
+    Dqn_FsInfoType_File,
+};
+
 struct Dqn_FsInfo
 {
+    Dqn_FsInfoType type;
     uint64_t create_time_in_s;
     uint64_t last_write_time_in_s;
     uint64_t last_access_time_in_s;
     uint64_t size;
-    operator bool() const { return size > 0; }
 };
 
 // NOTE: File System API
@@ -4091,9 +4098,9 @@ Dqn_BinarySearch(T const                        *array,
     #if defined(DQN_NO_WIN32_MINIMAL_HEADER) || defined(_INC_WINDOWS)
         #include <bcrypt.h>          // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
         #include <shellscalingapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
-        #if defined(DQN_WITH_WIN_NET)
+        #if !defined(DQN_NO_WINNET)
             #include <wininet.h> // Dqn_Win_Net -> InternetConnect ... etc
-        #endif // DQN_WITH_WIN_NET
+        #endif // DQN_NO_WINNET
     #else
         // Taken from Windows.h
         // Defines
@@ -4127,6 +4134,7 @@ Dqn_BinarySearch(T const                        *array,
         // NOTE: FindFirstFile
         #define INVALID_HANDLE_VALUE ((void *)(long *)-1)
         #define INVALID_FILE_ATTRIBUTES ((unsigned long)-1)
+        #define FILE_ATTRIBUTE_NORMAL 0x00000080
         #define FIND_FIRST_EX_LARGE_FETCH 0x00000002
         #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
         #define FILE_ATTRIBUTE_READONLY 0x00000001
@@ -7230,7 +7238,7 @@ DQN_API char *Dqn_Hex_CString8ToBytesArena(Dqn_Arena *arena, char const *hex, Dq
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Hex_String8ToBytesString8Arena(Dqn_Arena *arena, Dqn_String8 hex)
+DQN_API Dqn_String8 Dqn_Hex_String8ToBytesArena(Dqn_Arena *arena, Dqn_String8 hex)
 {
     Dqn_String8 result = {};
     result.data        = Dqn_Hex_CString8ToBytesArena(arena, hex.data, hex.size, &result.size);
@@ -7604,18 +7612,14 @@ DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *
         if (find_data.cFileName[0] == '.' || (find_data.cFileName[0] == '.' && find_data.cFileName[1] == '.'))
             continue;
 
-        if (find_data.dwFileAttributes & ~FILE_ATTRIBUTE_DIRECTORY) {
-            it->file_name.size = Dqn_CString16_Size(find_data.cFileName);
-            DQN_ASSERT(it->file_name.size < (Dqn_CArray_CountI(it->file_name_buf) - 1));
-
-            DQN_MEMCPY(it->file_name.data, find_data.cFileName, it->file_name.size * sizeof(wchar_t));
-            it->file_name_buf[it->file_name.size] = 0;
-
-            break;
-        }
+        it->file_name.size = Dqn_CString16_Size(find_data.cFileName);
+        DQN_ASSERT(it->file_name.size < (Dqn_CArray_CountI(it->file_name_buf) - 1));
+        DQN_MEMCPY(it->file_name.data, find_data.cFileName, it->file_name.size * sizeof(wchar_t));
+        it->file_name_buf[it->file_name.size] = 0;
+        break;
     } while (FindNextFileW(it->handle, &find_data) != 0);
 
-    return true;
+    return it->file_name.size > 0;
 }
 
 DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
@@ -7859,7 +7863,7 @@ DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *
 
     if (!HttpSendRequestA(handle->http_handle, nullptr /*headers*/, 0 /*headers length*/, (char *)post_data, post_data_size)) {
         handle->state = Dqn_WinNetHandleState_RequestFailed;
-        Dqn_Log_ErrorF("Failed to send request for %.*s [reason=%.*s]",
+        Dqn_Log_ErrorF("Failed to send request to %.*s [reason=%.*s]",
                        handle->host_name_size,
                        handle->host_name,
                        DQN_STRING_FMT(Dqn_Win_LastError()));
@@ -8400,27 +8404,33 @@ DQN_API bool Dqn_Fs_DirExists(Dqn_String8 path)
 DQN_API Dqn_FsInfo Dqn_Fs_GetInfo(Dqn_String8 path)
 {
     Dqn_FsInfo result = {};
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
     Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
     if (!GetFileAttributesExW(path16, GetFileExInfoStandard, &attrib_data))
         return result;
 
-    if (result) {
-        result.create_time_in_s      = Dqn__WinFileTimeToSeconds(&attrib_data.ftCreationTime);
-        result.last_access_time_in_s = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastAccessTime);
-        result.last_write_time_in_s  = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastWriteTime);
+    result.create_time_in_s      = Dqn__WinFileTimeToSeconds(&attrib_data.ftCreationTime);
+    result.last_access_time_in_s = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastAccessTime);
+    result.last_write_time_in_s  = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastWriteTime);
 
-        LARGE_INTEGER large_int = {};
-        large_int.u.HighPart    = DQN_CAST(int32_t)attrib_data.nFileSizeHigh;
-        large_int.u.LowPart     = attrib_data.nFileSizeLow;
-        result.size             = (uint64_t)large_int.QuadPart;
+    LARGE_INTEGER large_int = {};
+    large_int.u.HighPart    = DQN_CAST(int32_t)attrib_data.nFileSizeHigh;
+    large_int.u.LowPart     = attrib_data.nFileSizeLow;
+    result.size             = (uint64_t)large_int.QuadPart;
+
+    if (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
+        if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            result.type = Dqn_FsInfoType_Directory;
+        } else {
+            result.type = Dqn_FsInfoType_File;
+        }
     }
-#elif defined(DQN_OS_UNIX)
+
+    #elif defined(DQN_OS_UNIX)
     struct stat file_stat;
-    if (lstat(path.data, &file_stat) != -1)
-    {
+    if (lstat(path.data, &file_stat) != -1) {
         result.size                  = file_stat.st_size;
         result.last_access_time_in_s = file_stat.st_atime;
         result.last_write_time_in_s  = file_stat.st_mtime;
@@ -8430,10 +8440,9 @@ DQN_API Dqn_FsInfo Dqn_Fs_GetInfo(Dqn_String8 path)
         result.create_time_in_s = DQN_MIN(result.last_access_time_in_s, result.last_write_time_in_s);
     }
 
-#else
+    #else
     #error Unimplemented
-
-#endif
+    #endif
 
     return result;
 }
