@@ -23,7 +23,7 @@
 // [SECT-VMEM] Dqn_VMem             |                             | Virtual memory allocation
 // [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
 // [SECT-AMAP] Dqn_Map              | DQN_NO_MAP                  | Hashtable, collision=chain
-// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, collision=linear, tombstoneless deletes
+// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
 // [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
 // [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
 // [SECT-STRB] Dqn_String8Builder   |                             |
@@ -76,10 +76,15 @@
 //     is set to 0. Some of this library API accepts are clear memory parameter
 //     to scrub memory after certain operations.
 //
-// #define DQN_LEAK_TRACKING
+// #define DQN_LEAK_TRACING
 //     When defined to some allocating calls in the library will automatically
 //     get passed in the file name, function name, line number and an optional
 //     leak_msg.
+
+#if defined(DQN_LEAK_TRACING)
+#error Leak tracing not supported because we enter an infinite leak tracing loop tracing our own allocations made to tracks leaks in the internal leak table.
+#endif
+
 //
 // #define DQN_DEBUG_THREAD_CONTEXT
 //     Define this macro to record allocation stats for arenas used in the
@@ -765,7 +770,7 @@ typedef struct Dqn_CallSite {
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-ALLO] Dqn_Allocator        |                             | Generic allocator interface
 // ---------------------------------+-----------------------------+---------------------------------
-#if defined(DQN_LEAK_TRACKING)
+#if defined(DQN_LEAK_TRACING)
     #if defined(DQN_NO_DSMAP)
         #error "DSMap is required for allocation tracing"
     #endif
@@ -1363,13 +1368,14 @@ struct Dqn_ArenaTempMemory
 
 // Automatically begin and end a temporary memory scope on object construction
 // and destruction respectively.
+#define DQN_ARENA_TEMP_MEMORY_SCOPE(arena) Dqn_ArenaTempMemoryScope_ DQN_UNIQUE_NAME(temp_memory_) = Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE arena)
 #define Dqn_ArenaTempMemoryScope(arena) Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE arena)
 struct Dqn_ArenaTempMemoryScope_
 {
     Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena);
     ~Dqn_ArenaTempMemoryScope_();
     Dqn_ArenaTempMemory temp_memory;
-    #if defined(DQN_LEAK_TRACKING)
+    #if defined(DQN_LEAK_TRACING)
     Dqn_CallSite        leak_site__;
     #endif
 };
@@ -1444,135 +1450,190 @@ DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat);
 /// @param[in] arena The arena to dump stats for
 DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-AMAP] Dqn_Map              | DQN_NO_MAP                  | Hashtable, collision=chain
-// ---------------------------------+-----------------------------+---------------------------------
 #if !defined(DQN_NO_DSMAP)
-template <typename T>
-struct Dqn_MapEntry
-{
-    uint64_t      hash;
-    T             value;
-    Dqn_MapEntry *next;
-};
-
-/// A hash-table implementation that uses a linked-list allocated by an arena
-/// for collisions.
-template <typename T>
-struct Dqn_Map
-{
-    Dqn_Arena         *arena;
-    Dqn_MapEntry<T>  **slots;
-    Dqn_isize          size;  ///< The number of slots
-
-    // NOTE: Sum count and chain_count for total items in the list.
-    Dqn_isize          count;       ///< The total number of top-level slots in the 'values' list occupied
-    Dqn_isize          chain_count; ///< The total number of chained elements in 'values'
-    Dqn_MapEntry<T>   *free_list;
-};
-
-enum struct Dqn_MapCollideRule
-{
-    Overwrite,
-    Chain,
-    Fail,
-};
-
-template <typename T> Dqn_Map<T> Dqn_Map_InitWithArena(Dqn_Arena *arena, Dqn_isize size = 0);
-
-#define Dqn_Map_FindOrAdd(map, hash, rule) Dqn_Map_FindOrAdd_(DQN_LEAK_TRACE map, hash, rule)
-template <typename T> Dqn_MapEntry<T> *Dqn_Map_FindOrAdd_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollideRule rule);
-
-#define Dqn_Map_Add(map, hash, value, rule) Dqn_Map_Add_(DQN_LEAK_TRACE map, hash, value, rule)
-template <typename T> Dqn_MapEntry<T> *Dqn_Map_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, T *value, Dqn_MapCollideRule rule);
-
-#define Dqn_Map_AddCopy(map, hash, value, rule) Dqn_Map_AddCopy_(DQN_LEAK_TRACE map, hash, value, rule)
-template <typename T> Dqn_MapEntry<T> *Dqn_Map_AddCopy_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, const T &value, Dqn_MapCollideRule rule);
-
-template <typename T> Dqn_MapEntry<T> *Dqn_Map_Get(Dqn_Map<T> *map, uint64_t hash);
-
-template <typename T> void Dqn_Map_Erase(Dqn_Map<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem);
-#endif // !defined DQN_NO_MAP
-
 // ---------------------------------+-----------------------------+---------------------------------
-// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, collision=linear, tombstoneless deletes
+// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
 // ---------------------------------+-----------------------------+---------------------------------
-#if !defined(DQN_NO_DSMAP)
+// NOTE: Dqn_DSMap Design
+// =============================================================================
+// A hash table configured using the presets recommended by Demitri Spanos
+// from the Handmade Network (HMN),
+//
+// - power of two capacity
+// - grow by 2x on load >= 75%
+// - open-addressing with linear probing
+// - separate large values (esp. variable length values) into a separate table
+// - use a well-known hash function: MurmurHash3 (or xxhash, city, spooky ...)
+// - chain-repair on delete (rehash items in the probe chain after delete)
+// - shrink by 1/2 on load < 25% (suggested by Martins Mmozeiko of HMN)
+//
+// Source: discord.com/channels/239737791225790464/600063880533770251/941835678424129597
+//
+// This hash-table stores slots (values) separate from the hash mapping. Hashes
+// are mapped to slots using the hash-to-slot array which is an array of slot
+// indexes. This array intentionally only stores indexes to maximise usage
+// of the cache line. Linear probing on collision will only cost a couple of
+// cycles to fetch from L1 cache the next slot index to attempt.
+//
+// The slots array stores values contiguously, non-sorted allowing iteration of
+// the map. On element erase, the last element is swapped into the deleted
+// element causing the non-sorted property of this table.
+//
+// The 0th slot (DQN_DS_MAP_SENTINEL_SLOT) in the slots array is reserved for a
+// sentinel value, e.g. all zeros value. After map initialisation the 'occupied'
+// value of the array will be set to 1 to exclude the sentinel from the
+// capacity of the table. Skip the first value if you are iterating the hash
+// table!
+//
+// This hash-table accept either a U64 or a buffer (ptr + len) as the key. In
+// practice this covers a majority of use cases (with string, buffer and number
+// keys). It also allows us to minimise our C++ templates to only require 1
+// variable which is the Value part of the hash-table simplifying interface
+// complexity and cruft brought by C++.
+//
+// NOTE: Dqn_DSMap API
+// =============================================================================
+//
+// - All maps must be created by calling `DSMap_Init()` with the desired size
+// and the memory allocated for the table can be freed by called
+// `DSMap_Deinit()`.
+//
+// - Functions that return a pointer or boolean will always return null or false
+// if the passed in map is invalid e.g. `DSMap_IsValid()` returns false.
+//
+// @proc Dqn_DSMap_Init
+//   @param size[in] The number of slots in the table. This size must be a
+//   power-of-two or otherwise an assert will be triggered.
+//   @return The hash table. On memory allocation failure, the table will be
+//   zero initialised whereby calling Dqn_DSMap_IsValid() will return false.
+//
+// @proc Dqn_DSMap_Deinit
+//   @desc Free the memory allocated by the table
+//
+// @proc Dqn_DSMap_IsValid
+//   @desc Verify that the table is in a valid state (e.g. initialised 
+//   correctly).
+//
+// @proc Dqn_DSMap_Hash
+//   @desc Hash the input key using the custom hash function if it's set on the
+//   map, otherwise uses the default hashing function (32bit Murmur3).
+//
+// @proc Dqn_DSMap_HashToSlotIndex
+//   @desc Calculate the index into the map's `slots` array from the given hash.
+//
+// @proc Dqn_DSMap_FindSlot
+//   @desc Find the slot in the map's `slots` array corresponding to the given
+//   key and hash. If the map does not contain the key, a null pointer is
+//   returned.
+//
+// @proc Dqn_DSMap_MakeSlot
+//   @desc Same as `DSMap_FindSlot` except if the key does not exist it will be
+//   made and returned.
+//
+// @proc Dqn_DSMap_Find
+//   @desc Same as `DSMap_FindSlot` except it returns the value for the key. If
+//   the map does not contain the key, a null pointer is returned.
+//
+// @proc Dqn_DSMap_Make
+//   @desc Same as `DSMap_MakeSlot` except it returns the value for the key.
+//
+// @proc Dqn_DSMap_Resize
+//   @desc Resize the table and move all elements to the new map.
+//   the elements currently set in the
+//   @param size[in] New size of the table, must be a power of two.
+//   @return False if memory allocation fails, or the requested size is smaller
+//   than the current number of elements in the map to resize. True otherwise.
+//
+// @proc Dqn_Dqn_DSMap_Set
+//   @desc Assign the key-value pair to the table. Pre-existing keys are updated
+//   in place and new key-value pairs are inserted into the table. If by adding
+//   the key-value pair to the table puts the table over 75% load, the table
+//   will be grown to 2x the current the size before insertion completes.
+//
+// @proc Dqn_DSMap_Erase
+//   @desc Remove the key-value pair from the table. If by erasing the key-value
+//   pair from the table puts the table under 25% load, the table will be shrunk
+//   by 1/2 the current size after erasing. The table will not shrink below the
+//   initial size that the table was initialised as.
+//
+// @proc Dqn_DSMap_KeyCStringLit, Dqn_DSMap_KeyU64, Dqn_DSMap_KeyBuffer
+//   @desc Create a hash-table key given a cstring, uint64 or buffer (ptr + len)
+//   respectively.
+//
+// @proc Dqn_DSMap_KeyU64NoHash
+//   @desc Create a hash-table key given the uint64. This key is *not* hashed to
+//   map values into the table. This is useful if you already have a source of
+//   data that is already sufficiently uniformly distributed already (e.g.
+//   using 8 bytes taken from a SHA256 hash as the key).
+//
+//   This value will be used directly but truncated to 32 bits as the table uses
+//   32 bit hashes for mapping keys to values.
 
-/// If a DSMap is initialized to zero and does *not* call the init function then
-/// the table with be lazily initialised to this capacity on first write to the
-/// hash table. This size must be a power of two.
-#if !defined(DQN_DSMAP_MIN_SIZE)
-    #define DQN_DSMAP_MIN_SIZE 4096
-    static_assert((DQN_DSMAP_MIN_SIZE & (DQN_DSMAP_MIN_SIZE - 1)) == 0, "DSMap lazy initialisation size must be a power of two");
-#endif
-
-#define DQN_DS_MAP_API template <typename K, typename V> DQN_API
-#define DQN_DS_MAP     Dqn_DSMap<K, V>
-
-template <typename K, typename V>
-struct Dqn_DSMapItem
+enum Dqn_DSMapKeyType
 {
-    K                    key;
-    V                    value;
-    uint8_t              occupied;
-    Dqn_DSMapItem<K, V> *next;
-    Dqn_DSMapItem<K, V> *prev;
+    Dqn_DSMapKeyType_Invalid,
+    Dqn_DSMapKeyType_U64,       ///< Use a U64 key that is `hash(u64) % size` to map into the table
+    Dqn_DSMapKeyType_U64NoHash, ///< Use a U64 key that is `u64 % size` to map into the table
+    Dqn_DSMapKeyType_Buffer,    ///< Use a buffer key that is `hash(buffer) % size` to map into the table
 };
 
-/// The hashing function prototype
-using Dqn_DSMapHashProc = uint64_t(void *data, size_t size);
+struct Dqn_DSMapKey
+{
+    Dqn_DSMapKeyType type;
+    union Payload {
+        struct Buffer {
+            void const *data;
+            uint32_t    size;
+        } buffer;
+        uint64_t u64;
+    } payload;
+};
 
-/// A hash table configured using the presets recommended by Demitri Spanos from
-/// the Handmade Network,
-/// - 70% max load
-/// - power of two capacity
-/// - linear probing on collision
-/// - tombstoneless deletes (e.g. deletes slots get filled with linear probed
-/// entries if there are any).
-template <typename K, typename V>
+template <typename T>
+struct Dqn_DSMapSlot
+{
+    Dqn_DSMapKey key;   ///< Hash table lookup key
+    T            value;
+    uint32_t     hash;  ///< hash(key) for this slot
+};
+
+using Dqn_DSMapHashFunction = uint32_t(Dqn_DSMapKey key, uint32_t seed);
+template <typename T>
 struct Dqn_DSMap
 {
-    Dqn_Arena            arena;
-    Dqn_DSMapItem<K, V> *slots;
-    Dqn_isize            size;      ///< The number of slots
-    Dqn_isize            count;     ///< The number of slots occupied in the list
-    Dqn_DSMapItem<K, V> *link_head; ///< Linked list of items allocated in the map
-    Dqn_DSMapItem<K, V> *link_tail; ///< Linked list of items allocated in the map
-    Dqn_DSMapHashProc   *hash_function;
+    uint32_t              *hash_to_slot;  ///< Mapping from hash to a index in the slots array
+    Dqn_DSMapSlot<T>      *slots;         ///< Values of the array stored contiguously, non-sorted order
+    uint32_t               size;          ///< Total capacity of the map and is a power of two
+    uint32_t               occupied;      ///< Number of slots used in the hash table
+    Dqn_Allocator          allocator;     ///< Backing allocator for the hash table
+    uint32_t               initial_size;  ///< Initial map size, map cannot shrink on erase below this size
+    Dqn_DSMapHashFunction *hash_function; ///< Custom hashing function to use if field is set
+    uint32_t               hash_seed;     ///< Seed for the hashing function, when 0, DQN_DS_MAP_DEFAULT_HASH_SEED is used
 };
 
-/// Initialise a hash table with a given size. The given size must be a power of
-/// two. Initialisation is optional and the map can be zero-initialised in which
-/// the hash table will default to the size specified in DQN_DSMAP_MIN_SIZE.
-/// @param[in] size The number of slots in the hash-table. This value must be
-/// a power of two.
-DQN_DS_MAP_API
-DQN_DS_MAP Dqn_DSMap_Init(Dqn_isize size);
+// NOTE: Dqn_DSMap
+// =============================================================================
+DQN_API template <typename T> Dqn_DSMap<T>      Dqn_DSMap_Init           (uint32_t size);
+DQN_API template <typename T> void              Dqn_DSMap_Deinit         (Dqn_DSMap<T> *map);
+DQN_API template <typename T> bool              Dqn_DSMap_IsValid        (Dqn_DSMap<T> const *map);
+DQN_API template <typename T> uint32_t          Dqn_DSMap_Hash           (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
+DQN_API template <typename T> uint32_t          Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key, uint32_t hash);
+DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_FindSlot       (Dqn_DSMap<T> const *map, Dqn_DSMapKey key, uint32_t hash);
+DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_MakeSlot       (Dqn_DSMap<T> *map, Dqn_DSMapKey key, uint32_t hash);
+DQN_API template <typename T> T *               Dqn_DSMap_Find           (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
+DQN_API template <typename T> T *               Dqn_DSMap_Make           (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
+DQN_API template <typename T> bool              Dqn_DSMap_Resize         (Dqn_DSMap<T> *map, uint32_t size);
+DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_Set            (Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value);
+DQN_API template <typename T> bool              Dqn_DSMap_Erase          (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
 
-DQN_DS_MAP_API
-void Dqn_DSMap_Free(DQN_DS_MAP *map, Dqn_ZeroMem zero_mem);
-
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_Find(DQN_DS_MAP *map, K const &key);
-
-enum Dqn_DSMapFindOnly    { Dqn_DSMapFindOnly_No,    Dqn_DSMapFindOnly_Yes };
-enum Dqn_DSMapItemCreated { Dqn_DSMapItemCreated_No, Dqn_DSMapItemCreated_Yes };
-
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_FindOrAdd(DQN_DS_MAP *map, K const &key, Dqn_DSMapFindOnly find_only, Dqn_DSMapItemCreated *created);
-
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_Add(DQN_DS_MAP *map, K const &key, V const &value);
-
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_Make(DQN_DS_MAP *map, K const &key);
-
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_Get(DQN_DS_MAP *map, K const &key);
-
-DQN_DS_MAP_API
-void Dqn_DSMap_Erase(DQN_DS_MAP *map, K const &key, Dqn_ZeroMem zero_mem);
+// NOTE: Dqn_DSMapKey
+// =============================================================================
+DQN_API bool                                    Dqn_DSMap_KeyEquals    (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
+DQN_API bool                                    operator==             (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
+DQN_API Dqn_DSMapKey                            Dqn_DSMap_KeyBuffer    (void const *data, uint32_t size);
+DQN_API Dqn_DSMapKey                            Dqn_DSMap_KeyU64       (uint64_t u64);
+DQN_API Dqn_DSMapKey                            Dqn_DSMap_KeyU64NoHash (uint64_t u64);
+#define                                         Dqn_DSMap_KeyCStringLit(string) Dqn_DSMap_KeyBuffer(string, sizeof((string))/sizeof((string)[0]) - 1)
 #endif // !defined(DQN_NO_DSMAP)
 
 // ---------------------------------+-----------------------------+---------------------------------
@@ -1586,7 +1647,7 @@ struct Dqn_Library
     void *             log_file;       ///< TODO(dqn): Hmmm, how should we do this... ?
     Dqn_TicketMutex    log_file_mutex; ///< Is locked when instantiating the log_file for the first time
 
-#if defined(DQN_LEAK_TRACKING)
+#if defined(DQN_LEAK_TRACING)
     Dqn_TicketMutex          alloc_table_mutex;
     Dqn_DSMap<Dqn_LeakTrace> alloc_table;
 #endif
@@ -1618,7 +1679,7 @@ DQN_API void Dqn_Library_SetLogFile(void *file);
 /// Dump the per-thread arena statistics to the specified file
 DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path);
 
-#if defined(DQN_LEAK_TRACKING)
+#if defined(DQN_LEAK_TRACING)
 void Dqn_Library_LeakTraceAdd(Dqn_CallSite call_site, void *ptr, Dqn_usize size);
 void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr);
 #else
@@ -2874,11 +2935,12 @@ enum Dqn_FsInfoType
 
 struct Dqn_FsInfo
 {
+    bool           exists;
     Dqn_FsInfoType type;
-    uint64_t create_time_in_s;
-    uint64_t last_write_time_in_s;
-    uint64_t last_access_time_in_s;
-    uint64_t size;
+    uint64_t       create_time_in_s;
+    uint64_t       last_write_time_in_s;
+    uint64_t       last_access_time_in_s;
+    uint64_t       size;
 };
 
 // NOTE: File System API
@@ -3007,6 +3069,9 @@ struct Dqn_ThreadContext
 {
     Dqn_b32       init;
 
+    Dqn_Arena     arena;     ///< Per thread arena
+    Dqn_Allocator allocator; ///< Allocator that uses the arena
+
     /// Temp memory arena's for the calling thread
     Dqn_Arena     temp_arenas[DQN_THREAD_CONTEXT_ARENAS];
 
@@ -3031,7 +3096,7 @@ struct Dqn_ThreadScratch
     Dqn_Arena           *arena;
     Dqn_b32              destructed = false; /// Detect copies of the scratch
     Dqn_ArenaTempMemory  temp_memory;
-    #if defined(DQN_LEAK_TRACKING)
+    #if defined(DQN_LEAK_TRACING)
     Dqn_CallSite         leak_site__;
     #endif
 };
@@ -3062,62 +3127,116 @@ DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void co
 // ---------------------------------+-----------------------------+---------------------------------
 #if !defined(DQN_NO_JSON_BUILDER)
 // TODO(dqn): We need to write tests for this
-struct Dqn_JSONBuilder
-{
-    uint16_t            parent_field_count_stack[32];
-    int                 parent_field_count_stack_size;
-    Dqn_String8Builder  builder;
-    int                 indent_level;
-    int                 spaces_per_indent;
+enum Dqn_JSONBuilderItem {
+    Dqn_JSONBuilderItem_Empty,
+    Dqn_JSONBuilderItem_OpenContainer,
+    Dqn_JSONBuilderItem_CloseContainer,
+    Dqn_JSONBuilderItem_KeyValue,
 };
 
-#define Dqn_JSONBuilder_Object(writer)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBegin(writer), \
-                   Dqn_JSONBuilder_ObjectEnd(writer))
+/// Basic helper class to construct JSON string output
+struct Dqn_JSONBuilder {
+    bool                use_stdout;        ///< When set, ignore the string builder and dump immediately to stdout
+    Dqn_String8Builder  string_builder;    ///< (Internal)
+    int                 indent_level;      ///< (Internal)
+    int                 spaces_per_indent; ///< The number of spaces per indent level
+    Dqn_JSONBuilderItem last_item;
+};
 
-#define Dqn_JSONBuilder_ObjectNamed(writer, name)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBeginNamed(writer, name), \
-                   Dqn_JSONBuilder_ObjectEnd(writer))
+#define Dqn_JSONBuilder_Object(builder)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBegin(builder), \
+                   Dqn_JSONBuilder_ObjectEnd(builder))
 
-#define Dqn_JSONBuilder_Array(writer)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBegin(writer), \
-                   Dqn_JSONBuilder_ArrayEnd(writer))
+#define Dqn_JSONBuilder_ObjectNamed(builder, name)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBeginNamed(builder, name), \
+                   Dqn_JSONBuilder_ObjectEnd(builder))
 
-#define Dqn_JSONBuilder_ArrayNamed(writer, name)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBeginNamed(writer, name), \
-                   Dqn_JSONBuilder_ArrayEnd(writer))
+#define Dqn_JSONBuilder_Array(builder)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBegin(builder), \
+                   Dqn_JSONBuilder_ArrayEnd(builder))
 
-DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Arena *arena, int spaces_per_indent);
-DQN_API Dqn_String8     Dqn_JSONBuilder_Build(Dqn_JSONBuilder *builder, Dqn_Arena *arena);
+#define Dqn_JSONBuilder_ArrayNamed(builder, name)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBeginNamed(builder, name), \
+                   Dqn_JSONBuilder_ArrayEnd(builder))
 
-DQN_API void            Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
-DQN_API void            Dqn_JSONBuilder_ObjectBegin(Dqn_JSONBuilder *builder);
-DQN_API void            Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder);
 
-DQN_API void            Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
-DQN_API void            Dqn_JSONBuilder_ArrayBegin(Dqn_JSONBuilder *builder);
-DQN_API void            Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder);
+/// Initialise a JSON builder
+Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_indent);
 
-DQN_API void            Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-DQN_API void            Dqn_JSONBuilder_String(Dqn_JSONBuilder *builder, Dqn_String8 value);
+/// Convert the internal JSON buffer in the builder into a string.
+///
+/// @param[in] arena The allocator to use to build the string
+Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder const *builder, Dqn_Allocator allocator);
 
-DQN_API void            Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-DQN_API void            Dqn_JSONBuilder_Literal(Dqn_JSONBuilder *builder, Dqn_String8 value);
+/// Add a JSON key value pair untyped. The value is emitted directly without
+/// checking the contents of value.
+///
+/// All other functions internally call into this function which is the main
+/// workhorse of the builder.
+void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
 
-DQN_API void            Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
-DQN_API void            Dqn_JSONBuilder_U64(Dqn_JSONBuilder *builder, uint64_t value);
+void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, ...);
 
-DQN_API void            Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
-DQN_API void            Dqn_JSONBuilder_I64(Dqn_JSONBuilder *builder, uint64_t value);
+/// Begin a named JSON object for writing into in the builder
+///
+/// Generates internally a string like '"<name>": {'
+void    Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
+#define Dqn_JSONBuilder_ObjectBegin(builder) Dqn_JSONBuilder_ObjectBeginNamed(builder, DQN_STRING8(""))
 
-/// @param[in] decimal_places When < 0 show the default number of decimal places
-/// When >=0 show the specified amount of decimal places
-DQN_API void            Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places);
-DQN_API void            Dqn_JSONBuilder_F64(Dqn_JSONBuilder *builder, double value, int decimal_places);
+/// End a JSON object for writing into in the builder
+///
+/// Generates internally a string like '}'
+void  Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder);
 
-DQN_API void            Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value);
-DQN_API void            Dqn_JSONBuilder_Bool(Dqn_JSONBuilder *builder, bool value);
-#endif // !defiend(DQN_NO_JSON_BUIDLER)
+/// Begin a named JSON array for writing into in the builder
+///
+/// Generates internally a string like '"<name>": ['
+void    Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
+#define Dqn_JSONBuilder_ArrayBegin(builder) Dqn_JSONBuilder_ArrayBeginNamed(builder, DQN_STRING8(""))
+
+/// Begin a named JSON array for writing into in the builder
+///
+/// Generates internally a string like ']'
+void Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder);
+
+/// Add a named JSON string key-value object
+///
+/// Generates internally a string like '"<key>": "<value>"'
+void    Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+#define Dqn_JSONBuilder_String(builder, value) Dqn_JSONBuilder_StringNamed(builder, DQN_STRING8(""), value)
+
+/// Add a named JSON key-value object whose value is directly written
+///
+/// Generates internally a string like '"<key>": <value>' (e.g. useful for
+/// emitting the 'null' value)
+void    Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+#define Dqn_JSONBuilder_Literal(builder, value) Dqn_JSONBuilder_LiteralNamed(builder, DQN_STRING8(""), value)
+
+/// Add a named JSON u64 key-value object
+///
+/// Generates internally a string like '"<key>": <value>'
+void    Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
+#define Dqn_JSONBuilder_U64(builder, value) Dqn_JSONBuilder_U64Named(builder, DQN_STRING8(""), value)
+
+/// Add a JSON i64 key-value object
+///
+/// Generates internally a string like '"<key>": <value>'
+void    Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, int64_t value);
+#define Dqn_JSONBuilder_I64(builder, value) Dqn_JSONBuilder_I64Named(builder, DQN_STRING8(""), value)
+
+/// Add a JSON f64 key-value object
+///
+/// Generates internally a string like '"<key>": <value>'
+/// @param[in] decimal_places The number of decimal places to preserve. Maximum 16
+void    Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places);
+#define Dqn_JSONBuilder_F64(builder, value) Dqn_JSONBuilder_F64Named(builder, DQN_STRING8(""), value)
+
+/// Add a JSON bool key-value object
+///
+/// Generates internally a string like '"<key>": <value>'
+void    Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value);
+#define Dqn_JSONBuilder_Bool(builder, value) Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8(""), value)
+#endif // !defined(DQN_NO_JSON_BUIDLER)
 
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
@@ -3157,455 +3276,322 @@ struct Dqn_MurmurHash3 { uint64_t e[2]; };
 DQN_API uint32_t        Dqn_MurmurHash3_x86U32 (void const *key, int len, uint32_t seed);
 DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32_t seed);
 #define Dqn_MurmurHash3_x64U128AsU64(key, len, seed) (Dqn_MurmurHash3_x64U128(key, len, seed).e[0])
+#define Dqn_MurmurHash3_x64U128AsU32(key, len, seed) (DQN_CAST(uint32_t)Dqn_MurmurHash3_x64U128(key, len, seed).e[0])
 
-// NOTE: Dqn_Map Template Implementation
-// -------------------------------------------------------------------------------------------------
-#if !defined(DQN_NO_MAP)
-template <typename T>
-Dqn_Map<T> Dqn_Map_InitWithArena(Dqn_Arena *arena, Dqn_isize size)
-{
-    Dqn_Map<T> result = {};
-    result.arena      = arena;
-
-    Dqn_isize final_size          = size == 0 ? 4096 : size;
-    result.slots                  = Dqn_Arena_NewArray(arena, Dqn_MapEntry<T> *, final_size, Dqn_ZeroMem_Yes);
-    if (result.slots) result.size = final_size;
-    return result;
-}
-
-template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_FindOrAdd_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, Dqn_MapCollideRule rule)
-{
-    Dqn_isize         index = hash % map->size;
-    Dqn_MapEntry<T> *result = map->slots[index];
-
-    if (result) {
-        if (rule == Dqn_MapCollideRule::Chain) {
-            while (result->hash != hash) {
-                if (result->next)
-                    result = result->next;
-                else {
-                    map->chain_count++;
-                    result->next = (Dqn_MapEntry<T> *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG map->arena, sizeof(Dqn_MapEntry<T>), alignof(Dqn_MapEntry<T>), Dqn_ZeroMem_Yes);
-                    result       = result->next;
-                    break;
-                }
-            }
-        } else if (rule == Dqn_MapCollideRule::Fail) {
-            result = nullptr;
-        }
-    } else {
-        result = (Dqn_MapEntry<T> *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG map->arena, sizeof(Dqn_MapEntry<T>), alignof(Dqn_MapEntry<T>), Dqn_ZeroMem_Yes);
-        map->count++;
-        map->slots[index] = result;
-    }
-
-    if (result)
-        result->hash = hash;
-
-    return result;
-}
-
-template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, T &value, Dqn_MapCollideRule rule)
-{
-    Dqn_MapEntry<T> *result = Dqn_Map_FindOrAdd(DQN_LEAK_TRACE_ARG map, hash, rule);
-    if (result)
-        result->value = value;
-
-    return result;
-}
-
-template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_AddCopy_(DQN_LEAK_TRACE_FUNCTION Dqn_Map<T> *map, uint64_t hash, T const &value, Dqn_MapCollideRule rule)
-{
-    Dqn_MapEntry<T> *result = Dqn_Map_FindOrAdd(DQN_LEAK_TRACE_ARG map, hash, rule);
-    if (result)
-        result->value = value;
-
-    return result;
-}
-
-template <typename T>
-Dqn_MapEntry<T> *Dqn_Map_Get(Dqn_Map<T> *map, uint64_t hash)
-{
-    Dqn_isize         index  = hash % map->size;
-    Dqn_MapEntry<T> *result = nullptr;
-    for (Dqn_MapEntry<T> *entry = map->slots[index];
-         !result && entry;
-         entry = entry->next)
-    {
-        result = (entry->hash == hash) ? entry : nullptr;
-    }
-
-    return result;
-}
-
-template <typename T>
-void Dqn_Map_Erase(Dqn_Map<T> *map, uint64_t hash, Dqn_ZeroMem zero_mem)
-{
-    Dqn_isize         index = hash % map->size;
-    Dqn_MapEntry<T> **entry = &(map->slots[index]);
-    bool is_chain_entry = *entry && (*entry)->next;
-
-    while ((*entry) && (*entry)->hash != hash)
-        entry = &((*entry)->next);
-
-    bool result = false;
-    if ((*entry) && (*entry)->hash == hash) {
-        result = true;
-        Dqn_MapEntry<T> *erase_entry = *entry;
-        Dqn_MapEntry<T> *next        = erase_entry->next;
-        (*entry)                     = next;
-
-        if (zero_mem == Dqn_ZeroMem_Yes)
-            DQN_MEMSET(erase_entry, DQN_MEMSET_BYTE, sizeof(*erase_entry));
-
-        erase_entry->next = map->free_list;
-        map->free_list    = erase_entry;
-
-        if (is_chain_entry) map->chain_count--;
-        else map->count--;
-    }
-}
-#endif // !defined(DQN_NO_MAP)
-
-// NOTE: Dqn_DSMap Template Implementation
-// -------------------------------------------------------------------------------------------------
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// ---------------------------------+-----------------------------+---------------------------------
 #if !defined(DQN_NO_DSMAP)
-DQN_DS_MAP_API
-DQN_DS_MAP Dqn_DSMap_Init(Dqn_isize size)
+uint32_t const DQN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
+uint32_t const DQN_DS_MAP_SENTINEL_SLOT = 0;
+
+template <typename T>
+Dqn_DSMap<T> Dqn_DSMap_Init(uint32_t size)
 {
-    DQN_DS_MAP result = {};
-    if (Dqn_Safe_AssertF(size > 0 && (size & (size - 1)) == 0, "Non-zero & power of 2 table size required")) {
-        // TODO: We need to use placement new for C++ crap
-        result.slots = (Dqn_DSMapItem<K, V> *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE &result.arena,
-                                                                  sizeof(Dqn_DSMapItem<K, V>) * size,
-                                                                  alignof(Dqn_DSMapItem<K, V>),
-                                                                  Dqn_ZeroMem_Yes);
-        if (result.slots)
-            result.size = size;
+    Dqn_DSMap<T> result = {};
+    if (Dqn_Safe_AssertF((size & (size - 1)) == 0, "Power-of-two size required")) {
+        result.hash_to_slot = Dqn_Allocator_NewArray(result.allocator, uint32_t, size, Dqn_ZeroMem_Yes);
+        if (result.hash_to_slot) {
+            result.slots = Dqn_Allocator_NewArray(result.allocator, Dqn_DSMapSlot<T>, size, Dqn_ZeroMem_Yes);
+            if (result.slots) {
+                result.occupied     = 1; // For sentinel
+                result.size         = size;
+                result.initial_size = size;
+            } else {
+                Dqn_Allocator_Dealloc(result.allocator, result.hash_to_slot, size * sizeof(*result.hash_to_slot));
+            }
+        }
     }
     return result;
 }
 
-DQN_DS_MAP_API
-void Dqn_DSMap_Free(DQN_DS_MAP *map, Dqn_ZeroMem zero_mem)
+template <typename T>
+void Dqn_DSMap_Deinit(Dqn_DSMap<T> *map)
 {
-    Dqn_Arena_Free(&map->arena, zero_mem);
+    if (!map)
+        return;
+    if (map->slots)
+        Dqn_Allocator_Dealloc(map->allocator, map->slots, sizeof(*map->slots) * map->size);
+    if (map->hash_to_slot)
+        Dqn_Allocator_Dealloc(map->allocator, map->hash_to_slot, sizeof(*map->hash_to_slot) * map->size);
     *map = {};
 }
 
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_Find(DQN_DS_MAP *map, uint64_t hash)
+template <typename T>
+bool Dqn_DSMap_IsValid(Dqn_DSMap<T> const *map)
 {
-    Dqn_DSMapItem<K, V> *result = Dqn_DSMap_FindOrAdd(map, hash, true /*find_only*/);
+    bool result = map &&
+                  map->hash_to_slot &&                  // Hash to slot mapping array must be allocated
+                  map->slots &&                         // Slots array must be allocated
+                  (map->size & (map->size - 1)) == 0 && // Must be power of two size
+                  map->occupied >= 1;                   // DQN_DS_MAP_SENTINEL_SLOT takes up one slot
     return result;
 }
 
-DQN_FILE_SCOPE uint64_t Dqn_DSMap_KeyHash_(Dqn_DSMapHashProc *hash_function, void const *key, int key_size)
+template <typename T>
+uint32_t Dqn_DSMap_Hash(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
 {
-    uint64_t result;
-    if (hash_function)
-        result = hash_function(&key, key_size);
-    else
-        result = Dqn_MurmurHash3_x64U128AsU64(&key, key_size, 0xc8f451ac/*seed*/);
-    return result;
-}
-
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_FindOrAdd(DQN_DS_MAP *map, K const &key, Dqn_DSMapFindOnly find_only, Dqn_DSMapItemCreated *created)
-{
-    if (created)
-        *created = Dqn_DSMapItemCreated_No;
-
+    uint32_t result = 0;
     if (!map)
-        return nullptr;
+        return result;
 
-    if (!map->slots) {
-        if (find_only)
-            return nullptr;
-        else
-            *map = Dqn_DSMap_Init<K, V>(DQN_DSMAP_MIN_SIZE);
+    if (key.type == Dqn_DSMapKeyType_U64NoHash) {
+        result = DQN_CAST(uint32_t)key.payload.u64;
+        return result;
     }
 
-    // NOTE: Search for a vacant entry, linear probe if hash collision
-    uint64_t hash               = Dqn_DSMap_KeyHash_(map->hash_function, &key, sizeof(key));
-    Dqn_isize            index  = hash % map->size;
-    Dqn_DSMapItem<K, V> *result = map->slots + index;
-    while (result->occupied && result->key != key) {
-        index  = (index + 1) % map->size;
-        result = map->slots + index;
-    }
-
-    if (result->occupied) {
-        DQN_ASSERT_MSG(result->key == key,
-                       "We have a max load factor of 70%% so we should never get an occupied slot that doesn't match "
-                       "the hash we were searching for");
-    } else if (find_only == Dqn_DSMapFindOnly_Yes) {
-        result = nullptr;
+    uint32_t seed = map->hash_seed ? map->hash_seed : DQN_DS_MAP_DEFAULT_HASH_SEED;
+    if (map->hash_function) {
+        map->hash_function(key, seed);
     } else {
-        // NOTE: Fill the entry
-        result->key      = key;
-        result->occupied = true;
+        // NOTE: Courtesy of Demetri Spanos (which this hash table was inspired
+        // from), the following is a hashing function snippet provided for
+        // reliable, quick and simple quality hashing functions for hash table
+        // use.
+        // Source: https://github.com/demetri/scribbles/blob/c475464756c104c91bab83ed4e14badefef12ab5/hashing/ub_aware_hash_functions.c
 
-        if (created)
-            *created = Dqn_DSMapItemCreated_Yes;
+        char const *key_ptr = nullptr;
+        uint32_t len        = 0;
+        uint32_t h          = seed;
+        switch (key.type) {
+            case Dqn_DSMapKeyType_U64NoHash: DQN_INVALID_CODE_PATH; /*FALLTHRU*/
+            case Dqn_DSMapKeyType_Invalid: break;
 
-        // NOTE: Add the entry to the linked list of items (for iterability)
-        if (map->link_tail) {
-            map->link_tail->next = result;
-            result->prev         = map->link_tail;
-        } else {
-            map->link_head = result;
+            case Dqn_DSMapKeyType_Buffer:
+                key_ptr = DQN_CAST(char const *)key.payload.buffer.data;
+                len     = key.payload.buffer.size;
+                break;
+
+            case Dqn_DSMapKeyType_U64:
+                key_ptr = DQN_CAST(char const *)&key.payload.u64;
+                len     = sizeof(key.payload.u64);
+                break;
         }
-        map->link_tail = result;
 
-        // NOTE: Grow the hashtable if we hit the loading limit
-        Dqn_f32 load_factor = ++map->count / DQN_CAST(Dqn_f32)map->size;
-        if (load_factor >= 0.7f) {
+        // Murmur3 32-bit without UB unaligned accesses
+        // uint32_t mur3_32_no_UB(const void *key, int len, uint32_t h)
 
-            auto new_map = Dqn_DSMap_Init<K, V>(map->size << 1);
-            for (Dqn_DSMapItem<K, V> *entry = map->link_head; entry; entry = entry->next) {
-                if (!entry->occupied)
+        // main body, work on 32-bit blocks at a time
+        for (uint32_t i = 0; i < len / 4; i++) {
+            uint32_t k;
+            memcpy(&k, &key_ptr[i * 4], sizeof(k));
+
+            k *= 0xcc9e2d51;
+            k = ((k << 15) | (k >> 17)) * 0x1b873593;
+            h = (((h ^ k) << 13) | ((h ^ k) >> 19)) * 5 + 0xe6546b64;
+        }
+
+        // load/mix up to 3 remaining tail bytes into a tail block
+        uint32_t t    = 0;
+        uint8_t *tail = ((uint8_t *)key_ptr) + 4 * (len / 4);
+        switch (len & 3) {
+            case 3: t ^= tail[2] << 16;
+            case 2: t ^= tail[1] << 8;
+            case 1: {
+                t ^= tail[0] << 0;
+                h ^= ((0xcc9e2d51 * t << 15) | (0xcc9e2d51 * t >> 17)) * 0x1b873593;
+            }
+        }
+
+        // finalization mix, including key length
+        h      = ((h ^ len) ^ ((h ^ len) >> 16)) * 0x85ebca6b;
+        h      = (h ^ (h >> 13)) * 0xc2b2ae35;
+        result = h ^ (h >> 16);
+    }
+    return result;
+}
+
+template <typename T>
+uint32_t Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key, uint32_t hash)
+{
+    uint32_t result = DQN_DS_MAP_SENTINEL_SLOT;
+    if (!Dqn_DSMap_IsValid(map))
+        return result;
+
+    result = hash & (map->size - 1);
+    for (;;) {
+        if (map->hash_to_slot[result] == DQN_DS_MAP_SENTINEL_SLOT)
+            return result;
+
+        Dqn_DSMapSlot<T> *slot = map->slots + map->hash_to_slot[result];
+        if (slot->key.type == Dqn_DSMapKeyType_Invalid || (slot->hash == hash && slot->key == key))
+            return result;
+
+        result = (result + 1) & (map->size - 1);
+    }
+}
+
+template <typename T>
+Dqn_DSMapSlot<T> *Dqn_DSMap_FindSlot(Dqn_DSMap<T> const *map, Dqn_DSMapKey key, uint32_t hash)
+{
+    Dqn_DSMapSlot<T> const *result = nullptr;
+    if (Dqn_DSMap_IsValid(map)) {
+        uint32_t index = Dqn_DSMap_HashToSlotIndex(map, key, hash);
+        if (map->hash_to_slot[index] != DQN_DS_MAP_SENTINEL_SLOT)
+            result = map->slots + map->hash_to_slot[index];
+    }
+    return DQN_CAST(Dqn_DSMapSlot<T> *)result;
+}
+
+template <typename T>
+Dqn_DSMapSlot<T> *Dqn_DSMap_MakeSlot(Dqn_DSMap<T> *map, Dqn_DSMapKey key, uint32_t hash)
+{
+    Dqn_DSMapSlot<T> *result = nullptr;
+    if (Dqn_DSMap_IsValid(map)) {
+        uint32_t index = Dqn_DSMap_HashToSlotIndex(map, key, hash);
+        if (map->hash_to_slot[index] == DQN_DS_MAP_SENTINEL_SLOT)
+            map->hash_to_slot[index] = map->occupied++;
+        result = map->slots + map->hash_to_slot[index];
+    }
+    return result;
+}
+
+template <typename T>
+T *Dqn_DSMap_Find(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
+{
+    T const *result = nullptr;
+    if (Dqn_DSMap_IsValid(map)) {
+        uint32_t      hash     = Dqn_DSMap_Hash(map, key);
+        Dqn_DSMapSlot<T> *slot = Dqn_DSMap_FindSlot(map, key, hash);
+        result                 = slot ? &slot->value : nullptr;
+    }
+    return DQN_CAST(T *)result;
+}
+
+template <typename T>
+T *Dqn_DSMap_Make(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
+{
+    T const *result = nullptr;
+    if (Dqn_DSMap_IsValid(map)) {
+        uint32_t      hash     = Dqn_DSMap_Hash(map, key);
+        Dqn_DSMapSlot<T> *slot = Dqn_DSMap_MakeSlot(map, key, hash);
+        result                 = &slot->value;
+    }
+    return DQN_CAST(T *)result;
+}
+
+template <typename T>
+bool Dqn_DSMap_Resize(Dqn_DSMap<T> *map, uint32_t size)
+{
+    if (!Dqn_DSMap_IsValid(map) || size < map->occupied || size < map->initial_size)
+        return false;
+
+    Dqn_DSMap<T> new_map = Dqn_DSMap_Init<T>(size);
+    if (!Dqn_DSMap_IsValid(&new_map))
+        return false;
+
+    new_map.initial_size = map->initial_size;
+    for (uint32_t old_index = 1 /*Sentinel*/; old_index < map->occupied; old_index++) {
+        Dqn_DSMapSlot<T> *old_slot = map->slots + old_index;
+        if (old_slot->key.type != Dqn_DSMapKeyType_Invalid) {
+            Dqn_DSMapSlot<T> *slot = Dqn_DSMap_MakeSlot(&new_map, old_slot->key, old_slot->hash);
+            *slot              = *old_slot;
+        }
+    }
+
+    DQN_MEMCPY(new_map.slots, map->slots, sizeof(*map->slots) * map->occupied);
+    Dqn_DSMap_Deinit(map);
+    *map = new_map;
+    return true;
+}
+
+template <typename T>
+Dqn_DSMapSlot<T> *Dqn_DSMap_Set(Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value)
+{
+    Dqn_DSMapSlot<T> *result = nullptr;
+    if (!Dqn_DSMap_IsValid(map))
+        return result;
+
+    uint32_t hash = Dqn_DSMap_Hash(map, key);
+    result        = Dqn_DSMap_MakeSlot(map, key, hash);
+    if (result->key.type != Dqn_DSMapKeyType_Invalid) { // NOTE: Exists already, just update
+        result->value = value;
+        return result;
+    }
+
+    bool map_is_75pct_full = (map->occupied * 4) > (map->size * 3);
+    if (map_is_75pct_full) {
+        if (!Dqn_DSMap_Resize(map, map->size * 2))
+            return result;
+        result = Dqn_DSMap_MakeSlot(map, key, hash);
+    }
+
+    result->key   = key;
+    result->value = value;
+    result->hash  = hash;
+    return result;
+}
+
+template <typename T>
+bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
+{
+    if (!Dqn_DSMap_IsValid(map))
+        return false;
+
+    uint32_t hash       = Dqn_DSMap_Hash(map, key);
+    uint32_t index      = Dqn_DSMap_HashToSlotIndex(map, key, hash);
+    uint32_t slot_index = map->hash_to_slot[index];
+    if (slot_index == DQN_DS_MAP_SENTINEL_SLOT)
+        return false;
+
+    // NOTE: Mark the slot as unoccupied
+    map->hash_to_slot[index] = DQN_DS_MAP_SENTINEL_SLOT;
+    map->slots[slot_index]   = {}; // TODO: Optional?
+
+    if (map->occupied > 1 /*Sentinel*/) {
+        // NOTE: Repair the hash chain, e.g. rehash all the items after the removed
+        // element and reposition them if necessary.
+        for (uint32_t probe_index = index;;) {
+            probe_index = (probe_index + 1) & (map->size - 1);
+            if (map->hash_to_slot[probe_index] == DQN_DS_MAP_SENTINEL_SLOT)
+                break;
+
+            Dqn_DSMapSlot<T> *probe = map->slots + map->hash_to_slot[probe_index];
+            uint32_t new_index  = probe->hash & (map->size - 1);
+            if (index <= probe_index) {
+                if (index < new_index && new_index <= probe_index)
                     continue;
-
-                Dqn_DSMapItem<K, V> *new_entry = Dqn_DSMap_Add(&new_map, entry->key, entry->value);
-                if (new_entry->key == key)
-                    result = new_entry;
+            } else {
+                if (index < new_index || new_index <= probe_index)
+                    continue;
             }
 
-            Dqn_DSMap_Free(map, Dqn_ZeroMem_No);
-            *map = new_map;
+            map->hash_to_slot[index]       = map->hash_to_slot[probe_index];
+            map->hash_to_slot[probe_index] = DQN_DS_MAP_SENTINEL_SLOT;
+            index                          = probe_index;
+            DQN_ASSERT(Dqn_DSMap_FindSlot(map, probe->key, probe->hash) == probe);
+        }
+
+        // NOTE: We have erased a slot from the hash table, this leaves a gap
+        // in our contiguous array. After repairing the chain, the hash mapping
+        // is correct.
+        // We will now fill in the vacant spot that we erased using the last 
+        // element in the slot list.
+        if (map->occupied >= 3 /*Ignoring sentinel, at least 2 other elements to unstable erase*/) {
+            // NOTE: Copy in last slot to the erase slot
+            Dqn_DSMapSlot<T> *last_slot = map->slots + map->occupied - 1;
+            map->slots[slot_index]      = *last_slot;
+
+            // NOTE: Update the hash-to-slot mapping for the value that was copied in
+            uint32_t hash_to_slot_index           = Dqn_DSMap_HashToSlotIndex(map, last_slot->key, last_slot->hash);
+            map->hash_to_slot[hash_to_slot_index] = slot_index;
+            *last_slot = {}; // TODO: Optional?
         }
     }
 
-    return result;
-}
+    map->occupied--;
+    bool map_is_below_25pct_full = (map->occupied * 4) < (map->size * 1);
+    if (map_is_below_25pct_full && (map->size / 2) >= map->initial_size)
+        Dqn_DSMap_Resize(map, map->size / 2);
 
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_Add(DQN_DS_MAP *map, K const &key, V const &value)
-{
-    Dqn_DSMapItem<K, V> *result = Dqn_DSMap_FindOrAdd(map, key, Dqn_DSMapFindOnly_No, nullptr /*added*/);
-    if (result)
-        result->value = value;
-
-    return result;
-}
-
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_Make(DQN_DS_MAP *map, K const &key)
-{
-    Dqn_DSMapItem<K, V> *result = Dqn_DSMap_FindOrAdd(map, key, Dqn_DSMapFindOnly_No, nullptr /*added*/);
-    return result;
-}
-
-DQN_DS_MAP_API
-Dqn_DSMapItem<K, V> *Dqn_DSMap_Get(DQN_DS_MAP *map, K const &key)
-{
-    Dqn_DSMapItem<K, V> *result = Dqn_DSMap_FindOrAdd(map, key, Dqn_DSMapFindOnly_Yes, nullptr /*added*/);
-    return result;
-}
-
-DQN_DS_MAP_API
-void Dqn_DSMap_Erase(DQN_DS_MAP *map, K const &key, Dqn_ZeroMem zero_mem)
-{
-    if (!map)
-        return;
-
-    uint64_t hash               = Dqn_DSMap_KeyHash_(map, &key, sizeof(key));
-    Dqn_isize            index  = hash % map->size;
-    Dqn_DSMapItem<K, V> *result = map->slots + index;
-    if (!result || !result->occupied)
-        return;
-
-    // NOTE: Unlink the item
-    if (result->prev)
-        result->prev->next = result->next;
-    if (result->next)
-        result->next->prev = result->prev;
-
-    result->next = nullptr;
-    result->prev = nullptr;
-
-    // NOTE: Probe forward in the hash table and fill the gap with adjacent
-    // entries that were linear-probed on the entry we just deleted
-    Dqn_isize start_index = index;
-    Dqn_isize probe_index = index;
-    for (;;) {
-        probe_index                = (probe_index + 1) % map->size;
-        Dqn_DSMapItem<K, V> *probe = map->slots + probe_index;
-        if (!probe->occupied)
-            break;
-
-        Dqn_isize desired_index = probe->hash % map->size;
-        if (desired_index != probe_index) {
-            map->slots[start_index] = map->slots[probe_index];
-            start_index             = probe_index;
-            DQN_ASSERT(map->slots[start_index].occupied);
-            DQN_ASSERT(map->slots[probe_index].occupied);
-        }
-    }
-
-    // NOTE: Delete the entry, note that if there were probes, this will end up
-    // deleting the last item in the chain which is what we want because
-    // essentially every entry gets shifted up the chain by 1 spot.
-    DQN_ASSERT(map->slots[start_index].occupied);
-    map->slots[start_index].occupied = false;
-    map->count -= 1;
-
-    if (zero_mem == Dqn_ZeroMem_Yes) {
-        DQN_MEMSET(map->slots + start_index, DQN_MEMSET_BYTE, sizeof(map->slots[start_index]));
-    }
+    return true;
 }
 #endif // !defined(DQN_NO_DSMAP)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
-// ---------------------------------+-----------------------------+---------------------------------
-DQN_API void Dqn_Library_SetLogCallback(Dqn_LogProc *proc, void *user_data)
-{
-    dqn_library.log_callback  = proc;
-    dqn_library.log_user_data = user_data;
-}
-
-DQN_API void Dqn_Library_SetLogFile(FILE *file)
-{
-    Dqn_TicketMutex_Begin(&dqn_library.log_file_mutex);
-    dqn_library.log_file    = file;
-    dqn_library.log_to_file = file ? true : false;
-    Dqn_TicketMutex_End(&dqn_library.log_file_mutex);
-}
-
-DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
-{
-    #if defined(DQN_DEBUG_THREAD_CONTEXT)
-    // NOTE: Open a file to write the arena stats to
-    FILE *file = nullptr;
-    fopen_s(&file, file_path.data, "a+b");
-    if (file) {
-        Dqn_Log_ErrorF("Failed to dump thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
-        return;
-    }
-
-    // NOTE: Copy the stats from library book-keeping
-    // NOTE: Extremely short critical section, copy the stats then do our
-    // work on it.
-    Dqn_ArenaStat stats[Dqn_CArray_CountI(dqn_library.thread_context_arena_stats)];
-    int stats_size = 0;
-
-    Dqn_TicketMutex_Begin(&dqn_library.thread_context_mutex);
-    stats_size = dqn_library.thread_context_arena_stats_count;
-    DQN_MEMCPY(stats, dqn_library.thread_context_arena_stats, sizeof(stats[0]) * stats_size);
-    Dqn_TicketMutex_End(&dqn_library.thread_context_mutex);
-
-    // NOTE: Print the cumulative stat
-    Dqn_DateHMSTimeString now = Dqn_Date_HMSLocalTimeStringNow();
-    fprintf(file,
-            "Time=%.*s %.*s | Thread Context Arenas | Count=%d\n",
-            now.date_size, now.date,
-            now.hms_size, now.hms,
-            dqn_library.thread_context_arena_stats_count);
-
-    // NOTE: Write the cumulative thread arena data
-    {
-        Dqn_ArenaStat stat = {};
-        for (Dqn_isize index = 0; index < stats_size; index++) {
-            Dqn_ArenaStat const *current = stats + index;
-            stat.capacity += current->capacity;
-            stat.used     += current->used;
-            stat.wasted   += current->wasted;
-            stat.blocks   += current->blocks;
-
-            stat.capacity_hwm = DQN_MAX(stat.capacity_hwm, current->capacity_hwm);
-            stat.used_hwm     = DQN_MAX(stat.used_hwm, current->used_hwm);
-            stat.wasted_hwm   = DQN_MAX(stat.wasted_hwm, current->wasted_hwm);
-            stat.blocks_hwm   = DQN_MAX(stat.blocks_hwm, current->blocks_hwm);
-        }
-
-        Dqn_ArenaStatString stats_string = Dqn_Arena_StatString(&stat);
-        fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.data);
-    }
-
-    // NOTE: Print individual thread arena data
-    for (Dqn_isize index = 0; index < stats_size; index++) {
-        Dqn_ArenaStat const *current = stats + index;
-        Dqn_ArenaStatString current_string = Dqn_Arena_StatString(current);
-        fprintf(file, "  [%03d] CURR %.*s\n", DQN_CAST(int)index, current_string.size, current_string.data);
-    }
-
-    fclose(file);
-    DQN_LOG_I("Dumped thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
-    #else
-    (void)file_path;
-    #endif // #if defined(DQN_DEBUG_THREAD_CONTEXT)
-}
-
-#if defined(DQN_LEAK_TRACKING)
-DQN_API void Dqn_Library_LeakTraceAdd(Dqn_CallSite call_site, void *ptr, Dqn_usize size)
-{
-    if (!ptr)
-        return;
-
-    Dqn_TicketMutex_Begin(&dqn_library.alloc_table_mutex);
-    Dqn_DSMapItemCreated created       = Dqn_DSMapItemCreated_No;
-    Dqn_DSMapItem<Dqn_LeakTrace> *item = Dqn_DSMap_FindOrAdd(&dqn_library.alloc_table, (uintptr_t)ptr, Dqn_DSMapFindOnly_No, &created);
-
-    // NOTE: If the entry was not added, we are reusing a pointer that has been freed.
-    Dqn_LeakTrace *trace = &item->value;
-    if (created == Dqn_DSMapItemCreated_No) {
-        DQN_HARD_ASSERT_MSG(trace->freed, "This pointer is already in the leak tracker, however it"
-                                          " has not been freed yet. Somehow this pointer has been"
-                                          " given to the allocation table and has not being marked"
-                                          " freed with an equivalent call to LeakTraceMarkFree()"
-                                          " [ptr=%p, size=%_$$d, file=\"%.*s:%u\","
-                                          " function=\"%.*s\"]",
-                                          ptr,
-                                          size,
-                                          DQN_STRING_FMT(trace->call_site.file),
-                                          trace->call_site.line,
-                                          DQN_STRING_FMT(trace->call_site.function));
-    }
-
-    trace->ptr       = ptr;
-    trace->size      = size;
-    trace->call_site = call_site;
-    Dqn_TicketMutex_End(&dqn_library.alloc_table_mutex);
-}
-
-DQN_API void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr)
-{
-    if (!ptr)
-        return;
-
-    Dqn_TicketMutex_Begin(&dqn_library.alloc_table_mutex);
-
-    Dqn_DSMapItem<Dqn_LeakTrace> *item = Dqn_DSMap_Get(&dqn_library.alloc_table, DQN_CAST(uintptr_t)ptr);
-    DQN_HARD_ASSERT_MSG(item, "Allocated pointer can not be removed as it does not exist in the"
-                              " allocation table. When this memory was allocated, the pointer was"
-                              " not added to the allocation table [ptr=%p]",
-                              ptr);
-
-    Dqn_LeakTrace *trace = &item->value;
-    DQN_HARD_ASSERT_MSG(!trace->freed,
-                        "Double free detected, pointer was previously allocated at [ptr=%p, %_$$d, file=\"%.*s:%u\", function=\"%.*s\"]",
-                        ptr,
-                        trace->size,
-                        DQN_STRING_FMT(trace->call_site.file),
-                        trace->call_site.line,
-                        DQN_STRING_FMT(trace->call_site.function));
-
-    trace->freed           = true;
-    trace->freed_size      = trace->size;
-    trace->freed_call_site = call_site;
-    Dqn_TicketMutex_End(&dqn_library.alloc_table_mutex);
-}
-#endif /// defined(DQN_LEAK_TRACKING)
-
+#if !defined(DQN_NO_FSTRING8)
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
 // ---------------------------------+-----------------------------+---------------------------------
-#if !defined(DQN_NO_FSTRING8)
 DQN_FSTRING8_API
 DQN_FSTRING8 Dqn_FString8_InitF(char const *fmt, ...)
 {
@@ -3708,9 +3694,10 @@ Dqn_String8 Dqn_FString8_ToString8(DQN_FSTRING8 const *string)
 }
 #endif // !defined(DQN_NO_FSTRING8)
 
-// NOTE: Dqn_FArray Template Implementation
-// -------------------------------------------------------------------------------------------------
 #if !defined(DQN_NO_FARRAY)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
+// ---------------------------------+-----------------------------+---------------------------------
 DQN_FARRAY_API
 DQN_FARRAY Dqn_FArray_Init(T const *item, Dqn_isize count)
 {
@@ -4187,6 +4174,7 @@ Dqn_BinarySearch(T const                        *array,
         #define HTTP_ADDREQ_FLAG_COALESCE                  HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA
         #define HTTP_ADDREQ_FLAG_REPLACE    0x80000000
 
+        #define SW_MAXIMIZED 3
         #define SW_SHOW 5
 
         typedef enum PROCESS_DPI_AWARENESS {
@@ -4236,6 +4224,13 @@ Dqn_BinarySearch(T const                        *array,
             void *lpSecurityDescriptor;
             bool bInheritHandle;
         } SECURITY_ATTRIBUTES;
+
+        typedef struct {
+          long left;
+          long top;
+          long right;
+          long bottom;
+        } RECT, *PRECT, *NPRECT, *LPRECT;
 
         typedef struct {
             union {
@@ -4367,6 +4362,9 @@ Dqn_BinarySearch(T const                        *array,
         /*BOOL*/      int            __stdcall FreeLibrary                (void *hModule);
         /*FARPROC*/   void *         __stdcall GetProcAddress             (void *hModule, char const *lpProcName);
 
+        /*BOOL*/      int            __stdcall GetWindowRect              (void *hWnd, RECT *lpRect);
+        /*BOOL*/      int            __stdcall SetWindowPos               (void *hWnd, void *hWndInsertAfter, int X, int Y, int cx, int cy, unsigned int uFlags);
+
         /*DWORD*/     unsigned long  __stdcall GetWindowModuleFileNameA   (void *hwnd, char *pszFileName, unsigned int cchFileNameMax);
         /*HMODULE*/   void *         __stdcall GetModuleHandleA           (char const *lpModuleName);
         /*DWORD*/     unsigned long  __stdcall GetModuleFileNameW         (void *hModule, wchar_t *lpFilename, unsigned long nSize);
@@ -4410,7 +4408,9 @@ Dqn_BinarySearch(T const                        *array,
         /*BOOLAPI*/   int            __stdcall HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
         /*BOOLAPI*/   int            __stdcall HttpAddRequestHeadersA     (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, unsigned long dwModifiers);
         /*BOOL*/      int            __stdcall HttpQueryInfoA             (void *hRequest, unsigned long dwInfoLevel, void *lpBuffer, unsigned long *lpdwBufferLength, unsigned long *lpdwIndex);
+
         /*HINSTANCE*/ void *         __stdcall ShellExecuteA              (void *hwnd, char const *lpOperation, char const *lpFile, char const *lpParameters, char const *lpDirectory, int nShowCmd);
+        /*BOOL*/      int            __stdcall ShowWindow                 (void *hWnd, int nCmdShow);
         }
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
 #elif defined(DQN_OS_UNIX)
@@ -5673,8 +5673,205 @@ DQN_API void Dqn_Print_StdLnF(Dqn_PrintStd std_handle, char const *fmt, ...)
     va_end(args);
 }
 
-// NOTE: Dqn_String8Builder Implementation
-// -----------------------------------------------------------------------------
+#if !defined(DQN_NO_DSMAP)
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API bool Dqn_DSMap_KeyEquals(Dqn_DSMapKey lhs, Dqn_DSMapKey rhs)
+{
+    bool result = false;
+    if (lhs.type == rhs.type) {
+        switch (lhs.type)  {
+        case Dqn_DSMapKeyType_Invalid:   result = true; break;
+        case Dqn_DSMapKeyType_U64NoHash: /*FALLTHRU*/
+        case Dqn_DSMapKeyType_U64:       result = lhs.payload.u64         == rhs.payload.u64; break;
+        case Dqn_DSMapKeyType_Buffer:    result = lhs.payload.buffer.size == rhs.payload.buffer.size &&
+                                         memcmp(lhs.payload.buffer.data, rhs.payload.buffer.data, lhs.payload.buffer.size) == 0; break;
+        }
+    }
+    return result;
+}
+
+DQN_API bool operator==(Dqn_DSMapKey lhs, Dqn_DSMapKey rhs)
+{
+    bool result = Dqn_DSMap_KeyEquals(lhs, rhs);
+    return result;
+}
+
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyBuffer(void const *data, uint32_t size)
+{
+    Dqn_DSMapKey result        = {};
+    result.type                = Dqn_DSMapKeyType_Buffer;
+    result.payload.buffer.data = data;
+    result.payload.buffer.size = size;
+    return result;
+}
+
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64(uint64_t u64)
+{
+    Dqn_DSMapKey result = {};
+    result.type         = Dqn_DSMapKeyType_U64;
+    result.payload.u64  = u64;
+    return result;
+}
+
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64NoHash(uint64_t u64)
+{
+    Dqn_DSMapKey result = {};
+    result.type         = Dqn_DSMapKeyType_U64NoHash;
+    result.payload.u64  = u64;
+    return result;
+}
+#endif // !defined(DQN_NO_DSMAP)
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
+// ---------------------------------+-----------------------------+---------------------------------
+DQN_API void Dqn_Library_SetLogCallback(Dqn_LogProc *proc, void *user_data)
+{
+    dqn_library.log_callback  = proc;
+    dqn_library.log_user_data = user_data;
+}
+
+DQN_API void Dqn_Library_SetLogFile(FILE *file)
+{
+    Dqn_TicketMutex_Begin(&dqn_library.log_file_mutex);
+    dqn_library.log_file    = file;
+    dqn_library.log_to_file = file ? true : false;
+    Dqn_TicketMutex_End(&dqn_library.log_file_mutex);
+}
+
+DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
+{
+    #if defined(DQN_DEBUG_THREAD_CONTEXT)
+    // NOTE: Open a file to write the arena stats to
+    FILE *file = nullptr;
+    fopen_s(&file, file_path.data, "a+b");
+    if (file) {
+        Dqn_Log_ErrorF("Failed to dump thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
+        return;
+    }
+
+    // NOTE: Copy the stats from library book-keeping
+    // NOTE: Extremely short critical section, copy the stats then do our
+    // work on it.
+    Dqn_ArenaStat stats[Dqn_CArray_CountI(dqn_library.thread_context_arena_stats)];
+    int stats_size = 0;
+
+    Dqn_TicketMutex_Begin(&dqn_library.thread_context_mutex);
+    stats_size = dqn_library.thread_context_arena_stats_count;
+    DQN_MEMCPY(stats, dqn_library.thread_context_arena_stats, sizeof(stats[0]) * stats_size);
+    Dqn_TicketMutex_End(&dqn_library.thread_context_mutex);
+
+    // NOTE: Print the cumulative stat
+    Dqn_DateHMSTimeString now = Dqn_Date_HMSLocalTimeStringNow();
+    fprintf(file,
+            "Time=%.*s %.*s | Thread Context Arenas | Count=%d\n",
+            now.date_size, now.date,
+            now.hms_size, now.hms,
+            dqn_library.thread_context_arena_stats_count);
+
+    // NOTE: Write the cumulative thread arena data
+    {
+        Dqn_ArenaStat stat = {};
+        for (Dqn_isize index = 0; index < stats_size; index++) {
+            Dqn_ArenaStat const *current = stats + index;
+            stat.capacity += current->capacity;
+            stat.used     += current->used;
+            stat.wasted   += current->wasted;
+            stat.blocks   += current->blocks;
+
+            stat.capacity_hwm = DQN_MAX(stat.capacity_hwm, current->capacity_hwm);
+            stat.used_hwm     = DQN_MAX(stat.used_hwm, current->used_hwm);
+            stat.wasted_hwm   = DQN_MAX(stat.wasted_hwm, current->wasted_hwm);
+            stat.blocks_hwm   = DQN_MAX(stat.blocks_hwm, current->blocks_hwm);
+        }
+
+        Dqn_ArenaStatString stats_string = Dqn_Arena_StatString(&stat);
+        fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.data);
+    }
+
+    // NOTE: Print individual thread arena data
+    for (Dqn_isize index = 0; index < stats_size; index++) {
+        Dqn_ArenaStat const *current = stats + index;
+        Dqn_ArenaStatString current_string = Dqn_Arena_StatString(current);
+        fprintf(file, "  [%03d] CURR %.*s\n", DQN_CAST(int)index, current_string.size, current_string.data);
+    }
+
+    fclose(file);
+    DQN_LOG_I("Dumped thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
+    #else
+    (void)file_path;
+    #endif // #if defined(DQN_DEBUG_THREAD_CONTEXT)
+}
+
+#if defined(DQN_LEAK_TRACING)
+DQN_API void Dqn_Library_LeakTraceAdd(Dqn_CallSite call_site, void *ptr, Dqn_usize size)
+{
+    if (!ptr)
+        return;
+
+    Dqn_TicketMutex_Begin(&dqn_library.alloc_table_mutex);
+    if (!Dqn_DSMap_IsValid(&dqn_library.alloc_table))
+        dqn_library.alloc_table = Dqn_DSMap_Init<Dqn_LeakTrace>(4096);
+
+    // NOTE: If the entry was not added, we are reusing a pointer that has been freed.
+    // TODO: Add API for always making the item but exposing a var to indicate if the item was newly created or it already existed.
+    Dqn_LeakTrace *trace  = Dqn_DSMap_Find(&dqn_library.alloc_table, Dqn_DSMap_KeyU64(DQN_CAST(uintptr_t)ptr));
+    if (trace) {
+        DQN_HARD_ASSERT_MSG(trace->freed, "This pointer is already in the leak tracker, however it"
+                                          " has not been freed yet. Somehow this pointer has been"
+                                          " given to the allocation table and has not being marked"
+                                          " freed with an equivalent call to LeakTraceMarkFree()"
+                                          " [ptr=%p, size=%_$$d, file=\"%.*s:%u\","
+                                          " function=\"%.*s\"]",
+                                          ptr,
+                                          size,
+                                          DQN_STRING_FMT(trace->call_site.file),
+                                          trace->call_site.line,
+                                          DQN_STRING_FMT(trace->call_site.function));
+    } else {
+        trace = Dqn_DSMap_Make(&dqn_library.alloc_table, Dqn_DSMap_KeyU64(DQN_CAST(uintptr_t)ptr));
+    }
+
+    trace->ptr       = ptr;
+    trace->size      = size;
+    trace->call_site = call_site;
+    Dqn_TicketMutex_End(&dqn_library.alloc_table_mutex);
+}
+
+DQN_API void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr)
+{
+    if (!ptr)
+        return;
+
+    Dqn_TicketMutex_Begin(&dqn_library.alloc_table_mutex);
+
+    Dqn_LeakTrace *trace = Dqn_DSMap_Find(&dqn_library.alloc_table, Dqn_DSMap_KeyU64(DQN_CAST(uintptr_t)ptr));
+    DQN_HARD_ASSERT_MSG(trace, "Allocated pointer can not be removed as it does not exist in the"
+                              " allocation table. When this memory was allocated, the pointer was"
+                              " not added to the allocation table [ptr=%p]",
+                              ptr);
+
+    DQN_HARD_ASSERT_MSG(!trace->freed,
+                        "Double free detected, pointer was previously allocated at [ptr=%p, %_$$d, file=\"%.*s:%u\", function=\"%.*s\"]",
+                        ptr,
+                        trace->size,
+                        DQN_STRING_FMT(trace->call_site.file),
+                        trace->call_site.line,
+                        DQN_STRING_FMT(trace->call_site.function));
+
+    trace->freed           = true;
+    trace->freed_size      = trace->size;
+    trace->freed_call_site = call_site;
+    Dqn_TicketMutex_End(&dqn_library.alloc_table_mutex);
+}
+#endif /// defined(DQN_LEAK_TRACING)
+
+
+// ---------------------------------+-----------------------------+---------------------------------
+// [SECT-STRB] Dqn_String8Builder   |                             |
+// ---------------------------------+-----------------------------+---------------------------------
 bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String8 string)
 {
     if (!builder || !string.data || string.size <= 0)
@@ -5993,7 +6190,7 @@ DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemor
 Dqn_ArenaTempMemoryScope_::Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena)
 {
     temp_memory = Dqn_Arena_BeginTempMemory(arena);
-    #if defined(DQN_LEAK_TRACKING)
+    #if defined(DQN_LEAK_TRACING)
     leak_site__ = DQN_LEAK_TRACE_ARG_NO_COMMA;
     #endif
 }
@@ -7165,8 +7362,16 @@ DQN_API Dqn_isize Dqn_Hex_CString8ToByteBuffer(char const *hex, Dqn_isize hex_si
     char const *trim_hex = Dqn_Hex_TrimSpaceAnd0xPrefixCString8(hex,
                                                                 hex_size,
                                                                 &trim_size);
-    if (dest_size < (trim_size / 2))
+
+    // NOTE: Trimmed hex can be "0xf" -> "f" or "0xAB" -> "AB"
+    // Either way, the size can be odd or even, hence we round up to the nearest
+    // multiple of two to ensure that we calculate the min buffer size orrectly.
+    Dqn_isize trim_size_rounded_up = trim_size + (trim_size % 2);
+    Dqn_isize min_buffer_size      = trim_size_rounded_up / 2;
+    if (dest_size < min_buffer_size || trim_size <= 0) {
+        DQN_ASSERT_MSG(dest_size >= min_buffer_size, "Insufficient buffer size for converting hex to binary");
         return result;
+    }
 
     result = Dqn_Hex_CString8ToByteBufferUnchecked(trim_hex,
                                                    trim_size,
@@ -7968,11 +8173,13 @@ struct Dqn_Win_NetChunk
 
 DQN_API char *Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, Dqn_Arena *arena, size_t *download_size)
 {
-    Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(arena);
+    if (handle->state != Dqn_WinNetHandleState_RequestGood)
+        return nullptr;
+
+    Dqn_ThreadScratch scratch     = Dqn_Thread_GetScratch(arena);
     size_t total_size             = 0;
     Dqn_Win_NetChunk *first_chunk = nullptr;
-    for (Dqn_Win_NetChunk *last_chunk = nullptr;;)
-    {
+    for (Dqn_Win_NetChunk *last_chunk = nullptr;;) {
         Dqn_Win_NetChunk *chunk = Dqn_Arena_New(scratch.arena, Dqn_Win_NetChunk, Dqn_ZeroMem_Yes);
         bool pump_result        = Dqn_Win_NetHandlePump(handle, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
         if (chunk->size) {
@@ -7992,8 +8199,7 @@ DQN_API char *Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, Dqn_Arena 
 
     char *result     = Dqn_Arena_NewArray(arena, char, total_size + 1 /*null-terminator*/, Dqn_ZeroMem_No);
     char *result_ptr = result;
-    for (Dqn_Win_NetChunk *chunk = first_chunk; chunk; chunk = chunk->next)
-    {
+    for (Dqn_Win_NetChunk *chunk = first_chunk; chunk; chunk = chunk->next) {
         DQN_MEMCPY(result_ptr, chunk->data, chunk->size);
         result_ptr += chunk->size;
     }
@@ -8013,8 +8219,7 @@ DQN_API Dqn_String8 Dqn_Win_NetHandlePumpString8(Dqn_WinNetHandle *handle, Dqn_A
 
 DQN_API void Dqn_Win_NetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, FILE *file)
 {
-    for (bool keep_pumping = true; keep_pumping;)
-    {
+    for (bool keep_pumping = true; keep_pumping;) {
         char buffer[DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE];
         size_t buffer_size = 0;
         keep_pumping = Dqn_Win_NetHandlePump(handle, buffer, sizeof(buffer), &buffer_size);
@@ -8411,6 +8616,7 @@ DQN_API Dqn_FsInfo Dqn_Fs_GetInfo(Dqn_String8 path)
     if (!GetFileAttributesExW(path16, GetFileExInfoStandard, &attrib_data))
         return result;
 
+    result.exists                = true;
     result.create_time_in_s      = Dqn__WinFileTimeToSeconds(&attrib_data.ftCreationTime);
     result.last_access_time_in_s = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastAccessTime);
     result.last_write_time_in_s  = Dqn__WinFileTimeToSeconds(&attrib_data.ftLastWriteTime);
@@ -8431,6 +8637,7 @@ DQN_API Dqn_FsInfo Dqn_Fs_GetInfo(Dqn_String8 path)
     #elif defined(DQN_OS_UNIX)
     struct stat file_stat;
     if (lstat(path.data, &file_stat) != -1) {
+        result.exists                = true;
         result.size                  = file_stat.st_size;
         result.last_access_time_in_s = file_stat.st_atime;
         result.last_write_time_in_s  = file_stat.st_mtime;
@@ -9068,7 +9275,7 @@ Dqn_ThreadScratch::Dqn_ThreadScratch(DQN_LEAK_TRACE_FUNCTION Dqn_ThreadContext *
     allocator   = context->temp_allocators[index];
     arena       = &context->temp_arenas[index];
     temp_memory = Dqn_Arena_BeginTempMemory(arena);
-    #if defined(DQN_LEAK_TRACKING)
+    #if defined(DQN_LEAK_TRACING)
     leak_site__ = DQN_LEAK_TRACE_ARG_NO_COMMA;
     #endif
 }
@@ -9080,7 +9287,7 @@ Dqn_ThreadScratch::~Dqn_ThreadScratch()
     #endif
     DQN_ASSERT(destructed == false);
     #if defined(DQN_LEAK_TRACING)
-    Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_ARG_NO_COMMA temp_memory);
+    Dqn_Arena_EndTempMemory_(leak_site__, temp_memory);
     #else
     Dqn_Arena_EndTempMemory_(temp_memory);
     #endif
@@ -9092,6 +9299,8 @@ DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COM
     thread_local Dqn_ThreadContext result = {};
     if (!result.init) {
         result.init = true;
+        Dqn_Arena_Grow_(DQN_LEAK_TRACE_ARG &result.arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4));
+        result.allocator = Dqn_Arena_Allocator(&result.arena);
         for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
             Dqn_Arena *arena              = result.temp_arenas + index;
             result.temp_allocators[index] = Dqn_Arena_Allocator(arena);
@@ -9117,223 +9326,133 @@ DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void co
     }
 
     DQN_ASSERT(context_index != (uint8_t)-1);
-    return Dqn_ThreadScratch(context, context_index);
+    return Dqn_ThreadScratch(DQN_LEAK_TRACE_ARG context, context_index);
 }
 
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
 // ---------------------------------+-----------------------------+---------------------------------
 #if !defined(DQN_NO_JSON_BUILDER)
-Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Arena *arena, int spaces_per_indent)
+Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_indent)
 {
-    Dqn_JSONBuilder result   = {};
-    result.spaces_per_indent = spaces_per_indent;
-    result.builder.allocator = Dqn_Arena_Allocator(arena);
+    Dqn_JSONBuilder result          = {};
+    result.spaces_per_indent        = spaces_per_indent;
+    result.string_builder.allocator = allocator;
     return result;
 }
 
-Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder *builder, Dqn_Arena *arena)
+Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder const *builder, Dqn_Allocator allocator)
 {
-    Dqn_String8 result = Dqn_String8Builder_Build(&builder->builder, Dqn_Arena_Allocator(arena));
+    Dqn_String8 result = Dqn_String8Builder_Build(&builder->string_builder, allocator);
     return result;
 }
 
-void Dqn_JSONBuilder_AppendFV_(Dqn_JSONBuilder *builder, char const *fmt, va_list args)
+void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
 {
-    if (!builder || !fmt)
+    if (key.size == 0 && value.size == 0)
         return;
 
-    if (builder->builder.allocator.alloc)
-        Dqn_String8Builder_AppendFV(&builder->builder, fmt, args);
-    else
-        vfprintf(stdout, fmt, args);
-}
+    Dqn_JSONBuilderItem item = Dqn_JSONBuilderItem_KeyValue;
+    if (value.size == 1) {
+        if (value.data[0] == '{' || value.data[0] == '[') {
+            item = Dqn_JSONBuilderItem_OpenContainer;
+        } else if (value.data[0] == '}' || value.data[0] == ']') {
+            item = Dqn_JSONBuilderItem_CloseContainer;
+        }
+    }
 
-void Dqn_JSONBuilder_AppendF_(Dqn_JSONBuilder *builder, char const *fmt, ...)
-{
-    if (!builder || !fmt)
-        return;
+    bool adding_to_container_with_items = item != Dqn_JSONBuilderItem_CloseContainer &&
+                                          (builder->last_item == Dqn_JSONBuilderItem_KeyValue ||
+                                           builder->last_item == Dqn_JSONBuilderItem_CloseContainer);
 
-    va_list args;
-    va_start(args, fmt);
-    Dqn_JSONBuilder_AppendFV_(builder, fmt, args);
-    va_end(args);
-}
+    uint8_t prefix_size = 0;
+    char prefix[2]      = {0};
+    if (adding_to_container_with_items)
+        prefix[prefix_size++] = ',';
 
-void Dqn_JSONBuilder_AppendString8Ref_(Dqn_JSONBuilder *builder, Dqn_String8 string)
-{
-    if (builder->builder.allocator.alloc)
-        Dqn_String8Builder_AppendString8Ref(&builder->builder, string);
-    else
-        fprintf(stdout, "%.*s", DQN_STRING_FMT(string));
-}
+    if (builder->last_item != Dqn_JSONBuilderItem_Empty)
+        prefix[prefix_size++] = '\n';
 
-void Dqn_JSONBuilder_DoIndent_(Dqn_JSONBuilder *builder)
-{
+    if (item == Dqn_JSONBuilderItem_CloseContainer)
+        builder->indent_level--;
+
     int spaces_per_indent = builder->spaces_per_indent ? builder->spaces_per_indent : 2;
     int spaces            = builder->indent_level * spaces_per_indent;
-    if (spaces)
-        Dqn_JSONBuilder_AppendF_(builder, "%*c", spaces, ' ');
-}
 
-void Dqn_JSONBuilder_PreAddItem_(Dqn_JSONBuilder *builder)
-{
-    if (builder->parent_field_count_stack_size <= 0)
-        return;
-
-    uint16_t *parent_field_count = &builder->parent_field_count_stack[builder->parent_field_count_stack_size - 1];
-    if (*parent_field_count == 0) {
-        // NOTE: First time we're adding an item to an object, we need to write
-        // on a new line for nice formatting.
-        Dqn_JSONBuilder_AppendString8Ref_(builder, DQN_STRING8("\n"));
-    } else if (*parent_field_count > 0) {
-        // NOTE: We have items in the object already and we're adding another
-        // item so we need to add a comma on the previous item.
-        Dqn_JSONBuilder_AppendString8Ref_(builder, DQN_STRING8(",\n"));
+    if (key.size) {
+        Dqn_String8Builder_AppendF(&builder->string_builder,
+                                   "%.*s%*c\"%.*s\": %.*s",
+                                   prefix_size, prefix,
+                                   spaces, ' ',
+                                   DQN_STRING_FMT(key),
+                                   DQN_STRING_FMT(value));
+    } else {
+        Dqn_String8Builder_AppendF(&builder->string_builder,
+                                   "%.*s%*c%.*s",
+                                   prefix_size, prefix,
+                                   spaces, ' ',
+                                   DQN_STRING_FMT(value));
     }
 
-    Dqn_JSONBuilder_DoIndent_(builder);
+    if (item == Dqn_JSONBuilderItem_OpenContainer)
+        builder->indent_level++;
+
+    builder->last_item = item;
 }
 
-void Dqn_JSONBuilder_PostAddItem_(Dqn_JSONBuilder *builder)
+void Dqn_JSONBuilder_KeyValueFV(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, va_list args)
 {
-    if (builder->parent_field_count_stack_size <= 0)
-        return;
-
-    uint16_t *parent_field_count = &builder->parent_field_count_stack[builder->parent_field_count_stack_size - 1];
-    (*parent_field_count)++;
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(builder->string_builder.allocator.user_context);
+    Dqn_String8 value         = Dqn_String8_InitFV(scratch.allocator, value_fmt, args);
+    Dqn_JSONBuilder_KeyValue(builder, key, value);
 }
 
-void Dqn_JSONBuilder_BeginContainer_(Dqn_JSONBuilder *builder, Dqn_String8 name, bool array)
+void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, ...)
 {
-    Dqn_String8 container_ch = array ? DQN_STRING8("[") : DQN_STRING8("{");
-    Dqn_JSONBuilder_PreAddItem_(builder);
-    if (name.size)
-        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(name), DQN_STRING_FMT(container_ch));
-    else
-        Dqn_JSONBuilder_AppendString8Ref_(builder, container_ch);
-    Dqn_JSONBuilder_PostAddItem_(builder);
-
-    builder->indent_level++;
-
-    DQN_ASSERT(builder->parent_field_count_stack_size < DQN_ARRAY_UCOUNT(builder->parent_field_count_stack));
-    uint16_t *parent_field_count = &builder->parent_field_count_stack[builder->parent_field_count_stack_size++];
-    *parent_field_count          = 0;
-}
-
-void Dqn_JSONBuilder_EndContainer_(Dqn_JSONBuilder *builder, bool array)
-{
-    uint16_t *parent_field_count = &builder->parent_field_count_stack[builder->parent_field_count_stack_size - 1];
-    if (*parent_field_count > 0) {
-        // NOTE: End of object/array should start on a new line if the
-        // array/object has atleast one field in it.
-        Dqn_JSONBuilder_AppendString8Ref_(builder, DQN_STRING8("\n"));
-    }
-
-    builder->parent_field_count_stack_size--;
-    DQN_ASSERT(builder->parent_field_count_stack_size >= 0);
-
-    builder->indent_level--;
-    DQN_ASSERT(builder->indent_level >= 0);
-
-    Dqn_JSONBuilder_DoIndent_(builder);
-    Dqn_JSONBuilder_AppendString8Ref_(builder, array ? DQN_STRING8("]") : DQN_STRING8("}"));
-
-    // NOTE: Root object got closed, what ever that we write next has to start
-    // on a new line.
-    if (builder->parent_field_count_stack_size == 0) {
-        Dqn_JSONBuilder_AppendString8Ref_(builder, DQN_STRING8("\n"));
-    }
+    va_list args;
+    va_start(args, value_fmt);
+    Dqn_JSONBuilder_KeyValueFV(builder, key, value_fmt, args);
+    va_end(args);
 }
 
 void Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
 {
-    Dqn_JSONBuilder_BeginContainer_(builder, name, false /*array*/);
-}
-
-void Dqn_JSONBuilder_ObjectBegin(Dqn_JSONBuilder *builder)
-{
-    Dqn_JSONBuilder_BeginContainer_(builder, DQN_STRING8(""), false /*array*/);
+    Dqn_JSONBuilder_KeyValue(builder, name, DQN_STRING8("{"));
 }
 
 void Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder)
 {
-    Dqn_JSONBuilder_EndContainer_(builder, false /*array*/);
+    Dqn_JSONBuilder_KeyValue(builder, DQN_STRING8(""), DQN_STRING8("}"));
 }
 
 void Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
 {
-    Dqn_JSONBuilder_BeginContainer_(builder, name, true /*array*/);
-}
-
-void Dqn_JSONBuilder_ArrayBegin(Dqn_JSONBuilder *builder)
-{
-    Dqn_JSONBuilder_BeginContainer_(builder, DQN_STRING8(""), false /*array*/);
+    Dqn_JSONBuilder_KeyValue(builder, name, DQN_STRING8("["));
 }
 
 void Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder)
 {
-    Dqn_JSONBuilder_EndContainer_(builder, true /*array*/);
+    Dqn_JSONBuilder_KeyValue(builder, DQN_STRING8(""), DQN_STRING8("]"));
 }
 
 void Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
 {
-    Dqn_JSONBuilder_PreAddItem_(builder);
-    if (key.size)
-        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": \"%.*s\"", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
-    else
-        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\"", DQN_STRING_FMT(value));
-    Dqn_JSONBuilder_PostAddItem_(builder);
-}
-
-void Dqn_JSONBuilder_String(Dqn_JSONBuilder *builder, Dqn_String8 value)
-{
-    Dqn_JSONBuilder_StringNamed(builder, DQN_STRING8("") /*key*/, value);
+    Dqn_JSONBuilder_KeyValueF(builder, key, "\"%.*s\"", value.size, value.data);
 }
 
 void Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
 {
-    Dqn_JSONBuilder_PreAddItem_(builder);
-    if (key.size)
-        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(key), DQN_STRING_FMT(value));
-    else
-        Dqn_JSONBuilder_AppendF_(builder, "%.*s", DQN_STRING_FMT(value));
-    Dqn_JSONBuilder_PostAddItem_(builder);
-}
-
-void Dqn_JSONBuilder_Literal(Dqn_JSONBuilder *builder, Dqn_String8 value)
-{
-    Dqn_JSONBuilder_LiteralNamed(builder, DQN_STRING8("") /*key*/, value);
+    Dqn_JSONBuilder_KeyValueF(builder, key, "%.*s", value.size, value.data);
 }
 
 void Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value)
 {
-    Dqn_JSONBuilder_PreAddItem_(builder);
-    if (key.size)
-        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %I64u", DQN_STRING_FMT(key), value);
-    else
-        Dqn_JSONBuilder_AppendF_(builder, "%I64u", value);
-    Dqn_JSONBuilder_PostAddItem_(builder);
+    Dqn_JSONBuilder_KeyValueF(builder, key, "%I64u", value);
 }
 
-void Dqn_JSONBuilder_U64(Dqn_JSONBuilder *builder, uint64_t value)
+void Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, int64_t value)
 {
-    Dqn_JSONBuilder_U64Named(builder, DQN_STRING8("") /*key*/, value);
-}
-
-void Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value)
-{
-    Dqn_JSONBuilder_PreAddItem_(builder);
-    if (key.size)
-        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %I64d", DQN_STRING_FMT(key), value);
-    else
-        Dqn_JSONBuilder_AppendF_(builder, "%I64d", value);
-    Dqn_JSONBuilder_PostAddItem_(builder);
-}
-
-void Dqn_JSONBuilder_I64(Dqn_JSONBuilder *builder, uint64_t value)
-{
-    Dqn_JSONBuilder_I64Named(builder, DQN_STRING8("") /*key*/, value);
+    Dqn_JSONBuilder_KeyValueF(builder, key, "%I64d", value);
 }
 
 void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places)
@@ -9349,45 +9468,25 @@ void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double 
     char float_fmt[16];
     if (decimal_places > 0) {
         // NOTE: Emit the format string "%.<decimal_places>f" i.e. %.1f
-        STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
+        snprintf(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
     } else {
         // NOTE: Emit the format string "%f"
-        STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%f");
+        snprintf(float_fmt, sizeof(float_fmt), "%%f");
     }
 
     char fmt[32];
     if (key.size)
-        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
+        snprintf(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
     else
-        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "%s", float_fmt);
+        snprintf(fmt, sizeof(fmt), "%s", float_fmt);
 
-    Dqn_JSONBuilder_PreAddItem_(builder);
-    if (key.size)
-        Dqn_JSONBuilder_AppendF_(builder, fmt, DQN_STRING_FMT(key), value);
-    else
-        Dqn_JSONBuilder_AppendF_(builder, fmt, value);
-    Dqn_JSONBuilder_PostAddItem_(builder);
-}
-
-void Dqn_JSONBuilder_F64(Dqn_JSONBuilder *builder, double value, int decimal_places)
-{
-    Dqn_JSONBuilder_F64Named(builder, DQN_STRING8("") /*key*/, value, decimal_places);
+    Dqn_JSONBuilder_KeyValueF(builder, key, fmt, value);
 }
 
 void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value)
 {
-    Dqn_JSONBuilder_PreAddItem_(builder);
     Dqn_String8 value_string = value ? DQN_STRING8("true") : DQN_STRING8("false");
-    if (key.size)
-        Dqn_JSONBuilder_AppendF_(builder, "\"%.*s\": %.*s", DQN_STRING_FMT(key), DQN_STRING_FMT(value_string));
-    else
-        Dqn_JSONBuilder_AppendF_(builder, "%Boold", value);
-    Dqn_JSONBuilder_PostAddItem_(builder);
-}
-
-void Dqn_JSONBuilder_Bool(Dqn_JSONBuilder *builder, bool value)
-{
-    Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8("") /*key*/, value);
+    Dqn_JSONBuilder_KeyValueF(builder, key, "%.*s", value_string.size, value_string.data);
 }
 #endif // !defined(DQN_NO_JSON_BUILDER)
 
@@ -9644,8 +9743,6 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
 }
 
 //-----------------------------------------------------------------------------
-#endif // DQN_IMPLEMENTATION
-
 #if !defined(DQN_STB_SPRINTF_HEADER_ONLY)
 #define STB_SPRINTF_IMPLEMENTATION
 #ifdef STB_SPRINTF_IMPLEMENTATION
@@ -11338,6 +11435,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
 #endif // DQN_STB_SPRINTF_HEADER_ONLY
+#endif // DQN_IMPLEMENTATION
 
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #if !defined(DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED)

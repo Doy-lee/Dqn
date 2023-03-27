@@ -236,228 +236,163 @@ Dqn_Tester Dqn_Test_DSMap()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_DSMap") {
-        DQN_TESTER_TEST("Add r-value item to map") {
-            Dqn_DSMap<int> map         = Dqn_DSMap_Init<int>(128);
-            Dqn_DSMapItem<int> *entry = Dqn_DSMap_Add(&map, 3 /*hash*/, 5 /*value*/);
-            DQN_TESTER_ASSERTF(&test, map.size == 128, "size: %I64d", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, entry->hash == 3, "hash: %zu", entry->hash);
-            DQN_TESTER_ASSERTF(&test, entry->value == 5, "value: %d", entry->value);
-            Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
+        Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+        {
+            uint32_t const MAP_SIZE = 64;
+            Dqn_DSMap<uint64_t>  map      = Dqn_DSMap_Init<uint64_t>(MAP_SIZE);
+            DQN_DEFER { Dqn_DSMap_Deinit(&map); };
+
+            DQN_TESTER_TEST("Find non-existent value") {
+                uint64_t *value = Dqn_DSMap_Find(&map, Dqn_DSMap_KeyCStringLit("Foo"));
+                DQN_ASSERT(!value);
+                DQN_ASSERT(map.size         == MAP_SIZE);
+                DQN_ASSERT(map.initial_size == MAP_SIZE);
+                DQN_ASSERT(map.occupied     == 1 /*Sentinel*/);
+            }
+
+            Dqn_DSMapKey key = Dqn_DSMap_KeyCStringLit("Bar");
+            DQN_TESTER_TEST("Insert value and lookup") {
+                uint64_t desired_value  = 0xF00BAA;
+                Dqn_DSMapSlot<uint64_t> *slot = Dqn_DSMap_Set(&map, key, desired_value);
+                DQN_ASSERT(slot);
+                DQN_ASSERT(map.size == MAP_SIZE);
+                DQN_ASSERT(map.initial_size == MAP_SIZE);
+                DQN_ASSERT(map.occupied == 2);
+
+                uint64_t *value = Dqn_DSMap_Find(&map, key);
+                DQN_ASSERT(value);
+                DQN_ASSERT(*value == desired_value);
+            }
+
+            DQN_TESTER_TEST("Remove key") {
+                Dqn_DSMap_Erase(&map, key);
+                DQN_ASSERT(map.size         == MAP_SIZE);
+                DQN_ASSERT(map.initial_size == MAP_SIZE);
+                DQN_ASSERT(map.occupied     == 1 /*Sentinel*/);
+            }
         }
 
-        DQN_TESTER_TEST("Add l-value item to map") {
-            Dqn_DSMap<int> map   = Dqn_DSMap_Init<int>(128);
-            int            value = 5;
-            Dqn_DSMapItem<int> *entry = Dqn_DSMap_Add(&map, 3 /*hash*/, value);
-            DQN_TESTER_ASSERTF(&test, map.size == 128, "size: %I64d", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, entry->hash == 3, "hash: %zu", entry->hash);
-            DQN_TESTER_ASSERTF(&test, entry->value == 5, "value: %d", entry->value);
-            Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
+        {
+            DQN_ARENA_TEMP_MEMORY_SCOPE(scratch.arena);
+            uint32_t const MAP_SIZE = 64;
+            Dqn_DSMap<uint64_t>  map      = Dqn_DSMap_Init<uint64_t>(MAP_SIZE);
+            DQN_DEFER { Dqn_DSMap_Deinit(&map); };
+
+            DQN_TESTER_TEST("Test growing") {
+                uint64_t map_start_size  = map.size;
+                uint64_t value          = 0;
+                uint64_t grow_threshold = map_start_size * 3 / 4;
+                for (; map.occupied != grow_threshold; value++) {
+                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    Dqn_DSMapKey key    = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_ASSERT(!Dqn_DSMap_FindSlot<uint64_t>(&map, key, Dqn_DSMap_Hash(&map, key)));
+                    Dqn_DSMap_Set(&map, key, value);
+                    DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_ASSERT(Dqn_DSMap_FindSlot<uint64_t>(&map, key, Dqn_DSMap_Hash(&map, key)));
+                }
+                DQN_ASSERT(map.initial_size == MAP_SIZE);
+                DQN_ASSERT(map.size         == map_start_size);
+                DQN_ASSERT(map.occupied     == 1 /*Sentinel*/ + value);
+
+                { // NOTE: One more item should cause the table to grow by 2x
+                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    Dqn_DSMapKey key       = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    Dqn_DSMap_Set(&map, key, value++);
+
+                    DQN_ASSERT(map.size         == map_start_size * 2);
+                    DQN_ASSERT(map.initial_size == MAP_SIZE);
+                    DQN_ASSERT(map.occupied     == 1 /*Sentinel*/ + value);
+                }
+            }
+
+            DQN_TESTER_TEST("Check the sentinel is present") {
+                Dqn_DSMapSlot<uint64_t> NIL_SLOT = {};
+                Dqn_DSMapSlot<uint64_t> sentinel = map.slots[DQN_DS_MAP_SENTINEL_SLOT];
+                DQN_ASSERT(DQN_MEMCMP(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
+            }
+
+            DQN_TESTER_TEST("Recheck all the hash tables values after growing") {
+                for (uint64_t index = 1 /*Sentinel*/; index < map.occupied; index++) {
+                    Dqn_DSMapSlot<uint64_t> const *slot = map.slots + index;
+
+                    // NOTE: Validate each slot value
+                    uint64_t value_test = index - 1;
+                    Dqn_DSMapKey key = Dqn_DSMap_KeyBuffer(&value_test, sizeof(value_test));
+                    DQN_ASSERT(Dqn_DSMap_KeyEquals(slot->key, key));
+                    DQN_ASSERT(slot->value == value_test);
+                    DQN_ASSERT(slot->hash  == Dqn_DSMap_Hash(&map, slot->key));
+
+                    // NOTE: Check the reverse lookup is correct
+                    Dqn_DSMapSlot<uint64_t> const *check = Dqn_DSMap_FindSlot<uint64_t>(&map, slot->key, slot->hash);
+                    DQN_ASSERT(slot == check);
+                }
+            }
+
+            DQN_TESTER_TEST("Test shrinking") {
+                uint64_t start_map_size     = map.size;
+                uint64_t start_map_occupied = map.occupied;
+                uint64_t value              = 0;
+                uint64_t shrink_threshold   = map.size * 1 / 4;
+                for (; map.occupied != shrink_threshold; value++) {
+                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    Dqn_DSMapKey key       = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_ASSERT(Dqn_DSMap_FindSlot<uint64_t>(&map, key, Dqn_DSMap_Hash(&map, key)));
+                    Dqn_DSMap_Erase(&map, key);
+                    DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_ASSERT(!Dqn_DSMap_FindSlot<uint64_t>(&map, key, Dqn_DSMap_Hash(&map, key)));
+                }
+                DQN_ASSERT(map.size == start_map_size);
+                DQN_ASSERT(map.occupied == start_map_occupied - value);
+
+                { // NOTE: One more item should cause the table to grow by 2x
+                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    Dqn_DSMapKey key       = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    Dqn_DSMap_Erase(&map, key);
+                    value++;
+
+                    DQN_ASSERT(map.size     == start_map_size / 2);
+                    DQN_ASSERT(map.occupied == start_map_occupied - value);
+                }
+
+                { // NOTE: Check the sentinel is present
+                    Dqn_DSMapSlot<uint64_t> NIL_SLOT = {};
+                    Dqn_DSMapSlot<uint64_t> sentinel = map.slots[DQN_DS_MAP_SENTINEL_SLOT];
+                    DQN_ASSERT(DQN_MEMCMP(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
+                }
+
+                // NOTE: Recheck all the hash table values after growing
+                for (uint64_t index = 1 /*Sentinel*/; index < map.occupied; index++) {
+
+                    // NOTE: Generate the key
+                    uint64_t value_test = value + (index - 1);
+                    Dqn_DSMapKey key        = Dqn_DSMap_KeyBuffer((char *)&value_test, sizeof(value_test));
+
+                    // NOTE: Validate each slot value
+                    Dqn_DSMapSlot<uint64_t> const *slot = Dqn_DSMap_FindSlot(&map, key, Dqn_DSMap_Hash(&map, key));
+                    DQN_ASSERT(slot);
+                    DQN_ASSERT(slot->key   == key);
+                    DQN_ASSERT(slot->value == value_test);
+                    DQN_ASSERT(slot->hash  == Dqn_DSMap_Hash(&map, slot->key));
+
+                    // NOTE: Check the reverse lookup is correct
+                    Dqn_DSMapSlot<uint64_t> const *check = Dqn_DSMap_FindSlot<uint64_t>(&map, slot->key, slot->hash);
+                    DQN_ASSERT(slot == check);
+                }
+
+                for (; map.occupied != 1; value++) { // NOTE: Remove all items from the table
+                    uint64_t *val_copy  = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    Dqn_DSMapKey key        = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
+                    Dqn_DSMap_Erase(&map, key);
+                    DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));
+                }
+                DQN_ASSERT(map.initial_size == MAP_SIZE);
+                DQN_ASSERT(map.size == map.initial_size);
+                DQN_ASSERT(map.occupied == 1 /*Sentinel*/);
+            }
         }
-
-        DQN_TESTER_TEST("Get item from map") {
-            Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(128);
-            Dqn_DSMapItem<int> *entry = Dqn_DSMap_Add(&map, 3 /*hash*/, 5 /*value*/);
-            Dqn_DSMapItem<int> *get_entry = Dqn_DSMap_Get(&map, 3 /*hash*/);
-            DQN_TESTER_ASSERTF(&test, get_entry == entry, "get_entry: %p, entry: %p", get_entry, entry);
-            Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
-        }
-
-        DQN_TESTER_TEST("Get non-existent item from map") {
-            Dqn_DSMap<int> map        = Dqn_DSMap_Init<int>(128);
-            Dqn_DSMapItem<int> *entry = Dqn_DSMap_Get(&map, 3 /*hash*/);
-            DQN_TESTER_ASSERT(&test, entry == nullptr);
-            Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
-        }
-
-        DQN_TESTER_TEST("Erase item from map") {
-            Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(128);
-            Dqn_DSMap_Add(&map, 3 /*hash*/, 5 /*value*/);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %I64d", map.count);
-            Dqn_DSMap_Erase(&map, 3 /*hash*/, Dqn_ZeroMem_No);
-            DQN_TESTER_ASSERTF(&test, map.count == 0, "count: %I64d", map.count);
-            Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
-        }
-
-        DQN_TESTER_TEST("Erase non-existent item from map") {
-            Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(128);
-            Dqn_DSMap_Erase(&map, 3 /*hash*/, Dqn_ZeroMem_No);
-            DQN_TESTER_ASSERTF(&test, map.count == 0, "count: %I64d", map.count);
-            Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
-        }
-
-        DQN_TESTER_TEST("Test resize on maximum load") {
-            const Dqn_isize INIT_SIZE = 4;
-            Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(INIT_SIZE);
-            Dqn_DSMap_Add(&map, 0 /*hash*/, 5 /*value*/);
-            Dqn_DSMap_Add(&map, 1 /*hash*/, 5 /*value*/);
-            DQN_TESTER_ASSERTF(&test, map.count == 2, "count: %I64d", map.count);
-
-            // This *should* cause a resize because 3/4 slots filled is 75% load
-            Dqn_DSMap_Add(&map, 6 /*hash*/, 5 /*value*/);
-            DQN_TESTER_ASSERTF(&test, map.count == 3, "count: %I64d", map.count);
-            DQN_TESTER_ASSERTF(&test, map.size == INIT_SIZE * 2, "size: %I64d", map.size);
-
-            // Check that the elements are rehashed where we expected them to be
-            DQN_TESTER_ASSERT(&test, map.slots[0].occupied == DQN_CAST(uint8_t)true);
-            DQN_TESTER_ASSERT(&test, map.slots[1].occupied == DQN_CAST(uint8_t)true);
-            DQN_TESTER_ASSERT(&test, map.slots[2].occupied == DQN_CAST(uint8_t)false);
-            DQN_TESTER_ASSERT(&test, map.slots[3].occupied == DQN_CAST(uint8_t)false);
-            DQN_TESTER_ASSERT(&test, map.slots[4].occupied == DQN_CAST(uint8_t)false);
-            DQN_TESTER_ASSERT(&test, map.slots[5].occupied == DQN_CAST(uint8_t)false);
-            DQN_TESTER_ASSERT(&test, map.slots[6].occupied == DQN_CAST(uint8_t)true);
-            DQN_TESTER_ASSERT(&test, map.slots[7].occupied == DQN_CAST(uint8_t)false);
-
-            DQN_TESTER_ASSERTF(&test, map.slots[0].value == 5, "value: %d", map.slots[0].value);
-            DQN_TESTER_ASSERTF(&test, map.slots[1].value == 5, "value: %d", map.slots[1].value);
-            DQN_TESTER_ASSERTF(&test, map.slots[6].value == 5, "value: %d", map.slots[6].value);
-
-            Dqn_DSMap_Free(&map, Dqn_ZeroMem_No);
-        }
-    }
-    return test;
-}
-
-Dqn_Tester Dqn_Test_Map()
-{
-    Dqn_Tester test = {};
-    DQN_TESTER_GROUP(test, "Dqn_Map") {
-        DQN_TESTER_TEST("Add r-value item to map") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(scratch.arena, 1);
-            Dqn_MapEntry<int> *entry = Dqn_Map_AddCopy(&map, 3 /*hash*/, 5 /*value*/, Dqn_MapCollideRule::Overwrite);
-            DQN_TESTER_ASSERTF(&test, map.size == 1, "size: %I64d", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, map.chain_count == 0, "chain_count: %zu", map.chain_count);
-            DQN_TESTER_ASSERTF(&test, map.free_list == nullptr, "free_list: %p", map.free_list);
-            DQN_TESTER_ASSERTF(&test, entry->hash == 3, "hash: %zu", entry->hash);
-            DQN_TESTER_ASSERTF(&test, entry->value == 5, "value: %d", entry->value);
-            DQN_TESTER_ASSERTF(&test, entry->next == nullptr, "next: %p", entry->next);
-        }
-
-        DQN_TESTER_TEST("Add l-value item to map") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(scratch.arena, 1);
-            int                value = 5;
-            Dqn_MapEntry<int> *entry = Dqn_Map_Add(&map, 3 /*hash*/, value, Dqn_MapCollideRule::Overwrite);
-            DQN_TESTER_ASSERTF(&test, map.size == 1, "size: %I64d", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, map.chain_count == 0, "chain_count: %zu", map.chain_count);
-            DQN_TESTER_ASSERTF(&test, map.free_list == nullptr, "free_list: %p", map.free_list);
-            DQN_TESTER_ASSERTF(&test, entry->hash == 3, "hash: %zu", entry->hash);
-            DQN_TESTER_ASSERTF(&test, entry->value == 5, "value: %d", entry->value);
-            DQN_TESTER_ASSERTF(&test, entry->next == nullptr, "next: %p", entry->next);
-        }
-
-        DQN_TESTER_TEST("Add r-value item and overwrite on collision") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(scratch.arena, 1);
-            Dqn_MapEntry<int> *entry_a = Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
-            Dqn_MapEntry<int> *entry_b = Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Overwrite);
-            DQN_TESTER_ASSERTF(&test, map.size == 1, "size: %zu", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, map.chain_count == 0, "chain_count: %zu", map.chain_count);
-            DQN_TESTER_ASSERTF(&test, map.free_list == nullptr, "free_list: %p", map.free_list);
-            DQN_TESTER_ASSERTF(&test, entry_a == entry_b, "Expected entry to be overwritten");
-            DQN_TESTER_ASSERTF(&test, entry_b->hash == 4, "hash: %zu", entry_b->hash);
-            DQN_TESTER_ASSERTF(&test, entry_b->value == 6, "value: %d", entry_b->value);
-            DQN_TESTER_ASSERTF(&test, entry_b->next == nullptr, "next: %p", entry_b->next);
-        }
-
-        DQN_TESTER_TEST("Add r-value item and fail on collision") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(scratch.arena, 1);
-            Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
-            Dqn_MapEntry<int> *entry_b = Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Fail);
-            DQN_TESTER_ASSERTF(&test, entry_b == nullptr, "Expected entry to be overwritten");
-            DQN_TESTER_ASSERTF(&test, map.size == 1, "size: %zu", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, map.chain_count == 0, "chain_count: %zu", map.chain_count);
-            DQN_TESTER_ASSERTF(&test, map.free_list == nullptr, "free_list: %p", map.free_list);
-        }
-
-        DQN_TESTER_TEST("Add r-value item and chain on collision") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(scratch.arena, 1);
-            Dqn_MapEntry<int> *entry_a = Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
-            Dqn_MapEntry<int> *entry_b = Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Chain);
-            DQN_TESTER_ASSERTF(&test, map.size == 1, "size: %zu", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, map.chain_count == 1, "chain_count: %zu", map.chain_count);
-            DQN_TESTER_ASSERTF(&test, map.free_list == nullptr, "free_list: %p", map.free_list);
-            DQN_TESTER_ASSERTF(&test, entry_a != entry_b, "Expected colliding entry to be chained");
-            DQN_TESTER_ASSERTF(&test, entry_a->next == entry_b, "Expected chained entry to be next to our first map entry");
-            DQN_TESTER_ASSERTF(&test, entry_b->hash == 4, "hash: %zu", entry_b->hash);
-            DQN_TESTER_ASSERTF(&test, entry_b->value == 6, "value: %d", entry_b->value);
-            DQN_TESTER_ASSERTF(&test, entry_b->next == nullptr, "next: %p", entry_b->next);
-        }
-
-        DQN_TESTER_TEST("Add r-value item and get them back out again") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(scratch.arena, 1);
-            Dqn_MapEntry<int> *entry_a = Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
-            Dqn_MapEntry<int> *entry_b = Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Chain);
-
-            Dqn_MapEntry<int> *entry_a_copy = Dqn_Map_Get(&map, 3 /*hash*/);
-            Dqn_MapEntry<int> *entry_b_copy = Dqn_Map_Get(&map, 4 /*hash*/);
-            DQN_TESTER_ASSERTF(&test, map.size == 1, "size: %zu", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, map.chain_count == 1, "chain_count: %zu", map.chain_count);
-            DQN_TESTER_ASSERTF(&test, map.free_list == nullptr, "free_list: %p", map.free_list);
-            DQN_TESTER_ASSERT(&test, entry_a_copy == entry_a);
-            DQN_TESTER_ASSERT(&test, entry_b_copy == entry_b);
-        }
-
-        DQN_TESTER_TEST("Add r-value item and erase it") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(scratch.arena, 1);
-            Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
-            Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Chain);
-            Dqn_Map_Get(&map, 3 /*hash*/);
-
-            Dqn_Map_Erase(&map, 3 /*hash*/, Dqn_ZeroMem_No);
-            DQN_TESTER_ASSERTF(&test, map.size == 1, "size: %zu", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, map.chain_count == 0, "chain_count: %zu", map.chain_count);
-            DQN_TESTER_ASSERTF(&test, map.free_list != nullptr, "free_list: %p", map.free_list);
-
-            DQN_TESTER_ASSERTF(&test, map.free_list->hash == 3, "Entry should not be zeroed out on erase");
-            DQN_TESTER_ASSERTF(&test, map.free_list->value == 5, "Entry should not be zeroed out on erase");
-            DQN_TESTER_ASSERTF(&test, map.free_list->next == nullptr, "This should be the first and only entry in the free list");
-
-            Dqn_MapEntry<int> *entry = Dqn_Map_Get(&map, 4 /*hash*/);
-            DQN_TESTER_ASSERTF(&test, entry->hash == 4, "hash: %zu", entry->hash);
-            DQN_TESTER_ASSERTF(&test, entry->value == 6, "value: %d", entry->value);
-            DQN_TESTER_ASSERTF(&test, entry->next == nullptr, "next: %p", entry->next);
-        }
-
-        DQN_TESTER_TEST("Add r-value item and erase it, zeroing the memory out") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Map<int> map = Dqn_Map_InitWithArena<int>(scratch.arena, 1);
-            Dqn_Map_AddCopy(&map, 3 /*hash*/, 5, Dqn_MapCollideRule::Overwrite);
-            Dqn_Map_AddCopy(&map, 4 /*hash*/, 6, Dqn_MapCollideRule::Chain);
-            Dqn_Map_Get(&map, 3 /*hash*/);
-
-            Dqn_Map_Erase(&map, 3 /*hash*/, Dqn_ZeroMem_Yes);
-            DQN_TESTER_ASSERTF(&test, map.size == 1, "size: %zu", map.size);
-            DQN_TESTER_ASSERTF(&test, map.count == 1, "count: %zu", map.count);
-            DQN_TESTER_ASSERTF(&test, map.chain_count == 0, "chain_count: %zu", map.chain_count);
-            DQN_TESTER_ASSERTF(&test, map.free_list != nullptr, "free_list: %p", map.free_list);
-
-            DQN_TESTER_ASSERTF(&test, map.free_list->hash == 0, "Entry should be zeroed out on erase");
-            DQN_TESTER_ASSERTF(&test, map.free_list->value == 0, "Entry should be zeroed out on erase");
-            DQN_TESTER_ASSERTF(&test, map.free_list->next == nullptr, "This should be the first and only entry in the free list");
-
-            Dqn_MapEntry<int> *entry = Dqn_Map_Get(&map, 4 /*hash*/);
-            DQN_TESTER_ASSERTF(&test, entry->hash == 4, "hash: %zu", entry->hash);
-            DQN_TESTER_ASSERTF(&test, entry->value == 6, "value: %d", entry->value);
-            DQN_TESTER_ASSERTF(&test, entry->next == nullptr, "next: %p", entry->next);
-        }
-
-        // TODO(dqn): Test free list is chained correctly
-        // TODO(dqn): Test deleting 'b' from the list in the situation [map] - [a]->[b], we currently only test deleting a
     }
     return test;
 }
@@ -848,7 +783,7 @@ Dqn_Tester Dqn_Test_CString8()
             char const  prefix[]     = "@123";
             char const  buf[]        = "@123string";
             Dqn_isize   trimmed_size = 0;
-            char const *result       = Dqn_CString8_TrimPrefix(buf, prefix, Dqn_CString8_ArrayCountI(buf), Dqn_CString8_ArrayCountI(prefix), Dqn_CString8EqCase::Sensitive, &trimmed_size);
+            char const *result       = Dqn_CString8_TrimPrefix(buf, prefix, Dqn_CString8_ArrayCountI(buf), Dqn_CString8_ArrayCountI(prefix), Dqn_CString8EqCase_Sensitive, &trimmed_size);
             DQN_TESTER_ASSERTF(&test, trimmed_size == 6, "size: %I64d", trimmed_size);
             DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(Dqn_String8_Init(result, trimmed_size), DQN_STRING8("string")), "%.*s", (int)trimmed_size, result);
         }
@@ -856,7 +791,7 @@ Dqn_Tester Dqn_Test_CString8()
         DQN_TESTER_TEST("Trim prefix, nullptr trimmed size") {
             char const  prefix[]     = "@123";
             char const  buf[]        = "@123string";
-            char const *result       = Dqn_CString8_TrimPrefix(buf, prefix, Dqn_CString8_ArrayCountI(buf), Dqn_CString8_ArrayCountI(prefix), Dqn_CString8EqCase::Sensitive, nullptr);
+            char const *result       = Dqn_CString8_TrimPrefix(buf, prefix, Dqn_CString8_ArrayCountI(buf), Dqn_CString8_ArrayCountI(prefix), Dqn_CString8EqCase_Sensitive, nullptr);
             DQN_TESTER_ASSERT(&test, result);
         }
 
@@ -1073,38 +1008,38 @@ Dqn_Tester Dqn_Test_Win()
     DQN_TESTER_GROUP(test, "Dqn_Win") {
         DQN_TESTER_TEST("String8 to String16 size required") {
             int result = Dqn_Win_String8ToCString16(DQN_STRING8("a"), nullptr, 0);
-            DQN_TESTER_ASSERTF(&test, result == 2, "Size returned: %d. This size should include the null-terminator", result);
+            DQN_TESTER_ASSERTF(&test, result == 1, "Size returned: %d. This size should not include the null-terminator", result);
         }
 
         DQN_TESTER_TEST("String16 to String8 size required") {
             int result = Dqn_Win_String16ToCString8(DQN_STRING16(L"a"), nullptr, 0);
-            DQN_TESTER_ASSERTF(&test, result == 2, "Size returned: %d. This size should include the null-terminator", result);
+            DQN_TESTER_ASSERTF(&test, result == 1, "Size returned: %d. This size should not include the null-terminator", result);
         }
 
         DQN_TESTER_TEST("String8 to String16 size required") {
             int result = Dqn_Win_String8ToCString16(DQN_STRING8("String"), nullptr, 0);
-            DQN_TESTER_ASSERTF(&test, result == 7, "Size returned: %d. This size should include the null-terminator", result);
+            DQN_TESTER_ASSERTF(&test, result == 6, "Size returned: %d. This size should not include the null-terminator", result);
         }
 
         DQN_TESTER_TEST("String16 to String8 size required") {
             int result = Dqn_Win_String16ToCString8(DQN_STRING16(L"String"), nullptr, 0);
-            DQN_TESTER_ASSERTF(&test, result == 7, "Size returned: %d. This size should include the null-terminator", result);
+            DQN_TESTER_ASSERTF(&test, result == 6, "Size returned: %d. This size should not include the null-terminator", result);
         }
 
         DQN_TESTER_TEST("String8 to String16") {
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
             Dqn_String8 const INPUT   = DQN_STRING8("String");
             int size_required         = Dqn_Win_String8ToCString16(INPUT, nullptr, 0);
-            wchar_t *string           = Dqn_Arena_NewArray(scratch.arena, wchar_t, size_required, Dqn_ZeroMem_No);
+            wchar_t *string           = Dqn_Arena_NewArray(scratch.arena, wchar_t, size_required + 1, Dqn_ZeroMem_No);
 
             // Fill the string with error sentinels, which ensures the string is zero terminated
-            DQN_MEMSET(string, 'Z', size_required);
+            DQN_MEMSET(string, 'Z', size_required + 1);
 
-            int size_returned = Dqn_Win_String8ToCString16(INPUT, string, size_required);
+            int size_returned = Dqn_Win_String8ToCString16(INPUT, string, size_required + 1);
             wchar_t const EXPECTED[] = {L'S', L't', L'r', L'i', L'n', L'g', 0};
 
             DQN_TESTER_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
-            DQN_TESTER_ASSERTF(&test, size_returned == Dqn_CArray_Count(EXPECTED), "string_size: %d, expected: %zu", size_returned, Dqn_CArray_Count(EXPECTED));
+            DQN_TESTER_ASSERTF(&test, size_returned == Dqn_CArray_Count(EXPECTED) - 1, "string_size: %d, expected: %zu", size_returned, Dqn_CArray_Count(EXPECTED) - 1);
             DQN_TESTER_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
         }
 
@@ -1112,16 +1047,16 @@ Dqn_Tester Dqn_Test_Win()
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
             Dqn_String16 INPUT        = DQN_STRING16(L"String");
             int size_required         = Dqn_Win_String16ToCString8(INPUT, nullptr, 0);
-            char *string              = Dqn_Arena_NewArray(scratch.arena, char, size_required, Dqn_ZeroMem_No);
+            char *string              = Dqn_Arena_NewArray(scratch.arena, char, size_required + 1, Dqn_ZeroMem_No);
 
             // Fill the string with error sentinels, which ensures the string is zero terminated
-            DQN_MEMSET(string, 'Z', size_required);
+            DQN_MEMSET(string, 'Z', size_required + 1);
 
-            int size_returned = Dqn_Win_String16ToCString8(INPUT, string, size_required);
+            int size_returned = Dqn_Win_String16ToCString8(INPUT, string, size_required + 1);
             char const EXPECTED[] = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
             DQN_TESTER_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
-            DQN_TESTER_ASSERTF(&test, size_returned == Dqn_CArray_Count(EXPECTED), "string_size: %d, expected: %zu", size_returned, Dqn_CArray_Count(EXPECTED));
+            DQN_TESTER_ASSERTF(&test, size_returned == Dqn_CArray_Count(EXPECTED) - 1, "string_size: %d, expected: %zu", size_returned, Dqn_CArray_Count(EXPECTED) - 1);
             DQN_TESTER_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
         }
     }
@@ -1350,7 +1285,6 @@ void Dqn_Test_RunSuite()
         Dqn_Test_Intrinsics(),
         Dqn_Test_M4(),
         Dqn_Test_DSMap(),
-        Dqn_Test_Map(),
         Dqn_Test_Rect(),
         Dqn_Test_PerfCounter(),
         Dqn_Test_OS(),
