@@ -3626,10 +3626,9 @@ DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64(Dqn_DSMap<T> const *map, uint64_t u64)
     Dqn_DSMapKey result = {};
     result.type         = Dqn_DSMapKeyType_U64;
     result.payload.u64  = u64;
-    result.hash         = Dqn_DSMap_Hash(map, &result);
+    result.hash         = Dqn_DSMap_Hash(map, result);
     return result;
 }
-
 
 template <typename T>
 DQN_API Dqn_DSMapKey Dqn_DSMap_KeyString8(Dqn_DSMap<T> const *map, Dqn_String8 string)
@@ -3639,7 +3638,7 @@ DQN_API Dqn_DSMapKey Dqn_DSMap_KeyString8(Dqn_DSMap<T> const *map, Dqn_String8 s
     result.type                = Dqn_DSMapKeyType_Buffer;
     result.payload.buffer.data = string.data;
     result.payload.buffer.size = DQN_CAST(uint32_t)string.size;
-    result.hash                = Dqn_DSMap_Hash(map, &result);
+    result.hash                = Dqn_DSMap_Hash(map, result);
     return result;
 }
 
