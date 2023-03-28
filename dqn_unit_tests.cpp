@@ -243,18 +243,18 @@ Dqn_Tester Dqn_Test_DSMap()
             DQN_DEFER { Dqn_DSMap_Deinit(&map); };
 
             DQN_TESTER_TEST("Find non-existent value") {
-                uint64_t *value = Dqn_DSMap_Find(&map, Dqn_DSMap_KeyCStringLit("Foo"));
+                uint64_t *value = Dqn_DSMap_Find(&map, Dqn_DSMap_KeyCStringLit(&map, "Foo"));
                 DQN_ASSERT(!value);
                 DQN_ASSERT(map.size         == MAP_SIZE);
                 DQN_ASSERT(map.initial_size == MAP_SIZE);
                 DQN_ASSERT(map.occupied     == 1 /*Sentinel*/);
             }
 
-            Dqn_DSMapKey key = Dqn_DSMap_KeyCStringLit("Bar");
+            Dqn_DSMapKey key = Dqn_DSMap_KeyCStringLit(&map, "Bar");
             DQN_TESTER_TEST("Insert value and lookup") {
                 uint64_t desired_value  = 0xF00BAA;
-                Dqn_DSMapSlot<uint64_t> *slot = Dqn_DSMap_Set(&map, key, desired_value);
-                DQN_ASSERT(slot);
+                uint64_t *slot_value = Dqn_DSMap_Set(&map, key, desired_value, nullptr /*found*/);
+                DQN_ASSERT(slot_value);
                 DQN_ASSERT(map.size == MAP_SIZE);
                 DQN_ASSERT(map.initial_size == MAP_SIZE);
                 DQN_ASSERT(map.occupied == 2);
@@ -272,24 +272,37 @@ Dqn_Tester Dqn_Test_DSMap()
             }
         }
 
-        {
+        enum DSMapTestType { DSMapTestType_Set, DSMapTestType_MakeSlot, DSMapTestType_Count };
+        for (int test_type = 0; test_type < DSMapTestType_Count; test_type++) {
+            Dqn_String8 prefix = {};
+            switch (test_type) {
+                case DSMapTestType_Set:      prefix = DQN_STRING8("Set"); break;
+                case DSMapTestType_MakeSlot: prefix = DQN_STRING8("Make slot"); break;
+            }
+
             DQN_ARENA_TEMP_MEMORY_SCOPE(scratch.arena);
             uint32_t const MAP_SIZE = 64;
             Dqn_DSMap<uint64_t>  map      = Dqn_DSMap_Init<uint64_t>(MAP_SIZE);
             DQN_DEFER { Dqn_DSMap_Deinit(&map); };
 
-            DQN_TESTER_TEST("Test growing") {
+            DQN_TESTER_TEST("%.*s: Test growing", DQN_STRING_FMT(prefix)) {
                 uint64_t map_start_size  = map.size;
                 uint64_t value          = 0;
                 uint64_t grow_threshold = map_start_size * 3 / 4;
                 for (; map.occupied != grow_threshold; value++) {
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
-                    Dqn_DSMapKey key    = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));
-                    DQN_ASSERT(!Dqn_DSMap_FindSlot<uint64_t>(&map, key, Dqn_DSMap_Hash(&map, key)));
-                    Dqn_DSMap_Set(&map, key, value);
+                    DQN_ASSERT(!Dqn_DSMap_FindSlot<uint64_t>(&map, key));
+                    bool found = false;
+                    if (test_type == DSMapTestType_Set) {
+                        Dqn_DSMap_Set(&map, key, value, &found);
+                    } else {
+                        Dqn_DSMap_MakeSlot(&map, key, &found);
+                    }
+                    DQN_ASSERT(!found);
                     DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
-                    DQN_ASSERT(Dqn_DSMap_FindSlot<uint64_t>(&map, key, Dqn_DSMap_Hash(&map, key)));
+                    DQN_ASSERT(Dqn_DSMap_FindSlot<uint64_t>(&map, key));
                 }
                 DQN_ASSERT(map.initial_size == MAP_SIZE);
                 DQN_ASSERT(map.size         == map_start_size);
@@ -297,58 +310,70 @@ Dqn_Tester Dqn_Test_DSMap()
 
                 { // NOTE: One more item should cause the table to grow by 2x
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
-                    Dqn_DSMapKey key       = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
-                    Dqn_DSMap_Set(&map, key, value++);
+                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
+                    bool found         = false;
+                    if (test_type == DSMapTestType_Set) {
+                        Dqn_DSMap_Set(&map, key, value, &found);
+                    } else {
+                        Dqn_DSMap_MakeSlot(&map, key, &found);
+                    }
 
+                    value++;
+                    DQN_ASSERT(!found);
                     DQN_ASSERT(map.size         == map_start_size * 2);
                     DQN_ASSERT(map.initial_size == MAP_SIZE);
                     DQN_ASSERT(map.occupied     == 1 /*Sentinel*/ + value);
                 }
             }
 
-            DQN_TESTER_TEST("Check the sentinel is present") {
+            DQN_TESTER_TEST("%.*s: Check the sentinel is present", DQN_STRING_FMT(prefix)) {
                 Dqn_DSMapSlot<uint64_t> NIL_SLOT = {};
                 Dqn_DSMapSlot<uint64_t> sentinel = map.slots[DQN_DS_MAP_SENTINEL_SLOT];
                 DQN_ASSERT(DQN_MEMCMP(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
             }
 
-            DQN_TESTER_TEST("Recheck all the hash tables values after growing") {
+            DQN_TESTER_TEST("%.*s: Recheck all the hash tables values after growing", DQN_STRING_FMT(prefix)) {
                 for (uint64_t index = 1 /*Sentinel*/; index < map.occupied; index++) {
                     Dqn_DSMapSlot<uint64_t> const *slot = map.slots + index;
 
                     // NOTE: Validate each slot value
                     uint64_t value_test = index - 1;
-                    Dqn_DSMapKey key = Dqn_DSMap_KeyBuffer(&value_test, sizeof(value_test));
+                    Dqn_DSMapKey key    = Dqn_DSMap_KeyBuffer(&map, &value_test, sizeof(value_test));
                     DQN_ASSERT(Dqn_DSMap_KeyEquals(slot->key, key));
-                    DQN_ASSERT(slot->value == value_test);
-                    DQN_ASSERT(slot->hash  == Dqn_DSMap_Hash(&map, slot->key));
+                    if (test_type == DSMapTestType_Set) {
+                        DQN_ASSERT(slot->value == value_test);
+                    } else {
+                        DQN_ASSERT(slot->value == 0); // NOTE: Make slot does not set the key so should be 0
+                    }
+                    DQN_ASSERT(slot->key.hash == Dqn_DSMap_Hash(&map, slot->key));
 
                     // NOTE: Check the reverse lookup is correct
-                    Dqn_DSMapSlot<uint64_t> const *check = Dqn_DSMap_FindSlot<uint64_t>(&map, slot->key, slot->hash);
+                    Dqn_DSMapSlot<uint64_t> const *check = Dqn_DSMap_FindSlot(&map, slot->key);
                     DQN_ASSERT(slot == check);
                 }
             }
 
-            DQN_TESTER_TEST("Test shrinking") {
+            DQN_TESTER_TEST("%.*s: Test shrinking", DQN_STRING_FMT(prefix)) {
                 uint64_t start_map_size     = map.size;
                 uint64_t start_map_occupied = map.occupied;
                 uint64_t value              = 0;
                 uint64_t shrink_threshold   = map.size * 1 / 4;
                 for (; map.occupied != shrink_threshold; value++) {
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
-                    Dqn_DSMapKey key       = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
+
                     DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
-                    DQN_ASSERT(Dqn_DSMap_FindSlot<uint64_t>(&map, key, Dqn_DSMap_Hash(&map, key)));
+                    DQN_ASSERT(Dqn_DSMap_FindSlot<uint64_t>(&map, key));
                     Dqn_DSMap_Erase(&map, key);
                     DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));
-                    DQN_ASSERT(!Dqn_DSMap_FindSlot<uint64_t>(&map, key, Dqn_DSMap_Hash(&map, key)));
+                    DQN_ASSERT(!Dqn_DSMap_FindSlot(&map, key));
                 }
                 DQN_ASSERT(map.size == start_map_size);
                 DQN_ASSERT(map.occupied == start_map_occupied - value);
 
                 { // NOTE: One more item should cause the table to grow by 2x
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
-                    Dqn_DSMapKey key       = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     Dqn_DSMap_Erase(&map, key);
                     value++;
 
@@ -367,23 +392,27 @@ Dqn_Tester Dqn_Test_DSMap()
 
                     // NOTE: Generate the key
                     uint64_t value_test = value + (index - 1);
-                    Dqn_DSMapKey key        = Dqn_DSMap_KeyBuffer((char *)&value_test, sizeof(value_test));
+                    Dqn_DSMapKey key    = Dqn_DSMap_KeyBuffer(&map, (char *)&value_test, sizeof(value_test));
 
                     // NOTE: Validate each slot value
-                    Dqn_DSMapSlot<uint64_t> const *slot = Dqn_DSMap_FindSlot(&map, key, Dqn_DSMap_Hash(&map, key));
+                    Dqn_DSMapSlot<uint64_t> const *slot = Dqn_DSMap_FindSlot(&map, key);
                     DQN_ASSERT(slot);
-                    DQN_ASSERT(slot->key   == key);
-                    DQN_ASSERT(slot->value == value_test);
-                    DQN_ASSERT(slot->hash  == Dqn_DSMap_Hash(&map, slot->key));
+                    DQN_ASSERT(slot->key == key);
+                    if (test_type == DSMapTestType_Set) {
+                        DQN_ASSERT(slot->value == value_test);
+                    } else {
+                        DQN_ASSERT(slot->value == 0); // NOTE: Make slot does not set the key so should be 0
+                    }
+                    DQN_ASSERT(slot->key.hash == Dqn_DSMap_Hash(&map, slot->key));
 
                     // NOTE: Check the reverse lookup is correct
-                    Dqn_DSMapSlot<uint64_t> const *check = Dqn_DSMap_FindSlot<uint64_t>(&map, slot->key, slot->hash);
+                    Dqn_DSMapSlot<uint64_t> const *check = Dqn_DSMap_FindSlot(&map, slot->key);
                     DQN_ASSERT(slot == check);
                 }
 
                 for (; map.occupied != 1; value++) { // NOTE: Remove all items from the table
-                    uint64_t *val_copy  = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
-                    Dqn_DSMapKey key        = Dqn_DSMap_KeyBuffer((char *)val_copy, sizeof(*val_copy));
+                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
                     Dqn_DSMap_Erase(&map, key);
                     DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));

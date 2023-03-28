@@ -1491,6 +1491,9 @@ DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena);
 // variable which is the Value part of the hash-table simplifying interface
 // complexity and cruft brought by C++.
 //
+// Keys are value-copied into the hash-table. If the key uses a pointer to a
+// buffer, this buffer must be valid throughout the lifetime of the hash table!
+//
 // NOTE: Dqn_DSMap API
 // =============================================================================
 //
@@ -1521,21 +1524,30 @@ DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena);
 // @proc Dqn_DSMap_HashToSlotIndex
 //   @desc Calculate the index into the map's `slots` array from the given hash.
 //
-// @proc Dqn_DSMap_FindSlot
+// @proc Dqn_DSMap_FindSlot, Dqn_DSMap_Find
 //   @desc Find the slot in the map's `slots` array corresponding to the given
 //   key and hash. If the map does not contain the key, a null pointer is
 //   returned.
 //
-// @proc Dqn_DSMap_MakeSlot
-//   @desc Same as `DSMap_FindSlot` except if the key does not exist it will be
-//   made and returned.
+//   `Find`     returns the value.
+//   `FindSlot` returns the map's hash table slot.
 //
-// @proc Dqn_DSMap_Find
-//   @desc Same as `DSMap_FindSlot` except it returns the value for the key. If
-//   the map does not contain the key, a null pointer is returned.
+// @proc Dqn_DSMap_MakeSlot, Dqn_DSMap_Make, Dqn_DSMap_Set, Dqn_DSMap_SetSlot
+//   @desc Same as `DSMap_Find*` except if the key does not exist in the table,
+//   a hash-table slot will be made.
 //
-// @proc Dqn_DSMap_Make
-//   @desc Same as `DSMap_MakeSlot` except it returns the value for the key.
+//   `Make`     assigns the key       to the table and returns the hash table slot's value.
+//   `Set`      assigns the key-value to the table and returns the hash table slot's value.
+//   `MakeSlot` assigns the key       to the table and returns the hash table slot.
+//   `SetSlot`  assigns the key-value to the table and returns the hash table slot.
+//
+//   If by adding the key-value pair to the table puts the table over 75% load,
+//   the table will be grown to 2x the current the size before insertion
+//   completes.
+//
+//   @param found[out] Pass a pointer to a bool. The bool will be set to true
+//   if the item already existed in the map before, or false if the item was
+//   just created by this call.
 //
 // @proc Dqn_DSMap_Resize
 //   @desc Resize the table and move all elements to the new map.
@@ -1544,24 +1556,28 @@ DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena);
 //   @return False if memory allocation fails, or the requested size is smaller
 //   than the current number of elements in the map to resize. True otherwise.
 //
-// @proc Dqn_Dqn_DSMap_Set
-//   @desc Assign the key-value pair to the table. Pre-existing keys are updated
-//   in place and new key-value pairs are inserted into the table. If by adding
-//   the key-value pair to the table puts the table over 75% load, the table
-//   will be grown to 2x the current the size before insertion completes.
-//
 // @proc Dqn_DSMap_Erase
 //   @desc Remove the key-value pair from the table. If by erasing the key-value
 //   pair from the table puts the table under 25% load, the table will be shrunk
 //   by 1/2 the current size after erasing. The table will not shrink below the
 //   initial size that the table was initialised as.
 //
-// @proc Dqn_DSMap_KeyCStringLit, Dqn_DSMap_KeyU64, Dqn_DSMap_KeyBuffer
-//   @desc Create a hash-table key given a cstring, uint64 or buffer (ptr + len)
-//   respectively.
+// @proc Dqn_DSMap_KeyCStringLit, Dqn_DSMap_KeyU64, Dqn_DSMap_KeyBuffer,
+// Dqn_DSMap_KeyString8 Dqn_DSMap_KeyString8Copy
+//   @desc Create a hash-table key given
+//
+//   `KeyCStringLit`  a cstring literal
+//   `KeyU64`         a u64
+//   `KeyBuffer`      a (ptr+len) slice of bytes
+//   `KeyString8`     a Dqn_String8 string
+//   `KeyString8Copy` a Dqn_String8 string that is copied first using the allocator
+//
+//   If the key points to an array of bytes, the lifetime of those bytes *must*
+//   remain valid throughout the lifetime of the map as the pointers are value
+//   copied into the hash table!
 //
 // @proc Dqn_DSMap_KeyU64NoHash
-//   @desc Create a hash-table key given the uint64. This key is *not* hashed to
+//   @desc Create a hash-table key given the uint64. This u64 is *not* hashed to
 //   map values into the table. This is useful if you already have a source of
 //   data that is already sufficiently uniformly distributed already (e.g.
 //   using 8 bytes taken from a SHA256 hash as the key).
@@ -1580,6 +1596,7 @@ enum Dqn_DSMapKeyType
 struct Dqn_DSMapKey
 {
     Dqn_DSMapKeyType type;
+    uint32_t hash;
     union Payload {
         struct Buffer {
             void const *data;
@@ -1593,8 +1610,7 @@ template <typename T>
 struct Dqn_DSMapSlot
 {
     Dqn_DSMapKey key;   ///< Hash table lookup key
-    T            value;
-    uint32_t     hash;  ///< hash(key) for this slot
+    T            value; ///< Hash table value
 };
 
 using Dqn_DSMapHashFunction = uint32_t(Dqn_DSMapKey key, uint32_t seed);
@@ -1617,23 +1633,26 @@ DQN_API template <typename T> Dqn_DSMap<T>      Dqn_DSMap_Init           (uint32
 DQN_API template <typename T> void              Dqn_DSMap_Deinit         (Dqn_DSMap<T> *map);
 DQN_API template <typename T> bool              Dqn_DSMap_IsValid        (Dqn_DSMap<T> const *map);
 DQN_API template <typename T> uint32_t          Dqn_DSMap_Hash           (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
-DQN_API template <typename T> uint32_t          Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key, uint32_t hash);
-DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_FindSlot       (Dqn_DSMap<T> const *map, Dqn_DSMapKey key, uint32_t hash);
-DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_MakeSlot       (Dqn_DSMap<T> *map, Dqn_DSMapKey key, uint32_t hash);
+DQN_API template <typename T> uint32_t          Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
+DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_FindSlot       (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
+DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_MakeSlot       (Dqn_DSMap<T> *map, Dqn_DSMapKey key, bool *found);
+DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_SetSlot        (Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value, bool *found);
 DQN_API template <typename T> T *               Dqn_DSMap_Find           (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
-DQN_API template <typename T> T *               Dqn_DSMap_Make           (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
+DQN_API template <typename T> T *               Dqn_DSMap_Make           (Dqn_DSMap<T> *map, Dqn_DSMapKey key, bool *found);
+DQN_API template <typename T> T *               Dqn_DSMap_Set            (Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value, bool *found);
 DQN_API template <typename T> bool              Dqn_DSMap_Resize         (Dqn_DSMap<T> *map, uint32_t size);
-DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_Set            (Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value);
 DQN_API template <typename T> bool              Dqn_DSMap_Erase          (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
 
 // NOTE: Dqn_DSMapKey
 // =============================================================================
-DQN_API bool                                    Dqn_DSMap_KeyEquals    (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
-DQN_API bool                                    operator==             (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
-DQN_API Dqn_DSMapKey                            Dqn_DSMap_KeyBuffer    (void const *data, uint32_t size);
-DQN_API Dqn_DSMapKey                            Dqn_DSMap_KeyU64       (uint64_t u64);
-DQN_API Dqn_DSMapKey                            Dqn_DSMap_KeyU64NoHash (uint64_t u64);
-#define                                         Dqn_DSMap_KeyCStringLit(string) Dqn_DSMap_KeyBuffer(string, sizeof((string))/sizeof((string)[0]) - 1)
+DQN_API template <typename T> Dqn_DSMapKey      Dqn_DSMap_KeyBuffer      (Dqn_DSMap<T> const *map, void const *data, uint32_t size);
+DQN_API template <typename T> Dqn_DSMapKey      Dqn_DSMap_KeyU64         (Dqn_DSMap<T> const *map, uint64_t u64);
+DQN_API template <typename T> Dqn_DSMapKey      Dqn_DSMap_KeyString8     (Dqn_DSMap<T> const *map, Dqn_String8 string);
+DQN_API template <typename T> Dqn_DSMapKey      Dqn_DSMap_KeyString8Copy (Dqn_DSMap<T> const *map, Dqn_Allocator allocator, Dqn_String8 string);
+#define                                         Dqn_DSMap_KeyCStringLit(map, string) Dqn_DSMap_KeyBuffer(map, string, sizeof((string))/sizeof((string)[0]) - 1)
+DQN_API Dqn_DSMapKey                            Dqn_DSMap_KeyU64NoHash   (uint64_t u64);
+DQN_API bool                                    Dqn_DSMap_KeyEquals      (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
+DQN_API bool                                    operator==               (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
 #endif // !defined(DQN_NO_DSMAP)
 
 // ---------------------------------+-----------------------------+---------------------------------
@@ -3402,19 +3421,19 @@ uint32_t Dqn_DSMap_Hash(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
 }
 
 template <typename T>
-uint32_t Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key, uint32_t hash)
+uint32_t Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
 {
     uint32_t result = DQN_DS_MAP_SENTINEL_SLOT;
     if (!Dqn_DSMap_IsValid(map))
         return result;
 
-    result = hash & (map->size - 1);
+    result = key.hash & (map->size - 1);
     for (;;) {
         if (map->hash_to_slot[result] == DQN_DS_MAP_SENTINEL_SLOT)
             return result;
 
         Dqn_DSMapSlot<T> *slot = map->slots + map->hash_to_slot[result];
-        if (slot->key.type == Dqn_DSMapKeyType_Invalid || (slot->hash == hash && slot->key == key))
+        if (slot->key.type == Dqn_DSMapKeyType_Invalid || (slot->key.hash == key.hash && slot->key == key))
             return result;
 
         result = (result + 1) & (map->size - 1);
@@ -3422,11 +3441,11 @@ uint32_t Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key, ui
 }
 
 template <typename T>
-Dqn_DSMapSlot<T> *Dqn_DSMap_FindSlot(Dqn_DSMap<T> const *map, Dqn_DSMapKey key, uint32_t hash)
+Dqn_DSMapSlot<T> *Dqn_DSMap_FindSlot(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
 {
     Dqn_DSMapSlot<T> const *result = nullptr;
     if (Dqn_DSMap_IsValid(map)) {
-        uint32_t index = Dqn_DSMap_HashToSlotIndex(map, key, hash);
+        uint32_t index = Dqn_DSMap_HashToSlotIndex(map, key);
         if (map->hash_to_slot[index] != DQN_DS_MAP_SENTINEL_SLOT)
             result = map->slots + map->hash_to_slot[index];
     }
@@ -3434,40 +3453,71 @@ Dqn_DSMapSlot<T> *Dqn_DSMap_FindSlot(Dqn_DSMap<T> const *map, Dqn_DSMapKey key, 
 }
 
 template <typename T>
-Dqn_DSMapSlot<T> *Dqn_DSMap_MakeSlot(Dqn_DSMap<T> *map, Dqn_DSMapKey key, uint32_t hash)
+Dqn_DSMapSlot<T> *Dqn_DSMap_MakeSlot(Dqn_DSMap<T> *map, Dqn_DSMapKey key, bool *found)
 {
     Dqn_DSMapSlot<T> *result = nullptr;
     if (Dqn_DSMap_IsValid(map)) {
-        uint32_t index = Dqn_DSMap_HashToSlotIndex(map, key, hash);
-        if (map->hash_to_slot[index] == DQN_DS_MAP_SENTINEL_SLOT)
+        uint32_t index = Dqn_DSMap_HashToSlotIndex(map, key);
+        if (map->hash_to_slot[index] == DQN_DS_MAP_SENTINEL_SLOT) {
+            // NOTE: Create the slot
             map->hash_to_slot[index] = map->occupied++;
-        result = map->slots + map->hash_to_slot[index];
+
+            // NOTE: Check if resize is required
+            bool map_is_75pct_full = (map->occupied * 4) > (map->size * 3);
+            if (map_is_75pct_full) {
+                if (!Dqn_DSMap_Resize(map, map->size * 2))
+                    return result;
+                result = Dqn_DSMap_MakeSlot(map, key, nullptr /*found*/);
+            } else {
+                result = map->slots + map->hash_to_slot[index];
+            }
+
+            // NOTE: Update the slot
+            result->key = key;
+            if (found)
+                *found = false;
+        } else {
+            result = map->slots + map->hash_to_slot[index];
+            if (found)
+                *found = true;
+        }
     }
+    return result;
+}
+
+template <typename T>
+Dqn_DSMapSlot<T> *Dqn_DSMap_SetSlot(Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value, bool *found)
+{
+    Dqn_DSMapSlot<T> *result = nullptr;
+    if (!Dqn_DSMap_IsValid(map))
+        return result;
+
+    result        = Dqn_DSMap_MakeSlot(map, key, found);
+    result->value = value;
     return result;
 }
 
 template <typename T>
 T *Dqn_DSMap_Find(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
 {
-    T const *result = nullptr;
-    if (Dqn_DSMap_IsValid(map)) {
-        uint32_t      hash     = Dqn_DSMap_Hash(map, key);
-        Dqn_DSMapSlot<T> *slot = Dqn_DSMap_FindSlot(map, key, hash);
-        result                 = slot ? &slot->value : nullptr;
-    }
+    Dqn_DSMapSlot<T> const *slot = Dqn_DSMap_FindSlot(map, key);
+    T const *result              = slot ? &slot->value : nullptr;
     return DQN_CAST(T *)result;
 }
 
 template <typename T>
-T *Dqn_DSMap_Make(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
+T *Dqn_DSMap_Make(Dqn_DSMap<T> *map, Dqn_DSMapKey key, bool *found)
 {
-    T const *result = nullptr;
-    if (Dqn_DSMap_IsValid(map)) {
-        uint32_t      hash     = Dqn_DSMap_Hash(map, key);
-        Dqn_DSMapSlot<T> *slot = Dqn_DSMap_MakeSlot(map, key, hash);
-        result                 = &slot->value;
-    }
-    return DQN_CAST(T *)result;
+    Dqn_DSMapSlot<T> *slot = Dqn_DSMap_MakeSlot(map, key, found);
+    T *result              = &slot->value;
+    return result;
+}
+
+template <typename T>
+T *Dqn_DSMap_Set(Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value, bool *found)
+{
+    Dqn_DSMapSlot<T> *result = Dqn_DSMap_SetSlot(map, key, value, found);
+    return &result->value;
 }
 
 template <typename T>
@@ -3484,8 +3534,7 @@ bool Dqn_DSMap_Resize(Dqn_DSMap<T> *map, uint32_t size)
     for (uint32_t old_index = 1 /*Sentinel*/; old_index < map->occupied; old_index++) {
         Dqn_DSMapSlot<T> *old_slot = map->slots + old_index;
         if (old_slot->key.type != Dqn_DSMapKeyType_Invalid) {
-            Dqn_DSMapSlot<T> *slot = Dqn_DSMap_MakeSlot(&new_map, old_slot->key, old_slot->hash);
-            *slot              = *old_slot;
+            Dqn_DSMap_Set(&new_map, old_slot->key, old_slot->value, nullptr /*found*/);
         }
     }
 
@@ -3495,32 +3544,6 @@ bool Dqn_DSMap_Resize(Dqn_DSMap<T> *map, uint32_t size)
     return true;
 }
 
-template <typename T>
-Dqn_DSMapSlot<T> *Dqn_DSMap_Set(Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value)
-{
-    Dqn_DSMapSlot<T> *result = nullptr;
-    if (!Dqn_DSMap_IsValid(map))
-        return result;
-
-    uint32_t hash = Dqn_DSMap_Hash(map, key);
-    result        = Dqn_DSMap_MakeSlot(map, key, hash);
-    if (result->key.type != Dqn_DSMapKeyType_Invalid) { // NOTE: Exists already, just update
-        result->value = value;
-        return result;
-    }
-
-    bool map_is_75pct_full = (map->occupied * 4) > (map->size * 3);
-    if (map_is_75pct_full) {
-        if (!Dqn_DSMap_Resize(map, map->size * 2))
-            return result;
-        result = Dqn_DSMap_MakeSlot(map, key, hash);
-    }
-
-    result->key   = key;
-    result->value = value;
-    result->hash  = hash;
-    return result;
-}
 
 template <typename T>
 bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
@@ -3528,8 +3551,7 @@ bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
     if (!Dqn_DSMap_IsValid(map))
         return false;
 
-    uint32_t hash       = Dqn_DSMap_Hash(map, key);
-    uint32_t index      = Dqn_DSMap_HashToSlotIndex(map, key, hash);
+    uint32_t index      = Dqn_DSMap_HashToSlotIndex(map, key);
     uint32_t slot_index = map->hash_to_slot[index];
     if (slot_index == DQN_DS_MAP_SENTINEL_SLOT)
         return false;
@@ -3547,7 +3569,7 @@ bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
                 break;
 
             Dqn_DSMapSlot<T> *probe = map->slots + map->hash_to_slot[probe_index];
-            uint32_t new_index  = probe->hash & (map->size - 1);
+            uint32_t new_index      = probe->key.hash & (map->size - 1);
             if (index <= probe_index) {
                 if (index < new_index && new_index <= probe_index)
                     continue;
@@ -3559,7 +3581,7 @@ bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
             map->hash_to_slot[index]       = map->hash_to_slot[probe_index];
             map->hash_to_slot[probe_index] = DQN_DS_MAP_SENTINEL_SLOT;
             index                          = probe_index;
-            DQN_ASSERT(Dqn_DSMap_FindSlot(map, probe->key, probe->hash) == probe);
+            DQN_ASSERT(Dqn_DSMap_FindSlot(map, probe->key) == probe);
         }
 
         // NOTE: We have erased a slot from the hash table, this leaves a gap
@@ -3573,7 +3595,7 @@ bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
             map->slots[slot_index]      = *last_slot;
 
             // NOTE: Update the hash-to-slot mapping for the value that was copied in
-            uint32_t hash_to_slot_index           = Dqn_DSMap_HashToSlotIndex(map, last_slot->key, last_slot->hash);
+            uint32_t hash_to_slot_index           = Dqn_DSMap_HashToSlotIndex(map, last_slot->key);
             map->hash_to_slot[hash_to_slot_index] = slot_index;
             *last_slot = {}; // TODO: Optional?
         }
@@ -3585,6 +3607,48 @@ bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
         Dqn_DSMap_Resize(map, map->size / 2);
 
     return true;
+}
+
+template <typename T>
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyBuffer(Dqn_DSMap<T> const *map, void const *data, uint32_t size)
+{
+    Dqn_DSMapKey result        = {};
+    result.type                = Dqn_DSMapKeyType_Buffer;
+    result.payload.buffer.data = data;
+    result.payload.buffer.size = size;
+    result.hash                = Dqn_DSMap_Hash(map, result);
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64(Dqn_DSMap<T> const *map, uint64_t u64)
+{
+    Dqn_DSMapKey result = {};
+    result.type         = Dqn_DSMapKeyType_U64;
+    result.payload.u64  = u64;
+    result.hash         = Dqn_DSMap_Hash(map, &result);
+    return result;
+}
+
+
+template <typename T>
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyString8(Dqn_DSMap<T> const *map, Dqn_String8 string)
+{
+    DQN_ASSERT(string.size > 0 && string.size <= UINT32_MAX);
+    Dqn_DSMapKey result        = {};
+    result.type                = Dqn_DSMapKeyType_Buffer;
+    result.payload.buffer.data = string.data;
+    result.payload.buffer.size = DQN_CAST(uint32_t)string.size;
+    result.hash                = Dqn_DSMap_Hash(map, &result);
+    return result;
+}
+
+template <typename T>
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyString8Copy(Dqn_DSMap<T> const *map, Dqn_Allocator allocator, Dqn_String8 string)
+{
+    Dqn_String8 copy    = Dqn_String8_Copy(allocator, string);
+    Dqn_DSMapKey result = Dqn_DSMap_KeyString8(map, copy);
+    return result;
 }
 #endif // !defined(DQN_NO_DSMAP)
 
@@ -5677,13 +5741,22 @@ DQN_API void Dqn_Print_StdLnF(Dqn_PrintStd std_handle, char const *fmt, ...)
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
 // ---------------------------------+-----------------------------+---------------------------------
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64NoHash(uint64_t u64)
+{
+    Dqn_DSMapKey result = {};
+    result.type         = Dqn_DSMapKeyType_U64NoHash;
+    result.payload.u64  = u64;
+    result.hash         = DQN_CAST(uint32_t)u64;
+    return result;
+}
+
 DQN_API bool Dqn_DSMap_KeyEquals(Dqn_DSMapKey lhs, Dqn_DSMapKey rhs)
 {
     bool result = false;
-    if (lhs.type == rhs.type) {
+    if (lhs.type == rhs.type && lhs.hash == rhs.hash) {
         switch (lhs.type)  {
         case Dqn_DSMapKeyType_Invalid:   result = true; break;
-        case Dqn_DSMapKeyType_U64NoHash: /*FALLTHRU*/
+        case Dqn_DSMapKeyType_U64NoHash: result = true; break;
         case Dqn_DSMapKeyType_U64:       result = lhs.payload.u64         == rhs.payload.u64; break;
         case Dqn_DSMapKeyType_Buffer:    result = lhs.payload.buffer.size == rhs.payload.buffer.size &&
                                          memcmp(lhs.payload.buffer.data, rhs.payload.buffer.data, lhs.payload.buffer.size) == 0; break;
@@ -5698,30 +5771,6 @@ DQN_API bool operator==(Dqn_DSMapKey lhs, Dqn_DSMapKey rhs)
     return result;
 }
 
-DQN_API Dqn_DSMapKey Dqn_DSMap_KeyBuffer(void const *data, uint32_t size)
-{
-    Dqn_DSMapKey result        = {};
-    result.type                = Dqn_DSMapKeyType_Buffer;
-    result.payload.buffer.data = data;
-    result.payload.buffer.size = size;
-    return result;
-}
-
-DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64(uint64_t u64)
-{
-    Dqn_DSMapKey result = {};
-    result.type         = Dqn_DSMapKeyType_U64;
-    result.payload.u64  = u64;
-    return result;
-}
-
-DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64NoHash(uint64_t u64)
-{
-    Dqn_DSMapKey result = {};
-    result.type         = Dqn_DSMapKeyType_U64NoHash;
-    result.payload.u64  = u64;
-    return result;
-}
 #endif // !defined(DQN_NO_DSMAP)
 
 // ---------------------------------+-----------------------------+---------------------------------
