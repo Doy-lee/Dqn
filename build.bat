@@ -25,11 +25,7 @@ pushd Build
         echo [ERROR] cl is not found, please put MSVC's cl on the path
         exit /b 1
     )
-
-    if not exist msvc mkdir msvc
-    pushd msvc
-    cl %compile_flags% %msvc_flags% %code_dir%dqn_unit_tests.cpp %link_flags%
-    popd
+    cl %compile_flags% %msvc_flags% %code_dir%dqn_unit_tests.cpp /Fe:dqn_unit_tests_msvc %link_flags%
 
     REM Compiler: clang-cl
     REM ------------------------------------------------------------------------
@@ -37,9 +33,5 @@ pushd Build
         echo [WARN] Optional clang compile via clang-cl if it's in the path, please put clang-cl on the path for this feature
         exit /b 0
     )
-
-    if not exist clang mkdir clang
-    pushd clang
-    clang-cl %compile_flags% %clang_flags% %code_dir%dqn_unit_tests.cpp %link_flags%
-    popd
+    clang-cl %compile_flags% %clang_flags% %code_dir%dqn_unit_tests.cpp /Fe:dqn_unit_tests_clang %link_flags%
 popd
