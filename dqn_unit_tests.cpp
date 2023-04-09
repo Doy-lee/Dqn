@@ -19,11 +19,73 @@
 #define DQN_TESTER_IMPLEMENTATION
 #include "dqn_tester.h"
 
-Dqn_Tester Dqn_Test_File()
+Dqn_Tester TestBinarySearch()
 {
     Dqn_Tester test = {};
-    DQN_TESTER_GROUP(test, "Dqn_Fs")
-    {
+    DQN_TESTER_GROUP(test, "Dqn_BinarySearch") {
+        DQN_TESTER_TEST("Search array of 1 item") {
+            uint32_t array[] = {1};
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match) == -1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match) == +0);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match) == -1);
+
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +0);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
+        }
+
+        DQN_TESTER_TEST("Search array of 2 items") {
+            uint32_t array[] = {1, 2};
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match) == -1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match) == +0);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match) == +1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match) == -1);
+
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +0);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +2);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +2);
+        }
+
+        DQN_TESTER_TEST("Search array of 3 items") {
+            uint32_t array[] = {1, 2, 3};
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match) == -1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match) == +0);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match) == +1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match) == +2);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 4 /*find*/, Dqn_BinarySearchType_Match) == -1);
+
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +0);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +2);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +3);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 4 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +3);
+        }
+
+        DQN_TESTER_TEST("Search array of 4 items") {
+            uint32_t array[] = {1, 2, 3, 4};
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match) == -1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match) == +0);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match) == +1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match) == +2);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 4 /*find*/, Dqn_BinarySearchType_Match) == +3);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 5 /*find*/, Dqn_BinarySearchType_Match) == -1);
+
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +0);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +2);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +3);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 4 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +4);
+            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 5 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +4);
+        }
+    }
+    return test;
+}
+
+Dqn_Tester TestFs()
+{
+    Dqn_Tester test = {};
+    DQN_TESTER_GROUP(test, "Dqn_Fs") {
         DQN_TESTER_TEST("Make directory recursive \"abcd/efgh\"") {
             DQN_TESTER_ASSERTF(&test, Dqn_Fs_MakeDir(DQN_STRING8("abcd/efgh")), "Failed to make directory");
             DQN_TESTER_ASSERTF(&test, Dqn_Fs_DirExists(DQN_STRING8("abcd")), "Directory was not made");
@@ -77,7 +139,7 @@ Dqn_Tester Dqn_Test_File()
     return test;
 }
 
-Dqn_Tester Dqn_Test_FixedArray()
+Dqn_Tester TestFixedArray()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_FArray") {
@@ -127,26 +189,27 @@ Dqn_Tester Dqn_Test_FixedArray()
     return test;
 }
 
-Dqn_Tester Dqn_Test_FString8()
+Dqn_Tester TestFString8()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_FString8") {
         DQN_TESTER_TEST("Append too much fails") {
             Dqn_FString8<4> str = {};
-            DQN_TESTER_ASSERTF(&test, Dqn_FString8_AppendCString8(&str, "abcd") == false, "We need space for the null-terminator");
+            DQN_TESTER_ASSERT(&test, !Dqn_FString8_AppendCString8(&str, "abcde"));
         }
 
         DQN_TESTER_TEST("Append format string too much fails") {
             Dqn_FString8<4> str = {};
-            DQN_TESTER_ASSERTF(&test, Dqn_FString8_AppendF(&str, "abcd") == false, "We need space for the null-terminator");
+            DQN_TESTER_ASSERT(&test, !Dqn_FString8_AppendF(&str, "abcde"));
         }
     }
     return test;
 }
 
-Dqn_Tester Dqn_Test_Hex()
+Dqn_Tester TestHex()
 {
-    Dqn_Tester test = {};
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_Tester test           = {};
     DQN_TESTER_GROUP(test, "Dqn_Hex") {
         DQN_TESTER_TEST("Convert 0x123") {
             uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0x123"));
@@ -202,11 +265,33 @@ Dqn_Tester Dqn_Test_Hex()
             uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("-0x3"));
             DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
         }
+
+        uint32_t number = 0xd095f6;
+        DQN_TESTER_TEST("Convert %x to string", number) {
+            Dqn_String8 number_hex = Dqn_Hex_BytesToString8Arena(scratch.arena, &number, sizeof(number));
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(number_hex, DQN_STRING8("f695d000")), "number_hex=%.*s", DQN_STRING_FMT(number_hex));
+        }
+
+        number = 0xf6ed00;
+        DQN_TESTER_TEST("Convert %x to string", number) {
+            Dqn_String8 number_hex = Dqn_Hex_BytesToString8Arena(scratch.arena, &number, sizeof(number));
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(number_hex, DQN_STRING8("00edf600")), "number_hex=%.*s", DQN_STRING_FMT(number_hex));
+        }
+
+        Dqn_String8 hex = DQN_STRING8("0xf6ed00");
+        DQN_TESTER_TEST("Convert %.*s to bytes", DQN_STRING_FMT(hex)) {
+            Dqn_String8 bytes = Dqn_Hex_String8ToBytesArena(scratch.arena, hex);
+            DQN_TESTER_ASSERTF(&test,
+                               Dqn_String8_Eq(bytes, DQN_STRING8("\xf6\xed\x00")),
+                               "number_hex=%.*s",
+                               DQN_STRING_FMT(Dqn_Hex_BytesToString8Arena(scratch.arena, bytes.data, bytes.size)));
+        }
+
     }
     return test;
 }
 
-Dqn_Tester Dqn_Test_M4()
+Dqn_Tester TestM4()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_M4") {
@@ -232,7 +317,7 @@ Dqn_Tester Dqn_Test_M4()
     return test;
 }
 
-Dqn_Tester Dqn_Test_DSMap()
+Dqn_Tester TestDSMap()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_DSMap") {
@@ -244,31 +329,31 @@ Dqn_Tester Dqn_Test_DSMap()
 
             DQN_TESTER_TEST("Find non-existent value") {
                 uint64_t *value = Dqn_DSMap_Find(&map, Dqn_DSMap_KeyCStringLit(&map, "Foo"));
-                DQN_ASSERT(!value);
-                DQN_ASSERT(map.size         == MAP_SIZE);
-                DQN_ASSERT(map.initial_size == MAP_SIZE);
-                DQN_ASSERT(map.occupied     == 1 /*Sentinel*/);
+                DQN_TESTER_ASSERT(&test, !value);
+                DQN_TESTER_ASSERT(&test, map.size         == MAP_SIZE);
+                DQN_TESTER_ASSERT(&test, map.initial_size == MAP_SIZE);
+                DQN_TESTER_ASSERT(&test, map.occupied     == 1 /*Sentinel*/);
             }
 
             Dqn_DSMapKey key = Dqn_DSMap_KeyCStringLit(&map, "Bar");
             DQN_TESTER_TEST("Insert value and lookup") {
                 uint64_t desired_value  = 0xF00BAA;
                 uint64_t *slot_value = Dqn_DSMap_Set(&map, key, desired_value, nullptr /*found*/);
-                DQN_ASSERT(slot_value);
-                DQN_ASSERT(map.size == MAP_SIZE);
-                DQN_ASSERT(map.initial_size == MAP_SIZE);
-                DQN_ASSERT(map.occupied == 2);
+                DQN_TESTER_ASSERT(&test, slot_value);
+                DQN_TESTER_ASSERT(&test, map.size == MAP_SIZE);
+                DQN_TESTER_ASSERT(&test, map.initial_size == MAP_SIZE);
+                DQN_TESTER_ASSERT(&test, map.occupied == 2);
 
                 uint64_t *value = Dqn_DSMap_Find(&map, key);
-                DQN_ASSERT(value);
-                DQN_ASSERT(*value == desired_value);
+                DQN_TESTER_ASSERT(&test, value);
+                DQN_TESTER_ASSERT(&test, *value == desired_value);
             }
 
             DQN_TESTER_TEST("Remove key") {
                 Dqn_DSMap_Erase(&map, key);
-                DQN_ASSERT(map.size         == MAP_SIZE);
-                DQN_ASSERT(map.initial_size == MAP_SIZE);
-                DQN_ASSERT(map.occupied     == 1 /*Sentinel*/);
+                DQN_TESTER_ASSERT(&test, map.size         == MAP_SIZE);
+                DQN_TESTER_ASSERT(&test, map.initial_size == MAP_SIZE);
+                DQN_TESTER_ASSERT(&test, map.occupied     == 1 /*Sentinel*/);
             }
         }
 
@@ -292,21 +377,21 @@ Dqn_Tester Dqn_Test_DSMap()
                 for (; map.occupied != grow_threshold; value++) {
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
-                    DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));
-                    DQN_ASSERT(!Dqn_DSMap_FindSlot<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, !Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, !Dqn_DSMap_FindSlot<uint64_t>(&map, key));
                     bool found = false;
                     if (test_type == DSMapTestType_Set) {
                         Dqn_DSMap_Set(&map, key, value, &found);
                     } else {
                         Dqn_DSMap_MakeSlot(&map, key, &found);
                     }
-                    DQN_ASSERT(!found);
-                    DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
-                    DQN_ASSERT(Dqn_DSMap_FindSlot<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, !found);
+                    DQN_TESTER_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, Dqn_DSMap_FindSlot<uint64_t>(&map, key));
                 }
-                DQN_ASSERT(map.initial_size == MAP_SIZE);
-                DQN_ASSERT(map.size         == map_start_size);
-                DQN_ASSERT(map.occupied     == 1 /*Sentinel*/ + value);
+                DQN_TESTER_ASSERT(&test, map.initial_size == MAP_SIZE);
+                DQN_TESTER_ASSERT(&test, map.size         == map_start_size);
+                DQN_TESTER_ASSERT(&test, map.occupied     == 1 /*Sentinel*/ + value);
 
                 { // NOTE: One more item should cause the table to grow by 2x
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
@@ -319,17 +404,17 @@ Dqn_Tester Dqn_Test_DSMap()
                     }
 
                     value++;
-                    DQN_ASSERT(!found);
-                    DQN_ASSERT(map.size         == map_start_size * 2);
-                    DQN_ASSERT(map.initial_size == MAP_SIZE);
-                    DQN_ASSERT(map.occupied     == 1 /*Sentinel*/ + value);
+                    DQN_TESTER_ASSERT(&test, !found);
+                    DQN_TESTER_ASSERT(&test, map.size         == map_start_size * 2);
+                    DQN_TESTER_ASSERT(&test, map.initial_size == MAP_SIZE);
+                    DQN_TESTER_ASSERT(&test, map.occupied     == 1 /*Sentinel*/ + value);
                 }
             }
 
             DQN_TESTER_TEST("%.*s: Check the sentinel is present", DQN_STRING_FMT(prefix)) {
                 Dqn_DSMapSlot<uint64_t> NIL_SLOT = {};
                 Dqn_DSMapSlot<uint64_t> sentinel = map.slots[DQN_DS_MAP_SENTINEL_SLOT];
-                DQN_ASSERT(DQN_MEMCMP(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
+                DQN_TESTER_ASSERT(&test, DQN_MEMCMP(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
             }
 
             DQN_TESTER_TEST("%.*s: Recheck all the hash tables values after growing", DQN_STRING_FMT(prefix)) {
@@ -339,17 +424,17 @@ Dqn_Tester Dqn_Test_DSMap()
                     // NOTE: Validate each slot value
                     uint64_t value_test = index - 1;
                     Dqn_DSMapKey key    = Dqn_DSMap_KeyBuffer(&map, &value_test, sizeof(value_test));
-                    DQN_ASSERT(Dqn_DSMap_KeyEquals(slot->key, key));
+                    DQN_TESTER_ASSERT(&test, Dqn_DSMap_KeyEquals(slot->key, key));
                     if (test_type == DSMapTestType_Set) {
-                        DQN_ASSERT(slot->value == value_test);
+                        DQN_TESTER_ASSERT(&test, slot->value == value_test);
                     } else {
-                        DQN_ASSERT(slot->value == 0); // NOTE: Make slot does not set the key so should be 0
+                        DQN_TESTER_ASSERT(&test, slot->value == 0); // NOTE: Make slot does not set the key so should be 0
                     }
-                    DQN_ASSERT(slot->key.hash == Dqn_DSMap_Hash(&map, slot->key));
+                    DQN_TESTER_ASSERT(&test, slot->key.hash == Dqn_DSMap_Hash(&map, slot->key));
 
                     // NOTE: Check the reverse lookup is correct
                     Dqn_DSMapSlot<uint64_t> const *check = Dqn_DSMap_FindSlot(&map, slot->key);
-                    DQN_ASSERT(slot == check);
+                    DQN_TESTER_ASSERT(&test, slot == check);
                 }
             }
 
@@ -362,14 +447,14 @@ Dqn_Tester Dqn_Test_DSMap()
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
 
-                    DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
-                    DQN_ASSERT(Dqn_DSMap_FindSlot<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, Dqn_DSMap_FindSlot<uint64_t>(&map, key));
                     Dqn_DSMap_Erase(&map, key);
-                    DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));
-                    DQN_ASSERT(!Dqn_DSMap_FindSlot(&map, key));
+                    DQN_TESTER_ASSERT(&test, !Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, !Dqn_DSMap_FindSlot(&map, key));
                 }
-                DQN_ASSERT(map.size == start_map_size);
-                DQN_ASSERT(map.occupied == start_map_occupied - value);
+                DQN_TESTER_ASSERT(&test, map.size == start_map_size);
+                DQN_TESTER_ASSERT(&test, map.occupied == start_map_occupied - value);
 
                 { // NOTE: One more item should cause the table to grow by 2x
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
@@ -377,14 +462,14 @@ Dqn_Tester Dqn_Test_DSMap()
                     Dqn_DSMap_Erase(&map, key);
                     value++;
 
-                    DQN_ASSERT(map.size     == start_map_size / 2);
-                    DQN_ASSERT(map.occupied == start_map_occupied - value);
+                    DQN_TESTER_ASSERT(&test, map.size     == start_map_size / 2);
+                    DQN_TESTER_ASSERT(&test, map.occupied == start_map_occupied - value);
                 }
 
                 { // NOTE: Check the sentinel is present
                     Dqn_DSMapSlot<uint64_t> NIL_SLOT = {};
                     Dqn_DSMapSlot<uint64_t> sentinel = map.slots[DQN_DS_MAP_SENTINEL_SLOT];
-                    DQN_ASSERT(DQN_MEMCMP(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
+                    DQN_TESTER_ASSERT(&test, DQN_MEMCMP(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
                 }
 
                 // NOTE: Recheck all the hash table values after growing
@@ -396,37 +481,37 @@ Dqn_Tester Dqn_Test_DSMap()
 
                     // NOTE: Validate each slot value
                     Dqn_DSMapSlot<uint64_t> const *slot = Dqn_DSMap_FindSlot(&map, key);
-                    DQN_ASSERT(slot);
-                    DQN_ASSERT(slot->key == key);
+                    DQN_TESTER_ASSERT(&test, slot);
+                    DQN_TESTER_ASSERT(&test, slot->key == key);
                     if (test_type == DSMapTestType_Set) {
-                        DQN_ASSERT(slot->value == value_test);
+                        DQN_TESTER_ASSERT(&test, slot->value == value_test);
                     } else {
-                        DQN_ASSERT(slot->value == 0); // NOTE: Make slot does not set the key so should be 0
+                        DQN_TESTER_ASSERT(&test, slot->value == 0); // NOTE: Make slot does not set the key so should be 0
                     }
-                    DQN_ASSERT(slot->key.hash == Dqn_DSMap_Hash(&map, slot->key));
+                    DQN_TESTER_ASSERT(&test, slot->key.hash == Dqn_DSMap_Hash(&map, slot->key));
 
                     // NOTE: Check the reverse lookup is correct
                     Dqn_DSMapSlot<uint64_t> const *check = Dqn_DSMap_FindSlot(&map, slot->key);
-                    DQN_ASSERT(slot == check);
+                    DQN_TESTER_ASSERT(&test, slot == check);
                 }
 
                 for (; map.occupied != 1; value++) { // NOTE: Remove all items from the table
                     uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
-                    DQN_ASSERT(Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key));
                     Dqn_DSMap_Erase(&map, key);
-                    DQN_ASSERT(!Dqn_DSMap_Find<uint64_t>(&map, key));
+                    DQN_TESTER_ASSERT(&test, !Dqn_DSMap_Find<uint64_t>(&map, key));
                 }
-                DQN_ASSERT(map.initial_size == MAP_SIZE);
-                DQN_ASSERT(map.size == map.initial_size);
-                DQN_ASSERT(map.occupied == 1 /*Sentinel*/);
+                DQN_TESTER_ASSERT(&test, map.initial_size == MAP_SIZE);
+                DQN_TESTER_ASSERT(&test, map.size == map.initial_size);
+                DQN_TESTER_ASSERT(&test, map.occupied == 1 /*Sentinel*/);
             }
         }
     }
     return test;
 }
 
-Dqn_Tester Dqn_Test_Intrinsics()
+Dqn_Tester TestIntrinsics()
 {
     Dqn_Tester test = {};
     // TODO(dqn): We don't have meaningful tests here, but since
@@ -488,7 +573,7 @@ Dqn_Tester Dqn_Test_Intrinsics()
     return test;
 }
 
-Dqn_Tester Dqn_Test_Rect()
+Dqn_Tester TestRect()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_Rect") {
@@ -608,7 +693,7 @@ Dqn_Tester Dqn_Test_Rect()
     return test;
 }
 
-Dqn_Tester Dqn_Test_PerfCounter()
+Dqn_Tester TestPerfCounter()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_OS_PerfCounter") {
@@ -638,7 +723,7 @@ Dqn_Tester Dqn_Test_PerfCounter()
     return test;
 }
 
-Dqn_Tester Dqn_Test_OS()
+Dqn_Tester TestOS()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_OS_") {
@@ -673,7 +758,7 @@ Dqn_Tester Dqn_Test_OS()
     return test;
 }
 
-Dqn_Tester Dqn_Test_CString8()
+Dqn_Tester TestCString8()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_CString8") {
@@ -863,7 +948,7 @@ Dqn_Tester Dqn_Test_CString8()
     return test;
 }
 
-Dqn_Tester Dqn_Test_String8()
+Dqn_Tester TestString8()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_String8") {
@@ -998,7 +1083,7 @@ Dqn_Tester Dqn_Test_String8()
     return test;
 }
 
-Dqn_Tester Dqn_Test_TicketMutex()
+Dqn_Tester TestTicketMutex()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_TicketMutex") {
@@ -1031,7 +1116,90 @@ Dqn_Tester Dqn_Test_TicketMutex()
     return test;
 }
 
-Dqn_Tester Dqn_Test_Win()
+Dqn_Tester TestVArray()
+{
+    Dqn_Tester test            = {};
+    Dqn_ThreadScratch scratch  = Dqn_Thread_GetScratch(nullptr);
+    Dqn_VArray<uint32_t> array = Dqn_VArray_InitByteSize<uint32_t>(scratch.arena, DQN_KILOBYTES(64));
+
+    DQN_TESTER_GROUP(test, "Dqn_VArray") {
+        DQN_TESTER_TEST("Test adding an array of items to the array") {
+            uint32_t array_literal[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+            Dqn_VArray_Add<uint32_t>(&array, array_literal, DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+
+        DQN_TESTER_TEST("Test stable erase, 1 item, the '2' value from the array") {
+            Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, 1 /*count*/, Dqn_VArrayErase_Stable);
+            uint32_t array_literal[] = {0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+
+        DQN_TESTER_TEST("Test unstable erase, 1 item, the '1' value from the array") {
+            Dqn_VArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, Dqn_VArrayErase_Unstable);
+            uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+
+        Dqn_VArrayErase erase_enums[] = {Dqn_VArrayErase_Stable, Dqn_VArrayErase_Unstable};
+        DQN_TESTER_TEST("Test un/stable erase, OOB") {
+            for (Dqn_VArrayErase erase : erase_enums) {
+                uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+                Dqn_VArray_EraseRange(&array, DQN_ARRAY_UCOUNT(array_literal) /*begin_index*/, DQN_ARRAY_UCOUNT(array_literal) + 100 /*count*/, erase);
+                DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+                DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+            }
+        }
+
+        DQN_TESTER_TEST("Test flipped begin/end index stable erase, 2 items, the '15, 3' value from the array") {
+            Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, Dqn_VArrayErase_Stable);
+            uint32_t array_literal[] = {0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+
+        DQN_TESTER_TEST("Test flipped begin/end index unstable erase, 2 items, the '4, 5' value from the array") {
+            Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, Dqn_VArrayErase_Unstable);
+            uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10, 11, 12};
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+
+        DQN_TESTER_TEST("Test stable erase range, 2+1 (oob) item, the '13, 14, +1 OOB' value from the array") {
+            Dqn_VArray_EraseRange(&array, 8 /*begin_index*/, 3 /*count*/, Dqn_VArrayErase_Stable);
+            uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10};
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+
+        DQN_TESTER_TEST("Test unstable erase range, 3+1 (oob) item, the '11, 12, +1 OOB' value from the array") {
+            Dqn_VArray_EraseRange(&array, 6 /*begin_index*/, 3 /*count*/, Dqn_VArrayErase_Unstable);
+            uint32_t array_literal[] = {0, 13, 14, 6, 7, 8};
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+
+        DQN_TESTER_TEST("Test stable erase, negative overflow OOB items, erasing the '0, 13' value from the array") {
+            Dqn_VArray_EraseRange(&array, 1 /*begin_index*/, -DQN_ISIZE_MAX /*count*/, Dqn_VArrayErase_Stable);
+            uint32_t array_literal[] = {14, 6, 7, 8};
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+
+        DQN_TESTER_TEST("Test unstable erase, positive overflow OOB items, erasing the '0, 13' value from the array") {
+            Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, DQN_ISIZE_MAX /*count*/, Dqn_VArrayErase_Unstable);
+            uint32_t array_literal[] = {14, 6};
+            DQN_TESTER_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+    }
+    return test;
+}
+
+Dqn_Tester TestWin()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_Win") {
@@ -1117,7 +1285,7 @@ Dqn_String8 const DQN_TESTER_HASH_STRING_[] =
 #undef DQN_TESTER_HASH_X_ENTRY
 };
 
-void Dqn_Test_KeccakDispatch_(Dqn_Tester *test, int hash_type, Dqn_String8 input)
+void TestKeccakDispatch_(Dqn_Tester *test, int hash_type, Dqn_String8 input)
 {
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
     Dqn_String8 input_hex     = Dqn_Hex_BytesToString8Arena(scratch.arena, input.data, input.size);
@@ -1263,7 +1431,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_Tester *test, int hash_type, Dqn_String8 input
     }
 }
 
-Dqn_Tester Dqn_Test_Keccak()
+Dqn_Tester TestKeccak()
 {
     Dqn_Tester test = {};
     Dqn_String8 const INPUTS[] = {
@@ -1282,7 +1450,7 @@ Dqn_Tester Dqn_Test_Keccak()
 
             for (Dqn_String8 input : INPUTS) {
                 Dqn_Tester_Begin(&test, "%.*s - Input: %.*s", DQN_STRING_FMT(DQN_TESTER_HASH_STRING_[hash_type]), DQN_CAST(int)DQN_MIN(input.size, 54), input.data);
-                Dqn_Test_KeccakDispatch_(&test, hash_type, input);
+                TestKeccakDispatch_(&test, hash_type, input);
                 Dqn_Tester_End(&test);
             }
 
@@ -1295,7 +1463,7 @@ Dqn_Tester Dqn_Test_Keccak()
                     src[src_index] = pcg32_boundedrand_r(&rng, 255);
 
                 Dqn_String8 input = Dqn_String8_Init(src, src_size);
-                Dqn_Test_KeccakDispatch_(&test, hash_type, input);
+                TestKeccakDispatch_(&test, hash_type, input);
             }
             Dqn_Tester_End(&test);
         }
@@ -1303,25 +1471,27 @@ Dqn_Tester Dqn_Test_Keccak()
     return test;
 }
 
-void Dqn_Test_RunSuite()
+void TestRunSuite()
 {
     Dqn_Tester tests[]
     {
-        Dqn_Test_File(),
-        Dqn_Test_FixedArray(),
-        Dqn_Test_FString8(),
-        Dqn_Test_Hex(),
-        Dqn_Test_Intrinsics(),
-        Dqn_Test_M4(),
-        Dqn_Test_DSMap(),
-        Dqn_Test_Rect(),
-        Dqn_Test_PerfCounter(),
-        Dqn_Test_OS(),
-        Dqn_Test_Keccak(),
-        Dqn_Test_CString8(),
-        Dqn_Test_String8(),
-        Dqn_Test_TicketMutex(),
-        Dqn_Test_Win(),
+        TestBinarySearch(),
+        TestCString8(),
+        TestDSMap(),
+        TestFString8(),
+        TestFs(),
+        TestFixedArray(),
+        TestHex(),
+        TestIntrinsics(),
+        TestKeccak(),
+        TestM4(),
+        TestOS(),
+        TestPerfCounter(),
+        TestRect(),
+        TestString8(),
+        TestTicketMutex(),
+        TestVArray(),
+        TestWin(),
     };
 
     int total_tests = 0;
@@ -1338,7 +1508,7 @@ void Dqn_Test_RunSuite()
 int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;
-    Dqn_Test_RunSuite();
+    TestRunSuite();
     return 0;
 }
 #endif

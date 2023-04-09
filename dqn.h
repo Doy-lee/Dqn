@@ -22,7 +22,7 @@
 // [SECT-LLOG] Dqn_Log              |                             | Library logging
 // [SECT-VMEM] Dqn_VMem             |                             | Virtual memory allocation
 // [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
-// [SECT-AMAP] Dqn_Map              | DQN_NO_MAP                  | Hashtable, collision=chain
+// [SECT-VARR] Dqn_VArray           | DQN_NO_VARRAY               | Array backed by virtual memory arena
 // [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
 // [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
 // [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
@@ -134,11 +134,12 @@
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-MACR] Macros               |                             | Define macros used in the library
 // ---------------------------------+-----------------------------+---------------------------------
+#define Dqn_PowerOfTwoRoundUp(value, power_of_two) (((value) + ((power_of_two) - 1)) & ~((power_of_two) - 1))
 
 // NOTE: Memory allocation dependencies
 // -----------------------------------------------------------------------------
 #if !defined(DQN_ALLOC)
-    #define DQN_ALLOC(size) Dqn_VMem_Reserve(size, true /*commit*/)
+    #define DQN_ALLOC(size) Dqn_VMem_Reserve(size, Dqn_VMemCommit_Yes)
 #endif
 
 #if !defined(DQN_DEALLOC)
@@ -822,7 +823,7 @@ typedef struct Dqn_Allocator {
 /// @param[in] allocator The allocator to allocate bytes from
 /// @param[in] size The amount of bytes to allocator
 /// @param[in] zero_mem Flag to indicate if the allocated must be zero-ed out
-#define Dqn_Allocator_Alloc(allocator, size, align, zero_mem)                  Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, size, align, zero_mem)
+#define Dqn_Allocator_Alloc(allocator, size, align, zero_mem) Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, size, align, zero_mem)
 void *Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem);
 
 /// Deallocate the memory from the pointer using the allocator
@@ -833,7 +834,7 @@ void *Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, size
 /// @param[in] allocator The allocator to allocate bytes from
 /// @param[in] ptr The pointer to deallocate
 /// @param[in] size The amount of bytes to deallocate.
-#define Dqn_Allocator_Dealloc(allocator, ptr, size)                  Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE allocator, ptr, size)
+#define Dqn_Allocator_Dealloc(allocator, ptr, size) Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE allocator, ptr, size)
 void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, void *ptr, size_t size);
 
 #define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type) * count, alignof(Type), zero_mem)
@@ -1306,33 +1307,102 @@ DQN_API void Dqn_Log_TypeFCallSite(Dqn_LogType type, Dqn_CallSite call_site, cha
 DQN_API void Dqn_Log_FVCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, va_list va);
 DQN_API void Dqn_Log_FCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, ...);
 
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
 // [SECT-VMEM] Dqn_VMem             |                             | Virtual memory allocation
-// ---------------------------------+-----------------------------+---------------------------------
-DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, bool commit);
+// =================================================================================================
+enum Dqn_VMemCommit {
+    Dqn_VMemCommit_No,
+    Dqn_VMemCommit_Yes,
+};
+
+DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, Dqn_VMemCommit commit);
 DQN_API bool Dqn_VMem_Commit(void *ptr, Dqn_usize size);
 DQN_API void Dqn_VMem_Decommit(void *ptr, Dqn_usize size);
 DQN_API void Dqn_VMem_Release(void *ptr, Dqn_usize size);
 
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
 // [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
-// ---------------------------------+-----------------------------+---------------------------------
-Dqn_isize const DQN_ARENA_MIN_BLOCK_SIZE = DQN_KILOBYTES(4);
+// =================================================================================================
+//
+// A bump-allocator that can grow dynamically by chaining blocks of memory
+// together. The arena's memory is backed by virtual memory allowing the
+// allocator to reserve and commit physical pages as memory is given from
+// the block of memory.
+//
+// Arena's allow grouping of multiple allocations into one lifetime that is
+// bound to the arena. Allocation involves a simple 'bump' of the pointer in the
+// memory block. Freeing involves resetting the pointer to the start of the
+// block and/or releasing the single pointer to the entire block of memory.
+//
+// This allocator reserves memory blocks at a 64k granularity as per the minimum
+// granularity reserve size of VirtualAlloc on Windows. Memory is committed at
+// a 4k granularity for similar reasons. On 64 bit platforms you have access
+// to 48 bits of address space for applications, this is 256TB of address space
+// you can reserve. The typical usage for this style of arena is to reserve
+// as much space as you possibly need, ever, for the lifetime of the arena (e.g.
+// 64GB) since the arena only commits as much as needed.
+//
+// NOTE: API
+//
+// @proc Dqn_Arena_Grow
+//   @desc Grow the arena's capacity by allocating a block of memory with the
+//   requested size. The requested size is rounded up to the nearest 64k
+//   boundary as that is the minimum reserve granularity (atleast on Windows)
+//   for virtual memory.
+//   @param size[in] The size in bytes to expand the capacity of the arena
+//   @param commit[in] The amount of bytes to request to be physically backed by
+//   pages from the OS.
+//   @param flags[in] Bit flags from 'Dqn_ArenaBlockFlags', set to 0 if none
+//   @return The block of memory that
+//
+// @proc Dqn_Arena_Allocate, Dqn_Arena_New, Dqn_Arena_NewArray,
+// Dqn_Arena_NewArrayWithBlock,
+//   @desc Allocate byte/objects
+//   `Allocate`          allocates bytes
+//   `New`               allocates an object
+//   `NewArray`          allocates an array of objects
+//   `NewArrayWithBlock` allocates an array of objects from the given memory 'block'
+//   @return A pointer to the allocated bytes/object. Null pointer on failure
+//
+// @proc Dqn_Arena_Copy, Dqn_Arena_CopyZ
+//   @desc Allocate a copy of an object's bytes. The 'Z' variant adds
+//   a null-terminating byte at the end of the stream.
+//   @return A pointer to the allocated object. Null pointer on failure.
+//
+// @proc Dqn_Arena_Reset
+//   @desc Set the arena's current block to the first block in the linked list
+//   of blocks and mark all blocks free.
+//   @param[in] zero_mem When yes, the memory is cleared using DQN_MEMSET with the
+//   value of DQN_MEMSET_BYTE
+//
+// @proc Dqn_Arena_Free
+//   @desc Free the arena returning all memory back to the OS
+//   @param[in] zero_mem: When true, the memory is cleared using DQN_MEMSET with
+//   the value of DQN_MEMSET_BYTE
+//
+// @proc Dqn_Arena_BeginTempMemory
+//   @desc Begin an allocation scope where all allocations between begin and end
+//   calls will be reverted. Useful for short-lived or highly defined lifetime
+//   allocations. An allocation scope is invalidated if the arena is freed
+//   between the begin and end call.
+//
+// @proc Dqn_Arena_EndTempMemory
+//   @desc End an allocation scope previously begun by calling begin scope.
+//
+// @proc Dqn_Arena_StatString
+//   @desc Dump the stats of the given arena to a string
+//   @param[in] arena The arena to dump stats for
+//   @return A stack allocated string containing the stats of the arena
+//
+// @proc Dqn_Arena_LogStats
+//   @desc Dump the stats of the given arena to the memory log-stream.
+//   @param[in] arena The arena to dump stats for
 
-struct Dqn_ArenaBlock
-{
-    void           *memory;    ///< The backing memory of the block
-    Dqn_isize       size;      ///< The size of the block
-    Dqn_isize       used;      ///< The number of bytes used up in the block. Always less than the committed amount.
-    Dqn_isize       committed; ///< The number of physically backed bytes by the OS.
-    Dqn_ArenaBlock *prev;      ///< The previous linked block
-    Dqn_ArenaBlock *next;      ///< The next linked block
-};
+Dqn_isize const DQN_ARENA_MIN_BLOCK_SIZE = DQN_KILOBYTES(64);
 
-struct Dqn_ArenaStatString
+enum Dqn_ArenaBlockFlags
 {
-    char     data[256];
-    uint16_t size;
+    Dqn_ArenaBlockFlags_Private = 1 << 0, ///< Private blocks can only allocate its memory when used in the 'FromBlock' API variants
 };
 
 struct Dqn_ArenaStat
@@ -1347,6 +1417,24 @@ struct Dqn_ArenaStat
     Dqn_isize used_hwm;     ///< High-water mark for 'used'
     Dqn_isize wasted_hwm;   ///< High-water mark for 'wasted'
     uint32_t  blocks_hwm;   ///< High-water mark for 'blocks'
+};
+
+struct Dqn_ArenaBlock
+{
+    struct Dqn_Arena *arena;     ///< Arena that owns this block
+    void             *memory;    ///< Backing memory of the block
+    Dqn_isize         size;      ///< Size of the block
+    Dqn_isize         used;      ///< Number of bytes used up in the block. Always less than the committed amount.
+    Dqn_isize         committed; ///< Number of physically backed bytes by the OS.
+    Dqn_ArenaBlock   *prev;      ///< Previous linked block
+    Dqn_ArenaBlock   *next;      ///< Next linked block
+    uint8_t           flags;     ///< Bit field for 'Dqn_ArenaBlockFlags'
+};
+
+struct Dqn_ArenaStatString
+{
+    char     data[256];
+    uint16_t size;
 };
 
 struct Dqn_Arena
@@ -1380,82 +1468,67 @@ struct Dqn_ArenaTempMemoryScope_
     #endif
 };
 
-/// Grow the arena's capacity by the requested size
-/// @param[in] size The size in bytes to expand the capacity of the arena
-/// @param[in] commit The amount of bytes to request to be physically backed by
-/// pages from the OS.
-/// @return True if the arena was successfully grown, false otherwise.
-#define Dqn_Arena_Grow(arena, size, commit) Dqn_Arena_Grow_(DQN_LEAK_TRACE arena, size, commit)
-DQN_API bool Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit);
+// NOTE: Allocation ================================================================================
+#define                     Dqn_Arena_Grow(arena, size, commit, flags)                Dqn_Arena_Grow_(DQN_LEAK_TRACE arena, size, commit, flags)
+#define                     Dqn_Arena_Allocate(arena, size, align, zero_mem)          Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, size, align, zero_mem)
+#define                     Dqn_Arena_New(arena, Type, zero_mem)                      (Type *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, sizeof(Type), alignof(Type), zero_mem)
+#define                     Dqn_Arena_NewArray(arena, Type, count, zero_mem)          (Type *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, sizeof(Type) * count, alignof(Type), zero_mem)
+#define                     Dqn_Arena_NewArrayWithBlock(block, Type, count, zero_mem) (Type *)Dqn_Arena_AllocateFromBlock(block, sizeof(Type) * count, alignof(Type), zero_mem)
+#define                     Dqn_Arena_Copy(arena, Type, src, count)                   (Type *)Dqn_Arena_Copy_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
+#define                     Dqn_Arena_CopyZ(arena, Type, src, count)                  (Type *)Dqn_Arena_CopyZ_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
+#define                     Dqn_Arena_Free(arena, zero_mem)                           Dqn_Arena_Free_(DQN_LEAK_TRACE arena, zero_mem)
 
-/// Allocate bytes from the given arena
-/// @return A pointer to the allocated bytes. Null if the arena failed to
-/// allocate memory
-#define Dqn_Arena_Allocate(arena, size, align, zero_mem) Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, size, align, zero_mem)
-DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem);
+DQN_API void *              Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem);
+DQN_API Dqn_Allocator       Dqn_Arena_Allocator        (Dqn_Arena *arena);
+DQN_API void                Dqn_Arena_Reset            (Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
 
-/// Allocate a single object from the arena. No constructor is called.
-/// @return A pointer to the allocated object. Null if the arena failed to
-/// allocate memory
-#define Dqn_Arena_New(arena, Type, zero_mem) (Type *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, sizeof(Type), alignof(Type), zero_mem)
+// NOTE: Temp Memory ===============================================================================
+DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory  (Dqn_Arena *arena);
+#define                     Dqn_Arena_EndTempMemory(arena_temp_memory)                Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE arena_temp_memory)
 
-/// Allocate an array of objects from the arena.
-/// @return A pointer to the allocated object. Null if the arena failed to
-/// allocate memory
-#define Dqn_Arena_NewArray(arena, Type, count, zero_mem) (Type *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, sizeof(Type) * count, alignof(Type), zero_mem)
+// NOTE: Arena Stats ===============================================================================
+DQN_API Dqn_ArenaStatString Dqn_Arena_StatString       (Dqn_ArenaStat const *stat);
+DQN_API void                Dqn_Arena_LogStats         (Dqn_Arena const *arena);
 
-/// Copy an object by allocating memory for the copy from the arena
-/// @return A pointer to the allocated object. Null if the arena failed to
-/// allocate memory
-#define Dqn_Arena_Copy(arena, Type, src, count) (Type *)Dqn_Arena_Copy_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
-DQN_API void *Dqn_Arena_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
+// NOTE: Internal ==================================================================================
+DQN_API Dqn_ArenaBlock *    Dqn_Arena_Grow_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit, uint8_t flags);
+DQN_API void *              Dqn_Arena_Allocate_        (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem);
+DQN_API void *              Dqn_Arena_Copy_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
+DQN_API void                Dqn_Arena_Free_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
+DQN_API void *              Dqn_Arena_CopyZ_           (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
+DQN_API void                Dqn_Arena_EndTempMemory_   (DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory arena_temp_memory);
 
-/// Copy an object by allocating memory for the copy from the arena. The object
-/// has a null-terminating byte at the end of the stream.
-/// @return A pointer to the allocated object. Null if the arena failed to
-/// allocate memory
-#define Dqn_Arena_CopyZ(arena, Type, src, count) (Type *)Dqn_Arena_CopyZ_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
-DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
+#if !defined(DQN_NO_VARRAY)
+// =================================================================================================
+// [SECT-VARR] Dqn_VArray           | DQN_NO_VARRAY               | Array backed by virtual memory arena
+// =================================================================================================
+template <typename T> struct Dqn_VArray
+{
+    Dqn_ArenaBlock *block; ///< Block of memory from the allocator for this array
+    T              *data;  ///< Pointer to the start of the array items in the block of memory
+    Dqn_usize       size;  ///< Number of items currently in the array
+    Dqn_usize       max;   ///< Maximum number of items this array can store
+};
 
-/// Set the arena's current block to the first block in the linked list of blocks
-/// and mark all blocks free.
-/// @param[in] zero_mem When yes, the memory is cleared using DQN_MEMSET with the
-/// value of DQN_MEMSET_BYTE
-DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
+enum Dqn_VArrayErase
+{
+    Dqn_VArrayErase_Unstable,
+    Dqn_VArrayErase_Stable,
+};
 
-/// Free the arena returning all memory back to the OS
-/// @param[in] zero_mem: When true, the memory is cleared using DQN_MEMSET with
-/// the value of DQN_MEMSET_BYTE
-#define Dqn_Arena_Free(arena, zero_mem) Dqn_Arena_Free_(DQN_LEAK_TRACE arena, zero_mem)
-DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
-
-DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena);
-
-/// Begin an allocation scope where all allocations between begin and end calls
-/// will be reverted. Useful for short-lived or highly defined lifetime
-/// allocations. An allocation scope is invalidated if the arena is freed
-/// between the begin and end call.
-DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena);
-
-/// End an allocation scope previously begun by calling begin scope.
-#define Dqn_Arena_EndTempMemory(arena_temp_memory) Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE arena_temp_memory)
-DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory arena_temp_memory);
-
-/// Dump the stats of the given arena to a string
-/// @param[in] arena The arena to dump stats for
-/// @return A stack allocated string containing the stats of the arena
-DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat);
-
-/// Dump the stats of the given arena to the memory log-stream.
-/// @param[in] arena The arena to dump stats for
-DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena);
+DQN_API template <typename T> Dqn_VArray<T>  Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size);
+DQN_API template <typename T> Dqn_VArray<T>  Dqn_VArray_Init        (Dqn_Arena *arena, Dqn_usize max);
+DQN_API template <typename T> bool           Dqn_VArray_IsValid     (Dqn_VArray<T> const *array);
+DQN_API template <typename T> T *            Dqn_VArray_Make        (Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
+DQN_API template <typename T> T *            Dqn_VArray_Add         (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
+DQN_API template <typename T> void           Dqn_VArray_EraseRange  (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_VArrayErase erase);
+#endif // !defined(DQN_NO_VARRAY)
 
 #if !defined(DQN_NO_DSMAP)
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
 // [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// ---------------------------------+-----------------------------+---------------------------------
-// NOTE: Dqn_DSMap Design
-// =============================================================================
+// =================================================================================================
+//
 // A hash table configured using the presets recommended by Demitri Spanos
 // from the Handmade Network (HMN),
 //
@@ -1494,8 +1567,7 @@ DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena);
 // Keys are value-copied into the hash-table. If the key uses a pointer to a
 // buffer, this buffer must be valid throughout the lifetime of the hash table!
 //
-// NOTE: Dqn_DSMap API
-// =============================================================================
+// NOTE: API
 //
 // - All maps must be created by calling `DSMap_Init()` with the desired size
 // and the memory allocated for the table can be freed by called
@@ -1606,16 +1678,14 @@ struct Dqn_DSMapKey
     } payload;
 };
 
-template <typename T>
-struct Dqn_DSMapSlot
+template <typename T> struct Dqn_DSMapSlot
 {
     Dqn_DSMapKey key;   ///< Hash table lookup key
     T            value; ///< Hash table value
 };
 
 using Dqn_DSMapHashFunction = uint32_t(Dqn_DSMapKey key, uint32_t seed);
-template <typename T>
-struct Dqn_DSMap
+template <typename T> struct Dqn_DSMap
 {
     uint32_t              *hash_to_slot;  ///< Mapping from hash to a index in the slots array
     Dqn_DSMapSlot<T>      *slots;         ///< Values of the array stored contiguously, non-sorted order
@@ -1627,13 +1697,16 @@ struct Dqn_DSMap
     uint32_t               hash_seed;     ///< Seed for the hashing function, when 0, DQN_DS_MAP_DEFAULT_HASH_SEED is used
 };
 
-// NOTE: Dqn_DSMap
-// =============================================================================
+// NOTE: Setup =====================================================================================
 DQN_API template <typename T> Dqn_DSMap<T>      Dqn_DSMap_Init           (uint32_t size);
 DQN_API template <typename T> void              Dqn_DSMap_Deinit         (Dqn_DSMap<T> *map);
 DQN_API template <typename T> bool              Dqn_DSMap_IsValid        (Dqn_DSMap<T> const *map);
+
+// NOTE: Hash ======================================================================================
 DQN_API template <typename T> uint32_t          Dqn_DSMap_Hash           (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
 DQN_API template <typename T> uint32_t          Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
+
+// NOTE: Insert ====================================================================================
 DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_FindSlot       (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
 DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_MakeSlot       (Dqn_DSMap<T> *map, Dqn_DSMapKey key, bool *found);
 DQN_API template <typename T> Dqn_DSMapSlot<T> *Dqn_DSMap_SetSlot        (Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value, bool *found);
@@ -1643,8 +1716,7 @@ DQN_API template <typename T> T *               Dqn_DSMap_Set            (Dqn_DS
 DQN_API template <typename T> bool              Dqn_DSMap_Resize         (Dqn_DSMap<T> *map, uint32_t size);
 DQN_API template <typename T> bool              Dqn_DSMap_Erase          (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
 
-// NOTE: Dqn_DSMapKey
-// =============================================================================
+// NOTE: Table Keys ================================================================================
 DQN_API template <typename T> Dqn_DSMapKey      Dqn_DSMap_KeyBuffer      (Dqn_DSMap<T> const *map, void const *data, uint32_t size);
 DQN_API template <typename T> Dqn_DSMapKey      Dqn_DSMap_KeyU64         (Dqn_DSMap<T> const *map, uint64_t u64);
 DQN_API template <typename T> Dqn_DSMapKey      Dqn_DSMap_KeyString8     (Dqn_DSMap<T> const *map, Dqn_String8 string);
@@ -1655,9 +1727,9 @@ DQN_API bool                                    Dqn_DSMap_KeyEquals      (Dqn_DS
 DQN_API bool                                    operator==               (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
 #endif // !defined(DQN_NO_DSMAP)
 
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
 // [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
 struct Dqn_Library
 {
     Dqn_LogProc       *log_callback;   ///< Set this pointer to override the logging routine
@@ -1710,11 +1782,11 @@ void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr);
 // [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
 // ---------------------------------+-----------------------------+---------------------------------
 #if !defined(DQN_NO_FSTRING8)
-#define DQN_FSTRING8_API template <Dqn_isize N> DQN_API
+#define DQN_FSTRING8_API template <Dqn_usize N> DQN_API
 #define DQN_FSTRING8 Dqn_FString8<N>
 DQN_FSTRING8_API struct Dqn_FString8
 {
-    char      data[N];
+    char      data[N+1];
     Dqn_isize size;
 
     bool operator==(Dqn_FString8 const &other) const {
@@ -1770,13 +1842,33 @@ DQN_FSTRING8_API bool Dqn_FString8_AppendCString8(DQN_FSTRING8 *string, char con
 /// @param value[in] String to append to the fixed string
 /// determined before appending.
 /// @return True if append was successful, false otherwise.
-DQN_FSTRING8_API bool Dqn_FString8_AppendString8(DQN_FSTRING8 *string, Dqn_String8 value);
+DQN_FSTRING8_API bool Dqn_FString8_Append(DQN_FSTRING8 *string, Dqn_String8 value);
 
 /// Convert a fixed string to a string. The string holds a reference to the
 /// fixed string and is invalidated once fixed string is deleted.
 /// @param string[in] The fixed string to create a string from
 /// @return String referencing the contents of `string`
 DQN_FSTRING8_API Dqn_String8  Dqn_FString8_ToString8(DQN_FSTRING8 const *string);
+
+/// @see Dqn_CString8_Eq
+DQN_FSTRING8_API bool Dqn_FString8_Eq(DQN_FSTRING8 const *lhs, DQN_FSTRING8 const *rhs, Dqn_CString8EqCase eq_case);
+
+/// @see Dqn_CString8_Eq
+DQN_FSTRING8_API bool Dqn_FString8_EqString8(DQN_FSTRING8 const *lhs, Dqn_String8 rhs, Dqn_CString8EqCase eq_case);
+
+/// Compare a string for equality, case insensitive
+/// @see Dqn_CString8_Eq
+DQN_FSTRING8_API bool Dqn_FString8_EqInsensitive(DQN_FSTRING8 const *lhs, DQN_FSTRING8 const *rhs);
+
+/// Compare a string for equality, case insensitive
+/// @see Dqn_CString8_Eq
+DQN_FSTRING8_API bool Dqn_FString8_EqString8Insensitive(DQN_FSTRING8 const *lhs, Dqn_String8 rhs);
+
+template <Dqn_usize A, Dqn_usize B>
+bool Dqn_FString8_EqFStringAB(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs, Dqn_CString8EqCase eq_case);
+
+template <Dqn_usize A, Dqn_usize B>
+bool Dqn_FString8_EqABInsensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs);
 #endif // !defined(DQN_NO_FSTRING8)
 
 // ---------------------------------+-----------------------------+---------------------------------
@@ -1797,7 +1889,7 @@ struct Dqn_String8Builder
 /// @param string The string to append to the builder
 /// @return True if append was successful, false if parameters are invalid
 /// or memory allocation failure.
-bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String8 string);
+bool Dqn_String8Builder_AppendRef(Dqn_String8Builder *builder, Dqn_String8 string);
 
 /// Append a string to the list of strings in the builder by copy.
 /// The string is copied using the builder's allocator before appending.
@@ -1805,7 +1897,7 @@ bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String
 /// @param string The string to append to the builder
 /// @return True if append was successful, false if parameters are invalid
 /// or memory allocation failure.
-bool Dqn_String8Builder_AppendString8Copy(Dqn_String8Builder *builder, Dqn_String8 string);
+bool Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_String8 string);
 
 /// @copydoc Dqn_String8Builder_AppendF
 /// @param args The variable argument list to use in the format string
@@ -3279,17 +3371,17 @@ DQN_API uint64_t Dqn_FNV1A64_Hash   (void const *bytes, Dqn_isize size);
 DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_isize size, uint32_t hash);
 DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_isize size, uint64_t hash);
 
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
 // [SECT-MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
-// ---------------------------------+-----------------------------+---------------------------------
-/// MurmurHash3 was written by Austin Appleby, and is placed in the public
-/// domain. The author (Austin Appleby) hereby disclaims copyright to this source
-/// code.
-///
-/// Note - The x86 and x64 versions do _not_ produce the same results, as the
-/// algorithms are optimized for their respective platforms. You can still
-/// compile and run any of them on any platform, but your performance with the
-/// non-native version will be less than optimal.
+// =================================================================================================
+// MurmurHash3 was written by Austin Appleby, and is placed in the public
+// domain. The author (Austin Appleby) hereby disclaims copyright to this source
+// code.
+//
+// Note - The x86 and x64 versions do _not_ produce the same results, as the
+// algorithms are optimized for their respective platforms. You can still
+// compile and run any of them on any platform, but your performance with the
+// non-native version will be less than optimal.
 struct Dqn_MurmurHash3 { uint64_t e[2]; };
 
 DQN_API uint32_t        Dqn_MurmurHash3_x86U32 (void const *key, int len, uint32_t seed);
@@ -3297,10 +3389,106 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
 #define Dqn_MurmurHash3_x64U128AsU64(key, len, seed) (Dqn_MurmurHash3_x64U128(key, len, seed).e[0])
 #define Dqn_MurmurHash3_x64U128AsU32(key, len, seed) (DQN_CAST(uint32_t)Dqn_MurmurHash3_x64U128(key, len, seed).e[0])
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// ---------------------------------+-----------------------------+---------------------------------
+#if !defined(DQN_NO_VARRAY)
+// =================================================================================================
+// [SECT-VARR] Dqn_VArray           |                             | Array backed by virtual memory arena
+// =================================================================================================
+DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size)
+{
+    Dqn_usize byte_size_64k_aligned = Dqn_PowerOfTwoRoundUp(byte_size, DQN_KILOBYTES(64));
+    Dqn_VArray<T> result            = {};
+    result.block                    = Dqn_Arena_Grow(arena, byte_size_64k_aligned, 0 /*commit*/, Dqn_ArenaBlockFlags_Private);
+    result.max                      = result.block->size / sizeof(T);
+    result.data                     = DQN_CAST(T *)Dqn_PowerOfTwoRoundUp((uintptr_t)result.block->memory, alignof(T));
+    return result;
+}
+
+DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_Init(Dqn_Arena *arena, Dqn_usize max)
+{
+    Dqn_VArray<T> result = Dqn_VArray_InitByteSize(arena, max * sizeof(T));
+    return result;
+}
+
+DQN_API template <typename T> bool Dqn_VArray_IsValid(Dqn_VArray<T> const *array)
+{
+    bool result = array && array->data && array->size <= array->max && array->block;
+    return result;
+}
+
+DQN_API template <typename T> T *Dqn_VArray_Make(Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
+{
+    if (!Dqn_VArray_IsValid(array))
+        return nullptr;
+
+    if (!Dqn_Safe_AssertF((array->size + count) < array->max, "Array is out of virtual memory"))
+        return nullptr;
+
+    // TODO: Use placement new? Why doesn't this work?
+    T *result = Dqn_Arena_NewArrayWithBlock(array->block, T, count, zero_mem);
+    if (result)
+        array->size += count;
+    return result;
+}
+
+DQN_API template <typename T> T *Dqn_VArray_Add(Dqn_VArray<T> *array, T const *items, Dqn_usize count)
+{
+    T *result = Dqn_VArray_Make(array, count, Dqn_ZeroMem_No);
+    if (result)
+        DQN_MEMCPY(result, items, count * sizeof(T));
+    return result;
+}
+
+DQN_API template <typename T> void Dqn_VArray_EraseRange(Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_VArrayErase erase)
+{
+    if (!Dqn_VArray_IsValid(array) || array->size == 0 || count == 0)
+        return;
+
+    // NOTE: Caculate the end index of the erase range
+    Dqn_isize abs_count = DQN_ABS(count);
+    Dqn_usize end_index = 0;
+    if (count < 0) {
+        end_index = begin_index - (abs_count - 1);
+        if (end_index > begin_index)
+            end_index = 0;
+    } else {
+        end_index = begin_index + (abs_count - 1);
+        if (end_index < begin_index)
+            end_index = array->size - 1;
+    }
+
+    // NOTE: Ensure begin_index < one_past_end_index
+    if (end_index < begin_index) {
+        Dqn_usize tmp = begin_index;
+        begin_index   = end_index;
+        end_index     = tmp;
+    }
+
+    // NOTE: Ensure indexes are within valid bounds
+    begin_index = DQN_MIN(begin_index, array->size);
+    end_index   = DQN_MIN(end_index,   array->size - 1);
+
+    // NOTE: Erase the items in the range [begin_index, one_past_end_index)
+    Dqn_usize one_past_end_index = end_index + 1;
+    Dqn_usize erase_count        = one_past_end_index - begin_index;
+    if (erase_count) {
+        T *end  = array->data + array->size;
+        T *dest = array->data + begin_index;
+        if (erase == Dqn_VArrayErase_Stable) {
+            T *src = dest + erase_count;
+            DQN_MEMMOVE(dest, src, (end - src) * sizeof(T));
+        } else {
+            T *src = end - erase_count;
+            DQN_MEMCPY(dest, src, (end - src) * sizeof(T));
+        }
+        array->size -= erase_count;
+    }
+}
+#endif // !defined(DQN_NO_VARRAY)
+
 #if !defined(DQN_NO_DSMAP)
+// =================================================================================================
+// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// =================================================================================================
 uint32_t const DQN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
 uint32_t const DQN_DS_MAP_SENTINEL_SLOT = 0;
 
@@ -3690,14 +3878,13 @@ bool Dqn_FString8_AppendFV(DQN_FSTRING8 *string, char const *fmt, va_list args)
 
     DQN_HARD_ASSERT(string->size >= 0);
     Dqn_isize require = Dqn_CString8_FVSize(fmt, args) + 1 /*null_terminate*/;
-    Dqn_isize space   = N - string->size;
+    Dqn_isize space   = (N + 1) - string->size;
     result            = require <= space;
     string->size += STB_SPRINTF_DECORATE(vsnprintf)(string->data + string->size, DQN_CAST(int)space, fmt, args);
 
     // NOTE: snprintf returns the required size of the format string
-    // irrespective of if there's space or not, but, always null terminates so
-    // the last byte is wasted.
-    string->size = DQN_MIN(string->size, N - 1);
+    // irrespective of if there's space or not.
+    string->size = DQN_MIN(string->size, N);
     return result;
 }
 
@@ -3728,7 +3915,7 @@ bool Dqn_FString8_AppendCString8(DQN_FSTRING8 *string, char const *src, Dqn_isiz
         size = DQN_CAST(Dqn_isize)Dqn_CString8_Size(src);
     }
 
-    Dqn_isize space = (N - 1 /*reserve byte for null terminator*/) - string->size;
+    Dqn_isize space = N - string->size;
     result          = size <= space;
     DQN_MEMCPY(string->data + string->size, src, DQN_MIN(space, size));
     string->size = DQN_MIN(string->size + size, N);
@@ -3737,9 +3924,9 @@ bool Dqn_FString8_AppendCString8(DQN_FSTRING8 *string, char const *src, Dqn_isiz
 }
 
 DQN_FSTRING8_API
-bool Dqn_FString8_AppendString8(DQN_FSTRING8 *string, Dqn_String8 src)
+bool Dqn_FString8_Append(DQN_FSTRING8 *string, Dqn_String8 src)
 {
-    bool result = Dqn_FString8_Append(string, src.data, src.size);
+    bool result = Dqn_FString8_AppendCString8(string, src.data, src.size);
     return result;
 }
 
@@ -3753,6 +3940,44 @@ Dqn_String8 Dqn_FString8_ToString8(DQN_FSTRING8 const *string)
     DQN_HARD_ASSERT(string->size >= 0);
     result.data = DQN_CAST(char *)string->data;
     result.size = string->size;
+    return result;
+}
+
+DQN_FSTRING8_API bool Dqn_FString8_Eq(DQN_FSTRING8 const *lhs, DQN_FSTRING8 const *rhs, Dqn_CString8EqCase eq_case)
+{
+    bool result = Dqn_CString8_Eq(lhs->data, rhs->data, lhs->size, rhs->size, eq_case);
+    return result;
+}
+
+DQN_FSTRING8_API bool Dqn_FString8_EqString8(DQN_FSTRING8 const *lhs, Dqn_String8 rhs, Dqn_CString8EqCase eq_case)
+{
+    bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, eq_case);
+    return result;
+}
+
+DQN_FSTRING8_API bool Dqn_FString8_EqInsensitive(DQN_FSTRING8 const *lhs, DQN_FSTRING8 const *rhs)
+{
+    bool result = Dqn_CString8_Eq(lhs->data, rhs->data, lhs->size, rhs->size, Dqn_CString8EqCase_Insensitive);
+    return result;
+}
+
+DQN_FSTRING8_API bool Dqn_FString8_EqString8Insensitive(DQN_FSTRING8 const *lhs, Dqn_String8 rhs)
+{
+    bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, Dqn_CString8EqCase_Insensitive);
+    return result;
+}
+
+template <Dqn_usize A, Dqn_usize B>
+bool Dqn_FString8_EqFStringAB(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs, Dqn_CString8EqCase eq_case)
+{
+    bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, eq_case);
+    return result;
+}
+
+template <Dqn_usize A, Dqn_usize B>
+bool Dqn_FString8_EqABInsensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs)
+{
+    bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, Dqn_CString8EqCase_Insensitive);
     return result;
 }
 #endif // !defined(DQN_NO_FSTRING8)
@@ -4680,15 +4905,15 @@ DQN_API void Dqn_Log_TypeFCallSite(Dqn_LogType type, Dqn_CallSite call_site, cha
 
 // NOTE: Dqn_VMem_
 // -------------------------------------------------------------------------------------------------
-DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, bool commit)
+DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, Dqn_VMemCommit commit)
 {
     #if defined(DQN_OS_WIN32)
-    unsigned long flags = MEM_RESERVE | (commit ? MEM_COMMIT : 0);
+    unsigned long flags = MEM_RESERVE | (commit == Dqn_VMemCommit_Yes ? MEM_COMMIT : 0);
     void *result = VirtualAlloc(nullptr, size, flags, PAGE_READWRITE);
 
     #elif defined(DQN_OS_UNIX)
 
-    unsigned flags = PROT_NONE | (commit ? (PROT_READ | PROT_WRITE) : 0);
+    unsigned flags = PROT_NONE | (commit == Dqn_VMemCommit_Yes ? (PROT_READ | PROT_WRITE) : 0);
     void *result = mmap(nullptr, size, flags, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     if (result == MAP_FAILED)
         result = nullptr;
@@ -5601,12 +5826,12 @@ DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string,
             // a replacement action, otherwise we have a special case for no
             // replacements, where the entire string gets copied.
             Dqn_String8 slice = Dqn_String8_Init(string.data, head);
-            Dqn_String8Builder_AppendString8Ref(&string_builder, slice);
+            Dqn_String8Builder_AppendRef(&string_builder, slice);
         }
 
         Dqn_String8 range = Dqn_String8_Slice(string, head, (tail - head));
-        Dqn_String8Builder_AppendString8Ref(&string_builder, range);
-        Dqn_String8Builder_AppendString8Ref(&string_builder, replace);
+        Dqn_String8Builder_AppendRef(&string_builder, range);
+        Dqn_String8Builder_AppendRef(&string_builder, replace);
         head = tail + find.size;
         tail += find.size - 1; // NOTE: -1 since the for loop will post increment us past the end of the find string
     }
@@ -5617,7 +5842,7 @@ DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string,
         result = Dqn_String8_Copy(Dqn_Arena_Allocator(arena), string);
     } else {
         Dqn_String8 remainder = Dqn_String8_Init(string.data + head, string.size - head);
-        Dqn_String8Builder_AppendString8Ref(&string_builder, remainder);
+        Dqn_String8Builder_AppendRef(&string_builder, remainder);
         result = Dqn_String8Builder_Build(&string_builder, Dqn_Arena_Allocator(arena));
     }
 
@@ -5705,7 +5930,7 @@ DQN_FILE_SCOPE char *Dqn_Print_VSPrintfChunker_(const char *buf, void *user, int
 DQN_API void Dqn_Print_StdFV(Dqn_PrintStd std_handle, char const *fmt, va_list args)
 {
     char buffer[STB_SPRINTF_MIN];
-    stbsp_vsprintfcb(Dqn_Print_VSPrintfChunker_, DQN_CAST(void *)DQN_CAST(uintptr_t)std_handle, buffer, fmt, args);
+    STB_SPRINTF_DECORATE(vsprintfcb)(Dqn_Print_VSPrintfChunker_, DQN_CAST(void *)DQN_CAST(uintptr_t)std_handle, buffer, fmt, args);
 }
 
 DQN_API void Dqn_Print_StdF(Dqn_PrintStd std_handle, char const *fmt, ...)
@@ -5920,7 +6145,7 @@ DQN_API void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr)
 // ---------------------------------+-----------------------------+---------------------------------
 // [SECT-STRB] Dqn_String8Builder   |                             |
 // ---------------------------------+-----------------------------+---------------------------------
-bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String8 string)
+bool Dqn_String8Builder_AppendRef(Dqn_String8Builder *builder, Dqn_String8 string)
 {
     if (!builder || !string.data || string.size <= 0)
         return false;
@@ -5943,10 +6168,10 @@ bool Dqn_String8Builder_AppendString8Ref(Dqn_String8Builder *builder, Dqn_String
     return true;
 }
 
-bool Dqn_String8Builder_AppendString8Copy(Dqn_String8Builder *builder, Dqn_String8 string)
+bool Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_String8 string)
 {
     Dqn_String8 copy = Dqn_String8_Copy(builder->allocator, string);
-    bool result      = Dqn_String8Builder_AppendString8Ref(builder, copy);
+    bool result      = Dqn_String8Builder_AppendRef(builder, copy);
     return result;
 }
 
@@ -5956,7 +6181,7 @@ bool Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *bu
     if (string.size == 0)
         return true;
 
-    bool result = Dqn_String8Builder_AppendString8Ref(builder, string);
+    bool result = Dqn_String8Builder_AppendRef(builder, string);
     if (!result)
         Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_ARG builder->allocator, string.data, string.size + 1);
     return result;
@@ -5991,84 +6216,16 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
     return result;
 }
 
-// NOTE: Dqn_Arena
-// -------------------------------------------------------------------------------------------------
-DQN_API bool Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit)
+// =================================================================================================
+// [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
+// =================================================================================================
+DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
-    // TODO: Use the call site arguments
-    if (!arena || size <= 0 || commit < 0)
-        return false;
-
-    if (!Dqn_Safe_AssertF(commit <= size,
-                          "Commit must be less than or equal to the size requested [size=%zd, commit=%zd]",
-                          size, commit)) {
-        commit = size;
-    }
-
-    // NOTE: If the commit amount is the same as the size, the caller has
-    // requested all the memory is committed. We can save one sys-call by asking
-    // the OS to reserve+commit in one call.
-    bool commit_on_reserve     = size == commit;
-    auto const allocation_size = DQN_CAST(Dqn_isize)(sizeof(*arena->curr) + size);
-    auto *result               = DQN_CAST(Dqn_ArenaBlock *)Dqn_VMem_Reserve(allocation_size, commit_on_reserve);
-    if (result) {
-        // NOTE: If we didn't commit on reserve, commit the amount requested by
-        // the user.
-        if (!commit_on_reserve) {
-            Dqn_VMem_Commit(result, sizeof(*result) + commit);
-        }
-
-        // NOTE: Sanity check memory is zero-ed out
-        DQN_ASSERT(result->used == 0);
-        DQN_ASSERT(result->next == nullptr);
-        DQN_ASSERT(result->prev == nullptr);
-
-        // NOTE: Setup the block
-        result->size      = size;
-        result->committed = commit;
-        result->memory    = DQN_CAST(uint8_t *)result + sizeof(*result);
-
-        // NOTE: Attach the block to the arena
-        if (arena->tail) {
-            arena->tail->next = result;
-            result->prev      = arena->tail;
-        } else {
-            DQN_ASSERT(!arena->curr);
-            arena->curr = result;
-        }
-        arena->tail = result;
-
-        // NOTE: Update stats
-        arena->stats.syscalls += (commit_on_reserve ? 1 : 2);
-        arena->stats.blocks   += 1;
-        arena->stats.capacity += arena->curr->size;
-
-        arena->stats.blocks_hwm   = DQN_MAX(arena->stats.blocks_hwm,   arena->stats.blocks);
-        arena->stats.capacity_hwm = DQN_MAX(arena->stats.capacity_hwm, arena->stats.capacity);
-
-        Dqn_Library_LeakTraceAdd(DQN_LEAK_TRACE_ARG result, size);
-    }
-
-    return result;
-}
-
-DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
-{
-    DQN_ASSERT_MSG((align & (align - 1)) == 0, "Power of two alignment required");
     Dqn_isize allocation_size = size + (align - 1);
-    while (!arena->curr || (arena->curr->used + allocation_size) > arena->curr->size) {
-        if (arena->curr && arena->curr->next) {
-            arena->curr = arena->curr->next;
-        } else {
-            Dqn_isize grow_size = DQN_MAX(DQN_MAX(allocation_size, arena->min_block_size), DQN_ARENA_MIN_BLOCK_SIZE);
-            if (!Dqn_Arena_Grow_(DQN_LEAK_TRACE_ARG arena, grow_size /*size*/, grow_size /*commit*/)) {
-                return nullptr;
-            }
-        }
-    }
+    if ((block->used + allocation_size) > block->size)
+        return nullptr;
 
     // NOTE: Calculate an aligned allocation pointer
-    Dqn_ArenaBlock *block        = arena->curr;
     uintptr_t const address      = DQN_CAST(uintptr_t)block->memory + block->used;
     Dqn_isize const align_offset = (align - (address & (align - 1))) & (align - 1);
     void *result                 = DQN_CAST(char *)(address + align_offset);
@@ -6080,7 +6237,7 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_
     // NOTE: Ensure that the allocation is backed by physical pages from the OS
     Dqn_isize const commit_space = block->committed - block->used;
     if (commit_space < allocation_size) {
-        Dqn_isize commit_size = allocation_size - commit_space;
+        Dqn_isize commit_size = Dqn_PowerOfTwoRoundUp(allocation_size - commit_space, DQN_KILOBYTES(4));
         Dqn_VMem_Commit(DQN_CAST(char *)result + commit_space, commit_size);
         block->committed += commit_size;
     }
@@ -6094,6 +6251,7 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_
     }
 
     // NOTE: Update arena
+    Dqn_Arena *arena = block->arena;
     arena->stats.used += allocation_size;
     arena->stats.used_hwm = DQN_MAX(arena->stats.used_hwm, arena->stats.used);
     block->used += allocation_size;
@@ -6106,40 +6264,36 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_
     return result;
 }
 
-DQN_API void *Dqn_Arena_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
+DQN_FILE_SCOPE void *Dqn_Arena_AllocatorAlloc_(DQN_LEAK_TRACE_FUNCTION size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context)
 {
-    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, alignment, Dqn_ZeroMem_No);
-    DQN_MEMCPY(result, src, size);
+    void *result = NULL;
+    if (!user_context)
+        return result;
+
+    Dqn_Arena *arena = DQN_CAST(Dqn_Arena *)user_context;
+    result           = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, align, zero_mem);
     return result;
 }
 
-DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
+DQN_FILE_SCOPE void Dqn_Arena_AllocatorDealloc_(DQN_LEAK_TRACE_FUNCTION void *ptr, size_t size, void *user_context)
 {
-    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size + 1, alignment, Dqn_ZeroMem_No);
-    DQN_MEMCPY(result, src, size);
-    (DQN_CAST(char *)result)[size] = 0;
-    return result;
+    // NOTE: No-op, arenas batch allocate and batch deallocate. Call free on the
+    // underlying arena, since we can't free individual pointers.
+    DQN_LEAK_TRACE_UNUSED;
+    (void)ptr;
+    (void)size;
+    (void)user_context;
 }
 
-DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
+DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena)
 {
-    if (!arena)
-        return;
-
-    while (arena->tail) {
-        Dqn_ArenaBlock *tail = arena->tail;
-        arena->tail          = tail->prev;
-        if (zero_mem == Dqn_ZeroMem_Yes)
-            DQN_MEMSET(tail->memory, DQN_MEMSET_BYTE, tail->committed);
-        Dqn_VMem_Release(tail, sizeof(*tail) + tail->size);
-        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG tail);
+    Dqn_Allocator result = {};
+    if (arena) {
+        result.user_context = arena;
+        result.alloc        = Dqn_Arena_AllocatorAlloc_;
+        result.dealloc      = Dqn_Arena_AllocatorDealloc_;
     }
-
-    arena->curr           = arena->tail = nullptr;
-    arena->stats.capacity = 0;
-    arena->stats.used     = 0;
-    arena->stats.wasted   = 0;
-    arena->stats.blocks   = 0;
+    return result;
 }
 
 DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
@@ -6158,38 +6312,6 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
 
     arena->stats.used   = 0;
     arena->stats.wasted = 0;
-}
-
-DQN_FILE_SCOPE void *Dqn_Arena_AllocatorAlloc(DQN_LEAK_TRACE_FUNCTION size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context)
-{
-    void *result = NULL;
-    if (!user_context)
-        return result;
-
-    Dqn_Arena *arena = DQN_CAST(Dqn_Arena *)user_context;
-    result           = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, align, zero_mem);
-    return result;
-}
-
-DQN_FILE_SCOPE void Dqn_Arena_AllocatorDealloc(DQN_LEAK_TRACE_FUNCTION void *ptr, size_t size, void *user_context)
-{
-    // NOTE: No-op, arenas batch allocate and batch deallocate. Call free on the
-    // underlying arena, since we can't free individual pointers.
-    DQN_LEAK_TRACE_UNUSED;
-    (void)ptr;
-    (void)size;
-    (void)user_context;
-}
-
-DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena)
-{
-    Dqn_Allocator result = {};
-    if (arena) {
-        result.user_context = arena;
-        result.alloc        = Dqn_Arena_AllocatorAlloc;
-        result.dealloc      = Dqn_Arena_AllocatorDealloc;
-    }
-    return result;
 }
 
 DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena)
@@ -6296,6 +6418,129 @@ DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena)
 {
     Dqn_ArenaStatString string = Dqn_Arena_StatString(&arena->stats);
     Dqn_Log_InfoF("%.*s\n", DQN_STRING_FMT(string));
+}
+
+DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit, uint8_t flags)
+{
+    if (!arena || size <= 0 || commit < 0)
+        return nullptr;
+
+    DQN_ASSERT(commit <= size);
+    commit = DQN_MIN(commit, size);
+
+    // NOTE: If the commit amount is the same as the size, the caller has
+    // requested all the memory is committed. We can save one sys-call by asking
+    // the OS to reserve+commit in one call.
+    Dqn_VMemCommit commit_on_reserve = size == commit ? Dqn_VMemCommit_Yes : Dqn_VMemCommit_No;
+
+    // NOTE: 64k allocation granularity atleast on Windows
+    Dqn_isize size_rounded_up_to_64k_boundary = Dqn_PowerOfTwoRoundUp(size, DQN_KILOBYTES(64));
+    if (size == size_rounded_up_to_64k_boundary) {
+        // NOTE: Size is already at 64k boundary, we need more space for the
+        // block itself. We will allocate 64k more to avoid wasting bytes.
+        size_rounded_up_to_64k_boundary += DQN_KILOBYTES(64);
+    }
+
+    auto *result = DQN_CAST(Dqn_ArenaBlock *)Dqn_VMem_Reserve(size_rounded_up_to_64k_boundary, commit_on_reserve);
+    if (result) {
+        // NOTE: If we didn't commit on reserve, commit the amount requested by
+        // the user.
+        if (commit_on_reserve == Dqn_VMemCommit_No) {
+            Dqn_usize commit_size = Dqn_PowerOfTwoRoundUp(sizeof(*result) + commit, DQN_KILOBYTES(4));
+            Dqn_VMem_Commit(result, commit_size);
+        }
+
+        // NOTE: Sanity check memory is zero-ed out
+        DQN_ASSERT(result->used == 0);
+        DQN_ASSERT(result->next == nullptr);
+        DQN_ASSERT(result->prev == nullptr);
+
+        // NOTE: Setup the block
+        result->size      = size_rounded_up_to_64k_boundary - sizeof(*result);
+        result->committed = commit;
+        result->memory    = DQN_CAST(uint8_t *)result + sizeof(*result);
+        result->flags     = flags;
+        result->arena     = arena;
+
+        // NOTE: Attach the block to the arena
+        if (arena->tail) {
+            arena->tail->next = result;
+            result->prev      = arena->tail;
+        } else {
+            DQN_ASSERT(!arena->curr);
+            arena->curr = result;
+        }
+        arena->tail = result;
+
+        // NOTE: Update stats
+        arena->stats.syscalls += (commit_on_reserve ? 1 : 2);
+        arena->stats.blocks   += 1;
+        arena->stats.capacity += arena->curr->size;
+
+        arena->stats.blocks_hwm   = DQN_MAX(arena->stats.blocks_hwm,   arena->stats.blocks);
+        arena->stats.capacity_hwm = DQN_MAX(arena->stats.capacity_hwm, arena->stats.capacity);
+
+        Dqn_Library_LeakTraceAdd(DQN_LEAK_TRACE_ARG result, size);
+    }
+
+    return result;
+}
+
+DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
+{
+    DQN_ASSERT_MSG((align & (align - 1)) == 0, "Power of two alignment required");
+    Dqn_isize allocation_size = size + (align - 1);
+    while (!arena->curr ||
+           (arena->curr->flags & Dqn_ArenaBlockFlags_Private) ||
+           (arena->curr->used + allocation_size) > arena->curr->size)
+    {
+        if (arena->curr && arena->curr->next) {
+            arena->curr = arena->curr->next;
+        } else {
+            Dqn_isize grow_size = DQN_MAX(DQN_MAX(allocation_size, arena->min_block_size), DQN_ARENA_MIN_BLOCK_SIZE);
+            if (!Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG arena, grow_size /*size*/, grow_size /*commit*/, 0 /*flags*/))
+                return nullptr;
+        }
+    }
+
+    void *result = Dqn_Arena_AllocateFromBlock(arena->curr, size, align, zero_mem);
+    return result;
+}
+
+DQN_API void *Dqn_Arena_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
+{
+    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, alignment, Dqn_ZeroMem_No);
+    DQN_MEMCPY(result, src, size);
+    return result;
+}
+
+DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
+{
+    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size + 1, alignment, Dqn_ZeroMem_No);
+    DQN_MEMCPY(result, src, size);
+    (DQN_CAST(char *)result)[size] = 0;
+    return result;
+}
+
+DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
+{
+    if (!arena)
+        return;
+
+    while (arena->tail) {
+        Dqn_ArenaBlock *tail = arena->tail;
+        arena->tail          = tail->prev;
+        if (zero_mem == Dqn_ZeroMem_Yes)
+            DQN_MEMSET(tail->memory, DQN_MEMSET_BYTE, tail->committed);
+        Dqn_VMem_Release(tail, sizeof(*tail) + tail->size);
+        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG tail);
+    }
+
+    arena->curr           = arena->tail = nullptr;
+    arena->stats.capacity = 0;
+    arena->stats.used     = 0;
+    arena->stats.wasted   = 0;
+    arena->stats.blocks   = 0;
 }
 
 #if !defined(DQN_NO_MATH)
@@ -8280,7 +8525,7 @@ DQN_API char *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, size
     size_t            total_size  = 0;
     Dqn_Win_NetChunk *first_chunk = nullptr;
     for (Dqn_Win_NetChunk *last_chunk = nullptr;;) {
-        auto *chunk      = DQN_CAST(Dqn_Win_NetChunk *)Dqn_VMem_Reserve(sizeof(Dqn_Win_NetChunk), true /*commit*/);
+        auto *chunk      = DQN_CAST(Dqn_Win_NetChunk *)Dqn_VMem_Reserve(sizeof(Dqn_Win_NetChunk), Dqn_VMemCommit_Yes);
         bool pump_result = Dqn_Win_NetHandlePump(handle, chunk->data, DQN_WIN_NET_HANDLE_DOWNLOAD_SIZE, &chunk->size);
         if (chunk->size) {
             total_size += chunk->size;
@@ -8297,7 +8542,7 @@ DQN_API char *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, size
             break;
     }
 
-    auto *result     = DQN_CAST(char *)Dqn_VMem_Reserve(total_size * sizeof(char), true /*commit*/);
+    auto *result     = DQN_CAST(char *)Dqn_VMem_Reserve(total_size * sizeof(char), Dqn_VMemCommit_Yes);
     char *result_ptr = result;
     for (Dqn_Win_NetChunk *chunk = first_chunk; chunk;) {
         DQN_MEMCPY(result_ptr, chunk->data, chunk->size);
@@ -9347,12 +9592,12 @@ DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COM
     thread_local Dqn_ThreadContext result = {};
     if (!result.init) {
         result.init = true;
-        Dqn_Arena_Grow_(DQN_LEAK_TRACE_ARG &result.arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4));
+        Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG &result.arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4), 0 /*flags*/);
         result.allocator = Dqn_Arena_Allocator(&result.arena);
         for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
             Dqn_Arena *arena              = result.temp_arenas + index;
             result.temp_allocators[index] = Dqn_Arena_Allocator(arena);
-            Dqn_Arena_Grow_(DQN_LEAK_TRACE_ARG arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4));
+            Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4), 0 /*flags*/);
         }
     }
     return &result;
