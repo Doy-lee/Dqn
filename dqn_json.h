@@ -38,12 +38,12 @@ struct Dqn_JSONIterator
 
 // NOTE: Dqn_JSON_IteratorPush/Pop
 // -----------------------------------------------------------------------------
-bool Dqn_JSON_IteratorPushObjElement(Dqn_JSONIterator *it, json_object_element_s *element);
-bool Dqn_JSON_IteratorPushObj(Dqn_JSONIterator *it, json_object_s *obj);
+bool Dqn_JSON_IteratorPushObjElement  (Dqn_JSONIterator *it, json_object_element_s *element);
+bool Dqn_JSON_IteratorPushObj         (Dqn_JSONIterator *it, json_object_s *obj);
 bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *it, json_array_element_s *element);
-bool Dqn_JSON_IteratorPushArray(Dqn_JSONIterator *it, json_array_s *array);
-bool Dqn_JSON_IteratorPushValue(Dqn_JSONIterator *it, json_value_s *value);
-void Dqn_JSON_IteratorPop(Dqn_JSONIterator *it);
+bool Dqn_JSON_IteratorPushArray       (Dqn_JSONIterator *it, json_array_s *array);
+bool Dqn_JSON_IteratorPushValue       (Dqn_JSONIterator *it, json_value_s *value);
+void Dqn_JSON_IteratorPop             (Dqn_JSONIterator *it);
 
 // NOTE: Dqn_JSON_Iterator tree navigation
 // -----------------------------------------------------------------------------

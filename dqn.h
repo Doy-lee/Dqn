@@ -1324,7 +1324,7 @@ DQN_API void Dqn_VMem_Release(void *ptr, Dqn_usize size);
 // block and/or releasing the single pointer to the entire block of memory.
 //
 // This allocator reserves memory blocks at a 64k granularity as per the minimum
-// granularity reserve size of VirtualAlloc on Windows. Memory is committed at
+// granularity reserve size of VirtualAlloc on Windows. Memory is commit at
 // a 4k granularity for similar reasons. On 64 bit platforms you have access
 // to 48 bits of address space for applications, this is 256TB of address space
 // you can reserve. The typical usage for this style of arena is to reserve
@@ -1410,14 +1410,15 @@ struct Dqn_ArenaStat
 
 struct Dqn_ArenaBlock
 {
-    struct Dqn_Arena *arena;     ///< Arena that owns this block
-    void             *memory;    ///< Backing memory of the block
-    Dqn_isize         size;      ///< Size of the block
-    Dqn_isize         used;      ///< Number of bytes used up in the block. Always less than the committed amount.
-    Dqn_isize         committed; ///< Number of physically backed bytes by the OS.
-    Dqn_ArenaBlock   *prev;      ///< Previous linked block
-    Dqn_ArenaBlock   *next;      ///< Next linked block
-    uint8_t           flags;     ///< Bit field for 'Dqn_ArenaBlockFlags'
+    struct Dqn_Arena *arena;   ///< Arena that owns this block
+    void             *memory;  ///< Backing memory of the block
+    Dqn_isize         size;    ///< Size of the block
+    Dqn_isize         used;    ///< Number of bytes used up in the block. Always less than the commit amount.
+    Dqn_isize         hwm_used;///< High-water mark for 'used' bytes in this block
+    Dqn_isize         commit;  ///< Number of bytes in the block physically backed by pages
+    Dqn_ArenaBlock   *prev;    ///< Previous linked block
+    Dqn_ArenaBlock   *next;    ///< Next linked block
+    uint8_t           flags;   ///< Bit field for 'Dqn_ArenaBlockFlags'
 };
 
 struct Dqn_ArenaStatString
@@ -1457,6 +1458,14 @@ struct Dqn_ArenaTempMemoryScope_
     #endif
 };
 
+enum Dqn_ArenaCommit
+{
+    /// Commit the pages to ensure the block has the requested commit amount.
+    /// No-op if the block has sufficient commit space already.
+    Dqn_ArenaCommit_EnsureSpace,
+    Dqn_ArenaCommit_GetNewPages, ///< Grow the block by the requested commit amount
+};
+
 // NOTE: Allocation ================================================================================
 #define                     Dqn_Arena_Grow(arena, size, commit, flags)                Dqn_Arena_Grow_(DQN_LEAK_TRACE arena, size, commit, flags)
 #define                     Dqn_Arena_Allocate(arena, size, align, zero_mem)          Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, size, align, zero_mem)
@@ -1467,6 +1476,7 @@ struct Dqn_ArenaTempMemoryScope_
 #define                     Dqn_Arena_CopyZ(arena, Type, src, count)                  (Type *)Dqn_Arena_CopyZ_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
 #define                     Dqn_Arena_Free(arena, zero_mem)                           Dqn_Arena_Free_(DQN_LEAK_TRACE arena, zero_mem)
 
+DQN_API void                Dqn_Arena_CommitFromBlock  (Dqn_ArenaBlock *block, Dqn_isize size, Dqn_ArenaCommit commit);
 DQN_API void *              Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem);
 DQN_API Dqn_Allocator       Dqn_Arena_Allocator        (Dqn_Arena *arena);
 DQN_API void                Dqn_Arena_Reset            (Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
@@ -1522,6 +1532,11 @@ template <typename T> struct Dqn_VArray
     T              *data;  ///< Pointer to the start of the array items in the block of memory
     Dqn_usize       size;  ///< Number of items currently in the array
     Dqn_usize       max;   ///< Maximum number of items this array can store
+
+    T       *begin()       { return data; }
+    T       *end  ()       { return data + size; }
+    T const *begin() const { return data; }
+    T const *end  () const { return data + size; }
 };
 
 enum Dqn_VArrayErase
@@ -1536,6 +1551,7 @@ DQN_API template <typename T> bool           Dqn_VArray_IsValid     (Dqn_VArray<
 DQN_API template <typename T> T *            Dqn_VArray_Make        (Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
 DQN_API template <typename T> T *            Dqn_VArray_Add         (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
 DQN_API template <typename T> void           Dqn_VArray_EraseRange  (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_VArrayErase erase);
+DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<T> *array, Dqn_usize count);
 #endif // !defined(DQN_NO_VARRAY)
 
 #if !defined(DQN_NO_DSMAP)
@@ -3530,6 +3546,14 @@ DQN_API template <typename T> void Dqn_VArray_EraseRange(Dqn_VArray<T> *array, D
         }
         array->size -= erase_count;
     }
+}
+
+DQN_API template <typename T> void Dqn_VArray_Reserve(Dqn_VArray<T> *array, Dqn_usize count)
+{
+    if (!Dqn_VArray_IsValid(array) || count == 0)
+        return;
+
+    Dqn_Arena_CommitFromBlock(array->block, count * sizeof(T), Dqn_ArenaCommit_EnsureSpace);
 }
 #endif // !defined(DQN_NO_VARRAY)
 
@@ -6280,46 +6304,60 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
 // =================================================================================================
 // [$AREN] Dqn_Arena            |                             | Growing bump allocator
 // =================================================================================================
+DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, Dqn_ArenaCommit commit)
+{
+    Dqn_isize commit_size = 0;
+    switch (commit) {
+        case Dqn_ArenaCommit_GetNewPages: {
+            commit_size = Dqn_PowerOfTwoRoundUp(size, DQN_KILOBYTES(4));
+        } break;
+
+        case Dqn_ArenaCommit_EnsureSpace: {
+            Dqn_isize const unused_commit_space = block->commit - block->used;
+            if (unused_commit_space < size)
+                commit_size = Dqn_PowerOfTwoRoundUp(size - unused_commit_space, DQN_KILOBYTES(4));
+        } break;
+    }
+
+    if (commit_size) {
+        char *commit_ptr = DQN_CAST(char *)block->memory + block->commit;
+        Dqn_VMem_Commit(commit_ptr, commit_size);
+        block->commit += commit_size;
+    }
+}
+
 DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
     Dqn_isize allocation_size = size + (align - 1);
     if ((block->used + allocation_size) > block->size)
         return nullptr;
 
-    // NOTE: Calculate an aligned allocation pointer
-    uintptr_t const address      = DQN_CAST(uintptr_t)block->memory + block->used;
-    Dqn_isize const align_offset = (align - (address & (align - 1))) & (align - 1);
-    void *result                 = DQN_CAST(char *)(address + align_offset);
-
-    DQN_ASSERT_MSG(block->committed >= block->used,
+    DQN_ASSERT(block->hwm_used <= block->commit);
+    DQN_ASSERT_MSG(block->commit >= block->used,
                    "Internal error: Committed size must always be greater than the used size [commit=%_$$zd, used=%_$$zd]",
-                   block->committed, block->used);
+                   block->commit, block->used);
 
-    // NOTE: Ensure that the allocation is backed by physical pages from the OS
-    Dqn_isize const commit_space = block->committed - block->used;
-    if (commit_space < allocation_size) {
-        Dqn_isize commit_size = Dqn_PowerOfTwoRoundUp(allocation_size - commit_space, DQN_KILOBYTES(4));
-        Dqn_VMem_Commit(DQN_CAST(char *)result + commit_space, commit_size);
-        block->committed += commit_size;
-    }
-
+    void *unaligned_result = DQN_CAST(char *)block->memory + block->used;
+    void *result           = DQN_CAST(void *)Dqn_PowerOfTwoRoundUp(DQN_CAST(uintptr_t)unaligned_result, align);
     if (zero_mem == Dqn_ZeroMem_Yes) {
-        // NOTE: Newly committed pages are always 0-ed out, we only need to
-        // memset the memory that was reused from the arena.
-        DQN_MEMSET(DQN_CAST(char *)result - align_offset,
-                   DQN_MEMSET_BYTE,
-                   align_offset + commit_space);
+        // NOTE: Newly commit pages are always 0-ed out, we only need to
+        // memset the memory that was used before from the arena.
+        Dqn_isize const reused_bytes = DQN_MIN(block->hwm_used - block->used, allocation_size);
+        DQN_MEMSET(unaligned_result, DQN_MEMSET_BYTE, reused_bytes);
     }
+
+    // NOTE: Ensure requested bytes are backed by physical pages from the OS
+    Dqn_Arena_CommitFromBlock(block, allocation_size, Dqn_ArenaCommit_EnsureSpace);
 
     // NOTE: Update arena
-    Dqn_Arena *arena = block->arena;
-    arena->stats.used += allocation_size;
-    arena->stats.used_hwm = DQN_MAX(arena->stats.used_hwm, arena->stats.used);
-    block->used += allocation_size;
+    Dqn_Arena *arena       = block->arena;
+    arena->stats.used     += allocation_size;
+    arena->stats.used_hwm  = DQN_MAX(arena->stats.used_hwm, arena->stats.used);
+    block->used           += allocation_size;
+    block->hwm_used        = DQN_MAX(block->hwm_used, block->used);
 
-    DQN_ASSERT_MSG(size + align_offset <= allocation_size, "Internal error: Alignment size calculation error [size=%_$$zd, offset=%zd, allocation_size=%_$$zd]", size, align_offset, allocation_size);
-    DQN_ASSERT_MSG(block->used <= block->committed, "Internal error: Committed size must be greater than used size [used=%_$$zd, committed=%_$$zd]", block->used, block->committed);
-    DQN_ASSERT_MSG(block->committed <= block->size, "Internal error: Allocation exceeded block capacity [committed=%_$$zd, size=%_$$zd]", block->committed, block->size);
+    DQN_ASSERT_MSG(block->used      <= block->commit,             "Internal error: Committed size must be greater than used size [used=%_$$zd, commit=%_$$zd]", block->used, block->commit);
+    DQN_ASSERT_MSG(block->commit <= block->size,                  "Internal error: Allocation exceeded block capacity [commit=%_$$zd, size=%_$$zd]", block->commit, block->size);
     DQN_ASSERT_MSG(((DQN_CAST(uintptr_t)result) & (align - 1)) == 0, "Internal error: Pointer alignment failed [address=%p, align=%x]", result, align);
 
     return result;
@@ -6367,7 +6405,7 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
         if (!block->prev)
             arena->curr = block;
         if (zero_mem == Dqn_ZeroMem_Yes)
-            DQN_MEMSET(block->memory, DQN_MEMSET_BYTE, block->committed);
+            DQN_MEMSET(block->memory, DQN_MEMSET_BYTE, block->commit);
         block->used = 0;
     }
 
@@ -6399,8 +6437,9 @@ DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemor
     arena->stats.blocks   = scope.stats.blocks;
 
     // NOTE: Revert the current block to the scope's current block
-    arena->curr          = scope.curr;
-    arena->curr->used    = scope.curr_used;
+    arena->curr = scope.curr;
+    if (arena->curr)
+        arena->curr->used = scope.curr_used;
 
     // NOTE: Free the tail blocks until we reach the scope's tail block
     while (arena->tail != scope.tail) {
@@ -6490,7 +6529,7 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
     commit = DQN_MIN(commit, size);
 
     // NOTE: If the commit amount is the same as the size, the caller has
-    // requested all the memory is committed. We can save one sys-call by asking
+    // requested all the memory is commit. We can save one sys-call by asking
     // the OS to reserve+commit in one call.
     Dqn_VMemCommit commit_on_reserve = size == commit ? Dqn_VMemCommit_Yes : Dqn_VMemCommit_No;
 
@@ -6518,7 +6557,7 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
 
         // NOTE: Setup the block
         result->size      = size_rounded_up_to_64k_boundary - sizeof(*result);
-        result->committed = commit;
+        result->commit = commit;
         result->memory    = DQN_CAST(uint8_t *)result + sizeof(*result);
         result->flags     = flags;
         result->arena     = arena;
@@ -6592,7 +6631,7 @@ DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroM
         Dqn_ArenaBlock *tail = arena->tail;
         arena->tail          = tail->prev;
         if (zero_mem == Dqn_ZeroMem_Yes)
-            DQN_MEMSET(tail->memory, DQN_MEMSET_BYTE, tail->committed);
+            DQN_MEMSET(tail->memory, DQN_MEMSET_BYTE, tail->commit);
         Dqn_VMem_Release(tail, sizeof(*tail) + tail->size);
         Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG tail);
     }
