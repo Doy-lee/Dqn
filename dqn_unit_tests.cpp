@@ -2,19 +2,22 @@
 // NOTE: Preprocessor Config
 // -------------------------------------------------------------------------------------------------
 /*
-#define DQN_TEST_WITH_MAIN Define this to enable the main function and allow standalone compiling
-                           and running of the file.
+#define DQN_TEST_WITH_MAIN   Define this to enable the main function and allow standalone compiling
+                             and running of the file.
+#define DQN_TEST_WITH_KECCAK Define this to enable the main function and allow standalone compiling
+                             and running of the file.
 */
 
 #if defined(DQN_TEST_WITH_MAIN)
     #define DQN_IMPLEMENTATION
     #include "dqn.h"
-
-    #define DQN_KECCAK_IMPLEMENTATION
-    #include "dqn_keccak.h"
 #endif
 
-#include "dqn_tests_helpers.cpp"
+#if defined(DQN_TEST_WITH_KECCAK)
+    #define DQN_KECCAK_IMPLEMENTATION
+    #include "dqn_keccak.h"
+    #include "dqn_tests_helpers.cpp"
+#endif
 
 #define DQN_TESTER_IMPLEMENTATION
 #include "dqn_tester.h"
@@ -145,7 +148,7 @@ Dqn_Tester TestFixedArray()
     DQN_TESTER_GROUP(test, "Dqn_FArray") {
         DQN_TESTER_TEST("Initialise from raw array") {
             int raw_array[] = {1, 2};
-            auto array = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
             DQN_TESTER_ASSERT(&test, array.size == 2);
             DQN_TESTER_ASSERT(&test, array.data[0] == 1);
             DQN_TESTER_ASSERT(&test, array.data[1] == 2);
@@ -153,7 +156,7 @@ Dqn_Tester TestFixedArray()
 
         DQN_TESTER_TEST("Erase stable 1 element from array") {
             int raw_array[] = {1, 2, 3};
-            auto array = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
             Dqn_FArray_EraseStable(&array, 1);
             DQN_TESTER_ASSERT(&test, array.size == 2);
             DQN_TESTER_ASSERT(&test, array.data[0] == 1);
@@ -162,7 +165,7 @@ Dqn_Tester TestFixedArray()
 
         DQN_TESTER_TEST("Erase unstable 1 element from array") {
             int raw_array[] = {1, 2, 3};
-            auto array = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
             DQN_TESTER_ASSERT(&test, Dqn_FArray_EraseUnstable(&array, 0));
             DQN_TESTER_ASSERT(&test, array.size == 2);
             DQN_TESTER_ASSERT(&test, array.data[0] == 3);
@@ -172,7 +175,7 @@ Dqn_Tester TestFixedArray()
         DQN_TESTER_TEST("Add 1 element to array") {
             int const ITEM  = 2;
             int raw_array[] = {1};
-            auto array      = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+            auto array      = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
             Dqn_FArray_Add(&array, ITEM);
             DQN_TESTER_ASSERT(&test, array.size == 2);
             DQN_TESTER_ASSERT(&test, array.data[0] == 1);
@@ -181,7 +184,7 @@ Dqn_Tester TestFixedArray()
 
         DQN_TESTER_TEST("Clear array") {
             int raw_array[] = {1};
-            auto array      = Dqn_FArray_Init<int, 4>(raw_array, (int)Dqn_CArray_Count(raw_array));
+            auto array      = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
             Dqn_FArray_Clear(&array, Dqn_ZeroMem_No);
             DQN_TESTER_ASSERT(&test, array.size == 0);
         }
@@ -735,9 +738,9 @@ Dqn_Tester TestOS()
         DQN_TESTER_TEST("Generate secure RNG 32 bytes") {
             char const ZERO[32] = {};
             char       buf[32]  = {};
-            Dqn_b32 result = Dqn_OS_SecureRNGBytes(buf, Dqn_CArray_CountI(buf));
+            bool result         = Dqn_OS_SecureRNGBytes(buf, DQN_ARRAY_UCOUNT(buf));
             DQN_TESTER_ASSERT(&test, result);
-            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(buf, ZERO, Dqn_CArray_Count(buf)) != 0);
+            DQN_TESTER_ASSERT(&test, DQN_MEMCMP(buf, ZERO, DQN_ARRAY_UCOUNT(buf)) != 0);
         }
 
         DQN_TESTER_TEST("Generate secure RNG 0 bytes") {
@@ -1236,7 +1239,7 @@ Dqn_Tester TestWin()
             wchar_t const EXPECTED[] = {L'S', L't', L'r', L'i', L'n', L'g', 0};
 
             DQN_TESTER_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
-            DQN_TESTER_ASSERTF(&test, size_returned == Dqn_CArray_Count(EXPECTED) - 1, "string_size: %d, expected: %zu", size_returned, Dqn_CArray_Count(EXPECTED) - 1);
+            DQN_TESTER_ASSERTF(&test, size_returned == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", size_returned, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
             DQN_TESTER_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
         }
 
@@ -1253,13 +1256,14 @@ Dqn_Tester TestWin()
             char const EXPECTED[] = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
             DQN_TESTER_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
-            DQN_TESTER_ASSERTF(&test, size_returned == Dqn_CArray_Count(EXPECTED) - 1, "string_size: %d, expected: %zu", size_returned, Dqn_CArray_Count(EXPECTED) - 1);
+            DQN_TESTER_ASSERTF(&test, size_returned == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", size_returned, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
             DQN_TESTER_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
         }
     }
     return test;
 }
 
+#if defined(DQN_TEST_WITH_KECCAK)
 #define DQN_TESTER_HASH_X_MACRO \
     DQN_TESTER_HASH_X_ENTRY(SHA3_224, "SHA3-224") \
     DQN_TESTER_HASH_X_ENTRY(SHA3_256, "SHA3-256") \
@@ -1470,6 +1474,7 @@ Dqn_Tester TestKeccak()
     }
     return test;
 }
+#endif // defined(DQN_TEST_WITH_KECCAK)
 
 void TestRunSuite()
 {
@@ -1483,7 +1488,9 @@ void TestRunSuite()
         TestFixedArray(),
         TestHex(),
         TestIntrinsics(),
+        #if defined(DQN_TEST_WITH_KECCAK)
         TestKeccak(),
+        #endif
         TestM4(),
         TestOS(),
         TestPerfCounter(),

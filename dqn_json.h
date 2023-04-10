@@ -11,83 +11,6 @@ void *Dqn_JSON_ArenaAllocFunc(void *user_data, size_t count);
 char const *Dqn_JSON_TypeEnumCString(json_type_e type, size_t *size);
 bool Dqn_JSON_String8Cmp(json_string_s const *lhs, Dqn_String8 rhs);
 
-#define Dqn_JSON_RecordIgnoredObjElement(element, flags) Dqn_JSON_RecordIgnoredObjElement_(element, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-void    Dqn_JSON_RecordIgnoredObjElement_(json_object_element_s const *element, size_t flags, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define Dqn_JSON_RecordIgnoredArrayElement(element, flags) Dqn_JSON_RecordIgnoredArrayElement_(element, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-void    Dqn_JSON_RecordIgnoredArrayElement_(json_array_element_s const *element, size_t flags, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define Dqn_JSON_RecordIgnoredValue(value, flags) Dqn_JSON_RecordIgnoredValue_(value, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-void    Dqn_JSON_RecordIgnoredValue_(json_value_s const *value, size_t flags, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-// NOTE: Dqn_JSON_ValueCheck
-// -----------------------------------------------------------------------------
-#define        Dqn_JSON_ValueCheck(val, type, flags, require) Dqn_JSON_ValueCheck(val, type, flags, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_value_s  *Dqn_JSON_ValueCheck_(json_value_s *val, json_type_e type, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ValueCheckObj(val, flags, require) Dqn_JSON_ValueCheckObj_(val, flags, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_object_s *Dqn_JSON_ValueCheckObj_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ValueCheckArray(val, flags, require) Dqn_JSON_ValueCheckArray_(val, flags, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_array_s  *Dqn_JSON_ValueCheckArray_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ValueCheckString(val, flags, require) Dqn_JSON_ValueCheckString_(val, flags, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_string_s *Dqn_JSON_ValueCheckString_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ValueCheckNumber(val, flags, require) Dqn_JSON_ValueCheckNumber_(val, flags, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_number_s *Dqn_JSON_ValueCheckNumber_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define       Dqn_JSON_ValueCheckBool(val, flags, require) Dqn_JSON_ValueCheckBool_(val, flags, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_value_s *Dqn_JSON_ValueCheckBool_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-
-// NOTE: Dqn_JSON_ValueRequire
-// -----------------------------------------------------------------------------
-#define Dqn_JSON_ValueRequire(val, type, flags) Dqn_JSON_ValueCheck(val, type,    flags, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ValueRequireObj(val, flags) Dqn_JSON_ValueCheckObj_(val,       flags, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ValueRequireArray(val, flags) Dqn_JSON_ValueCheckArray_(val,   flags, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ValueRequireString(val, flags) Dqn_JSON_ValueCheckString_(val, flags, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ValueRequireNumber(val, flags) Dqn_JSON_ValueCheckNumber_(val, flags, true /*require*/ DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ValueRequireBool(val, flags) Dqn_JSON_ValueCheckBool_(val,     flags, true /*require*/ DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-
-// NOTE: Dqn_JSON_ObjElementCheck
-// -----------------------------------------------------------------------------
-#define        Dqn_JSON_ObjElementCheckNamed(element, type, key, flags) Dqn_JSON_ObjElementCheckNamed_(element, type, key, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_value_s  *Dqn_JSON_ObjElementCheckNamed_(json_object_element_s *element, json_type_e type, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ObjElementCheckNamedObj(element, key, flags) Dqn_JSON_ObjElementCheckNamedObj_(element, key, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_object_s *Dqn_JSON_ObjElementCheckNamedObj_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ObjElementCheckNamedArray(element, key, flags) Dqn_JSON_ObjElementCheckNamedArray_(element, key, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_array_s  *Dqn_JSON_ObjElementCheckNamedArray_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ObjElementCheckNamedString(element, key, flags) Dqn_JSON_ObjElementCheckNamedString_(element, key, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_string_s *Dqn_JSON_ObjElementCheckNamedString_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ObjElementCheckNamedNumber(element, key, flags) Dqn_JSON_ObjElementCheckNamedNumber_(element, key, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_number_s *Dqn_JSON_ObjElementCheckNamedNumber_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_ObjElementCheckNamedBool(element, key, flags) Dqn_JSON_ObjElementCheckNamedBool_(element, key, flags, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_value_s  *Dqn_JSON_ObjElementCheckNamedBool_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-// NOTE: Dqn_JSON_ObjElementIs
-// -----------------------------------------------------------------------------
-#define Dqn_JSON_ObjElementIsNamed(element, type, key) Dqn_JSON_ObjElementCheckNamed_(element, type,  key, 0 /*flags*/, false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementIsNamedObj(element, key)    Dqn_JSON_ObjElementCheckNamedObj_(element,    key, 0 /*flags*/, false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementIsNamedArray(element, key)  Dqn_JSON_ObjElementCheckNamedArray_(element,  key, 0 /*flags*/, false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementIsNamedString(element, key) Dqn_JSON_ObjElementCheckNamedString_(element, key, 0 /*flags*/, false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementIsNamedNumber(element, key) Dqn_JSON_ObjElementCheckNamedNumber_(element, key, 0 /*flags*/, false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementIsNamedBool(element, key)   Dqn_JSON_ObjElementCheckNamedBool_(element,   key, 0 /*flags*/, false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-
-// NOTE: Dqn_JSON_ObjElementRequire
-// -----------------------------------------------------------------------------
-#define Dqn_JSON_ObjElementRequireNamed(element, type, key)  Dqn_JSON_ObjElementCheckNamed_(element, type,  key, 0 /*flags*/, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementRequireNamedObj(element, key)    Dqn_JSON_ObjElementCheckNamedObj_(element,    key, 0 /*flags*/, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementRequireNamedArray(element, key)  Dqn_JSON_ObjElementCheckNamedArray_(element,  key, 0 /*flags*/, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementRequireNamedString(element, key) Dqn_JSON_ObjElementCheckNamedString_(element, key, 0 /*flags*/, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementRequireNamedNumber(element, key) Dqn_JSON_ObjElementCheckNamedNumber_(element, key, 0 /*flags*/, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_ObjElementRequireNamedBool(element, key)   Dqn_JSON_ObjElementCheckNamedBool_(element,   key, 0 /*flags*/, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-
 // NOTE: Dqn_JSON_Iterator
 // -----------------------------------------------------------------------------
 enum Dqn_JSONIteratorEntryType
@@ -115,91 +38,63 @@ struct Dqn_JSONIterator
 
 // NOTE: Dqn_JSON_IteratorPush/Pop
 // -----------------------------------------------------------------------------
-bool Dqn_JSON_IteratorPushObjElement(Dqn_JSONIterator *state, json_object_element_s *element);
-bool Dqn_JSON_IteratorPushObj(Dqn_JSONIterator *state, json_object_s *obj);
-bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *state, json_array_element_s *element);
-bool Dqn_JSON_IteratorPushArray(Dqn_JSONIterator *state, json_array_s *array);
-void Dqn_JSON_IteratorPop(Dqn_JSONIterator *state);
+bool Dqn_JSON_IteratorPushObjElement(Dqn_JSONIterator *it, json_object_element_s *element);
+bool Dqn_JSON_IteratorPushObj(Dqn_JSONIterator *it, json_object_s *obj);
+bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *it, json_array_element_s *element);
+bool Dqn_JSON_IteratorPushArray(Dqn_JSONIterator *it, json_array_s *array);
+bool Dqn_JSON_IteratorPushValue(Dqn_JSONIterator *it, json_value_s *value);
+void Dqn_JSON_IteratorPop(Dqn_JSONIterator *it);
 
 // NOTE: Dqn_JSON_Iterator tree navigation
 // -----------------------------------------------------------------------------
-json_value_s *Dqn_JSON_IteratorPushKey(Dqn_JSONIterator *state);
-bool Dqn_JSON_IteratorNextField(Dqn_JSONIterator *state);
+json_value_s *Dqn_JSON_IteratorPushCurrValue(Dqn_JSONIterator *it);
+bool Dqn_JSON_IteratorNext(Dqn_JSONIterator *it);
 
-#define Dqn_JSON_IteratorErrorUnrecognisedKey(state) Dqn_JSON_IteratorErrorUnrecognisedKey_(state, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-void Dqn_JSON_IteratorErrorUnrecognisedKey_(Dqn_JSONIterator *state, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
+#define Dqn_JSON_IteratorErrorUnrecognisedKey(it) Dqn_JSON_IteratorErrorUnrecognisedKey_(it, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
+void Dqn_JSON_IteratorErrorUnrecognisedKey_(Dqn_JSONIterator *it, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
 
-#define Dqn_JSON_IteratorPushKeyIterateThenPop(state) \
-    for(void *DQN_UNIQUE_NAME(ptr) = Dqn_JSON_IteratorPushKey(state); DQN_UNIQUE_NAME(ptr); Dqn_JSON_IteratorPop(state), DQN_UNIQUE_NAME(ptr) = nullptr) \
-        while (Dqn_JSON_IteratorNextField(state))
+#define Dqn_JSON_IteratorPushCurrValueIterateThenPop(it) \
+    for(void *DQN_UNIQUE_NAME(ptr) = Dqn_JSON_IteratorPushCurrValue(it); DQN_UNIQUE_NAME(ptr); Dqn_JSON_IteratorPop(it), DQN_UNIQUE_NAME(ptr) = nullptr) \
+        while (Dqn_JSON_IteratorNext(it))
 
 // NOTE: Dqn_JSON_IteratorCurr
 // -----------------------------------------------------------------------------
-Dqn_JSONIteratorEntry *Dqn_JSON_IteratorCurr(Dqn_JSONIterator *state);
-json_value_s          *Dqn_JSON_IteratorCurrValue(Dqn_JSONIterator *state);
-json_object_element_s *Dqn_JSON_IteratorCurrObjElement(Dqn_JSONIterator *state);
+Dqn_JSONIteratorEntry *Dqn_JSON_IteratorCurr(Dqn_JSONIterator *it);
+json_value_s          *Dqn_JSON_IteratorCurrValue(Dqn_JSONIterator *it);
+json_object_element_s *Dqn_JSON_IteratorCurrObjElement(Dqn_JSONIterator *it);
 
-// NOTE: Dqn_JSON_IteratorKeyCheck
+// NOTE: Dqn_JSON_IteratorValueIs
 // -----------------------------------------------------------------------------
+json_value_s  *Dqn_JSON_IteratorValueIs(Dqn_JSONIterator *it, json_type_e type);
+json_object_s *Dqn_JSON_IteratorValueIsObj(Dqn_JSONIterator *it);
+json_array_s  *Dqn_JSON_IteratorValueIsArray(Dqn_JSONIterator *it);
+json_string_s *Dqn_JSON_IteratorValueIsString(Dqn_JSONIterator *it);
+json_number_s *Dqn_JSON_IteratorValueIsNumber(Dqn_JSONIterator *it);
+json_value_s  *Dqn_JSON_IteratorValueIsBool(Dqn_JSONIterator *it);
 
-#define        Dqn_JSON_IteratorKeyCheck(state, type, require) Dqn_JSON_IteratorKeyCheck(state, type, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_value_s  *Dqn_JSON_IteratorKeyCheck_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
+size_t Dqn_JSON_IteratorValueArraySize(Dqn_JSONIterator *it);
 
-#define        Dqn_JSON_IteratorKeyCheckObj(state, require) Dqn_JSON_IteratorKeyCheckObj_(state, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_object_s *Dqn_JSON_IteratorKeyCheckObj_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_IteratorKeyCheckArray(state, require) Dqn_JSON_IteratorKeyCheckArray_(state, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_array_s  *Dqn_JSON_IteratorKeyCheckArray_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_IteratorKeyCheckString(state, require) Dqn_JSON_IteratorKeyCheckString_(state, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_string_s *Dqn_JSON_IteratorKeyCheckString_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_IteratorKeyCheckNumber(state, require) Dqn_JSON_IteratorKeyCheckNumber_(state, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_number_s *Dqn_JSON_IteratorKeyCheckNumber_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_IteratorKeyCheckBool(state, require) Dqn_JSON_IteratorKeyCheckBool_(state, require, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_value_s  *Dqn_JSON_IteratorKeyCheckBool_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-// NOTE: Dqn_JSON_Iterator_KeyIs
+// NOTE: Dqn_JSON_IteratorKeyValueIs
 // -----------------------------------------------------------------------------
-#define Dqn_JSON_IteratorKeyIs(state, type) Dqn_JSON_IteratorKeyCheck(state, type,    false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyIsObj(state) Dqn_JSON_IteratorKeyCheckObj_(state,       false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyIsArray(state) Dqn_JSON_IteratorKeyCheckArray_(state,   false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyIsString(state) Dqn_JSON_IteratorKeyCheckString_(state, false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyIsNumber(state) Dqn_JSON_IteratorKeyCheckNumber_(state, false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyIsBool(state) Dqn_JSON_IteratorKeyCheckBool_(state,     false /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
+Dqn_String8    Dqn_JSON_IteratorKey(Dqn_JSONIterator *it);
+bool           Dqn_JSON_IteratorKeyIs(Dqn_JSONIterator *it, Dqn_String8 key);
+json_object_s *Dqn_JSON_IteratorKeyValueIsObj(Dqn_JSONIterator *it, Dqn_String8 key);
+json_array_s  *Dqn_JSON_IteratorKeyValueIsArray(Dqn_JSONIterator *it, Dqn_String8 key);
+json_string_s *Dqn_JSON_IteratorKeyValueIsString(Dqn_JSONIterator *it, Dqn_String8 key);
+json_number_s *Dqn_JSON_IteratorKeyValueIsNumber(Dqn_JSONIterator *it, Dqn_String8 key);
+json_value_s  *Dqn_JSON_IteratorKeyValueIsBool(Dqn_JSONIterator *it, Dqn_String8 key);
 
-// NOTE: Dqn_JSON_Iterator_KeyRequire
+// NOTE: Dqn_JSON_IteratorValueTo
 // -----------------------------------------------------------------------------
-#define Dqn_JSON_IteratorKeyRequire(state, type, require) Dqn_JSON_IteratorKeyCheck(state, type,  true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyRequireObj(state, require) Dqn_JSON_IteratorKeyCheckObj_(state,       true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyRequireArray(state, require) Dqn_JSON_IteratorKeyCheckArray_(state,   true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyRequireString(state, require) Dqn_JSON_IteratorKeyCheckString_(state, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyRequireNumber(state, require) Dqn_JSON_IteratorKeyCheckNumber_(state, true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-#define Dqn_JSON_IteratorKeyRequireBool(state, require) Dqn_JSON_IteratorKeyCheckBool_(state,     true /*require*/, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
+Dqn_String8 Dqn_JSON_IteratorValueToString(Dqn_JSONIterator *it);
+int64_t     Dqn_JSON_IteratorValueToI64(Dqn_JSONIterator *it);
+uint64_t    Dqn_JSON_IteratorValueToU64(Dqn_JSONIterator *it);
+bool        Dqn_JSON_IteratorValueToBool(Dqn_JSONIterator *it);
 
-// NOTE: Dqn_JSON_IteratorKeyIsNamed
-// -----------------------------------------------------------------------------
-#define        Dqn_JSON_IteratorKeyIsNamedObj(state, key) Dqn_JSON_IteratorKeyIsNamedObj_(state, key, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_object_s *Dqn_JSON_IteratorKeyIsNamedObj_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
+#define Dqn_JSON_IteratorErrorUnknownKeyValue(it) \
+    Dqn_JSON_IteratorErrorUnknownKeyValue_(it, DQN_CALL_SITE)
 
-#define        Dqn_JSON_IteratorKeyIsNamedArray(state, key) Dqn_JSON_IteratorKeyIsNamedArray_(state, key, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_array_s  *Dqn_JSON_IteratorKeyIsNamedArray_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_IteratorKeyIsNamedString(state, key) Dqn_JSON_IteratorKeyIsNamedString_(state, key, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_string_s *Dqn_JSON_IteratorKeyIsNamedString_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_IteratorKeyIsNamedNumber(state, key) Dqn_JSON_IteratorKeyIsNamedNumber_(state, key, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_number_s *Dqn_JSON_IteratorKeyIsNamedNumber_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-#define        Dqn_JSON_IteratorKeyIsNamedBool(state, key) Dqn_JSON_IteratorKeyIsNamedBool_(state, key, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-json_value_s  *Dqn_JSON_IteratorKeyIsNamedBool_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
-
-// NOTE: Dqn_JSON_IteratorKeyTo
-// -----------------------------------------------------------------------------
-Dqn_String8 Dqn_JSON_IteratorKeyToString(Dqn_JSONIterator *state);
-int64_t     Dqn_JSON_IteratorKeyToI64(Dqn_JSONIterator *state);
-bool        Dqn_JSON_IteratorKeyToBool(Dqn_JSONIterator *state);
+void Dqn_JSON_IteratorErrorUnknownKeyValue_(Dqn_JSONIterator *it, Dqn_String8 file, Dqn_String8 func, int line);
 
 #endif // DQN_JSON_H
 
@@ -242,323 +137,74 @@ bool Dqn_JSON_String8Cmp(json_string_s const *lhs, Dqn_String8 key)
     return result;
 }
 
-void Dqn_JSON_RecordIgnoredObjElement_(json_object_element_s const *element, size_t flags, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_string_s const *key = element->name;
-    size_t value_type_size = 0;
-    char const *value_type = Dqn_JSON_TypeEnumCString(DQN_CAST(json_type_e)element->value->type, &value_type_size);
-    if (flags == json_parse_flags_allow_location_information) {
-        auto const *info = DQN_CAST(json_string_ex_s const *)key;
-        Dqn_Log(Dqn_LogType::Warning,
-                nullptr,
-                file,
-                func,
-                line,
-                "Ignored key-value pair in object [line=%zu, col=%zu, key=%.*s, type=%.*s]",
-                info->line_no,
-                info->row_no,
-                key->string_size,
-                key->string,
-                value_type_size,
-                value_type);
-    } else {
-        Dqn_Log(Dqn_LogType::Warning,
-                nullptr,
-                file,
-                func,
-                line,
-                "Ignored key-value pair in object [key=%.*s, type=%.*s]",
-                key->string_size,
-                key->string,
-                value_type_size,
-                value_type);
-    }
-}
-
-void Dqn_JSON_RecordIgnoredArrayElement_(json_array_element_s const *element, size_t flags, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_value_s const *value = element->value;
-    size_t              size  = 0;
-    char const         *type  = Dqn_JSON_TypeEnumCString((json_type_e)value->type, &size);
-    if (flags == json_parse_flags_allow_location_information) {
-        size_t line_no = 0;
-        size_t row_no = 0;
-        if (value->type == json_type_string) {
-            auto *info = DQN_CAST(json_string_ex_s const *) value;
-            line_no    = info->line_no;
-            row_no     = info->row_no;
-        } else {
-            auto *info = DQN_CAST(json_value_ex_s const *) value;
-            line_no    = info->line_no;
-            row_no     = info->row_no;
-        }
-
-        Dqn_Log(Dqn_LogType::Warning,
-                nullptr,
-                file,
-                func,
-                line,
-                "Ignored value in array [line=%zu, col=%zu, value_type=%.*s]",
-                line_no,
-                row_no,
-                size,
-                type);
-    } else {
-        Dqn_Log(Dqn_LogType::Warning,
-                nullptr,
-                file,
-                func,
-                line,
-                "Ignored value in array [value_type=%.*s]",
-                size,
-                type);
-    }
-}
-
-void Dqn_JSON_RecordIgnoredValue_(json_value_s const *value, size_t flags, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    size_t              size  = 0;
-    char const         *type  = Dqn_JSON_TypeEnumCString((json_type_e)value->type, &size);
-    if (flags == json_parse_flags_allow_location_information) {
-        size_t line_no = 0;
-        size_t row_no = 0;
-        if (value->type == json_type_string) {
-            auto *info = DQN_CAST(json_string_ex_s const *) value;
-            line_no    = info->line_no;
-            row_no     = info->row_no;
-        } else {
-            auto *info = DQN_CAST(json_value_ex_s const *) value;
-            line_no    = info->line_no;
-            row_no     = info->row_no;
-        }
-
-        Dqn_Log(Dqn_LogType::Warning,
-                nullptr,
-                file,
-                func,
-                line,
-                "Ignored value in json [line=%zu, col=%zu, value_type=%.*s]",
-                line_no,
-                row_no,
-                size,
-                type);
-    } else {
-        Dqn_Log(Dqn_LogType::Warning,
-                nullptr,
-                file,
-                func,
-                line,
-                "Ignored value in json [value_type=%.*s]",
-                size,
-                type);
-    }
-}
-
-// NOTE: Dqn_JSON_ValueCheck
-// -----------------------------------------------------------------------------
-json_value_s *Dqn_JSON_ValueCheck_(json_value_s *val, json_type_e type, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_value_s *result = (val && val->type == type) ? val : nullptr;
-    if (!result && require) {
-        size_t      expect_size = 0;
-        char const *expect_type = Dqn_JSON_TypeEnumCString(type, &expect_size);
-        size_t      val_size    = 0;
-        char const *val_type    = Dqn_JSON_TypeEnumCString((json_type_e)val->type, &val_size);
-        if (flags == json_parse_flags_allow_location_information) {
-            auto const *info = DQN_CAST(json_value_ex_s const *) val;
-            Dqn_Log(Dqn_LogType::Error,
-                    nullptr /*user_data*/,
-                    file,
-                    func,
-                    line,
-                    "Expected json '%.*s' [line=%zu, col=%zu, value_type=%.*s]",
-                    expect_size,
-                    expect_type,
-                    info->line_no,
-                    info->row_no,
-                    val_size,
-                    val_type);
-        } else {
-            Dqn_Log(Dqn_LogType::Error,
-                    nullptr /*userdata*/,
-                    file,
-                    func,
-                    line,
-                    "Expected json '%.*s' [value_type=%.*s]",
-                    expect_size,
-                    expect_type,
-                    val_size,
-                    val_type);
-        }
-    }
-
-    return result;
-}
-
-json_object_s *Dqn_JSON_ValueCheckObj_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_object_s *result = nullptr;
-    if (Dqn_JSON_ValueCheck_(val, json_type_object, flags, require, file, func, line))
-        result = json_value_as_object(val);
-    return result;
-}
-
-json_array_s *Dqn_JSON_ValueCheckArray_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_array_s *result = nullptr;
-    if (Dqn_JSON_ValueCheck_(val, json_type_array, flags, require, file, func, line))
-        result = json_value_as_array(val);
-    return result;
-}
-
-json_string_s *Dqn_JSON_ValueCheckString_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_string_s *result = nullptr;
-    if (Dqn_JSON_ValueCheck_(val, json_type_string, flags, require, file, func, line))
-        result = json_value_as_string(val);
-    return result;
-}
-
-json_number_s *Dqn_JSON_ValueCheckNumber_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_number_s *result = nullptr;
-    if (Dqn_JSON_ValueCheck_(val, json_type_number, flags, require, file, func, line))
-        result = json_value_as_number(val);
-    return result;
-}
-
-json_value_s *Dqn_JSON_ValueCheckBool_(json_value_s *val, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_value_s *result = nullptr;
-    if (val->type == json_type_true || val->type == json_type_false) {
-        result = val;
-    } else {
-        if (require) {
-            size_t      val_size = 0;
-            char const *val_type = Dqn_JSON_TypeEnumCString((json_type_e)val->type, &val_size);
-            if (flags == json_parse_flags_allow_location_information) {
-                auto const *info = DQN_CAST(json_value_ex_s const *) val;
-                Dqn_Log(Dqn_LogType::Error,
-                        nullptr /*userdata*/,
-                        file,
-                        func,
-                        line,
-                        "Expected json bool [line=%zu, col=%zu, value_type=%.*s]",
-                        info->line_no,
-                        info->row_no,
-                        val_size,
-                        val_type);
-            } else {
-                Dqn_Log(Dqn_LogType::Error,
-                        nullptr /*userdata*/,
-                        file,
-                        func,
-                        line,
-                        "Expected json bool [value_type=%.*s]",
-                        val_size,
-                        val_type);
-            }
-        }
-    }
-
-    return result;
-}
-
-// NOTE: Dqn_JSON_ObjElementCheck
-// -----------------------------------------------------------------------------
-json_value_s *Dqn_JSON_ObjElementCheckNamed_(json_object_element_s *element, json_type_e type, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_value_s *result = nullptr;
-    if (element && Dqn_JSON_String8Cmp(element->name, key))
-        result = Dqn_JSON_ValueCheck_(element->value, type, flags, require, file, func, line);
-    return result;
-}
-
-json_object_s *Dqn_JSON_ObjElementCheckNamedObj_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_object_s *result = DQN_CAST(json_object_s *)Dqn_JSON_ObjElementCheckNamed_(element, json_type_object, key, flags, require, file, func, line);
-    return result;
-}
-
-json_array_s *Dqn_JSON_ObjElementCheckNamedArray_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_array_s *result = DQN_CAST(json_array_s *)Dqn_JSON_ObjElementCheckNamed_(element, json_type_array, key, flags, require, file, func, line);
-    return result;
-}
-
-json_string_s *Dqn_JSON_ObjElementCheckNamedString_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_string_s *result = DQN_CAST(json_string_s *)Dqn_JSON_ObjElementCheckNamed_(element, json_type_string, key, flags, require, file, func, line);
-    return result;
-}
-
-json_number_s *Dqn_JSON_ObjElementCheckNamedNumber_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_number_s *result = DQN_CAST(json_number_s *)Dqn_JSON_ObjElementCheckNamed_(element, json_type_number, key, flags, require, file, func, line);
-    return result;
-}
-
-json_value_s *Dqn_JSON_ObjElementCheckNamedBool_(json_object_element_s *element, Dqn_String8 key, size_t flags, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    json_value_s *result = nullptr;
-    if (element && Dqn_JSON_String8Cmp(element->name, key))
-        result = Dqn_JSON_ValueCheckBool_(element->value, flags, require, file, func, line);
-    return result;
-}
-
 // NOTE: Dqn_JSON_Iterator_push/pop
 // -----------------------------------------------------------------------------
-bool Dqn_JSON_IteratorPushObjElement(Dqn_JSONIterator *state, json_object_element_s *element)
+bool Dqn_JSON_IteratorPushObjElement(Dqn_JSONIterator *it, json_object_element_s *element)
 {
-    if (!state || !element)
+    if (!it || !element)
         return false;
-    DQN_ASSERT(state->stack_count < DQN_ARRAY_ICOUNT(state->stack));
-    state->stack[state->stack_count++] = {Dqn_JSON_IteratorEntryTypeObjElement, element};
+    DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
+    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeObjElement, element};
     return true;
 }
 
-bool Dqn_JSON_IteratorPushObj(Dqn_JSONIterator *state, json_object_s *obj)
+bool Dqn_JSON_IteratorPushObj(Dqn_JSONIterator *it, json_object_s *obj)
 {
-    if (!state || !obj)
+    if (!it || !obj)
         return false;
-    DQN_ASSERT(state->stack_count < DQN_ARRAY_ICOUNT(state->stack));
-    state->stack[state->stack_count++] = {Dqn_JSON_IteratorEntryTypeObj, obj};
+    DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
+    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeObj, obj};
     return true;
 }
 
-bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *state, json_array_element_s *element)
+bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *it, json_array_element_s *element)
 {
-    if (!state || !element)
+    if (!it || !element)
         return false;
-    DQN_ASSERT(state->stack_count < DQN_ARRAY_ICOUNT(state->stack));
-    state->stack[state->stack_count++] = {Dqn_JSON_IteratorEntryTypeArrayElement, element};
+    DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
+    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeArrayElement, element};
     return true;
 }
 
-bool Dqn_JSON_IteratorPushArray(Dqn_JSONIterator *state, json_array_s *array)
+bool Dqn_JSON_IteratorPushArray(Dqn_JSONIterator *it, json_array_s *array)
 {
-    if (!state || !array)
+    if (!it || !array)
         return false;
-    DQN_ASSERT(state->stack_count < DQN_ARRAY_ICOUNT(state->stack));
-    state->stack[state->stack_count++] = {Dqn_JSON_IteratorEntryTypeArray, array};
+    DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
+    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeArray, array};
     return true;
 }
 
-void Dqn_JSON_IteratorPop(Dqn_JSONIterator *state)
+bool Dqn_JSON_IteratorPushValue(Dqn_JSONIterator *it, json_value_s *value)
 {
-    if (!state)
+    bool result = false;
+    if (!it || !value)
+        return result;
+
+    if (value->type == json_type_object) {
+        result = Dqn_JSON_IteratorPushObj(it, json_value_as_object(value));
+    } else if (value->type == json_type_array) {
+        result = Dqn_JSON_IteratorPushArray(it, json_value_as_array(value));
+    }
+
+    return result;
+}
+
+void Dqn_JSON_IteratorPop(Dqn_JSONIterator *it)
+{
+    if (!it)
         return;
-    DQN_ASSERT(state->stack_count > 0);
-    if (state->stack_count > 0)
-        state->stack_count--;
+    DQN_ASSERT(it->stack_count > 0);
+    if (it->stack_count > 0)
+        it->stack_count--;
 }
 
 // NOTE: Dqn_JSON_Iterator json tree navigation
 // -----------------------------------------------------------------------------
-json_value_s *Dqn_JSON_IteratorPushKey(Dqn_JSONIterator *state)
+json_value_s *Dqn_JSON_IteratorPushCurrValue(Dqn_JSONIterator *it)
 {
     json_value_s          *result = nullptr;
-    Dqn_JSONIteratorEntry *curr   = Dqn_JSON_IteratorCurr(state);
+    Dqn_JSONIteratorEntry *curr   = Dqn_JSON_IteratorCurr(it);
     if (!curr)
         return result;
 
@@ -575,19 +221,22 @@ json_value_s *Dqn_JSON_IteratorPushKey(Dqn_JSONIterator *state)
     if (result->type == json_type_array) {
         json_array_s *array = json_value_as_array(result);
         DQN_ASSERT(array);
-        Dqn_JSON_IteratorPushArray(state, array);
+        Dqn_JSON_IteratorPushArray(it, array);
     } else if (result->type == json_type_object) {
         json_object_s *obj = json_value_as_object(result);
         DQN_ASSERT(obj);
-        Dqn_JSON_IteratorPushObj(state, obj);
+        Dqn_JSON_IteratorPushObj(it, obj);
     }
 
     return result;
 }
 
-bool Dqn_JSON_IteratorNextField(Dqn_JSONIterator *state)
+bool Dqn_JSON_IteratorNext(Dqn_JSONIterator *it)
 {
-    Dqn_JSONIteratorEntry *curr          = Dqn_JSON_IteratorCurr(state);
+    Dqn_JSONIteratorEntry *curr = Dqn_JSON_IteratorCurr(it);
+    if (!curr)
+        return false;
+
     json_object_element_s *obj_element   = nullptr;
     json_array_element_s  *array_element = nullptr;
     if (curr->type == Dqn_JSON_IteratorEntryTypeObj) {
@@ -596,61 +245,43 @@ bool Dqn_JSON_IteratorNextField(Dqn_JSONIterator *state)
     } else if (curr->type == Dqn_JSON_IteratorEntryTypeObjElement) {
         auto *element = DQN_CAST(json_object_element_s *) curr->value;
         obj_element   = element->next;
-        Dqn_JSON_IteratorPop(state);
+        Dqn_JSON_IteratorPop(it);
     } else if (curr->type == Dqn_JSON_IteratorEntryTypeArray) {
         auto *array   = DQN_CAST(json_array_s *) curr->value;
         array_element = array->start;
     } else if (curr->type == Dqn_JSON_IteratorEntryTypeArrayElement) {
         auto *element = DQN_CAST(json_array_element_s *) curr->value;
         array_element = element->next;
-        Dqn_JSON_IteratorPop(state);
+        Dqn_JSON_IteratorPop(it);
     } else {
-        Dqn_JSON_IteratorPop(state);
+        Dqn_JSON_IteratorPop(it);
     }
 
     if (obj_element)
-        Dqn_JSON_IteratorPushObjElement(state, obj_element);
+        Dqn_JSON_IteratorPushObjElement(it, obj_element);
     else if (array_element)
-        Dqn_JSON_IteratorPushArrayElement(state, array_element);
+        Dqn_JSON_IteratorPushArrayElement(it, array_element);
 
     bool result = obj_element || array_element;
     return result;
 }
 
-void Dqn_JSON_IteratorErrorUnrecognisedKey_(Dqn_JSONIterator *state, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
-{
-    Dqn_JSONIteratorEntry *curr = Dqn_JSON_IteratorCurr(state);
-    if (!curr)
-        return;
-
-    if (curr->type == Dqn_JSON_IteratorEntryTypeObjElement) {
-        json_object_element_s *element = DQN_CAST(json_object_element_s *) curr->value;
-        Dqn_JSON_RecordIgnoredObjElement_(element, state->flags, file, func, line);
-    } else if (curr->type == Dqn_JSON_IteratorEntryTypeArrayElement) {
-        json_array_element_s *element = DQN_CAST(json_array_element_s *) curr->value;
-        Dqn_JSON_RecordIgnoredArrayElement_(element, state->flags, file, func, line);
-    } else {
-        json_value_s *value = DQN_CAST(json_value_s *) curr->value;
-        Dqn_JSON_RecordIgnoredValue_(value, state->flags, file, func, line);
-    }
-}
-
 // NOTE: Dqn_JSON_IteratorCurr
 // -----------------------------------------------------------------------------
-Dqn_JSONIteratorEntry *Dqn_JSON_IteratorCurr(Dqn_JSONIterator *state)
+Dqn_JSONIteratorEntry *Dqn_JSON_IteratorCurr(Dqn_JSONIterator *it)
 {
     Dqn_JSONIteratorEntry *result = nullptr;
-    if (!state || state->stack_count <= 0)
+    if (!it || it->stack_count <= 0)
         return result;
 
-    result = &state->stack[state->stack_count - 1];
+    result = &it->stack[it->stack_count - 1];
     return result;
 }
 
-json_value_s *Dqn_JSON_IteratorCurrValue(Dqn_JSONIterator *state)
+json_value_s *Dqn_JSON_IteratorCurrValue(Dqn_JSONIterator *it)
 {
     json_value_s *result = nullptr;
-    Dqn_JSONIteratorEntry *curr = Dqn_JSON_IteratorCurr(state);
+    Dqn_JSONIteratorEntry *curr = Dqn_JSON_IteratorCurr(it);
     if (!curr)
         return result;
 
@@ -671,120 +302,200 @@ json_value_s *Dqn_JSON_IteratorCurrValue(Dqn_JSONIterator *state)
     return result;
 }
 
-json_object_element_s *Dqn_JSON_IteratorCurrObjElement(Dqn_JSONIterator *state)
+json_object_element_s *Dqn_JSON_IteratorCurrObjElement(Dqn_JSONIterator *it)
 {
-    Dqn_JSONIteratorEntry *curr   = Dqn_JSON_IteratorCurr(state);
-    auto           *result = (curr && curr->type == Dqn_JSON_IteratorEntryTypeObjElement)
-                                 ? DQN_CAST(json_object_element_s *) curr->value
-                                 : nullptr;
+    Dqn_JSONIteratorEntry *curr   = Dqn_JSON_IteratorCurr(it);
+    auto                  *result = (curr && curr->type == Dqn_JSON_IteratorEntryTypeObjElement)
+                                        ? DQN_CAST(json_object_element_s *) curr->value
+                                        : nullptr;
     return result;
 }
 
-// NOTE: Dqn_JSON_IteratorKeyCheck
+// NOTE: Dqn_JSON_IteratorValueIs
 // -----------------------------------------------------------------------------
-json_value_s *Dqn_JSON_IteratorKeyCheck_(Dqn_JSONIterator *state, json_type_e type, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_value_s *Dqn_JSON_IteratorValueIs(Dqn_JSONIterator *it, json_type_e type)
 {
-    json_value_s  *curr  = Dqn_JSON_IteratorCurrValue(state);
-    json_value_s *result = Dqn_JSON_ValueCheck_(curr, type, state->flags, require, file, func, line);
+    json_value_s  *curr  = Dqn_JSON_IteratorCurrValue(it);
+    json_value_s *result = (curr && type == curr->type) ? curr : nullptr;
     return result;
 }
 
-json_object_s *Dqn_JSON_IteratorKeyCheckObj_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_object_s *Dqn_JSON_IteratorValueIsObj(Dqn_JSONIterator *it)
 {
-    json_value_s  *curr   = Dqn_JSON_IteratorCurrValue(state);
-    json_object_s *result = Dqn_JSON_ValueCheckObj_(curr, state->flags, require, file, func, line);
+    json_value_s *curr    = Dqn_JSON_IteratorCurrValue(it);
+    json_object_s *result = curr ? json_value_as_object(curr) : nullptr;
     return result;
 }
 
-json_array_s *Dqn_JSON_IteratorKeyCheckArray_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_array_s *Dqn_JSON_IteratorValueIsArray(Dqn_JSONIterator *it)
 {
-    json_value_s *curr   = Dqn_JSON_IteratorCurrValue(state);
-    json_array_s *result = Dqn_JSON_ValueCheckArray_(curr, state->flags, require, file, func, line);
+    json_value_s *curr   = Dqn_JSON_IteratorCurrValue(it);
+    json_array_s *result = curr ? json_value_as_array(curr) : nullptr;
     return result;
 }
 
-json_string_s *Dqn_JSON_IteratorKeyCheckString_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_string_s *Dqn_JSON_IteratorValueIsString(Dqn_JSONIterator *it)
 {
-    json_value_s  *curr   = Dqn_JSON_IteratorCurrValue(state);
-    json_string_s *result = Dqn_JSON_ValueCheckString_(curr, state->flags, require, file, func, line);
+    json_value_s *curr    = Dqn_JSON_IteratorCurrValue(it);
+    json_string_s *result = curr ? json_value_as_string(curr) : nullptr;
     return result;
 }
 
-json_number_s *Dqn_JSON_IteratorKeyCheckNumber_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_number_s *Dqn_JSON_IteratorValueIsNumber(Dqn_JSONIterator *it)
 {
-    json_value_s  *curr   = Dqn_JSON_IteratorCurrValue(state);
-    json_number_s *result = Dqn_JSON_ValueCheckNumber_(curr, state->flags, require, file, func, line);
+    json_value_s *curr    = Dqn_JSON_IteratorCurrValue(it);
+    json_number_s *result = curr ? json_value_as_number(curr) : nullptr;
     return result;
 }
 
-json_value_s *Dqn_JSON_IteratorKeyCheckBool_(Dqn_JSONIterator *state, bool require, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_value_s *Dqn_JSON_IteratorValueIsBool(Dqn_JSONIterator *it)
 {
-    json_value_s *curr   = Dqn_JSON_IteratorCurrValue(state);
-    json_value_s *result = Dqn_JSON_ValueCheckBool_(curr, state->flags, require, file, func, line);
+    json_value_s *curr   = Dqn_JSON_IteratorCurrValue(it);
+    json_value_s *result = (curr && (curr->type == json_type_true || curr->type == json_type_false)) ? curr : nullptr;
     return result;
 }
 
-// NOTE: Dqn_JSON_IteratorKeyIsNamed
+size_t Dqn_JSON_IteratorValueArraySize(Dqn_JSONIterator *it)
+{
+    size_t result = 0;
+    if (json_array_s *curr = Dqn_JSON_IteratorValueIsArray(it))
+        result = curr->length;
+    return result;
+}
+
+
+// NOTE: Dqn_JSON_IteratorKeyValueIs
 // -----------------------------------------------------------------------------
-json_object_s *Dqn_JSON_IteratorKeyIsNamedObj_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+Dqn_String8 Dqn_JSON_IteratorKey(Dqn_JSONIterator *it)
 {
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(state);
-    json_object_s         *result = state ? Dqn_JSON_ObjElementCheckNamedObj_(curr, key, state->flags, false /*require*/, file, func, line) : nullptr;
+    json_object_element_s *curr = Dqn_JSON_IteratorCurrObjElement(it);
+    Dqn_String8 result = {};
+    if (curr) {
+        result.data = DQN_CAST(char *)curr->name->string;
+        result.size = curr->name->string_size;
+    }
     return result;
 }
 
-json_array_s *Dqn_JSON_IteratorKeyIsNamedArray_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+bool Dqn_JSON_IteratorKeyIs(Dqn_JSONIterator *it, Dqn_String8 key)
 {
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(state);
-    json_array_s          *result = state ? Dqn_JSON_ObjElementCheckNamedArray_(curr, key, state->flags, false /*require*/, file, func, line) : nullptr;
+    json_object_element_s *curr = Dqn_JSON_IteratorCurrObjElement(it);
+    bool result                 = Dqn_JSON_String8Cmp(curr->name, key);
     return result;
 }
 
-json_string_s *Dqn_JSON_IteratorKeyIsNamedString_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_object_s *Dqn_JSON_IteratorKeyValueIsObj(Dqn_JSONIterator *it, Dqn_String8 key)
 {
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(state);
-    json_string_s         *result = state ? Dqn_JSON_ObjElementCheckNamedString_(curr, key, state->flags, false /*require*/, file, func, line) : nullptr;
+    json_object_s         *result = nullptr;
+    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    if (curr && Dqn_JSON_String8Cmp(curr->name, key))
+        result = json_value_as_object(curr->value);
     return result;
 }
 
-json_number_s *Dqn_JSON_IteratorKeyIsNamedNumber_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_array_s *Dqn_JSON_IteratorKeyValueIsArray(Dqn_JSONIterator *it, Dqn_String8 key)
 {
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(state);
-    json_number_s         *result = state ? Dqn_JSON_ObjElementCheckNamedNumber_(curr, key, state->flags, false /*require*/, file, func, line) : nullptr;
+    json_array_s          *result = nullptr;
+    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    if (curr && Dqn_JSON_String8Cmp(curr->name, key))
+        result = json_value_as_array(curr->value);
     return result;
 }
 
-json_value_s *Dqn_JSON_IteratorKeyIsNamedBool_(Dqn_JSONIterator *state, Dqn_String8 key, Dqn_String8 file, Dqn_String8 func, Dqn_uint line)
+json_string_s *Dqn_JSON_IteratorKeyValueIsString(Dqn_JSONIterator *it, Dqn_String8 key)
 {
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(state);
-    json_value_s          *result = state ? Dqn_JSON_ObjElementCheckNamedBool_(curr, key, state->flags, false /*require*/, file, func, line) : nullptr;
+    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    json_string_s         *result = nullptr;
+    if (curr && Dqn_JSON_String8Cmp(curr->name, key))
+        result = json_value_as_string(curr->value);
     return result;
 }
 
+json_number_s *Dqn_JSON_IteratorKeyValueIsNumber(Dqn_JSONIterator *it, Dqn_String8 key)
+{
+    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    json_number_s         *result = nullptr;
+    if (curr && Dqn_JSON_String8Cmp(curr->name, key))
+        result = json_value_as_number(curr->value);
+    return result;
+}
 
-// NOTE: Dqn_JSON_IteratorKeyTo
+json_value_s *Dqn_JSON_IteratorKeyValueIsBool(Dqn_JSONIterator *it, Dqn_String8 key)
+{
+    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    json_value_s          *result = nullptr;
+    if (curr && Dqn_JSON_String8Cmp(curr->name, key))
+        result = curr->value->type == json_type_true || curr->value->type == json_type_false ? curr->value : nullptr;
+    return result;
+}
+
+// NOTE: Dqn_JSON_IteratorValueTo
 // -----------------------------------------------------------------------------
-Dqn_String8 Dqn_JSON_IteratorKeyToString(Dqn_JSONIterator *state)
+Dqn_String8 Dqn_JSON_IteratorValueToString(Dqn_JSONIterator *it)
 {
     Dqn_String8 result = {};
-    if (json_string_s *curr = Dqn_JSON_IteratorKeyIsString(state))
+    if (json_string_s *curr = Dqn_JSON_IteratorValueIsString(it))
         result = Dqn_String8_Init(curr->string, curr->string_size);
     return result;
 }
 
-int64_t Dqn_JSON_IteratorKeyToI64(Dqn_JSONIterator *state)
+int64_t Dqn_JSON_IteratorValueToI64(Dqn_JSONIterator *it)
 {
     int64_t result = {};
-    if (json_number_s *curr = Dqn_JSON_IteratorKeyIsNumber(state))
+    if (json_number_s *curr = Dqn_JSON_IteratorValueIsNumber(it))
         result = Dqn_String8_ToI64(Dqn_String8_Init(curr->number, curr->number_size), 0 /*separator*/);
     return result;
 }
 
-bool Dqn_JSON_IteratorKeyToBool(Dqn_JSONIterator *state)
+uint64_t Dqn_JSON_IteratorValueToU64(Dqn_JSONIterator *it)
+{
+    uint64_t result = {};
+    if (json_number_s *curr = Dqn_JSON_IteratorValueIsNumber(it))
+        result = Dqn_String8_ToU64(Dqn_String8_Init(curr->number, curr->number_size), 0 /*separator*/);
+    return result;
+}
+
+bool Dqn_JSON_IteratorValueToBool(Dqn_JSONIterator *it)
 {
     bool result = {};
-    if (json_value_s *curr = Dqn_JSON_IteratorKeyIsBool(state))
+    if (json_value_s *curr = Dqn_JSON_IteratorValueIsBool(it))
         result = curr->type == json_type_true;
     return result;
 }
+
+void Dqn_JSON_IteratorErrorUnknownKeyValue_(Dqn_JSONIterator *it, Dqn_CallSite call_site)
+{
+    if (!it)
+        return;
+
+    json_object_element_s const *curr = Dqn_JSON_IteratorCurrObjElement(it);
+    if (!curr)
+        return;
+
+    size_t value_type_size = 0;
+    char const *value_type = Dqn_JSON_TypeEnumCString(DQN_CAST(json_type_e)curr->value->type, &value_type_size);
+
+    json_string_s const *key = curr->name;
+    if (it->flags & json_parse_flags_allow_location_information) {
+        json_string_ex_s const *info = DQN_CAST(json_string_ex_s const *)key;
+        Dqn_Log_TypeFCallSite(Dqn_LogType_Warning,
+                              call_site,
+                              "Unknown key-value pair in object [loc=%zu:%zu, key=%.*s, value=%.*s]",
+                              info->line_no,
+                              info->row_no,
+                              key->string_size,
+                              key->string,
+                              value_type_size,
+                              value_type);
+    } else {
+        Dqn_Log_TypeFCallSite(Dqn_LogType_Warning,
+                              call_site,
+                              "Unknown key-value pair in object [key=%.*s, value=%.*s]",
+                              key->string_size,
+                              key->string,
+                              value_type_size,
+                              value_type);
+    }
+}
+
 #endif // defined(DQN_JSON_IMPLEMENTATION)

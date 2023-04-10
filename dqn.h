@@ -1,55 +1,54 @@
 /// @file dqn.h
 #if !defined(DQN_H)
 #define DQN_H
-// ---------------------------------+-----------------------------+---------------------------------
-// Table Of Contents                | Compile out with #define    | Description
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-CFGM] Config macros        |                             | Compile time customisation of library
-// [SECT-CMAC] Compiler macros      |                             | Macros for the compiler
-// [SECT-INCL] Include files        |                             | Standard library Include dependencies
-// [SECT-MACR] Macros               |                             | Define macros used in the library
-// [SECT-TYPE] Typedefs             |                             | Typedefs used in the library
-// [SECT-GSTR] Global Structs       |                             | Forward declare useful structs
-// [SECT-W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
-// [SECT-INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
-// [SECT-CARR] Dqn_CArray           |                             | Compile time C-array size
-// [SECT-STBS] stb_sprintf          |                             | Portable sprintf
-// [SECT-CALL] Dqn_CallSite         |                             | Source code location/tracing
-// [SECT-ALLO] Dqn_Allocator        |                             | Generic allocator interface
-// [SECT-CSTR] Dqn_CString8         |                             | C-string helpers
-// [SECT-STR8] Dqn_String8          |                             | Pointer and length strings
-// [SECT-PRIN] Dqn_Print            |                             | Console printing
-// [SECT-LLOG] Dqn_Log              |                             | Library logging
-// [SECT-VMEM] Dqn_VMem             |                             | Virtual memory allocation
-// [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
-// [SECT-VARR] Dqn_VArray           | DQN_NO_VARRAY               | Array backed by virtual memory arena
-// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
-// [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
-// [SECT-STRB] Dqn_String8Builder   |                             |
-// [SECT-FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
-// [SECT-LIST] Dqn_List             |                             | Chunked linked lists, append only
-// [SECT-MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
-// [SECT-BITS] Dqn_Bit              |                             | Bitset manipulation
-// [SECT-SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
-// [SECT-CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
-// [SECT-UTFX] Dqn_UTF              |                             | Unicode helpers
-// [SECT-BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
-// [SECT-DATE] Dqn_Date             |                             | Date-time helpers
-// [SECT-WIND] Dqn_Win              |                             | Windows OS helpers
-// [SECT-WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
-// [SECT-OSYS] Dqn_OS               |                             | Operating-system APIs
-// [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
-// [SECT-MISC] Miscellaneous        |                             | General purpose helpers
-// [SECT-TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
-// [SECT-JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
-// [SECT-FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
-// [SECT-MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// Table Of Contents            | Compile out with #define    | Description
+// =================================================================================================
+// [$CFGM] Config macros        |                             | Compile time customisation of library
+// [$CMAC] Compiler macros      |                             | Macros for the compiler
+// [$INCL] Include files        |                             | Standard library Include dependencies
+// [$MACR] Macros               |                             | Define macros used in the library
+// [$TYPE] Typedefs             |                             | Typedefs used in the library
+// [$GSTR] Global Structs       |                             | Forward declare useful structs
+// [$W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
+// [$INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
+// [$STBS] stb_sprintf          |                             | Portable sprintf
+// [$CALL] Dqn_CallSite         |                             | Source code location/tracing
+// [$ALLO] Dqn_Allocator        |                             | Generic allocator interface
+// [$CSTR] Dqn_CString8         |                             | C-string helpers
+// [$STR8] Dqn_String8          |                             | Pointer and length strings
+// [$PRIN] Dqn_Print            |                             | Console printing
+// [$LLOG] Dqn_Log              |                             | Library logging
+// [$VMEM] Dqn_VMem             |                             | Virtual memory allocation
+// [$AREN] Dqn_Arena            |                             | Growing bump allocator
+// [$VARR] Dqn_VArray           | DQN_NO_VARRAY               | Array backed by virtual memory arena
+// [$DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// [$DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
+// [$FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
+// [$STRB] Dqn_String8Builder   |                             |
+// [$FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
+// [$LIST] Dqn_List             |                             | Chunked linked lists, append only
+// [$MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
+// [$BITS] Dqn_Bit              |                             | Bitset manipulation
+// [$SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
+// [$CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
+// [$UTFX] Dqn_UTF              |                             | Unicode helpers
+// [$BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
+// [$DATE] Dqn_Date             |                             | Date-time helpers
+// [$WIND] Dqn_Win              |                             | Windows OS helpers
+// [$WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
+// [$OSYS] Dqn_OS               |                             | Operating-system APIs
+// [$FSYS] Dqn_Fs               |                             | Filesystem helpers
+// [$MISC] Miscellaneous        |                             | General purpose helpers
+// [$TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
+// [$JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
+// [$FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
+// [$MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
+// =================================================================================================
 //
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-CFGM] Config macros        |                             | Compile time customisation of library
-// -------------------------------------------------------------------------------------------------
+// =================================================================================================
+// [$CFGM] Config macros        |                             | Compile time customisation of library
+// =================================================================================================
 // #define DQN_IMPLEMENTATION
 //     Define this in one and only one C++ file to enable the implementation
 //     code of the header file
@@ -91,9 +90,9 @@
 //     thread context. The thread context arena stats can be printed by using
 //     Dqn_Library_DumpThreadContextArenaStat.
 //
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-CMAC] Compiler macros      |                             | Macros for the compiler
-// -------------------------------------------------------------------------------------------------
+// =================================================================================================
+// [$CMAC] Compiler macros      |                             | Macros for the compiler
+// =================================================================================================
 // NOTE: Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
     #if defined(__clang__)
@@ -123,17 +122,17 @@
     #endif
 #endif
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-INCL] Include files        |                             | Standard library Include dependencies
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$INCL] Include files        |                             | Standard library Include dependencies
+// =================================================================================================
 #include <stdarg.h> // va_list
 #include <stdio.h>  // fprintf, FILE, stdout, stderr
 #include <stdint.h> // [u]int_*, ...
 #include <limits.h> // [U]INT_MAX, ...
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-MACR] Macros               |                             | Define macros used in the library
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$MACR] Macros               |                             | Define macros used in the library
+// =================================================================================================
 #define Dqn_PowerOfTwoRoundUp(value, power_of_two) (((value) + ((power_of_two) - 1)) & ~((power_of_two) - 1))
 
 // NOTE: Memory allocation dependencies
@@ -336,9 +335,9 @@ struct Dqn_DeferHelper
          DQN_UNIQUE_NAME(once);                      \
          end, DQN_UNIQUE_NAME(once) = false)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-TYPE] Typedefs             |                             | Typedefs used in the library
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$TYPE] Typedefs             |                             | Typedefs used in the library
+// =================================================================================================
 typedef intptr_t Dqn_isize;
 typedef uintptr_t Dqn_usize;
 typedef intptr_t Dqn_isize;
@@ -351,9 +350,9 @@ typedef int32_t Dqn_b32;
 #define DQN_ISIZE_MAX INTPTR_MAX
 #define DQN_ISIZE_MIN INTPTR_MIN
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-GSTR] Global Structs       |                             | Forward declare useful structs
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$GSTR] Global Structs       |                             | Forward declare useful structs
+// =================================================================================================
 struct Dqn_String8 ///< Pointer and length style UTF8 strings
 {
     char      *data; ///< The UTF8 bytes of the string
@@ -367,9 +366,9 @@ struct Dqn_String8 ///< Pointer and length style UTF8 strings
     #endif
 };
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
+// =================================================================================================
 #if defined(DQN_OS_WIN32)
     #if !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
         // Taken from Windows.h
@@ -395,9 +394,9 @@ struct Dqn_String8 ///< Pointer and length style UTF8 strings
     #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
 #endif // !defined(DQN_OS_WIN32)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
+// =================================================================================================
 typedef enum Dqn_ZeroMem {
     Dqn_ZeroMem_No,  ///< Memory can be handed out without zero-ing it out
     Dqn_ZeroMem_Yes, ///< Memory should be zero-ed out before giving to the callee
@@ -406,15 +405,15 @@ typedef enum Dqn_ZeroMem {
 // NOTE: Dqn_Atomic_Add/Exchange return the previous value store in the target
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #include <intrin.h>
-    #define Dqn_Atomic_AddU32(target, value) _InterlockedExchangeAdd(DQN_CAST(long volatile *)target, value)
-    #define Dqn_Atomic_AddU64(target, value) _InterlockedExchangeAdd64(DQN_CAST(__int64 volatile *)target, value)
-    #define Dqn_Atomic_SubU32(target, value) DQN_CAST(unsigned)Dqn_Atomic_AddU32(DQN_CAST(long volatile *)target, -DQN_CAST(long)value)
-    #define Dqn_Atomic_SubU64(target, value) DQN_CAST(uint64_t)Dqn_Atomic_AddU64(target, -DQN_CAST(uint64_t)value)
-    #define Dqn_Atomic_CompareExchange64(dest, desired_val, prev_val) _InterlockedCompareExchange64(DQN_CAST(__int64 volatile *)dest, desired_val, prev_val)
-    #define Dqn_Atomic_CompareExchange32(dest, desired_val, prev_val) _InterlockedCompareExchange(DQN_CAST(long volatile *)dest, desired_val, prev_val)
-    #define Dqn_CPUClockCycle() __rdtsc()
-    #define Dqn_CompilerReadBarrierAndCPUReadFence _ReadBarrier(); _mm_lfence()
-    #define Dqn_CompilerWriteBarrierAndCPUWriteFence _WriteBarrier(); _mm_sfence()
+    #define Dqn_Atomic_CompareExchange64(dest, desired_val, prev_val) _InterlockedCompareExchange64((__int64 volatile *)dest, desired_val, prev_val)
+    #define Dqn_Atomic_CompareExchange32(dest, desired_val, prev_val) _InterlockedCompareExchange((long volatile *)dest, desired_val, prev_val)
+    #define Dqn_Atomic_AddU32(target, value)                          _InterlockedExchangeAdd((long volatile *)target, value)
+    #define Dqn_Atomic_AddU64(target, value)                          _InterlockedExchangeAdd64((__int64 volatile *)target, value)
+    #define Dqn_Atomic_SubU32(target, value)                          Dqn_Atomic_AddU32(DQN_CAST(long volatile *)target, (long)-value)
+    #define Dqn_Atomic_SubU64(target, value)                          Dqn_Atomic_AddU64(target, (uint64_t)-value)
+    #define Dqn_CPUClockCycle()                                       __rdtsc()
+    #define Dqn_CompilerReadBarrierAndCPUReadFence                    _ReadBarrier(); _mm_lfence()
+    #define Dqn_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
 #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     #include <x86intrin.h>
     #define Dqn_Atomic_AddU32(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
@@ -426,7 +425,7 @@ typedef enum Dqn_ZeroMem {
     #else
         #define Dqn_CPUClockCycle() __builtin_readcyclecounter()
     #endif
-    #define Dqn_CompilerReadBarrierAndCPUReadFence asm volatile("lfence" ::: "memory")
+    #define Dqn_CompilerReadBarrierAndCPUReadFence   asm volatile("lfence" ::: "memory")
     #define Dqn_CompilerWriteBarrierAndCPUWriteFence asm volatile("sfence" ::: "memory")
 #else
     #error "Compiler not supported"
@@ -525,19 +524,9 @@ void Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 /// Determine if the mutex can be locked using the given ticket number.
 bool Dqn_TicketMutex_CanLock(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-CARR] Dqn_CArray           |                             | Compile time C-array size
-// ---------------------------------+-----------------------------+---------------------------------
-/// Calculate the size of a C-array at compile time
-/// @param array The C-array to calculate the size for
-/// @return The size of the c-array buffer
-template <typename T, Dqn_isize N> constexpr Dqn_usize Dqn_CArray_Count   (T const (&array)[N]) { (void)array; return N; }
-template <typename T, Dqn_isize N> constexpr Dqn_isize Dqn_CArray_CountI  (T const (&array)[N]) { (void)array; return N; }
-template <typename T, int N>       constexpr Dqn_isize Dqn_CArray_CountInt(T const (&array)[N]) { (void)array; return N; }
-
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-STBS] stb_sprintf          |                             | Portable sprintf
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$STBS] stb_sprintf          |                             | Portable sprintf
+// =================================================================================================
 /// @cond NO_DOXYYGEN
 // stb_sprintf - v1.10 - public domain snprintf() implementation
 // originally by Jeff Roberts / RAD Game Tools, 2015/10/20
@@ -757,9 +746,9 @@ STBSP__PUBLICDEC void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #endif // STB_SPRINTF_H_INCLUDE
 /// @endcond
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-CALL] Dqn_CallSite         |                             | Source code location/tracing
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$CALL] Dqn_CallSite         |                             | Source code location/tracing
+// =================================================================================================
 typedef struct Dqn_CallSite {
     Dqn_String8  file;
     Dqn_String8  function;
@@ -768,9 +757,9 @@ typedef struct Dqn_CallSite {
 
 #define DQN_CALL_SITE Dqn_CallSite{DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__}
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-ALLO] Dqn_Allocator        |                             | Generic allocator interface
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$ALLO] Dqn_Allocator        |                             | Generic allocator interface
+// =================================================================================================
 #if defined(DQN_LEAK_TRACING)
     #if defined(DQN_NO_DSMAP)
         #error "DSMap is required for allocation tracing"
@@ -840,9 +829,9 @@ void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, voi
 #define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type) * count, alignof(Type), zero_mem)
 #define Dqn_Allocator_New(allocator, Type, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type), alignof(Type), zero_mem)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-CSTR] Dqn_CString8         |                             | C-string helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$CSTR] Dqn_CString8         |                             | C-string helpers
+// =================================================================================================
 /// Calculate the size of a cstring literal/array at compile time
 /// @param literal The cstring literal/array to calculate the size for
 /// @return The size of the cstring not including the null-terminating byte
@@ -1062,9 +1051,9 @@ DQN_API bool        Dqn_CString8_IsAllDigits(char const *src, Dqn_isize size);
 
 DQN_API Dqn_isize Dqn_CString16_Size(wchar_t const *a);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-STR8] Dqn_String8          |                             | Pointer and length strings
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$STR8] Dqn_String8          |                             | Pointer and length strings
+// =================================================================================================
 /// Construct a UTF8 c-string literal into a Dqn_String8 referencing a string
 /// stored in the data-segment. This string is read-only.
 #define DQN_STRING8(string) Dqn_String8{(char *)(string), sizeof(string) - 1}
@@ -1243,9 +1232,9 @@ bool operator==(Dqn_String8 const &lhs, Dqn_String8 const &rhs);
 bool operator!=(Dqn_String8 const &lhs, Dqn_String8 const &rhs);
 #endif
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-PRIN] Dqn_Print            |                             | Console printing
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$PRIN] Dqn_Print            |                             | Console printing
+// =================================================================================================
 enum Dqn_PrintStd
 {
     Dqn_PrintStd_Out,
@@ -1268,9 +1257,9 @@ DQN_API void Dqn_Print_StdLnF(Dqn_PrintStd std_handle, char const *fmt, ...);
 #define Dqn_Print_LnFV(fmt, args) Dqn_Print_StdLnFV(Dqn_PrintStd_Out, fmt, args)
 #define Dqn_Print_LnF(fmt, ...) Dqn_Print_StdLnF(Dqn_PrintStd_Out, fmt, ## __VA_ARGS__)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-LLOG] Dqn_Log              |                             | Library logging
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$LLOG] Dqn_Log              |                             | Library logging
+// =================================================================================================
 enum Dqn_LogType
 {
     Dqn_LogType_Error,
@@ -1308,7 +1297,7 @@ DQN_API void Dqn_Log_FVCallSite(Dqn_String8 type, Dqn_CallSite call_site, char c
 DQN_API void Dqn_Log_FCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, ...);
 
 // =================================================================================================
-// [SECT-VMEM] Dqn_VMem             |                             | Virtual memory allocation
+// [$VMEM] Dqn_VMem             |                             | Virtual memory allocation
 // =================================================================================================
 enum Dqn_VMemCommit {
     Dqn_VMemCommit_No,
@@ -1321,7 +1310,7 @@ DQN_API void Dqn_VMem_Decommit(void *ptr, Dqn_usize size);
 DQN_API void Dqn_VMem_Release(void *ptr, Dqn_usize size);
 
 // =================================================================================================
-// [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
+// [$AREN] Dqn_Arena            |                             | Growing bump allocator
 // =================================================================================================
 //
 // A bump-allocator that can grow dynamically by chaining blocks of memory
@@ -1498,9 +1487,34 @@ DQN_API void                Dqn_Arena_Free_            (DQN_LEAK_TRACE_FUNCTION 
 DQN_API void *              Dqn_Arena_CopyZ_           (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
 DQN_API void                Dqn_Arena_EndTempMemory_   (DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory arena_temp_memory);
 
+// =================================================================================================
+// [$ACAT] Dqn_ArenaCatalog     |                             | Collate, create & manage arenas in a catalog
+// =================================================================================================
+struct Dqn_ArenaCatalogItem
+{
+    Dqn_Arena            *arena;
+    Dqn_String8           label;
+    Dqn_ArenaCatalogItem *next;
+    Dqn_ArenaCatalogItem *prev;
+};
+
+struct Dqn_ArenaCatalog
+{
+    Dqn_TicketMutex       ticket_mutex; ///< Mutex for adding to the linked list of arenas
+    Dqn_Arena            *arena;
+    Dqn_ArenaCatalogItem  sentinel;
+    uint16_t              arena_count;
+};
+
+DQN_API void       Dqn_ArenaCatalog_Init   (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena);
+DQN_API void       Dqn_ArenaCatalog_AddFV  (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, char const *fmt, va_list args);
+DQN_API void       Dqn_ArenaCatalog_AddF   (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, char const *fmt, ...);
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, va_list args);
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF (Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, ...);
+
 #if !defined(DQN_NO_VARRAY)
 // =================================================================================================
-// [SECT-VARR] Dqn_VArray           | DQN_NO_VARRAY               | Array backed by virtual memory arena
+// [$VARR] Dqn_VArray           | DQN_NO_VARRAY               | Array backed by virtual memory arena
 // =================================================================================================
 template <typename T> struct Dqn_VArray
 {
@@ -1526,7 +1540,7 @@ DQN_API template <typename T> void           Dqn_VArray_EraseRange  (Dqn_VArray<
 
 #if !defined(DQN_NO_DSMAP)
 // =================================================================================================
-// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// [$DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
 // =================================================================================================
 //
 // A hash table configured using the presets recommended by Demitri Spanos
@@ -1728,59 +1742,79 @@ DQN_API bool                                    operator==               (Dqn_DS
 #endif // !defined(DQN_NO_DSMAP)
 
 // =================================================================================================
-// [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
+// [$DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
 // =================================================================================================
+//
+// Book-keeping data for the library and allow customisation of certain features
+// provided.
+//
+// NOTE: API
+//
+// @proc Dqn_Library_SetLogCallback
+//   @desc Update the default logging function, all logging functions will run through
+//   this callback
+//   @param[in] proc The new logging function, set to nullptr to revert back to
+//   the default logger.
+//   @param[in] user_data A user defined parameter to pass to the callback
+//
+// @proc Dqn_Library_SetLogFile
+//   @param[in] file Pass in nullptr to turn off writing logs to disk, otherwise
+//   point it to the FILE that you wish to write to.
+//
+// @proc Dqn_Library_DumpThreadContextArenaStat
+//   @desc Dump the per-thread arena statistics to the specified file
+
 struct Dqn_Library
 {
-    Dqn_LogProc       *log_callback;   ///< Set this pointer to override the logging routine
-    void *             log_user_data;
-    bool               log_to_file;    ///< Output logs to file as well as standard out
-    void *             log_file;       ///< TODO(dqn): Hmmm, how should we do this... ?
-    Dqn_TicketMutex    log_file_mutex; ///< Is locked when instantiating the log_file for the first time
+    bool                     lib_init;
+    Dqn_TicketMutex          lib_mutex;
 
-#if defined(DQN_LEAK_TRACING)
+    Dqn_LogProc             *log_callback;   ///< Set this pointer to override the logging routine
+    void *                   log_user_data;
+    bool                     log_to_file;    ///< Output logs to file as well as standard out
+    void *                   log_file;       ///< TODO(dqn): Hmmm, how should we do this... ?
+    Dqn_TicketMutex          log_file_mutex; ///< Is locked when instantiating the log_file for the first time
+
+    /// The backup arena to use if no arena is passed into Dqn_Library_Init
+    Dqn_Arena                arena_catalog_backup_arena;
+    Dqn_ArenaCatalog         arena_catalog;
+
+    #if defined(DQN_LEAK_TRACING)
     Dqn_TicketMutex          alloc_table_mutex;
     Dqn_DSMap<Dqn_LeakTrace> alloc_table;
-#endif
+    #endif
 
-#if defined(DQN_OS_WIN32)
-    LARGE_INTEGER     win32_qpc_frequency;
-    Dqn_TicketMutex   win32_bcrypt_rng_mutex;
-    void             *win32_bcrypt_rng_handle;
-#endif
+    #if defined(DQN_OS_WIN32)
+    LARGE_INTEGER            win32_qpc_frequency;
+    Dqn_TicketMutex          win32_bcrypt_rng_mutex;
+    void                    *win32_bcrypt_rng_handle;
+    #endif
 
-#if defined(DQN_DEBUG_THREAD_CONTEXT)
-    Dqn_TicketMutex thread_context_mutex;
-    Dqn_ArenaStat   thread_context_arena_stats[256];
-    uint8_t         thread_context_arena_stats_count;
-#endif
+    #if defined(DQN_DEBUG_THREAD_CONTEXT)
+    Dqn_TicketMutex          thread_context_mutex;
+    Dqn_ArenaStat            thread_context_arena_stats[256];
+    uint8_t                  thread_context_arena_stats_count;
+    #endif
 } extern dqn_library;
 
-/// Update the default logging function, all logging functions will run through
-/// this callback
-/// @param[in] proc The new logging function, set to nullptr to revert back to
-/// the default logger.
-/// @param[in] user_data A user defined parameter to pass to the callback
-DQN_API void Dqn_Library_SetLogCallback(Dqn_LogProc *proc, void *user_data);
+// NOTE: Properties ================================================================================
+DQN_API Dqn_Library *Dqn_Library_Init                      (Dqn_Arena *arena);
+DQN_API void         Dqn_Library_SetLogCallback            (Dqn_LogProc *proc, void *user_data);
+DQN_API void         Dqn_Library_SetLogFile                (void *file);
+DQN_API void         Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path);
 
-/// @param[in] file Pass in nullptr to turn off writing logs to disk, otherwise
-/// point it to the FILE that you wish to write to.
-DQN_API void Dqn_Library_SetLogFile(void *file);
-
-/// Dump the per-thread arena statistics to the specified file
-DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path);
-
+// NOTE: Leak Trace ================================================================================
 #if defined(DQN_LEAK_TRACING)
-void Dqn_Library_LeakTraceAdd(Dqn_CallSite call_site, void *ptr, Dqn_usize size);
-void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr);
+DQN_API void Dqn_Library_LeakTraceAdd              (Dqn_CallSite call_site, void *ptr, Dqn_usize size);
+DQN_API void Dqn_Library_LeakTraceMarkFree         (Dqn_CallSite call_site, void *ptr);
 #else
-#define Dqn_Library_LeakTraceAdd(...)
-#define Dqn_Library_LeakTraceMarkFree(...)
+#define      Dqn_Library_LeakTraceAdd(...)
+#define      Dqn_Library_LeakTraceMarkFree(...)
 #endif
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
+// =================================================================================================
 #if !defined(DQN_NO_FSTRING8)
 #define DQN_FSTRING8_API template <Dqn_usize N> DQN_API
 #define DQN_FSTRING8 Dqn_FString8<N>
@@ -1871,9 +1905,9 @@ template <Dqn_usize A, Dqn_usize B>
 bool Dqn_FString8_EqABInsensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs);
 #endif // !defined(DQN_NO_FSTRING8)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-STRB] Dqn_String8Builder   |                             |
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$STRB] Dqn_String8Builder   |                             |
+// =================================================================================================
 struct Dqn_String8Builder
 {
     Dqn_Allocator    allocator;   ///< Allocator to use to back the string list
@@ -1919,9 +1953,9 @@ bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ..
 /// invalid or memory allocation failure.
 Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allocator allocator);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
+// =================================================================================================
 #if !defined(DQN_NO_FARRAY)
 #define DQN_FARRAY_API template <typename T, Dqn_isize N> DQN_API
 #define DQN_FARRAY Dqn_FArray<T, N>
@@ -2028,9 +2062,9 @@ DQN_API T *Dqn_FArray_FindProcElseMake(DQN_FARRAY *array, IsEqualProc IsEqual, b
 DQN_FARRAY_API T *Dqn_FArray_Find(DQN_FARRAY *array, T const *find);
 #endif // !defined(DQN_NO_FARRAY)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-LIST] Dqn_List             |                             | Chunked linked lists, append only
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$LIST] Dqn_List             |                             | Chunked linked lists, append only
+// =================================================================================================
 template <typename T>
 struct Dqn_ListChunk
 {
@@ -2092,9 +2126,9 @@ T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> *at_chunk);
 template <typename T> DQN_API
 bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_isize start_index);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
+// =================================================================================================
 #if !defined(DQN_NO_MATH)
 struct Dqn_V2I
 {
@@ -2307,17 +2341,17 @@ DQN_API Dqn_V2  Dqn_Lerp_V2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
 DQN_API Dqn_f32 Dqn_Lerp_F32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b);
 #endif // !defined(DQN_NO_MATH)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-BITS] Dqn_Bit              |                             | Bitset manipulation
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$BITS] Dqn_Bit              |                             | Bitset manipulation
+// =================================================================================================
 DQN_API void    Dqn_Bit_UnsetInplace(uint32_t *flags, uint32_t bitfield);
 DQN_API void    Dqn_Bit_SetInplace(uint32_t *flags, uint32_t bitfield);
 DQN_API bool    Dqn_Bit_IsSet(uint32_t bits, uint32_t bits_to_set);
 DQN_API bool    Dqn_Bit_IsNotSet(uint32_t bits, uint32_t bits_to_check);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
+// =================================================================================================
 #if defined(NDEBUG)
     #define Dqn_Safe_AssertF(expr, fmt, ...)
     #define Dqn_Safe_Assert(expr, fmt, ...)
@@ -2581,9 +2615,9 @@ DQN_API uint32_t Dqn_Safe_SaturateCastIntToU32(int val);
 /// out of the valid range when casted.
 DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
+// =================================================================================================
 DQN_API bool    Dqn_Char_IsAlpha       (char ch);
 DQN_API bool    Dqn_Char_IsDigit       (char ch);
 DQN_API bool    Dqn_Char_IsAlphaNum    (char ch);
@@ -2594,15 +2628,15 @@ DQN_API char    Dqn_Char_ToHex         (char ch);
 DQN_API char    Dqn_Char_ToHexUnchecked(char ch);
 DQN_API char    Dqn_Char_ToLower       (char ch);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-UTFX] Dqn_UTF              |                             | Unicode helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$UTFX] Dqn_UTF              |                             | Unicode helpers
+// =================================================================================================
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint);
 DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
+// =================================================================================================
 #if !defined(DQN_NO_HEX)
 DQN_API char const  *Dqn_Hex_TrimSpaceAnd0xPrefixCString8(char const *hex, Dqn_isize size, Dqn_isize *real_size);
 DQN_API Dqn_String8  Dqn_Hex_TrimSpaceAnd0xPrefixString8(Dqn_String8 const string);
@@ -2715,9 +2749,9 @@ DQN_API char *Dqn_Hex_CString8ToBytesArena(Dqn_Arena *arena, char const *hex, Dq
 DQN_API Dqn_String8 Dqn_Hex_String8ToBytesArena(Dqn_Arena *arena, Dqn_String8 hex);
 #endif // !defined(DQN_NO_HEX)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-DATE] Dqn_Date             |                             | Date-time helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$DATE] Dqn_Date             |                             | Date-time helpers
+// =================================================================================================
 struct Dqn_DateHMSTimeString
 {
     char    date[DQN_ARRAY_UCOUNT("YYYY-MM-SS")];
@@ -2747,9 +2781,9 @@ DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString(Dqn_DateHMSTime time, 
 DQN_API uint64_t Dqn_Date_EpochTime();
 
 #if defined(DQN_OS_WIN32)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-WIND] Dqn_Win              |                             | Windows OS helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$WIND] Dqn_Win              |                             | Windows OS helpers
+// =================================================================================================
 struct Dqn_WinErrorMsg
 {
     unsigned long code;
@@ -2834,9 +2868,9 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
 DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it);
 
 #if !defined(DQN_NO_WINNET)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
+// =================================================================================================
 enum Dqn_WinNetHandleState
 {
     Dqn_WinNetHandleState_Invalid,
@@ -2945,9 +2979,9 @@ DQN_API Dqn_String8      Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *ha
 #endif // !defined(DQN_NO_WINNET)
 #endif // defined(DQN_OS_WIN32)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-OSYS] Dqn_OS               | DQN_NO_WIN                  | Operating-system APIs
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$OSYS] Dqn_OS               | DQN_NO_WIN                  | Operating-system APIs
+// =================================================================================================
 /// Generate cryptographically secure bytes
 DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size);
 
@@ -3034,9 +3068,9 @@ struct Dqn_OSTimedBlock
         DQN_LOG_D("%s -> %s (total): %fms", t1.label, t2.label, Dqn_OS_PerfCounterMs(t1.tick, t2.tick));\
     }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$FSYS] Dqn_Fs               |                             | Filesystem helpers
+// =================================================================================================
 enum Dqn_FsInfoType
 {
     Dqn_FsInfoType_Unknown,
@@ -3121,9 +3155,9 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
 DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_isize size);
 DQN_API void Dqn_Fs_CloseFile(Dqn_FsFile *file);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-MISC] Miscellaneous        |                             | General purpose helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$MISC] Miscellaneous        |                             | General purpose helpers
+// =================================================================================================
 /// Write the format string to the buffer truncating with a trailing ".." if
 /// there is insufficient space in the buffer followed by null-terminating the
 /// buffer (uses stb_sprintf underneath).
@@ -3165,12 +3199,38 @@ Dqn_BinarySearch(T const                        *array,
                  Dqn_BinarySearchType            type      = Dqn_BinarySearchType_Match,
                  Dqn_BinarySearchLessThanProc<T> less_than = Dqn_BinarySearch_DefaultLessThan);
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
-// ---------------------------------+-----------------------------+---------------------------------
-// Utility functions for building applications by providing an in-built thread
-// context that gives the user access to a temporary arena automatically without
-// explicit setup on the end application's side.
+// =================================================================================================
+// [$TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
+// =================================================================================================
+//
+// Each thread is assigned in their thread-local storage (TLS) scratch and
+// permanent arena allocators. These can be used for allocations with a lifetime
+// scoped to the lexical scope or for storing data permanently using the arena
+// paradigm.
+//
+// TLS in this implementation is implemented using the `thread_local` C/C++
+// keyword.
+//
+// NOTE: API
+//
+// @proc Dqn_Thread_GetContext
+//   @desc Get the current thread's context- this contains all the metadata for managing
+//   the thread scratch data. In general you probably want Dqn_Thread_GetScratch()
+//   which ensures you get a usable scratch arena for temporary allocations
+//   without having to worry about selecting the right arena from the state.
+//
+// @proc Dqn_Thread_GetScratch
+//   @desc Retrieve the per-thread temporary arena allocator that is reset on scope
+//   exit.
+//
+//   The scratch arena must be deconflicted with any existing arenas in the
+//   function to avoid trampling over each other's memory. Consider the situation
+//   where the scratch arena is passed into the function. Inside the function, if
+//   the same arena is reused then, if both arenas allocate, when the inner arena
+//   is reset, this will undo the passed in arena's allocations in the function.
+//
+//   @param[in] conflict_arena A pointer to the arena currently being used in the
+//   function
 
 #if !defined(DQN_THREAD_CONTEXT_ARENAS)
     #define DQN_THREAD_CONTEXT_ARENAS 2
@@ -3178,20 +3238,20 @@ Dqn_BinarySearch(T const                        *array,
 
 struct Dqn_ThreadContext
 {
-    Dqn_b32       init;
+    Dqn_b32        init;
 
-    Dqn_Arena     arena;     ///< Per thread arena
-    Dqn_Allocator allocator; ///< Allocator that uses the arena
+    Dqn_Arena     *arena;     ///< Per thread arena
+    Dqn_Allocator  allocator; ///< Allocator that uses the arena
 
     /// Temp memory arena's for the calling thread
-    Dqn_Arena     temp_arenas[DQN_THREAD_CONTEXT_ARENAS];
+    Dqn_Arena     *temp_arenas[DQN_THREAD_CONTEXT_ARENAS];
 
     /// Allocators that use the corresponding arena from the thread context.
     /// Provided for convenience when interfacing with allocator interfaces.
-    Dqn_Allocator temp_allocators[DQN_THREAD_CONTEXT_ARENAS];
+    Dqn_Allocator  temp_allocators[DQN_THREAD_CONTEXT_ARENAS];
 
     #if defined(DQN_DEBUG_THREAD_CONTEXT)
-    Dqn_ArenaStat temp_arenas_stat[DQN_THREAD_CONTEXT_ARENAS];
+    Dqn_ArenaStat  temp_arenas_stat[DQN_THREAD_CONTEXT_ARENAS];
     #endif
 };
 
@@ -3212,30 +3272,18 @@ struct Dqn_ThreadScratch
     #endif
 };
 
-// Get the current thread's context- this contains all the metadata for managing
-// the thread scratch data. In general you probably want Dqn_Thread_GetScratch()
-// which ensures you get a usable scratch arena for temporary allocations
-// without having to worry about selecting the right arena from the state.
-#define Dqn_Thread_GetContext() Dqn_Thread_GetContext_(DQN_LEAK_TRACE_NO_COMMA)
+// NOTE: Context ===================================================================================
+#define                    Dqn_Thread_GetContext()                  Dqn_Thread_GetContext_(DQN_LEAK_TRACE_NO_COMMA)
+#define                    Dqn_Thread_GetScratch(conflict_arena)    Dqn_Thread_GetScratch_(DQN_LEAK_TRACE conflict_arena)
+DQN_API uint32_t           Dqn_Thread_GetID();
+
+// NOTE: Internal ==================================================================================
 DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COMMA);
+DQN_API Dqn_ThreadScratch  Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void const *conflict_arena);
 
-/// Retrieve the per-thread temporary arena allocator that is reset on scope
-/// exit.
-///
-/// The scratch arena must be deconflicted with any existing arenas in the
-/// function to avoid trampling over each other's memory. Consider the situation
-/// where the scratch arena is passed into the function. Inside the function, if
-/// the same arena is reused then, if both arenas allocate, when the inner arena
-/// is reset, this will undo the passed in arena's allocations in the function.
-///
-/// @param[in] conflict_arena A pointer to the arena currently being used in the
-/// function
-#define Dqn_Thread_GetScratch(conflict_arena) Dqn_Thread_GetScratch_(DQN_LEAK_TRACE conflict_arena)
-DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void const *conflict_arena);
-
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
+// =================================================================================================
 #if !defined(DQN_NO_JSON_BUILDER)
 // TODO(dqn): We need to write tests for this
 enum Dqn_JSONBuilderItem {
@@ -3349,9 +3397,9 @@ void    Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, boo
 #define Dqn_JSONBuilder_Bool(builder, value) Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8(""), value)
 #endif // !defined(DQN_NO_JSON_BUIDLER)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
+// =================================================================================================
 #ifndef DQN_FNV1A32_SEED
     #define DQN_FNV1A32_SEED 2166136261U
 #endif
@@ -3372,7 +3420,7 @@ DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_isize size, uint32_t
 DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_isize size, uint64_t hash);
 
 // =================================================================================================
-// [SECT-MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
+// [$MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
 // =================================================================================================
 // MurmurHash3 was written by Austin Appleby, and is placed in the public
 // domain. The author (Austin Appleby) hereby disclaims copyright to this source
@@ -3391,7 +3439,7 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
 
 #if !defined(DQN_NO_VARRAY)
 // =================================================================================================
-// [SECT-VARR] Dqn_VArray           |                             | Array backed by virtual memory arena
+// [$VARR] Dqn_VArray           |                             | Array backed by virtual memory arena
 // =================================================================================================
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size)
 {
@@ -3487,7 +3535,7 @@ DQN_API template <typename T> void Dqn_VArray_EraseRange(Dqn_VArray<T> *array, D
 
 #if !defined(DQN_NO_DSMAP)
 // =================================================================================================
-// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// [$DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
 // =================================================================================================
 uint32_t const DQN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
 uint32_t const DQN_DS_MAP_SENTINEL_SLOT = 0;
@@ -3840,9 +3888,9 @@ DQN_API Dqn_DSMapKey Dqn_DSMap_KeyString8Copy(Dqn_DSMap<T> const *map, Dqn_Alloc
 #endif // !defined(DQN_NO_DSMAP)
 
 #if !defined(DQN_NO_FSTRING8)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
+// =================================================================================================
 DQN_FSTRING8_API
 DQN_FSTRING8 Dqn_FString8_InitF(char const *fmt, ...)
 {
@@ -3983,9 +4031,9 @@ bool Dqn_FString8_EqABInsensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> co
 #endif // !defined(DQN_NO_FSTRING8)
 
 #if !defined(DQN_NO_FARRAY)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
+// =================================================================================================
 DQN_FARRAY_API
 DQN_FARRAY Dqn_FArray_Init(T const *item, Dqn_isize count)
 {
@@ -4364,9 +4412,9 @@ Dqn_BinarySearch(T const                        *array,
 #if defined(DQN_IMPLEMENTATION)
 
 #if defined(DQN_OS_WIN32)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
+// =================================================================================================
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "wininet")
 
@@ -4706,12 +4754,13 @@ Dqn_BinarySearch(T const                        *array,
     #include <fcntl.h>        // O_RDONLY ... etc
     #include <linux/fs.h>     // FICLONE
     #include <sys/ioctl.h>    // ioctl
+    #include <sys/types.h>    // pid_t
     #include <sys/random.h>   // getrandom
     #include <sys/stat.h>     // stat
     #include <sys/sendfile.h> // sendfile
     #include <sys/mman.h>     // mmap
     #include <time.h>         // clock_gettime, nanosleep
-    #include <unistd.h>       // access
+    #include <unistd.h>       // access, gettid
 #endif
 
 Dqn_Library dqn_library;
@@ -4799,9 +4848,9 @@ DQN_API void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator alloca
     }
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-LLOG] Dqn_Log              |                             | Library logging
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$LLOG] Dqn_Log              |                             | Library logging
+// =================================================================================================
 DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
 {
     (void)log_type;
@@ -5869,9 +5918,9 @@ bool operator!=(Dqn_String8 const &lhs, Dqn_String8 const &rhs)
 }
 #endif
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-PRIN] Dqn_Print            |                             | Printing
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$PRIN] Dqn_Print            |                             | Printing
+// =================================================================================================
 DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string)
 {
     DQN_ASSERT(std_handle == Dqn_PrintStd_Out || std_handle == Dqn_PrintStd_Err);
@@ -5962,9 +6011,9 @@ DQN_API void Dqn_Print_StdLnF(Dqn_PrintStd std_handle, char const *fmt, ...)
 }
 
 #if !defined(DQN_NO_DSMAP)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// =================================================================================================
 DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64NoHash(uint64_t u64)
 {
     Dqn_DSMapKey result = {};
@@ -5997,9 +6046,21 @@ DQN_API bool operator==(Dqn_DSMapKey lhs, Dqn_DSMapKey rhs)
 
 #endif // !defined(DQN_NO_DSMAP)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
+// =================================================================================================
+DQN_API Dqn_Library *Dqn_Library_Init(Dqn_Arena *arena)
+{
+    Dqn_Library *result = &dqn_library;
+    Dqn_TicketMutex_Begin(&result->lib_mutex);
+    if (!result->lib_init) {
+        Dqn_ArenaCatalog_Init(&result->arena_catalog, arena ? arena : &result->arena_catalog_backup_arena);
+        result->lib_init = true;
+    }
+    Dqn_TicketMutex_End(&result->lib_mutex);
+    return result;
+}
+
 DQN_API void Dqn_Library_SetLogCallback(Dqn_LogProc *proc, void *user_data)
 {
     dqn_library.log_callback  = proc;
@@ -6142,9 +6203,9 @@ DQN_API void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr)
 #endif /// defined(DQN_LEAK_TRACING)
 
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-STRB] Dqn_String8Builder   |                             |
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$STRB] Dqn_String8Builder   |                             |
+// =================================================================================================
 bool Dqn_String8Builder_AppendRef(Dqn_String8Builder *builder, Dqn_String8 string)
 {
     if (!builder || !string.data || string.size <= 0)
@@ -6217,7 +6278,7 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
 }
 
 // =================================================================================================
-// [SECT-AREN] Dqn_Arena            |                             | Growing bump allocator
+// [$AREN] Dqn_Arena            |                             | Growing bump allocator
 // =================================================================================================
 DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
@@ -6543,10 +6604,72 @@ DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroM
     arena->stats.blocks   = 0;
 }
 
+// =================================================================================================
+// [$ACAT] Dqn_ArenaCatalog     |                             | Collate, create & manage arenas in a catalog
+// =================================================================================================
+DQN_API void Dqn_ArenaCatalog_Init(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena)
+{
+    catalog->arena         = arena;
+    catalog->sentinel.next = &catalog->sentinel;
+    catalog->sentinel.prev = &catalog->sentinel;
+}
+
+DQN_API void Dqn_ArenaCatalog_AddFV(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, char const *fmt, va_list args)
+{
+    // NOTE: We could use an atomic for appending to the sentinel but it is such
+    // a rare operation to append to the catalog that we don't bother.
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
+
+    // NOTE: Create item in the catalog
+    Dqn_ArenaCatalogItem *result = Dqn_Arena_New(catalog->arena, Dqn_ArenaCatalogItem, Dqn_ZeroMem_Yes);
+    result->arena                = arena;
+
+    // NOTE: Create arena label
+    result->label = Dqn_String8_InitFV(Dqn_Arena_Allocator(catalog->arena), fmt, args);
+
+    // NOTE: Add to the catalog (linked list)
+    Dqn_ArenaCatalogItem *sentinel = &catalog->sentinel;
+    result->next                   = sentinel;
+    result->prev                   = sentinel->prev;
+    result->next->prev             = result;
+    result->prev->next             = result;
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
+
+    Dqn_Atomic_AddU32(&catalog->arena_count, 1);
+}
+
+DQN_API void Dqn_ArenaCatalog_AddF(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_ArenaCatalog_AddFV(catalog, arena, fmt, args);
+    va_end(args);
+}
+
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, va_list args)
+{
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
+    Dqn_Arena *result = Dqn_Arena_New(catalog->arena, Dqn_Arena, Dqn_ZeroMem_Yes);
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
+
+    Dqn_Arena_Grow(result, byte_size, commit, 0 /*flags*/);
+    Dqn_ArenaCatalog_AddFV(catalog, result, fmt, args);
+    return result;
+}
+
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Arena *result = Dqn_ArenaCatalog_AllocFV(catalog, byte_size, commit, fmt, args);
+    va_end(args);
+    return result;
+}
+
 #if !defined(DQN_NO_MATH)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
+// =================================================================================================
 DQN_API Dqn_V2I Dqn_V2ToV2I(Dqn_V2 a)
 {
     Dqn_V2I result = Dqn_V2I(DQN_CAST(int32_t)a.x, DQN_CAST(int32_t)a.y);
@@ -6995,9 +7118,9 @@ DQN_API Dqn_f32 Dqn_Lerp_F32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b)
 }
 #endif // !defined(DQN_NO_MATH)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-BITS] Dqn_Bit              |                             | Bitset manipulation
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$BITS] Dqn_Bit              |                             | Bitset manipulation
+// =================================================================================================
 DQN_API void Dqn_Bit_UnsetInplace(uint64_t *flags, uint64_t bitfield)
 {
     *flags = (*flags & ~bitfield);
@@ -7020,9 +7143,9 @@ DQN_API bool Dqn_Bit_IsNotSet(uint64_t bits, uint64_t bits_to_check)
     return result;
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
+// =================================================================================================
 DQN_API bool Dqn_Safe_AssertF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...)
 {
     bool result = assertion_expr;
@@ -7357,9 +7480,9 @@ DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val)
     return result;
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
+// =================================================================================================
 DQN_API bool Dqn_Char_IsAlpha(char ch)
 {
     bool result = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
@@ -7426,9 +7549,9 @@ DQN_API char Dqn_Char_ToLower(char ch)
     return result;
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-UTFX] Dqn_UTF              |                             | Unicode helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$UTFX] Dqn_UTF              |                             | Unicode helpers
+// =================================================================================================
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
 {
     // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
@@ -7502,9 +7625,9 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
 }
 
 #if !defined(DQN_NO_HEX)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
+// =================================================================================================
 DQN_API char const *Dqn_Hex_TrimSpaceAnd0xPrefixCString8(char const *hex, Dqn_isize size, Dqn_isize *real_size)
 {
     Dqn_isize   trim_size = 0;
@@ -7744,9 +7867,9 @@ DQN_API Dqn_String8 Dqn_Hex_String8ToBytesArena(Dqn_Arena *arena, Dqn_String8 he
 }
 #endif // !defined(DQN_NO_HEX)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-DATE] Dqn_Date             |                             | Date-time helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$DATE] Dqn_Date             |                             | Date-time helpers
+// =================================================================================================
 DQN_API Dqn_DateHMSTime Dqn_Date_HMSLocalTimeNow()
 {
     Dqn_DateHMSTime result = {};
@@ -7791,16 +7914,16 @@ DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString(Dqn_DateHMSTime time, 
 {
     Dqn_DateHMSTimeString result = {};
     result.hms_size              = DQN_CAST(uint8_t) STB_SPRINTF_DECORATE(snprintf)(result.hms,
-                                                                      DQN_CAST(int) Dqn_CArray_CountI(result.hms),
-                                                                      "%02d%c%02d%c%02d",
-                                                                      time.hour,
-                                                                      hms_separator,
-                                                                      time.minutes,
-                                                                      hms_separator,
-                                                                      time.seconds);
+                                                                                    DQN_ARRAY_ICOUNT(result.hms),
+                                                                                    "%02d%c%02d%c%02d",
+                                                                                    time.hour,
+                                                                                    hms_separator,
+                                                                                    time.minutes,
+                                                                                    hms_separator,
+                                                                                    time.seconds);
 
     result.date_size = DQN_CAST(uint8_t) STB_SPRINTF_DECORATE(snprintf)(result.date,
-                                                                       DQN_CAST(int) Dqn_CArray_CountI(result.date),
+                                                                       DQN_ARRAY_ICOUNT(result.date),
                                                                        "%d%c%02d%c%02d",
                                                                        time.year,
                                                                        date_separator,
@@ -7850,9 +7973,9 @@ DQN_API uint64_t Dqn_Date_EpochTime()
 #endif
 
 #if defined(DQN_OS_WIN32)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-WIND] Dqn_Win              |                             | Windows OS helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$WIND] Dqn_Win              |                             | Windows OS helpers
+// =================================================================================================
 DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_WinErrorMsg *msg)
 {
     msg->code    = GetLastError();
@@ -8111,7 +8234,7 @@ DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *
             continue;
 
         it->file_name.size = Dqn_CString16_Size(find_data.cFileName);
-        DQN_ASSERT(it->file_name.size < (Dqn_CArray_CountI(it->file_name_buf) - 1));
+        DQN_ASSERT(it->file_name.size < (DQN_ARRAY_UCOUNT(it->file_name_buf) - 1));
         DQN_MEMCPY(it->file_name.data, find_data.cFileName, it->file_name.size * sizeof(wchar_t));
         it->file_name_buf[it->file_name.size] = 0;
         break;
@@ -8173,9 +8296,9 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
 }
 
 #if !defined(DQN_NO_WIN_NET)
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
+// =================================================================================================
 DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitCString(char const *url, int url_size)
 {
     URL_COMPONENTSA components  = {};
@@ -8568,9 +8691,9 @@ DQN_API Dqn_String8 Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle)
 #endif // !defined(DQN_NO_WINNET)
 #endif // defined(DQN_OS_WIN32)
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-OSYS] Dqn_OS               | DQN_NO_WIN                  | Operating-system APIs
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$OSYS] Dqn_OS               | DQN_NO_WIN                  | Operating-system APIs
+// =================================================================================================
 DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
 {
     if (!buffer || size < 0)
@@ -8833,9 +8956,9 @@ DQN_API Dqn_f64 Dqn_OS_TimerNs(Dqn_OSTimer timer)
     return result;
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-FSYS] Dqn_Fs               |                             | Filesystem helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$FSYS] Dqn_Fs               |                             | Filesystem helpers
+// =================================================================================================
 #if defined(DQN_OS_WIN32)
 DQN_API uint64_t Dqn__WinFileTimeToSeconds(FILETIME const *time)
 {
@@ -9512,9 +9635,9 @@ DQN_API void Dqn_Fs_CloseFile(Dqn_FsFile *file)
     *file = {};
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-MISC] Miscellaneous        |                             | General purpose helpers
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$MISC] Miscellaneous        |                             | General purpose helpers
+// =================================================================================================
 DQN_API int Dqn_SNPrintF2DotsOnOverflow(char *buffer, int size, char const *fmt, ...)
 {
     va_list args;
@@ -9559,14 +9682,14 @@ DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator)
     return result;
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
+// =================================================================================================
 Dqn_ThreadScratch::Dqn_ThreadScratch(DQN_LEAK_TRACE_FUNCTION Dqn_ThreadContext *context, uint8_t context_index)
 {
     index       = context_index;
     allocator   = context->temp_allocators[index];
-    arena       = &context->temp_arenas[index];
+    arena       = context->temp_arenas[index];
     temp_memory = Dqn_Arena_BeginTempMemory(arena);
     #if defined(DQN_LEAK_TRACING)
     leak_site__ = DQN_LEAK_TRACE_ARG_NO_COMMA;
@@ -9587,17 +9710,41 @@ Dqn_ThreadScratch::~Dqn_ThreadScratch()
     destructed = true;
 }
 
+DQN_API uint32_t Dqn_Thread_GetID()
+{
+    #if defined(DQN_OS_WIN32)
+    unsigned long result = GetCurrentThreadId();
+    #else
+    pid_t result = gettid();
+    assert(gettid() >= 0);
+    #endif
+    return (uint32_t)result;
+}
+
 DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COMMA)
 {
     thread_local Dqn_ThreadContext result = {};
     if (!result.init) {
         result.init = true;
-        Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG &result.arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4), 0 /*flags*/);
-        result.allocator = Dqn_Arena_Allocator(&result.arena);
+
+        // NOTE: Setup permanent arena
+        Dqn_ArenaCatalog *catalog = &dqn_library.arena_catalog;
+        result.allocator          = Dqn_Arena_Allocator(result.arena);
+        result.arena              = Dqn_ArenaCatalog_AllocF(catalog,
+                                                            DQN_GIGABYTES(1) /*size*/,
+                                                            DQN_KILOBYTES(64) /*commit*/,
+                                                            "Thread %u Arena",
+                                                            Dqn_Thread_GetID());
+
+        // NOTE: Setup temporary arenas
         for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
-            Dqn_Arena *arena              = result.temp_arenas + index;
-            result.temp_allocators[index] = Dqn_Arena_Allocator(arena);
-            Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG arena, DQN_MEGABYTES(4), DQN_MEGABYTES(4), 0 /*flags*/);
+            result.temp_arenas[index]     = Dqn_ArenaCatalog_AllocF(catalog,
+                                                                    DQN_GIGABYTES(1) /*size*/,
+                                                                    DQN_KILOBYTES(64) /*commit*/,
+                                                                    "Thread %u Temp Arena %u",
+                                                                    Dqn_Thread_GetID(),
+                                                                    index);
+            result.temp_allocators[index] = Dqn_Arena_Allocator(result.temp_arenas[index]);
         }
     }
     return &result;
@@ -9611,7 +9758,7 @@ DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void co
     Dqn_ThreadContext *context = Dqn_Thread_GetContext_(DQN_LEAK_TRACE_ARG_NO_COMMA);
     uint8_t context_index      = (uint8_t)-1;
     for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
-        Dqn_Arena *arena = context->temp_arenas + index;
+        Dqn_Arena *arena = context->temp_arenas[index];
         if (!conflict_arena || arena != conflict_arena) {
             context_index = index;
             break;
@@ -9622,10 +9769,10 @@ DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void co
     return Dqn_ThreadScratch(DQN_LEAK_TRACE_ARG context, context_index);
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
-// ---------------------------------+-----------------------------+---------------------------------
 #if !defined(DQN_NO_JSON_BUILDER)
+// =================================================================================================
+// [$JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
+// =================================================================================================
 Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_indent)
 {
     Dqn_JSONBuilder result          = {};
@@ -9784,9 +9931,9 @@ void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool v
 #endif // !defined(DQN_NO_JSON_BUILDER)
 
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
+// =================================================================================================
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
 DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_isize size, uint32_t hash)
 {
@@ -9816,9 +9963,9 @@ DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_isize size)
     return result;
 }
 
-// ---------------------------------+-----------------------------+---------------------------------
-// [SECT-MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
-// ---------------------------------+-----------------------------+---------------------------------
+// =================================================================================================
+// [$MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
+// =================================================================================================
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
     #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)
