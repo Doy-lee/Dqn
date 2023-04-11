@@ -12,6 +12,7 @@
 // [$GSTR] Global Structs       |                             | Forward declare useful structs
 // [$W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
 // [$INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
+// [$TMUT] Dqn_TicketMutex      |                             | Userland mutex via spinlocking atomics
 // [$STBS] stb_sprintf          |                             | Portable sprintf
 // [$CALL] Dqn_CallSite         |                             | Source code location/tracing
 // [$ALLO] Dqn_Allocator        |                             | Generic allocator interface
@@ -135,8 +136,7 @@
 // =================================================================================================
 #define Dqn_PowerOfTwoRoundUp(value, power_of_two) (((value) + ((power_of_two) - 1)) & ~((power_of_two) - 1))
 
-// NOTE: Memory allocation dependencies
-// -----------------------------------------------------------------------------
+// NOTE: Alloc Macros ==============================================================================
 #if !defined(DQN_ALLOC)
     #define DQN_ALLOC(size) Dqn_VMem_Reserve(size, Dqn_VMemCommit_Yes)
 #endif
@@ -145,8 +145,7 @@
     #define DQN_DEALLOC(ptr, size) Dqn_VMem_Release(ptr, size)
 #endif
 
-// NOTE: string.h dependencies
-// -----------------------------------------------------------------------------
+// NOTE: String.h Dependnecies =====================================================================
 #if !defined(DQN_MEMCPY) || !defined(DQN_MEMSET) || !defined(DQN_MEMCMP) || !defined(DQN_MEMMOVE)
     #include <string.h>
     #if !defined(DQN_MEMCPY)
@@ -163,8 +162,7 @@
     #endif
 #endif
 
-// NOTE: math.h dependencies
-// -----------------------------------------------------------------------------
+// NOTE: Math.h Dependnecies =======================================================================
 #if !defined(DQN_SQRTF) || !defined(DQN_SINF) || !defined(DQN_COSF) || !defined(DQN_TANF)
     #include <math.h>
     #define DQN_SQRTF(val) sqrtf(val)
@@ -179,8 +177,7 @@
     #endif
 #endif
 
-// NOTE: Math macros
-// -----------------------------------------------------------------------------
+// NOTE: Math Macros ===============================================================================
 #define DQN_PI 3.14159265359f
 
 #define DQN_DEGREE_TO_RADIAN(degrees) ((degrees) * (DQN_PI / 180.0f))
@@ -192,8 +189,7 @@
 #define DQN_CLAMP(val, lo, hi) DQN_MAX(DQN_MIN(val, hi), lo)
 #define DQN_SQUARED(val) ((val) * (val))
 
-// NOTE: Function/variable annotations
-// -----------------------------------------------------------------------------
+// NOTE: Function/Variable Annotations =============================================================
 #if defined(DQN_STATIC_API)
     #define DQN_API static
 #else
@@ -210,8 +206,7 @@
     #define DQN_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
-// NOTE: Preprocessor token tricks
-// -----------------------------------------------------------------------------
+// NOTE: Preprocessor Token Tricks =================================================================
 #define DQN_TOKEN_COMBINE2(x, y) x ## y
 #define DQN_TOKEN_COMBINE(x, y) DQN_TOKEN_COMBINE2(x, y)
 #define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
@@ -224,30 +219,26 @@
         b        = temp; \
     } while (0)
 
-// NOTE: Compile time evaluation macros
-// -----------------------------------------------------------------------------
+// NOTE: Size Macros ===============================================================================
 #define DQN_ISIZEOF(val) DQN_CAST(ptrdiff_t)sizeof(val)
 #define DQN_ARRAY_UCOUNT(array) (sizeof(array)/(sizeof((array)[0])))
 #define DQN_ARRAY_ICOUNT(array) (Dqn_isize)DQN_ARRAY_UCOUNT(array)
 #define DQN_CHAR_COUNT(string) (sizeof(string) - 1)
 
-// NOTE: SI byte units
-// -----------------------------------------------------------------------------
+// NOTE: SI Byte Macros ============================================================================
 #define DQN_BYTES(val) (val)
 #define DQN_KILOBYTES(val) (1024ULL * DQN_BYTES(val))
 #define DQN_MEGABYTES(val) (1024ULL * DQN_KILOBYTES(val))
 #define DQN_GIGABYTES(val) (1024ULL * DQN_MEGABYTES(val))
 
-// NOTE: Duration to sections
-// -----------------------------------------------------------------------------
+// NOTE: Time Macros ===============================================================================
 #define DQN_SECONDS_TO_MS(val) ((val) * 1000.0f)
 #define DQN_MINS_TO_S(val) ((val) * 60ULL)
 #define DQN_HOURS_TO_S(val) (DQN_MINS_TO_S(val) * 60ULL)
 #define DQN_DAYS_TO_S(val) (DQN_HOURS_TO_S(val) * 24ULL)
 #define DQN_YEARS_TO_S(val) (DQN_DAYS_TO_S(val) * 365ULL)
 
-// NOTE: Debug macros
-// -----------------------------------------------------------------------------
+// NOTE: Debug Macros ==============================================================================
 #if !defined(DQN_DEBUG_BREAK)
     #if defined(NDEBUG)
         #define DQN_DEBUG_BREAK
@@ -267,14 +258,25 @@
     #define DQN_MEMSET_BYTE 0
 #endif
 
-// NOTE: Assert macros
-// ------------------------------------------------------------------------------------------------
-#define DQN_HARD_ASSERT(expr) DQN_HARD_ASSERT_MSG(expr, "")
-#define DQN_HARD_ASSERT_MSG(expr, fmt, ...)                         \
-    if (!(expr)) {                                                  \
+// NOTE: Assert Macros =============================================================================
+#define DQN_HARD_ASSERT(expr) DQN_HARD_ASSERTF(expr, "")
+#define DQN_HARD_ASSERTF(expr, fmt, ...)                                         \
+    if (!(expr)) {                                                               \
         Dqn_Log_ErrorF("Hard assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
-        DQN_DEBUG_BREAK;                                            \
+        DQN_DEBUG_BREAK;                                                         \
     }
+
+#if defined(DQN_NO_ASSERT)
+    #define DQN_ASSERTF(...)
+    #define DQN_ASSERT(...)
+#else
+    #define DQN_ASSERT(expr) DQN_ASSERTF(expr, "")
+    #define DQN_ASSERTF(expr, fmt, ...)                                         \
+        if (!(expr)) {                                                          \
+            Dqn_Log_ErrorF("Assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
+            DQN_DEBUG_BREAK;                                                    \
+        }
+#endif
 
 #if defined(__cplusplus__)
     #define DQN_ZERO_INIT {}
@@ -282,22 +284,10 @@
     #define DQN_ZERO_INIT {0}
 #endif
 
-#if defined(DQN_NO_ASSERT)
-    #define DQN_ASSERT(expr)
-    #define DQN_ASSERT_MSG(expr, fmt, ...)
-#else
-    #define DQN_ASSERT(expr) DQN_HARD_ASSERT_MSG(expr, "")
-    #define DQN_ASSERT_MSG(expr, fmt, ...) DQN_HARD_ASSERT_MSG(expr, fmt, ##__VA_ARGS__)
-#endif
+#define DQN_INVALID_CODE_PATHF(fmt, ...) DQN_ASSERTF(0, fmt, ##__VA_ARGS__)
+#define DQN_INVALID_CODE_PATH DQN_INVALID_CODE_PATHF("Invalid code path triggered")
 
-#define DQN_INVALID_CODE_PATH_MSG(fmt, ...) DQN_ASSERT_MSG(0, fmt, ##__VA_ARGS__)
-#define DQN_INVALID_CODE_PATH DQN_INVALID_CODE_PATH_MSG("Invalid code path triggered")
-
-#define DQN_HARD_INVALID_CODE_PATH_MSG(fmt, ...) DQN_HARD_ASSERT_MSG(0, fmt, ##__VA_ARGS__)
-#define DQN_HARD_INVALID_CODE_PATH DQN_HARD_INVALID_CODE_PATH_MSG("Invalid code path triggered")
-
-// NOTE: Defer macros
-// ------------------------------------------------------------------------------------------------
+// NOTE: Defer Macro ===============================================================================
 #if 0
 #include <stdio.h>
 int main()
@@ -479,50 +469,57 @@ struct Dqn_CPUIDRegisters
 /// Execute 'CPUID' instruction to query the capabilities of the current CPU.
 Dqn_CPUIDRegisters Dqn_CPUID(int function_id);
 
-/// A mutex implemented using an atomic compare and swap on tickets handed out
-/// for each critical section.
-///
-/// This mutex serves ticket in order and will block all other threads until the
-/// tickets are returned in order. The thread with the oldest ticket that has
-/// not been returned has right of way to execute, all other threads will be
-/// blocked in an atomic compare and swap loop. block execution by going into an
-/// atomic
-///
-/// When a thread is blocked by this mutex, a spinlock intrinsic `_mm_pause` is
-/// used to yield the CPU and reduce spinlock on the thread. This mutex is not
-/// ideal for long blocking operations. This mutex does not issue any syscalls
-/// and relies entirely on atomic instructions.
+// =================================================================================================
+// [$TMUT] Dqn_TicketMutex      |                             | Userland mutex via spinlocking atomics
+// =================================================================================================
+// A mutex implemented using an atomic compare and swap on tickets handed out
+// for each critical section.
+//
+// This mutex serves ticket in order and will block all other threads until the
+// tickets are returned in order. The thread with the oldest ticket that has
+// not been returned has right of way to execute, all other threads will be
+// blocked in an atomic compare and swap loop. block execution by going into an
+// atomic
+//
+// When a thread is blocked by this mutex, a spinlock intrinsic `_mm_pause` is
+// used to yield the CPU and reduce spinlock on the thread. This mutex is not
+// ideal for long blocking operations. This mutex does not issue any syscalls
+// and relies entirely on atomic instructions.
+//
+// NOTE: API
+//
+// @proc Dqn_TicketMutex_Begin, End
+//   @desc Lock and unlock the mutex respectively
+//
+// @proc Dqn_TicketMutex_MakeTicket
+//   @desc Allocate the next available ticket from the mutex for locking using
+//   Dqn_TicketMutex_BeginTicket().
+//   @param[in] mutex The mutex
+//   @code
+//   Dqn_TicketMutex mutex = {};
+//   unsigned int ticket = Dqn_TicketMutex_MakeTicket(&mutex);
+//   Dqn_TicketMutex_BeginTicket(&mutex, ticket); // Blocking call until we attain the lock
+//   Dqn_TicketMutex_End(&mutex);
+//   @endcode
+//
+// @proc Dqn_TicketMutex_BeginTicket
+//   @desc Lock the mutex using the given ticket if possible, otherwise block
+//   waiting until the mutex can be locked.
+//
+// @proc Dqn_TicketMutex_CanLock
+//   @desc Determine if the mutex can be locked using the given ticket number
+
 struct Dqn_TicketMutex
 {
     unsigned int volatile ticket;  ///< The next ticket to give out to the thread taking the mutex
     unsigned int volatile serving; ///< The ticket ID to block the mutex on until it is returned
 };
 
-/// Lock the mutex
-void Dqn_TicketMutex_Begin(Dqn_TicketMutex *mutex);
-
-/// Unlock the mutex
-void Dqn_TicketMutex_End(Dqn_TicketMutex *mutex);
-
-/// Allocate the next available ticket from the mutex for locking using
-/// Dqn_TicketMutex_BeginTicket().
-///
-/// @param[in] mutex The mutex
-///
-/// @code
-/// Dqn_TicketMutex mutex = {};
-/// unsigned int ticket = Dqn_TicketMutex_MakeTicket(&mutex);
-/// Dqn_TicketMutex_BeginTicket(&mutex, ticket); // Blocking call until we attain the lock
-/// Dqn_TicketMutex_End(&mutex);
-/// @endcode
-Dqn_uint Dqn_TicketMutex_MakeTicket(Dqn_TicketMutex *mutex);
-
-/// Lock the mutex using the given ticket if possible, otherwise block
-/// waiting until the mutex can be locked.
-void Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
-
-/// Determine if the mutex can be locked using the given ticket number.
-bool Dqn_TicketMutex_CanLock(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
+void     Dqn_TicketMutex_Begin      (Dqn_TicketMutex *mutex);
+void     Dqn_TicketMutex_End        (Dqn_TicketMutex *mutex);
+Dqn_uint Dqn_TicketMutex_MakeTicket (Dqn_TicketMutex *mutex);
+void     Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
+bool     Dqn_TicketMutex_CanLock    (Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 
 // =================================================================================================
 // [$STBS] stb_sprintf          |                             | Portable sprintf
@@ -1526,6 +1523,67 @@ DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF (Dqn_ArenaCatalog *catalog, Dqn_usize
 // =================================================================================================
 // [$VARR] Dqn_VArray           | DQN_NO_VARRAY               | Array backed by virtual memory arena
 // =================================================================================================
+//
+// An array that is backed by virtual memory by reserving addressing space and
+// comitting pages as items are allocated in the array. This array never
+// reallocs, instead you should reserve the upper bound of the memory you will
+// possibly ever need (e.g. 16GB) and let the array commit physical pages on
+// demand. On 64 bit operating systems you are given 48 bits of addressable
+// space giving you 256 TB of reservable memory. This gives you practically
+// an unlimited array capacity that avoids reallocs and only consumes memory 
+// that is actually occupied by the array.
+//
+// Each page that is committed into the array will be at page/allocation
+// granularity which are always cache aligned. This array essentially retains
+// all the benefits of normal arrays,
+//
+// - contiguous memory
+// - O(1) random access
+// - O(N) iterate
+//
+// In addition to no realloc on expansion or shrinking.
+//
+// NOTE: API
+//
+// @proc Dqn_VArray_InitByteSize, Dqn_VArray_Init
+//   @desc Initialise an array with the requested byte size or item capacity
+//   respectively. The returned array may have a higher capacity than the
+//   requested amount since requested memory from the OS may have a certain
+//   alignment requirement (e.g. on Windows reserve/commit are 64k/4k aligned).
+//
+// @proc Dqn_VArray_IsValid
+//   @desc Verify if the array has been initialised
+//
+// @proc Dqn_VArray_Make, Dqn_VArray_Add
+//   @desc Allocate items into the array
+//     'Make' creates the `count` number of requested items
+//     'Add' adds the array of items into the array
+//   @return The array of items allocated. Null pointer if the array is invalid
+//   or the array has insufficient space for the requested items.
+//
+// @proc Dqn_VArray_EraseRange
+//   @desc Erase the next `count` items at `begin_index` in the array. `count`
+//   can be positive or negative which dictates the if we erase forward from the
+//   `begin_index` or in reverse.
+//
+//   This operation will invalidate all pointers to the array!
+//
+//   @param erase The erase method, stable erase will shift all elements after
+//   the erase ranged into the range. Unstable erase will copy the tail elements
+//   into the range to delete.
+//
+// @proc Dqn_VArray_Reserve
+//   @desc Ensure that the requested number of items are backed by physical
+//   pages from the OS. Calling this pre-emptively will minimise syscalls into
+//   the kernel to request memory. The requested items will be rounded up to the
+//   in bytes to the allocation granularity of OS allocation APIs hence the
+//   reserved space may be greater than the requested amount (e.g. this is 4k
+//   on Windows).
+//
+// TODO(doyle)
+//
+// Add an API for shrinking the array by decomitting pages back to the OS.
+
 template <typename T> struct Dqn_VArray
 {
     Dqn_ArenaBlock *block; ///< Block of memory from the allocator for this array
@@ -3070,7 +3128,7 @@ struct Dqn_OSTimedBlock
 
 // Dump the timing block via Dqn_Log
 #define DQN_OS_TIMED_BLOCK_DUMP                                                                         \
-    DQN_ASSERT_MSG(timings_size_ < sizeof(timings_) / sizeof(timings_[0]),                              \
+    DQN_ASSERTF(timings_size_ < sizeof(timings_) / sizeof(timings_[0]),                              \
                    "Timings array indexed out-of-bounds, use a bigger size");                           \
     for (int timings_index_ = 0; timings_index_ < (timings_size_ - 1); timings_index_++) {              \
         Dqn_OSTimedBlock t1 = timings_[timings_index_ + 0];                                             \
@@ -4006,10 +4064,9 @@ DQN_FSTRING8_API
 Dqn_String8 Dqn_FString8_ToString8(DQN_FSTRING8 const *string)
 {
     Dqn_String8 result = {};
-    if (!string)
+    if (!string || string->size <= 0)
         return result;
 
-    DQN_HARD_ASSERT(string->size >= 0);
     result.data = DQN_CAST(char *)string->data;
     result.size = string->size;
     return result;
@@ -4831,11 +4888,11 @@ DQN_API Dqn_uint Dqn_TicketMutex_MakeTicket(Dqn_TicketMutex *mutex)
 
 DQN_API void Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket)
 {
-    DQN_ASSERT_MSG(mutex->serving <= ticket,
-                   "Mutex skipped ticket? Was ticket generated by the correct mutex via MakeTicket? ticket = %u, "
-                   "mutex->serving = %u",
-                   ticket,
-                   mutex->serving);
+    DQN_ASSERTF(mutex->serving <= ticket,
+                "Mutex skipped ticket? Was ticket generated by the correct mutex via MakeTicket? ticket = %u, "
+                "mutex->serving = %u",
+                ticket,
+                mutex->serving);
     while (ticket != mutex->serving) {
         // NOTE: Use spinlock intrinsic
         _mm_pause();
@@ -6177,7 +6234,7 @@ DQN_API void Dqn_Library_LeakTraceAdd(Dqn_CallSite call_site, void *ptr, Dqn_usi
     // TODO: Add API for always making the item but exposing a var to indicate if the item was newly created or it already existed.
     Dqn_LeakTrace *trace  = Dqn_DSMap_Find(&dqn_library.alloc_table, Dqn_DSMap_KeyU64(DQN_CAST(uintptr_t)ptr));
     if (trace) {
-        DQN_HARD_ASSERT_MSG(trace->freed, "This pointer is already in the leak tracker, however it"
+        DQN_HARD_ASSERTF(trace->freed, "This pointer is already in the leak tracker, however it"
                                           " has not been freed yet. Somehow this pointer has been"
                                           " given to the allocation table and has not being marked"
                                           " freed with an equivalent call to LeakTraceMarkFree()"
@@ -6206,12 +6263,12 @@ DQN_API void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr)
     Dqn_TicketMutex_Begin(&dqn_library.alloc_table_mutex);
 
     Dqn_LeakTrace *trace = Dqn_DSMap_Find(&dqn_library.alloc_table, Dqn_DSMap_KeyU64(DQN_CAST(uintptr_t)ptr));
-    DQN_HARD_ASSERT_MSG(trace, "Allocated pointer can not be removed as it does not exist in the"
+    DQN_HARD_ASSERTF(trace, "Allocated pointer can not be removed as it does not exist in the"
                               " allocation table. When this memory was allocated, the pointer was"
                               " not added to the allocation table [ptr=%p]",
                               ptr);
 
-    DQN_HARD_ASSERT_MSG(!trace->freed,
+    DQN_HARD_ASSERTF(!trace->freed,
                         "Double free detected, pointer was previously allocated at [ptr=%p, %_$$d, file=\"%.*s:%u\", function=\"%.*s\"]",
                         ptr,
                         trace->size,
@@ -6328,22 +6385,28 @@ DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, Dq
 
 DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
-    Dqn_isize allocation_size = size + (align - 1);
-    if ((block->used + allocation_size) > block->size)
-        return nullptr;
-
     DQN_ASSERT(block->hwm_used <= block->commit);
-    DQN_ASSERT_MSG(block->commit >= block->used,
+    DQN_ASSERTF(block->commit >= block->used,
                    "Internal error: Committed size must always be greater than the used size [commit=%_$$zd, used=%_$$zd]",
                    block->commit, block->used);
 
-    void *unaligned_result = DQN_CAST(char *)block->memory + block->used;
-    void *result           = DQN_CAST(void *)Dqn_PowerOfTwoRoundUp(DQN_CAST(uintptr_t)unaligned_result, align);
+    // NOTE: Calculate how much we need to pad the next pointer to divvy out
+    // (only if it is unaligned)
+    uintptr_t next_ptr     = DQN_CAST(uintptr_t)block->memory + block->used;
+    Dqn_isize align_offset = 0;
+    if (next_ptr & (align - 1))
+        align_offset = (align - (next_ptr & (align - 1)));
+
+    Dqn_isize allocation_size = size + align_offset;
+    if ((block->used + allocation_size) > block->size)
+        return nullptr;
+
+    void *result = DQN_CAST(char *)next_ptr + align_offset;
     if (zero_mem == Dqn_ZeroMem_Yes) {
         // NOTE: Newly commit pages are always 0-ed out, we only need to
-        // memset the memory that was used before from the arena.
+        // memset the memory that are being reused.
         Dqn_isize const reused_bytes = DQN_MIN(block->hwm_used - block->used, allocation_size);
-        DQN_MEMSET(unaligned_result, DQN_MEMSET_BYTE, reused_bytes);
+        DQN_MEMSET(DQN_CAST(void *)next_ptr, DQN_MEMSET_BYTE, reused_bytes);
     }
 
     // NOTE: Ensure requested bytes are backed by physical pages from the OS
@@ -6356,9 +6419,9 @@ DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size,
     block->used           += allocation_size;
     block->hwm_used        = DQN_MAX(block->hwm_used, block->used);
 
-    DQN_ASSERT_MSG(block->used      <= block->commit,             "Internal error: Committed size must be greater than used size [used=%_$$zd, commit=%_$$zd]", block->used, block->commit);
-    DQN_ASSERT_MSG(block->commit <= block->size,                  "Internal error: Allocation exceeded block capacity [commit=%_$$zd, size=%_$$zd]", block->commit, block->size);
-    DQN_ASSERT_MSG(((DQN_CAST(uintptr_t)result) & (align - 1)) == 0, "Internal error: Pointer alignment failed [address=%p, align=%x]", result, align);
+    DQN_ASSERTF(block->used   <= block->commit,                   "Internal error: Committed size must be greater than used size [used=%_$$zd, commit=%_$$zd]", block->used, block->commit);
+    DQN_ASSERTF(block->commit <= block->size,                     "Internal error: Allocation exceeded block capacity [commit=%_$$zd, size=%_$$zd]", block->commit, block->size);
+    DQN_ASSERTF(((DQN_CAST(uintptr_t)result) & (align - 1)) == 0, "Internal error: Pointer alignment failed [address=%p, align=%x]", result, align);
 
     return result;
 }
@@ -6588,7 +6651,7 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
 
 DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
-    DQN_ASSERT_MSG((align & (align - 1)) == 0, "Power of two alignment required");
+    DQN_ASSERTF((align & (align - 1)) == 0, "Power of two alignment required");
     Dqn_isize allocation_size = size + (align - 1);
     while (!arena->curr ||
            (arena->curr->flags & Dqn_ArenaBlockFlags_Private) ||
@@ -6869,9 +6932,9 @@ DQN_API Dqn_M4 Dqn_M4_Transpose(Dqn_M4 mat)
 
 DQN_API Dqn_M4 Dqn_M4_Rotate(Dqn_V3 axis01, Dqn_f32 radians)
 {
-    DQN_ASSERT_MSG(DQN_ABS(Dqn_V3Length(axis01) - 1.f) <= 0.01f,
-                   "Rotation axis must be normalised, length = %f",
-                   Dqn_V3Length(axis01));
+    DQN_ASSERTF(DQN_ABS(Dqn_V3Length(axis01) - 1.f) <= 0.01f,
+                "Rotation axis must be normalised, length = %f",
+                Dqn_V3Length(axis01));
 
     Dqn_f32 sin           = DQN_SINF(radians);
     Dqn_f32 cos           = DQN_COSF(radians);
@@ -7554,7 +7617,7 @@ DQN_API bool Dqn_Char_IsHex(char ch)
 
 DQN_API uint8_t Dqn_Char_HexToU8(char ch)
 {
-    DQN_ASSERT_MSG(Dqn_Char_IsHex(ch), "Hex character not valid '%c'", ch);
+    DQN_ASSERTF(Dqn_Char_IsHex(ch), "Hex character not valid '%c'", ch);
 
     uint8_t result = 0;
     if (ch >= 'a' && ch <= 'f')
@@ -7824,7 +7887,7 @@ DQN_API Dqn_isize Dqn_Hex_CString8ToByteBuffer(char const *hex, Dqn_isize hex_si
     Dqn_isize trim_size_rounded_up = trim_size + (trim_size % 2);
     Dqn_isize min_buffer_size      = trim_size_rounded_up / 2;
     if (dest_size < min_buffer_size || trim_size <= 0) {
-        DQN_ASSERT_MSG(dest_size >= min_buffer_size, "Insufficient buffer size for converting hex to binary");
+        DQN_ASSERTF(dest_size >= min_buffer_size, "Insufficient buffer size for converting hex to binary");
         return result;
     }
 
@@ -8173,7 +8236,7 @@ DQN_API Dqn_isize Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_isize size)
 {
     wchar_t module_path[DQN_OS_WIN32_MAX_PATH];
     int module_size = GetModuleFileNameW(nullptr /*module*/, module_path, DQN_ARRAY_UCOUNT(module_path));
-    DQN_HARD_ASSERT_MSG(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
+    DQN_HARD_ASSERTF(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
 
     Dqn_isize result = 0;
     for (int index = module_size - 1; !result && index >= 0; index--)
@@ -8191,7 +8254,7 @@ DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena)
 {
     wchar_t dir[DQN_OS_WIN32_MAX_PATH];
     Dqn_isize dir_size = Dqn_Win_EXEDirW(dir, DQN_ARRAY_ICOUNT(dir));
-    DQN_HARD_ASSERT_MSG(dir_size <= DQN_ARRAY_ICOUNT(dir), "How the hell?");
+    DQN_HARD_ASSERTF(dir_size <= DQN_ARRAY_ICOUNT(dir), "How the hell?");
 
     Dqn_String16 result = {};
     if (dir_size > 0) {
@@ -8767,9 +8830,9 @@ DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
     }
 
 #else
-    DQN_ASSERT_MSG(size <= 32,
-                   "We can increase this by chunking the buffer and filling 32 bytes at a time. *Nix guarantees 32 "
-                   "bytes can always be fulfilled by this system at a time");
+    DQN_ASSERTF(size <= 32,
+                "We can increase this by chunking the buffer and filling 32 bytes at a time. *Nix guarantees 32 "
+                "bytes can always be fulfilled by this system at a time");
     // TODO(doyle): https://github.com/jedisct1/libsodium/blob/master/src/libsodium/randombytes/sysrandom/randombytes_sysrandom.c
     // TODO(doyle): https://man7.org/linux/man-pages/man2/getrandom.2.html
     int read_bytes = 0;
@@ -8825,7 +8888,7 @@ DQN_API Dqn_String8 Dqn_OS_EXEDir(Dqn_Allocator allocator)
             // try_buf around, memcopy the byte and trash the try_buf from the
             // arena. Instead we just get the size and redo the call one last
             // time after this "calculate" step.
-            DQN_ASSERT_MSG(bytes_written < try_size, "bytes_written can never be greater than the try size, function writes at most try_size");
+            DQN_ASSERTF(bytes_written < try_size, "bytes_written can never be greater than the try size, function writes at most try_size");
             required_size_wo_null_terminator = bytes_written;
 
             for (int index_of_last_slash = bytes_written;
@@ -8948,7 +9011,7 @@ DQN_API uint64_t Dqn_OS_PerfCounterNow()
     LARGE_INTEGER integer = {};
     int qpc_result = QueryPerformanceCounter(&integer);
     (void)qpc_result;
-    DQN_ASSERT_MSG(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
+    DQN_ASSERTF(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
     result = integer.QuadPart;
 #else
     struct timespec ts;
@@ -9540,9 +9603,8 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
 
     unsigned long access_mode = 0;
     if (access & Dqn_FsFileAccess_AppendOnly) {
-        DQN_ASSERT_MSG(
-            (access & ~Dqn_FsFileAccess_AppendOnly) == 0,
-            "Append can only be applied exclusively to the file, other access modes not permitted");
+        DQN_ASSERTF((access & ~Dqn_FsFileAccess_AppendOnly) == 0,
+                    "Append can only be applied exclusively to the file, other access modes not permitted");
         access_mode = FILE_APPEND_DATA;
     } else {
         if (access & Dqn_FsFileAccess_Read)
@@ -9762,9 +9824,11 @@ DQN_API uint32_t Dqn_Thread_GetID()
 
 DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COMMA)
 {
+
     thread_local Dqn_ThreadContext result = {};
     if (!result.init) {
         result.init = true;
+        DQN_ASSERTF(dqn_library.lib_init, "Library must be initialised by calling Dqn_Library_Init(nullptr)");
 
         // NOTE: Setup permanent arena
         Dqn_ArenaCatalog *catalog = &dqn_library.arena_catalog;

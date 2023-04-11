@@ -16,7 +16,7 @@ pushd Build
     REM Tp     Treat header file as CPP source file
     set compile_flags=-MT -EHa -GR- -Od -Oi -Z7 -wd4201 -D DQN_TEST_WITH_MAIN -nologo
     set linker_flags=-link -nologo
-    set msvc_flags=
+    set msvc_flags=-fsanitize=address
     set clang_flags=-fsanitize=address -fsanitize=undefined
 
     REM Compiler: MSVC cl
@@ -31,7 +31,7 @@ pushd Build
     REM ------------------------------------------------------------------------
     where /q clang-cl || (
         echo [WARN] Optional clang compile via clang-cl if it's in the path, please put clang-cl on the path for this feature
-        exit /b 0
+        exit /b 1
     )
     clang-cl %compile_flags% %clang_flags% %code_dir%dqn_unit_tests.cpp /Fe:dqn_unit_tests_clang %link_flags%
 popd
