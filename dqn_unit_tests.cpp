@@ -64,254 +64,257 @@ Dqn_Tester TestArena()
     return test;
 }
 
+Dqn_Tester TestBin()
+{
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_Tester test           = {};
+    DQN_TESTER_GROUP(test, "Dqn_Bin") {
+        DQN_TESTER_TEST("Convert 0x123") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("0x123"));
+            DQN_TESTER_ASSERTF(&test, result == 0x123, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert 0xFFFF") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("0xFFFF"));
+            DQN_TESTER_ASSERTF(&test, result == 0xFFFF, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert FFFF") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("FFFF"));
+            DQN_TESTER_ASSERTF(&test, result == 0xFFFF, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert abCD") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("abCD"));
+            DQN_TESTER_ASSERTF(&test, result == 0xabCD, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert 0xabCD") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("0xabCD"));
+            DQN_TESTER_ASSERTF(&test, result == 0xabCD, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert 0x") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("0x"));
+            DQN_TESTER_ASSERTF(&test, result == 0x0, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert 0X") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("0X"));
+            DQN_TESTER_ASSERTF(&test, result == 0x0, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert 3") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("3"));
+            DQN_TESTER_ASSERTF(&test, result == 3, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert f") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("f"));
+            DQN_TESTER_ASSERTF(&test, result == 0xf, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert g") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("g"));
+            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("Convert -0x3") {
+            uint64_t result = Dqn_Bin_HexToU64(DQN_STRING8("-0x3"));
+            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
+        }
+
+        uint32_t number = 0xd095f6;
+        DQN_TESTER_TEST("Convert %x to string", number) {
+            Dqn_String8 number_hex = Dqn_Bin_BytesToHexArena(scratch.arena, &number, sizeof(number));
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(number_hex, DQN_STRING8("f695d000")), "number_hex=%.*s", DQN_STRING_FMT(number_hex));
+        }
+
+        number = 0xf6ed00;
+        DQN_TESTER_TEST("Convert %x to string", number) {
+            Dqn_String8 number_hex = Dqn_Bin_BytesToHexArena(scratch.arena, &number, sizeof(number));
+            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(number_hex, DQN_STRING8("00edf600")), "number_hex=%.*s", DQN_STRING_FMT(number_hex));
+        }
+
+        Dqn_String8 hex = DQN_STRING8("0xf6ed00");
+        DQN_TESTER_TEST("Convert %.*s to bytes", DQN_STRING_FMT(hex)) {
+            Dqn_String8 bytes = Dqn_Bin_HexToBytesArena(scratch.arena, hex);
+            DQN_TESTER_ASSERTF(&test,
+                               Dqn_String8_Eq(bytes, DQN_STRING8("\xf6\xed\x00")),
+                               "number_hex=%.*s",
+                               DQN_STRING_FMT(Dqn_Bin_BytesToHexArena(scratch.arena, bytes.data, bytes.size)));
+        }
+
+    }
+    return test;
+}
+
+
 Dqn_Tester TestBinarySearch()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_BinarySearch") {
         DQN_TESTER_TEST("Search array of 1 item") {
             uint32_t array[] = {1};
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match) == -1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match) == +0);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match) == -1);
 
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +0);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
+            Dqn_BinarySearchResult result = {};
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 1);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 1);
         }
 
         DQN_TESTER_TEST("Search array of 2 items") {
             uint32_t array[] = {1, 2};
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match) == -1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match) == +0);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match) == +1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match) == -1);
 
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +0);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +2);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +2);
+            Dqn_BinarySearchResult result = {};
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 1);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 1);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 2);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 2);
         }
 
         DQN_TESTER_TEST("Search array of 3 items") {
             uint32_t array[] = {1, 2, 3};
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match) == -1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match) == +0);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match) == +1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match) == +2);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 4 /*find*/, Dqn_BinarySearchType_Match) == -1);
 
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +0);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +2);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +3);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 4 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +3);
+            Dqn_BinarySearchResult result = {};
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 1);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 2);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 4 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 1);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 2);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 3);
+
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 4 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 3);
         }
 
         DQN_TESTER_TEST("Search array of 4 items") {
             uint32_t array[] = {1, 2, 3, 4};
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match) == -1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match) == +0);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match) == +1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match) == +2);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 4 /*find*/, Dqn_BinarySearchType_Match) == +3);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 5 /*find*/, Dqn_BinarySearchType_Match) == -1);
 
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +0);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +1);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +2);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +3);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 4 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +4);
-            DQN_TESTER_ASSERT(&test, Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_ICOUNT(array), 5 /*find*/, Dqn_BinarySearchType_OnePastMatch) == +4);
-        }
-    }
-    return test;
-}
+            Dqn_BinarySearchResult result = {};
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 0 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
 
-Dqn_Tester TestCString8()
-{
-    Dqn_Tester test = {};
-    DQN_TESTER_GROUP(test, "Dqn_CString8") {
-        // NOTE: Dqn_CString8_ToI64
-        // ---------------------------------------------------------------------------------------------
-        DQN_TESTER_TEST("To I64: Convert nullptr") {
-            int64_t result = Dqn_CString8_ToI64(nullptr);
-            DQN_TESTER_ASSERT(&test, result == 0);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 1 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
 
-        DQN_TESTER_TEST("To I64: Convert empty string") {
-            int64_t result = Dqn_CString8_ToI64("");
-            DQN_TESTER_ASSERT(&test, result == 0);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 2 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 1);
 
-        DQN_TESTER_TEST("To I64: Convert \"1\"") {
-            int64_t result = Dqn_CString8_ToI64("1");
-            DQN_TESTER_ASSERT(&test, result == 1);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 3 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 2);
 
-        DQN_TESTER_TEST("To I64: Convert \"-0\"") {
-            int64_t result = Dqn_CString8_ToI64("-0");
-            DQN_TESTER_ASSERT(&test, result == 0);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 4 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 3);
 
-        DQN_TESTER_TEST("To I64: Convert \"-1\"") {
-            int64_t result = Dqn_CString8_ToI64("-1");
-            DQN_TESTER_ASSERT(&test, result == -1);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 5 /*find*/, Dqn_BinarySearchType_Match);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
 
-        DQN_TESTER_TEST("To I64: Convert \"1.2\"") {
-            int64_t result = Dqn_CString8_ToI64("1.2");
-            DQN_TESTER_ASSERT(&test, result == 1);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 0 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 0);
 
-        DQN_TESTER_TEST("To I64: Convert \"1,234\"") {
-            int64_t result = Dqn_CString8_ToI64("1,234");
-            DQN_TESTER_ASSERT(&test, result == 1234);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 1 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 1);
 
-        DQN_TESTER_TEST("To I64: Convert \"1,2\"") {
-            int64_t result = Dqn_CString8_ToI64("1,2");
-            DQN_TESTER_ASSERT(&test, result == 12);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 2 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 2);
 
-        DQN_TESTER_TEST("To I64: Convert \"12a3\"") {
-            int64_t result = Dqn_CString8_ToI64("12a3");
-            DQN_TESTER_ASSERT(&test, result == 12);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 3 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 3);
 
-        // NOTE: Dqn_CString8_ToU64
-        // ---------------------------------------------------------------------------------------------
-        DQN_TESTER_TEST("To U64: Convert nullptr") {
-            uint64_t result = Dqn_CString8_ToU64(nullptr);
-            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
-        }
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 4 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 4);
 
-        DQN_TESTER_TEST("To U64: Convert empty string") {
-            uint64_t result = Dqn_CString8_ToU64("");
-            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("To U64: Convert \"1\"") {
-            uint64_t result = Dqn_CString8_ToU64("1");
-            DQN_TESTER_ASSERTF(&test, result == 1, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("To U64: Convert \"-0\"") {
-            uint64_t result = Dqn_CString8_ToU64("-0");
-            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("To U64: Convert \"-1\"") {
-            uint64_t result = Dqn_CString8_ToU64("-1");
-            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("To U64: Convert \"1.2\"") {
-            uint64_t result = Dqn_CString8_ToU64("1.2");
-            DQN_TESTER_ASSERTF(&test, result == 1, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("To U64: Convert \"1,234\"") {
-            uint64_t result = Dqn_CString8_ToU64("1,234");
-            DQN_TESTER_ASSERTF(&test, result == 1234, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("To U64: Convert \"1,2\"") {
-            uint64_t result = Dqn_CString8_ToU64("1,2");
-            DQN_TESTER_ASSERTF(&test, result == 12, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("To U64: Convert \"12a3\"") {
-            uint64_t result = Dqn_CString8_ToU64("12a3");
-            DQN_TESTER_ASSERTF(&test, result == 12, "result: %zu", result);
-        }
-
-        // NOTE: Dqn_CString8_Find
-        // ---------------------------------------------------------------------------------------------
-        DQN_TESTER_TEST("Find: String (char) is not in buffer") {
-            char const buf[]  = "836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55";
-            char const find[] = "2";
-            char const *result = Dqn_CString8_Find(buf, find, Dqn_CString8_ArrayCountI(buf), Dqn_CString8_ArrayCountI(find));
-            DQN_TESTER_ASSERT(&test, result == nullptr);
-        }
-
-        DQN_TESTER_TEST("Find: String (char) is in buffer") {
-            char const buf[]  = "836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55";
-            char const find[] = "6";
-            char const *result = Dqn_CString8_Find(buf, find, Dqn_CString8_ArrayCountI(buf), Dqn_CString8_ArrayCountI(find));
-            DQN_TESTER_ASSERT(&test, result != nullptr);
-            DQN_TESTER_ASSERT(&test, result[0] == '6' && result[1] == 'a');
-        }
-
-        // NOTE: Dqn_CString8_FileNameFromPath
-        // ---------------------------------------------------------------------------------------------
-        DQN_TESTER_TEST("File name from Windows path") {
-            Dqn_isize file_name_size = 0;
-            char const buf[]  = "C:\\ABC\\test.exe";
-            char const *result = Dqn_CString8_FileNameFromPath(buf, Dqn_CString8_ArrayCountI(buf), &file_name_size);
-            DQN_TESTER_ASSERTF(&test, file_name_size == 8, "size: %I64d", file_name_size);
-            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(Dqn_String8_Init(result, file_name_size), DQN_STRING8("test.exe")), "%.*s", DQN_CAST(int)file_name_size, result);
-        }
-
-        DQN_TESTER_TEST("File name from Linux path") {
-            Dqn_isize file_name_size = 0;
-            char const buf[]  = "/ABC/test.exe";
-            char const *result = Dqn_CString8_FileNameFromPath(buf, Dqn_CString8_ArrayCountI(buf), &file_name_size);
-            DQN_TESTER_ASSERTF(&test, file_name_size == 8, "size: %I64d", file_name_size);
-            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(Dqn_String8_Init(result, file_name_size), DQN_STRING8("test.exe")), "%.*s", (int)file_name_size, result);
-        }
-
-        // NOTE: Dqn_CString8_TrimPrefix
-        // ---------------------------------------------------------------------------------------------
-        DQN_TESTER_TEST("Trim prefix") {
-            char const  prefix[]     = "@123";
-            char const  buf[]        = "@123string";
-            Dqn_isize   trimmed_size = 0;
-            char const *result       = Dqn_CString8_TrimPrefix(buf, prefix, Dqn_CString8_ArrayCountI(buf), Dqn_CString8_ArrayCountI(prefix), Dqn_CString8EqCase_Sensitive, &trimmed_size);
-            DQN_TESTER_ASSERTF(&test, trimmed_size == 6, "size: %I64d", trimmed_size);
-            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(Dqn_String8_Init(result, trimmed_size), DQN_STRING8("string")), "%.*s", (int)trimmed_size, result);
-        }
-
-        DQN_TESTER_TEST("Trim prefix, nullptr trimmed size") {
-            char const  prefix[]     = "@123";
-            char const  buf[]        = "@123string";
-            char const *result       = Dqn_CString8_TrimPrefix(buf, prefix, Dqn_CString8_ArrayCountI(buf), Dqn_CString8_ArrayCountI(prefix), Dqn_CString8EqCase_Sensitive, nullptr);
-            DQN_TESTER_ASSERT(&test, result);
-        }
-
-        // NOTE: Dqn_CString8_IsAllDigits
-        // ---------------------------------------------------------------------------------------------
-        DQN_TESTER_TEST("Is all digits fails on non-digit string") {
-            char const buf[]  = "@123string";
-            Dqn_b32    result = Dqn_CString8_IsAllDigits(buf, Dqn_CString8_ArrayCountI(buf));
-            DQN_TESTER_ASSERT(&test, result == false);
-        }
-
-        DQN_TESTER_TEST("Is all digits fails on nullptr") {
-            Dqn_b32 result = Dqn_CString8_IsAllDigits(nullptr, 0);
-            DQN_TESTER_ASSERT(&test, result == false);
-        }
-
-        DQN_TESTER_TEST("Is all digits fails on nullptr w/ size") {
-            Dqn_b32 result = Dqn_CString8_IsAllDigits(nullptr, 1);
-            DQN_TESTER_ASSERT(&test, result == false);
-        }
-
-        DQN_TESTER_TEST("Is all digits fails on 0 size w/ string") {
-            char const buf[]  = "@123string";
-            Dqn_b32    result = Dqn_CString8_IsAllDigits(buf, 0);
-            DQN_TESTER_ASSERT(&test, result == false);
-        }
-
-        DQN_TESTER_TEST("Is all digits success") {
-            char const buf[]  = "23";
-            Dqn_b32    result = Dqn_CString8_IsAllDigits(buf, Dqn_CString8_ArrayCountI(buf));
-            DQN_TESTER_ASSERT(&test, DQN_CAST(bool)result == true);
-        }
-
-        DQN_TESTER_TEST("Is all digits fails on whitespace") {
-            char const buf[]  = "23 ";
-            Dqn_b32    result = Dqn_CString8_IsAllDigits(buf, Dqn_CString8_ArrayCountI(buf));
-            DQN_TESTER_ASSERT(&test, DQN_CAST(bool)result == false);
+            result = Dqn_BinarySearch<uint32_t>(array, DQN_ARRAY_UCOUNT(array), 5 /*find*/, Dqn_BinarySearchType_OnePastMatch);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.index == 4);
         }
     }
     return test;
@@ -517,7 +520,7 @@ Dqn_Tester TestFString8()
     DQN_TESTER_GROUP(test, "Dqn_FString8") {
         DQN_TESTER_TEST("Append too much fails") {
             Dqn_FString8<4> str = {};
-            DQN_TESTER_ASSERT(&test, !Dqn_FString8_AppendCString8(&str, "abcde"));
+            DQN_TESTER_ASSERT(&test, !Dqn_FString8_Append(&str, DQN_STRING8("abcde")));
         }
 
         DQN_TESTER_TEST("Append format string too much fails") {
@@ -591,7 +594,7 @@ Dqn_Tester TestFixedArray()
     DQN_TESTER_GROUP(test, "Dqn_FArray") {
         DQN_TESTER_TEST("Initialise from raw array") {
             int raw_array[] = {1, 2};
-            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
+            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_UCOUNT(raw_array));
             DQN_TESTER_ASSERT(&test, array.size == 2);
             DQN_TESTER_ASSERT(&test, array.data[0] == 1);
             DQN_TESTER_ASSERT(&test, array.data[1] == 2);
@@ -599,8 +602,8 @@ Dqn_Tester TestFixedArray()
 
         DQN_TESTER_TEST("Erase stable 1 element from array") {
             int raw_array[] = {1, 2, 3};
-            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
-            Dqn_FArray_EraseStable(&array, 1);
+            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_UCOUNT(raw_array));
+            Dqn_FArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, Dqn_FArrayErase_Stable);
             DQN_TESTER_ASSERT(&test, array.size == 2);
             DQN_TESTER_ASSERT(&test, array.data[0] == 1);
             DQN_TESTER_ASSERT(&test, array.data[1] == 3);
@@ -608,8 +611,8 @@ Dqn_Tester TestFixedArray()
 
         DQN_TESTER_TEST("Erase unstable 1 element from array") {
             int raw_array[] = {1, 2, 3};
-            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
-            DQN_TESTER_ASSERT(&test, Dqn_FArray_EraseUnstable(&array, 0));
+            auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_UCOUNT(raw_array));
+            Dqn_FArray_EraseRange(&array, 0 /*begin_index*/, 1 /*count*/, Dqn_FArrayErase_Unstable);
             DQN_TESTER_ASSERT(&test, array.size == 2);
             DQN_TESTER_ASSERT(&test, array.data[0] == 3);
             DQN_TESTER_ASSERT(&test, array.data[1] == 2);
@@ -618,8 +621,8 @@ Dqn_Tester TestFixedArray()
         DQN_TESTER_TEST("Add 1 element to array") {
             int const ITEM  = 2;
             int raw_array[] = {1};
-            auto array      = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
-            Dqn_FArray_Add(&array, ITEM);
+            auto array      = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_UCOUNT(raw_array));
+            Dqn_FArray_Add(&array, &ITEM, 1);
             DQN_TESTER_ASSERT(&test, array.size == 2);
             DQN_TESTER_ASSERT(&test, array.data[0] == 1);
             DQN_TESTER_ASSERT(&test, array.data[1] == ITEM);
@@ -627,95 +630,10 @@ Dqn_Tester TestFixedArray()
 
         DQN_TESTER_TEST("Clear array") {
             int raw_array[] = {1};
-            auto array      = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_ICOUNT(raw_array));
-            Dqn_FArray_Clear(&array, Dqn_ZeroMem_No);
+            auto array      = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_UCOUNT(raw_array));
+            Dqn_FArray_Clear(&array);
             DQN_TESTER_ASSERT(&test, array.size == 0);
         }
-    }
-    return test;
-}
-
-Dqn_Tester TestHex()
-{
-    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-    Dqn_Tester test           = {};
-    DQN_TESTER_GROUP(test, "Dqn_Hex") {
-        DQN_TESTER_TEST("Convert 0x123") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0x123"));
-            DQN_TESTER_ASSERTF(&test, result == 0x123, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert 0xFFFF") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0xFFFF"));
-            DQN_TESTER_ASSERTF(&test, result == 0xFFFF, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert FFFF") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("FFFF"));
-            DQN_TESTER_ASSERTF(&test, result == 0xFFFF, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert abCD") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("abCD"));
-            DQN_TESTER_ASSERTF(&test, result == 0xabCD, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert 0xabCD") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0xabCD"));
-            DQN_TESTER_ASSERTF(&test, result == 0xabCD, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert 0x") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0x"));
-            DQN_TESTER_ASSERTF(&test, result == 0x0, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert 0X") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("0X"));
-            DQN_TESTER_ASSERTF(&test, result == 0x0, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert 3") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("3"));
-            DQN_TESTER_ASSERTF(&test, result == 3, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert f") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("f"));
-            DQN_TESTER_ASSERTF(&test, result == 0xf, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert g") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("g"));
-            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
-        }
-
-        DQN_TESTER_TEST("Convert -0x3") {
-            uint64_t result = Dqn_Hex_String8ToU64(DQN_STRING8("-0x3"));
-            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
-        }
-
-        uint32_t number = 0xd095f6;
-        DQN_TESTER_TEST("Convert %x to string", number) {
-            Dqn_String8 number_hex = Dqn_Hex_BytesToString8Arena(scratch.arena, &number, sizeof(number));
-            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(number_hex, DQN_STRING8("f695d000")), "number_hex=%.*s", DQN_STRING_FMT(number_hex));
-        }
-
-        number = 0xf6ed00;
-        DQN_TESTER_TEST("Convert %x to string", number) {
-            Dqn_String8 number_hex = Dqn_Hex_BytesToString8Arena(scratch.arena, &number, sizeof(number));
-            DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(number_hex, DQN_STRING8("00edf600")), "number_hex=%.*s", DQN_STRING_FMT(number_hex));
-        }
-
-        Dqn_String8 hex = DQN_STRING8("0xf6ed00");
-        DQN_TESTER_TEST("Convert %.*s to bytes", DQN_STRING_FMT(hex)) {
-            Dqn_String8 bytes = Dqn_Hex_String8ToBytesArena(scratch.arena, hex);
-            DQN_TESTER_ASSERTF(&test,
-                               Dqn_String8_Eq(bytes, DQN_STRING8("\xf6\xed\x00")),
-                               "number_hex=%.*s",
-                               DQN_STRING_FMT(Dqn_Hex_BytesToString8Arena(scratch.arena, bytes.data, bytes.size)));
-        }
-
     }
     return test;
 }
@@ -1270,33 +1188,33 @@ Dqn_Tester TestString8()
         // NOTE: Dqn_String8_IsAllDigits
         // ---------------------------------------------------------------------------------------------
         DQN_TESTER_TEST("Is all digits fails on non-digit string") {
-            Dqn_b32 result = Dqn_String8_IsAllDigits(DQN_STRING8("@123string"));
+            Dqn_b32 result = Dqn_String8_IsAll(DQN_STRING8("@123string"), Dqn_String8IsAll_Digits);
             DQN_TESTER_ASSERT(&test, result == false);
         }
 
         DQN_TESTER_TEST("Is all digits fails on nullptr") {
-            Dqn_b32 result = Dqn_String8_IsAllDigits(Dqn_String8_Init(nullptr, 0));
+            Dqn_b32 result = Dqn_String8_IsAll(Dqn_String8_Init(nullptr, 0), Dqn_String8IsAll_Digits);
             DQN_TESTER_ASSERT(&test, result == false);
         }
 
         DQN_TESTER_TEST("Is all digits fails on nullptr w/ size") {
-            Dqn_b32 result = Dqn_String8_IsAllDigits(Dqn_String8_Init(nullptr, 1));
+            Dqn_b32 result = Dqn_String8_IsAll(Dqn_String8_Init(nullptr, 1), Dqn_String8IsAll_Digits);
             DQN_TESTER_ASSERT(&test, result == false);
         }
 
-        DQN_TESTER_TEST("Is all digits fails on string w/ 0 size") {
+        DQN_TESTER_TEST("Is all digits succeeds on string w/ 0 size") {
             char const buf[]  = "@123string";
-            Dqn_b32    result = Dqn_String8_IsAllDigits(Dqn_String8_Init(buf, 0));
-            DQN_TESTER_ASSERT(&test, result == false);
+            Dqn_b32    result = Dqn_String8_IsAll(Dqn_String8_Init(buf, 0), Dqn_String8IsAll_Digits);
+            DQN_TESTER_ASSERT(&test, result);
         }
 
         DQN_TESTER_TEST("Is all digits success") {
-            Dqn_b32 result = Dqn_String8_IsAllDigits(DQN_STRING8("23"));
+            Dqn_b32 result = Dqn_String8_IsAll(DQN_STRING8("23"), Dqn_String8IsAll_Digits);
             DQN_TESTER_ASSERT(&test, DQN_CAST(bool)result == true);
         }
 
         DQN_TESTER_TEST("Is all digits fails on whitespace") {
-            Dqn_b32 result = Dqn_String8_IsAllDigits(DQN_STRING8("23 "));
+            Dqn_b32 result = Dqn_String8_IsAll(DQN_STRING8("23 "), Dqn_String8IsAll_Digits);
             DQN_TESTER_ASSERT(&test, DQN_CAST(bool)result == false);
         }
 
@@ -1330,6 +1248,144 @@ Dqn_Tester TestString8()
                 DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(lhs, DQN_STRING8("")), "[lhs=%.*s]", DQN_STRING_FMT(lhs));
                 DQN_TESTER_ASSERTF(&test, Dqn_String8_Eq(rhs, DQN_STRING8("abcdef")), "[rhs=%.*s]", DQN_STRING_FMT(rhs));
             }
+        }
+
+        // NOTE: Dqn_String8_ToI64
+        // =========================================================================================
+        DQN_TESTER_TEST("To I64: Convert null string") {
+            int64_t result = Dqn_String8_ToI64(Dqn_String8_Init(nullptr, 5), 0);
+            DQN_TESTER_ASSERT(&test, result == 0);
+        }
+
+        DQN_TESTER_TEST("To I64: Convert empty string") {
+            int64_t result = Dqn_String8_ToI64(DQN_STRING8(""), 0);
+            DQN_TESTER_ASSERT(&test, result == 0);
+        }
+
+        DQN_TESTER_TEST("To I64: Convert \"1\"") {
+            int64_t result = Dqn_String8_ToI64(DQN_STRING8("1"), 0);
+            DQN_TESTER_ASSERT(&test, result == 1);
+        }
+
+        DQN_TESTER_TEST("To I64: Convert \"-0\"") {
+            int64_t result = Dqn_String8_ToI64(DQN_STRING8("-0"), 0);
+            DQN_TESTER_ASSERT(&test, result == 0);
+        }
+
+        DQN_TESTER_TEST("To I64: Convert \"-1\"") {
+            int64_t result = Dqn_String8_ToI64(DQN_STRING8("-1"), 0);
+            DQN_TESTER_ASSERT(&test, result == -1);
+        }
+
+        DQN_TESTER_TEST("To I64: Convert \"1.2\"") {
+            int64_t result = Dqn_String8_ToI64(DQN_STRING8("1.2"), 0);
+            DQN_TESTER_ASSERT(&test, result == 1);
+        }
+
+        DQN_TESTER_TEST("To I64: Convert \"1,234\"") {
+            int64_t result = Dqn_String8_ToI64(DQN_STRING8("1,234"), ',');
+            DQN_TESTER_ASSERT(&test, result == 1234);
+        }
+
+        DQN_TESTER_TEST("To I64: Convert \"1,2\"") {
+            int64_t result = Dqn_String8_ToI64(DQN_STRING8("1,2"), ',');
+            DQN_TESTER_ASSERT(&test, result == 12);
+        }
+
+        DQN_TESTER_TEST("To I64: Convert \"12a3\"") {
+            int64_t result = Dqn_String8_ToI64(DQN_STRING8("12a3"), 0);
+            DQN_TESTER_ASSERT(&test, result == 12);
+        }
+
+        // NOTE: Dqn_String8_ToU64
+        // ---------------------------------------------------------------------------------------------
+        DQN_TESTER_TEST("To U64: Convert nullptr") {
+            uint64_t result = Dqn_String8_ToU64(Dqn_String8_Init(nullptr, 5), 0);
+            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("To U64: Convert empty string") {
+            uint64_t result = Dqn_String8_ToU64(DQN_STRING8(""), 0);
+            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("To U64: Convert \"1\"") {
+            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("1"), 0);
+            DQN_TESTER_ASSERTF(&test, result == 1, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("To U64: Convert \"-0\"") {
+            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("-0"), 0);
+            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("To U64: Convert \"-1\"") {
+            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("-1"), 0);
+            DQN_TESTER_ASSERTF(&test, result == 0, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("To U64: Convert \"1.2\"") {
+            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("1.2"), 0);
+            DQN_TESTER_ASSERTF(&test, result == 1, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("To U64: Convert \"1,234\"") {
+            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("1,234"), ',');
+            DQN_TESTER_ASSERTF(&test, result == 1234, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("To U64: Convert \"1,2\"") {
+            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("1,2"), ',');
+            DQN_TESTER_ASSERTF(&test, result == 12, "result: %zu", result);
+        }
+
+        DQN_TESTER_TEST("To U64: Convert \"12a3\"") {
+            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("12a3"), 0);
+            DQN_TESTER_ASSERTF(&test, result == 12, "result: %zu", result);
+        }
+
+        // NOTE: Dqn_String8_Find
+        // =========================================================================================
+        DQN_TESTER_TEST("Find: String (char) is not in buffer") {
+            Dqn_String8 buf              = DQN_STRING8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
+            Dqn_String8 find             = DQN_STRING8("2");
+            Dqn_String8FindResult result = Dqn_String8_Find(buf, find, 0);
+            DQN_TESTER_ASSERT(&test, !result.found);
+            DQN_TESTER_ASSERT(&test, result.offset == 0);
+            DQN_TESTER_ASSERT(&test, result.string.data == nullptr);
+            DQN_TESTER_ASSERT(&test, result.string.size == 0);
+        }
+
+        DQN_TESTER_TEST("Find: String (char) is in buffer") {
+            Dqn_String8 buf              = DQN_STRING8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
+            Dqn_String8 find             = DQN_STRING8("6");
+            Dqn_String8FindResult result = Dqn_String8_Find(buf, find, 0);
+            DQN_TESTER_ASSERT(&test, result.found);
+            DQN_TESTER_ASSERT(&test, result.offset == 2);
+            DQN_TESTER_ASSERT(&test, result.string.data[0] == '6');
+        }
+
+        // NOTE: Dqn_String8_FileNameFromPath
+        // =========================================================================================
+        DQN_TESTER_TEST("File name from Windows path") {
+            Dqn_String8 buf    = DQN_STRING8("C:\\ABC\\test.exe");
+            Dqn_String8 result = Dqn_String8_FileNameFromPath(buf);
+            DQN_TESTER_ASSERTF(&test, result == DQN_STRING8("test.exe"), "%.*s", DQN_STRING_FMT(result));
+        }
+
+        DQN_TESTER_TEST("File name from Linux path") {
+            Dqn_String8 buf    = DQN_STRING8("/ABC/test.exe");
+            Dqn_String8 result = Dqn_String8_FileNameFromPath(buf);
+            DQN_TESTER_ASSERTF(&test, result == DQN_STRING8("test.exe"), "%.*s", DQN_STRING_FMT(result));
+        }
+
+        // NOTE: Dqn_String8_TrimPrefix
+        // =========================================================================================
+        DQN_TESTER_TEST("Trim prefix") {
+            Dqn_String8 prefix = DQN_STRING8("@123");
+            Dqn_String8 buf    = DQN_STRING8("@123string");
+            Dqn_String8 result = Dqn_String8_TrimPrefix(buf, prefix, Dqn_String8EqCase_Sensitive);
+            DQN_TESTER_ASSERT(&test, result == DQN_STRING8("string"));
         }
     }
     return test;
@@ -1571,13 +1627,12 @@ void TestRunSuite()
     Dqn_Tester tests[]
     {
         TestArena(),
+        TestBin(),
         TestBinarySearch(),
-        TestCString8(),
         TestDSMap(),
         TestFString8(),
         TestFs(),
         TestFixedArray(),
-        TestHex(),
         TestIntrinsics(),
         #if defined(DQN_TEST_WITH_KECCAK)
         TestKeccak(),

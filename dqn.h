@@ -34,7 +34,7 @@
 // [$SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
 // [$CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
 // [$UTFX] Dqn_UTF              |                             | Unicode helpers
-// [$BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
+// [$BHEX] Dqn_Bin              | DQN_NO_HEX                  | Binary <-> hex helpers
 // [$DATE] Dqn_Date             |                             | Date-time helpers
 // [$WIND] Dqn_Win              |                             | Windows OS helpers
 // [$WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
@@ -134,7 +134,8 @@
 // =================================================================================================
 // [$MACR] Macros               |                             | Define macros used in the library
 // =================================================================================================
-#define Dqn_PowerOfTwoRoundUp(value, power_of_two) (((value) + ((power_of_two) - 1)) & ~((power_of_two) - 1))
+#define Dqn_PowerOfTwoAlign(value, power_of_two) (((value) + ((power_of_two) - 1)) & ~((power_of_two) - 1))
+#define Dqn_IsPowerOfTwo(value) (((value) & (value - 1)) == 0)
 
 // NOTE: Alloc Macros ==============================================================================
 #if !defined(DQN_ALLOC)
@@ -328,13 +329,13 @@ struct Dqn_DeferHelper
 // =================================================================================================
 // [$TYPE] Typedefs             |                             | Typedefs used in the library
 // =================================================================================================
-typedef intptr_t Dqn_isize;
-typedef uintptr_t Dqn_usize;
-typedef intptr_t Dqn_isize;
-typedef float Dqn_f32;
-typedef double Dqn_f64;
+typedef intptr_t     Dqn_isize;
+typedef uintptr_t    Dqn_usize;
+typedef intptr_t     Dqn_isize;
+typedef float        Dqn_f32;
+typedef double       Dqn_f64;
 typedef unsigned int Dqn_uint;
-typedef int32_t Dqn_b32;
+typedef int32_t      Dqn_b32;
 
 #define DQN_USIZE_MAX UINTPTR_MAX
 #define DQN_ISIZE_MAX INTPTR_MAX
@@ -346,7 +347,7 @@ typedef int32_t Dqn_b32;
 struct Dqn_String8 ///< Pointer and length style UTF8 strings
 {
     char      *data; ///< The UTF8 bytes of the string
-    Dqn_isize  size; ///< The number of bytes in the string
+    Dqn_usize  size; ///< The number of bytes in the string
 
     #if defined(__cplusplus)
     char const *begin() const { return data; }        ///< Const begin iterator for range-for loops
@@ -780,10 +781,10 @@ typedef struct Dqn_CallSite {
 
 typedef struct Dqn_LeakTrace {
     void         *ptr;             ///< The pointer we are tracking
-    Dqn_isize     size;            ///< Size of the allocation
+    Dqn_usize     size;            ///< Size of the allocation
     Dqn_CallSite  call_site;       ///< Call site where the allocation was allocated
     bool          freed;           ///< True if this pointer has been freed
-    Dqn_isize     freed_size;      ///< Size of the allocation that has been freed
+    Dqn_usize     freed_size;      ///< Size of the allocation that has been freed
     Dqn_CallSite  freed_call_site; ///< Call site where the allocation was freed
 } Dqn_LeakTrace;
 
@@ -829,241 +830,294 @@ void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, voi
 // =================================================================================================
 // [$CSTR] Dqn_CString8         |                             | C-string helpers
 // =================================================================================================
-/// Calculate the size of a cstring literal/array at compile time
-/// @param literal The cstring literal/array to calculate the size for
-/// @return The size of the cstring not including the null-terminating byte
-template <Dqn_isize N> constexpr Dqn_usize Dqn_CString8_ArrayCount(char const (&literal)[N]) { (void)literal; return N - 1; }
+// @proc Dqn_CString8_ArrayCount
+//   @desc Calculate the size of a cstring literal/array at compile time
+//   @param literal The cstring literal/array to calculate the size for
+//   @return The size of the cstring not including the null-terminating byte
+//
+// @proc Dqn_CString8_FSize, Dqn_CString8_FVSize
+//   Calculate the required size to format the given format cstring.
+//   @param[in] fmt The format string to calculate the size for
+//   @return The size required to format the string, not including the null
+//   terminator.
+//
+// @proc Dqn_CString8_BinarySplit
+//   @desc Split a string into the substring occuring prior and after the first
+//   occurence of the `delimiter`. Neither strings include the `delimiter`.
+//
+//   @param[in] string The string to split
+//   @param[in] string_size The size of the string
+//   @param[in] delimiter The character to split the string on
+//   @param[out] lhs_size The size of the left hand side of the split string
+//   @param[out] rhs The right hand side of the split string
+//   @param[out] rhs_size The size of the right hand side of the split string
+//
+//   @return The left hand side of the split string. The original pointer is
+//   returned if the arguments were invalid.
+//
+// @proc Dqn_CString8_Eq, Dqn_CString8_EqInsensitive
+//   @desc Compare a string for equality with or without case sensitivity.
+//   @param[in] lhs The first string to compare equality with
+//   @param[in] rhs The second string to compare equality with
+//   @param[in] lhs The first string's size
+//   @param[in] rhs The second string's size
+//   @param[in] eq_case Set the comparison to be case sensitive or insensitive
+//   @return True if the arguments are valid, non-null and the strings
+//   are equal, false otherwise.
+//
+// @proc Dqn_CString8_StartsWith, Dqn_CString8_StartsWithInsensitive,
+// Dqn_CString8_EndsWith, Dqn_CString8_EndswithInsensitive
+//   @desc Check if a string starts/ends with the specified prefix
+//   `EndsWithInsensitive` is case insensitive
+//   @param[in] string The string to check for the prefix
+//   @param[in] prefix The prefix to check against the string
+//   @param[in] string_size The size of the string
+//   @param[in] prefix_size The size of the prefix string
+//   @param[in] eq_case Set the comparison to be case sensitive or insensitive
+//   @return True if the string is valid, non-null and has the specified prefix,
+//   false otherwise.
+//
+// @proc Dqn_CString8_TrimPrefix, Dqn_CString8_TrimSuffix
+//   @desc Remove the prefix/suffix respectively from the given `string.
+//
+//   @param[in] string The string to trim
+//   @param[in] prefix The prefix to trim from the string
+//   @param[in] suffix The suffix to trim from the string
+//   @param[in] string_size The size of the string
+//   @param[in] prefix_size The size of the prefix
+//   @param[in] eq_case Set the comparison to be case sensitive or insensitive
+//   @param[out] trimmed_string The size of the trimmed string
+//
+//   @return The trimmed string. The original input string is returned if
+//   arguments are invalid or no trim was possible.
+//
+// @proc Dqn_CString8_TrimWhitespaceAround
+//   @desc Trim whitespace from the prefix and suffix of the string
+//
+//   @param[in] string The string to trim
+//   @param[in] string_size The size of the string
+//   @param[out] trimmed_string The size of the trimmed string
+//
+//   @return The trimmed string. The original input string is returned if
+//   arguments are invalid or no trim was possible.
+//
+// @proc Dqn_CString8_TrimByteOrderMark
+//   @desc Trim UTF8, UTF16 BE/LE, UTF32 BE/LE byte order mark prefix in the string.
+//
+//   @param[in] string The string to trim
+//   @param[in] string_size The size of the string
+//   @param[out] trimmed_string The size of the trimmed string
+//
+//   @return The trimmed string. The original input string is returned if
+//   arguments are invalid or no trim was possible.
+//
+// @proc Dqn_CString8_FileNameFromPath
+//   @desc Get the file name from a file path. The file name is evaluated by
+//   searching from the end of the string backwards to the first occurring path
+//   separator '/' or '\'. If no path separator is found, the original string is
+//   returned. This function preserves the file extension if there were any.
+//
+//   @param[in] path A file path on the disk
+//   @param[in] size The size of the file path string, if size is '-1' the null
+//   terminated string length is evaluated.
+//   @param[out] file_name_size The size of the returned file name
+//
+//   @return The file name in the file path, if none is found, the original path
+//   string is returned. Null pointer if arguments are null or invalid.
+//
+// @proc Dqn_CString8_ToI64Checked, Dqn_CString8_ToI64,
+//  Dqn_CString8_ToU64Checked, Dqn_CString8_ToU64
+//   @desc Convert a number represented as a string to a signed 64 bit number.
+//
+//   The `separator` is an optional digit separator for example, if `separator`
+//   is set to ',' then "1,234" will successfully be parsed to '1234'.
+//
+//   Real numbers are truncated. Both '-' and '+' prefixed strings are permitted,
+//   i.e. "+1234" -> 1234 and "-1234" -> -1234. Strings must consist entirely of
+//   digits, the seperator or the permitted prefixes as previously mentioned
+//   otherwise this function will return false, i.e. "1234 dog" will cause the
+//   function to return false, however, the output is greedily converted and will
+//   be evaluated to "1234".
+//
+//   `ToU64Checked` and `ToU64` only '+' prefix is permitted
+//   `ToI64Checked` and `ToI64` both '+' and '-' prefix is permitted
+//
+//   @param[in] buf The string to convert
+//   @param[in] size The size of the string, pass '-1' to calculate the
+//   null-terminated string length in the function.
+//   @param[in] separator The character used to separate the digits, if any. Set
+//   this to 0, if no separators are permitted.
+//   @param[out] output The number to write the parsed value to
+//
+//   @return The checked variants return false if there were invalid characters
+//   in the string true otherwise.
+//   The non-checked variant returns the number that could optimistically be
+//   parsed from the string e.g. "1234 dog" will return 1234.
+//
+// @proc Dqn_CString8_Size
+//   @desc Calculate the string length of the null-terminated string.
+//   @param[in] a The string whose length is to be determined
+//   @return The length of the string
 
-/// @copybrief Dqn_CString8_ArrayCount
-template <Dqn_isize N> constexpr Dqn_isize Dqn_CString8_ArrayCountI(char const (&literal)[N]) { (void)literal; return N - 1; }
-
-/// @copybrief Dqn_CString8_ArrayCount
-template <int N>       constexpr Dqn_isize Dqn_CString8_ArrayCountInt(char const (&literal)[N]) { (void)literal; return N - 1; }
-
-/// Calculate the required size to format the given format cstring.
-/// @param[in] fmt The format string to calculate the size for
-/// @return The size required to format the string, not including the null
-/// terminator.
-DQN_API Dqn_isize Dqn_CString8_FSize(char const *fmt, ...);
-
-/// @copydoc Dqn_CString8_FSize
-/// @param[in] args The variable argument list to use to format the string
-DQN_API Dqn_isize Dqn_CString8_FVSize(char const *fmt, va_list args);
-
-/// Split a string into the substring occuring prior and after the first
-/// occurence of the `delimiter`.
-///
-/// @param[in] string The string to split
-/// @param[in] string_size The size of the string
-/// @param[in] delimiter The character to split the string on
-/// @param[out] lhs_size The size of the left hand side of the split string
-/// @param[out] rhs The right hand side of the split string
-/// @param[out] rhs_size The size of the right hand side of the split string
-///
-/// @return The left hand side of the split string. The original pointer is
-/// returned if the arguments were invalid.
-DQN_API char const *Dqn_CString8_BinarySplit(char const *string, Dqn_isize string_size, char delimiter, Dqn_isize *lhs_size, char **rhs, Dqn_isize *rhs_size);
-
-enum Dqn_CString8EqCase
-{
-    Dqn_CString8EqCase_Sensitive,
-    Dqn_CString8EqCase_Insensitive,
-};
-
-/// Compare a string for equality with or without case sensitivity.
-/// @param[in] lhs The first string to compare equality with
-/// @param[in] rhs The second string to compare equality with
-/// @param[in] lhs The first string's size
-/// @param[in] rhs The second string's size
-/// @param[in] eq_case Set the comparison to be case sensitive or insensitive
-/// @return True if the arguments are valid, non-null and the strings
-/// are equal, false otherwise.
-DQN_API bool Dqn_CString8_Eq(char const *lhs, char const *rhs, Dqn_isize lhs_size = -1, Dqn_isize rhs_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// Compare a string for equality, case insensitive
-/// @see Dqn_CString8_Eq
-DQN_API bool Dqn_CString8_EqInsensitive(char const *lhs, char const *rhs, Dqn_isize lhs_size = -1, Dqn_isize rhs_size = -1);
-
-/// Check if a string starts with the specified prefix
-/// @param[in] string The string to check for the prefix
-/// @param[in] prefix The prefix to check against the string
-/// @param[in] string_size The size of the string
-/// @param[in] prefix_size The size of the prefix string
-/// @param[in] eq_case Set the comparison to be case sensitive or insensitive
-/// @return True if the string is valid, non-null and has the specified prefix,
-/// false otherwise.
-DQN_API bool Dqn_CString8_StartsWith(char const *string, char const *prefix, Dqn_isize string_size = -1, Dqn_isize prefix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// Check if a string starts with the specified prefix, case insensitive
-/// @see Dqn_CString8_StartsWith
-DQN_API bool Dqn_CString8_StartsWithInsensitive(char const *string, char const *prefix, Dqn_isize string_size = -1, Dqn_isize prefix_size = -1);
-
-/// Check if a string ends with the specified suffix
-/// @param[in] string The string to check for the suffix
-/// @param[in] suffix The suffix to check against the string
-/// @param[in] eq_case Set the comparison to be case sensitive or insensitive
-/// @return True if the string has the specified suffix, false otherwise
-DQN_API bool Dqn_CString8_EndsWith(char const *string, char const *suffix, Dqn_isize string_size = -1, Dqn_isize suffix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// Check if a string ends with the specified suffix, case insensitive
-/// @param[in] string The string to check for the suffix
-/// @param[in] suffix The suffix to check against the string
-/// @return True if the string has the specified suffix, false otherwise
-DQN_API bool Dqn_CString8_EndsWithInsensitive(char const *string, char const *suffix, Dqn_isize string_size = -1, Dqn_isize suffix_size = -1);
-
-/// Remove the prefix from the given `string` if it starts with it by
-/// offsetting the input string.
-///
-/// @param[in] string The string to trim
-/// @param[in] prefix The prefix to trim from the string
-/// @param[in] string_size The size of the string
-/// @param[in] prefix_size The size of the prefix
-/// @param[in] eq_case Set the comparison to be case sensitive or insensitive
-/// @param[out] trimmed_string The size of the trimmed string
-///
-/// @return The trimmed string. The original input string is returned if
-/// arguments are invalid or no trim was possible.
-DQN_API char const *Dqn_CString8_TrimPrefix(char const *string, char const *prefix, Dqn_isize string_size = -1, Dqn_isize prefix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive, Dqn_isize *trimmed_size = nullptr);
-
-/// Remove the prefix from the given `string` if it ends with it by
-/// adjusting the input string size.
-///
-/// @param[in] string The string to trim
-/// @param[in] suffix The suffix to trim from the string
-/// @param[in] string_size The size of the string
-/// @param[in] suffix_size The size of the suffix
-/// @param[in] eq_case Set the comparison to be case sensitive or insensitive
-/// @param[out] trimmed_string The size of the trimmed string
-///
-/// @return The trimmed string. The original input string is returned if
-/// arguments are invalid or no trim was possible.
-DQN_API char const *Dqn_CString8_TrimSuffix(char const *string, char const *suffix, Dqn_isize string_size = -1, Dqn_isize suffix_size = -1, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive, Dqn_isize *trimmed_size = nullptr);
-
-/// Trim whitespace from the prefix and suffix of the string
-///
-/// @param[in] string The string to trim
-/// @param[in] string_size The size of the string
-/// @param[out] trimmed_string The size of the trimmed string
-///
-/// @return The trimmed string. The original input string is returned if
-/// arguments are invalid or no trim was possible.
-DQN_API char const *Dqn_CString8_TrimWhitespaceAround(char const *string, Dqn_isize string_size = -1, Dqn_isize *trimmed_size = nullptr);
-
-/// Trim UTF8, UTF16 BE/LE, UTF32 BE/LE byte order mark prefix in the string.
-///
-/// @param[in] string The string to trim
-/// @param[in] string_size The size of the string
-/// @param[out] trimmed_string The size of the trimmed string
-///
-/// @return The trimmed string. The original input string is returned if
-/// arguments are invalid or no trim was possible.
-DQN_API char const *Dqn_CString8_TrimByteOrderMark(char const *string, Dqn_isize string_size = -1, Dqn_isize *trimmed_size = nullptr);
-
-/// Get the file name from a file path.
-///
-/// The file name is evaluated by searching from the end of the string backwards
-/// to the first occurring path separator '/' or '\'. If no path separator is
-/// found, the original string is returned. This function preserves the file
-/// extension if there were any.
-///
-/// @param[in] path A file path on the disk
-/// @param[in] size The size of the file path string, if size is '-1' the null
-/// terminated string length is evaluated.
-/// @param[out] file_name_size The size of the returned file name
-///
-/// @return The file name in the file path, if none is found, the original path
-/// string is returned. Null pointer if arguments are null or invalid.
-DQN_API char const *Dqn_CString8_FileNameFromPath(char const *path, Dqn_isize size = -1, Dqn_isize *file_name_size = nullptr);
-
-/// Convert a number represented as a string to a unsigned 64 bit number.
-///
-/// This function behaves similarly to @see Dqn_CString8_ToI64Checked with the
-/// exception that only the '+' prefix is permitted.
-DQN_API bool Dqn_CString8_ToU64Checked(char const *buf, Dqn_isize size, char separator, uint64_t *output);
-
-/// Convert a number to an unsigned 64 bit number.
-///
-/// @copydetails Dqn_CString8_ToU64Checked
-///
-/// @return The parsed number. On failure, this function optimistically returns
-/// the most that could be parsed from the string, i.e. "1234 dog" will return
-/// "1234".
-DQN_API uint64_t Dqn_CString8_ToU64(char const *buf, Dqn_isize size = -1, char separator = ',');
-
-/// Convert a number represented as a string to a signed 64 bit number.
-///
-/// The `separator` is an optional digit separator for example, if `separator`
-/// is set to ',' then "1,234" will successfully be parsed to '1234'.
-///
-/// Real numbers are truncated. Both '-' and '+' prefixed strings are permitted,
-/// i.e. "+1234" -> 1234 and "-1234" -> -1234. Strings must consist entirely of
-/// digits, the seperator or the permitted prefixes as previously mentioned,
-/// otherwise this function will return false, i.e. "1234 dog" will cause the
-/// function to return false, however, the output is greedily converted and will
-/// be evaluated to "1234".
-///
-/// @param[in] buf The string to convert
-/// @param[in] size The size of the string, pass '-1' to calculate the
-/// null-terminated string length in the function.
-/// @param[in] separator The character used to separate the digits, if any. Set
-/// this to 0, if no separators are permitted.
-/// @param[out] output The number to write the parsed value to
-///
-/// @return True if the string was parsed successfully, false otherwise, e.g.
-/// non-permitted character found in string.
-DQN_API bool Dqn_CString8_ToI64Checked(char const *buf, Dqn_isize size, char separator, int64_t *output);
-
-/// Convert a number represented as a string to a signed 64 bit number.
-///
-/// This function behaves similarly to @see Dqn_CString8_ToI64Checked
-///
-/// @return The parsed number. On failure, this function optimistically returns
-/// the most that could be parsed from the string, i.e. "1234 dog" will return
-/// "1234".
-DQN_API int64_t Dqn_CString8_ToI64(char const *buf, Dqn_isize size = -1, char separator = ',');
-
-DQN_API char const *Dqn_CString8_FindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_sizes, Dqn_isize find_size, Dqn_isize *match_index, Dqn_isize buf_size = -1);
-DQN_API char const *Dqn_CString8_Find(char const *buf, char const *find, Dqn_isize buf_size = -1, Dqn_isize find_size = -1, bool case_insensitive = false);
-
-/// Calculate the string length of the null-terminated string.
-/// @param[in] a The string whose length is to be determined
-/// @return The length of the string
-DQN_API Dqn_isize Dqn_CString8_Size(char const *a);
-
-DQN_API bool        Dqn_CString8_Match(char const *src, char const *find, int find_size);
-DQN_API char const *Dqn_CString8_SkipToChar(char const *src, char ch);
-DQN_API char const *Dqn_CString8_SkipToNextAlphaNum(char const *src);
-DQN_API char const *Dqn_CString8_SkipToNextDigit(char const *src);
-DQN_API char const *Dqn_CString8_SkipToNextChar(char const *src);
-DQN_API char const *Dqn_CString8_SkipToNextWord(char const *src);
-DQN_API char const *Dqn_CString8_SkipToNextWhitespace(char const *src);
-DQN_API char const *Dqn_CString8_SkipWhitespace(char const *src);
-DQN_API char const *Dqn_CString8_SkipToCharInPlace(char const **src, char ch);
-DQN_API char const *Dqn_CString8_SkipToNextAlphaNumInPlace(char const **src);
-DQN_API char const *Dqn_CString8_SkipToNextCharInPlace(char const **src);
-DQN_API char const *Dqn_CString8_SkipToNextWhitespaceInPlace(char const **src);
-DQN_API char const *Dqn_CString8_SkipToNextWordInPlace(char const **src);
-DQN_API char const *Dqn_CString8_SkipWhitespaceInPlace(char const **src);
-DQN_API bool        Dqn_CString8_IsAllDigits(char const *src, Dqn_isize size);
-
-DQN_API Dqn_isize Dqn_CString16_Size(wchar_t const *a);
+DQN_API template <Dqn_usize N> constexpr Dqn_usize Dqn_CString8_ArrayUCount(char const (&literal)[N]) { (void)literal; return N - 1; }
+DQN_API template <Dqn_usize N> constexpr Dqn_usize Dqn_CString8_ArrayICount(char const (&literal)[N]) { (void)literal; return N - 1; }
+DQN_API                                  Dqn_usize Dqn_CString8_FSize      (char const *fmt, ...);
+DQN_API                                  Dqn_usize Dqn_CString8_FVSize     (char const *fmt, va_list args);
+DQN_API                                  Dqn_usize Dqn_CString8_Size       (char const *a);
+DQN_API                                  Dqn_usize Dqn_CString16_Size      (wchar_t const *a);
 
 // =================================================================================================
 // [$STR8] Dqn_String8          |                             | Pointer and length strings
 // =================================================================================================
-/// Construct a UTF8 c-string literal into a Dqn_String8 referencing a string
-/// stored in the data-segment. This string is read-only.
-#define DQN_STRING8(string) Dqn_String8{(char *)(string), sizeof(string) - 1}
+//
+// NOTE: API
+//
+// @proc Dqn_String8_Init
+//   @desc Initialise a string from a pointer and length
+//   The string is invalid (i.e. Dqn_String8_IsValid() returns false) if size is
+//   negative or the string is null.
+//
+// @proc Dqn_String8_InitCString
+//   @desc Initialise a string from a cstring
+//   The cstring must be null-terminated as its length is evaluated using
+//   strlen. The string is invalid (i.e. Dqn_String8_IsValid() returns false) if
+//   size is negative or the string is null.
+//
+// @proc Dqn_String8_InitF
+//   @desc Create a string from a printf style format string
+//   @param[in] allocator The allocator the string will be allocated from
+//   @param[in] fmt The printf style format cstring
+//
+// @proc Dqn_String8_InitFV
+//   @desc Create a string from a printf style format string using a va_list
+//   @param[in] arena The allocator the string will be allocated from
+//   @param[in] fmt The printf style format cstring
+//   @param[in] va The variable argument list
+//
+// @proc Dqn_String8_IsValid
+//   @desc Determine if the values of the given string are valid
+//   A string is invalid if size is negative or the string is null.
+//   @return True if the string is valid, false otherwise.
+//
+// @proc Dqn_String8 Dqn_String8_Slice
+//   @desc Create a slice from a pre-existing string.
+//   The requested slice is clamped to within the bounds of the original string.
+//   @param[in] string The string to slice
+//   @param[in] offset The starting byte to slice from
+//   @param[in] size The size of the slice
+//   @return The sliced string
+//
+// @proc Dqn_String8_Allocate
+//   @desc Create an empty string with the requested size
+//   @param[in] allocator The allocator the string will be allocated from
+//   @param[in] size The size in bytes of the string to allocate
+//   @param[in] zero_mem Enum to indicate if the string's memory should be cleared
+//
+// @proc Dqn_String8_CopyCString
+//   @desc Create a copy of the given cstring
+//   @param[in] allocator The allocator the string will be allocated from
+//   @param[in] string The cstring to copy
+//   @param[in] size The size of the cstring to copy. This cannot be <= 0
+//   @return A copy of the string, invalid string if any argument was invalid.
+//
+// @proc Dqn_String8_Copy
+//   @desc Create a copy of the given string
+//   @param[in] allocator The allocator the string will be allocated from
+//   @param[in] string The string to copy
+//   @return A copy of the string, invalid string if any argument was invalid.
+//
+// @proc Dqn_String8 Dqn_String8_BinarySplit
+//   @desc @see Dqn_CString8_BinarySplit
+//
+// @proc Dqn_String8_Eq
+//   @desc @see Dqn_CString8_Eq
+//
+// @proc Dqn_String8_EqInsensitive
+//   @desc @see Dqn_CString8_EqInsensitive
+//
+// @proc Dqn_String8_StartsWith
+//   @desc @see Dqn_CString8_StartsWith
+//
+// @proc Dqn_String8_StartsWithInsensitive
+//   @desc @see Dqn_CString8_StartsWithInsensitive
+//
+// @proc Dqn_String8_EndsWith
+//   @desc @see Dqn_CString8_EndsWith
+//
+// @proc Dqn_String8_EndsWithInsensitive
+//   @desc @see Dqn_CString8_EndsWithInsensitive
+//
+// @proc Dqn_String8 Dqn_String8_TrimPrefix
+//   @desc @see Dqn_CString8_TrimPrefix
+//
+// @proc Dqn_String8 Dqn_String8_TrimSuffix
+//   @desc @see Dqn_CString8_TrimSuffix
+//
+// @proc Dqn_String8 Dqn_String8_TrimWhitespaceAround
+//   @desc @see Dqn_CString8_TrimWhitespaceAround
+//
+// @proc Dqn_String8 Dqn_String8_TrimByteOrderMark
+//   @desc @see Dqn_CString8_TrimByteOrderMark
+//
+// @proc Dqn_String8 Dqn_String8_FileNameFromPath
+//   @desc @see Dqn_CString8_FileNameFromPath
+//
+// @proc Dqn_String8_ToU64Checked
+//   @desc @see Dqn_CString8_ToU64Checked
+//
+// @proc Dqn_String8_ToU64
+//   @desc @see Dqn_CString8_ToU64
+//
+// @proc Dqn_String8_ToI64Checked
+//   @desc @see Dqn_CString8_ToI64Checked
+//
+// @proc Dqn_String8_ToI64
+//   @desc @see Dqn_CString8_ToI64
+//
+// @proc Dqn_String8_Split
+//   @desc Split a string by the delimiting character.
+//   This function can evaluate the number of splits required in the return value
+//   by setting `splits` to null and `splits_count` to 0.
+//   @param[in] string The source string to split
+//   @param[in] delimiter The substring to split the string on
+//   @param[out] splits (Optional) The destination array to write the splits to.
+//   @param[in] splits_count The number of splits that can be written into the
+//   `splits` array.
+//   @return The number of splits in the `string`. If the return value is >=
+//   'splits_count' then there are more splits in the string than can be written
+//   to the `splits` array. The number of splits written is capped to the
+//   capacity given by the caller, i.e. `splits_count`. This function should be
+//   called again with a sufficiently sized array if all splits are desired.
+//
+// @proc Dqn_String8_Remove
+//   @desc Remove the substring denoted by the begin index and the size from the string
+//   string in-place using MEMMOVE to shift the string back.
+//
+// @proc Dqn_String8_FindOffset
+//   @desc
+//   @param[in] start_index Set an index within the string string to start the
+//   search from, if not desired, set to 0
+//   @return The index of the matching find, -1 if it is not found
+//
+// @proc Dqn_String8_Find
+//   @desc @param start_index Set an index within the string string to start the search
+//   from, if not desired, set to 0
+//   @return A string that points to the matching find, otherwise a 0 length string.
+//
+// @proc DQN_STRING8
+//   @desc Construct a UTF8 c-string literal into a Dqn_String8 referencing a 
+//   string stored in the data-segment. This string is read-only.
+//
+// @proc DQN_STRING16
+//   @desc Construct a UTF16 c-string literal into a Dqn_String16 referencing a string
+//   stored in the data-segment. This string is read-only.
+//
+// @proc DQN_STRING_FMT
+//   @desc Unpack a string into arguments for printing a string into a printf style
+//   format string.
 
-/// Construct a UTF16 c-string literal into a Dqn_String16 referencing a string
-/// stored in the data-segment. This string is read-only.
-#define DQN_STRING16(string) Dqn_String16{(wchar_t *)(string), (sizeof(string)/sizeof(string[0])) - 1}
-
-/// Unpack a string into arguments for printing a string into a printf style
-/// format string.
-#define DQN_STRING_FMT(string) (int)((string).size), (string).data
-
-struct Dqn_String8Link {
+struct Dqn_String8Link
+{
     Dqn_String8      string; ///< The string
     Dqn_String8Link *next;   ///< The next string in the linked list
 };
@@ -1071,7 +1125,7 @@ struct Dqn_String8Link {
 struct Dqn_String16 /// A pointer and length style string that holds slices to UTF16 bytes.
 {
     wchar_t   *data; ///< The UTF16 bytes of the string
-    Dqn_isize  size; ///< The number of bytes in the string
+    Dqn_usize  size; ///< The number of characters in the string
 
     #if defined(__cplusplus)
     wchar_t const *begin() const { return data; }        ///< Const begin iterator for range-for loops
@@ -1081,153 +1135,86 @@ struct Dqn_String16 /// A pointer and length style string that holds slices to U
     #endif
 };
 
-/// Initialise a string from a pointer and length
-/// The string is invalid (i.e. Dqn_String8_IsValid() returns false) if size is
-/// negative or the string is null.
-DQN_API Dqn_String8 Dqn_String8_Init(char const *string, Dqn_isize size);
-
-/// Initialise a string from a cstring
-/// The cstring must be null-terminated as its length is evaluated using
-/// strlen. The string is invalid (i.e. Dqn_String8_IsValid() returns false) if
-/// size is negative or the string is null.
-DQN_API Dqn_String8 Dqn_String8_InitCString(char const *string);
-
-/// Create a string from a printf style format string
-/// @param[in] allocator The allocator the string will be allocated from
-/// @param[in] fmt The printf style format cstring
-#define Dqn_String8_InitF(allocator, fmt, ...) Dqn_String8_InitF_(DQN_LEAK_TRACE allocator, fmt, ## __VA_ARGS__)
-DQN_API Dqn_String8 Dqn_String8_InitF_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, ...);
-
-/// Create a string from a printf style format string using a va_list
-/// @param[in] arena The allocator the string will be allocated from
-/// @param[in] fmt The printf style format cstring
-/// @param[in] va The variable argument list
-#define Dqn_String8_InitFV(allocator, fmt, args) Dqn_String8_InitFV_(DQN_LEAK_TRACE allocator, fmt, args)
-DQN_API Dqn_String8 Dqn_String8_InitFV_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, va_list args);
-
-/// Determine if the values of the given string are valid
-/// A string is invalid if size is negative or the string is null.
-/// @return True if the string is valid, false otherwise.
-DQN_API bool Dqn_String8_IsValid(Dqn_String8 string);
-
-/// Create a slice from a pre-existing string.
-/// The requested slice is clamped to within the bounds of the original string.
-/// @param[in] string The string to slice
-/// @param[in] offset The starting byte to slice from
-/// @param[in] size The size of the slice
-/// @return The sliced string
-DQN_API Dqn_String8 Dqn_String8_Slice(Dqn_String8 string, Dqn_isize offset, Dqn_isize size);
-
-/// Create an empty string with the requested size
-/// @param[in] allocator The allocator the string will be allocated from
-/// @param[in] size The size in bytes of the string to allocate
-/// @param[in] zero_mem Enum to indicate if the string's memory should be cleared
-#define Dqn_String8_Allocate(allocator, size, zero_mem) Dqn_String8_Allocate_(DQN_LEAK_TRACE allocator, size, zero_mem)
-DQN_API Dqn_String8 Dqn_String8_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_isize size, Dqn_ZeroMem zero_mem);
-
-/// Create a copy of the given cstring
-/// @param[in] allocator The allocator the string will be allocated from
-/// @param[in] string The cstring to copy
-/// @param[in] size The size of the cstring to copy. This cannot be <= 0
-/// @return A copy of the string, invalid string if any argument was invalid.
-#define Dqn_String8_CopyCString(allocator, string, size) Dqn_String8_CopyCString_(DQN_LEAK_TRACE allocator, string, size)
-DQN_API Dqn_String8 Dqn_String8_CopyCString_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *string, Dqn_isize size);
-
-/// Create a copy of the given string
-/// @param[in] allocator The allocator the string will be allocated from
-/// @param[in] string The string to copy
-/// @return A copy of the string, invalid string if any argument was invalid.
-#define Dqn_String8_Copy(allocator, string) Dqn_String8_Copy_(DQN_LEAK_TRACE allocator, string)
-DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_String8 string);
-
-/// @see Dqn_CString8_BinarySplit
-DQN_API Dqn_String8 Dqn_String8_BinarySplit(Dqn_String8 string, char delimiter, Dqn_String8 *rhs);
-
-/// @see Dqn_CString8_Eq
-DQN_API bool Dqn_String8_Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// @see Dqn_CString8_EqInsensitive
-DQN_API bool Dqn_String8_EqInsensitive(Dqn_String8 lhs, Dqn_String8 rhs);
-
-/// @see Dqn_CString8_StartsWith
-DQN_API bool Dqn_String8_StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// @see Dqn_CString8_StartsWithInsensitive
-DQN_API bool Dqn_String8_StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix);
-
-/// @see Dqn_CString8_EndsWith
-DQN_API bool Dqn_String8_EndsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// @see Dqn_CString8_EndsWithInsensitive
-DQN_API bool Dqn_String8_EndsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix);
-
-/// @see Dqn_CString8_TrimPrefix
-DQN_API Dqn_String8 Dqn_String8_TrimPrefix(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// @see Dqn_CString8_TrimSuffix
-DQN_API Dqn_String8 Dqn_String8_TrimSuffix(Dqn_String8 string, Dqn_String8 suffix, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// @see Dqn_CString8_TrimWhitespaceAround
-DQN_API Dqn_String8 Dqn_String8_TrimWhitespaceAround(Dqn_String8 string);
-
-/// @see Dqn_CString8_TrimByteOrderMark
-DQN_API Dqn_String8 Dqn_String8_TrimByteOrderMark(Dqn_String8 string);
-
-/// @see Dqn_CString8_FileNameFromPath
-DQN_API Dqn_String8 Dqn_String8_FileNameFromPath(Dqn_String8 path);
-
-/// @see Dqn_CString8_ToU64Checked
-DQN_API bool Dqn_String8_ToU64Checked(Dqn_String8 string, char separator, uint64_t *output);
-
-/// @see Dqn_CString8_ToU64
-DQN_API uint64_t Dqn_String8_ToU64(Dqn_String8 string, char separator);
-
-/// @see Dqn_CString8_ToI64Checked
-DQN_API bool Dqn_String8_ToI64Checked(Dqn_String8 string, char separator, int64_t *output);
-
-/// @see Dqn_CString8_ToI64
-DQN_API int64_t Dqn_String8_ToI64(Dqn_String8 string, char separator);
-
-/// Split a string by the delimiting character.
-/// This function can evaluate the number of splits required in the return value
-/// by setting `splits` to null and `splits_count` to 0.
-/// @param[in] string The source string to split
-/// @param[in] delimiter The substring to split the string on
-/// @param[out] splits (Optional) The destination array to write the splits to.
-/// @param[in] splits_count The number of splits that can be written into the
-/// `splits` array.
-/// @return The number of splits in the `string`. If the return value is >=
-/// 'splits_count' then there are more splits in the string than can be written
-/// to the `splits` array. The number of splits written is capped to the
-/// capacity given by the caller, i.e. `splits_count`. This function should be
-/// called again with a sufficiently sized array if all splits are desired.
-DQN_API Dqn_isize   Dqn_String8_Split(Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_isize splits_count);
-
-DQN_API bool        Dqn_String8_IsAllDigits(Dqn_String8 string);
-DQN_API bool        Dqn_String8_IsAllHex(Dqn_String8 string);
-DQN_API bool        Dqn_String8_HasChar(Dqn_String8 string, char ch);
-
-/// Remove the substring denoted by the begin index and the size from the string
-/// string in-place using MEMMOVE to shift the string back.
-DQN_API void        Dqn_String8_Remove(Dqn_String8 *string, Dqn_isize begin, Dqn_isize size);
-
-/// @param[in] start_index Set an index within the string string to start the
-/// search from, if not desired, set to 0
-/// @return The index of the matching find, -1 if it is not found
-DQN_API Dqn_isize   Dqn_String8_FindOffset(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-/// @param start_index Set an index within the string string to start the search
-/// from, if not desired, set to 0
-/// @return A string that points to the matching find, otherwise a 0 length string.
-DQN_API Dqn_String8 Dqn_String8_Find(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-
-DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator, Dqn_CString8EqCase eq_case = Dqn_CString8EqCase_Sensitive);
-DQN_API Dqn_String8 Dqn_String8_ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Allocator allocator);
+// NOTE: Macros ====================================================================================
+#define DQN_STRING8(string)                              Dqn_String8{(char *)(string), sizeof(string) - 1}
+#define DQN_STRING16(string)                             Dqn_String16{(wchar_t *)(string), (sizeof(string)/sizeof(string[0])) - 1}
+#define DQN_STRING_FMT(string)                           (int)((string).size), (string).data
 
 #if defined(__cplusplus)
-bool operator==(Dqn_String8 const &lhs, Dqn_String8 const &rhs);
-bool operator!=(Dqn_String8 const &lhs, Dqn_String8 const &rhs);
+#define Dqn_String8_Init(data, size)                     Dqn_String8{(char *)(data), (Dqn_usize)(size)}
+#else
+#define Dqn_String8_Init(data, size)                     (Dqn_String8){data, size}
 #endif
+
+#define Dqn_String8_InitF(allocator, fmt, ...)           Dqn_String8_InitF_(DQN_LEAK_TRACE allocator, fmt, ## __VA_ARGS__)
+#define Dqn_String8_InitFV(allocator, fmt, args)         Dqn_String8_InitFV_(DQN_LEAK_TRACE allocator, fmt, args)
+#define Dqn_String8_Allocate(allocator, size, zero_mem)  Dqn_String8_Allocate_(DQN_LEAK_TRACE allocator, size, zero_mem)
+#define Dqn_String8_CopyCString(allocator, string, size) Dqn_String8_CopyCString_(DQN_LEAK_TRACE allocator, string, size)
+#define Dqn_String8_Copy(allocator, string)              Dqn_String8_Copy_(DQN_LEAK_TRACE allocator, string)
+
+// NOTE: API =======================================================================================
+enum Dqn_String8IsAll
+{
+    Dqn_String8IsAll_Digits,
+    Dqn_String8IsAll_Hex,
+};
+
+enum Dqn_String8EqCase
+{
+    Dqn_String8EqCase_Sensitive,
+    Dqn_String8EqCase_Insensitive,
+};
+
+DQN_API bool                  Dqn_String8_IsValid              (Dqn_String8 string);
+DQN_API bool                  Dqn_String8_IsAll                (Dqn_String8 string, Dqn_String8IsAll is_all);
+
+DQN_API Dqn_String8           Dqn_String8_Slice                (Dqn_String8 string, Dqn_usize offset, Dqn_usize size);
+DQN_API Dqn_String8           Dqn_String8_BinarySplit          (Dqn_String8 string, char delimiter, Dqn_String8 *rhs);
+DQN_API Dqn_usize             Dqn_String8_Split                (Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_usize splits_count);
+
+DQN_API bool                  Dqn_String8_Eq                   (Dqn_String8 lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API bool                  Dqn_String8_EqInsensitive        (Dqn_String8 lhs, Dqn_String8 rhs);
+DQN_API bool                  Dqn_String8_StartsWith           (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API bool                  Dqn_String8_StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix);
+DQN_API bool                  Dqn_String8_EndsWith             (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API bool                  Dqn_String8_EndsWithInsensitive  (Dqn_String8 string, Dqn_String8 prefix);
+DQN_API bool                  Dqn_String8_HasChar              (Dqn_String8 string, char ch);
+
+DQN_API Dqn_String8           Dqn_String8_TrimPrefix           (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API Dqn_String8           Dqn_String8_TrimSuffix           (Dqn_String8 string, Dqn_String8 suffix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API Dqn_String8           Dqn_String8_TrimWhitespaceAround (Dqn_String8 string);
+DQN_API Dqn_String8           Dqn_String8_TrimByteOrderMark    (Dqn_String8 string);
+
+DQN_API Dqn_String8           Dqn_String8_FileNameFromPath     (Dqn_String8 path);
+
+DQN_API bool                  Dqn_String8_ToU64Checked         (Dqn_String8 string, char separator, uint64_t *output);
+DQN_API uint64_t              Dqn_String8_ToU64                (Dqn_String8 string, char separator);
+DQN_API bool                  Dqn_String8_ToI64Checked         (Dqn_String8 string, char separator, int64_t *output);
+DQN_API int64_t               Dqn_String8_ToI64                (Dqn_String8 string, char separator);
+
+struct Dqn_String8FindResult
+{
+    bool        found;
+    Dqn_usize   offset;
+    Dqn_String8 string;
+};
+
+DQN_API Dqn_String8FindResult Dqn_String8_Find                 (Dqn_String8 string, Dqn_String8 find, Dqn_usize start_index, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API Dqn_String8           Dqn_String8_Replace              (Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Allocator allocator, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API Dqn_String8           Dqn_String8_ReplaceInsensitive   (Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Allocator allocator);
+DQN_API void                  Dqn_String8_Remove               (Dqn_String8 *string, Dqn_usize offset, Dqn_usize size);
+
+#if defined(__cplusplus)
+DQN_API bool        operator==                       (Dqn_String8 const &lhs, Dqn_String8 const &rhs);
+DQN_API bool        operator!=                       (Dqn_String8 const &lhs, Dqn_String8 const &rhs);
+#endif
+
+// NOTE: Internal ==================================================================================
+DQN_API Dqn_String8 Dqn_String8_InitF_               (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, ...);
+DQN_API Dqn_String8 Dqn_String8_InitFV_              (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, va_list args);
+DQN_API Dqn_String8 Dqn_String8_Allocate_            (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_usize size, Dqn_ZeroMem zero_mem);
+DQN_API Dqn_String8 Dqn_String8_CopyCString_         (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *string, Dqn_usize size);
+DQN_API Dqn_String8 Dqn_String8_Copy_                (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_String8 string);
 
 // =================================================================================================
 // [$PRIN] Dqn_Print            |                             | Console printing
@@ -1300,6 +1287,21 @@ enum Dqn_VMemCommit {
     Dqn_VMemCommit_No,
     Dqn_VMemCommit_Yes,
 };
+
+#if !defined(DQN_VMEM_RESERVE_GRANULARITY)
+    #define DQN_VMEM_RESERVE_GRANULARITY DQN_KILOBYTES(64)
+#endif
+
+#if !defined(DQN_VMEM_COMMIT_GRANULARITY)
+    #define DQN_VMEM_COMMIT_GRANULARITY DQN_KILOBYTES(4)
+#endif
+
+static_assert(Dqn_IsPowerOfTwo(DQN_VMEM_RESERVE_GRANULARITY),
+              "This library assumes that the memory allocation routines from the OS has PoT allocation granularity");
+static_assert(Dqn_IsPowerOfTwo(DQN_VMEM_COMMIT_GRANULARITY),
+              "This library assumes that the memory allocation routines from the OS has PoT allocation granularity");
+static_assert(DQN_VMEM_COMMIT_GRANULARITY < DQN_VMEM_RESERVE_GRANULARITY,
+              "Minimum commit size must be lower than the reserve size to avoid OOB math on pointers in this library");
 
 DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, Dqn_VMemCommit commit);
 DQN_API bool Dqn_VMem_Commit(void *ptr, Dqn_usize size);
@@ -1384,7 +1386,9 @@ DQN_API void Dqn_VMem_Release(void *ptr, Dqn_usize size);
 //   @desc Dump the stats of the given arena to the memory log-stream.
 //   @param[in] arena The arena to dump stats for
 
-Dqn_isize const DQN_ARENA_MIN_BLOCK_SIZE = DQN_KILOBYTES(64);
+#if !defined(DQN_ARENA_MIN_BLOCK_SIZE)
+    #define DQN_ARENA_MIN_BLOCK_SIZE DQN_VMEM_RESERVE_GRANULARITY
+#endif
 
 enum Dqn_ArenaBlockFlags
 {
@@ -1393,15 +1397,15 @@ enum Dqn_ArenaBlockFlags
 
 struct Dqn_ArenaStat
 {
-    Dqn_isize capacity;     ///< Total allocating capacity of the arena in bytes
-    Dqn_isize used;         ///< Total amount of bytes used in the arena
-    Dqn_isize wasted;       ///< Orphaned space in blocks due to allocations requiring more space than available in the active block
+    Dqn_usize capacity;     ///< Total allocating capacity of the arena in bytes
+    Dqn_usize used;         ///< Total amount of bytes used in the arena
+    Dqn_usize wasted;       ///< Orphaned space in blocks due to allocations requiring more space than available in the active block
     uint32_t  blocks;       ///< Number of memory blocks in the arena
-    Dqn_isize syscalls;     ///< Number of memory allocation syscalls into the OS
+    Dqn_usize syscalls;     ///< Number of memory allocation syscalls into the OS
 
-    Dqn_isize capacity_hwm; ///< High-water mark for 'capacity'
-    Dqn_isize used_hwm;     ///< High-water mark for 'used'
-    Dqn_isize wasted_hwm;   ///< High-water mark for 'wasted'
+    Dqn_usize capacity_hwm; ///< High-water mark for 'capacity'
+    Dqn_usize used_hwm;     ///< High-water mark for 'used'
+    Dqn_usize wasted_hwm;   ///< High-water mark for 'wasted'
     uint32_t  blocks_hwm;   ///< High-water mark for 'blocks'
 };
 
@@ -1409,10 +1413,10 @@ struct Dqn_ArenaBlock
 {
     struct Dqn_Arena *arena;   ///< Arena that owns this block
     void             *memory;  ///< Backing memory of the block
-    Dqn_isize         size;    ///< Size of the block
-    Dqn_isize         used;    ///< Number of bytes used up in the block. Always less than the commit amount.
-    Dqn_isize         hwm_used;///< High-water mark for 'used' bytes in this block
-    Dqn_isize         commit;  ///< Number of bytes in the block physically backed by pages
+    Dqn_usize         size;    ///< Size of the block
+    Dqn_usize         used;    ///< Number of bytes used up in the block. Always less than the commit amount.
+    Dqn_usize         hwm_used;///< High-water mark for 'used' bytes in this block
+    Dqn_usize         commit;  ///< Number of bytes in the block physically backed by pages
     Dqn_ArenaBlock   *prev;    ///< Previous linked block
     Dqn_ArenaBlock   *next;    ///< Next linked block
     uint8_t           flags;   ///< Bit field for 'Dqn_ArenaBlockFlags'
@@ -1426,7 +1430,7 @@ struct Dqn_ArenaStatString
 
 struct Dqn_Arena
 {
-    Dqn_isize       min_block_size;
+    Dqn_usize       min_block_size;
     Dqn_ArenaBlock *curr;           ///< The current memory block of the arena
     Dqn_ArenaBlock *tail;           ///< The tail memory block of the arena
     Dqn_ArenaStat   stats;          ///< Current arena stats, reset when reset usage is invoked.
@@ -1437,7 +1441,7 @@ struct Dqn_ArenaTempMemory
     Dqn_Arena      *arena;     ///< The arena the scope is for
     Dqn_ArenaBlock *curr;      ///< The current block of the arena at the beginning of the scope
     Dqn_ArenaBlock *tail;      ///< The tail block of the arena at the beginning of the scope
-    Dqn_isize       curr_used; ///< The current used amount of the current block
+    Dqn_usize       curr_used; ///< The current used amount of the current block
     Dqn_ArenaStat   stats;     ///< The stats of the arena at the beginning of the scope
 };
 
@@ -1473,8 +1477,8 @@ enum Dqn_ArenaCommit
 #define                     Dqn_Arena_CopyZ(arena, Type, src, count)                  (Type *)Dqn_Arena_CopyZ_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
 #define                     Dqn_Arena_Free(arena, zero_mem)                           Dqn_Arena_Free_(DQN_LEAK_TRACE arena, zero_mem)
 
-DQN_API void                Dqn_Arena_CommitFromBlock  (Dqn_ArenaBlock *block, Dqn_isize size, Dqn_ArenaCommit commit);
-DQN_API void *              Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem);
+DQN_API void                Dqn_Arena_CommitFromBlock  (Dqn_ArenaBlock *block, Dqn_usize size, Dqn_ArenaCommit commit);
+DQN_API void *              Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem);
 DQN_API Dqn_Allocator       Dqn_Arena_Allocator        (Dqn_Arena *arena);
 DQN_API void                Dqn_Arena_Reset            (Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
 
@@ -1487,11 +1491,11 @@ DQN_API Dqn_ArenaStatString Dqn_Arena_StatString       (Dqn_ArenaStat const *sta
 DQN_API void                Dqn_Arena_LogStats         (Dqn_Arena const *arena);
 
 // NOTE: Internal ==================================================================================
-DQN_API Dqn_ArenaBlock *    Dqn_Arena_Grow_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit, uint8_t flags);
-DQN_API void *              Dqn_Arena_Allocate_        (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem);
-DQN_API void *              Dqn_Arena_Copy_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
+DQN_API Dqn_ArenaBlock *    Dqn_Arena_Grow_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_usize size, Dqn_usize commit, uint8_t flags);
+DQN_API void *              Dqn_Arena_Allocate_        (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem);
+DQN_API void *              Dqn_Arena_Copy_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t alignment);
 DQN_API void                Dqn_Arena_Free_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
-DQN_API void *              Dqn_Arena_CopyZ_           (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment);
+DQN_API void *              Dqn_Arena_CopyZ_           (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t alignment);
 DQN_API void                Dqn_Arena_EndTempMemory_   (DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory arena_temp_memory);
 
 // =================================================================================================
@@ -1572,6 +1576,9 @@ DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF (Dqn_ArenaCatalog *catalog, Dqn_usize
 //   the erase ranged into the range. Unstable erase will copy the tail elements
 //   into the range to delete.
 //
+// @proc Dqn_VArray_Clear
+//   @desc Set the size of the array to 0
+//
 // @proc Dqn_VArray_Reserve
 //   @desc Ensure that the requested number of items are backed by physical
 //   pages from the OS. Calling this pre-emptively will minimise syscalls into
@@ -1609,6 +1616,7 @@ DQN_API template <typename T> bool           Dqn_VArray_IsValid     (Dqn_VArray<
 DQN_API template <typename T> T *            Dqn_VArray_Make        (Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
 DQN_API template <typename T> T *            Dqn_VArray_Add         (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
 DQN_API template <typename T> void           Dqn_VArray_EraseRange  (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_VArrayErase erase);
+DQN_API template <typename T> void           Dqn_VArray_Clear       (Dqn_VArray<T> *array);
 DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<T> *array, Dqn_usize count);
 #endif // !defined(DQN_NO_VARRAY)
 
@@ -1886,16 +1894,77 @@ DQN_API void Dqn_Library_LeakTraceMarkFree         (Dqn_CallSite call_site, void
 #define      Dqn_Library_LeakTraceMarkFree(...)
 #endif
 
+#if !defined(DQN_NO_FSTRING8)
 // =================================================================================================
 // [$FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
 // =================================================================================================
-#if !defined(DQN_NO_FSTRING8)
-#define DQN_FSTRING8_API template <Dqn_usize N> DQN_API
-#define DQN_FSTRING8 Dqn_FString8<N>
-DQN_FSTRING8_API struct Dqn_FString8
+//
+// NOTE: API
+//
+// @proc Dqn_FString8_InitF
+//   @desc Create a fixed string from the format string. The result string is
+//   null-terminated.
+//   @param fmt[in] Format string specifier to create the fixed string from
+//   @return The created string, truncated if there was insufficient space
+//
+// @proc Dqn_FString8_Max
+//   @desc @param string[in] The string to query the maximum capacity of
+//   @return Maximum capacity of the fixed string
+//
+// @proc Dqn_FString8_Clear
+//   @desc Reset the characters in the string
+//   @param string[in] The string to clear
+//
+// @proc Dqn_FString8_AppendFV
+//   @desc Append a format string to the fixed string. On failure the string is
+//   appended to but truncated ensuring null-termination.
+//   @param string[in] The string to append to
+//   @param fmt[in] Format string to append to the fixed string
+//   @return True if append was successful, false otherwise.
+//
+// @proc Dqn_FString8_AppendF
+//   @desc @copydocs Dqn_FString8_AppendF
+//
+// @proc Dqn_FString8_AppendCString8
+//   @desc Append a cstring to the fixed string. On failure the string is
+//   appended to but truncated ensuring null-termination.
+//   @param string[in] The string to append to
+//   @param value[in] Cstring to append to the fixed string
+//   @param size[in] Size of the cstring
+//   @return True if append was successful, false otherwise.
+//
+// @proc Dqn_FString8_Append
+//   @desc Append a string to the fixed string. On failure the string is
+//   appended to but truncated ensuring null-termination.
+//   @param string[in] The string to append to
+//   @param value[in] String to append to the fixed string
+//   determined before appending.
+//   @return True if append was successful, false otherwise.
+//
+// @proc Dqn_FString8_ToString8
+//   @desc Convert a fixed string to a string. The string holds a reference to the
+//   fixed string and is invalidated once fixed string is deleted.
+//   @param string[in] The fixed string to create a string from
+//   @return String referencing the contents of `string`
+//
+// @proc Dqn_FString8_Eq
+//   @desc @see Dqn_CString8_Eq
+//
+// @proc Dqn_FString8_EqString8
+//   @desc @see Dqn_CString8_Eq
+//
+// @proc Dqn_FString8_EqInsensitive
+//   @desc Compare a string for equality, case insensitive
+//   @see Dqn_CString8_Eq
+//
+// @proc Dqn_FString8_EqString8Insensitive
+//   @desc Compare a string for equality, case insensitive
+//   @see Dqn_CString8_Eq
+
+template <Dqn_usize N> struct Dqn_FString8
 {
     char      data[N+1];
-    Dqn_isize size;
+    Dqn_usize size;
 
     bool operator==(Dqn_FString8 const &other) const {
         if (size != other.size) return false;
@@ -1911,72 +1980,20 @@ DQN_FSTRING8_API struct Dqn_FString8
     char const *end  () const { return data + size; }
 };
 
-/// Create a fixed string from the format string. The result string is
-/// null-terminated.
-/// @param fmt[in] Format string specifier to create the fixed string from
-/// @return The created string, truncated if there was insufficient space
-DQN_FSTRING8_API DQN_FSTRING8 Dqn_FString8_InitF(char const *fmt, ...);
-
-/// @param string[in] The string to query the maximum capacity of
-/// @return Maximum capacity of the fixed string
-DQN_FSTRING8_API Dqn_isize Dqn_FString8_Max(DQN_FSTRING8 *string);
-
-/// Reset the characters in the string
-/// @param string[in] The string to clear
-DQN_FSTRING8_API void Dqn_FString8_Clear(DQN_FSTRING8 *string);
-
-/// Append a format string to the fixed string. On failure the string is
-/// appended to but truncated ensuring null-termination.
-/// @param string[in] The string to append to
-/// @param fmt[in] Format string to append to the fixed string
-/// @return True if append was successful, false otherwise.
-DQN_FSTRING8_API bool Dqn_FString8_AppendFV(DQN_FSTRING8 *string, char const *fmt, va_list va);
-
-/// @copydocs Dqn_FString8_AppendF
-DQN_FSTRING8_API bool Dqn_FString8_AppendF(DQN_FSTRING8 *string, char const *fmt, ...);
-
-/// Append a cstring to the fixed string. On failure the string is
-/// appended to but truncated ensuring null-termination.
-/// @param string[in] The string to append to
-/// @param value[in] Cstring to append to the fixed string
-/// @param size[in] Size of the cstring, when <0, the cstring's length is
-/// determined before appending.
-/// @return True if append was successful, false otherwise.
-DQN_FSTRING8_API bool Dqn_FString8_AppendCString8(DQN_FSTRING8 *string, char const *value, Dqn_isize size = -1);
-
-/// Append a string to the fixed string. On failure the string is
-/// appended to but truncated ensuring null-termination.
-/// @param string[in] The string to append to
-/// @param value[in] String to append to the fixed string
-/// determined before appending.
-/// @return True if append was successful, false otherwise.
-DQN_FSTRING8_API bool Dqn_FString8_Append(DQN_FSTRING8 *string, Dqn_String8 value);
-
-/// Convert a fixed string to a string. The string holds a reference to the
-/// fixed string and is invalidated once fixed string is deleted.
-/// @param string[in] The fixed string to create a string from
-/// @return String referencing the contents of `string`
-DQN_FSTRING8_API Dqn_String8  Dqn_FString8_ToString8(DQN_FSTRING8 const *string);
-
-/// @see Dqn_CString8_Eq
-DQN_FSTRING8_API bool Dqn_FString8_Eq(DQN_FSTRING8 const *lhs, DQN_FSTRING8 const *rhs, Dqn_CString8EqCase eq_case);
-
-/// @see Dqn_CString8_Eq
-DQN_FSTRING8_API bool Dqn_FString8_EqString8(DQN_FSTRING8 const *lhs, Dqn_String8 rhs, Dqn_CString8EqCase eq_case);
-
-/// Compare a string for equality, case insensitive
-/// @see Dqn_CString8_Eq
-DQN_FSTRING8_API bool Dqn_FString8_EqInsensitive(DQN_FSTRING8 const *lhs, DQN_FSTRING8 const *rhs);
-
-/// Compare a string for equality, case insensitive
-/// @see Dqn_CString8_Eq
-DQN_FSTRING8_API bool Dqn_FString8_EqString8Insensitive(DQN_FSTRING8 const *lhs, Dqn_String8 rhs);
-
-template <Dqn_usize A, Dqn_usize B>
-bool Dqn_FString8_EqFStringAB(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs, Dqn_CString8EqCase eq_case);
-
-template <Dqn_usize A, Dqn_usize B>
-bool Dqn_FString8_EqABInsensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs);
+template <Dqn_usize N>              Dqn_FString8<N> Dqn_FString8_InitF                (char const *fmt, ...);
+template <Dqn_usize N>              Dqn_usize       Dqn_FString8_Max                  (Dqn_FString8<N> const *string);
+template <Dqn_usize N>              void            Dqn_FString8_Clear                (Dqn_FString8<N> *string);
+template <Dqn_usize N>              bool            Dqn_FString8_AppendFV             (Dqn_FString8<N> *string, char const *fmt, va_list va);
+template <Dqn_usize N>              bool            Dqn_FString8_AppendF              (Dqn_FString8<N> *string, char const *fmt, ...);
+template <Dqn_usize N>              bool            Dqn_FString8_AppendCString8       (Dqn_FString8<N> *string, char const *value, Dqn_usize size);
+template <Dqn_usize N>              bool            Dqn_FString8_Append               (Dqn_FString8<N> *string, Dqn_String8 value);
+template <Dqn_usize N>              Dqn_String8     Dqn_FString8_ToString8            (Dqn_FString8<N> const *string);
+template <Dqn_usize N>              bool            Dqn_FString8_Eq                   (Dqn_FString8<N> const *lhs, Dqn_FString8<N> const *rhs, Dqn_String8EqCase eq_case);
+template <Dqn_usize N>              bool            Dqn_FString8_EqString8            (Dqn_FString8<N> const *lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case);
+template <Dqn_usize N>              bool            Dqn_FString8_EqInsensitive        (Dqn_FString8<N> const *lhs, Dqn_FString8<N> const *rhs);
+template <Dqn_usize N>              bool            Dqn_FString8_EqString8Insensitive (Dqn_FString8<N> const *lhs, Dqn_String8 rhs);
+template <Dqn_usize A, Dqn_usize B> bool            Dqn_FString8_EqFString8           (Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs, Dqn_String8EqCase eq_case);
+template <Dqn_usize A, Dqn_usize B> bool            Dqn_FString8_EqFString8Insensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs);
 #endif // !defined(DQN_NO_FSTRING8)
 
 // =================================================================================================
@@ -1987,8 +2004,8 @@ struct Dqn_String8Builder
     Dqn_Allocator    allocator;   ///< Allocator to use to back the string list
     Dqn_String8Link *head;        ///< First string in the linked list of strings
     Dqn_String8Link *tail;        ///< Last string in the linked list of strings
-    ptrdiff_t        string_size; ///< The size in bytes necessary to construct the current string
-    ptrdiff_t        count;       ///< The number of links in the linked list of strings
+    Dqn_usize        string_size; ///< The size in bytes necessary to construct the current string
+    Dqn_usize        count;       ///< The number of links in the linked list of strings
 };
 
 /// Append a string to the list of strings in the builder by reference.
@@ -2031,174 +2048,93 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
 // [$FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
 // =================================================================================================
 #if !defined(DQN_NO_FARRAY)
-#define DQN_FARRAY_API template <typename T, Dqn_isize N> DQN_API
-#define DQN_FARRAY Dqn_FArray<T, N>
-DQN_FARRAY_API struct Dqn_FArray
+template <typename T, Dqn_usize N> struct Dqn_FArray
 {
-    T         data[N]; ///< Storage of the fixed array
-    Dqn_isize size;    ///< Current number of items in the array
+    T         data[N]; ///< Pointer to the start of the array items in the block of memory
+    Dqn_usize size;    ///< Number of items currently in the array
+
     T       *begin()       { return data; }
     T       *end  ()       { return data + size; }
     T const *begin() const { return data; }
     T const *end  () const { return data + size; }
 };
 
-/// Initialise a fixed size array with the given items
-/// @param items[in] Items to initialise the array with
-/// @param count[in] Number of items to initialise the array with
-/// @return Fixed size array with the items added to it
-DQN_FARRAY_API DQN_FARRAY Dqn_FArray_Init(T const *items, Dqn_isize count);
+enum Dqn_FArrayErase
+{
+    Dqn_FArrayErase_Unstable,
+    Dqn_FArrayErase_Stable,
+};
 
-/// @param array[in] The array to query the maximum capacity of
-/// @return Maximum capacity of the fixed array
-DQN_FARRAY_API Dqn_isize  Dqn_FArray_Max(DQN_FARRAY const *array);
-
-/// Add the array of items into the array by copy
-/// @param array[in] Array to copy items to
-/// @param items[in] Array of items to copy
-/// @param count[in] Number of items to copy
-/// @return Pointer to the first item added, null pointer if arguments are
-/// invalid or there is insufficient capacity.
-DQN_FARRAY_API T *Dqn_FArray_AddArray(DQN_FARRAY *array, T const *items, Dqn_isize count);
-
-/// Add the item into the array by copy
-DQN_FARRAY_API T *Dqn_FArray_Add(DQN_FARRAY *a, T const &item);
-
-/// Allocate the next `count` number of items from the array
-/// @param array[in] The array to allocate from
-/// @param count[in] Number of items to allocate
-/// @return Pointer to the `count` items requested, null pointer if there's
-/// insufficient space.
-DQN_FARRAY_API T *Dqn_FArray_Make(DQN_FARRAY *array, Dqn_isize count);
-
-/// Reset the number of items in the array
-/// @param array[in] The array to clear
-/// @param zero_mem[in] Flag to request the memory is zeroed-out or not
-DQN_FARRAY_API void Dqn_FArray_Clear(DQN_FARRAY *array, Dqn_ZeroMem zero_mem);
-
-/// Erase the item at index in the array, preserving the order of items in the
-/// array
-/// @param array[in] The array to erase from
-/// @param index[in] Item index to erase from the array
-/// @return True if erase was successful, false if parameters were invalid
-DQN_FARRAY_API bool Dqn_FArray_EraseStable(DQN_FARRAY *array, Dqn_isize index);
-
-/// Erase the item at index in the array
-/// @param array[in] The array to erase from
-/// @param index[in] Item index to erase from the array
-/// @return True if erase was successful, false if parameters were invalid
-DQN_FARRAY_API bool Dqn_FArray_EraseUnstable(DQN_FARRAY *array, Dqn_isize index);
-
-/// Remove the last `count` elements from the array
-/// @param array[in] The array to pop from
-/// @param count[in] Number of elements to remove from the array
-/// @return True if pop was successful, false if paramters were invalid
-DQN_FARRAY_API bool Dqn_FArray_Pop(DQN_FARRAY *array, Dqn_isize count);
-
-/// Return the last most element from the array
-/// @param array[in] The array to peek
-/// @return Last most element if successful, null pointer otherwise
-DQN_FARRAY_API T *Dqn_FArray_Peek(DQN_FARRAY *array);
-
-/// Return a copy of the last most element from the array. Asserts if the array
-/// is empty.
-/// @param array[in] The array to peek
-/// @return Last most element
-DQN_FARRAY_API T Dqn_FArray_PeekCopy(DQN_FARRAY const *array);
-
-/// Find the specified item in the given array using the equality procedure
-/// passed in.
-/// @param array[in] Array to search
-/// @param IsEqualProc[in] Lambda to a procedure that defines the equality of
-/// the item to find in the array.
-/// @param made[out] (Optional) Set to true if the item didn't exist and was
-/// created successfully
-/// @return Pointer to the item if found, null pointer otherwise
-template <typename T, Dqn_isize N, typename IsEqualProc>
-T *Dqn_FArray_Find(DQN_FARRAY *a, IsEqualProc IsEqual);
-
-/// Find the specified item in the given array using the equality procedure
-/// passed in.
-/// @param array[in] The array to search
-/// @param IsEqualProc[in] Lambda to a procedure that defines the equality of
-/// the item to find in the array.
-/// @param made[out] (Optional) Set to true if the item didn't exist and was
-/// created successfully
-/// @return Pointer to the item if found, null pointer otherwise
-template <typename T, Dqn_isize N, typename IsEqualProc>
-DQN_API T *Dqn_FArray_FindProcElseMake(DQN_FARRAY *array, IsEqualProc IsEqual, bool *made);
-
-/// Find the specified item in the given array. The items must have an
-/// operator== defined.
-/// @param array[in] The array to search
-/// @param find[in] Item to find in the array
-/// @return Pointer to the item if found, null pointer otherwise
-DQN_FARRAY_API T *Dqn_FArray_Find(DQN_FARRAY *array, T const *find);
+DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init      (T const *array, Dqn_usize count);
+DQN_API template <typename T, Dqn_usize N> bool             Dqn_FArray_IsValid   (Dqn_FArray<T, N> const *array);
+DQN_API template <typename T, Dqn_usize N> T *              Dqn_FArray_Make      (Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
+DQN_API template <typename T, Dqn_usize N> T *              Dqn_FArray_Add       (Dqn_FArray<T, N> *array, T const *items, Dqn_usize count);
+DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_FArrayErase erase);
+DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_Clear     (Dqn_FArray<T, N> *array);
 #endif // !defined(DQN_NO_FARRAY)
 
 // =================================================================================================
 // [$LIST] Dqn_List             |                             | Chunked linked lists, append only
 // =================================================================================================
-template <typename T>
-struct Dqn_ListChunk
+//
+// NOTE: API
+//
+// @proc Dqn_List_At
+//   @param at_chunk[out] (Optional) The chunk that the index belongs to will 
+//   be set in this parameter if given
+//   @return The element, or null pointer if it is not a valid index.
+//
+// @proc Dqn_List_Iterate
+//   @desc Produce an iterator for the data in the list
+//
+//   @param[in] start_index The index to start iterating from
+//
+//   @begincode
+//   Dqn_List<int> list = {};
+//   for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);)
+//   {
+//       int *item = it.data;
+//   }
+//   @endcode
+
+template <typename T> struct Dqn_ListChunk
 {
     T                *data;
-    Dqn_isize         size;
-    Dqn_isize         count;
+    Dqn_usize         size;
+    Dqn_usize         count;
     Dqn_ListChunk<T> *next;
     Dqn_ListChunk<T> *prev;
 };
 
-template <typename T>
-struct Dqn_ListIterator
+template <typename T> struct Dqn_ListIterator
 {
     Dqn_b32           init;             // (Internal): True if Dqn_List_Iterate has been called at-least once on this iterator
     Dqn_ListChunk<T> *chunk;            // (Internal): The chunk that the iterator is reading from
-    Dqn_isize         chunk_data_index; // (Internal): The index in the chunk the iterator is referencing
+    Dqn_usize         chunk_data_index; // (Internal): The index in the chunk the iterator is referencing
     T                *data;             // (Read):     Pointer to the data the iterator is referencing. Nullptr if invalid.
 };
 
-template <typename T>
-struct Dqn_List
+template <typename T> struct Dqn_List
 {
     Dqn_Arena        *arena;
-    Dqn_isize         count;      // Cumulative count of all items made across all list chunks
-    Dqn_isize         chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
+    Dqn_usize         count;      // Cumulative count of all items made across all list chunks
+    Dqn_usize         chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
     Dqn_ListChunk<T> *head;
     Dqn_ListChunk<T> *tail;
 };
 
-template <typename T> DQN_API
-Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_isize chunk_size = 128);
+// NOTE: API =======================================================================================
+DQN_API template <typename T> Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_usize chunk_size = 128);
+DQN_API template <typename T> T *         Dqn_List_At           (Dqn_List<T> *list, Dqn_usize index, Dqn_ListChunk<T> *at_chunk);
+DQN_API template <typename T> bool        Dqn_List_Iterate      (Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index);
 
-#define Dqn_List_Make(list, count) Dqn_List_Make_(DQN_LEAK_TRACE list, count)
-template <typename T> DQN_API
-T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize count);
+// NOTE: Macros ====================================================================================
+#define Dqn_List_Make(list, count)        Dqn_List_Make_(DQN_LEAK_TRACE list, count)
+#define Dqn_List_Add(list, count)         Dqn_List_Add_(DQN_LEAK_TRACE list, count)
 
-#define Dqn_List_Add(list, count) Dqn_List_Add_(DQN_LEAK_TRACE list, count)
-template <typename T> DQN_API
-T *Dqn_List_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize count);
-
-/// @param at_chunk[out] (Optional) The chunk that the index belongs to will 
-/// be set in this parameter if given
-/// @return The element, or null pointer if it is not a valid index.
-template <typename T> DQN_API
-T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> *at_chunk);
-
-/// Produce an iterator for the data in the list
-///
-/// @param[in] start_index The index to start iterating from
-///
-/// @begincode
-/// Dqn_List<int> list = {};
-/// for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);)
-/// {
-///     int *item = it.data;
-/// }
-/// @endcode
-///
-template <typename T> DQN_API
-bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_isize start_index);
+// NOTE: Internal ==================================================================================
+DQN_API template <typename T> T *         Dqn_List_Make_        (DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_usize count);
+DQN_API template <typename T> T *         Dqn_List_Add_         (DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_usize count);
 
 // =================================================================================================
 // [$MATH] Math                 | DQN_NO_MATH                 | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
@@ -2708,119 +2644,130 @@ DQN_API char    Dqn_Char_ToLower       (char ch);
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint);
 DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 
-// =================================================================================================
-// [$BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
-// =================================================================================================
 #if !defined(DQN_NO_HEX)
-DQN_API char const  *Dqn_Hex_TrimSpaceAnd0xPrefixCString8(char const *hex, Dqn_isize size, Dqn_isize *real_size);
-DQN_API Dqn_String8  Dqn_Hex_TrimSpaceAnd0xPrefixString8(Dqn_String8 const string);
-
-// NOTE: Byte to string conversions
-// -----------------------------------------------------------------------------
-struct Dqn_HexNumberString
+// =================================================================================================
+// [$BHEX] Dqn_Bin              | DQN_NO_HEX                  | Binary <-> hex helpers
+// =================================================================================================
+//
+// NOTE: API
+//
+// @proc Dqn_Bin_U64ToHexU64String
+//   @desc Convert a 64 bit number to a hex string
+//   @param[in] number Number to convert to hexadecimal representation
+//   @param[in] flags Bit flags from Dqn_BinHexU64StringFlags to customise the
+//   output of the hexadecimal string.
+//   @return The hexadecimal representation of the number. This string is always
+//   null-terminated.
+//
+// @proc Dqn_Bin_U64ToHex
+//   @copybrief Dqn_Bin_U64ToHexU64String
+//
+//   @param[in] allocator The memory allocator to use for the memory of the
+//   hexadecimal string.
+//   @copyparams Dqn_Bin_U64ToHexU64String
+//
+// @proc Dqn_Bin_HexBufferToU64
+//   @desc Convert a hexadecimal string a 64 bit value.
+//   Asserts if the hex string is too big to be converted into a 64 bit number.
+//
+// @proc Dqn_Bin_HexToU64
+//   @copydoc Dqn_Bin_HexToU64
+//
+// @proc Dqn_Bin_BytesToHexBuffer
+//   @desc Convert a binary buffer into its hex representation into dest.
+//
+//   The dest buffer must be large enough to contain the hex representation, i.e.
+//   atleast (src_size * 2).
+//
+//   @return True if the conversion into the dest buffer was successful, false
+//   otherwise (e.g. invalid arguments).
+//
+// @proc Dqn_Bin_BytesToHexBufferArena
+//   @desc Convert a series of bytes into a string
+//   @return A null-terminated hex string, null pointer if allocation failed
+//
+// @proc Dqn_Bin_BytesToHexArena
+//   @copydoc Dqn_Bin_BytesToHexBufferArena
+//   @return A hex string, the string is invalid if conversion failed.
+//
+// @proc Dqn_Bin_HexBufferToBytes
+//   @desc Convert a hex string into binary at `dest`.
+//
+//   The dest buffer must be large enough to contain the binary representation,
+//   i.e. atleast ceil(hex_size / 2). This function will strip whitespace,
+//   leading 0x/0X prefix from the string before conversion.
+//
+//   @param[in] hex The hexadecimal string to convert
+//   @param[in] hex_size Size of the hex buffer. This function can handle an odd
+//   size hex string i.e. "fff" produces 0xfff0.
+//   @param[out] dest Buffer to write the bytes to
+//   @param[out] dest_size Maximum number of bytes to write to dest
+//
+//   @return The number of bytes written to `dest_size`, this value will *never*
+//   be greater than `dest_size`.
+//
+// @proc Dqn_Bin_HexToBytes
+//   @desc String8 variant of @see Dqn_Bin_HexBufferToBytes
+//
+// @proc Dqn_Bin_StringHexBufferToBytesUnchecked
+//   @desc Unchecked variant of @see Dqn_Bin_HexBufferToBytes
+//
+//   This function skips some string checks, it assumes the hex is a valid hex
+//   stream and that the arguments are valid e.g. no trimming or 0x prefix
+//   stripping is performed
+//
+// @proc Dqn_Bin_String
+//   @desc String8 variant of @see Dqn_Bin_HexBufferToBytesUnchecked
+//
+// @proc Dqn_Bin_HexBufferToBytesArena
+//   Dynamic allocating variant of @see Dqn_Bin_HexBufferToBytesUnchecked
+//
+//   @param[in] arena The arena to allocate the bytes from
+//   @param[in] hex Hex string to convert into bytes
+//   @param[in] size Size of the hex string
+//   @param[out] real_size The size of the buffer returned by the function
+//
+//   @return The byte representation of the hex string.
+//
+// @proc Dqn_Bin_HexToBytesArena
+//   @copybrief Dqn_Bin_HexBufferToBytesArena
+//
+//   @param[in] arena The arena to allocate the bytes from
+//   @param[in] hex Hex string to convert into bytes
+//
+//   @return The byte representation of the hex string.
+struct Dqn_BinHexU64String
 {
     char   data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
     int8_t size;
 };
 
-enum Dqn_HexNumberStringFlags
+enum Dqn_BinHexU64StringFlags
 {
-    Dqn_HexNumberStringFlags_No0xPrefix   = 1 << 0, /// Remove the 0x prefix from the string
-    Dqn_HexNumberStringFlags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
+    Dqn_BinHexU64StringFlags_No0xPrefix   = 1 << 0, /// Remove the 0x prefix from the string
+    Dqn_BinHexU64StringFlags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
 };
 
-/// Convert a 64 bit number to a hex string
-///
-/// @param[in] number Number to convert to hexadecimal representation
-/// @param[in] flags Bit flags from Dqn_HexNumberStringFlags to customise the
-/// output of the hexadecimal string.
-///
-/// @return The hexadecimal representation of the number. This string is always
-/// null-terminated.
-DQN_API Dqn_HexNumberString Dqn_Hex_U64ToNumberString(uint64_t number, uint32_t flags);
+DQN_API char const *         Dqn_Bin_HexBufferTrim0x          (char const *hex, Dqn_usize size, Dqn_usize *real_size);
+DQN_API Dqn_String8          Dqn_Bin_HexTrim0x                (Dqn_String8 string);
 
-/// @copybrief Dqn_Hex_U64ToNumberString
-///
-/// @param[in] allocator The memory allocator to use for the memory of the
-/// hexadecimal string.
-/// @copyparams Dqn_Hex_U64ToNumberString
-DQN_API Dqn_String8 Dqn_Hex_U64ToString8(Dqn_Allocator allocator, uint64_t number, uint32_t flags);
+DQN_API Dqn_BinHexU64String  Dqn_Bin_U64ToHexU64String        (uint64_t number, uint32_t flags);
+DQN_API Dqn_String8          Dqn_Bin_U64ToHex                 (Dqn_Allocator allocator, uint64_t number, uint32_t flags);
 
-/// Convert a hexadecimal string a 64 bit value.
-///
-/// Asserts if the hex string is too big to be converted into a 64 bit number.
-DQN_API uint64_t Dqn_Hex_CString8ToU64(char const *hex, Dqn_isize size);
+DQN_API uint64_t             Dqn_Bin_HexBufferToU64           (char const *hex, Dqn_usize size);
+DQN_API uint64_t             Dqn_Bin_HexToU64                 (Dqn_String8 hex);
 
-/// @copydoc Dqn_Hex_String8ToU64
-DQN_API uint64_t Dqn_Hex_String8ToU64(Dqn_String8 hex);
+DQN_API Dqn_String8          Dqn_Bin_BytesToHexArena          (Dqn_Arena *arena, void const *src, Dqn_usize size);
+DQN_API char *               Dqn_Bin_BytesToHexBufferArena    (Dqn_Arena *arena, void const *src, Dqn_usize size);
+DQN_API bool                 Dqn_Bin_BytesToHexBuffer         (void const *src, Dqn_usize src_size, char *dest, Dqn_usize dest_size);
 
-/// Convert a binary buffer into its hex representation into dest.
-///
-/// The dest buffer must be large enough to contain the hex representation, i.e.
-/// atleast (src_size * 2).
-///
-/// @return True if the conversion into the dest buffer was successful, false
-/// otherwise (e.g. invalid arguments).
-DQN_API bool Dqn_Hex_BytesToCString8Buffer(void const *src, Dqn_isize src_size, char *dest, Dqn_isize dest_size);
+DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytesUnchecked(char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
+DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytes         (char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
+DQN_API char *               Dqn_Bin_HexBufferToBytesArena    (Dqn_Arena *arena, char const *hex, Dqn_usize hex_size, Dqn_usize *real_size);
 
-/// Convert a series of bytes into a string
-///
-/// @return A null-terminated hex string, null pointer if allocation failed
-DQN_API char *Dqn_Hex_BytesToCString8Arena(Dqn_Arena *arena, void const *bytes, Dqn_isize size);
-
-/// @copydoc Dqn_Hex_BytesToCString8Arena
-///
-/// @return A hex string, the string is invalid if conversion failed.
-DQN_API Dqn_String8 Dqn_Hex_BytesToString8Arena(Dqn_Arena *arena, void const *bytes, Dqn_isize size);
-
-// NOTE: String to byte conversions
-// -----------------------------------------------------------------------------
-/// Convert a hex string into binary at `dest`.
-///
-/// The dest buffer must be large enough to contain the binary representation,
-/// i.e. atleast ceil(hex_size / 2). This function will strip whitespace,
-/// leading 0x/0X prefix from the string before conversion.
-///
-/// @param[in] hex The hexadecimal string to convert
-/// @param[in] hex_size Size of the hex buffer. This function can handle an odd
-/// size hex string i.e. "fff" produces 0xfff0.
-/// @param[out] dest Buffer to write the bytes to
-/// @param[out] dest_size Maximum number of bytes to write to dest
-///
-/// @return The number of bytes written to `dest_size`, this value will *never*
-/// be greater than `dest_size`.
-DQN_API Dqn_isize Dqn_Hex_CString8ToByteBuffer(char const *hex, Dqn_isize hex_size, void *dest, Dqn_isize dest_size);
-
-/// String8 variant of @see Dqn_Hex_CString8ToByteBuffer
-DQN_API Dqn_isize Dqn_Hex_String8ToByteBuffer(Dqn_String8 hex, void *dest, Dqn_isize dest_size);
-
-/// Unchecked variant of @see Dqn_Hex_CString8ToByteBuffer
-///
-/// This function skips some string checks, it assumes the hex is a valid hex
-/// stream and that the arguments are valid e.g. no trimming or 0x prefix
-/// stripping is performed
-DQN_API Dqn_isize Dqn_Hex_CString8ToByteBufferUnchecked(char const *hex, Dqn_isize hex_size, void *dest, Dqn_isize dest_size);
-
-/// String8 variant of @see Dqn_Hex_CString8ToByteBufferUnchecked
-DQN_API Dqn_isize Dqn_Hex_String8ToByteBufferUnchecked(Dqn_String8 hex, void *dest, Dqn_isize dest_size);
-
-/// Dynamic allocating variant of @see Dqn_Hex_CString8ToByteBufferUnchecked
-///
-/// @param[in] arena The arena to allocate the bytes from
-/// @param[in] hex Hex string to convert into bytes
-/// @param[in] size Size of the hex string
-/// @param[out] real_size The size of the buffer returned by the function
-///
-/// @return The byte representation of the hex string.
-DQN_API char *Dqn_Hex_CString8ToBytesArena(Dqn_Arena *arena, char const *hex, Dqn_isize hex_size, Dqn_isize *real_size);
-
-/// @copybrief Dqn_Hex_CString8ToBytesArena
-///
-/// @param[in] arena The arena to allocate the bytes from
-/// @param[in] hex Hex string to convert into bytes
-///
-/// @return The byte representation of the hex string.
-DQN_API Dqn_String8 Dqn_Hex_String8ToBytesArena(Dqn_Arena *arena, Dqn_String8 hex);
+DQN_API Dqn_usize            Dqn_Bin_HexToBytesUnchecked      (Dqn_String8 hex, void *dest, Dqn_usize dest_size);
+DQN_API Dqn_usize            Dqn_Bin_HexToBytes               (Dqn_String8 hex, void *dest, Dqn_usize dest_size);
+DQN_API Dqn_String8          Dqn_Bin_HexToBytesArena          (Dqn_Arena *arena, Dqn_String8 hex);
 #endif // !defined(DQN_NO_HEX)
 
 // =================================================================================================
@@ -2915,7 +2862,7 @@ DQN_API Dqn_String8 Dqn_Win_String16ToString8Allocator(Dqn_String16 src, Dqn_All
 /// required buffer size for the directory.
 /// @return The length of the executable directory string. If this return value
 /// exceeds the capacity of the 'buffer', the 'buffer' is untouched.
-DQN_API Dqn_isize    Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_isize size);
+DQN_API Dqn_usize    Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_usize size);
 DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena);
 
 // @param[in] size (Optional) The size of the current directory string returned
@@ -3035,7 +2982,7 @@ struct Dqn_WinNetHandleResponse
 {
     Dqn_String8  raw_headers;
     Dqn_String8 *headers;
-    Dqn_isize    headers_size;
+    Dqn_usize    headers_size;
 
     // NOTE: Headers pulled from the 'raw_headers' for convenience
     uint64_t     content_length;
@@ -3180,7 +3127,7 @@ DQN_API bool       Dqn_Fs_Delete(Dqn_String8 path);
 // NOTE: Read/Write Entire File API
 // =============================================================================
 // file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
-DQN_API bool       Dqn_Fs_WriteCString8(char const *file_path, Dqn_isize file_path_size, char const *buffer, Dqn_isize buffer_size);
+DQN_API bool       Dqn_Fs_WriteCString8(char const *file_path, Dqn_usize file_path_size, char const *buffer, Dqn_usize buffer_size);
 DQN_API bool       Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer);
 
 /// Read a file at the specified path into memory.
@@ -3190,7 +3137,7 @@ DQN_API bool       Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer
 /// @param[in] allocator Allocator used to read the file to memory with
 /// @return A cstring with the read file, null pointer on failure.
 #define              Dqn_Fs_ReadCString8(path, path_size, file_size, allocator) Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE path, path_size, file_size, allocator)
-DQN_API char        *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Allocator allocator);
+DQN_API char        *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator);
 
 /// Read a file at the specified path into memory.
 /// @param[in] file_path Path to the file to read
@@ -3226,7 +3173,7 @@ enum Dqn_FsFileAccess
 };
 
 DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access);
-DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_isize size);
+DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize size);
 DQN_API void Dqn_Fs_CloseFile(Dqn_FsFile *file);
 
 // =================================================================================================
@@ -3261,14 +3208,25 @@ DQN_FORCE_INLINE bool Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rh
 
 enum Dqn_BinarySearchType
 {
+    /// Index of the match. If no match is found, found is set to false and the
+    /// index is set to 0
     Dqn_BinarySearchType_Match,
+
+    /// Index after the match. If no match is found, found is set to false and
+    /// the index is set to one past the closest match.
     Dqn_BinarySearchType_OnePastMatch,
 };
 
+struct Dqn_BinarySearchResult
+{
+    bool      found;
+    Dqn_usize index;
+};
+
 template <typename T>
-Dqn_isize
+Dqn_BinarySearchResult
 Dqn_BinarySearch(T const                        *array,
-                 Dqn_isize                       array_size,
+                 Dqn_usize                       array_size,
                  T const                        &find,
                  Dqn_BinarySearchType            type      = Dqn_BinarySearchType_Match,
                  Dqn_BinarySearchLessThanProc<T> less_than = Dqn_BinarySearch_DefaultLessThan);
@@ -3488,10 +3446,10 @@ void    Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, boo
 /// uint64_t hash     = Dqn_FNV1A64_Hash(buffer1, sizeof(buffer1));
 /// hash              = Dqn_FNV1A64_Iterate(buffer2, sizeof(buffer2), hash); // subsequent hashing
 /// @endcode
-DQN_API uint32_t Dqn_FNV1A32_Hash   (void const *bytes, Dqn_isize size);
-DQN_API uint64_t Dqn_FNV1A64_Hash   (void const *bytes, Dqn_isize size);
-DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_isize size, uint32_t hash);
-DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_isize size, uint64_t hash);
+DQN_API uint32_t Dqn_FNV1A32_Hash   (void const *bytes, Dqn_usize size);
+DQN_API uint64_t Dqn_FNV1A64_Hash   (void const *bytes, Dqn_usize size);
+DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_usize size, uint32_t hash);
+DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_usize size, uint64_t hash);
 
 // =================================================================================================
 // [$MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
@@ -3517,17 +3475,17 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
 // =================================================================================================
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size)
 {
-    Dqn_usize byte_size_64k_aligned = Dqn_PowerOfTwoRoundUp(byte_size, DQN_KILOBYTES(64));
+    Dqn_usize byte_size_64k_aligned = Dqn_PowerOfTwoAlign(byte_size, DQN_VMEM_RESERVE_GRANULARITY);
     Dqn_VArray<T> result            = {};
     result.block                    = Dqn_Arena_Grow(arena, byte_size_64k_aligned, 0 /*commit*/, Dqn_ArenaBlockFlags_Private);
     result.max                      = result.block->size / sizeof(T);
-    result.data                     = DQN_CAST(T *)Dqn_PowerOfTwoRoundUp((uintptr_t)result.block->memory, alignof(T));
+    result.data                     = DQN_CAST(T *)Dqn_PowerOfTwoAlign((uintptr_t)result.block->memory, alignof(T));
     return result;
 }
 
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_Init(Dqn_Arena *arena, Dqn_usize max)
 {
-    Dqn_VArray<T> result = Dqn_VArray_InitByteSize(arena, max * sizeof(T));
+    Dqn_VArray<T> result = Dqn_VArray_InitByteSize<T>(arena, max * sizeof(T));
     return result;
 }
 
@@ -3604,6 +3562,12 @@ DQN_API template <typename T> void Dqn_VArray_EraseRange(Dqn_VArray<T> *array, D
         }
         array->size -= erase_count;
     }
+}
+
+DQN_API template <typename T> void Dqn_VArray_Clear(Dqn_VArray<T> *array)
+{
+    if (array)
+        array->size = 0;
 }
 
 DQN_API template <typename T> void Dqn_VArray_Reserve(Dqn_VArray<T> *array, Dqn_usize count)
@@ -3973,10 +3937,9 @@ DQN_API Dqn_DSMapKey Dqn_DSMap_KeyString8Copy(Dqn_DSMap<T> const *map, Dqn_Alloc
 // =================================================================================================
 // [$FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
 // =================================================================================================
-DQN_FSTRING8_API
-DQN_FSTRING8 Dqn_FString8_InitF(char const *fmt, ...)
+template <Dqn_usize N> Dqn_FString8<N> Dqn_FString8_InitF(char const *fmt, ...)
 {
-    DQN_FSTRING8 result = {};
+    Dqn_FString8<N> result = {};
     if (fmt) {
         va_list args;
         va_start(args, fmt);
@@ -3986,29 +3949,26 @@ DQN_FSTRING8 Dqn_FString8_InitF(char const *fmt, ...)
     return result;
 }
 
-DQN_FSTRING8_API
-Dqn_isize Dqn_FString8_Max(DQN_FSTRING8 *)
+template <Dqn_usize N> Dqn_usize Dqn_FString8_Max(Dqn_FString8<N> const *)
 {
-    Dqn_isize result = MAX_;
+    Dqn_usize result = MAX_;
     return result;
 }
 
-DQN_FSTRING8_API
-void Dqn_FString8_Clear(DQN_FSTRING8 *string)
+template <Dqn_usize N> void Dqn_FString8_Clear(Dqn_FString8<N> *string)
 {
     *str = {};
 }
 
-DQN_FSTRING8_API
-bool Dqn_FString8_AppendFV(DQN_FSTRING8 *string, char const *fmt, va_list args)
+template <Dqn_usize N> bool Dqn_FString8_AppendFV(Dqn_FString8<N> *string, char const *fmt, va_list args)
 {
     bool result = false;
     if (!string || !fmt)
         return result;
 
     DQN_HARD_ASSERT(string->size >= 0);
-    Dqn_isize require = Dqn_CString8_FVSize(fmt, args) + 1 /*null_terminate*/;
-    Dqn_isize space   = (N + 1) - string->size;
+    Dqn_usize require = Dqn_CString8_FVSize(fmt, args) + 1 /*null_terminate*/;
+    Dqn_usize space   = (N + 1) - string->size;
     result            = require <= space;
     string->size += STB_SPRINTF_DECORATE(vsnprintf)(string->data + string->size, DQN_CAST(int)space, fmt, args);
 
@@ -4018,8 +3978,7 @@ bool Dqn_FString8_AppendFV(DQN_FSTRING8 *string, char const *fmt, va_list args)
     return result;
 }
 
-DQN_FSTRING8_API
-bool Dqn_FString8_AppendF(DQN_FSTRING8 *string, char const *fmt, ...)
+template <Dqn_usize N> bool Dqn_FString8_AppendF(Dqn_FString8<N> *string, char const *fmt, ...)
 {
     bool result = false;
     if (!string || !fmt)
@@ -4034,18 +3993,14 @@ bool Dqn_FString8_AppendF(DQN_FSTRING8 *string, char const *fmt, ...)
     return result;
 }
 
-DQN_FSTRING8_API
-bool Dqn_FString8_AppendCString8(DQN_FSTRING8 *string, char const *src, Dqn_isize size)
+template <Dqn_usize N> bool Dqn_FString8_AppendCString8(Dqn_FString8<N> *string, char const *src, Dqn_usize size)
 {
+    DQN_ASSERT(string->size <= N);
     bool result = false;
-    if (!string || !src || size == 0)
+    if (!string || !src || size == 0 || string->size >= N)
         return result;
 
-    if (size <= -1) {
-        size = DQN_CAST(Dqn_isize)Dqn_CString8_Size(src);
-    }
-
-    Dqn_isize space = N - string->size;
+    Dqn_usize space = N - string->size;
     result          = size <= space;
     DQN_MEMCPY(string->data + string->size, src, DQN_MIN(space, size));
     string->size = DQN_MIN(string->size + size, N);
@@ -4053,15 +4008,13 @@ bool Dqn_FString8_AppendCString8(DQN_FSTRING8 *string, char const *src, Dqn_isiz
     return result;
 }
 
-DQN_FSTRING8_API
-bool Dqn_FString8_Append(DQN_FSTRING8 *string, Dqn_String8 src)
+template <Dqn_usize N> bool Dqn_FString8_Append(Dqn_FString8<N> *string, Dqn_String8 src)
 {
     bool result = Dqn_FString8_AppendCString8(string, src.data, src.size);
     return result;
 }
 
-DQN_FSTRING8_API
-Dqn_String8 Dqn_FString8_ToString8(DQN_FSTRING8 const *string)
+template <Dqn_usize N> Dqn_String8 Dqn_FString8_ToString8(Dqn_FString8<N> const *string)
 {
     Dqn_String8 result = {};
     if (!string || string->size <= 0)
@@ -4072,41 +4025,46 @@ Dqn_String8 Dqn_FString8_ToString8(DQN_FSTRING8 const *string)
     return result;
 }
 
-DQN_FSTRING8_API bool Dqn_FString8_Eq(DQN_FSTRING8 const *lhs, DQN_FSTRING8 const *rhs, Dqn_CString8EqCase eq_case)
+template <Dqn_usize N> bool Dqn_FString8_Eq(Dqn_FString8<N> const *lhs, Dqn_FString8<N> const *rhs, Dqn_String8EqCase eq_case)
 {
     bool result = Dqn_CString8_Eq(lhs->data, rhs->data, lhs->size, rhs->size, eq_case);
     return result;
 }
 
-DQN_FSTRING8_API bool Dqn_FString8_EqString8(DQN_FSTRING8 const *lhs, Dqn_String8 rhs, Dqn_CString8EqCase eq_case)
+template <Dqn_usize N> bool Dqn_FString8_EqString8(Dqn_FString8<N> const *lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case)
 {
     bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, eq_case);
     return result;
 }
 
-DQN_FSTRING8_API bool Dqn_FString8_EqInsensitive(DQN_FSTRING8 const *lhs, DQN_FSTRING8 const *rhs)
+template <Dqn_usize N> bool Dqn_FString8_EqInsensitive(Dqn_FString8<N> const *lhs, Dqn_FString8<N> const *rhs)
 {
-    bool result = Dqn_CString8_Eq(lhs->data, rhs->data, lhs->size, rhs->size, Dqn_CString8EqCase_Insensitive);
+    Dqn_String8 lhs_s8 = Dqn_FString8_ToString8(lhs);
+    Dqn_String8 rhs_s8 = Dqn_FString8_ToString8(rhs);
+    bool result        = Dqn_String8_Eq(lhs_s8, rhs_s8, Dqn_String8EqCase_Insensitive);
     return result;
 }
 
-DQN_FSTRING8_API bool Dqn_FString8_EqString8Insensitive(DQN_FSTRING8 const *lhs, Dqn_String8 rhs)
+template <Dqn_usize N> bool Dqn_FString8_EqString8Insensitive(Dqn_FString8<N> const *lhs, Dqn_String8 rhs)
 {
-    bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, Dqn_CString8EqCase_Insensitive);
+    Dqn_String8 lhs_s8 = Dqn_FString8_ToString8(lhs);
+    bool result        = Dqn_String8_Eq(lhs_s8, rhs, Dqn_String8EqCase_Insensitive);
     return result;
 }
 
-template <Dqn_usize A, Dqn_usize B>
-bool Dqn_FString8_EqFStringAB(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs, Dqn_CString8EqCase eq_case)
+template <Dqn_usize A, Dqn_usize B> bool Dqn_FString8_EqFString8(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs, Dqn_String8EqCase eq_case)
 {
-    bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, eq_case);
+    Dqn_String8 lhs_s8 = Dqn_FString8_ToString8(lhs);
+    Dqn_String8 rhs_s8 = Dqn_FString8_ToString8(rhs);
+    bool result        = Dqn_String8_Eq(lhs_s8, rhs_s8, eq_case);
     return result;
 }
 
-template <Dqn_usize A, Dqn_usize B>
-bool Dqn_FString8_EqABInsensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs)
+template <Dqn_usize A, Dqn_usize B> bool Dqn_FString8_EqFString8Insensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs)
 {
-    bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, Dqn_CString8EqCase_Insensitive);
+    Dqn_String8 lhs_s8 = Dqn_FString8_ToString8(lhs);
+    Dqn_String8 rhs_s8 = Dqn_FString8_ToString8(rhs);
+    bool result = Dqn_CString8_Eq(lhs_s8, rhs_s8, Dqn_String8EqCase_Insensitive);
     return result;
 }
 #endif // !defined(DQN_NO_FSTRING8)
@@ -4115,192 +4073,100 @@ bool Dqn_FString8_EqABInsensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> co
 // =================================================================================================
 // [$FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
 // =================================================================================================
-DQN_FARRAY_API
-DQN_FARRAY Dqn_FArray_Init(T const *item, Dqn_isize count)
+DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init(T const *array, Dqn_usize count)
 {
-    DQN_FARRAY result = {};
-    Dqn_FArray_AddArray(&result, item, count);
+    Dqn_FArray<T, N> result = {};
+    bool added              = Dqn_FArray_Add(&result, array, count);
+    DQN_ASSERT(added);
+    return result;
+}
+DQN_API template <typename T, Dqn_usize N> bool Dqn_FArray_IsValid(Dqn_FArray<T, N> const *array)
+{
+    bool result = array && array->size <= DQN_ARRAY_UCOUNT(array->data);
     return result;
 }
 
-DQN_FARRAY_API
-Dqn_isize Dqn_FArray_Max(DQN_FARRAY const *)
+DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Make(Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
 {
-    Dqn_isize result = N;
+    if (!Dqn_FArray_IsValid(array))
+        return nullptr;
+
+    if (!Dqn_Safe_AssertF((array->size + count) < DQN_ARRAY_UCOUNT(array->data), "Array is out of memory"))
+        return nullptr;
+
+    // TODO: Use placement new? Why doesn't this work?
+    T *result    = array->data + array->size;
+    array->size += count;
+    if (zero_mem == Dqn_ZeroMem_Yes)
+        DQN_MEMSET(result, DQN_MEMSET_BYTE, sizeof(*result) * count);
     return result;
 }
 
-DQN_FARRAY_API
-T *Dqn_FArray_AddArray(DQN_FARRAY *array, T const *items, Dqn_isize count)
+DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Add(Dqn_FArray<T, N> *array, T const *items, Dqn_usize count)
 {
-    T *result = nullptr;
-    if (!array || !items || count <= 0)
-        return result;
-
-    DQN_ASSERT(array->size >= 0);
-    if (Dqn_Safe_AssertF(array->size + count < N, "Array out of space")) {
-        result = array->data + array->size;
-        array->size += count;
-        DQN_MEMCPY(result, items, sizeof(T) * count);
-    }
+    T *result = Dqn_FArray_Make(array, count, Dqn_ZeroMem_No);
+    if (result)
+        DQN_MEMCPY(result, items, count * sizeof(T));
     return result;
 }
 
-DQN_FARRAY_API
-T *Dqn_FArray_Add(DQN_FARRAY *array, T const &item)
+DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_FArrayErase erase)
 {
-    T *result = nullptr;
-    if (!array)
-        return result;
-
-    DQN_ASSERT(array->size >= 0);
-    if (Dqn_Safe_AssertF(array->size < N, "Array out of space")) {
-        array->data[array->size++] = item;
-        result = array->data + (array->size - 1);
-    }
-    return result;
-}
-
-DQN_FARRAY_API
-T *Dqn_FArray_Make(DQN_FARRAY *array, Dqn_isize count)
-{
-    T *result = nullptr;
-    if (!array || count <= 0)
-        return result;
-
-    DQN_ASSERT(array->size >= 0);
-    if (Dqn_Safe_AssertF(array->size + count <= N, "Array out of space")) {
-        result = array->data + array->size;
-        array->size += count;
-    }
-    return result;
-}
-
-DQN_FARRAY_API
-void Dqn_FArray_Clear(DQN_FARRAY *array, Dqn_ZeroMem zero_mem)
-{
-    if (!array)
+    if (!Dqn_FArray_IsValid(array) || array->size == 0 || count == 0)
         return;
 
-    DQN_ASSERT(array->size >= 0);
-    array->size = 0;
-    if (zero_mem == Dqn_ZeroMem_Yes)
-        DQN_MEMSET(array->data, DQN_MEMSET_BYTE, sizeof(T));
-}
-
-DQN_FARRAY_API
-bool Dqn_FArray_EraseStable(DQN_FARRAY *array, Dqn_isize index)
-{
-    if (!array)
-        return false;
-
-    DQN_ASSERT(array->size >= 0);
-    if (index < 0 || index > array->size || array->size <= 0)
-        return false;
-
-    T *end  = array->data + array->size;
-    T *dest = array->data + index;
-    T *src  = DQN_MIN(dest + 1, end);
-    DQN_MEMCPY(dest, src, DQN_CAST(size_t)(end - src));
-    array->size--;
-    return true;
-}
-
-DQN_FARRAY_API
-bool Dqn_FArray_EraseUnstable(DQN_FARRAY *array, Dqn_isize index)
-{
-    if (!array)
-        return false;
-
-    DQN_ASSERT(array->size >= 0);
-    if (!array || index < 0 || index > array->size || array->size <= 0)
-        return false;
-
-    array->data[index] = array->data[array->size - 1];
-    array->size--;
-    return true;
-}
-
-DQN_FARRAY_API
-bool Dqn_FArray_Pop(DQN_FARRAY *array, Dqn_isize count)
-{
-    bool result = false;
-    if (!array || array->size < count || count <= 0)
-        return result;
-
-    if (Dqn_Safe_Assert(array->size >= 0)) {
-        array->size -= DQN_MIN(count, array->size);
-        result = true;
+    // NOTE: Caculate the end index of the erase range
+    Dqn_isize abs_count = DQN_ABS(count);
+    Dqn_usize end_index = 0;
+    if (count < 0) {
+        end_index = begin_index - (abs_count - 1);
+        if (end_index > begin_index)
+            end_index = 0;
+    } else {
+        end_index = begin_index + (abs_count - 1);
+        if (end_index < begin_index)
+            end_index = array->size - 1;
     }
-    return result;
-}
 
-DQN_FARRAY_API
-T *Dqn_FArray_Peek(DQN_FARRAY *array)
-{
-    T *result = nullptr;
-    if (!array)
-        return result;
-
-    if (Dqn_Safe_Assert(array->size >= 0)) {
-        result = array->size ? nullptr : array->data + (array->size - 1);
+    // NOTE: Ensure begin_index < one_past_end_index
+    if (end_index < begin_index) {
+        Dqn_usize tmp = begin_index;
+        begin_index   = end_index;
+        end_index     = tmp;
     }
-    return result;
-}
 
-DQN_FARRAY_API
-T Dqn_FArray_PeekCopy(DQN_FARRAY const *array)
-{
-    T *ptr = Dqn_FArray_Peek(array);
-    DQN_HARD_ASSERT(ptr);
-    T result = *ptr;
-    return result;
-}
+    // NOTE: Ensure indexes are within valid bounds
+    begin_index = DQN_MIN(begin_index, array->size);
+    end_index   = DQN_MIN(end_index,   array->size - 1);
 
-template <typename T, int N, typename IsEqualProc> DQN_API
-T *Dqn_FArray_FindProc(DQN_FARRAY *array, IsEqualProc IsEqual)
-{
-    if (!array || !IsEqualProc)
-        return nullptr;
-
-    for (const T &entry : (*array)) {
-        if (IsEqual(entry))
-            return &entry;
+    // NOTE: Erase the items in the range [begin_index, one_past_end_index)
+    Dqn_usize one_past_end_index = end_index + 1;
+    Dqn_usize erase_count        = one_past_end_index - begin_index;
+    if (erase_count) {
+        T *end  = array->data + array->size;
+        T *dest = array->data + begin_index;
+        if (erase == Dqn_FArrayErase_Stable) {
+            T *src = dest + erase_count;
+            DQN_MEMMOVE(dest, src, (end - src) * sizeof(T));
+        } else {
+            T *src = end - erase_count;
+            DQN_MEMCPY(dest, src, (end - src) * sizeof(T));
+        }
+        array->size -= erase_count;
     }
-    return nullptr;
 }
 
-// return: True if the entry was found, false if not- the entry is made using Dqn_FArray_Make() in this case
-template <typename T, Dqn_isize N, typename IsEqualProc>
-DQN_API T *Dqn_FArray_FindProcElseMake(DQN_FARRAY *array, IsEqualProc IsEqual, bool *made)
+DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_Clear(Dqn_FArray<T, N> *array)
 {
-    T *result = Dqn_FArray_FindProc(array, IsEqual);
-    if (!result) {
-        result = Dqn_FArray_Make(array, 1);
-        if (result && made)
-            *made = true;
-    }
-    return result;
-}
-
-DQN_FARRAY_API
-T *Dqn_FArray_Find(DQN_FARRAY *array, T const *find)
-{
-    if (!array || !find)
-        return nullptr;
-
-    for (const T &entry : (*array)) {
-        if (entry == *find)
-            return &entry;
-    }
-    return nullptr;
+    if (array)
+        array->size = 0;
 }
 #endif // !defined(DQN_NO_FARRAY)
 
-// NOTE: Dqn_List Template Implementation
-// -------------------------------------------------------------------------------------------------
-template <typename T>
-DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_isize chunk_size)
+// =================================================================================================
+// [$LIST] Dqn_List             |                             | Chunked linked lists, append only
+// =================================================================================================
+template <typename T> DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_usize chunk_size)
 {
     Dqn_List<T> result = {};
     result.arena       = arena;
@@ -4308,27 +4174,23 @@ DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_isize chunk_siz
     return result;
 }
 
-template <typename T>
-DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize count)
+template <typename T> DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_usize count)
 {
     if (list->chunk_size == 0)
         list->chunk_size = 128;
-
-    if (!list->tail || (list->tail->count + count) > list->tail->size)
-    {
+    if (!list->tail || (list->tail->count + count) > list->tail->size) {
         auto *tail = (Dqn_ListChunk<T> * )Dqn_Arena_Allocate_(list->arena, sizeof(Dqn_ListChunk<T>), alignof(Dqn_ListChunk<T>), Dqn_ZeroMem_Yes DQN_LEAK_TRACE_ARG);
         if (!tail)
           return nullptr;
 
-        Dqn_isize items = DQN_MAX(list->chunk_size, count);
-        tail->data      = (T * )Dqn_Arena_Allocate_(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem_Yes DQN_LEAK_TRACE_ARG);
+        Dqn_usize items = DQN_MAX(list->chunk_size, count);
+        tail->data      = DQN_CAST(T * )Dqn_Arena_Allocate_(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem_Yes DQN_LEAK_TRACE_ARG);
         tail->size      = items;
 
         if (!tail->data)
             return nullptr;
 
-        if (list->tail)
-        {
+        if (list->tail) {
             list->tail->next = tail;
             tail->prev       = list->tail;
         }
@@ -4341,23 +4203,21 @@ DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_isize c
 
     T *result = list->tail->data + list->tail->count;
     list->tail->count += count;
-    list->count += count;
+    list->count       += count;
     return result;
 }
 
-template <typename T>
-DQN_API T *Dqn_List_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, T const &value)
+template <typename T> DQN_API T *Dqn_List_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, T const &value)
 {
     T *result = Dqn_List_Make_(list, 1);
     *result = value;
     return result;
 }
 
-template <typename T>
-DQN_API bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_isize start_index)
+template <typename T> DQN_API bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index)
 {
     bool result = false;
-    if (!list || !it || start_index < 0 || list->chunk_size <= 0)
+    if (!list || !it || list->chunk_size <= 0)
         return result;
 
     if (!it->init) {
@@ -4390,43 +4250,32 @@ DQN_API bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_is
     return result;
 }
 
-template <typename T>
-DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at_chunk)
+template <typename T> DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_usize index, Dqn_ListChunk<T> **at_chunk)
 {
-    if (!list || !list->chunk_size || index < 0 || index >= list->count)
+    if (!list || !list->chunk_size || index >= list->count)
         return nullptr;
 
-    Dqn_isize total_chunks       = list->count / (list->chunk_size + (list->chunk_size - 1));
-    Dqn_isize desired_chunk      = index / list->chunk_size;
-    Dqn_isize forward_scan_dist  = desired_chunk;
-    Dqn_isize backward_scan_dist = total_chunks - desired_chunk;
+    Dqn_usize total_chunks       = list->count / (list->chunk_size + (list->chunk_size - 1));
+    Dqn_usize desired_chunk      = index / list->chunk_size;
+    Dqn_usize forward_scan_dist  = desired_chunk;
+    Dqn_usize backward_scan_dist = total_chunks - desired_chunk;
 
     // NOTE: Linearly scan forwards/backwards to the chunk we need. We don't
     // have random access to chunks
-    Dqn_isize current_chunk = 0;
+    Dqn_usize current_chunk = 0;
     Dqn_ListChunk<T> **chunk = nullptr;
-    if (forward_scan_dist <= backward_scan_dist)
-    {
-        for (chunk = &list->head;
-             *chunk && current_chunk != desired_chunk;
-             *chunk = (*chunk)->next, current_chunk++)
-        {
+    if (forward_scan_dist <= backward_scan_dist) {
+        for (chunk = &list->head; *chunk && current_chunk != desired_chunk; *chunk = (*chunk)->next, current_chunk++) {
         }
-    }
-    else
-    {
+    } else {
         current_chunk = total_chunks;
-        for (chunk = &list->tail;
-             *chunk && current_chunk != desired_chunk;
-             *chunk = (*chunk)->prev, current_chunk--)
-        {
+        for (chunk = &list->tail; *chunk && current_chunk != desired_chunk; *chunk = (*chunk)->prev, current_chunk--) {
         }
     }
 
     T *result = nullptr;
-    if (*chunk)
-    {
-        Dqn_isize relative_index = index % list->chunk_size;
+    if (*chunk) {
+        Dqn_usize relative_index = index % list->chunk_size;
         result                   = (*chunk)->data + relative_index;
         DQN_ASSERT(relative_index < (*chunk)->count);
     }
@@ -4437,47 +4286,46 @@ DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_isize index, Dqn_ListChunk<T> **at
     return result;
 }
 
-// NOTE: Dqn_BinarySearch Template Implementation
+// NOTE: Binary Search
 // -------------------------------------------------------------------------------------------------
-template <typename T>
-DQN_FORCE_INLINE bool Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
+template <typename T> DQN_FORCE_INLINE bool Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
 {
     bool result = lhs < rhs;
     return result;
 }
 
 template <typename T>
-Dqn_isize
+Dqn_BinarySearchResult
 Dqn_BinarySearch(T const                        *array,
-                 Dqn_isize                       array_size,
+                 Dqn_usize                       array_size,
                  T const                        &find,
                  Dqn_BinarySearchType            type,
                  Dqn_BinarySearchLessThanProc<T> less_than)
 {
-    Dqn_isize result = -1;
-    Dqn_isize head   = 0;
-    Dqn_isize tail   = array_size - 1;
-
-    if (array && array_size >= 0) {
-        while (result == -1 && head <= tail) {
-            Dqn_isize mid  = (head + tail) / 2;
+    Dqn_BinarySearchResult result = {};
+    Dqn_usize head                = 0;
+    Dqn_usize tail                = array_size - 1;
+    if (array && array_size > 0) {
+        while (!result.found && head <= tail) {
+            Dqn_usize mid  = (head + tail) / 2;
             T const &value = array[mid];
             if (less_than(find, value)) {
                 tail = mid - 1;
+                if (mid == 0)
+                    break;
             } else if (less_than(value, find)) {
                 head = mid + 1;
             } else {
-                result = mid;
+                result.found = true;
+                result.index = mid;
             }
         }
     }
 
-    if (type == Dqn_BinarySearchType_OnePastMatch) {
-        result = (result == -1) ? tail + 1 : result + 1;
-        result = DQN_MAX(result, 0);
-    } else {
+    if (type == Dqn_BinarySearchType_OnePastMatch)
+        result.index = result.found ? result.index + 1 : tail + 1;
+    else
         DQN_ASSERT(type == Dqn_BinarySearchType_Match);
-    }
 
     return result;
 }
@@ -4969,11 +4817,11 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *use
 
     // NOTE: Header padding
     // =========================================================================
-    Dqn_isize padding_size = 0;
+    Dqn_usize padding_size = 0;
     {
-        DQN_LOCAL_PERSIST Dqn_isize max_header_length = 0;
+        DQN_LOCAL_PERSIST Dqn_usize max_header_length = 0;
         max_header_length                             = DQN_MAX(max_header_length, header.size);
-        padding_size                                  = DQN_MAX(0, max_header_length - header.size);
+        padding_size                                  = max_header_length - header.size;
     }
 
     // NOTE: Construct final log
@@ -5090,424 +4938,41 @@ DQN_API void Dqn_VMem_Release(void *ptr, Dqn_usize size)
     #endif
 }
 
-// NOTE: Dqn_CString8
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_isize Dqn_CString8_FSize(char const *fmt, ...)
+// =================================================================================================
+// [$CSTR] Dqn_CString8         |                             | C-string helpers
+// =================================================================================================
+DQN_API Dqn_usize Dqn_CString8_FSize(char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    Dqn_isize result = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, args);
+    Dqn_usize result = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, args);
     va_end(args);
     return result;
 }
 
-DQN_API Dqn_isize Dqn_CString8_FVSize(char const *fmt, va_list args)
+DQN_API Dqn_usize Dqn_CString8_FVSize(char const *fmt, va_list args)
 {
     va_list args_copy;
     va_copy(args_copy, args);
-    Dqn_isize result = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, args_copy);
+    Dqn_usize result = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, args_copy);
     va_end(args_copy);
     return result;
 }
 
-static bool Dqn_CString8_Validate_(char const *lhs, Dqn_isize *lhs_size)
+
+DQN_API Dqn_usize Dqn_CString8_Size(char const *src)
 {
-    if (lhs_size && *lhs_size <= -1)
-        *lhs_size = Dqn_CString8_Size(lhs);
-
-    if (!lhs || !lhs_size)
-        return false;
-
-    return true;
-}
-
-DQN_API char const *Dqn_CString8_BinarySplit(char const *string, Dqn_isize string_size, char delimiter, Dqn_isize *lhs_size, char **rhs, Dqn_isize *rhs_size)
-{
-    char const *result = string;
-    if (lhs_size)
-        *lhs_size = 0;
-    if (rhs_size)
-        *rhs_size = 0;
-    if (rhs)
-        *rhs = nullptr;
-
-    if (!Dqn_CString8_Validate_(string, &string_size))
-        return result;
-
-    Dqn_isize offset = 0;
-    while (offset < string_size && string[offset] != delimiter)
-        offset++;
-
-    // NOTE: LHS, the string before the delimiter
-    result = string;
-    if (lhs_size)
-        *lhs_size = offset;
-
-    // NOTE: RHS, the string after the delimiter
-    if (rhs) {
-        char const *end = string + string_size;
-        *rhs      = DQN_CAST(char *)DQN_MIN((string + offset + 1), end);
-        *rhs_size = end - (*rhs);
-    }
-
-    return result;
-}
-
-DQN_API bool Dqn_CString8_Eq(char const *lhs, char const *rhs, Dqn_isize lhs_size, Dqn_isize rhs_size, Dqn_CString8EqCase eq_case)
-{
-    if (!Dqn_CString8_Validate_(lhs, &lhs_size) || !Dqn_CString8_Validate_(rhs, &rhs_size)) {
-        return false;
-    }
-
-    if (lhs_size != rhs_size)
-        return false;
-
-    bool result = lhs_size == rhs_size;
-    if (result) {
-        if (eq_case == Dqn_CString8EqCase_Sensitive) {
-            result = (DQN_MEMCMP(lhs, rhs, DQN_CAST(size_t)lhs_size) == 0);
-        } else {
-            for (Dqn_isize index = 0; index < lhs_size && result; index++)
-                result = (Dqn_Char_ToLower(lhs[index]) == Dqn_Char_ToLower(rhs[index]));
-        }
-    }
-
-    return result;
-}
-
-DQN_API bool Dqn_CString8_EqInsensitive(char const *lhs, char const *rhs, Dqn_isize lhs_size, Dqn_isize rhs_size)
-{
-    bool result = Dqn_CString8_Eq(lhs, rhs, lhs_size, rhs_size, Dqn_CString8EqCase_Insensitive);
-    return result;
-}
-
-DQN_API bool Dqn_CString8_StartsWith(char const *string, char const *prefix, Dqn_isize string_size, Dqn_isize prefix_size, Dqn_CString8EqCase eq_case)
-{
-    if (!Dqn_CString8_Validate_(string, &string_size) || !Dqn_CString8_Validate_(prefix, &prefix_size)) {
-        return false;
-    }
-
-    bool result = false;
-    if (string_size >= prefix_size)
-        result = Dqn_CString8_Eq(string /*lhs*/, prefix /*rhs*/, prefix_size /*lhs_size*/, prefix_size /*rhs_size*/, eq_case);
-
-    return result;
-}
-
-DQN_API bool Dqn_CString8_StartsWithInsensitive(char const *string, char const *prefix, Dqn_isize string_size, Dqn_isize prefix_size)
-{
-    bool result = Dqn_CString8_StartsWith(string, prefix, string_size, prefix_size, Dqn_CString8EqCase_Insensitive);
-    return result;
-}
-
-DQN_API bool Dqn_CString8_EndsWith(char const *string, char const *suffix, Dqn_isize string_size, Dqn_isize suffix_size, Dqn_CString8EqCase eq_case)
-{
-    if (!Dqn_CString8_Validate_(string, &string_size) || !Dqn_CString8_Validate_(suffix, &suffix_size)) {
-        return false;
-    }
-
-    bool result = false;
-    if (string_size >= suffix_size) {
-        char const *string_tail = (string + string_size) - suffix_size;
-        result = Dqn_CString8_Eq(string_tail /*lhs*/, suffix /*rhs*/, suffix_size /*lhs_size*/, suffix_size /*rhs_size*/, eq_case);
-    }
-
-    return result;
-}
-
-DQN_API bool Dqn_CString8_EndsWithInsensitive(char const *string, char const *suffix, Dqn_isize string_size, Dqn_isize suffix_size)
-{
-    bool result = Dqn_CString8_EndsWith(string, suffix, string_size, suffix_size, Dqn_CString8EqCase_Insensitive);
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_TrimPrefix(char const *string, char const *prefix, Dqn_isize string_size, Dqn_isize prefix_size, Dqn_CString8EqCase eq_case, Dqn_isize *trimmed_size)
-{
-    char const *result = string;
-    bool starts_with = Dqn_CString8_StartsWith(string, prefix, string_size, prefix_size, eq_case);
-
-    if (starts_with) {
-        result = string + prefix_size;
-    }
-
-    if (trimmed_size) {
-        if (starts_with)
-            *trimmed_size = string_size - prefix_size;
-        else
-            *trimmed_size = string_size;
-    }
-
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_TrimSuffix(char const *string, char const *suffix, Dqn_isize string_size, Dqn_isize suffix_size, Dqn_CString8EqCase eq_case, Dqn_isize *trimmed_size)
-{
-    char const *result = string;
-    bool ends_with = Dqn_CString8_EndsWith(string, suffix, string_size, suffix_size, eq_case);
-
-    if (trimmed_size) {
-        if (ends_with)
-            *trimmed_size = string_size - suffix_size;
-        else
-            *trimmed_size = string_size;
-    }
-
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_TrimWhitespaceAround(char const *string, Dqn_isize string_size, Dqn_isize *trimmed_size)
-{
-    char const *result = string;
-    if (trimmed_size)
-        *trimmed_size = 0;
-
-    if (!Dqn_CString8_Validate_(string, &string_size)) {
-        return result;
-    }
-
-    char const *start = result;
-    char const *end   = start + string_size;
-
-    while (start < end && Dqn_Char_IsWhitespace(start[0]))
-        start++;
-
-    while (end > start && Dqn_Char_IsWhitespace(end[-1]))
-        end--;
-
-    result                = start;
-    Dqn_isize result_size = end - start;
-    DQN_ASSERT(result_size >= 0);
-
-    if (trimmed_size)
-        *trimmed_size = result_size;
-
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_TrimByteOrderMark(char const *string, Dqn_isize string_size, Dqn_isize *trimmed_size)
-{
-    // TODO(dqn): This is little endian
-    char const *result = string;
-    if (trimmed_size)
-        *trimmed_size = string_size;
-
-    if (!Dqn_CString8_Validate_(string, &string_size))
-        return result;
-
-    char const UTF8_BOM[]     = "\xEF\xBB\xBF";
-    char const UTF16_BOM_BE[] = "\xEF\xFF";
-    char const UTF16_BOM_LE[] = "\xFF\xEF";
-    char const UTF32_BOM_BE[] = "\x00\x00\xFE\xFF";
-    char const UTF32_BOM_LE[] = "\xFF\xFE\x00\x00";
-
-    Dqn_isize result_size = string_size;
-    result = Dqn_CString8_TrimPrefix(result, UTF8_BOM,     result_size, DQN_CHAR_COUNT(UTF8_BOM),     Dqn_CString8EqCase_Sensitive, &result_size);
-    result = Dqn_CString8_TrimPrefix(result, UTF16_BOM_BE, result_size, DQN_CHAR_COUNT(UTF16_BOM_BE), Dqn_CString8EqCase_Sensitive, &result_size);
-    result = Dqn_CString8_TrimPrefix(result, UTF16_BOM_LE, result_size, DQN_CHAR_COUNT(UTF16_BOM_LE), Dqn_CString8EqCase_Sensitive, &result_size);
-    result = Dqn_CString8_TrimPrefix(result, UTF32_BOM_BE, result_size, DQN_CHAR_COUNT(UTF32_BOM_BE), Dqn_CString8EqCase_Sensitive, &result_size);
-    result = Dqn_CString8_TrimPrefix(result, UTF32_BOM_LE, result_size, DQN_CHAR_COUNT(UTF32_BOM_LE), Dqn_CString8EqCase_Sensitive, &result_size);
-
-    if (trimmed_size)
-        *trimmed_size = result_size;
-
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_FileNameFromPath(char const *path, Dqn_isize path_size, Dqn_isize *file_name_size)
-{
-    char const *result = path;
-    if (file_name_size)
-        *file_name_size = path_size;
-
-    if (!Dqn_CString8_Validate_(path, &path_size))
-        return result;
-
-    Dqn_isize result_size = path_size;
-    for (Dqn_isize i = (result_size - 1); i >= 0; --i) {
-        if (result[i] == '\\' || result[i] == '/') {
-            char const *file_end = result + result_size;
-            result               = result + (i + 1);
-            result_size          = file_end - result;
-            break;
-        }
-    }
-
-    if (file_name_size)
-        *file_name_size = result_size;
-
-    return result;
-}
-
-DQN_API bool Dqn_CString8_ToU64Checked(char const *buf, Dqn_isize size, char separator, uint64_t *output)
-{
-    // NOTE: Argument check
-    if (!Dqn_CString8_Validate_(buf, &size)) {
-        return false;
-    }
-
-    // NOTE: Sanitize input/output
-    *output = 0;
-    Dqn_isize start_index = Dqn_CString8_TrimWhitespaceAround(buf, size, &size /*new_size*/) - buf;
-    DQN_ASSERT(start_index <= size);
-
-    if (size == 0)
-        return true;
-
-    // NOTE: Handle prefix '+'
-    if (!Dqn_Char_IsDigit(buf[start_index])) {
-        if (buf[start_index] == '+') {
-            start_index++;
-        } else {
-            return false;
-        }
-    }
-
-    // NOTE: Convert the string number to the binary number
-    for (Dqn_isize index = start_index; index < size; ++index) {
-        char ch = buf[index];
-        if (index) {
-            if (separator != 0 && ch == separator)
-                continue;
-        }
-
-        if (ch < '0' || ch > '9')
-            return false;
-
-        *output        = Dqn_Safe_MulU64(*output, 10);
-        uint64_t digit = ch - '0';
-        *output        = Dqn_Safe_AddU64(*output, digit);
-    }
-
-    return true;
-}
-
-DQN_API uint64_t Dqn_CString8_ToU64(char const *buf, Dqn_isize size, char separator)
-{
-    uint64_t result = 0;
-    Dqn_CString8_ToU64Checked(buf, size, separator, &result);
-    return result;
-}
-
-DQN_API bool Dqn_CString8_ToI64Checked(char const *buf, Dqn_isize size, char separator, int64_t *output)
-{
-    // NOTE: Sanitize input/output
-    *output = 0;
-    Dqn_isize start_index = Dqn_CString8_TrimWhitespaceAround(buf, size, &size /*new_size*/) - buf;
-    DQN_ASSERT(start_index <= size);
-
-    if (size == 0)
-        return true;
-
-    // NOTE: Handle prefix '-' or '+'
-    bool negative = false;
-    if (!Dqn_Char_IsDigit(buf[start_index])) {
-        negative = (buf[start_index] == '-');
-        if (negative || buf[start_index] == '+') {
-            start_index++;
-        } else {
-            return false; // NOTE: Prefix not handled
-        }
-    }
-
-    // NOTE: Convert the string number to the binary number
-    for (Dqn_isize index = start_index; index < size; ++index) {
-        char ch = buf[index];
-        if (index) {
-            if (separator != 0 && ch == separator)
-                continue;
-        }
-
-        if (ch < '0' || ch > '9')
-            return false;
-
-        *output     = Dqn_Safe_MulI64(*output, 10);
-        int64_t val = ch - '0';
-        *output     = Dqn_Safe_AddI64(*output, val);
-    }
-
-    if (negative)
-        *output *= -1;
-
-    return true;
-}
-
-DQN_API int64_t Dqn_CString8_ToI64(char const *buf, Dqn_isize size, char separator)
-{
-    int64_t result = 0;
-    Dqn_CString8_ToI64Checked(buf, size, separator, &result);
-    return result;
-}
-
-
-DQN_API char const *Dqn_CString8_FindMulti(char const *buf, char const *find_list[], Dqn_isize const *find_string_sizes, Dqn_isize find_size, Dqn_isize *match_index, Dqn_isize buf_size)
-{
-    char const *result = nullptr;
-    if (find_size == 0) return result;
-    if (buf_size < 0) buf_size = DQN_CAST(Dqn_isize)Dqn_CString8_Size(buf);
-
-    char const *buf_end = buf + buf_size;
-    for (; buf != buf_end; ++buf) {
-        Dqn_isize remaining = static_cast<Dqn_isize>(buf_end - buf);
-        for (Dqn_isize find_index = 0; find_index < find_size; find_index++) {
-            char const *find   = find_list[find_index];
-            Dqn_isize find_str_size = find_string_sizes[find_index];
-            if (remaining < find_str_size) continue;
-
-            if (strncmp(buf, find, DQN_CAST(size_t)find_str_size) == 0) {
-                result       = buf;
-                *match_index = find_index;
-                return result;
-            }
-        }
-
+    Dqn_usize result = 0;
+    while (src && src[0] != 0) {
+        src++;
+        result++;
     }
     return result;
 }
 
-DQN_API char const *Dqn_CString8_Find(char const *buf, char const *find, Dqn_isize buf_size, Dqn_isize find_size, bool case_insensitive)
+DQN_API Dqn_usize Dqn_CString16_Size(wchar_t const *src)
 {
-    if (find_size == 0) return nullptr;
-    if (buf_size < 0) buf_size = DQN_CAST(Dqn_isize)Dqn_CString8_Size(buf);
-    if (find_size < 0) find_size = DQN_CAST(Dqn_isize)Dqn_CString8_Size(find);
-
-    char const *buf_end = buf + buf_size;
-    char const *result = nullptr;
-    for (; buf != buf_end; ++buf)
-    {
-        Dqn_isize remaining = static_cast<Dqn_isize>(buf_end - buf);
-        if (remaining < find_size) break;
-
-        bool matched = true;
-        for (Dqn_isize index = 0; index < find_size; index++)
-        {
-            char lhs = buf[index];
-            char rhs = find[index];
-
-            if (case_insensitive)
-            {
-                lhs = Dqn_Char_ToLower(lhs);
-                rhs = Dqn_Char_ToLower(rhs);
-            }
-
-            if (lhs != rhs)
-            {
-                matched = false;
-                break;
-            }
-        }
-
-        if (matched)
-        {
-            result = buf;
-            break;
-        }
-    }
-    return result;
-}
-
-DQN_API Dqn_isize Dqn_CString8_Size(char const *src)
-{
-    Dqn_isize result = 0;
+    Dqn_usize result = 0;
     while (src && src[0] != 0) {
         src++;
         result++;
@@ -5516,327 +4981,87 @@ DQN_API Dqn_isize Dqn_CString8_Size(char const *src)
     return result;
 }
 
-DQN_API bool Dqn_CString8_Match(char const *src, char const *find, int find_size)
-{
-    if (find_size == -1) find_size = Dqn_Safe_SaturateCastUSizeToInt(Dqn_CString8_Size(find));
-    bool result = (DQN_MEMCMP(src, find, DQN_CAST(size_t)find_size) == 0);
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_SkipToChar(char const *src, char ch)
-{
-    char const *result = src;
-    while (result && result[0] && result[0] != ch) ++result;
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextAlphaNum(char const *src)
-{
-    char const *result = src;
-    while (result && result[0] && !Dqn_Char_IsAlphaNum(result[0])) ++result;
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextDigit(char const *src)
-{
-    char const *result = src;
-    while (result && result[0] && !Dqn_Char_IsDigit(result[0])) ++result;
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextChar(char const *src)
-{
-    char const *result = src;
-    while (result && result[0] && !Dqn_Char_IsAlpha(result[0])) ++result;
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextWord(char const *src)
-{
-    char const *result = src;
-    while (result && result[0] && !Dqn_Char_IsWhitespace(result[0])) ++result;
-    while (result && result[0] && Dqn_Char_IsWhitespace(result[0])) ++result;
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextWhitespace(char const *src)
-{
-    char const *result = src;
-    while (result && result[0] && !Dqn_Char_IsWhitespace(result[0])) ++result;
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_SkipWhitespace(char const *src)
-{
-    char const *result = src;
-    while (result && result[0] && Dqn_Char_IsWhitespace(result[0])) ++result;
-    return result;
-}
-
-DQN_API char const *Dqn_CString8_SkipToCharInPlace(char const **src, char ch)
-{
-    *src = Dqn_CString8_SkipToChar(*src, ch);
-    return *src;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextAlphaNumInPlace(char const **src)
-{
-    *src = Dqn_CString8_SkipToNextAlphaNum(*src);
-    return *src;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextCharInPlace(char const **src)
-{
-    *src = Dqn_CString8_SkipToNextChar(*src);
-    return *src;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextWhitespaceInPlace(char const **src)
-{
-    *src = Dqn_CString8_SkipToNextWhitespace(*src);
-    return *src;
-}
-
-DQN_API char const *Dqn_CString8_SkipToNextWordInPlace(char const **src)
-{
-    *src = Dqn_CString8_SkipToNextWord(*src);
-    return *src;
-}
-
-DQN_API char const *Dqn_CString8_SkipWhitespaceInPlace(char const **src)
-{
-    *src = Dqn_CString8_SkipWhitespace(*src);
-    return *src;
-}
-
-DQN_API bool Dqn_CString8_IsAllDigits(char const *src, Dqn_isize size)
-{
-    if (!src) return false;
-    if (size <= -1) size = Dqn_CString8_Size(src);
-    for (Dqn_isize ch_index = 0; ch_index < size; ch_index++) {
-        if (!(src[ch_index] >= '0' && src[ch_index] <= '9'))
-            return false;
-    }
-    bool result = src && size > 0;
-    return result;
-}
-
-DQN_API Dqn_isize Dqn_CString16_Size(wchar_t const *src)
-{
-    Dqn_isize result = 0;
-    while (src && src[0] != 0) {
-        src++;
-        result++;
-    }
-
-    return result;
-}
-
-
-// NOTE: Dqn_String8
-// -------------------------------------------------------------------------------------------------
-DQN_API Dqn_String8 Dqn_String8_Init(char const *string, Dqn_isize size)
-{
-    Dqn_String8 result = {};
-    result.data = DQN_CAST(char *)string;
-    result.size = size;
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_InitCString(char const *string)
-{
-    Dqn_isize size     = Dqn_CString8_Size(string);
-    Dqn_String8 result = Dqn_String8_Init(string, size);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_InitF_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, ...)
-{
-    va_list va;
-    va_start(va, fmt);
-    Dqn_String8 result = Dqn_String8_InitFV_(DQN_LEAK_TRACE_ARG allocator, fmt, va);
-    va_end(va);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_InitFV_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, va_list args)
-{
-    Dqn_String8 result = {};
-    if (!fmt)
-        return result;
-
-    Dqn_isize size = Dqn_CString8_FVSize(fmt, args);
-    if (size) {
-        result = Dqn_String8_Allocate_(DQN_LEAK_TRACE_ARG allocator, size, Dqn_ZeroMem_No);
-        if (Dqn_String8_IsValid(result))
-            STB_SPRINTF_DECORATE(vsnprintf)(result.data, Dqn_Safe_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
-    }
-    return result;
-}
-
+// =================================================================================================
+// [$STR8] Dqn_String8          |                             | Pointer and length strings
+// =================================================================================================
 DQN_API bool Dqn_String8_IsValid(Dqn_String8 string)
 {
-    bool result = string.size >= 0 && string.data;
+    bool result = string.data;
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8_Slice(Dqn_String8 string, Dqn_isize offset, Dqn_isize size)
+DQN_API bool Dqn_String8_IsAll(Dqn_String8 string, Dqn_String8IsAll is_all)
+{
+    bool result = Dqn_String8_IsValid(string);
+    if (!result)
+        return result;
+
+    switch (is_all) {
+        case Dqn_String8IsAll_Digits: {
+            for (Dqn_usize index = 0; result && index < string.size; index++)
+                result = string.data[index] >= '0' && string.data[index] <= '9';
+        } break;
+
+        case Dqn_String8IsAll_Hex: {
+            Dqn_String8 trimmed = Dqn_String8_TrimPrefix(string, DQN_STRING8("0x"), Dqn_String8EqCase_Insensitive);
+            for (Dqn_usize index = 0; result && index < string.size; index++) {
+                char ch = trimmed.data[index];
+                result  = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+            }
+        } break;
+    }
+
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_Slice(Dqn_String8 string, Dqn_usize offset, Dqn_usize size)
 {
     Dqn_String8 result = Dqn_String8_Init(string.data, 0);
-    if (!Dqn_String8_IsValid(string) || offset < 0 || size < 0)
+    if (!Dqn_String8_IsValid(result))
         return result;
 
-    Dqn_isize capped_offset = DQN_MIN(offset, string.size);
-    Dqn_isize max_size      = string.size - capped_offset;
-    Dqn_isize capped_size   = DQN_MIN(size, max_size);
+    Dqn_usize capped_offset = DQN_MIN(offset, string.size);
+    Dqn_usize max_size      = string.size - capped_offset;
+    Dqn_usize capped_size   = DQN_MIN(size, max_size);
     result                  = Dqn_String8_Init(string.data + capped_offset, capped_size);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_isize size, Dqn_ZeroMem zero_mem)
-{
-    Dqn_String8 result = {};
-    result.data       = (char *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_ARG allocator, size + 1, alignof(char), zero_mem);
-    if (result.data) {
-        result.size = size;
-    }
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_CopyCString_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *string, Dqn_isize size)
-{
-    Dqn_String8 result = {};
-    if (!string || size <= 0)
-        return result;
-
-    result = Dqn_String8_Allocate_(DQN_LEAK_TRACE_ARG allocator, size, Dqn_ZeroMem_No);
-    if (Dqn_String8_IsValid(result)) {
-        DQN_MEMCPY(result.data, string, DQN_CAST(size_t)size);
-        result.data[size] = 0;
-    }
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_String8 string)
-{
-    Dqn_String8 result = Dqn_String8_CopyCString_(DQN_LEAK_TRACE_ARG allocator, string.data, string.size);
     return result;
 }
 
 DQN_API Dqn_String8 Dqn_String8_BinarySplit(Dqn_String8 string, char delimiter, Dqn_String8 *rhs)
 {
-    char **rhs_string   = rhs ? &rhs->data : nullptr;
-    Dqn_isize *rhs_size = rhs ? &rhs->size : nullptr;
-    Dqn_String8 result  = {};
-    result.data         = DQN_CAST(char *)Dqn_CString8_BinarySplit(string.data, string.size, delimiter, &result.size, rhs_string, rhs_size);
+    Dqn_String8 result = string;
+    if (rhs)
+        *rhs = {};
+
+    if (!Dqn_String8_IsValid(string))
+        return result;
+
+    Dqn_usize offset = 0;
+    while (offset < string.size && string.data[offset] != delimiter)
+        offset++;
+
+    // NOTE: LHS, the string before the delimiter
+    result = Dqn_String8_Init(string.data, offset);
+
+    // NOTE: RHS, the string after the delimiter
+    if (rhs) {
+        char *end = string.data + string.size;
+        rhs->data = DQN_MIN((string.data + offset + 1), end);
+        rhs->size = end - rhs->data;
+    }
+
     return result;
 }
 
-DQN_API bool Dqn_String8_Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_CString8EqCase eq_case)
+DQN_API Dqn_usize Dqn_String8_Split(Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_usize splits_count)
 {
-    bool result = Dqn_CString8_Eq(lhs.data, rhs.data, lhs.size, rhs.size, eq_case);
-    return result;
-}
-
-DQN_API bool Dqn_String8_EqInsensitive(Dqn_String8 lhs, Dqn_String8 rhs)
-{
-    bool result = Dqn_String8_Eq(lhs, rhs, Dqn_CString8EqCase_Insensitive);
-    return result;
-}
-
-DQN_API bool Dqn_String8_StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case)
-{
-    bool result = Dqn_CString8_StartsWith(string.data, prefix.data, string.size, prefix.size, eq_case);
-    return result;
-}
-
-DQN_API bool Dqn_String8_StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix)
-{
-    bool result = Dqn_String8_StartsWith(string, prefix, Dqn_CString8EqCase_Insensitive);
-    return result;
-}
-
-DQN_API bool Dqn_String8_EndsWith(Dqn_String8 string, Dqn_String8 suffix, Dqn_CString8EqCase eq_case)
-{
-    bool result = Dqn_CString8_EndsWith(string.data, suffix.data, string.size, suffix.size, eq_case);
-    return result;
-}
-
-DQN_API bool Dqn_String8_EndsWithInsensitive(Dqn_String8 string, Dqn_String8 suffix)
-{
-    bool result = Dqn_String8_EndsWith(string, suffix, Dqn_CString8EqCase_Insensitive);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_TrimPrefix(Dqn_String8 string, Dqn_String8 prefix, Dqn_CString8EqCase eq_case)
-{
-    Dqn_String8 result = {};
-    result.data = DQN_CAST(char *)Dqn_CString8_TrimPrefix(string.data, prefix.data, string.size, prefix.size, eq_case, &result.size);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_TrimSuffix(Dqn_String8 string, Dqn_String8 suffix, Dqn_CString8EqCase eq_case)
-{
-    Dqn_String8 result = {};
-    result.data = DQN_CAST(char *)Dqn_CString8_TrimSuffix(string.data, suffix.data, string.size, suffix.size, eq_case, &result.size);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_TrimWhitespaceAround(Dqn_String8 string)
-{
-    Dqn_String8 result = {};
-    result.data = DQN_CAST(char *)Dqn_CString8_TrimWhitespaceAround(string.data, string.size, &result.size);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_TrimByteOrderMark(Dqn_String8 string)
-{
-    Dqn_String8 result = {};
-    result.data = DQN_CAST(char *)Dqn_CString8_TrimByteOrderMark(string.data, string.size, &result.size);
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_FileNameFromPath(Dqn_String8 path)
-{
-    Dqn_String8 result = {};
-    result.data        = DQN_CAST(char *)Dqn_CString8_FileNameFromPath(path.data, path.size, &result.size);
-    return result;
-}
-
-DQN_API bool Dqn_String8_ToU64Checked(Dqn_String8 string, char separator, uint64_t *output)
-{
-    bool result = Dqn_CString8_ToU64Checked(string.data, string.size, separator, output);
-    return result;
-}
-
-DQN_API uint64_t Dqn_String8_ToU64(Dqn_String8 string, char separator)
-{
-    uint64_t result = Dqn_CString8_ToU64(string.data, string.size, separator);
-    return result;
-}
-
-DQN_API bool Dqn_String8_ToI64Checked(Dqn_String8 string, char separator, int64_t *output)
-{
-    bool result = Dqn_CString8_ToI64Checked(string.data, string.size, separator, output);
-    return result;
-}
-
-DQN_API int64_t Dqn_String8_ToI64(Dqn_String8 string, char separator)
-{
-    int64_t result = Dqn_CString8_ToI64(string.data, string.size, separator);
-    return result;
-}
-
-
-DQN_API Dqn_isize Dqn_String8_Split(Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_isize splits_count)
-{
-    Dqn_isize result = 0; // The number of splits in the actual string.
+    Dqn_usize result = 0; // The number of splits in the actual string.
     if (!Dqn_String8_IsValid(string) || !Dqn_String8_IsValid(delimiter) || delimiter.size <= 0)
         return result;
 
-    Dqn_isize splits_index = 0; // The number of splits written.
-    Dqn_isize begin        = 0;
-    for (Dqn_isize index = 0; index < string.size; ) {
+    Dqn_usize splits_index = 0; // The number of splits written.
+    Dqn_usize begin        = 0;
+    for (Dqn_usize index = 0; index < string.size; ) {
         // NOTE: Check if we encountered the substring that is the delimiter
         Dqn_String8 check = Dqn_String8_Slice(string, index, delimiter.size);
         if (!Dqn_String8_Eq(check, delimiter)) {
@@ -5853,99 +5078,284 @@ DQN_API Dqn_isize Dqn_String8_Split(Dqn_String8 string, Dqn_String8 delimiter, D
         result += (split.size > 0);
         index  += delimiter.size;
         begin   = index;
-
-        // NOTE: Exit early if space in string is less than the delimiter size
-        Dqn_isize space = string.size - index;
-        if (space < delimiter.size)
-            break;
     }
 
     return result;
 }
 
-DQN_API bool Dqn_String8_IsAllDigits(Dqn_String8 string)
+DQN_API bool Dqn_String8_Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case)
 {
-    bool result = Dqn_String8_IsValid(string) && string.size > 0;
-    for (Dqn_isize index = 0; result && index < string.size; index++)
-        result = string.data[index] >= '0' && string.data[index] <= '9';
+    bool result = (DQN_CAST(bool)lhs.data == DQN_CAST(bool)rhs.data) && (lhs.size == rhs.size);
+    if (!result)
+        return result;
+
+    if (lhs.data) {
+        switch (eq_case) {
+            case Dqn_String8EqCase_Sensitive: {
+                result = (DQN_MEMCMP(lhs.data, rhs.data, lhs.size) == 0);
+            } break;
+
+            case Dqn_String8EqCase_Insensitive: {
+                for (Dqn_usize index = 0; index < lhs.size && result; index++)
+                    result = (Dqn_Char_ToLower(lhs.data[index]) == Dqn_Char_ToLower(rhs.data[index]));
+            } break;
+        }
+    } else {
+        DQN_ASSERT(lhs.size == 0);
+    }
     return result;
 }
 
-DQN_API bool Dqn_String8_IsAllHex(Dqn_String8 string)
+DQN_API bool Dqn_String8_EqInsensitive(Dqn_String8 lhs, Dqn_String8 rhs)
 {
-    Dqn_String8 trimmed = Dqn_String8_TrimPrefix(string, DQN_STRING8("0x"), Dqn_CString8EqCase_Insensitive);
-    bool result        = Dqn_String8_IsValid(trimmed) && trimmed.size > 0;
-    for (Dqn_isize index = 0; result && index < trimmed.size; index++) {
-        char ch = trimmed.data[index];
-        result  = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
-    }
+    bool result = Dqn_String8_Eq(lhs, rhs, Dqn_String8EqCase_Insensitive);
+    return result;
+}
+
+DQN_API bool Dqn_String8_StartsWith(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case)
+{
+    Dqn_String8 substring = {string.data, DQN_MIN(prefix.size, string.size)};
+    bool result           = Dqn_String8_Eq(substring, prefix, eq_case);
+    return result;
+}
+
+DQN_API bool Dqn_String8_StartsWithInsensitive(Dqn_String8 string, Dqn_String8 prefix)
+{
+    bool result = Dqn_String8_StartsWith(string, prefix, Dqn_String8EqCase_Insensitive);
+    return result;
+}
+
+DQN_API bool Dqn_String8_EndsWith(Dqn_String8 string, Dqn_String8 suffix, Dqn_String8EqCase eq_case)
+{
+    Dqn_String8 substring = {string.data + string.size - suffix.size, DQN_MIN(string.size, suffix.size)};
+    bool result           = Dqn_String8_Eq(substring, suffix, eq_case);
+    return result;
+}
+
+DQN_API bool Dqn_String8_EndsWithInsensitive(Dqn_String8 string, Dqn_String8 suffix)
+{
+    bool result = Dqn_String8_EndsWith(string, suffix, Dqn_String8EqCase_Insensitive);
     return result;
 }
 
 DQN_API bool Dqn_String8_HasChar(Dqn_String8 string, char ch)
 {
     bool result = false;
-    for (Dqn_isize index = 0; !result && index < string.size; index++) {
+    for (Dqn_usize index = 0; !result && index < string.size; index++)
         result = string.data[index] == ch;
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_TrimPrefix(Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case)
+{
+    Dqn_String8 result = string;
+    if (Dqn_String8_StartsWith(string, prefix, eq_case)) {
+        result.data += prefix.size;
+        result.size -= prefix.size;
     }
     return result;
 }
 
-DQN_API void Dqn_String8_Remove(Dqn_String8 *string, Dqn_isize begin, Dqn_isize size)
+DQN_API Dqn_String8 Dqn_String8_TrimSuffix(Dqn_String8 string, Dqn_String8 suffix, Dqn_String8EqCase eq_case)
 {
-    if (!string ||
-        !Dqn_String8_IsValid(*string) ||
-        (begin < 0 || begin >= string->size) ||
-        (size <= 0 || size >= string->size))
-    {
-        return;
-    }
-
-    char *dest      = string->data + begin;
-    char const *src = string->data + (begin + size);
-    char const *end = string->data + string->size;
-    DQN_MEMMOVE(dest, src, end - src);
-    string->size -= size;
+    Dqn_String8 result = string;
+    if (Dqn_String8_EndsWith(string, suffix, eq_case))
+        result.size -= suffix.size;
+    return result;
 }
 
-DQN_API Dqn_isize Dqn_String8_FindOffset(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_CString8EqCase eq_case)
+DQN_API Dqn_String8 Dqn_String8_TrimWhitespaceAround(Dqn_String8 string)
 {
-    Dqn_isize result  = -1;
-    if (!Dqn_String8_IsValid(string) || !Dqn_String8_IsValid(find) || start_index < 0)
-        return -1;
+    Dqn_String8 result = string;
+    if (!Dqn_String8_IsValid(string))
+        return result;
 
-    Dqn_isize max = string.size - find.size;
-    for (Dqn_isize index = start_index; result == -1 && index <= max; index++) {
+    char const *start = string.data;
+    char const *end   = string.data + string.size;
+    while (start < end && Dqn_Char_IsWhitespace(start[0]))
+        start++;
+
+    while (end > start && Dqn_Char_IsWhitespace(end[-1]))
+        end--;
+
+    result = Dqn_String8_Init(start, end - start);
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_TrimByteOrderMark(Dqn_String8 string)
+{
+    Dqn_String8 result = string;
+    if (!Dqn_String8_IsValid(result))
+        return result;
+
+    // TODO(dqn): This is little endian
+    Dqn_String8 UTF8_BOM     = DQN_STRING8("\xEF\xBB\xBF");
+    Dqn_String8 UTF16_BOM_BE = DQN_STRING8("\xEF\xFF");
+    Dqn_String8 UTF16_BOM_LE = DQN_STRING8("\xFF\xEF");
+    Dqn_String8 UTF32_BOM_BE = DQN_STRING8("\x00\x00\xFE\xFF");
+    Dqn_String8 UTF32_BOM_LE = DQN_STRING8("\xFF\xFE\x00\x00");
+
+    result = Dqn_String8_TrimPrefix(result, UTF8_BOM,     Dqn_String8EqCase_Sensitive);
+    result = Dqn_String8_TrimPrefix(result, UTF16_BOM_BE, Dqn_String8EqCase_Sensitive);
+    result = Dqn_String8_TrimPrefix(result, UTF16_BOM_LE, Dqn_String8EqCase_Sensitive);
+    result = Dqn_String8_TrimPrefix(result, UTF32_BOM_BE, Dqn_String8EqCase_Sensitive);
+    result = Dqn_String8_TrimPrefix(result, UTF32_BOM_LE, Dqn_String8EqCase_Sensitive);
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_FileNameFromPath(Dqn_String8 path)
+{
+    Dqn_String8 result = path;
+    if (!Dqn_String8_IsValid(result))
+        return result;
+
+    for (Dqn_usize i = result.size - 1; i < result.size; --i) {
+        if (result.data[i] == '\\' || result.data[i] == '/') {
+            char const *end = result.data + result.size;
+            result.data     = result.data + (i + 1);
+            result.size     = end - result.data;
+            break;
+        }
+    }
+    return result;
+}
+
+DQN_API bool Dqn_String8_ToU64Checked(Dqn_String8 string, char separator, uint64_t *output)
+{
+    // NOTE: Argument check
+    if (!Dqn_String8_IsValid(string))
+        return false;
+
+    // NOTE: Sanitize input/output
+    *output = 0;
+    Dqn_String8 trim_string = Dqn_String8_TrimWhitespaceAround(string);
+    if (trim_string.size == 0)
+        return true;
+
+    // NOTE: Handle prefix '+'
+    Dqn_usize start_index = 0;
+    if (!Dqn_Char_IsDigit(trim_string.data[0])) {
+        if (trim_string.data[0] != '+')
+            return false;
+        start_index++;
+    }
+
+    // NOTE: Convert the string number to the binary number
+    for (Dqn_usize index = start_index; index < trim_string.size; index++) {
+        char ch = trim_string.data[index];
+        if (index) {
+            if (separator != 0 && ch == separator)
+                continue;
+        }
+
+        if (!Dqn_Char_IsDigit(ch))
+            return false;
+
+        *output        = Dqn_Safe_MulU64(*output, 10);
+        uint64_t digit = ch - '0';
+        *output        = Dqn_Safe_AddU64(*output, digit);
+    }
+
+    return true;
+}
+
+DQN_API uint64_t Dqn_String8_ToU64(Dqn_String8 string, char separator)
+{
+    uint64_t result = 0;
+    Dqn_String8_ToU64Checked(string, separator, &result);
+    return result;
+}
+
+DQN_API bool Dqn_String8_ToI64Checked(Dqn_String8 string, char separator, int64_t *output)
+{
+    // NOTE: Argument check
+    if (!Dqn_String8_IsValid(string))
+        return false;
+
+    // NOTE: Sanitize input/output
+    *output = 0;
+    Dqn_String8 trim_string = Dqn_String8_TrimWhitespaceAround(string);
+    if (trim_string.size == 0)
+        return true;
+
+    bool negative         = false;
+    Dqn_usize start_index = 0;
+    if (!Dqn_Char_IsDigit(trim_string.data[0])) {
+        negative = (trim_string.data[start_index] == '-');
+        if (!negative && trim_string.data[0] != '+')
+            return false;
+        start_index++;
+    }
+
+    // NOTE: Convert the string number to the binary number
+    for (Dqn_usize index = start_index; index < trim_string.size; index++) {
+        char ch = trim_string.data[index];
+        if (index) {
+            if (separator != 0 && ch == separator)
+                continue;
+        }
+
+        if (!Dqn_Char_IsDigit(ch))
+            return false;
+
+        *output        = Dqn_Safe_MulU64(*output, 10);
+        uint64_t digit = ch - '0';
+        *output        = Dqn_Safe_AddU64(*output, digit);
+    }
+
+    if (negative)
+        *output *= -1;
+
+    return true;
+}
+
+DQN_API int64_t Dqn_String8_ToI64(Dqn_String8 string, char separator)
+{
+    int64_t result = 0;
+    Dqn_String8_ToI64Checked(string, separator, &result);
+    return result;
+}
+
+DQN_API Dqn_String8FindResult Dqn_String8_Find(Dqn_String8 string, Dqn_String8 find, Dqn_usize offset, Dqn_String8EqCase eq_case)
+{
+    Dqn_String8FindResult result = {};
+    if (!Dqn_String8_IsValid(string) || !Dqn_String8_IsValid(find) || find.size > string.size)
+        return result;
+
+    Dqn_usize start_index = DQN_MIN(offset, string.size);
+    Dqn_usize end         = string.size - find.size + 1;
+    for (Dqn_usize index = start_index; !result.found && index < end; index++) {
         Dqn_String8 check = Dqn_String8_Slice(string, index, find.size);
-        if (Dqn_String8_Eq(check, find, eq_case))
-            result = index;
+        if (Dqn_String8_Eq(check, find, eq_case)) {
+            result.found  = true;
+            result.offset = index;
+            result.string = check;
+        }
     }
-
-    return result;
-}
-
-DQN_API Dqn_String8 Dqn_String8_Find(Dqn_String8 string, Dqn_String8 find, Dqn_isize start_index, Dqn_CString8EqCase eq_case)
-{
-    Dqn_isize offset  = Dqn_String8_FindOffset(string, find, start_index, eq_case);
-    Dqn_String8 result = Dqn_String8_Slice(string, offset == -1 ? 0 : offset, offset == -1 ? 0 : find.size);
     return result;
 }
 
 DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string,
-                                       Dqn_String8 find,
-                                       Dqn_String8 replace,
-                                       Dqn_isize start_index,
-                                       Dqn_Arena *arena,
-                                       Dqn_Arena *temp_arena,
-                                       Dqn_CString8EqCase eq_case)
+                                        Dqn_String8 find,
+                                        Dqn_String8 replace,
+                                        Dqn_usize start_index,
+                                        Dqn_Arena *arena,
+                                        Dqn_Arena *temp_arena,
+                                        Dqn_String8EqCase eq_case)
 {
+    Dqn_String8 result = {};
+    if (!Dqn_String8_IsValid(string) || !Dqn_String8_IsValid(find) || find.size > string.size || find.size == 0 || string.size == 0) {
+        result = Dqn_String8_Copy(Dqn_Arena_Allocator(arena), string);
+        return result;
+    }
+
     auto temp_arena_scope             = Dqn_ArenaTempMemoryScope(temp_arena);
     Dqn_String8Builder string_builder = {};
     string_builder.allocator          = Dqn_Arena_Allocator(temp_arena);
-    Dqn_isize max                     = string.size - find.size;
-    Dqn_isize head                    = start_index;
+    Dqn_usize max                     = string.size - find.size;
+    Dqn_usize head                    = start_index;
 
-    for (Dqn_isize tail = head; tail <= max; tail++) {
+    for (Dqn_usize tail = head; tail <= max; tail++) {
         Dqn_String8 check = Dqn_String8_Slice(string, tail, find.size);
         if (!Dqn_String8_Eq(check, find, eq_case))
             continue;
@@ -5966,7 +5376,6 @@ DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string,
         tail += find.size - 1; // NOTE: -1 since the for loop will post increment us past the end of the find string
     }
 
-    Dqn_String8 result = {};
     if (string_builder.string_size == 0) {
         // NOTE: No replacement possible, so we just do a full-copy
         result = Dqn_String8_Copy(Dqn_Arena_Allocator(arena), string);
@@ -5979,25 +5388,91 @@ DQN_API Dqn_String8 Dqn_String8_Replace(Dqn_String8 string,
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8_ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_isize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena)
+DQN_API Dqn_String8 Dqn_String8_ReplaceInsensitive(Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Arena *arena, Dqn_Arena *temp_arena)
 {
-    Dqn_String8 result = Dqn_String8_Replace(string, find, replace, start_index, arena, temp_arena, Dqn_CString8EqCase_Insensitive);
+    Dqn_String8 result = Dqn_String8_Replace(string, find, replace, start_index, arena, temp_arena, Dqn_String8EqCase_Insensitive);
     return result;
+}
+
+DQN_API void Dqn_String8_Remove(Dqn_String8 *string, Dqn_usize offset, Dqn_usize size)
+{
+    if (!string || !Dqn_String8_IsValid(*string))
+        return;
+
+    char *end               = string->data + string->size;
+    char *dest              = DQN_MIN(string->data + offset,        end);
+    char *src               = DQN_MIN(string->data + offset + size, end);
+    Dqn_usize bytes_to_move = end - src;
+    DQN_MEMMOVE(dest, src, bytes_to_move);
+    string->size -= bytes_to_move;
 }
 
 #if defined(__cplusplus)
-bool operator==(Dqn_String8 const &lhs, Dqn_String8 const &rhs)
+DQN_API bool operator==(Dqn_String8 const &lhs, Dqn_String8 const &rhs)
 {
-    bool result = Dqn_String8_Eq(lhs, rhs, Dqn_CString8EqCase_Sensitive);
+    bool result = Dqn_String8_Eq(lhs, rhs, Dqn_String8EqCase_Sensitive);
     return result;
 }
 
-bool operator!=(Dqn_String8 const &lhs, Dqn_String8 const &rhs)
+DQN_API bool operator!=(Dqn_String8 const &lhs, Dqn_String8 const &rhs)
 {
     bool result = !(lhs == rhs);
     return result;
 }
 #endif
+
+DQN_API Dqn_String8 Dqn_String8_InitF_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, ...)
+{
+    va_list va;
+    va_start(va, fmt);
+    Dqn_String8 result = Dqn_String8_InitFV_(DQN_LEAK_TRACE_ARG allocator, fmt, va);
+    va_end(va);
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_InitFV_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, va_list args)
+{
+    Dqn_String8 result = {};
+    if (!fmt)
+        return result;
+
+    Dqn_usize size = Dqn_CString8_FVSize(fmt, args);
+    if (size) {
+        result = Dqn_String8_Allocate_(DQN_LEAK_TRACE_ARG allocator, size, Dqn_ZeroMem_No);
+        if (Dqn_String8_IsValid(result))
+            STB_SPRINTF_DECORATE(vsnprintf)(result.data, Dqn_Safe_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
+    }
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_usize size, Dqn_ZeroMem zero_mem)
+{
+    Dqn_String8 result = {};
+    result.data        = (char *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_ARG allocator, size + 1, alignof(char), zero_mem);
+    if (result.data)
+        result.size = size;
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_CopyCString_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *string, Dqn_usize size)
+{
+    Dqn_String8 result = {};
+    if (!string)
+        return result;
+
+    result = Dqn_String8_Allocate_(DQN_LEAK_TRACE_ARG allocator, size, Dqn_ZeroMem_No);
+    if (Dqn_String8_IsValid(result)) {
+        DQN_MEMCPY(result.data, string, size);
+        result.data[size] = 0;
+    }
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_String8 string)
+{
+    Dqn_String8 result = Dqn_String8_CopyCString_(DQN_LEAK_TRACE_ARG allocator, string.data, string.size);
+    return result;
+}
 
 // =================================================================================================
 // [$PRIN] Dqn_Print            |                             | Printing
@@ -6189,7 +5664,7 @@ DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
     // NOTE: Write the cumulative thread arena data
     {
         Dqn_ArenaStat stat = {};
-        for (Dqn_isize index = 0; index < stats_size; index++) {
+        for (Dqn_usize index = 0; index < stats_size; index++) {
             Dqn_ArenaStat const *current = stats + index;
             stat.capacity += current->capacity;
             stat.used     += current->used;
@@ -6207,7 +5682,7 @@ DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
     }
 
     // NOTE: Print individual thread arena data
-    for (Dqn_isize index = 0; index < stats_size; index++) {
+    for (Dqn_usize index = 0; index < stats_size; index++) {
         Dqn_ArenaStat const *current = stats + index;
         Dqn_ArenaStatString current_string = Dqn_Arena_StatString(current);
         fprintf(file, "  [%03d] CURR %.*s\n", DQN_CAST(int)index, current_string.size, current_string.data);
@@ -6361,18 +5836,19 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
 // =================================================================================================
 // [$AREN] Dqn_Arena            |                             | Growing bump allocator
 // =================================================================================================
-DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, Dqn_ArenaCommit commit)
+DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, Dqn_ArenaCommit commit)
 {
-    Dqn_isize commit_size = 0;
+    Dqn_usize commit_size = 0;
     switch (commit) {
         case Dqn_ArenaCommit_GetNewPages: {
-            commit_size = Dqn_PowerOfTwoRoundUp(size, DQN_KILOBYTES(4));
+            commit_size = Dqn_PowerOfTwoAlign(size, DQN_KILOBYTES(4));
         } break;
 
         case Dqn_ArenaCommit_EnsureSpace: {
-            Dqn_isize const unused_commit_space = block->commit - block->used;
+            DQN_ASSERT(block->commit > block->used);
+            Dqn_usize const unused_commit_space = block->commit - block->used;
             if (unused_commit_space < size)
-                commit_size = Dqn_PowerOfTwoRoundUp(size - unused_commit_space, DQN_KILOBYTES(4));
+                commit_size = Dqn_PowerOfTwoAlign(size - unused_commit_space, DQN_KILOBYTES(4));
         } break;
     }
 
@@ -6383,21 +5859,24 @@ DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, Dq
     }
 }
 
-DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
+DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
+    if (!block)
+        return nullptr;
     DQN_ASSERT(block->hwm_used <= block->commit);
+    DQN_ASSERT(block->hwm_used >= block->used);
     DQN_ASSERTF(block->commit >= block->used,
-                   "Internal error: Committed size must always be greater than the used size [commit=%_$$zd, used=%_$$zd]",
-                   block->commit, block->used);
+                "Internal error: Committed size must always be greater than the used size [commit=%_$$zd, used=%_$$zd]",
+                block->commit, block->used);
 
     // NOTE: Calculate how much we need to pad the next pointer to divvy out
     // (only if it is unaligned)
     uintptr_t next_ptr     = DQN_CAST(uintptr_t)block->memory + block->used;
-    Dqn_isize align_offset = 0;
+    Dqn_usize align_offset = 0;
     if (next_ptr & (align - 1))
         align_offset = (align - (next_ptr & (align - 1)));
 
-    Dqn_isize allocation_size = size + align_offset;
+    Dqn_usize allocation_size = size + align_offset;
     if ((block->used + allocation_size) > block->size)
         return nullptr;
 
@@ -6405,7 +5884,7 @@ DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_isize size,
     if (zero_mem == Dqn_ZeroMem_Yes) {
         // NOTE: Newly commit pages are always 0-ed out, we only need to
         // memset the memory that are being reused.
-        Dqn_isize const reused_bytes = DQN_MIN(block->hwm_used - block->used, allocation_size);
+        Dqn_usize const reused_bytes = DQN_MIN(block->hwm_used - block->used, allocation_size);
         DQN_MEMSET(DQN_CAST(void *)next_ptr, DQN_MEMSET_BYTE, reused_bytes);
     }
 
@@ -6583,34 +6062,28 @@ DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena)
     Dqn_Log_InfoF("%.*s\n", DQN_STRING_FMT(string));
 }
 
-DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, Dqn_isize commit, uint8_t flags)
+DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_usize size, Dqn_usize commit, uint8_t flags)
 {
-    if (!arena || size <= 0 || commit < 0)
+    DQN_ASSERT(commit <= size);
+    if (!arena || size == 0)
         return nullptr;
 
-    DQN_ASSERT(commit <= size);
-    commit = DQN_MIN(commit, size);
+    commit                    = DQN_MIN(commit, size);
+    Dqn_usize reserve_aligned = Dqn_PowerOfTwoAlign(size   + sizeof(Dqn_ArenaBlock), DQN_VMEM_RESERVE_GRANULARITY);
+    Dqn_usize commit_aligned  = Dqn_PowerOfTwoAlign(commit + sizeof(Dqn_ArenaBlock), DQN_VMEM_COMMIT_GRANULARITY);
+    DQN_ASSERT(commit_aligned < reserve_aligned);
 
-    // NOTE: If the commit amount is the same as the size, the caller has
-    // requested all the memory is commit. We can save one sys-call by asking
-    // the OS to reserve+commit in one call.
-    Dqn_VMemCommit commit_on_reserve = size == commit ? Dqn_VMemCommit_Yes : Dqn_VMemCommit_No;
-
-    // NOTE: 64k allocation granularity atleast on Windows
-    Dqn_isize size_rounded_up_to_64k_boundary = Dqn_PowerOfTwoRoundUp(size, DQN_KILOBYTES(64));
-    if (size == size_rounded_up_to_64k_boundary) {
-        // NOTE: Size is already at 64k boundary, we need more space for the
-        // block itself. We will allocate 64k more to avoid wasting bytes.
-        size_rounded_up_to_64k_boundary += DQN_KILOBYTES(64);
-    }
-
-    auto *result = DQN_CAST(Dqn_ArenaBlock *)Dqn_VMem_Reserve(size_rounded_up_to_64k_boundary, commit_on_reserve);
+    // NOTE: If the commit amount is the same as reserve size we can save one
+    // syscall by asking the OS to reserve+commit in the same call.
+    Dqn_VMemCommit commit_on_reserve = reserve_aligned == commit_aligned ? Dqn_VMemCommit_Yes : Dqn_VMemCommit_No;
+    auto *result                     = DQN_CAST(Dqn_ArenaBlock *)Dqn_VMem_Reserve(reserve_aligned, commit_on_reserve);
     if (result) {
-        // NOTE: If we didn't commit on reserve, commit the amount requested by
-        // the user.
+        // NOTE: Commit the amount requested by the user if we did not commit
+        // on reserve the initial range.
         if (commit_on_reserve == Dqn_VMemCommit_No) {
-            Dqn_usize commit_size = Dqn_PowerOfTwoRoundUp(sizeof(*result) + commit, DQN_KILOBYTES(4));
-            Dqn_VMem_Commit(result, commit_size);
+            Dqn_VMem_Commit(result, commit_aligned);
+        } else {
+            DQN_ASSERT(commit_aligned == reserve_aligned);
         }
 
         // NOTE: Sanity check memory is zero-ed out
@@ -6619,11 +6092,11 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
         DQN_ASSERT(result->prev == nullptr);
 
         // NOTE: Setup the block
-        result->size      = size_rounded_up_to_64k_boundary - sizeof(*result);
-        result->commit = commit;
-        result->memory    = DQN_CAST(uint8_t *)result + sizeof(*result);
-        result->flags     = flags;
-        result->arena     = arena;
+        result->size   = reserve_aligned - sizeof(*result);
+        result->commit = commit_aligned  - sizeof(*result);
+        result->memory = DQN_CAST(uint8_t *)result + sizeof(*result);
+        result->flags  = flags;
+        result->arena  = arena;
 
         // NOTE: Attach the block to the arena
         if (arena->tail) {
@@ -6649,37 +6122,35 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
     return result;
 }
 
-DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_isize size, uint8_t align, Dqn_ZeroMem zero_mem)
+DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
     DQN_ASSERTF((align & (align - 1)) == 0, "Power of two alignment required");
-    Dqn_isize allocation_size = size + (align - 1);
-    while (!arena->curr ||
-           (arena->curr->flags & Dqn_ArenaBlockFlags_Private) ||
-           (arena->curr->used + allocation_size) > arena->curr->size)
-    {
-        if (arena->curr && arena->curr->next) {
-            arena->curr = arena->curr->next;
-        } else {
-            Dqn_isize grow_size = DQN_MAX(DQN_MAX(allocation_size, arena->min_block_size), DQN_ARENA_MIN_BLOCK_SIZE);
-            if (!Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG arena, grow_size /*size*/, grow_size /*commit*/, 0 /*flags*/))
-                return nullptr;
+    while (arena->curr && (arena->curr->flags & Dqn_ArenaBlockFlags_Private))
+        arena->curr = arena->curr->next;
+
+    void *result = Dqn_Arena_AllocateFromBlock(arena->curr, size, align, zero_mem);
+    if (!result) {
+        Dqn_usize allocation_size = size + (align - 1);
+        if (Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG arena, allocation_size, allocation_size /*commit*/, 0 /*flags*/)) {
+            result = Dqn_Arena_AllocateFromBlock(arena->curr, size, align, zero_mem);
         }
     }
 
-    void *result = Dqn_Arena_AllocateFromBlock(arena->curr, size, align, zero_mem);
+    if (result)
+        DQN_ASSERT((arena->curr->flags & Dqn_ArenaBlockFlags_Private) == 0);
     return result;
 }
 
-DQN_API void *Dqn_Arena_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
+DQN_API void *Dqn_Arena_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t align)
 {
-    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, alignment, Dqn_ZeroMem_No);
+    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, align, Dqn_ZeroMem_No);
     DQN_MEMCPY(result, src, size);
     return result;
 }
 
-DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_isize size, uint8_t alignment)
+DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t align)
 {
-    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size + 1, alignment, Dqn_ZeroMem_No);
+    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size + 1, align, Dqn_ZeroMem_No);
     DQN_MEMCPY(result, src, size);
     (DQN_CAST(char *)result)[size] = 0;
     return result;
@@ -7091,14 +6562,12 @@ DQN_API Dqn_M4 Dqn_M4_DivF(Dqn_M4 lhs, Dqn_f32 rhs)
 DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
 {
     Dqn_FString8<256> result = {};
-    for (int row = 0; row < 4; row++)
-    {
-        for (int it = 0; it < 4; it++)
-        {
-            if (it == 0) Dqn_FString8_AppendCString8(&result, "|");
+    for (int row = 0; row < 4; row++) {
+        for (int it = 0; it < 4; it++) {
+            if (it == 0) Dqn_FString8_Append(&result, DQN_STRING8("|"));
             Dqn_FString8_AppendF(&result, "%.5f", mat.columns[it][row]);
-            if (it != 3) Dqn_FString8_AppendCString8(&result, ", ");
-            else         Dqn_FString8_AppendCString8(&result, "|\n");
+            if (it != 3) Dqn_FString8_Append(&result, DQN_STRING8(", "));
+            else         Dqn_FString8_Append(&result, DQN_STRING8("|\n"));
         }
     }
 
@@ -7728,43 +7197,36 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
 
 #if !defined(DQN_NO_HEX)
 // =================================================================================================
-// [$BHEX] Dqn_Hex              | DQN_NO_HEX                  | Binary <-> hex helpers
+// [$BHEX] Dqn_Bin              | DQN_NO_HEX                  | Binary <-> hex helpers
 // =================================================================================================
-DQN_API char const *Dqn_Hex_TrimSpaceAnd0xPrefixCString8(char const *hex, Dqn_isize size, Dqn_isize *real_size)
+DQN_API char const *Dqn_Bin_HexBufferTrim0x(char const *hex, Dqn_usize size, Dqn_usize *real_size)
 {
-    Dqn_isize   trim_size = 0;
-    char const *result    = Dqn_CString8_TrimWhitespaceAround(hex, size, &trim_size);
-    if (trim_size >= 2) {
-        if (result[0] == '0' && (result[1] == 'x' || result[1] == 'X')) {
-            trim_size -= 2;
-            result += 2;
-        }
-    }
-
+    Dqn_String8 result = Dqn_String8_TrimWhitespaceAround(Dqn_String8_Init(hex, size));
+    result             = Dqn_String8_TrimPrefix(result, DQN_STRING8("0x"), Dqn_String8EqCase_Insensitive);
     if (real_size)
-        *real_size = trim_size;
-    return result;
+        *real_size = result.size;
+    return result.data;
 }
 
-DQN_API Dqn_String8 Dqn_Hex_TrimSpaceAnd0xPrefixString8(Dqn_String8 const string)
+DQN_API Dqn_String8 Dqn_Bin_HexTrim0x(Dqn_String8 string)
 {
-    Dqn_isize trimmed_size = 0;
-    char const *trimmed    = Dqn_Hex_TrimSpaceAnd0xPrefixCString8(string.data, string.size, &trimmed_size);
+    Dqn_usize trimmed_size = 0;
+    char const *trimmed    = Dqn_Bin_HexBufferTrim0x(string.data, string.size, &trimmed_size);
     Dqn_String8 result     = Dqn_String8_Init(trimmed, trimmed_size);
     return result;
 }
 
-DQN_API Dqn_HexNumberString Dqn_Hex_U64ToNumberString(uint64_t number, uint32_t flags)
+DQN_API Dqn_BinHexU64String Dqn_Bin_U64ToHexU64String(uint64_t number, uint32_t flags)
 {
     Dqn_String8 prefix = {};
-    if (!(flags & Dqn_HexNumberStringFlags_No0xPrefix))
+    if (!(flags & Dqn_BinHexU64StringFlags_No0xPrefix))
         prefix = DQN_STRING8("0x");
 
-    Dqn_HexNumberString result = {};
+    Dqn_BinHexU64String result = {};
     DQN_MEMCPY(result.data, prefix.data, prefix.size);
     result.size += DQN_CAST(int8_t)prefix.size;
 
-    char const *fmt = (flags & Dqn_HexNumberStringFlags_UppercaseHex) ? "%I64X" : "%I64x";
+    char const *fmt = (flags & Dqn_BinHexU64StringFlags_UppercaseHex) ? "%I64X" : "%I64x";
     int size        = STB_SPRINTF_DECORATE(snprintf)(result.data + result.size, DQN_ARRAY_UCOUNT(result.data) - result.size, fmt, number);
     result.size    += Dqn_Safe_SaturateCastIntToI8(size);
     DQN_ASSERT(result.size < DQN_ARRAY_UCOUNT(result.data));
@@ -7776,14 +7238,14 @@ DQN_API Dqn_HexNumberString Dqn_Hex_U64ToNumberString(uint64_t number, uint32_t 
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Hex_U64ToString8(Dqn_Allocator allocator, uint64_t number, uint32_t flags)
+DQN_API Dqn_String8 Dqn_Bin_U64ToHex(Dqn_Allocator allocator, uint64_t number, uint32_t flags)
 {
     Dqn_String8 prefix = {};
-    if (!(flags & Dqn_HexNumberStringFlags_No0xPrefix))
+    if (!(flags & Dqn_BinHexU64StringFlags_No0xPrefix))
         prefix = DQN_STRING8("0x");
 
-    char const *fmt         = (flags & Dqn_HexNumberStringFlags_UppercaseHex) ? "%I64X" : "%I64x";
-    Dqn_isize required_size = Dqn_CString8_FSize(fmt, number) + prefix.size;
+    char const *fmt         = (flags & Dqn_BinHexU64StringFlags_UppercaseHex) ? "%I64X" : "%I64x";
+    Dqn_usize required_size = Dqn_CString8_FSize(fmt, number) + prefix.size;
     Dqn_String8 result      = Dqn_String8_Allocate(allocator, required_size, Dqn_ZeroMem_No);
 
     if (Dqn_String8_IsValid(result)) {
@@ -7794,9 +7256,9 @@ DQN_API Dqn_String8 Dqn_Hex_U64ToString8(Dqn_Allocator allocator, uint64_t numbe
     return result;
 }
 
-DQN_API uint64_t Dqn_Hex_CString8ToU64(char const *hex, Dqn_isize size)
+DQN_API uint64_t Dqn_Bin_HexBufferToU64(char const *hex, Dqn_usize size)
 {
-    Dqn_isize   trim_size = size;
+    Dqn_usize   trim_size = size;
     char const *trim_hex  = hex;
     if (trim_size >= 2) {
         if (trim_hex[0] == '0' && (trim_hex[1] == 'x' || trim_hex[1] == 'X')) {
@@ -7809,8 +7271,8 @@ DQN_API uint64_t Dqn_Hex_CString8ToU64(char const *hex, Dqn_isize size)
 
     uint64_t   result      = 0;
     Dqn_usize bits_written = 0;
-    Dqn_isize max_size     = DQN_MIN(size, 8 /*bytes*/ * 2 /*hex chars per byte*/);
-    for (Dqn_isize hex_index = 0; hex_index < max_size; hex_index++, bits_written += 4) {
+    Dqn_usize max_size     = DQN_MIN(size, 8 /*bytes*/ * 2 /*hex chars per byte*/);
+    for (Dqn_usize hex_index = 0; hex_index < max_size; hex_index++, bits_written += 4) {
         char ch = trim_hex[hex_index];
         if (!Dqn_Char_IsHex(ch))
             break;
@@ -7823,15 +7285,15 @@ DQN_API uint64_t Dqn_Hex_CString8ToU64(char const *hex, Dqn_isize size)
     return result;
 }
 
-DQN_API uint64_t Dqn_Hex_String8ToU64(Dqn_String8 hex)
+DQN_API uint64_t Dqn_Bin_HexToU64(Dqn_String8 hex)
 {
-    uint64_t result = Dqn_Hex_CString8ToU64(hex.data, hex.size);
+    uint64_t result = Dqn_Bin_HexBufferToU64(hex.data, hex.size);
     return result;
 }
 
-DQN_API bool Dqn_Hex_BytesToCString8Buffer(void const *src, Dqn_isize src_size, char *dest, Dqn_isize dest_size)
+DQN_API bool Dqn_Bin_BytesToHexBuffer(void const *src, Dqn_usize src_size, char *dest, Dqn_usize dest_size)
 {
-    if (!src || !dest || src_size < 0)
+    if (!src || !dest)
         return false;
 
     if (!Dqn_Safe_Assert(dest_size >= src_size * 2))
@@ -7839,7 +7301,7 @@ DQN_API bool Dqn_Hex_BytesToCString8Buffer(void const *src, Dqn_isize src_size, 
 
     char const *HEX             = "0123456789abcdef";
     unsigned char const *src_u8 = DQN_CAST(unsigned char const *)src;
-    for (Dqn_isize src_index = 0, dest_index = 0; src_index < src_size; src_index++) {
+    for (Dqn_usize src_index = 0, dest_index = 0; src_index < src_size; src_index++) {
         char byte          = src_u8[src_index];
         char hex01         = (byte >> 4) & 0b1111;
         char hex02         = (byte >> 0) & 0b1111;
@@ -7850,60 +7312,60 @@ DQN_API bool Dqn_Hex_BytesToCString8Buffer(void const *src, Dqn_isize src_size, 
     return true;
 }
 
-DQN_API char *Dqn_Hex_BytesToCString8Arena(Dqn_Arena *arena, void const *bytes, Dqn_isize size)
+DQN_API char *Dqn_Bin_BytesToHexBufferArena(Dqn_Arena *arena, void const *src, Dqn_usize size)
 {
     char *result = size > 0 ? Dqn_Arena_NewArray(arena, char, (size * 2) + 1 /*null terminate*/, Dqn_ZeroMem_No) : nullptr;
     if (result) {
-        bool converted = Dqn_Hex_BytesToCString8Buffer(bytes, size, result, size * 2);
+        bool converted = Dqn_Bin_BytesToHexBuffer(src, size, result, size * 2);
         DQN_ASSERT(converted);
         result[size * 2] = 0;
     }
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Hex_BytesToString8Arena(Dqn_Arena *arena, void const *bytes, Dqn_isize size)
+DQN_API Dqn_String8 Dqn_Bin_BytesToHexArena(Dqn_Arena *arena, void const *src, Dqn_usize size)
 {
     Dqn_String8 result = {};
-    result.data        = Dqn_Hex_BytesToCString8Arena(arena, bytes, size);
+    result.data        = Dqn_Bin_BytesToHexBufferArena(arena, src, size);
     if (result.data)
         result.size = size * 2;
     return result;
 }
 
-DQN_API Dqn_isize Dqn_Hex_CString8ToByteBuffer(char const *hex, Dqn_isize hex_size, void *dest, Dqn_isize dest_size)
+DQN_API Dqn_usize Dqn_Bin_HexBufferToBytes(char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size)
 {
-    Dqn_isize result = 0;
+    Dqn_usize result = 0;
     if (!hex || hex_size <= 0)
         return result;
 
-    Dqn_isize trim_size  = 0;
-    char const *trim_hex = Dqn_Hex_TrimSpaceAnd0xPrefixCString8(hex,
+    Dqn_usize trim_size  = 0;
+    char const *trim_hex = Dqn_Bin_HexBufferTrim0x(hex,
                                                                 hex_size,
                                                                 &trim_size);
 
     // NOTE: Trimmed hex can be "0xf" -> "f" or "0xAB" -> "AB"
     // Either way, the size can be odd or even, hence we round up to the nearest
     // multiple of two to ensure that we calculate the min buffer size orrectly.
-    Dqn_isize trim_size_rounded_up = trim_size + (trim_size % 2);
-    Dqn_isize min_buffer_size      = trim_size_rounded_up / 2;
+    Dqn_usize trim_size_rounded_up = trim_size + (trim_size % 2);
+    Dqn_usize min_buffer_size      = trim_size_rounded_up / 2;
     if (dest_size < min_buffer_size || trim_size <= 0) {
         DQN_ASSERTF(dest_size >= min_buffer_size, "Insufficient buffer size for converting hex to binary");
         return result;
     }
 
-    result = Dqn_Hex_CString8ToByteBufferUnchecked(trim_hex,
+    result = Dqn_Bin_HexBufferToBytesUnchecked(trim_hex,
                                                    trim_size,
                                                    dest,
                                                    dest_size);
     return result;
 }
 
-DQN_API Dqn_isize Dqn_Hex_CString8ToByteBufferUnchecked(char const *hex, Dqn_isize hex_size, void *dest, Dqn_isize dest_size)
+DQN_API Dqn_usize Dqn_Bin_HexBufferToBytesUnchecked(char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size)
 {
-    Dqn_isize result       = 0;
+    Dqn_usize result       = 0;
     unsigned char *dest_u8 = DQN_CAST(unsigned char *)dest;
 
-    for (Dqn_isize hex_index = 0;
+    for (Dqn_usize hex_index = 0;
          hex_index < hex_size;
          hex_index += 2, result += 1)
     {
@@ -7928,43 +7390,43 @@ DQN_API Dqn_isize Dqn_Hex_CString8ToByteBufferUnchecked(char const *hex, Dqn_isi
     return result;
 }
 
-DQN_API Dqn_isize Dqn_Hex_String8ToByteBufferUnchecked(Dqn_String8 hex, void *dest, Dqn_isize dest_size)
+DQN_API Dqn_usize Dqn_Bin_HexToBytesUnchecked(Dqn_String8 hex, void *dest, Dqn_usize dest_size)
 {
-    Dqn_isize result = Dqn_Hex_CString8ToByteBufferUnchecked(hex.data, hex.size, dest, dest_size);
+    Dqn_usize result = Dqn_Bin_HexBufferToBytesUnchecked(hex.data, hex.size, dest, dest_size);
     return result;
 }
 
-DQN_API Dqn_isize Dqn_Hex_String8ToByteBuffer(Dqn_String8 hex, void *dest, Dqn_isize dest_size)
+DQN_API Dqn_usize Dqn_Bin_HexToBytes(Dqn_String8 hex, void *dest, Dqn_usize dest_size)
 {
-    Dqn_isize result = Dqn_Hex_CString8ToByteBuffer(hex.data, hex.size, dest, dest_size);
+    Dqn_usize result = Dqn_Bin_HexBufferToBytes(hex.data, hex.size, dest, dest_size);
     return result;
 }
 
-DQN_API char *Dqn_Hex_CString8ToBytesArena(Dqn_Arena *arena, char const *hex, Dqn_isize size, Dqn_isize *real_size)
+DQN_API char *Dqn_Bin_HexBufferToBytesArena(Dqn_Arena *arena, char const *hex, Dqn_usize size, Dqn_usize *real_size)
 {
     char *result = nullptr;
     if (!arena || !hex || size <= 0)
         return result;
 
-    Dqn_isize trim_size  = 0;
-    char const *trim_hex = Dqn_Hex_TrimSpaceAnd0xPrefixCString8(hex,
+    Dqn_usize trim_size  = 0;
+    char const *trim_hex = Dqn_Bin_HexBufferTrim0x(hex,
                                                                 size,
                                                                 &trim_size);
 
-    Dqn_isize binary_size = trim_size / 2;
+    Dqn_usize binary_size = trim_size / 2;
     result                = Dqn_Arena_NewArray(arena, char, binary_size, Dqn_ZeroMem_No);
     if (result) {
-        Dqn_isize convert_size = Dqn_Hex_CString8ToByteBufferUnchecked(trim_hex, trim_size, result, binary_size);
+        Dqn_usize convert_size = Dqn_Bin_HexBufferToBytesUnchecked(trim_hex, trim_size, result, binary_size);
         if (real_size)
             *real_size = convert_size;
     }
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Hex_String8ToBytesArena(Dqn_Arena *arena, Dqn_String8 hex)
+DQN_API Dqn_String8 Dqn_Bin_HexToBytesArena(Dqn_Arena *arena, Dqn_String8 hex)
 {
     Dqn_String8 result = {};
-    result.data        = Dqn_Hex_CString8ToBytesArena(arena, hex.data, hex.size, &result.size);
+    result.data        = Dqn_Bin_HexBufferToBytesArena(arena, hex.data, hex.size, &result.size);
     return result;
 }
 #endif // !defined(DQN_NO_HEX)
@@ -8198,10 +7660,10 @@ DQN_API Dqn_String8 Dqn_Win_CString16ToString8Allocator(const wchar_t* src, int 
 {
     Dqn_String8 result = {};
     int required = Dqn_Win_CString16ToCString8(src, src_size, nullptr, 0);
-    if (required != 0) {
+    if (required > 0) {
         // NOTE: String allocate ensures there's one extra byte for
         // null-termination already so no-need to +1 the required size
-        result = Dqn_String8_Allocate(allocator, required, Dqn_ZeroMem_No);
+        result = Dqn_String8_Allocate(allocator, DQN_CAST(Dqn_usize)required, Dqn_ZeroMem_No);
         if (Dqn_String8_IsValid(result)) {
             int next_required = Dqn_Win_CString16ToCString8(src, src_size, result.data, required + 1);
             DQN_ASSERT(required == next_required);
@@ -8232,14 +7694,14 @@ DQN_API Dqn_String8 Dqn_Win_String16ToString8Allocator(Dqn_String16 src, Dqn_All
 
 // NOTE: Windows Executable Directory
 // -----------------------------------------------------------------------------
-DQN_API Dqn_isize Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_isize size)
+DQN_API Dqn_usize Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_usize size)
 {
     wchar_t module_path[DQN_OS_WIN32_MAX_PATH];
     int module_size = GetModuleFileNameW(nullptr /*module*/, module_path, DQN_ARRAY_UCOUNT(module_path));
     DQN_HARD_ASSERTF(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
 
-    Dqn_isize result = 0;
-    for (int index = module_size - 1; !result && index >= 0; index--)
+    Dqn_usize result = 0;
+    for (Dqn_usize index = module_size - 1; !result && index < module_size; index--)
         result = module_path[index] == '\\' ? index : 0;
 
     if (!buffer || size < result) {
@@ -8253,7 +7715,7 @@ DQN_API Dqn_isize Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_isize size)
 DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena)
 {
     wchar_t dir[DQN_OS_WIN32_MAX_PATH];
-    Dqn_isize dir_size = Dqn_Win_EXEDirW(dir, DQN_ARRAY_ICOUNT(dir));
+    Dqn_usize dir_size = Dqn_Win_EXEDirW(dir, DQN_ARRAY_ICOUNT(dir));
     DQN_HARD_ASSERTF(dir_size <= DQN_ARRAY_ICOUNT(dir), "How the hell?");
 
     Dqn_String16 result = {};
@@ -8306,7 +7768,7 @@ DQN_API Dqn_String16 Dqn_Win_WorkingDirW(Dqn_Allocator allocator, Dqn_String16 s
         w_path[desired_size] = 0;
     }
 
-    result = Dqn_String16{w_path, DQN_CAST(Dqn_isize)(desired_size - 1)};
+    result = Dqn_String16{w_path, DQN_CAST(Dqn_usize)(desired_size - 1)};
     return result;
 }
 
@@ -8352,7 +7814,7 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
 
     wchar_t path16[DQN_OS_WIN32_MAX_PATH + 1];
     path16[0] = 0;
-    int path16_size = 0;
+    Dqn_usize path16_size = 0;
 
     Dqn_Win_FolderIteratorW wide_it = {};
     if (it->handle) {
@@ -8371,7 +7833,7 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
             // NOTE: We are missing the glob for enumerating the files, we will
             // add those characters in this branch, so overwrite the null
             // character, add the glob and re-null terminate the buffer.
-            int space = DQN_OS_WIN32_MAX_PATH - path16_size;
+            Dqn_usize space = DQN_OS_WIN32_MAX_PATH - path16_size;
             if (needs_asterisks) {
                 if (space < 2)
                     return false;
@@ -8610,13 +8072,13 @@ DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *
     }
 
     Dqn_String8 delimiter     = DQN_STRING8("\r\n");
-    Dqn_isize splits_required = Dqn_String8_Split(result.raw_headers, delimiter, nullptr, 0);
+    Dqn_usize splits_required = Dqn_String8_Split(result.raw_headers, delimiter, nullptr, 0);
     result.headers            = Dqn_Allocator_NewArray(allocator, Dqn_String8, splits_required, Dqn_ZeroMem_No);
     result.headers_size       = Dqn_String8_Split(result.raw_headers, delimiter, result.headers, splits_required);
 
     bool found_content_type   = false;
     bool found_content_length = false;
-    for (Dqn_isize header_index = 0; header_index < result.headers_size; header_index++) {
+    for (Dqn_usize header_index = 0; header_index < result.headers_size; header_index++) {
         Dqn_String8 header = result.headers[header_index];
         Dqn_String8 value  = {};
         Dqn_String8 key    = Dqn_String8_BinarySplit(header, ':', &value);
@@ -8853,7 +8315,7 @@ DQN_API Dqn_String8 Dqn_OS_EXEDir(Dqn_Allocator allocator)
 
 #if defined(DQN_OS_WIN32)
     wchar_t exe_dir[DQN_OS_WIN32_MAX_PATH];
-    Dqn_isize exe_dir_size = Dqn_Win_EXEDirW(exe_dir, DQN_ARRAY_ICOUNT(exe_dir));
+    Dqn_usize exe_dir_size = Dqn_Win_EXEDirW(exe_dir, DQN_ARRAY_ICOUNT(exe_dir));
     result = Dqn_Win_CString16ToString8Allocator(exe_dir, DQN_CAST(int)exe_dir_size, allocator);
 
 #elif defined(DQN_OS_UNIX)
@@ -9198,7 +8660,7 @@ DQN_API bool Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
     if (src_fd != -1 && dest_fd != -1) {
         struct stat stat_existing;
         fstat(src_fd, &stat_existing);
-        Dqn_isize bytes_written = sendfile64(dest_fd, src_fd, 0, stat_existing.st_size);
+        Dqn_usize bytes_written = sendfile64(dest_fd, src_fd, 0, stat_existing.st_size);
         result = (bytes_written == stat_existing.st_size);
     }
 
@@ -9236,7 +8698,7 @@ DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
     // If we find a file at some point in the path we fail out because the
     // series of directories can not be made if a file exists with the same
     // name.
-    for (Dqn_isize index = path16.size - 1; index >= 0; index--) {
+    for (Dqn_usize index = path16.size - 1; index < path16.size; index--) {
         bool first_char = index == (path16.size - 1);
         wchar_t ch      = path16.data[index];
         if (ch == '/' || ch == '\\' || first_char) {
@@ -9267,7 +8729,7 @@ DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
         }
     }
 
-    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--) {
+    for (Dqn_usize index = path_indexes_size - 1; result && index < path_indexes_size; index--) {
         uint16_t path_index = path_indexes[index];
         wchar_t temp = path16.data[path_index];
 
@@ -9278,9 +8740,9 @@ DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
 
 #elif defined(DQN_OS_UNIX)
     Dqn_String8 copy = Dqn_String8_Copy(scratch.arena, path);
-    for (int32_t index = copy.size - 1; index >= 0; index--) {
+    for (Dqn_usize index = copy.size - 1; index < copy.size; index--) {
         bool first_char = index == (copy.size - 1);
-        wchar_t ch         = copy.data[index];
+        char ch         = copy.data[index];
         if (ch == '/' || first_char) {
             char temp = copy.data[index];
             if (!first_char) copy.data[index] = 0; // Temporarily null terminate it
@@ -9307,7 +8769,7 @@ DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
         }
     }
 
-    for (Dqn_isize index = path_indexes_size - 1; index >= 0 && result; index--) {
+    for (Dqn_usize index = path_indexes_size - 1; result && index < path_indexes_size; index--) {
         uint16_t path_index = path_indexes[index];
         char temp = copy.data[path_index];
 
@@ -9388,7 +8850,7 @@ DQN_API bool Dqn_Fs_Delete(Dqn_String8 path)
 
 // NOTE: Read/Write Entire File API
 // =============================================================================
-DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_isize path_size, Dqn_isize *file_size, Dqn_Allocator allocator)
+DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator)
 {
     char *result = nullptr;
     if (!path)
@@ -9474,7 +8936,7 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
         *file_size = Dqn_Safe_SaturateCastI64ToISize(bytes_read);
     }
 #else
-    Dqn_isize file_size_ = 0;
+    Dqn_usize file_size_ = 0;
     if (!file_size)
         file_size = &file_size_;
 
@@ -9515,13 +8977,13 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
 
 DQN_API Dqn_String8 Dqn_Fs_ReadString8_(DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator)
 {
-    Dqn_isize   file_size = 0;
+    Dqn_usize   file_size = 0;
     char *      string    = Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_ARG path.data, path.size, &file_size, allocator);
     Dqn_String8 result    = Dqn_String8_Init(string, file_size);
     return result;
 }
 
-DQN_API bool Dqn_Fs_WriteCString8(char const *path, Dqn_isize path_size, char const *buffer, Dqn_isize buffer_size)
+DQN_API bool Dqn_Fs_WriteCString8(char const *path, Dqn_usize path_size, char const *buffer, Dqn_usize buffer_size)
 {
     bool result = false;
     if (!path || !buffer || buffer_size <= 0)
@@ -9694,7 +9156,7 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
     return result;
 }
 
-DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_isize size)
+DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize size)
 {
     if (!file || !file->handle || !buffer || size <= 0 || file->error_size)
         return false;
@@ -10038,29 +9500,29 @@ void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool v
 // [$FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
 // =================================================================================================
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
-DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_isize size, uint32_t hash)
+DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_usize size, uint32_t hash)
 {
     auto buffer = DQN_CAST(uint8_t const *)bytes;
-    for (Dqn_isize i = 0; i < size; i++)
+    for (Dqn_usize i = 0; i < size; i++)
         hash = (buffer[i] ^ hash) * 16777619 /*FNV Prime*/;
     return hash;
 }
 
-DQN_API uint32_t Dqn_FNV1A32_Hash(void const *bytes, Dqn_isize size)
+DQN_API uint32_t Dqn_FNV1A32_Hash(void const *bytes, Dqn_usize size)
 {
     uint32_t result = Dqn_FNV1A32_Iterate(bytes, size, DQN_FNV1A32_SEED);
     return result;
 }
 
-DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_isize size, uint64_t hash)
+DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_usize size, uint64_t hash)
 {
     auto buffer = DQN_CAST(uint8_t const *)bytes;
-    for (Dqn_isize i = 0; i < size; i++)
+    for (Dqn_usize i = 0; i < size; i++)
         hash = (buffer[i] ^ hash) * 1099511628211 /*FNV Prime*/;
     return hash;
 }
 
-DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_isize size)
+DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_usize size)
 {
     uint64_t result = Dqn_FNV1A64_Iterate(bytes, size, DQN_FNV1A64_SEED);
     return result;

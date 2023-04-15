@@ -1,4 +1,5 @@
 @echo OFF
+setlocal
 
 set code_dir=%~dp0
 if not exist Build mkdir Build
@@ -17,7 +18,7 @@ pushd Build
     set compile_flags=-MT -EHa -GR- -Od -Oi -Z7 -wd4201 -D DQN_TEST_WITH_MAIN -nologo
     set linker_flags=-link -nologo
     set msvc_flags=-fsanitize=address
-    set clang_flags=-fsanitize=address -fsanitize=undefined
+    set clang_flags=-fsanitize=address,undefined
 
     REM Compiler: MSVC cl
     REM ------------------------------------------------------------------------
@@ -33,5 +34,5 @@ pushd Build
         echo [WARN] Optional clang compile via clang-cl if it's in the path, please put clang-cl on the path for this feature
         exit /b 1
     )
-    clang-cl %compile_flags% %clang_flags% %code_dir%dqn_unit_tests.cpp /Fe:dqn_unit_tests_clang %link_flags%
+    clang-cl -v -D DQN_TEST_WITH_MAIN %code_dir%dqn_unit_tests.cpp /Fe:dqn_unit_tests_clang -link
 popd
