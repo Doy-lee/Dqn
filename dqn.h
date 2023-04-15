@@ -279,7 +279,7 @@
         }
 #endif
 
-#if defined(__cplusplus__)
+#if defined(__cplusplus)
     #define DQN_ZERO_INIT {}
 #else
     #define DQN_ZERO_INIT {0}
@@ -1141,9 +1141,9 @@ struct Dqn_String16 /// A pointer and length style string that holds slices to U
 #define DQN_STRING_FMT(string)                           (int)((string).size), (string).data
 
 #if defined(__cplusplus)
-#define Dqn_String8_Init(data, size)                     Dqn_String8{(char *)(data), (Dqn_usize)(size)}
+#define Dqn_String8_Init(data, size)                     (Dqn_String8{(char *)(data), (Dqn_usize)(size)})
 #else
-#define Dqn_String8_Init(data, size)                     (Dqn_String8){data, size}
+#define Dqn_String8_Init(data, size)                     (Dqn_String8){(data), (size)}
 #endif
 
 #define Dqn_String8_InitF(allocator, fmt, ...)           Dqn_String8_InitF_(DQN_LEAK_TRACE allocator, fmt, ## __VA_ARGS__)
@@ -2738,8 +2738,8 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 //   @return The byte representation of the hex string.
 struct Dqn_BinHexU64String
 {
-    char   data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
-    int8_t size;
+    char    data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
+    uint8_t size;
 };
 
 enum Dqn_BinHexU64StringFlags
@@ -7228,7 +7228,7 @@ DQN_API Dqn_BinHexU64String Dqn_Bin_U64ToHexU64String(uint64_t number, uint32_t 
 
     char const *fmt = (flags & Dqn_BinHexU64StringFlags_UppercaseHex) ? "%I64X" : "%I64x";
     int size        = STB_SPRINTF_DECORATE(snprintf)(result.data + result.size, DQN_ARRAY_UCOUNT(result.data) - result.size, fmt, number);
-    result.size    += Dqn_Safe_SaturateCastIntToI8(size);
+    result.size    += DQN_CAST(uint8_t)size;
     DQN_ASSERT(result.size < DQN_ARRAY_UCOUNT(result.data));
 
     // NOTE: snprintf returns the required size of the format string
@@ -7636,11 +7636,11 @@ DQN_API Dqn_String16 Dqn_Win_String8ToString16Allocator(Dqn_String8 src, Dqn_All
 {
     Dqn_String16 result = {};
     int required = Dqn_Win_String8ToCString16(src, nullptr, 0);
-    if (required != 0) {
+    if (required > 0) {
         result.data = Dqn_Allocator_NewArray(allocator, wchar_t, required + 1, Dqn_ZeroMem_No);
         if (result.data) {
             result.size = Dqn_Win_String8ToCString16(src, result.data, required + 1);
-            DQN_ASSERT(result.size == required);
+            DQN_ASSERT(result.size == DQN_CAST(Dqn_usize)required);
         }
     }
     return result;
@@ -7697,7 +7697,7 @@ DQN_API Dqn_String8 Dqn_Win_String16ToString8Allocator(Dqn_String16 src, Dqn_All
 DQN_API Dqn_usize Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_usize size)
 {
     wchar_t module_path[DQN_OS_WIN32_MAX_PATH];
-    int module_size = GetModuleFileNameW(nullptr /*module*/, module_path, DQN_ARRAY_UCOUNT(module_path));
+    Dqn_usize module_size = DQN_CAST(Dqn_usize)GetModuleFileNameW(nullptr /*module*/, module_path, DQN_ARRAY_UCOUNT(module_path));
     DQN_HARD_ASSERTF(GetLastError() != ERROR_INSUFFICIENT_BUFFER, "How the hell?");
 
     Dqn_usize result = 0;
@@ -8678,10 +8678,10 @@ DQN_API bool Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
 
 DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
 {
-    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-    bool result               = true;
-    int path_indexes_size     = 0;
-    uint16_t path_indexes[64] = {};
+    Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(nullptr);
+    bool result                 = true;
+    Dqn_usize path_indexes_size = 0;
+    uint16_t path_indexes[64]   = {};
 
 #if defined(DQN_OS_WIN32)
     Dqn_String16 path16 = Dqn_Win_String8ToString16Allocator(path, Dqn_Arena_Allocator(scratch.arena));

@@ -56,7 +56,7 @@ Dqn_Tester TestArena()
             DQN_TESTER_ASSERT(&test, first_ptr_address == DQN_CAST(uintptr_t)ptr);
 
             // NOTE: Check that the bytes are set to 0
-            for (int i = 0; i < size; i++)
+            for (Dqn_usize i = 0; i < size; i++)
                 DQN_TESTER_ASSERT(&test, ptr[i] == 0);
         }
     }
@@ -1548,11 +1548,11 @@ Dqn_Tester TestVArray()
             DQN_TESTER_ASSERT(&test, (uintptr_t)data_item_b == (uintptr_t)(make_item_a + 1));
             DQN_TESTER_ASSERT(&test, (uintptr_t)data_item_b == (uintptr_t)make_item_b);
 
-            for (int i = 0; i < sizeof(data_item_a->data); i++) {
+            for (Dqn_usize i = 0; i < sizeof(data_item_a->data); i++) {
                 DQN_TESTER_ASSERT(&test, data_item_a->data[i] == 'a');
             }
 
-            for (int i = 0; i < sizeof(data_item_b->data); i++) {
+            for (Dqn_usize i = 0; i < sizeof(data_item_b->data); i++) {
                 DQN_TESTER_ASSERT(&test, data_item_b->data[i] == 'b');
             }
         }
