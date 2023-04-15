@@ -34,5 +34,5 @@ pushd Build
         echo [WARN] Optional clang compile via clang-cl if it's in the path, please put clang-cl on the path for this feature
         exit /b 1
     )
-    clang-cl -v -D DQN_TEST_WITH_MAIN %code_dir%dqn_unit_tests.cpp /Fe:dqn_unit_tests_clang -link
+    clang-cl -D DQN_TEST_WITH_MAIN %code_dir%dqn_unit_tests.cpp /Fe:dqn_unit_tests_clang -link
 popd
