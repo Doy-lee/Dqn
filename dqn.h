@@ -1430,6 +1430,7 @@ struct Dqn_ArenaStatString
 
 struct Dqn_Arena
 {
+    Dqn_String8     label;          ///< Optional label to describe the arena
     Dqn_usize       min_block_size;
     Dqn_ArenaBlock *curr;           ///< The current memory block of the arena
     Dqn_ArenaBlock *tail;           ///< The tail memory block of the arena
@@ -1504,7 +1505,6 @@ DQN_API void                Dqn_Arena_EndTempMemory_   (DQN_LEAK_TRACE_FUNCTION 
 struct Dqn_ArenaCatalogItem
 {
     Dqn_Arena            *arena;
-    Dqn_String8           label;
     Dqn_ArenaCatalogItem *next;
     Dqn_ArenaCatalogItem *prev;
 };
@@ -1518,8 +1518,8 @@ struct Dqn_ArenaCatalog
 };
 
 DQN_API void       Dqn_ArenaCatalog_Init   (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena);
-DQN_API void       Dqn_ArenaCatalog_AddFV  (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, char const *fmt, va_list args);
-DQN_API void       Dqn_ArenaCatalog_AddF   (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, char const *fmt, ...);
+DQN_API void       Dqn_ArenaCatalog_Add    (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena);
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_Alloc  (Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit);
 DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, va_list args);
 DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF (Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, ...);
 
@@ -6187,7 +6187,7 @@ DQN_API void Dqn_ArenaCatalog_Init(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena)
     catalog->sentinel.prev = &catalog->sentinel;
 }
 
-DQN_API void Dqn_ArenaCatalog_AddFV(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, char const *fmt, va_list args)
+DQN_API void Dqn_ArenaCatalog_Add(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena)
 {
     // NOTE: We could use an atomic for appending to the sentinel but it is such
     // a rare operation to append to the catalog that we don't bother.
@@ -6196,9 +6196,6 @@ DQN_API void Dqn_ArenaCatalog_AddFV(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena,
     // NOTE: Create item in the catalog
     Dqn_ArenaCatalogItem *result = Dqn_Arena_New(catalog->arena, Dqn_ArenaCatalogItem, Dqn_ZeroMem_Yes);
     result->arena                = arena;
-
-    // NOTE: Create arena label
-    result->label = Dqn_String8_InitFV(Dqn_Arena_Allocator(catalog->arena), fmt, args);
 
     // NOTE: Add to the catalog (linked list)
     Dqn_ArenaCatalogItem *sentinel = &catalog->sentinel;
@@ -6211,22 +6208,21 @@ DQN_API void Dqn_ArenaCatalog_AddFV(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena,
     Dqn_Atomic_AddU32(&catalog->arena_count, 1);
 }
 
-DQN_API void Dqn_ArenaCatalog_AddF(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, char const *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    Dqn_ArenaCatalog_AddFV(catalog, arena, fmt, args);
-    va_end(args);
-}
-
-DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, va_list args)
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_Alloc(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit)
 {
     Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Arena *result = Dqn_Arena_New(catalog->arena, Dqn_Arena, Dqn_ZeroMem_Yes);
     Dqn_TicketMutex_End(&catalog->ticket_mutex);
 
     Dqn_Arena_Grow(result, byte_size, commit, 0 /*flags*/);
-    Dqn_ArenaCatalog_AddFV(catalog, result, fmt, args);
+    Dqn_ArenaCatalog_Add(catalog, result);
+    return result;
+}
+
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, va_list args)
+{
+    Dqn_Arena *result = Dqn_ArenaCatalog_Alloc(catalog, byte_size, commit);
+    result->label     = Dqn_String8_InitFV(Dqn_Arena_Allocator(result), fmt, args);
     return result;
 }
 
