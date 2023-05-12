@@ -5002,8 +5002,8 @@ DQN_API void Dqn_VMem_Decommit(void *ptr, Dqn_usize size)
     #if defined(DQN_OS_WIN32)
     VirtualFree(ptr, size, MEM_DECOMMIT);
     #elif defined(DQN_OS_UNIX)
-    mprotect(ptr, size, PROT_NONE)
-    madvise(ptr, size, MADV_FREE)
+    mprotect(ptr, size, PROT_NONE);
+    madvise(ptr, size, MADV_FREE);
     #else
         #error "Missing implementation for Dqn_VMem_Decommit"
     #endif
@@ -5633,7 +5633,7 @@ DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string)
         WriteFile(print_handle, string.data, DQN_CAST(unsigned long)string.size, &bytes_written, nullptr);
     }
     #else
-    fprintf(std_handle == Dqn_PrintStd_Out ? stdout : stderr, "%.*s", DQN_STRING8_FMT(string));
+    fprintf(std_handle == Dqn_PrintStd_Out ? stdout : stderr, "%.*s", DQN_STRING_FMT(string));
     #endif
 }
 
@@ -9292,7 +9292,7 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
             result.error,
             DQN_ARRAY_UCOUNT(result.error),
             "Open file failed: execute access not supported for \"%.*s\"",
-            DQN_STRING8_FMT(path));
+            DQN_STRING_FMT(path));
         DQN_INVALID_CODE_PATH; // TODO: Not supported via fopen
         return result;
     }
@@ -9315,7 +9315,7 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
                 DQN_ARRAY_UCOUNT(result.error),
                 "Open file failed: Could not open file in requested mode %d for \"%.*s\"",
                 open_mode,
-                DQN_STRING8_FMT(path));
+                DQN_STRING_FMT(path));
             return result;
         }
         fclose(handle);
@@ -9337,7 +9337,7 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
             DQN_ARRAY_UCOUNT(result.error),
             "Open file failed: Could not open file in fopen mode \"%s\" for \"%.*s\"",
             fopen_mode,
-            DQN_STRING8_FMT(path));
+            DQN_STRING_FMT(path));
         return result;
     }
     #endif
