@@ -41,7 +41,7 @@ struct Dqn_JSONIterator
 bool Dqn_JSON_IteratorPushObjElement  (Dqn_JSONIterator *it, json_object_element_s *element);
 bool Dqn_JSON_IteratorPushObj         (Dqn_JSONIterator *it, json_object_s *obj);
 bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *it, json_array_element_s *element);
-bool Dqn_JSON_IteratorPushArray       (Dqn_JSONIterator *it, json_array_s *array);
+bool Dqn_JSON_IteratorPushArray       (Dqn_JSONIterator *it, json_value_s *value);
 bool Dqn_JSON_IteratorPushValue       (Dqn_JSONIterator *it, json_value_s *value);
 void Dqn_JSON_IteratorPop             (Dqn_JSONIterator *it);
 
@@ -166,12 +166,12 @@ bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *it, json_array_element_
     return true;
 }
 
-bool Dqn_JSON_IteratorPushArray(Dqn_JSONIterator *it, json_array_s *array)
+bool Dqn_JSON_IteratorPushArray(Dqn_JSONIterator *it, json_value_s *value)
 {
-    if (!it || !array)
+    if (!it || !value || json_value_as_array(value) == nullptr)
         return false;
     DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
-    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeArray, array};
+    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeArray, value};
     return true;
 }
 
@@ -184,7 +184,7 @@ bool Dqn_JSON_IteratorPushValue(Dqn_JSONIterator *it, json_value_s *value)
     if (value->type == json_type_object) {
         result = Dqn_JSON_IteratorPushObj(it, json_value_as_object(value));
     } else if (value->type == json_type_array) {
-        result = Dqn_JSON_IteratorPushArray(it, json_value_as_array(value));
+        result = Dqn_JSON_IteratorPushArray(it, value);
     }
 
     return result;
@@ -221,7 +221,7 @@ json_value_s *Dqn_JSON_IteratorPushCurrValue(Dqn_JSONIterator *it)
     if (result->type == json_type_array) {
         json_array_s *array = json_value_as_array(result);
         DQN_ASSERT(array);
-        Dqn_JSON_IteratorPushArray(it, array);
+        Dqn_JSON_IteratorPushArray(it, result);
     } else if (result->type == json_type_object) {
         json_object_s *obj = json_value_as_object(result);
         DQN_ASSERT(obj);
@@ -247,7 +247,8 @@ bool Dqn_JSON_IteratorNext(Dqn_JSONIterator *it)
         obj_element   = element->next;
         Dqn_JSON_IteratorPop(it);
     } else if (curr->type == Dqn_JSON_IteratorEntryTypeArray) {
-        auto *array   = DQN_CAST(json_array_s *) curr->value;
+        auto *value   = DQN_CAST(json_value_s *) curr->value;
+        auto *array   = json_value_as_array(value);
         array_element = array->start;
     } else if (curr->type == Dqn_JSON_IteratorEntryTypeArrayElement) {
         auto *element = DQN_CAST(json_array_element_s *) curr->value;
