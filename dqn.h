@@ -406,7 +406,12 @@ typedef enum Dqn_ZeroMem {
     #define Dqn_CompilerReadBarrierAndCPUReadFence                    _ReadBarrier(); _mm_lfence()
     #define Dqn_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
 #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
-    #include <x86intrin.h>
+    #if defined(__ANDROID__)
+        
+    #else
+        #include <x86intrin.h>
+    #endif
+
     #define Dqn_Atomic_AddU32(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_AddU64(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_SubU32(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
@@ -855,16 +860,6 @@ void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, voi
 //   @return The left hand side of the split string. The original pointer is
 //   returned if the arguments were invalid.
 //
-// @proc Dqn_CString8_Eq, Dqn_CString8_EqInsensitive
-//   @desc Compare a string for equality with or without case sensitivity.
-//   @param[in] lhs The first string to compare equality with
-//   @param[in] rhs The second string to compare equality with
-//   @param[in] lhs The first string's size
-//   @param[in] rhs The second string's size
-//   @param[in] eq_case Set the comparison to be case sensitive or insensitive
-//   @return True if the arguments are valid, non-null and the strings
-//   are equal, false otherwise.
-//
 // @proc Dqn_CString8_StartsWith, Dqn_CString8_StartsWithInsensitive,
 // Dqn_CString8_EndsWith, Dqn_CString8_EndswithInsensitive
 //   @desc Check if a string starts/ends with the specified prefix
@@ -1029,11 +1024,13 @@ DQN_API                                  Dqn_usize Dqn_CString16_Size      (wcha
 // @proc Dqn_String8 Dqn_String8_BinarySplit
 //   @desc @see Dqn_CString8_BinarySplit
 //
-// @proc Dqn_String8_Eq
-//   @desc @see Dqn_CString8_Eq
-//
-// @proc Dqn_String8_EqInsensitive
-//   @desc @see Dqn_CString8_EqInsensitive
+// @proc Dqn_String8_Eq, Dqn_String8_EqInsensitive
+//   @desc Compare a string for equality with or without case sensitivity.
+//   @param[in] lhs The first string to compare equality with
+//   @param[in] rhs The second string to compare equality with
+//   @param[in] eq_case Set the comparison to be case sensitive or insensitive
+//   @return True if the arguments are valid, non-null and the strings
+//   are equal, false otherwise.
 //
 // @proc Dqn_String8_StartsWith
 //   @desc @see Dqn_CString8_StartsWith
@@ -2019,18 +2016,18 @@ DQN_API void Dqn_Library_LeakTraceMarkFree         (Dqn_CallSite call_site, void
 //   @return String referencing the contents of `string`
 //
 // @proc Dqn_FString8_Eq
-//   @desc @see Dqn_CString8_Eq
+//   @desc @see Dqn_String8_Eq
 //
 // @proc Dqn_FString8_EqString8
-//   @desc @see Dqn_CString8_Eq
+//   @desc @see Dqn_String8_Eq
 //
 // @proc Dqn_FString8_EqInsensitive
 //   @desc Compare a string for equality, case insensitive
-//   @see Dqn_CString8_Eq
+//   @see Dqn_String8_Eq
 //
 // @proc Dqn_FString8_EqString8Insensitive
 //   @desc Compare a string for equality, case insensitive
-//   @see Dqn_CString8_Eq
+//   @see Dqn_String8_Eq
 
 template <Dqn_usize N> struct Dqn_FString8
 {
@@ -4022,13 +4019,13 @@ template <Dqn_usize N> Dqn_FString8<N> Dqn_FString8_InitF(char const *fmt, ...)
 
 template <Dqn_usize N> Dqn_usize Dqn_FString8_Max(Dqn_FString8<N> const *)
 {
-    Dqn_usize result = MAX_;
+    Dqn_usize result = N;
     return result;
 }
 
 template <Dqn_usize N> void Dqn_FString8_Clear(Dqn_FString8<N> *string)
 {
-    *str = {};
+    *string = {};
 }
 
 template <Dqn_usize N> bool Dqn_FString8_AppendFV(Dqn_FString8<N> *string, char const *fmt, va_list args)
@@ -4098,13 +4095,16 @@ template <Dqn_usize N> Dqn_String8 Dqn_FString8_ToString8(Dqn_FString8<N> const 
 
 template <Dqn_usize N> bool Dqn_FString8_Eq(Dqn_FString8<N> const *lhs, Dqn_FString8<N> const *rhs, Dqn_String8EqCase eq_case)
 {
-    bool result = Dqn_CString8_Eq(lhs->data, rhs->data, lhs->size, rhs->size, eq_case);
+    Dqn_String8 lhs_s8 = Dqn_FString8_ToString8(lhs);
+    Dqn_String8 rhs_s8 = Dqn_FString8_ToString8(rhs);
+    bool result = Dqn_String8_Eq(lhs_s8, rhs_s8, eq_case);
     return result;
 }
 
 template <Dqn_usize N> bool Dqn_FString8_EqString8(Dqn_FString8<N> const *lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case)
 {
-    bool result = Dqn_CString8_Eq(lhs->data, rhs.data, lhs->size, rhs.size, eq_case);
+    Dqn_String8 lhs_s8 = Dqn_FString8_ToString8(lhs);
+    bool result = Dqn_String8_Eq(lhs_s8, rhs, eq_case);
     return result;
 }
 
@@ -4135,7 +4135,7 @@ template <Dqn_usize A, Dqn_usize B> bool Dqn_FString8_EqFString8Insensitive(Dqn_
 {
     Dqn_String8 lhs_s8 = Dqn_FString8_ToString8(lhs);
     Dqn_String8 rhs_s8 = Dqn_FString8_ToString8(rhs);
-    bool result = Dqn_CString8_Eq(lhs_s8, rhs_s8, Dqn_String8EqCase_Insensitive);
+    bool result = Dqn_String8_Eq(lhs_s8, rhs_s8, Dqn_String8EqCase_Insensitive);
     return result;
 }
 #endif // !defined(DQN_NO_FSTRING8)
