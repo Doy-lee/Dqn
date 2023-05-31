@@ -4955,7 +4955,6 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *use
                                                              type.size,          type.data,
                                                              type_padding,       "",
                                                              reset.size,         reset.data,
->>>>>>> 4540f8b (dqn: Various bug fixes)
                                                              file_name.size,     file_name.data,
                                                              call_site.line);
         header_size_no_ansi_codes = header.size - colour.size - Dqn_Print_ESCResetString.size;
