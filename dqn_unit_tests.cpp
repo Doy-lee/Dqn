@@ -37,16 +37,16 @@ Dqn_Tester TestArena()
     DQN_TESTER_GROUP(test, "Dqn_Arena") {
         DQN_TESTER_TEST("Reused memory is zeroed out") {
             Dqn_Arena arena = {};
-            DQN_ARENA_TEMP_MEMORY_SCOPE(&arena);
 
             // NOTE: Allocate 128 kilobytes, fill it with garbage, then reset the arena
             Dqn_usize size              = DQN_KILOBYTES(128);
             uintptr_t first_ptr_address = 0;
             {
-                DQN_ARENA_TEMP_MEMORY_SCOPE(&arena);
+                Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
                 void *ptr         = Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
                 first_ptr_address = DQN_CAST(uintptr_t)ptr;
                 DQN_MEMSET(ptr, 'z', size);
+                Dqn_Arena_EndTempMemory(temp_mem);
             }
 
             // NOTE: Reallocate 128 kilobytes
@@ -58,6 +58,35 @@ Dqn_Tester TestArena()
             // NOTE: Check that the bytes are set to 0
             for (Dqn_usize i = 0; i < size; i++)
                 DQN_TESTER_ASSERT(&test, ptr[i] == 0);
+            Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
+        }
+
+        Dqn_usize sizes[] = {DQN_KILOBYTES(1), DQN_KILOBYTES(4), DQN_KILOBYTES(5)};
+        for (Dqn_usize size : sizes) {
+            DQN_TESTER_TEST("Use-after-free guard on %.1f KiB allocation", size / 1024.0) {
+                Dqn_Arena arena            = {};
+                arena.use_after_free_guard = true;
+
+                // NOTE: Wrap in temp memory, allocate and write
+                Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
+                Dqn_usize size              = DQN_KILOBYTES(1);
+                uintptr_t first_ptr_address = 0;
+                void *ptr                   = Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
+                DQN_MEMSET(ptr, 'z', size);
+                Dqn_Arena_EndTempMemory(temp_mem);
+
+                // NOTE: Temp memory is ended, try and write the pointer
+                // we should trigger the use-after-free guard.
+                bool caught = false;
+                __try {
+                    DQN_MEMSET(ptr, 'a', size);
+                } __except (1) {
+                    caught = true;
+                }
+
+                DQN_TESTER_ASSERTF(&test, caught, "Exception was not triggered, was page protected properly?");
+                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
+            }
         }
     }
 
