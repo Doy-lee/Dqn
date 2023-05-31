@@ -4979,6 +4979,7 @@ DQN_API void Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, ch
         case Dqn_LogType_Info:    type_string = DQN_STRING8("INFO"); break;
         case Dqn_LogType_Warning: type_string = DQN_STRING8("WARN"); break;
         case Dqn_LogType_Debug:   type_string = DQN_STRING8("DEBUG"); break;
+        case Dqn_LogType_Count:   type_string = DQN_STRING8("BADXX"); break;
     }
 
     Dqn_LogProc *logging_function = dqn_library.log_callback ? dqn_library.log_callback : Dqn_Log_FVDefault_;
