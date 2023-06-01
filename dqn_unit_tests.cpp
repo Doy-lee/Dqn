@@ -66,12 +66,12 @@ Dqn_Tester TestArena()
             DQN_TESTER_TEST("Use-after-free guard on %.1f KiB allocation", size / 1024.0) {
                 Dqn_Arena arena            = {};
                 arena.use_after_free_guard = true;
+                Dqn_Arena_Grow(&arena, size, false /*commit*/, 0 /*flags*/);
 
                 // NOTE: Wrap in temp memory, allocate and write
                 Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
-                Dqn_usize size              = DQN_KILOBYTES(1);
-                uintptr_t first_ptr_address = 0;
-                void *ptr                   = Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
+                uintptr_t first_ptr_address  = 0;
+                void *ptr                    = Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
                 DQN_MEMSET(ptr, 'z', size);
                 Dqn_Arena_EndTempMemory(temp_mem);
 

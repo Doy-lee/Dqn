@@ -1338,9 +1338,9 @@ enum Dqn_VMemPage
 
     Dqn_VMemPage_ReadWrite = Dqn_VMemPage_Read | Dqn_VMemPage_Write,
 
-    /// Modifier used in conjunction with previous flags. This flag is *only* supported on Windows
-    /// ignored in other OS's. Exception on first access to the page, then, the underlying 
-    /// protection flags are active.
+    /// Modifier used in conjunction with previous flags. Raises exception on first access to the 
+    /// page, then, the underlying protection flags are active. This is supported on Windows, on
+    /// other OS's using this flag will set the OS equivalent of Dqn_VMemPage_NoAccess.
     Dqn_VMemPage_Guard     = 1 << 3,
 };
 
@@ -1364,7 +1364,7 @@ static_assert(DQN_VMEM_COMMIT_GRANULARITY < DQN_VMEM_RESERVE_GRANULARITY,
               "Minimum commit size must be lower than the reserve size to avoid OOB math on pointers in this library");
 
 DQN_API void *Dqn_VMem_Reserve (Dqn_usize size, Dqn_VMemCommit commit, uint32_t page_flags);
-DQN_API bool  Dqn_VMem_Commit  (void *ptr, Dqn_usize size);
+DQN_API bool  Dqn_VMem_Commit  (void *ptr, Dqn_usize size, uint32_t page_flags);
 DQN_API void  Dqn_VMem_Decommit(void *ptr, Dqn_usize size);
 DQN_API void  Dqn_VMem_Release (void *ptr, Dqn_usize size);
 DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
@@ -1453,8 +1453,7 @@ DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
 
 enum Dqn_ArenaBlockFlags
 {
-    Dqn_ArenaBlockFlags_Private           = 1 << 0, ///< Private blocks can only allocate its memory when used in the 'FromBlock' API variants
-    Dqn_ArenaBlockFlags_UseAfterFreeGuard = 1 << 1, ///< Pages guards are placed on freed memory ranges
+    Dqn_ArenaBlockFlags_Private = 1 << 0, ///< Private blocks can only allocate its memory when used in the 'FromBlock' API variants
 };
 
 struct Dqn_ArenaStat
@@ -5053,7 +5052,7 @@ DQN_FILE_SCOPE uint32_t Dqn_VMem_ConvertPageToOSFlags_(uint32_t protect)
 
     DQN_ASSERTF(result != PAGE_GUARD, "Page guard is a modifier, you must also specify a page permission like read or/and write");
     #else
-    if (protect & Dqn_VMemPage_NoAccess) {
+    if (protect & (Dqn_VMemPage_NoAccess | Dqn_VMemPage_Guard)) {
         result = PROT_NONE;
     } else {
         if (protect & Dqn_VMemPage_Read)
@@ -5088,12 +5087,13 @@ DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, Dqn_VMemCommit commit, uint32_t p
     return result;
 }
 
-DQN_API bool Dqn_VMem_Commit(void *ptr, Dqn_usize size)
+DQN_API bool Dqn_VMem_Commit(void *ptr, Dqn_usize size, uint32_t page_flags)
 {
+    unsigned long os_page_flags = Dqn_VMem_ConvertPageToOSFlags_(page_flags);
     #if defined(DQN_OS_WIN32)
-    bool result = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != nullptr;
+    bool result = VirtualAlloc(ptr, size, MEM_COMMIT, os_page_flags) != nullptr;
     #elif defined(DQN_OS_UNIX)
-    bool result = mprotect(ptr, size, PROT_READ|PROT_WRITE) == 0;
+    bool result = mprotect(ptr, size, os_page_flags) == 0;
     #else
         #error "Missing implementation for Dqn_VMem_Commit"
     #endif
@@ -5128,6 +5128,12 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
 {
     if (!ptr || size == 0)
         return 0;
+
+    static Dqn_String8 const ALIGNMENT_ERROR_MSG =
+        DQN_STRING8("Page protection requires pointers to be page aligned because we "
+                    "can only guard memory at a multiple of the page boundary.");
+    DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(DQN_CAST(uintptr_t)ptr, DQN_VMEM_PAGE_GRANULARITY), "%s", ALIGNMENT_ERROR_MSG.data);
+    DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(size,                   DQN_VMEM_PAGE_GRANULARITY), "%s", ALIGNMENT_ERROR_MSG.data);
 
     unsigned long os_page_flags = Dqn_VMem_ConvertPageToOSFlags_(page_flags);
     #if defined(DQN_OS_WIN32)
@@ -6192,10 +6198,6 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
 // =================================================================================================
 // [$AREN] Dqn_Arena            |                             | Growing bump allocator
 // =================================================================================================
-DQN_FILE_SCOPE Dqn_String8 DQN_ARENA_USE_AFTER_FREE_PTR_ALIGNMENT_ERROR =
-    DQN_STRING8("Use-after-free guard requires that all pointers are page aligned because we "
-                "can only guard memory at a multiple of the page boundary.");
-
 DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, Dqn_ArenaCommit commit)
 {
     Dqn_usize commit_size = 0;
@@ -6213,8 +6215,9 @@ DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, Dq
     }
 
     if (commit_size) {
+        uint32_t page_flags = Dqn_VMemPage_ReadWrite;
         char *commit_ptr = DQN_CAST(char *)block->memory + block->commit;
-        Dqn_VMem_Commit(commit_ptr, commit_size);
+        Dqn_VMem_Commit(commit_ptr, commit_size, page_flags);
         block->commit += commit_size;
 
         DQN_ASSERTF(block->commit < block->size,
@@ -6222,13 +6225,8 @@ DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, Dq
                     block->size, block->commit);
 
         // NOTE: Guard new pages being allocated from the block
-        if (block->arena->use_after_free_guard) {
-            DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(DQN_CAST(uintptr_t)commit_ptr, DQN_VMEM_PAGE_GRANULARITY),
-                        "%s", DQN_ARENA_USE_AFTER_FREE_PTR_ALIGNMENT_ERROR.data);
-            DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(commit_size, DQN_VMEM_PAGE_GRANULARITY),
-                        "%s", DQN_ARENA_USE_AFTER_FREE_PTR_ALIGNMENT_ERROR.data);
-            Dqn_VMem_Protect(commit_ptr, commit_size, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
-        }
+        if (block->arena->use_after_free_guard)
+            Dqn_VMem_Protect(commit_ptr, commit_size, page_flags | Dqn_VMemPage_Guard);
     }
 }
 
@@ -6269,17 +6267,8 @@ DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_usize size,
     Dqn_Arena_CommitFromBlock(block, allocation_size, Dqn_ArenaCommit_EnsureSpace);
 
     // NOTE: Unlock the pages requested
-    if (block->arena->use_after_free_guard) {
-        char const error_msg[] = "Use-after-free guard requires that all pointers are page aligned because we "
-                                 "can only guard memory at a multiple of the page boundary.";
-        DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(DQN_CAST(uintptr_t)result,                        DQN_VMEM_PAGE_GRANULARITY),
-                    "%s", DQN_ARENA_USE_AFTER_FREE_PTR_ALIGNMENT_ERROR.data);
-        DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(DQN_CAST(uintptr_t)allocation_size,               DQN_VMEM_PAGE_GRANULARITY),
-                    "%s", DQN_ARENA_USE_AFTER_FREE_PTR_ALIGNMENT_ERROR.data);
-        DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(DQN_CAST(uintptr_t)block->used + allocation_size, DQN_VMEM_PAGE_GRANULARITY),
-                    "%s", DQN_ARENA_USE_AFTER_FREE_PTR_ALIGNMENT_ERROR.data);
+    if (block->arena->use_after_free_guard)
         Dqn_VMem_Protect(result, allocation_size, Dqn_VMemPage_ReadWrite);
-    }
 
     // NOTE: Update arena
     Dqn_Arena *arena       = block->arena;
@@ -6338,7 +6327,12 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
             arena->curr = block;
         if (zero_mem == Dqn_ZeroMem_Yes)
             DQN_MEMSET(block->memory, DQN_MEMSET_BYTE, block->commit);
+
         block->used = 0;
+
+        // NOTE: Guard all the committed pages again
+        if (arena->use_after_free_guard)
+            Dqn_VMem_Protect(block->memory, block->commit, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
     }
 
     arena->stats.used   = 0;
@@ -6370,8 +6364,14 @@ DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemor
 
     // NOTE: Revert the current block to the scope's current block
     arena->curr = scope.curr;
-    if (arena->curr)
-        arena->curr->used = scope.curr_used;
+    if (arena->curr) {
+        Dqn_ArenaBlock *curr = arena->curr;
+        curr->used           = scope.curr_used;
+
+        // NOTE: Reguard the pages
+        if (arena->use_after_free_guard)
+            Dqn_VMem_Protect(curr->memory, curr->commit, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
+    }
 
     // NOTE: Free the tail blocks until we reach the scope's tail block
     while (arena->tail != scope.tail) {
@@ -6384,8 +6384,13 @@ DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemor
     // NOTE: Reset the usage of all the blocks between the tail and current block's
     if (arena->tail) {
         arena->tail->next = nullptr;
-        for (Dqn_ArenaBlock *block = arena->tail; block && block != arena->curr; block = block->prev)
+        for (Dqn_ArenaBlock *block = arena->tail; block && block != arena->curr; block = block->prev) {
             block->used = 0;
+
+            // NOTE: Reguard the pages
+            if (arena->use_after_free_guard)
+                Dqn_VMem_Protect(block->memory, block->commit, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
+        }
     }
 }
 
@@ -6476,7 +6481,7 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
         // NOTE: Commit the amount requested by the user if we did not commit
         // on reserve the initial range.
         if (commit_on_reserve == Dqn_VMemCommit_No) {
-            Dqn_VMem_Commit(result, commit_aligned);
+            Dqn_VMem_Commit(result, commit_aligned, page_flags);
         } else {
             DQN_ASSERT(commit_aligned == reserve_aligned);
         }
@@ -6493,9 +6498,9 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
         result->flags  = flags;
         result->arena  = arena;
 
-        // NOTE: Guard all the pages
+        // NOTE: Guard all the committed pages in the memory block
         if (arena->use_after_free_guard)
-            Dqn_VMem_Protect(result->memory, commit_aligned - block_metadata_size, page_flags | Dqn_VMemPage_Guard);
+            Dqn_VMem_Protect(result->memory, result->commit, page_flags | Dqn_VMemPage_Guard);
 
         // NOTE: Attach the block to the arena
         if (arena->tail) {
@@ -6528,7 +6533,7 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_
 
     if (arena->use_after_free_guard) {
         size  = Dqn_PowerOfTwoAlign(size, DQN_VMEM_PAGE_GRANULARITY);
-        align = 0;
+        align = 1;
     }
 
     void *result = nullptr;
