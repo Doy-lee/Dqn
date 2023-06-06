@@ -1495,8 +1495,8 @@ struct Dqn_Arena
 
     Dqn_String8     label;          ///< Optional label to describe the arena
     Dqn_usize       min_block_size;
-    Dqn_ArenaBlock *curr;           ///< The current memory block of the arena
-    Dqn_ArenaBlock *tail;           ///< The tail memory block of the arena
+    Dqn_ArenaBlock *curr;           ///< Active block the arena is allocating from
+    Dqn_ArenaBlock *tail;           ///< Last block in the linked list of blocks
     Dqn_ArenaStat   stats;          ///< Current arena stats, reset when reset usage is invoked.
 };
 
@@ -6316,6 +6316,31 @@ DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena)
     return result;
 }
 
+struct Dqn_ArenaBlockResetInfo_
+{
+    bool      free_memory;
+    Dqn_usize used_value;
+};
+
+DQN_API void Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaBlock *block, Dqn_ZeroMem zero_mem, Dqn_ArenaBlockResetInfo_ reset_info)
+{
+    if (!block)
+        return;
+
+    if (zero_mem == Dqn_ZeroMem_Yes)
+        DQN_MEMSET(block->memory, DQN_MEMSET_BYTE, block->commit);
+
+    if (reset_info.free_memory) {
+        Dqn_VMem_Release(block, sizeof(*block) + block->size);
+        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG block);
+    } else {
+        block->used = reset_info.used_value;
+        // NOTE: Guard all the committed pages again
+        if (block->arena->use_after_free_guard)
+            Dqn_VMem_Protect(block->memory, block->commit, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
+    }
+}
+
 DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
 {
     if (!arena)
@@ -6325,14 +6350,8 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
     for (Dqn_ArenaBlock *block = arena->tail; block; block = block->prev) {
         if (!block->prev)
             arena->curr = block;
-        if (zero_mem == Dqn_ZeroMem_Yes)
-            DQN_MEMSET(block->memory, DQN_MEMSET_BYTE, block->commit);
-
-        block->used = 0;
-
-        // NOTE: Guard all the committed pages again
-        if (arena->use_after_free_guard)
-            Dqn_VMem_Protect(block->memory, block->commit, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
+        Dqn_ArenaBlockResetInfo_ reset_info = {};
+        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE block, zero_mem, reset_info);
     }
 
     arena->stats.used   = 0;
@@ -6365,31 +6384,27 @@ DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemor
     // NOTE: Revert the current block to the scope's current block
     arena->curr = scope.curr;
     if (arena->curr) {
-        Dqn_ArenaBlock *curr = arena->curr;
-        curr->used           = scope.curr_used;
-
-        // NOTE: Reguard the pages
-        if (arena->use_after_free_guard)
-            Dqn_VMem_Protect(curr->memory, curr->commit, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
+        Dqn_ArenaBlock *curr                = arena->curr;
+        Dqn_ArenaBlockResetInfo_ reset_info = {};
+        reset_info.used_value               = scope.curr_used;
+        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG curr, Dqn_ZeroMem_No, reset_info);
     }
 
     // NOTE: Free the tail blocks until we reach the scope's tail block
     while (arena->tail != scope.tail) {
-        Dqn_ArenaBlock *tail = arena->tail;
-        arena->tail          = tail->prev;
-        Dqn_VMem_Release(tail, sizeof(*tail) + tail->size);
-        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG tail);
+        Dqn_ArenaBlock *tail                = arena->tail;
+        arena->tail                         = tail->prev;
+        Dqn_ArenaBlockResetInfo_ reset_info = {};
+        reset_info.free_memory              = true;
+        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG tail, Dqn_ZeroMem_No, reset_info);
     }
 
     // NOTE: Reset the usage of all the blocks between the tail and current block's
     if (arena->tail) {
         arena->tail->next = nullptr;
         for (Dqn_ArenaBlock *block = arena->tail; block && block != arena->curr; block = block->prev) {
-            block->used = 0;
-
-            // NOTE: Reguard the pages
-            if (arena->use_after_free_guard)
-                Dqn_VMem_Protect(block->memory, block->commit, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
+            Dqn_ArenaBlockResetInfo_ reset_info = {};
+            Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG block, Dqn_ZeroMem_No, reset_info);
         }
     }
 }
@@ -6498,9 +6513,9 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
         result->flags  = flags;
         result->arena  = arena;
 
-        // NOTE: Guard all the committed pages in the memory block
-        if (arena->use_after_free_guard)
-            Dqn_VMem_Protect(result->memory, result->commit, page_flags | Dqn_VMemPage_Guard);
+        // NOTE: Reset the block (this will guard the memory pages if required, otherwise no-op).
+        Dqn_ArenaBlockResetInfo_ reset_info = {};
+        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG result, Dqn_ZeroMem_No, reset_info);
 
         // NOTE: Attach the block to the arena
         if (arena->tail) {
@@ -6579,12 +6594,11 @@ DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroM
         return;
 
     while (arena->tail) {
-        Dqn_ArenaBlock *tail = arena->tail;
-        arena->tail          = tail->prev;
-        if (zero_mem == Dqn_ZeroMem_Yes)
-            DQN_MEMSET(tail->memory, DQN_MEMSET_BYTE, tail->commit);
-        Dqn_VMem_Release(tail, sizeof(*tail) + tail->size);
-        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG tail);
+        Dqn_ArenaBlock *block               = arena->tail;
+        arena->tail                         = block->prev;
+        Dqn_ArenaBlockResetInfo_ reset_info = {};
+        reset_info.free_memory              = true;
+        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG block, zero_mem, reset_info);
     }
 
     arena->curr           = arena->tail = nullptr;
