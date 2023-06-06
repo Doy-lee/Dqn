@@ -6322,6 +6322,10 @@ struct Dqn_ArenaBlockResetInfo_
     Dqn_usize used_value;
 };
 
+// Calculate the size in bytes required to allocate the memory for the block
+// (*not* including the memory required for the user in the block!)
+#define Dqn_Arena_BlockMetadataSize_(arena) ((arena)->use_after_free_guard ? (Dqn_PowerOfTwoAlign(sizeof(Dqn_ArenaBlock), DQN_VMEM_PAGE_GRANULARITY)) : sizeof(Dqn_ArenaBlock))
+
 DQN_API void Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaBlock *block, Dqn_ZeroMem zero_mem, Dqn_ArenaBlockResetInfo_ reset_info)
 {
     if (!block)
@@ -6331,7 +6335,8 @@ DQN_API void Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaBlock *block
         DQN_MEMSET(block->memory, DQN_MEMSET_BYTE, block->commit);
 
     if (reset_info.free_memory) {
-        Dqn_VMem_Release(block, sizeof(*block) + block->size);
+        Dqn_usize block_metadata_size = Dqn_Arena_BlockMetadataSize_(block->arena);
+        Dqn_VMem_Release(block, block_metadata_size + block->size);
         Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG block);
     } else {
         block->used = reset_info.used_value;
@@ -6478,13 +6483,10 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
     if (!arena || size == 0)
         return nullptr;
 
-    Dqn_usize block_metadata_size = sizeof(Dqn_ArenaBlock);
-    if (arena->use_after_free_guard)
-        block_metadata_size = Dqn_PowerOfTwoAlign(block_metadata_size, DQN_VMEM_PAGE_GRANULARITY);
-
-    commit                    = DQN_MIN(commit, size);
-    Dqn_usize reserve_aligned = Dqn_PowerOfTwoAlign(size   + block_metadata_size, DQN_VMEM_RESERVE_GRANULARITY);
-    Dqn_usize commit_aligned  = Dqn_PowerOfTwoAlign(commit + block_metadata_size, DQN_VMEM_COMMIT_GRANULARITY);
+    Dqn_usize block_metadata_size = Dqn_Arena_BlockMetadataSize_(arena);
+    commit                        = DQN_MIN(commit, size);
+    Dqn_usize reserve_aligned     = Dqn_PowerOfTwoAlign(size   + block_metadata_size, DQN_VMEM_RESERVE_GRANULARITY);
+    Dqn_usize commit_aligned      = Dqn_PowerOfTwoAlign(commit + block_metadata_size, DQN_VMEM_COMMIT_GRANULARITY);
     DQN_ASSERT(commit_aligned < reserve_aligned);
 
     // NOTE: If the commit amount is the same as reserve size we can save one
