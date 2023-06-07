@@ -1447,10 +1447,6 @@ DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
 //   @desc Dump the stats of the given arena to the memory log-stream.
 //   @param[in] arena The arena to dump stats for
 
-#if !defined(DQN_ARENA_MIN_BLOCK_SIZE)
-    #define DQN_ARENA_MIN_BLOCK_SIZE DQN_VMEM_RESERVE_GRANULARITY
-#endif
-
 enum Dqn_ArenaBlockFlags
 {
     Dqn_ArenaBlockFlags_Private = 1 << 0, ///< Private blocks can only allocate its memory when used in the 'FromBlock' API variants
@@ -1493,20 +1489,21 @@ struct Dqn_Arena
 {
     bool            use_after_free_guard;
 
-    Dqn_String8     label;          ///< Optional label to describe the arena
-    Dqn_usize       min_block_size;
-    Dqn_ArenaBlock *curr;           ///< Active block the arena is allocating from
-    Dqn_ArenaBlock *tail;           ///< Last block in the linked list of blocks
-    Dqn_ArenaStat   stats;          ///< Current arena stats, reset when reset usage is invoked.
+    Dqn_String8     label; ///< Optional label to describe the arena
+    Dqn_ArenaBlock *head;  ///< Active block the arena is allocating from
+    Dqn_ArenaBlock *curr;  ///< Active block the arena is allocating from
+    Dqn_ArenaBlock *tail;  ///< Last block in the linked list of blocks
+    Dqn_ArenaStat   stats; ///< Current arena stats, reset when reset usage is invoked.
 };
 
 struct Dqn_ArenaTempMemory
 {
-    Dqn_Arena      *arena;     ///< The arena the scope is for
-    Dqn_ArenaBlock *curr;      ///< The current block of the arena at the beginning of the scope
-    Dqn_ArenaBlock *tail;      ///< The tail block of the arena at the beginning of the scope
-    Dqn_usize       curr_used; ///< The current used amount of the current block
-    Dqn_ArenaStat   stats;     ///< The stats of the arena at the beginning of the scope
+    Dqn_Arena      *arena;     ///< Arena the scope is for
+    Dqn_ArenaBlock *head;      ///< Head block of the arena at the beginning of the scope
+    Dqn_ArenaBlock *curr;      ///< Current block of the arena at the beginning of the scope
+    Dqn_ArenaBlock *tail;      ///< Tail block of the arena at the beginning of the scope
+    Dqn_usize       curr_used; ///< Current used amount of the current block
+    Dqn_ArenaStat   stats;     ///< Stats of the arena at the beginning of the scope
 };
 
 // Automatically begin and end a temporary memory scope on object construction
@@ -6352,13 +6349,12 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
         return;
 
     // NOTE: Zero all the blocks until we reach the first block in the list
-    for (Dqn_ArenaBlock *block = arena->tail; block; block = block->prev) {
-        if (!block->prev)
-            arena->curr = block;
+    for (Dqn_ArenaBlock *block = arena->head; block; block = block->next) {
         Dqn_ArenaBlockResetInfo_ reset_info = {};
         Dqn_Arena_BlockReset_(DQN_LEAK_TRACE block, zero_mem, reset_info);
     }
 
+    arena->curr         = arena->head;
     arena->stats.used   = 0;
     arena->stats.wasted = 0;
 }
@@ -6366,11 +6362,12 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
 DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena)
 {
     Dqn_ArenaTempMemory result = {};
-    result.arena              = arena;
-    result.curr               = arena->curr;
-    result.tail               = arena->tail;
-    result.curr_used          = (arena->curr) ? arena->curr->used : 0;
-    result.stats              = arena->stats;
+    result.arena               = arena;
+    result.head                = arena->head;
+    result.curr                = arena->curr;
+    result.tail                = arena->tail;
+    result.curr_used           = (arena->curr) ? arena->curr->used : 0;
+    result.stats               = arena->stats;
     return result;
 }
 
@@ -6387,6 +6384,7 @@ DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemor
     arena->stats.blocks   = scope.stats.blocks;
 
     // NOTE: Revert the current block to the scope's current block
+    arena->head = scope.head;
     arena->curr = scope.curr;
     if (arena->curr) {
         Dqn_ArenaBlock *curr                = arena->curr;
@@ -6526,6 +6524,7 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
         } else {
             DQN_ASSERT(!arena->curr);
             arena->curr = result;
+            arena->head = result;
         }
         arena->tail = result;
 
@@ -6558,15 +6557,18 @@ DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_
         while (arena->curr && (arena->curr->flags & Dqn_ArenaBlockFlags_Private))
             arena->curr = arena->curr->next;
 
-        if (!arena->curr) {
-            Dqn_usize allocation_size = size + (align - 1);
-            if (!Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG arena, allocation_size, allocation_size /*commit*/, 0 /*flags*/)) {
-                break;
-            }
-            arena->curr = arena->tail;
-        }
-
         result = Dqn_Arena_AllocateFromBlock(arena->curr, size, align, zero_mem);
+        if (!result) {
+            if (!arena->curr || arena->curr == arena->tail) {
+                Dqn_usize allocation_size = size + (align - 1);
+                if (!Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG arena, allocation_size, allocation_size /*commit*/, 0 /*flags*/)) {
+                    break;
+                }
+            }
+
+            if (arena->curr != arena->tail)
+                arena->curr = arena->curr->next;
+        }
     }
 
     if (result)

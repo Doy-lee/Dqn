@@ -31,34 +31,82 @@
 #define DQN_TESTER_IMPLEMENTATION
 #include "dqn_tester.h"
 
+enum Guard {
+    Guard_None,
+    Guard_UseAfterFree,
+    Guard_Count,
+};
+
+static Dqn_String8 ArenaGuardTestSuffix(uint32_t guard)
+{
+    Dqn_String8 result = {};
+    switch (guard) {
+        case Guard_None:         result = DQN_STRING8(" ");      break;
+        case Guard_UseAfterFree: result = DQN_STRING8(" [UAF]"); break;
+    }
+    return result;
+}
+
 Dqn_Tester TestArena()
 {
     Dqn_Tester test = {};
     DQN_TESTER_GROUP(test, "Dqn_Arena") {
-        DQN_TESTER_TEST("Reused memory is zeroed out") {
-            Dqn_Arena arena = {};
+        for (Dqn_usize guard = 0; guard < Guard_Count; guard++) {
+            Dqn_String8 test_suffix = ArenaGuardTestSuffix(guard);
+            DQN_TESTER_TEST("Reused memory is zeroed out%.*s", DQN_STRING_FMT(test_suffix)) {
+                Dqn_Arena arena            = {};
+                arena.use_after_free_guard = guard == Guard_UseAfterFree;
 
-            // NOTE: Allocate 128 kilobytes, fill it with garbage, then reset the arena
-            Dqn_usize size              = DQN_KILOBYTES(128);
-            uintptr_t first_ptr_address = 0;
-            {
-                Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
-                void *ptr         = Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
-                first_ptr_address = DQN_CAST(uintptr_t)ptr;
-                DQN_MEMSET(ptr, 'z', size);
-                Dqn_Arena_EndTempMemory(temp_mem);
+                // NOTE: Allocate 128 kilobytes, fill it with garbage, then reset the arena
+                Dqn_usize size              = DQN_KILOBYTES(128);
+                uintptr_t first_ptr_address = 0;
+                {
+                    Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
+                    void *ptr         = Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
+                    first_ptr_address = DQN_CAST(uintptr_t)ptr;
+                    DQN_MEMSET(ptr, 'z', size);
+                    Dqn_Arena_EndTempMemory(temp_mem);
+                }
+
+                // NOTE: Reallocate 128 kilobytes
+                char *ptr = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
+
+                // NOTE: Double check we got the same pointer
+                DQN_TESTER_ASSERT(&test, first_ptr_address == DQN_CAST(uintptr_t)ptr);
+
+                // NOTE: Check that the bytes are set to 0
+                for (Dqn_usize i = 0; i < size; i++)
+                    DQN_TESTER_ASSERT(&test, ptr[i] == 0);
+                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
             }
+        }
 
-            // NOTE: Reallocate 128 kilobytes
-            char *ptr = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
+        for (Dqn_usize guard = 0; guard < Guard_Count; guard++) {
+            Dqn_String8 test_suffix = ArenaGuardTestSuffix(guard);
+            DQN_TESTER_TEST("Test arena grows naturally, 1mb + 4mb%.*s", DQN_STRING_FMT(test_suffix)) {
+                Dqn_Arena arena            = {};
+                arena.use_after_free_guard = guard == Guard_UseAfterFree;
 
-            // NOTE: Double check we got the same pointer
-            DQN_TESTER_ASSERT(&test, first_ptr_address == DQN_CAST(uintptr_t)ptr);
+                // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
+                char *ptr_1mb = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
+                char *ptr_4mb = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(4), 1 /*align*/, Dqn_ZeroMem_Yes);
+                DQN_TESTER_ASSERT(&test, ptr_1mb);
+                DQN_TESTER_ASSERT(&test, ptr_4mb);
 
-            // NOTE: Check that the bytes are set to 0
-            for (Dqn_usize i = 0; i < size; i++)
-                DQN_TESTER_ASSERT(&test, ptr[i] == 0);
-            Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
+                Dqn_ArenaBlock const *block_1mb       = arena.head;
+                char           const *block_1mb_begin = DQN_CAST(char *)block_1mb->memory;
+                char           const *block_1mb_end   = DQN_CAST(char *)block_1mb->memory + block_1mb->size;
+
+                Dqn_ArenaBlock const *block_4mb       = arena.curr;
+                char           const *block_4mb_begin = DQN_CAST(char *)block_4mb->memory;
+                char           const *block_4mb_end   = DQN_CAST(char *)block_4mb->memory + block_4mb->size;
+
+                DQN_TESTER_ASSERTF(&test, block_1mb != block_4mb,                                 "New block should have been allocated and linked");
+                DQN_TESTER_ASSERTF(&test, ptr_1mb >= block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
+                DQN_TESTER_ASSERTF(&test, ptr_4mb >= block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
+
+                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
+            }
         }
 
         Dqn_usize sizes[] = {DQN_KILOBYTES(1), DQN_KILOBYTES(4), DQN_KILOBYTES(5)};
