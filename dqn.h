@@ -57,6 +57,10 @@
 // #define DQN_NO_ASSERT
 //     Turn all assertion macros to no-ops
 //
+// #define DQN_NO_CHECK_BREAK
+//     Disable debug break when a check macro's expression fails. Instead only 
+//     the error will be logged.
+//
 // #define DQN_NO_WIN32_MINIMAL_HEADER
 //     Define this to stop this library from defining a minimal subset of Win32
 //     prototypes and definitions in this file. Useful for stopping redefinition
@@ -281,6 +285,30 @@
             Dqn_Log_ErrorF("Assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
             DQN_DEBUG_BREAK;                                                    \
         }
+#endif
+
+#define DQN_CHECK(expr) DQN_CHECKF(expr, "")
+#if defined(DQN_NO_CHECK_BREAK)
+    #define DQN_CHECKF(expr, fmt, ...) \
+        ((expr) ? true : (Dqn_Log_TypeFCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, ## __VA_ARGS__), false))
+#else
+    #define DQN_CHECKF(expr, fmt, ...) \
+        ((expr) ? true : (Dqn_Log_TypeFCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, ## __VA_ARGS__), DQN_DEBUG_BREAK, false))
+#endif
+
+#if 0
+DQN_API bool DQN_CHECKF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...)
+{
+    bool result = assertion_expr;
+    if (!result) {
+        va_list args;
+        va_start(args, fmt);
+        Dqn_Log_TypeFVCallSite(Dqn_LogType_Error, call_site, fmt, args);
+        va_end(args);
+        DQN_DEBUG_BREAK;
+    }
+    return result;
+}
 #endif
 
 #if defined(__cplusplus)
@@ -1310,10 +1338,11 @@ typedef void Dqn_LogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_Ca
 #define Dqn_Log_FV(type, fmt, args)     Dqn_Log_FVCallSite(type, DQN_CALL_SITE, fmt, args)
 #define Dqn_Log_F(type, fmt, ...)       Dqn_Log_FCallSite(type, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
 
-DQN_API void Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, va_list va);
-DQN_API void Dqn_Log_TypeFCallSite (Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, ...);
-DQN_API void Dqn_Log_FVCallSite    (Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, va_list va);
-DQN_API void Dqn_Log_FCallSite     (Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, ...);
+DQN_API Dqn_String8 Dqn_Log_MakeString    (Dqn_Allocator allocator, bool colour, Dqn_String8 type, int log_type, Dqn_CallSite call_site, char const *fmt, va_list args);
+DQN_API void        Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, va_list va);
+DQN_API void        Dqn_Log_TypeFCallSite (Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, ...);
+DQN_API void        Dqn_Log_FVCallSite    (Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, va_list va);
+DQN_API void        Dqn_Log_FCallSite     (Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, ...);
 
 // =================================================================================================
 // [$VMEM] Dqn_VMem             |                             | Virtual memory allocation
@@ -1488,7 +1517,7 @@ struct Dqn_ArenaStatString
 struct Dqn_Arena
 {
     bool            use_after_free_guard;
-
+    uint32_t        temp_memory_count;
     Dqn_String8     label; ///< Optional label to describe the arena
     Dqn_ArenaBlock *head;  ///< Active block the arena is allocating from
     Dqn_ArenaBlock *curr;  ///< Active block the arena is allocating from
@@ -2424,26 +2453,17 @@ DQN_API bool    Dqn_Bit_IsNotSet(uint32_t bits, uint32_t bits_to_check);
 // =================================================================================================
 // [$SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
 // =================================================================================================
-#if defined(NDEBUG)
-    #define Dqn_Safe_AssertF(expr, fmt, ...)
-    #define Dqn_Safe_Assert(expr, fmt, ...)
-#else
-    #define Dqn_Safe_AssertF(expr, fmt, ...) \
-        Dqn_Safe_AssertF_(expr, DQN_CALL_SITE, "Safe assert triggered " #expr ": " fmt, ## __VA_ARGS__)
-    #define Dqn_Safe_Assert(expr) Dqn_Safe_AssertF(expr, "")
-#endif
-
 /// Assert the expression given in debug, whilst in release- assertion is
 /// removed and the expression is evaluated and returned.
 ///
 /// This function provides dual logic which allows handling of the condition
 /// gracefully in release mode, but asserting in debug mode. This is an internal
-/// function, prefer the @see Dqn_Safe_Assert macros.
+/// function, prefer the @see DQN_CHECK macros.
 ///
 /// @param assertion_expr[in] Expressin to assert on
 /// @param fmt[in] Format string for providing a message on assertion
 /// @return True if the expression evaluated to true, false otherwise.
-DQN_API bool Dqn_Safe_AssertF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...);
+DQN_API bool DQN_CHECKF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...);
 
 // NOTE: Dqn_Safe Arithmetic
 // -----------------------------------------------------------------------------
@@ -3606,7 +3626,7 @@ DQN_API template <typename T> T *Dqn_VArray_Make(Dqn_VArray<T> *array, Dqn_usize
     if (!Dqn_VArray_IsValid(array))
         return nullptr;
 
-    if (!Dqn_Safe_AssertF((array->size + count) < array->max, "Array is out of virtual memory"))
+    if (!DQN_CHECKF((array->size + count) < array->max, "Array is out of virtual memory"))
         return nullptr;
 
     // TODO: Use placement new? Why doesn't this work?
@@ -3696,7 +3716,7 @@ template <typename T>
 Dqn_DSMap<T> Dqn_DSMap_Init(uint32_t size)
 {
     Dqn_DSMap<T> result = {};
-    if (Dqn_Safe_AssertF((size & (size - 1)) == 0, "Power-of-two size required")) {
+    if (DQN_CHECKF((size & (size - 1)) == 0, "Power-of-two size required")) {
         result.hash_to_slot = Dqn_Allocator_NewArray(result.allocator, uint32_t, size, Dqn_ZeroMem_Yes);
         if (result.hash_to_slot) {
             result.slots = Dqn_Allocator_NewArray(result.allocator, Dqn_DSMapSlot<T>, size, Dqn_ZeroMem_Yes);
@@ -4200,7 +4220,7 @@ DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Make(Dqn_FArray<T, N> *
     if (!Dqn_FArray_IsValid(array))
         return nullptr;
 
-    if (!Dqn_Safe_AssertF((array->size + count) < DQN_ARRAY_UCOUNT(array->data), "Array is out of memory"))
+    if (!DQN_CHECKF((array->size + count) < DQN_ARRAY_UCOUNT(array->data), "Array is out of memory"))
         return nullptr;
 
     // TODO: Use placement new? Why doesn't this work?
@@ -4892,6 +4912,78 @@ DQN_API void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator alloca
 // =================================================================================================
 // [$LLOG] Dqn_Log              |                             | Library logging
 // =================================================================================================
+DQN_API Dqn_String8 Dqn_Log_MakeString(Dqn_Allocator allocator,
+                                       bool colour,
+                                       Dqn_String8 type,
+                                       int log_type,
+                                       Dqn_CallSite call_site,
+                                       char const *fmt,
+                                       va_list args)
+{
+    Dqn_usize     header_size_no_ansi_codes = 0;
+    Dqn_String8   header                    = {};
+    {
+        DQN_LOCAL_PERSIST Dqn_usize max_type_length = 0;
+        max_type_length                             = DQN_MAX(max_type_length, type.size);
+        int type_padding                            = DQN_CAST(int)(max_type_length - type.size);
+
+        Dqn_String8 colour_esc = {};
+        Dqn_String8 bold_esc   = {};
+        Dqn_String8 reset_esc  = {};
+        if (colour) {
+            bold_esc  = Dqn_Print_ESCBoldString;
+            reset_esc = Dqn_Print_ESCResetString;
+            switch (log_type) {
+                case Dqn_LogType_Debug:                                                                          break;
+                case Dqn_LogType_Info:    colour_esc = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Info);    break;
+                case Dqn_LogType_Warning: colour_esc = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Warning); break;
+                case Dqn_LogType_Error:   colour_esc = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Error);   break;
+            }
+        }
+
+        Dqn_String8 file_name            = Dqn_String8_FileNameFromPath(call_site.file);
+        Dqn_DateHMSTimeString const time = Dqn_Date_HMSLocalTimeStringNow();
+        header                           = Dqn_String8_InitF(allocator,
+                                                             "%.*s "   // date
+                                                             "%.*s "   // hms
+                                                             "%.*s"    // colour
+                                                             "%.*s"    // bold
+                                                             "%.*s"    // type
+                                                             "%*s"     // type padding
+                                                             "%.*s"    // reset
+                                                             " %.*s"   // file name
+                                                             ":%05u ", // line number
+                                                             time.date_size - 2, time.date + 2,
+                                                             time.hms_size,      time.hms,
+                                                             colour_esc.size,    colour_esc.data,
+                                                             bold_esc.size,      bold_esc.data,
+                                                             type.size,          type.data,
+                                                             type_padding,       "",
+                                                             reset_esc.size,     reset_esc.data,
+                                                             file_name.size,     file_name.data,
+                                                             call_site.line);
+        header_size_no_ansi_codes = header.size - colour_esc.size - Dqn_Print_ESCResetString.size;
+    }
+
+    // NOTE: Header padding
+    // =========================================================================
+    Dqn_usize header_padding = 0;
+    {
+        DQN_LOCAL_PERSIST Dqn_usize max_header_length = 0;
+        max_header_length                             = DQN_MAX(max_header_length, header_size_no_ansi_codes);
+        header_padding                                = max_header_length - header_size_no_ansi_codes;
+    }
+
+    // NOTE: Construct final log
+    // =========================================================================
+    Dqn_String8 user_msg = Dqn_String8_InitFV(allocator, fmt, args);
+    Dqn_String8 result   = Dqn_String8_Allocate(allocator, header.size + header_padding + user_msg.size, Dqn_ZeroMem_No);
+    DQN_MEMCPY(result.data,                                header.data, header.size);
+    DQN_MEMSET(result.data + header.size,                  ' ',         header_padding);
+    DQN_MEMCPY(result.data + header.size + header_padding, user_msg.data, user_msg.size);
+    return result;
+}
+
 DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
 {
     (void)log_type;
@@ -4910,69 +5002,14 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *use
 
     // NOTE: Generate the log header
     // =========================================================================
-    Dqn_ThreadScratch scratch                   = Dqn_Thread_GetScratch(nullptr);
-    Dqn_usize         header_size_no_ansi_codes = 0;
-    Dqn_String8       header                    = {};
-    {
-        DQN_LOCAL_PERSIST Dqn_usize max_type_length = 0;
-        max_type_length                             = DQN_MAX(max_type_length, type.size);
-        int type_padding                            = DQN_CAST(int)(max_type_length - type.size);
-
-        Dqn_String8 colour = {};
-        Dqn_String8 bold   = {};
-        Dqn_String8 reset  = {};
-        if (!dqn_library.log_no_colour) {
-            bold  = Dqn_Print_ESCBoldString;
-            reset = Dqn_Print_ESCResetString;
-            switch (log_type) {
-                case Dqn_LogType_Debug:                                                                          break;
-                case Dqn_LogType_Info:    colour = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Info);    break;
-                case Dqn_LogType_Warning: colour = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Warning); break;
-                case Dqn_LogType_Error:   colour = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Error);   break;
-            }
-        }
-
-        Dqn_String8 file_name            = Dqn_String8_FileNameFromPath(call_site.file);
-        Dqn_DateHMSTimeString const time = Dqn_Date_HMSLocalTimeStringNow();
-        header                           = Dqn_String8_InitF(scratch.allocator,
-                                                             "%.*s "   // date
-                                                             "%.*s "   // hms
-                                                             "%.*s"    // colour
-                                                             "%.*s"    // bold
-                                                             "%.*s"    // type
-                                                             "%*s"     // type padding
-                                                             "%.*s"    // reset
-                                                             " %.*s"   // file name
-                                                             ":%05u ", // line number
-                                                             time.date_size - 2, time.date + 2,
-                                                             time.hms_size,      time.hms,
-                                                             colour.size,        colour.data,
-                                                             bold.size,          bold.data,
-                                                             type.size,          type.data,
-                                                             type_padding,       "",
-                                                             reset.size,         reset.data,
-                                                             file_name.size,     file_name.data,
-                                                             call_site.line);
-        header_size_no_ansi_codes = header.size - colour.size - Dqn_Print_ESCResetString.size;
-    }
-
-    // NOTE: Header padding
-    // =========================================================================
-    Dqn_usize header_padding = 0;
-    {
-        DQN_LOCAL_PERSIST Dqn_usize max_header_length = 0;
-        max_header_length                             = DQN_MAX(max_header_length, header_size_no_ansi_codes);
-        header_padding                                = max_header_length - header_size_no_ansi_codes;
-    }
-
-    // NOTE: Construct final log
-    // =========================================================================
-    Dqn_String8 msg = Dqn_String8_InitFV(scratch.allocator, fmt, args);
-
-    Dqn_String8 log_line = Dqn_String8_Allocate(scratch.allocator, header.size + header_padding + msg.size, Dqn_ZeroMem_No);
-    DQN_MEMCPY(log_line.data,                                header.data, header.size);
-    DQN_MEMSET(log_line.data + header.size,                  ' ',         header_padding);
-    DQN_MEMCPY(log_line.data + header.size + header_padding, msg.data,    msg.size);
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_String8 log_line      = Dqn_Log_MakeString(scratch.allocator,
+                                                   !dqn_library.log_no_colour,
+                                                   type,
+                                                   log_type,
+                                                   call_site,
+                                                   fmt,
+                                                   args);
 
     // NOTE: Print log
     // =========================================================================
@@ -6362,12 +6399,15 @@ DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
 DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena)
 {
     Dqn_ArenaTempMemory result = {};
-    result.arena               = arena;
-    result.head                = arena->head;
-    result.curr                = arena->curr;
-    result.tail                = arena->tail;
-    result.curr_used           = (arena->curr) ? arena->curr->used : 0;
-    result.stats               = arena->stats;
+    if (arena) {
+        arena->temp_memory_count++;
+        result.arena     = arena;
+        result.head      = arena->head;
+        result.curr      = arena->curr;
+        result.tail      = arena->tail;
+        result.curr_used = (arena->curr) ? arena->curr->used : 0;
+        result.stats     = arena->stats;
+    }
     return result;
 }
 
@@ -6376,8 +6416,12 @@ DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemor
     if (!scope.arena)
         return;
 
+    Dqn_Arena *arena = scope.arena;
+    if (!DQN_CHECKF(arena->temp_memory_count > 0, "End temp memory has been called without a matching begin pair on the arena"))
+        return;
+
     // NOTE: Revert arena stats
-    Dqn_Arena *arena      = scope.arena;
+    arena->temp_memory_count--;
     arena->stats.capacity = scope.stats.capacity;
     arena->stats.used     = scope.stats.used;
     arena->stats.wasted   = scope.stats.wasted;
@@ -6595,6 +6639,9 @@ DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *s
 DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
 {
     if (!arena)
+        return;
+
+    if (!DQN_CHECKF(arena->temp_memory_count == 0, "You cannot free an arena whilst in an temp memory region"))
         return;
 
     while (arena->tail) {
@@ -7148,52 +7195,39 @@ DQN_API bool Dqn_Bit_IsNotSet(uint64_t bits, uint64_t bits_to_check)
 // =================================================================================================
 // [$SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
 // =================================================================================================
-DQN_API bool Dqn_Safe_AssertF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...)
-{
-    bool result = assertion_expr;
-    if (!result) {
-        va_list args;
-        va_start(args, fmt);
-        Dqn_Log_TypeFVCallSite(Dqn_LogType_Error, call_site, fmt, args);
-        va_end(args);
-        DQN_DEBUG_BREAK;
-    }
-    return result;
-}
-
 DQN_API int64_t Dqn_Safe_AddI64(int64_t a, int64_t b)
 {
-    int64_t result = Dqn_Safe_AssertF(a <= INT64_MAX - b, "a=%zd, b=%zd", a, b) ? (a + b) : INT64_MAX;
+    int64_t result = DQN_CHECKF(a <= INT64_MAX - b, "a=%zd, b=%zd", a, b) ? (a + b) : INT64_MAX;
     return result;
 }
 
 DQN_API int64_t Dqn_Safe_MulI64(int64_t a, int64_t b)
 {
-    int64_t result = Dqn_Safe_AssertF(a <= INT64_MAX / b, "a=%zd, b=%zd", a, b) ? (a * b) : INT64_MAX;
+    int64_t result = DQN_CHECKF(a <= INT64_MAX / b, "a=%zd, b=%zd", a, b) ? (a * b) : INT64_MAX;
     return result;
 }
 
 DQN_API uint64_t Dqn_Safe_AddU64(uint64_t a, uint64_t b)
 {
-    uint64_t result = Dqn_Safe_AssertF(a <= UINT64_MAX - b, "a=%zu, b=%zu", a, b) ? (a + b) : UINT64_MAX;
+    uint64_t result = DQN_CHECKF(a <= UINT64_MAX - b, "a=%zu, b=%zu", a, b) ? (a + b) : UINT64_MAX;
     return result;
 }
 
 DQN_API uint64_t Dqn_Safe_SubU64(uint64_t a, uint64_t b)
 {
-    uint64_t result = Dqn_Safe_AssertF(a >= b, "a=%zu, b=%zu", a, b) ? (a - b) : 0;
+    uint64_t result = DQN_CHECKF(a >= b, "a=%zu, b=%zu", a, b) ? (a - b) : 0;
     return result;
 }
 
 DQN_API uint64_t Dqn_Safe_MulU64(uint64_t a, uint64_t b)
 {
-    uint64_t result = Dqn_Safe_AssertF(a <= UINT64_MAX / b, "a=%zu, b=%zu", a, b) ? (a * b) : UINT64_MAX;
+    uint64_t result = DQN_CHECKF(a <= UINT64_MAX / b, "a=%zu, b=%zu", a, b) ? (a * b) : UINT64_MAX;
     return result;
 }
 
 DQN_API uint32_t Dqn_Safe_SubU32(uint32_t a, uint32_t b)
 {
-    uint32_t result = Dqn_Safe_AssertF(a >= b, "a=%u, b=%u", a, b) ? (a - b) : 0;
+    uint32_t result = DQN_CHECKF(a >= b, "a=%u, b=%u", a, b) ? (a - b) : 0;
     return result;
 }
 
@@ -7203,31 +7237,31 @@ DQN_API uint32_t Dqn_Safe_SubU32(uint32_t a, uint32_t b)
 // the highest possible rank (unsigned > signed).
 DQN_API int Dqn_Safe_SaturateCastUSizeToInt(Dqn_usize val)
 {
-    int result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT_MAX) ? DQN_CAST(int)val : INT_MAX;
+    int result = DQN_CHECK(DQN_CAST(uintmax_t)val <= INT_MAX) ? DQN_CAST(int)val : INT_MAX;
     return result;
 }
 
 DQN_API int8_t Dqn_Safe_SaturateCastUSizeToI8(Dqn_usize val)
 {
-    int8_t result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT8_MAX) ? DQN_CAST(int8_t)val : INT8_MAX;
+    int8_t result = DQN_CHECK(DQN_CAST(uintmax_t)val <= INT8_MAX) ? DQN_CAST(int8_t)val : INT8_MAX;
     return result;
 }
 
 DQN_API int16_t Dqn_Safe_SaturateCastUSizeToI16(Dqn_usize val)
 {
-    int16_t result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT16_MAX) ? DQN_CAST(int16_t)val : INT16_MAX;
+    int16_t result = DQN_CHECK(DQN_CAST(uintmax_t)val <= INT16_MAX) ? DQN_CAST(int16_t)val : INT16_MAX;
     return result;
 }
 
 DQN_API int32_t Dqn_Safe_SaturateCastUSizeToI32(Dqn_usize val)
 {
-    int32_t result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT32_MAX) ? DQN_CAST(int32_t)val : INT32_MAX;
+    int32_t result = DQN_CHECK(DQN_CAST(uintmax_t)val <= INT32_MAX) ? DQN_CAST(int32_t)val : INT32_MAX;
     return result;
 }
 
 DQN_API int64_t Dqn_Safe_SaturateCastUSizeToI64(Dqn_usize val)
 {
-    int64_t result = Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= INT64_MAX) ? DQN_CAST(int64_t)val : INT64_MAX;
+    int64_t result = DQN_CHECK(DQN_CAST(uintmax_t)val <= INT64_MAX) ? DQN_CAST(int64_t)val : INT64_MAX;
     return result;
 }
 
@@ -7237,25 +7271,25 @@ DQN_API int64_t Dqn_Safe_SaturateCastUSizeToI64(Dqn_usize val)
 // match the highest rank operand.
 DQN_API uint8_t Dqn_Safe_SaturateCastUSizeToU8(Dqn_usize val)
 {
-    uint8_t result = Dqn_Safe_Assert(val <= UINT8_MAX) ? DQN_CAST(uint8_t)val : UINT8_MAX;
+    uint8_t result = DQN_CHECK(val <= UINT8_MAX) ? DQN_CAST(uint8_t)val : UINT8_MAX;
     return result;
 }
 
 DQN_API uint16_t Dqn_Safe_SaturateCastUSizeToU16(Dqn_usize val)
 {
-    uint16_t result = Dqn_Safe_Assert(val <= UINT16_MAX) ? DQN_CAST(uint16_t)val : UINT16_MAX;
+    uint16_t result = DQN_CHECK(val <= UINT16_MAX) ? DQN_CAST(uint16_t)val : UINT16_MAX;
     return result;
 }
 
 DQN_API uint32_t Dqn_Safe_SaturateCastUSizeToU32(Dqn_usize val)
 {
-    uint32_t result = Dqn_Safe_Assert(val <= UINT32_MAX) ? DQN_CAST(uint32_t)val : UINT32_MAX;
+    uint32_t result = DQN_CHECK(val <= UINT32_MAX) ? DQN_CAST(uint32_t)val : UINT32_MAX;
     return result;
 }
 
 DQN_API uint64_t Dqn_Safe_SaturateCastUSizeToU64(Dqn_usize val)
 {
-    uint64_t result = Dqn_Safe_Assert(val <= UINT64_MAX) ? DQN_CAST(uint64_t)val : UINT64_MAX;
+    uint64_t result = DQN_CHECK(val <= UINT64_MAX) ? DQN_CAST(uint64_t)val : UINT64_MAX;
     return result;
 }
 
@@ -7265,25 +7299,25 @@ DQN_API uint64_t Dqn_Safe_SaturateCastUSizeToU64(Dqn_usize val)
 // match the highest rank operand.
 DQN_API unsigned int Dqn_Safe_SaturateCastU64ToUInt(uint64_t val)
 {
-    unsigned int result = Dqn_Safe_Assert(val <= UINT8_MAX) ? DQN_CAST(unsigned int)val : UINT_MAX;
+    unsigned int result = DQN_CHECK(val <= UINT8_MAX) ? DQN_CAST(unsigned int)val : UINT_MAX;
     return result;
 }
 
 DQN_API uint8_t Dqn_Safe_SaturateCastU64ToU8(uint64_t val)
 {
-    uint8_t result = Dqn_Safe_Assert(val <= UINT8_MAX) ? DQN_CAST(uint8_t)val : UINT8_MAX;
+    uint8_t result = DQN_CHECK(val <= UINT8_MAX) ? DQN_CAST(uint8_t)val : UINT8_MAX;
     return result;
 }
 
 DQN_API uint16_t Dqn_Safe_SaturateCastU64ToU16(uint64_t val)
 {
-    uint16_t result = Dqn_Safe_Assert(val <= UINT16_MAX) ? DQN_CAST(uint16_t)val : UINT16_MAX;
+    uint16_t result = DQN_CHECK(val <= UINT16_MAX) ? DQN_CAST(uint16_t)val : UINT16_MAX;
     return result;
 }
 
 DQN_API uint32_t Dqn_Safe_SaturateCastU64ToU32(uint64_t val)
 {
-    uint32_t result = Dqn_Safe_Assert(val <= UINT32_MAX) ? DQN_CAST(uint32_t)val : UINT32_MAX;
+    uint32_t result = DQN_CHECK(val <= UINT32_MAX) ? DQN_CAST(uint32_t)val : UINT32_MAX;
     return result;
 }
 
@@ -7294,35 +7328,35 @@ DQN_API uint32_t Dqn_Safe_SaturateCastU64ToU32(uint64_t val)
 // match the highest rank operand.
 DQN_API int Dqn_Safe_SaturateCastISizeToInt(Dqn_isize val)
 {
-    Dqn_Safe_Assert(val >= INT_MIN && val <= INT_MAX);
+    DQN_ASSERT(val >= INT_MIN && val <= INT_MAX);
     int result = DQN_CAST(int)DQN_CLAMP(val, INT_MIN, INT_MAX);
     return result;
 }
 
 DQN_API int8_t Dqn_Safe_SaturateCastISizeToI8(Dqn_isize val)
 {
-    Dqn_Safe_Assert(val >= INT8_MIN && val <= INT8_MAX);
+    DQN_ASSERT(val >= INT8_MIN && val <= INT8_MAX);
     int8_t result = DQN_CAST(int8_t)DQN_CLAMP(val, INT8_MIN, INT8_MAX);
     return result;
 }
 
 DQN_API int16_t Dqn_Safe_SaturateCastISizeToI16(Dqn_isize val)
 {
-    Dqn_Safe_Assert(val >= INT16_MIN && val <= INT16_MAX);
+    DQN_ASSERT(val >= INT16_MIN && val <= INT16_MAX);
     int16_t result = DQN_CAST(int16_t)DQN_CLAMP(val, INT16_MIN, INT16_MAX);
     return result;
 }
 
 DQN_API int32_t Dqn_Safe_SaturateCastISizeToI32(Dqn_isize val)
 {
-    Dqn_Safe_Assert(val >= INT32_MIN && val <= INT32_MAX);
+    DQN_ASSERT(val >= INT32_MIN && val <= INT32_MAX);
     int32_t result = DQN_CAST(int32_t)DQN_CLAMP(val, INT32_MIN, INT32_MAX);
     return result;
 }
 
 DQN_API int64_t Dqn_Safe_SaturateCastISizeToI64(Dqn_isize val)
 {
-    Dqn_Safe_Assert(val >= INT64_MIN && val <= INT64_MAX);
+    DQN_ASSERT(val >= INT64_MIN && val <= INT64_MAX);
     int64_t result = DQN_CAST(int64_t)DQN_CLAMP(val, INT64_MIN, INT64_MAX);
     return result;
 }
@@ -7335,8 +7369,8 @@ DQN_API int64_t Dqn_Safe_SaturateCastISizeToI64(Dqn_isize val)
 DQN_API unsigned int Dqn_Safe_SaturateCastISizeToUInt(Dqn_isize val)
 {
     unsigned int result = 0;
-    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
-        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT_MAX))
+    if (DQN_CHECK(val >= DQN_CAST(Dqn_isize)0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t)val <= UINT_MAX))
             result = DQN_CAST(unsigned int)val;
         else
             result = UINT_MAX;
@@ -7347,8 +7381,8 @@ DQN_API unsigned int Dqn_Safe_SaturateCastISizeToUInt(Dqn_isize val)
 DQN_API uint8_t Dqn_Safe_SaturateCastISizeToU8(Dqn_isize val)
 {
     uint8_t result = 0;
-    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
-        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT8_MAX))
+    if (DQN_CHECK(val >= DQN_CAST(Dqn_isize)0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t)val <= UINT8_MAX))
             result = DQN_CAST(uint8_t)val;
         else
             result = UINT8_MAX;
@@ -7359,8 +7393,8 @@ DQN_API uint8_t Dqn_Safe_SaturateCastISizeToU8(Dqn_isize val)
 DQN_API uint16_t Dqn_Safe_SaturateCastISizeToU16(Dqn_isize val)
 {
     uint16_t result = 0;
-    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
-        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT16_MAX))
+    if (DQN_CHECK(val >= DQN_CAST(Dqn_isize)0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t)val <= UINT16_MAX))
             result = DQN_CAST(uint16_t)val;
         else
             result = UINT16_MAX;
@@ -7371,8 +7405,8 @@ DQN_API uint16_t Dqn_Safe_SaturateCastISizeToU16(Dqn_isize val)
 DQN_API uint32_t Dqn_Safe_SaturateCastISizeToU32(Dqn_isize val)
 {
     uint32_t result = 0;
-    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
-        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT32_MAX))
+    if (DQN_CHECK(val >= DQN_CAST(Dqn_isize)0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t)val <= UINT32_MAX))
             result = DQN_CAST(uint32_t)val;
         else
             result = UINT32_MAX;
@@ -7383,8 +7417,8 @@ DQN_API uint32_t Dqn_Safe_SaturateCastISizeToU32(Dqn_isize val)
 DQN_API uint64_t Dqn_Safe_SaturateCastISizeToU64(Dqn_isize val)
 {
     uint64_t result = 0;
-    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
-        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT64_MAX))
+    if (DQN_CHECK(val >= DQN_CAST(Dqn_isize)0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t)val <= UINT64_MAX))
             result = DQN_CAST(uint64_t)val;
         else
             result = UINT64_MAX;
@@ -7398,28 +7432,28 @@ DQN_API uint64_t Dqn_Safe_SaturateCastISizeToU64(Dqn_isize val)
 // match the highest rank operand.
 DQN_API Dqn_isize Dqn_Safe_SaturateCastI64ToISize(int64_t val)
 {
-    Dqn_Safe_Assert(val >= DQN_ISIZE_MIN && val <= DQN_ISIZE_MAX);
+    DQN_CHECK(val >= DQN_ISIZE_MIN && val <= DQN_ISIZE_MAX);
     Dqn_isize result = DQN_CAST(int64_t)DQN_CLAMP(val, DQN_ISIZE_MIN, DQN_ISIZE_MAX);
     return result;
 }
 
 DQN_API int8_t Dqn_Safe_SaturateCastI64ToI8(int64_t val)
 {
-    Dqn_Safe_Assert(val >= INT8_MIN && val <= INT8_MAX);
+    DQN_CHECK(val >= INT8_MIN && val <= INT8_MAX);
     int8_t result = DQN_CAST(int8_t)DQN_CLAMP(val, INT8_MIN, INT8_MAX);
     return result;
 }
 
 DQN_API int16_t Dqn_Safe_SaturateCastI64ToI16(int64_t val)
 {
-    Dqn_Safe_Assert(val >= INT16_MIN && val <= INT16_MAX);
+    DQN_CHECK(val >= INT16_MIN && val <= INT16_MAX);
     int16_t result = DQN_CAST(int16_t)DQN_CLAMP(val, INT16_MIN, INT16_MAX);
     return result;
 }
 
 DQN_API int32_t Dqn_Safe_SaturateCastI64ToI32(int64_t val)
 {
-    Dqn_Safe_Assert(val >= INT32_MIN && val <= INT32_MAX);
+    DQN_CHECK(val >= INT32_MIN && val <= INT32_MAX);
     int32_t result = DQN_CAST(int32_t)DQN_CLAMP(val, INT32_MIN, INT32_MAX);
     return result;
 }
@@ -7428,14 +7462,14 @@ DQN_API int32_t Dqn_Safe_SaturateCastI64ToI32(int64_t val)
 // -----------------------------------------------------------------------------
 DQN_API int8_t Dqn_Safe_SaturateCastIntToI8(int val)
 {
-    Dqn_Safe_Assert(val >= INT8_MIN && val <= INT8_MAX);
+    DQN_CHECK(val >= INT8_MIN && val <= INT8_MAX);
     int8_t result = DQN_CAST(int8_t)DQN_CLAMP(val, INT8_MIN, INT8_MAX);
     return result;
 }
 
 DQN_API int16_t Dqn_Safe_SaturateCastIntToI16(int val)
 {
-    Dqn_Safe_Assert(val >= INT16_MIN && val <= INT16_MAX);
+    DQN_CHECK(val >= INT16_MIN && val <= INT16_MAX);
     int16_t result = DQN_CAST(int16_t)DQN_CLAMP(val, INT16_MIN, INT16_MAX);
     return result;
 }
@@ -7443,8 +7477,8 @@ DQN_API int16_t Dqn_Safe_SaturateCastIntToI16(int val)
 DQN_API uint8_t Dqn_Safe_SaturateCastIntToU8(int val)
 {
     uint8_t result = 0;
-    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
-        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT8_MAX))
+    if (DQN_CHECK(val >= DQN_CAST(Dqn_isize)0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t)val <= UINT8_MAX))
             result = DQN_CAST(uint8_t)val;
         else
             result = UINT8_MAX;
@@ -7455,8 +7489,8 @@ DQN_API uint8_t Dqn_Safe_SaturateCastIntToU8(int val)
 DQN_API uint16_t Dqn_Safe_SaturateCastIntToU16(int val)
 {
     uint16_t result = 0;
-    if (Dqn_Safe_Assert(val >= DQN_CAST(Dqn_isize)0)) {
-        if (Dqn_Safe_Assert(DQN_CAST(uintmax_t)val <= UINT16_MAX))
+    if (DQN_CHECK(val >= DQN_CAST(Dqn_isize)0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t)val <= UINT16_MAX))
             result = DQN_CAST(uint16_t)val;
         else
             result = UINT16_MAX;
@@ -7468,7 +7502,7 @@ DQN_API uint32_t Dqn_Safe_SaturateCastIntToU32(int val)
 {
     static_assert(sizeof(val) <= sizeof(uint32_t), "Sanity check to allow simplifying of casting");
     uint32_t result = 0;
-    if (Dqn_Safe_Assert(val >= 0))
+    if (DQN_CHECK(val >= 0))
         result = DQN_CAST(uint32_t)val;
     return result;
 }
@@ -7477,7 +7511,7 @@ DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val)
 {
     static_assert(sizeof(val) <= sizeof(uint64_t), "Sanity check to allow simplifying of casting");
     uint64_t result = 0;
-    if (Dqn_Safe_Assert(val >= 0))
+    if (DQN_CHECK(val >= 0))
         result = DQN_CAST(uint64_t)val;
     return result;
 }
@@ -7727,7 +7761,7 @@ DQN_API bool Dqn_Bin_BytesToHexBuffer(void const *src, Dqn_usize src_size, char 
     if (!src || !dest)
         return false;
 
-    if (!Dqn_Safe_Assert(dest_size >= src_size * 2))
+    if (!DQN_CHECK(dest_size >= src_size * 2))
         return false;
 
     char const *HEX             = "0123456789abcdef";
@@ -8433,7 +8467,7 @@ DQN_API bool Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle,
     if (handle->state < Dqn_WinNetHandleState_HttpMethodReady)
         return false;
 
-    if (!Dqn_Safe_Assert(handle->http_handle))
+    if (!DQN_CHECK(handle->http_handle))
         return false;
 
     unsigned long modifier = 0;
@@ -8489,7 +8523,7 @@ DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *
     handle->state = Dqn_WinNetHandleState_RequestGood;
     unsigned long buffer_size = 0;
     int query_result          = HttpQueryInfoA(handle->http_handle, HTTP_QUERY_RAW_HEADERS_CRLF, nullptr, &buffer_size, nullptr);
-    if (!Dqn_Safe_Assert(query_result != ERROR_INSUFFICIENT_BUFFER))
+    if (!DQN_CHECK(query_result != ERROR_INSUFFICIENT_BUFFER))
         return result;
 
     result.raw_headers = Dqn_String8_Allocate(allocator, buffer_size, Dqn_ZeroMem_No);
@@ -9326,8 +9360,8 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
     }
 
     unsigned long const bytes_desired = DQN_CAST(unsigned long)win_file_size.QuadPart;
-    if (!Dqn_Safe_AssertF(bytes_desired == win_file_size.QuadPart,
-                          "Current implementation doesn't support >4GiB, implement Win32 overlapped IO")) {
+    if (!DQN_CHECKF(bytes_desired == win_file_size.QuadPart,
+                    "Current implementation doesn't support >4GiB, implement Win32 overlapped IO")) {
         return nullptr;
     }
 
