@@ -115,6 +115,8 @@
 
 #if defined(_WIN32)
     #define DQN_OS_WIN32
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    #define DQN_OS_ARM64
 #else
     #define DQN_OS_UNIX
 #endif
@@ -499,6 +501,7 @@ DQN_FORCE_INLINE long Dqn_Atomic_SetValue32(long volatile *target, long value)
     #endif
 }
 
+#if !defined(DQN_OS_ARM64)
 struct Dqn_CPUIDRegisters
 {
     Dqn_uint array[4]; ///< Values from 'CPUID' instruction for each register (EAX, EBX, ECX, EDX)
@@ -506,6 +509,7 @@ struct Dqn_CPUIDRegisters
 
 /// Execute 'CPUID' instruction to query the capabilities of the current CPU.
 Dqn_CPUIDRegisters Dqn_CPUID(int function_id);
+#endif // DQN_OS_ARM64
 
 // =================================================================================================
 // [$TMUT] Dqn_TicketMutex      |                             | Userland mutex via spinlocking atomics
@@ -4828,6 +4832,7 @@ Dqn_Library dqn_library;
 
 // NOTE: Intrinsics
 // -------------------------------------------------------------------------------------------------
+#if !defined(DQN_OS_ARM64)
 #if defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
 #include <cpuid.h>
 #endif
@@ -4846,6 +4851,7 @@ Dqn_CPUIDRegisters Dqn_CPUID(int function_id)
 #endif
     return result;
 }
+#endif // !defined(DQN_OS_ARM64)
 
 // NOTE: Dqn_TicketMutex_
 // -------------------------------------------------------------------------------------------------
