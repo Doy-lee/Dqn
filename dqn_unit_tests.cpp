@@ -1377,32 +1377,39 @@ Dqn_UTest TestString8()
         // NOTE: Dqn_String8_BinarySplit
         // ---------------------------------------------------------------------------------------------
         {
-            char const *TEST_FMT = "Dqn_String8_BinarySplit \"%s\" with 'c'";
+            {
+                char const *TEST_FMT  = "Binary split \"%.*s\" with \"%.*s\"";
+                Dqn_String8 delimiter = DQN_STRING8("/");
+                Dqn_String8 input     = DQN_STRING8("abcdef");
+                DQN_UTEST_TEST(TEST_FMT, DQN_STRING_FMT(input), DQN_STRING_FMT(delimiter)) {
+                    Dqn_String8BinarySplitResult split = Dqn_String8_BinarySplit(input, delimiter);
+                    DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(split.lhs, DQN_STRING8("abcdef")), "[lhs=%.*s]", DQN_STRING_FMT(split.lhs));
+                    DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(split.rhs, DQN_STRING8("")),       "[rhs=%.*s]", DQN_STRING_FMT(split.rhs));
+                }
 
-            char delimiter    = '/';
-            Dqn_String8 input = DQN_STRING8("abcdef");
-            DQN_UTEST_TEST(TEST_FMT, input.data, delimiter) {
-                Dqn_String8 rhs = {};
-                Dqn_String8 lhs = Dqn_String8_BinarySplit(input, delimiter, &rhs);
+                input = DQN_STRING8("abc/def");
+                DQN_UTEST_TEST(TEST_FMT, DQN_STRING_FMT(input), DQN_STRING_FMT(delimiter)) {
+                    Dqn_String8BinarySplitResult split = Dqn_String8_BinarySplit(input, delimiter);
+                    DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(split.lhs, DQN_STRING8("abc")), "[lhs=%.*s]", DQN_STRING_FMT(split.lhs));
+                    DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(split.rhs, DQN_STRING8("def")), "[rhs=%.*s]", DQN_STRING_FMT(split.rhs));
+                }
 
-                DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(lhs, DQN_STRING8("abcdef")), "[lhs=%.*s]", DQN_STRING_FMT(lhs));
-                DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(rhs, DQN_STRING8("")), "[rhs=%.*s]", DQN_STRING_FMT(rhs));
+                input = DQN_STRING8("/abcdef");
+                DQN_UTEST_TEST(TEST_FMT, DQN_STRING_FMT(input), DQN_STRING_FMT(delimiter)) {
+                    Dqn_String8BinarySplitResult split = Dqn_String8_BinarySplit(input, delimiter);
+                    DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(split.lhs, DQN_STRING8("")),       "[lhs=%.*s]", DQN_STRING_FMT(split.lhs));
+                    DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(split.rhs, DQN_STRING8("abcdef")), "[rhs=%.*s]", DQN_STRING_FMT(split.rhs));
+                }
             }
 
-            input = DQN_STRING8("abc/def");
-            DQN_UTEST_TEST(TEST_FMT, input.data, delimiter) {
-                Dqn_String8 rhs = {};
-                Dqn_String8 lhs = Dqn_String8_BinarySplit(input, delimiter, &rhs);
-                DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(lhs, DQN_STRING8("abc")), "[lhs=%.*s]", DQN_STRING_FMT(lhs));
-                DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(rhs, DQN_STRING8("def")), "[rhs=%.*s]", DQN_STRING_FMT(rhs));
-            }
-
-            input = DQN_STRING8("/abcdef");
-            DQN_UTEST_TEST(TEST_FMT, input.data, delimiter) {
-                Dqn_String8 rhs = {};
-                Dqn_String8 lhs = Dqn_String8_BinarySplit(input, delimiter, &rhs);
-                DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(lhs, DQN_STRING8("")), "[lhs=%.*s]", DQN_STRING_FMT(lhs));
-                DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(rhs, DQN_STRING8("abcdef")), "[rhs=%.*s]", DQN_STRING_FMT(rhs));
+            {
+                Dqn_String8 delimiter = DQN_STRING8("-=-");
+                Dqn_String8 input     = DQN_STRING8("123-=-456");
+                DQN_UTEST_TEST("Binary split \"%.*s\" with \"%.*s\"", DQN_STRING_FMT(input), DQN_STRING_FMT(delimiter)) {
+                    Dqn_String8BinarySplitResult split = Dqn_String8_BinarySplit(input, delimiter);
+                    DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(split.lhs, DQN_STRING8("123")), "[lhs=%.*s]", DQN_STRING_FMT(split.lhs));
+                    DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(split.rhs, DQN_STRING8("456")), "[rhs=%.*s]", DQN_STRING_FMT(split.rhs));
+                }
             }
         }
 
@@ -1505,20 +1512,20 @@ Dqn_UTest TestString8()
         DQN_UTEST_TEST("Find: String (char) is not in buffer") {
             Dqn_String8 buf              = DQN_STRING8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
             Dqn_String8 find             = DQN_STRING8("2");
-            Dqn_String8FindResult result = Dqn_String8_Find(buf, find, 0);
+            Dqn_String8FindResult result = Dqn_String8_FindFirstString(buf, find);
             DQN_UTEST_ASSERT(&test, !result.found);
-            DQN_UTEST_ASSERT(&test, result.offset == 0);
-            DQN_UTEST_ASSERT(&test, result.string.data == nullptr);
-            DQN_UTEST_ASSERT(&test, result.string.size == 0);
+            DQN_UTEST_ASSERT(&test, result.index == 0);
+            DQN_UTEST_ASSERT(&test, result.match.data == nullptr);
+            DQN_UTEST_ASSERT(&test, result.match.size == 0);
         }
 
         DQN_UTEST_TEST("Find: String (char) is in buffer") {
             Dqn_String8 buf              = DQN_STRING8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
             Dqn_String8 find             = DQN_STRING8("6");
-            Dqn_String8FindResult result = Dqn_String8_Find(buf, find, 0);
+            Dqn_String8FindResult result = Dqn_String8_FindFirstString(buf, find);
             DQN_UTEST_ASSERT(&test, result.found);
-            DQN_UTEST_ASSERT(&test, result.offset == 2);
-            DQN_UTEST_ASSERT(&test, result.string.data[0] == '6');
+            DQN_UTEST_ASSERT(&test, result.index == 2);
+            DQN_UTEST_ASSERT(&test, result.match.data[0] == '6');
         }
 
         // NOTE: Dqn_String8_FileNameFromPath

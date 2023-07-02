@@ -935,9 +935,6 @@ DQN_API                                  Dqn_usize Dqn_CString16_Size      (wcha
 //   @param[in] size The size of the slice
 //   @return The sliced string
 
-// @proc Dqn_String8_BinarySplitStringChars
-//   @desc TODO(doyle): Write description
-
 // @proc Dqn_String8_BinarySplit
 //   @desc Split a string into the substring occuring prior and after the first
 //   occurence of the `delimiter`. Neither strings include the `delimiter`.
@@ -1129,6 +1126,20 @@ struct Dqn_String16 /// A pointer and length style string that holds slices to U
     #endif
 };
 
+struct Dqn_String8BinarySplitResult
+{
+    Dqn_String8 lhs;
+    Dqn_String8 rhs;
+};
+
+struct Dqn_String8FindResult
+{
+    bool        found;
+    Dqn_usize   index;
+    Dqn_String8 match;
+    Dqn_String8 match_to_end_of_buffer;
+};
+
 // NOTE: Macros ====================================================================================
 #define DQN_STRING8(string)                              Dqn_String8{(char *)(string), sizeof(string) - 1}
 #define DQN_STRING16(string)                             Dqn_String16{(wchar_t *)(string), (sizeof(string)/sizeof(string[0])) - 1}
@@ -1159,51 +1170,56 @@ enum Dqn_String8EqCase
     Dqn_String8EqCase_Insensitive,
 };
 
-DQN_API Dqn_String8           Dqn_String8_InitCString8          (char const *src);
-DQN_API bool                  Dqn_String8_IsValid               (Dqn_String8 string);
-DQN_API bool                  Dqn_String8_IsAll                 (Dqn_String8 string, Dqn_String8IsAll is_all);
-
-DQN_API Dqn_String8           Dqn_String8_Slice                 (Dqn_String8 string, Dqn_usize offset, Dqn_usize size);
-DQN_API Dqn_String8           Dqn_String8_BinarySplitStringChars(Dqn_String8 string, Dqn_String8 delimiter_chars, Dqn_String8 *rhs);
-DQN_API Dqn_String8           Dqn_String8_BinarySplit           (Dqn_String8 string, char delimiter, Dqn_String8 *rhs);
-DQN_API Dqn_usize             Dqn_String8_Split                 (Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_usize splits_count);
-DQN_API Dqn_String8           Dqn_String8_Segment               (Dqn_Allocator allocator, Dqn_String8 src, Dqn_usize segment_size, char segment_char);
-
-DQN_API bool                  Dqn_String8_Eq                    (Dqn_String8 lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
-DQN_API bool                  Dqn_String8_EqInsensitive         (Dqn_String8 lhs, Dqn_String8 rhs);
-DQN_API bool                  Dqn_String8_StartsWith            (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
-DQN_API bool                  Dqn_String8_StartsWithInsensitive (Dqn_String8 string, Dqn_String8 prefix);
-DQN_API bool                  Dqn_String8_EndsWith              (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
-DQN_API bool                  Dqn_String8_EndsWithInsensitive   (Dqn_String8 string, Dqn_String8 prefix);
-DQN_API bool                  Dqn_String8_HasChar               (Dqn_String8 string, char ch);
-
-DQN_API Dqn_String8           Dqn_String8_TrimPrefix            (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
-DQN_API Dqn_String8           Dqn_String8_TrimSuffix            (Dqn_String8 string, Dqn_String8 suffix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
-DQN_API Dqn_String8           Dqn_String8_TrimWhitespaceAround  (Dqn_String8 string);
-DQN_API Dqn_String8           Dqn_String8_TrimByteOrderMark     (Dqn_String8 string);
-
-DQN_API Dqn_String8           Dqn_String8_FileNameFromPath      (Dqn_String8 path);
-
-DQN_API bool                  Dqn_String8_ToU64Checked          (Dqn_String8 string, char separator, uint64_t *output);
-DQN_API uint64_t              Dqn_String8_ToU64                 (Dqn_String8 string, char separator);
-DQN_API bool                  Dqn_String8_ToI64Checked          (Dqn_String8 string, char separator, int64_t *output);
-DQN_API int64_t               Dqn_String8_ToI64                 (Dqn_String8 string, char separator);
-
-struct Dqn_String8FindResult
+enum Dqn_String8FindFlag
 {
-    bool        found;
-    Dqn_usize   offset;
-    Dqn_String8 string;
+    Dqn_String8FindFlag_Digit      = 1 << 0, // 0-9
+    Dqn_String8FindFlag_Whitespace = 1 << 1, // '\r', '\t', '\n', ' '
+    Dqn_String8FindFlag_Alphabet   = 1 << 2, // A-Z, a-z
+    Dqn_String8FindFlag_Plus       = 1 << 3, // +
+    Dqn_String8FindFlag_Minus      = 1 << 4, // -
+    Dqn_String8FindFlag_AlphaNum   = Dqn_String8FindFlag_Alphabet | Dqn_String8FindFlag_Digit,
 };
 
-DQN_API Dqn_String8FindResult Dqn_String8_Find                  (Dqn_String8 string, Dqn_String8 find, Dqn_usize start_index, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
-DQN_API Dqn_String8           Dqn_String8_Replace               (Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Allocator allocator, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
-DQN_API Dqn_String8           Dqn_String8_ReplaceInsensitive    (Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Allocator allocator);
-DQN_API void                  Dqn_String8_Remove                (Dqn_String8 *string, Dqn_usize offset, Dqn_usize size);
+DQN_API Dqn_String8                  Dqn_String8_InitCString8          (char const *src);
+DQN_API bool                         Dqn_String8_IsValid               (Dqn_String8 string);
+DQN_API bool                         Dqn_String8_IsAll                 (Dqn_String8 string, Dqn_String8IsAll is_all);
+
+DQN_API Dqn_String8                  Dqn_String8_Slice                 (Dqn_String8 string, Dqn_usize offset, Dqn_usize size);
+DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplitArray      (Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size);
+DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplit           (Dqn_String8 string, Dqn_String8 find);
+DQN_API Dqn_usize                    Dqn_String8_Split                 (Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_usize splits_count);
+DQN_API Dqn_String8FindResult        Dqn_String8_FindFirstStringArray  (Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size);
+DQN_API Dqn_String8FindResult        Dqn_String8_FindFirstString       (Dqn_String8 string, Dqn_String8 find);
+DQN_API Dqn_String8FindResult        Dqn_String8_FindFirst             (Dqn_String8 string, uint32_t flags);
+DQN_API Dqn_String8                  Dqn_String8_Segment               (Dqn_Allocator allocator, Dqn_String8 src, Dqn_usize segment_size, char segment_char);
+
+DQN_API bool                         Dqn_String8_Eq                    (Dqn_String8 lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API bool                         Dqn_String8_EqInsensitive         (Dqn_String8 lhs, Dqn_String8 rhs);
+DQN_API bool                         Dqn_String8_StartsWith            (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API bool                         Dqn_String8_StartsWithInsensitive (Dqn_String8 string, Dqn_String8 prefix);
+DQN_API bool                         Dqn_String8_EndsWith              (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API bool                         Dqn_String8_EndsWithInsensitive   (Dqn_String8 string, Dqn_String8 prefix);
+DQN_API bool                         Dqn_String8_HasChar               (Dqn_String8 string, char ch);
+
+DQN_API Dqn_String8                  Dqn_String8_TrimPrefix            (Dqn_String8 string, Dqn_String8 prefix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API Dqn_String8                  Dqn_String8_TrimSuffix            (Dqn_String8 string, Dqn_String8 suffix, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API Dqn_String8                  Dqn_String8_TrimWhitespaceAround  (Dqn_String8 string);
+DQN_API Dqn_String8                  Dqn_String8_TrimByteOrderMark     (Dqn_String8 string);
+
+DQN_API Dqn_String8                  Dqn_String8_FileNameFromPath      (Dqn_String8 path);
+
+DQN_API bool                         Dqn_String8_ToU64Checked          (Dqn_String8 string, char separator, uint64_t *output);
+DQN_API uint64_t                     Dqn_String8_ToU64                 (Dqn_String8 string, char separator);
+DQN_API bool                         Dqn_String8_ToI64Checked          (Dqn_String8 string, char separator, int64_t *output);
+DQN_API int64_t                      Dqn_String8_ToI64                 (Dqn_String8 string, char separator);
+
+DQN_API Dqn_String8                  Dqn_String8_Replace               (Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Allocator allocator, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
+DQN_API Dqn_String8                  Dqn_String8_ReplaceInsensitive    (Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Allocator allocator);
+DQN_API void                         Dqn_String8_Remove                (Dqn_String8 *string, Dqn_usize offset, Dqn_usize size);
 
 #if defined(__cplusplus)
-DQN_API bool                  operator==                        (Dqn_String8 const &lhs, Dqn_String8 const &rhs);
-DQN_API bool                  operator!=                        (Dqn_String8 const &lhs, Dqn_String8 const &rhs);
+DQN_API bool                         operator==                        (Dqn_String8 const &lhs, Dqn_String8 const &rhs);
+DQN_API bool                         operator!=                        (Dqn_String8 const &lhs, Dqn_String8 const &rhs);
 #endif
 
 // NOTE: Internal ==================================================================================
@@ -2714,7 +2730,7 @@ DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val);
 // =================================================================================================
 // [$CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
 // =================================================================================================
-DQN_API bool    Dqn_Char_IsAlpha       (char ch);
+DQN_API bool    Dqn_Char_IsAlphabet    (char ch);
 DQN_API bool    Dqn_Char_IsDigit       (char ch);
 DQN_API bool    Dqn_Char_IsAlphaNum    (char ch);
 DQN_API bool    Dqn_Char_IsWhitespace  (char ch);
@@ -5288,46 +5304,32 @@ DQN_API Dqn_String8 Dqn_String8_Slice(Dqn_String8 string, Dqn_usize offset, Dqn_
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8_BinarySplitStringChars(Dqn_String8 string, Dqn_String8 delimiter_chars, Dqn_String8 *rhs)
+DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplitArray(Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size)
 {
-    Dqn_String8 result = string;
-    if (rhs)
-        *rhs = {};
-
-    if (!Dqn_String8_IsValid(string))
+    Dqn_String8BinarySplitResult result = {};
+    if (!Dqn_String8_IsValid(string) || !find || find_size == 0)
         return result;
 
-    Dqn_usize offset = 0;
-    for (bool hit_delimiter = false; !hit_delimiter && offset < string.size; ) {
-        for (Dqn_usize index = 0; !hit_delimiter && index < delimiter_chars.size; index++) {
-            char delimiter = delimiter_chars.data[index];
-            hit_delimiter  = string.data[offset] == delimiter;
-        }
-
-        if (!hit_delimiter)
-            offset++;
-    }
-
-    // NOTE: LHS, the string before the delimiter
-    result = Dqn_String8_Init(string.data, offset);
-
-    // NOTE: RHS, the string after the delimiter
-    if (rhs) {
-        char *end  = string.data + string.size;
-        char *next = DQN_MIN((string.data + offset + 1), end);
-        if (next != end) {
-            rhs->data = next;
-            rhs->size = end - rhs->data;
+    result.lhs = string;
+    for (size_t index = 0; index <= string.size; index++) {
+        for (Dqn_usize find_index = 0; find_index < find_size; find_index++) {
+            Dqn_String8 find_item    = find[find_index];
+            Dqn_String8 string_slice = Dqn_String8_Slice(string, index, find_item.size);
+            if (Dqn_String8_Eq(string_slice, find_item)) {
+                result.lhs.size = index;
+                result.rhs.data = string_slice.data + find_item.size;
+                result.rhs.size = string.size - (index + find_item.size);
+                break;
+            }
         }
     }
 
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8_BinarySplit(Dqn_String8 string, char delimiter, Dqn_String8 *rhs)
+DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplit(Dqn_String8 string, Dqn_String8 find)
 {
-    Dqn_String8 delimiter_chars = Dqn_String8_Init(&delimiter, 1);
-    Dqn_String8 result          = Dqn_String8_BinarySplitStringChars(string, delimiter_chars, rhs);
+    Dqn_String8BinarySplitResult result = Dqn_String8_BinarySplitArray(string, &find, 1);
     return result;
 }
 
@@ -5361,6 +5363,52 @@ DQN_API Dqn_usize Dqn_String8_Split(Dqn_String8 string, Dqn_String8 delimiter, D
     return result;
 }
 
+DQN_API Dqn_String8FindResult Dqn_String8_FindFirstStringArray(Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size)
+{
+    Dqn_String8FindResult result = {};
+    if (!Dqn_String8_IsValid(string) || !find || find_size == 0)
+        return result;
+
+    for (Dqn_usize index = 0; !result.found && index < string.size; index++) {
+        for (Dqn_usize find_index = 0; find_index < find_size; find_index++) {
+            Dqn_String8 find_item    = find[find_index];
+            Dqn_String8 string_slice = Dqn_String8_Slice(string, index, find_item.size);
+            if (Dqn_String8_Eq(string_slice, find_item)) {
+                result.found                  = true;
+                result.index                  = index;
+                result.match                  = Dqn_String8_Init(string.data + index, find_item.size);
+                result.match_to_end_of_buffer = Dqn_String8_Init(result.match.data, string.size - index);
+                break;
+            }
+        }
+    }
+    return result;
+}
+
+DQN_API Dqn_String8FindResult Dqn_String8_FindFirstString(Dqn_String8 string, Dqn_String8 find)
+{
+    Dqn_String8FindResult result = Dqn_String8_FindFirstStringArray(string, &find, 1);
+    return result;
+}
+
+DQN_API Dqn_String8FindResult Dqn_String8_FindFirst(Dqn_String8 string, uint32_t flags)
+{
+    Dqn_String8FindResult result = {};
+    for (size_t index = 0; !result.found && index < string.size; index++) {
+        result.found |= ((flags & Dqn_String8FindFlag_Digit)      && Dqn_Char_IsDigit(string.data[index]));
+        result.found |= ((flags & Dqn_String8FindFlag_Alphabet)   && Dqn_Char_IsAlphabet(string.data[index]));
+        result.found |= ((flags & Dqn_String8FindFlag_Whitespace) && Dqn_Char_IsWhitespace(string.data[index]));
+        result.found |= ((flags & Dqn_String8FindFlag_Plus)       && string.data[index] == '+');
+        result.found |= ((flags & Dqn_String8FindFlag_Minus)      && string.data[index] == '-');
+        if (result.found) {
+            result.index                  = index;
+            result.match                  = Dqn_String8_Init(string.data + index, 1);
+            result.match_to_end_of_buffer = Dqn_String8_Init(result.match.data, string.size - index);
+        }
+    }
+    return result;
+}
+
 DQN_API Dqn_String8 Dqn_String8_Segment(Dqn_Allocator allocator, Dqn_String8 src, Dqn_usize segment_size, char segment_char)
 {
     Dqn_usize result_size = src.size;
@@ -5379,6 +5427,7 @@ DQN_API Dqn_String8 Dqn_String8_Segment(Dqn_Allocator allocator, Dqn_String8 src
     DQN_ASSERTF(write_index == result.size, "result.size=%zu, write_index=%zu", result.size, write_index);
     return result;
 }
+
 
 DQN_API bool Dqn_String8_Eq(Dqn_String8 lhs, Dqn_String8 rhs, Dqn_String8EqCase eq_case)
 {
@@ -5612,25 +5661,6 @@ DQN_API int64_t Dqn_String8_ToI64(Dqn_String8 string, char separator)
 {
     int64_t result = 0;
     Dqn_String8_ToI64Checked(string, separator, &result);
-    return result;
-}
-
-DQN_API Dqn_String8FindResult Dqn_String8_Find(Dqn_String8 string, Dqn_String8 find, Dqn_usize offset, Dqn_String8EqCase eq_case)
-{
-    Dqn_String8FindResult result = {};
-    if (!Dqn_String8_IsValid(string) || !Dqn_String8_IsValid(find) || find.size > string.size)
-        return result;
-
-    Dqn_usize start_index = DQN_MIN(offset, string.size);
-    Dqn_usize end         = string.size - find.size + 1;
-    for (Dqn_usize index = start_index; !result.found && index < end; index++) {
-        Dqn_String8 check = Dqn_String8_Slice(string, index, find.size);
-        if (Dqn_String8_Eq(check, find, eq_case)) {
-            result.found  = true;
-            result.offset = index;
-            result.string = check;
-        }
-    }
     return result;
 }
 
@@ -7525,7 +7555,7 @@ DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val)
 // =================================================================================================
 // [$CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
 // =================================================================================================
-DQN_API bool Dqn_Char_IsAlpha(char ch)
+DQN_API bool Dqn_Char_IsAlphabet(char ch)
 {
     bool result = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
     return result;
@@ -7539,7 +7569,7 @@ DQN_API bool Dqn_Char_IsDigit(char ch)
 
 DQN_API bool Dqn_Char_IsAlphaNum(char ch)
 {
-    bool result = Dqn_Char_IsAlpha(ch) || Dqn_Char_IsDigit(ch);
+    bool result = Dqn_Char_IsAlphabet(ch) || Dqn_Char_IsDigit(ch);
     return result;
 }
 
@@ -8551,8 +8581,10 @@ DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *
     bool found_content_length = false;
     for (Dqn_usize header_index = 0; header_index < result.headers_size; header_index++) {
         Dqn_String8 header = result.headers[header_index];
-        Dqn_String8 value  = {};
-        Dqn_String8 key    = Dqn_String8_BinarySplit(header, ':', &value);
+
+        Dqn_String8BinarySplitResult key_value_split = Dqn_String8_BinarySplit(header, DQN_STRING8(":"));
+        Dqn_String8 value                            = key_value_split.lhs;
+        Dqn_String8 key                              = key_value_split.rhs;
 
         key   = Dqn_String8_TrimWhitespaceAround(key);
         value = Dqn_String8_TrimWhitespaceAround(value);
@@ -9676,19 +9708,21 @@ DQN_API bool Dqn_FsPath_AddRef(Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String
     if (path.size <= 0)
         return true;
 
-    Dqn_String8 delimiter_chars = DQN_STRING8("/\\");
+    Dqn_String8 const delimiter_array[] = {
+        DQN_STRING8("\\"),
+        DQN_STRING8("/")
+    };
     for (;;) {
-        Dqn_String8 rhs = {};
-        Dqn_String8 lhs = Dqn_String8_BinarySplitStringChars(path, delimiter_chars, &rhs);
-        for (; lhs.data; lhs = Dqn_String8_BinarySplitStringChars(rhs, delimiter_chars, &rhs)) {
-            if (lhs.size <= 0)
+        Dqn_String8BinarySplitResult delimiter = Dqn_String8_BinarySplitArray(path, delimiter_array, DQN_ARRAY_UCOUNT(delimiter_array));
+        for (; delimiter.lhs.data; delimiter = Dqn_String8_BinarySplitArray(delimiter.rhs, delimiter_array, DQN_ARRAY_UCOUNT(delimiter_array))) {
+            if (delimiter.lhs.size <= 0)
                 continue;
 
             Dqn_FsPathLink *link = Dqn_Arena_New(arena, Dqn_FsPathLink, Dqn_ZeroMem_Yes);
             if (!link)
                 return false;
 
-            link->string = lhs;
+            link->string = delimiter.lhs;
             link->prev   = fs_path->tail;
             if (fs_path->tail) {
                 fs_path->tail->next = link;
@@ -9697,10 +9731,10 @@ DQN_API bool Dqn_FsPath_AddRef(Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String
             }
             fs_path->tail         = link;
             fs_path->links_size  += 1;
-            fs_path->string_size += lhs.size;
+            fs_path->string_size += delimiter.lhs.size;
         }
 
-        if (!lhs.data)
+        if (!delimiter.lhs.data)
             break;
     }
 
