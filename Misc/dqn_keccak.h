@@ -59,7 +59,7 @@
     #if defined(NDEBUG)
         #define DQN_KECCAK_ASSERT(expr)
     #else
-        #define DQN_KECCAK_ASSERT(expr)                                                                  \
+        #define DQN_KECCAK_ASSERT(expr)                                                            \
             do                                                                                     \
             {                                                                                      \
                 if (!(expr))                                                                       \
