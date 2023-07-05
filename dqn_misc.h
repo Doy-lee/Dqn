@@ -1,12 +1,18 @@
+// NOTE: Table Of Contents =========================================================================
+// Index                     | Disable #define | Description
 // =================================================================================================
-// [$DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
+// [$DLIB] Dqn_Library       |                 | Library run-time behaviour configuration
+// [$BITS] Dqn_Bit           |                 | Bitset manipulation
+// [$SAFE] Dqn_Safe          |                 | Safe arithmetic, casts, asserts
+// [$TCTX] Dqn_ThreadContext |                 | Per-thread data structure e.g. temp arenas
+// [$BSEA] Dqn_BinarySearch  |                 | Binary search
 // =================================================================================================
-//
+
+// NOTE: [$DLIB] Dqn_Library =======================================================================
 // Book-keeping data for the library and allow customisation of certain features
 // provided.
 //
-// NOTE: API
-//
+// NOTE: API =======================================================================================
 // @proc Dqn_Library_SetLogCallback
 //   @desc Update the default logging function, all logging functions will run through
 //   this callback
@@ -70,27 +76,23 @@ DQN_API void Dqn_Library_LeakTraceMarkFree         (Dqn_CallSite call_site, void
 #define      Dqn_Library_LeakTraceMarkFree(...)
 #endif
 
-// =================================================================================================
-// [$BITS] Dqn_Bit              |                             | Bitset manipulation
-// =================================================================================================
+// NOTE: [$BITS] Dqn_Bit ===========================================================================
 DQN_API void Dqn_Bit_UnsetInplace(uint32_t *flags, uint32_t bitfield);
 DQN_API void Dqn_Bit_SetInplace(uint32_t *flags, uint32_t bitfield);
 DQN_API bool Dqn_Bit_IsSet(uint32_t bits, uint32_t bits_to_set);
 DQN_API bool Dqn_Bit_IsNotSet(uint32_t bits, uint32_t bits_to_check);
 
-// =================================================================================================
-// [$SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
-// =================================================================================================
-/// Assert the expression given in debug, whilst in release- assertion is
-/// removed and the expression is evaluated and returned.
-///
-/// This function provides dual logic which allows handling of the condition
-/// gracefully in release mode, but asserting in debug mode. This is an internal
-/// function, prefer the @see DQN_CHECK macros.
-///
-/// @param assertion_expr[in] Expressin to assert on
-/// @param fmt[in] Format string for providing a message on assertion
-/// @return True if the expression evaluated to true, false otherwise.
+// NOTE: [$SAFE] Dqn_Safe ==========================================================================
+// Assert the expression given in debug, whilst in release- assertion is
+// removed and the expression is evaluated and returned.
+//
+// This function provides dual logic which allows handling of the condition
+// gracefully in release mode, but asserting in debug mode. This is an internal
+// function, prefer the @see DQN_CHECK macros.
+//
+// @param assertion_expr[in] Expressin to assert on
+// @param fmt[in] Format string for providing a message on assertion
+// @return True if the expression evaluated to true, false otherwise.
 DQN_API bool DQN_CHECKF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...);
 
 // NOTE: Dqn_Safe Arithmetic
@@ -335,10 +337,7 @@ DQN_API uint32_t Dqn_Safe_SaturateCastIntToU32(int val);
 /// out of the valid range when casted.
 DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val);
 
-// =================================================================================================
-// [$TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
-// =================================================================================================
-//
+// NOTE: [$TCTX] Dqn_ThreadContext =================================================================
 // Each thread is assigned in their thread-local storage (TLS) scratch and
 // permanent arena allocators. These can be used for allocations with a lifetime
 // scoped to the lexical scope or for storing data permanently using the arena
@@ -417,9 +416,7 @@ DQN_API uint32_t           Dqn_Thread_GetID();
 DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COMMA);
 DQN_API Dqn_ThreadScratch  Dqn_Thread_GetScratch_(DQN_LEAK_TRACE_FUNCTION void const *conflict_arena);
 
-// =================================================================================================
-// [$BSEA] Binary Search        |                             |
-// =================================================================================================
+// NOTE: [$BSEA] Dqn_BinarySearch ==================================================================
 template <typename T>
 using Dqn_BinarySearchLessThanProc = bool(T const &lhs, T const &rhs);
 

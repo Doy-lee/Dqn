@@ -1,7 +1,5 @@
 #if !defined(DQN_NO_DSMAP)
-// =================================================================================================
-// [$DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// =================================================================================================
+// NOTE: [$DMAP] Dqn_DSMap =========================================================================
 DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64NoHash(uint64_t u64)
 {
     Dqn_DSMapKey result = {};
@@ -31,6 +29,4 @@ DQN_API bool operator==(Dqn_DSMapKey lhs, Dqn_DSMapKey rhs)
     bool result = Dqn_DSMap_KeyEquals(lhs, rhs);
     return result;
 }
-
 #endif // !defined(DQN_NO_DSMAP)
-

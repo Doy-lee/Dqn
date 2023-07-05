@@ -1,6 +1,4 @@
-// =================================================================================================
-// [$CSTR] Dqn_CString8         |                             | C-string helpers
-// =================================================================================================
+// NOTE: [$CSTR] Dqn_CString8 ======================================================================
 DQN_API Dqn_usize Dqn_CString8_FSize(char const *fmt, ...)
 {
     va_list args;
@@ -41,9 +39,7 @@ DQN_API Dqn_usize Dqn_CString16_Size(wchar_t const *src)
     return result;
 }
 
-// =================================================================================================
-// [$STR8] Dqn_String8          |                             | Pointer and length strings
-// =================================================================================================
+// NOTE: [$STR8] Dqn_String8 =======================================================================
 DQN_API Dqn_String8 Dqn_String8_InitCString8(char const *src)
 {
     Dqn_usize size     = Dqn_CString8_Size(src);
@@ -592,9 +588,7 @@ DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allo
     return result;
 }
 
-// =================================================================================================
-// [$STRB] Dqn_String8Builder   |                             |
-// =================================================================================================
+// NOTE: [$STRB] Dqn_String8Builder ================================================================
 bool Dqn_String8Builder_AppendRef(Dqn_String8Builder *builder, Dqn_String8 string)
 {
     if (!builder || !string.data || string.size <= 0)
@@ -667,9 +661,7 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
 }
 
 #if !defined(DQN_NO_JSON_BUILDER)
-// =================================================================================================
-// [$JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
-// =================================================================================================
+// NOTE: [$JSON] Dqn_JSONBuilder ===================================================================
 Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_indent)
 {
     Dqn_JSONBuilder result          = {};
@@ -827,9 +819,7 @@ void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool v
 }
 #endif // !defined(DQN_NO_JSON_BUILDER)
 
-// =================================================================================================
-// [$CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
-// =================================================================================================
+// NOTE: [$CHAR] Dqn_Char ==========================================================================
 DQN_API bool Dqn_Char_IsAlphabet(char ch)
 {
     bool result = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
@@ -896,9 +886,7 @@ DQN_API char Dqn_Char_ToLower(char ch)
     return result;
 }
 
-// =================================================================================================
-// [$UTFX] Dqn_UTF              |                             | Unicode helpers
-// =================================================================================================
+// NOTE: [$UTFX] Dqn_UTF ===========================================================================
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
 {
     // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
@@ -972,9 +960,7 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
 }
 
 #if !defined(DQN_NO_HEX)
-// =================================================================================================
-// [$BHEX] Dqn_Bin              | DQN_NO_HEX                  | Binary <-> hex helpers
-// =================================================================================================
+// NOTE: [$BHEX] Dqn_Bin ===========================================================================
 DQN_API char const *Dqn_Bin_HexBufferTrim0x(char const *hex, Dqn_usize size, Dqn_usize *real_size)
 {
     Dqn_String8 result = Dqn_String8_TrimWhitespaceAround(Dqn_String8_Init(hex, size));
@@ -1251,9 +1237,7 @@ DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator)
     return result;
 }
 
-// =================================================================================================
-// [$STBS] stb_sprintf          |                             | Portable sprintf
-// =================================================================================================
+// NOTE: [$STBS] stb_sprintf =======================================================================
 #if !defined(DQN_STB_SPRINTF_HEADER_ONLY)
 #define STB_SPRINTF_IMPLEMENTATION
 #ifdef STB_SPRINTF_IMPLEMENTATION

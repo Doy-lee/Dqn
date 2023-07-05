@@ -1,6 +1,13 @@
+// NOTE: Table Of Contents =========================================================================
+// Index                    | Disable #define | Description
 // =================================================================================================
-// [$ALLO] Dqn_Allocator        |                             | Generic allocator interface
+// [$ALLO] Dqn_Allocator    |                 | Generic allocator interface
+// [$VMEM] Dqn_VMem         |                 | Virtual memory allocation
+// [$AREN] Dqn_Arena        |                 | Growing bump allocator
+// [$ACAT] Dqn_ArenaCatalog |                 | Collate, create & manage arenas in a catalog
 // =================================================================================================
+
+// NOTE: [$ALLO] Dqn_Allocator =====================================================================
 #if defined(DQN_LEAK_TRACING)
     #if defined(DQN_NO_DSMAP)
         #error "DSMap is required for allocation tracing"
@@ -70,9 +77,7 @@ void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, voi
 #define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type) * count, alignof(Type), zero_mem)
 #define Dqn_Allocator_New(allocator, Type, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type), alignof(Type), zero_mem)
 
-// =================================================================================================
-// [$VMEM] Dqn_VMem             |                             | Virtual memory allocation
-// =================================================================================================
+// NOTE: [$VMEM] Dqn_VMem ==========================================================================
 enum Dqn_VMemCommit
 {
     Dqn_VMemCommit_No,
@@ -124,10 +129,7 @@ DQN_API void  Dqn_VMem_Decommit(void *ptr, Dqn_usize size);
 DQN_API void  Dqn_VMem_Release (void *ptr, Dqn_usize size);
 DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
 
-// =================================================================================================
-// [$AREN] Dqn_Arena            |                             | Growing bump allocator
-// =================================================================================================
-//
+// NOTE: [$AREN] Dqn_Arena =========================================================================
 // A bump-allocator that can grow dynamically by chaining blocks of memory
 // together. The arena's memory is backed by virtual memory allowing the
 // allocator to reserve and commit physical pages as memory is given from
@@ -314,9 +316,7 @@ DQN_API void                Dqn_Arena_Free_            (DQN_LEAK_TRACE_FUNCTION 
 DQN_API void *              Dqn_Arena_CopyZ_           (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t alignment);
 DQN_API void                Dqn_Arena_EndTempMemory_   (DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory arena_temp_memory);
 
-// =================================================================================================
-// [$ACAT] Dqn_ArenaCatalog     |                             | Collate, create & manage arenas in a catalog
-// =================================================================================================
+// NOTE: [$ACAT] Dqn_ArenaCatalog ==================================================================
 struct Dqn_ArenaCatalogItem
 {
     Dqn_Arena            *arena;

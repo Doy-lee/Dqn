@@ -1,7 +1,5 @@
 #if defined(DQN_OS_WIN32)
-// =================================================================================================
-// [$W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
-// =================================================================================================
+// NOTE: [$W32H] Win32 Min Header ==================================================================
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "wininet")
 
@@ -353,9 +351,7 @@
     #include <unistd.h>       // access, gettid
 #endif
 
-// =================================================================================================
-// [$FSYS] Dqn_Fs               |                             | Filesystem helpers
-// =================================================================================================
+// NOTE: [$FSYS] Dqn_Fs ============================================================================
 #if defined(DQN_OS_WIN32)
 DQN_API uint64_t Dqn__WinFileTimeToSeconds(FILETIME const *time)
 {
@@ -1141,9 +1137,7 @@ DQN_API Dqn_String8 Dqn_FsPath_BuildWithSeparator(Dqn_Arena *arena, Dqn_FsPath c
     return result;
 }
 
-// =================================================================================================
-// [$DATE] Dqn_Date             |                             | Date-time helpers
-// =================================================================================================
+// NOTE: [$DATE] Dqn_Date ==========================================================================
 DQN_API Dqn_DateHMSTime Dqn_Date_HMSLocalTimeNow()
 {
     Dqn_DateHMSTime result = {};
@@ -1241,9 +1235,7 @@ DQN_API uint64_t Dqn_Date_EpochTime()
 }
 
 #if defined(DQN_OS_WIN32)
-// =================================================================================================
-// [$WIND] Dqn_Win              |                             | Windows OS helpers
-// =================================================================================================
+// NOTE: [$WIND] Dqn_Win ===========================================================================
 DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_WinErrorMsg *msg)
 {
     msg->code    = GetLastError();
@@ -1564,9 +1556,7 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
 }
 
 #if !defined(DQN_NO_WIN_NET)
-// =================================================================================================
-// [$WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
-// =================================================================================================
+// NOTE: [$WINN] Dqn_WinNet ========================================================================
 DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitCString(char const *url, int url_size)
 {
     URL_COMPONENTSA components  = {};
@@ -1961,9 +1951,7 @@ DQN_API Dqn_String8 Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle)
 #endif // !defined(DQN_NO_WINNET)
 #endif // defined(DQN_OS_WIN32)
 
-// =================================================================================================
-// [$OSYS] Dqn_OS               | DQN_NO_WIN                  | Operating-system APIs
-// =================================================================================================
+// NOTE: [$OSYS] Dqn_OS ============================================================================
 DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
 {
     if (!buffer || size < 0)

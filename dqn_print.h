@@ -1,6 +1,11 @@
+// NOTE: Table Of Contents =========================================================================
+// Index             | Disable #define | Description
 // =================================================================================================
-// [$PRIN] Dqn_Print            |                             | Console printing
+// [$PRIN] Dqn_Print |                 | Console printing
+// [$LLOG] Dqn_Log   |                 | Library logging
 // =================================================================================================
+
+// NOTE: [$PRIN] Dqn_Print =========================================================================
 enum Dqn_PrintStd
 {
     Dqn_PrintStd_Out,
@@ -84,9 +89,7 @@ Dqn_String8            Dqn_Print_ESCColourU32String(Dqn_PrintESCColour colour, u
 #define                Dqn_Print_ESCResetString              DQN_STRING8(Dqn_Print_ESCReset)
 #define                Dqn_Print_ESCBoldString               DQN_STRING8(Dqn_Print_ESCBold)
 
-// =================================================================================================
-// [$LLOG] Dqn_Log              |                             | Library logging
-// =================================================================================================
+// NOTE: [$LLOG] Dqn_Log  ==========================================================================
 enum Dqn_LogType
 {
     Dqn_LogType_Debug,

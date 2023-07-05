@@ -1,8 +1,5 @@
+// NOTE: [$DLIB] Dqn_Library =======================================================================
 Dqn_Library dqn_library;
-
-// =================================================================================================
-// [$DLIB] Dqn_Library          |                             | Library run-time behaviour configuration
-// =================================================================================================
 DQN_API Dqn_Library *Dqn_Library_Init(Dqn_Arena *arena)
 {
     Dqn_Library *result = &dqn_library;
@@ -156,9 +153,7 @@ DQN_API void Dqn_Library_LeakTraceMarkFree(Dqn_CallSite call_site, void *ptr)
 }
 #endif /// defined(DQN_LEAK_TRACING)
 
-// =================================================================================================
-// [$BITS] Dqn_Bit              |                             | Bitset manipulation
-// =================================================================================================
+// NOTE: [$BITS] Dqn_Bit ===========================================================================
 DQN_API void Dqn_Bit_UnsetInplace(uint64_t *flags, uint64_t bitfield)
 {
     *flags = (*flags & ~bitfield);
@@ -181,9 +176,7 @@ DQN_API bool Dqn_Bit_IsNotSet(uint64_t bits, uint64_t bits_to_check)
     return result;
 }
 
-// =================================================================================================
-// [$SAFE] Dqn_Safe             |                             | Safe arithmetic, casts, asserts
-// =================================================================================================
+// NOTE: [$SAFE] Dqn_Safe ==========================================================================
 DQN_API int64_t Dqn_Safe_AddI64(int64_t a, int64_t b)
 {
     int64_t result = DQN_CHECKF(a <= INT64_MAX - b, "a=%zd, b=%zd", a, b) ? (a + b) : INT64_MAX;
@@ -505,9 +498,7 @@ DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val)
     return result;
 }
 
-// =================================================================================================
-// [$TCTX] Dqn_ThreadContext    |                             | Per-thread data structure e.g. temp arenas
-// =================================================================================================
+// NOTE: [$TCTX] Dqn_ThreadContext =================================================================
 Dqn_ThreadScratch::Dqn_ThreadScratch(DQN_LEAK_TRACE_FUNCTION Dqn_ThreadContext *context, uint8_t context_index)
 {
     index       = context_index;

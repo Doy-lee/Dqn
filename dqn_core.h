@@ -1,6 +1,17 @@
+// NOTE: Table Of Contents =========================================================================
+// Index                   | Disable #define | Description
 // =================================================================================================
-// [$CFGM] Config macros        |                             | Compile time customisation of library
-// =================================================================================================
+// [$CFGM] Config macros   |                 | Compile time customisation of library
+// [$CMAC] Compiler macros |                 | Macros for the compiler
+// [$MACR] Macros          |                 | Define macros used in the library
+// [$TYPE] Typedefs        |                 | Typedefs used in the library
+// [$GSTR] Global Structs  |                 | Forward declare useful structs
+// [$INTR] Intrinsics      |                 | Atomics, cpuid, ticket mutex
+// [$TMUT] Dqn_TicketMutex |                 | Userland mutex via spinlocking atomics
+// [$CALL] Dqn_CallSite    |                 | Source code location/tracing
+// ===================+=================+===========================================================
+
+// NOTE: [$CFGM] Config macros =====================================================================
 // #define DQN_IMPLEMENTATION
 //     Define this in one and only one C++ file to enable the implementation
 //     code of the header file
@@ -46,9 +57,7 @@
 //     thread context. The thread context arena stats can be printed by using
 //     Dqn_Library_DumpThreadContextArenaStat.
 //
-// =================================================================================================
-// [$CMAC] Compiler macros      |                             | Macros for the compiler
-// =================================================================================================
+// NOTE: [$CMAC] Compiler macros ===================================================================
 // NOTE: Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
     #if defined(__clang__)
@@ -78,9 +87,7 @@
     #endif
 #endif
 
-// =================================================================================================
-// [$MACR] Macros               |                             | Define macros used in the library
-// =================================================================================================
+// NOTE: [$MACR] Macros ============================================================================
 #define DQN_FOR_UINDEX(index, size) for (Dqn_usize index = 0; index < size; index++)
 #define DQN_FOR_IINDEX(index, size) for (Dqn_isize index = 0; index < size; index++)
 
@@ -301,9 +308,7 @@ struct Dqn_DeferHelper
          DQN_UNIQUE_NAME(once);                      \
          end, DQN_UNIQUE_NAME(once) = false)
 
-// =================================================================================================
-// [$TYPE] Typedefs             |                             | Typedefs used in the library
-// =================================================================================================
+// NOTE: [$TYPE] Typedefs ==========================================================================
 typedef intptr_t     Dqn_isize;
 typedef uintptr_t    Dqn_usize;
 typedef intptr_t     Dqn_isize;
@@ -316,9 +321,7 @@ typedef int32_t      Dqn_b32;
 #define DQN_ISIZE_MAX INTPTR_MAX
 #define DQN_ISIZE_MIN INTPTR_MIN
 
-// =================================================================================================
-// [$GSTR] Global Structs       |                             | Forward declare useful structs
-// =================================================================================================
+// NOTE [$GSTR] Global Structs =====================================================================
 struct Dqn_String8 ///< Pointer and length style UTF8 strings
 {
     char      *data; ///< The UTF8 bytes of the string
@@ -332,9 +335,7 @@ struct Dqn_String8 ///< Pointer and length style UTF8 strings
     #endif
 };
 
-// =================================================================================================
-// [$INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
-// =================================================================================================
+// NOTE: [$INTR] Intrinsics ========================================================================
 typedef enum Dqn_ZeroMem {
     Dqn_ZeroMem_No,  ///< Memory can be handed out without zero-ing it out
     Dqn_ZeroMem_Yes, ///< Memory should be zero-ed out before giving to the callee
@@ -424,9 +425,8 @@ struct Dqn_CPUIDRegisters
 Dqn_CPUIDRegisters Dqn_CPUID(int function_id);
 #endif // DQN_OS_ARM64
 
-// =================================================================================================
-// [$TMUT] Dqn_TicketMutex      |                             | Userland mutex via spinlocking atomics
-// =================================================================================================
+// NOTE: [$TMUT] Dqn_TicketMutex ===================================================================
+//
 // A mutex implemented using an atomic compare and swap on tickets handed out
 // for each critical section.
 //
@@ -476,9 +476,7 @@ Dqn_uint Dqn_TicketMutex_MakeTicket (Dqn_TicketMutex *mutex);
 void     Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 bool     Dqn_TicketMutex_CanLock    (Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 
-// =================================================================================================
-// [$CALL] Dqn_CallSite         |                             | Source code location/tracing
-// =================================================================================================
+// NOTE: [$CALL] Dqn_CallSite ======================================================================
 typedef struct Dqn_CallSite {
     Dqn_String8  file;
     Dqn_String8  function;

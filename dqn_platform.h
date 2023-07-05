@@ -1,6 +1,15 @@
+// NOTE: Table Of Contents =========================================================================
+// Index                    | Disable #define         | Description
 // =================================================================================================
-// [$FSYS] Dqn_Fs               |                             | Filesystem helpers
+// [$FSYS] Dqn_Fs           |                         | Filesystem helpers
+// [$DATE] Dqn_Date         |                         | Date-time helpers
+// [$W32H] Win32 Min Header | DQN_NO_WIN32_MIN_HEADER | Minimal windows.h subset
+// [$WIND] Dqn_Win          |                         | Windows OS helpers
+// [$WINN] Dqn_WinNet       | DQN_NO_WINNET           | Windows internet download/query helpers
+// [$OSYS] Dqn_OS           | DQN_NO_WIN              | Operating-system APIs
 // =================================================================================================
+
+// NOTE: [$FSYS] Dqn_Fs ============================================================================
 enum Dqn_FsInfoType
 {
     Dqn_FsInfoType_Unknown,
@@ -128,10 +137,7 @@ DQN_API Dqn_String8 Dqn_FsPath_ConvertString8    (Dqn_Arena *arena, Dqn_String8 
     #endif
 #endif
 
-
-// =================================================================================================
-// [$DATE] Dqn_Date             |                             | Date-time helpers
-// =================================================================================================
+// NOTE: [$DATE] Dqn_Date ==========================================================================
 struct Dqn_DateHMSTimeString
 {
     char    date[DQN_ARRAY_UCOUNT("YYYY-MM-SS")];
@@ -160,11 +166,9 @@ DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString(Dqn_DateHMSTime time, 
 // return: The time elapsed since Unix epoch (1970-01-01T00:00:00Z) in seconds
 DQN_API uint64_t Dqn_Date_EpochTime();
 
-// =================================================================================================
-// [$W32H] Win32 minimal header | DQN_NO_WIN32_MINIMAL_HEADER | Minimal windows.h subset
-// =================================================================================================
+// NOTE: [$W32H] Win32 Min Header ==================================================================
 #if defined(DQN_OS_WIN32)
-#if !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
+#if !defined(DQN_NO_WIN32_MIN_HEADER) && !defined(_INC_WINDOWS)
     // Taken from Windows.h
     // typedef unsigned long DWORD;
     // typedef unsigned short WORD;
@@ -185,11 +189,9 @@ DQN_API uint64_t Dqn_Date_EpochTime();
         } u;
         uint64_t QuadPart;
     } LARGE_INTEGER;
-#endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
+#endif // !defined(DQN_NO_WIN32_MIN_HEADER) && !defined(_INC_WINDOWS)
 
-// =================================================================================================
-// [$WIND] Dqn_Win              |                             | Windows OS helpers
-// =================================================================================================
+// NOTE: [$WIND] Dqn_Win ===========================================================================
 struct Dqn_WinErrorMsg
 {
     unsigned long code;
@@ -274,9 +276,7 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
 DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it);
 
 #if !defined(DQN_NO_WINNET)
-// =================================================================================================
-// [$WINN] Dqn_WinNet           | DQN_NO_WINNET               | Windows internet download/query helpers
-// =================================================================================================
+// NOTE: [$WINN] Dqn_WinNet ========================================================================
 enum Dqn_WinNetHandleState
 {
     Dqn_WinNetHandleState_Invalid,
@@ -385,9 +385,7 @@ DQN_API Dqn_String8      Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *ha
 #endif // !defined(DQN_NO_WINNET)
 #endif // defined(DQN_OS_WIN32)
 
-// =================================================================================================
-// [$OSYS] Dqn_OS               | DQN_NO_WIN                  | Operating-system APIs
-// =================================================================================================
+// NOTE: [$OSYS] Dqn_OS ============================================================================
 /// Generate cryptographically secure bytes
 DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size);
 

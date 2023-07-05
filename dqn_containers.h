@@ -1,8 +1,14 @@
+// NOTE: Table Of Contents =========================================================================
+// Index              | Disable #define | Description
+// =================================================================================================
+// [$VARR] Dqn_VArray | DQN_NO_VARRAY   | Array backed by virtual memory arena
+// [$FARR] Dqn_FArray | DQN_NO_FARRAY   | Fixed-size arrays
+// [$DMAP] Dqn_DSMap  | DQN_NO_DSMAP    | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// [$LIST] Dqn_List   | DQN_NO_LIST     | Chunked linked lists, append only
+// =================================================================================================
+
 #if !defined(DQN_NO_VARRAY)
-// =================================================================================================
-// [$VARR] Dqn_VArray           | DQN_NO_VARRAY               | Array backed by virtual memory arena
-// =================================================================================================
-//
+// NOTE: [$VARR] Dqn_VArray ========================================================================
 // An array that is backed by virtual memory by reserving addressing space and
 // comitting pages as items are allocated in the array. This array never
 // reallocs, instead you should reserve the upper bound of the memory you will
@@ -96,10 +102,7 @@ DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<
 #endif // !defined(DQN_NO_VARRAY)
 
 #if !defined(DQN_NO_DSMAP)
-// =================================================================================================
-// [$DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// =================================================================================================
-//
+// NOTE: [$DMAP] Dqn_DSMap =========================================================================
 // A hash table configured using the presets recommended by Demitri Spanos
 // from the Handmade Network (HMN),
 //
@@ -298,10 +301,8 @@ DQN_API bool                                    Dqn_DSMap_KeyEquals      (Dqn_DS
 DQN_API bool                                    operator==               (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
 #endif // !defined(DQN_NO_DSMAP)
 
-// =================================================================================================
-// [$FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
-// =================================================================================================
 #if !defined(DQN_NO_FARRAY)
+// NOTE: [$FARR] Dqn_FArray ========================================================================
 template <typename T, Dqn_usize N> struct Dqn_FArray
 {
     T         data[N]; ///< Pointer to the start of the array items in the block of memory
@@ -327,10 +328,8 @@ DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_EraseRang
 DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_Clear     (Dqn_FArray<T, N> *array);
 #endif // !defined(DQN_NO_FARRAY)
 
-// =================================================================================================
-// [$LIST] Dqn_List             |                             | Chunked linked lists, append only
-// =================================================================================================
-//
+#if !defined(DQN_NO_LIST)
+// NOTE: [$LIST] Dqn_List ==========================================================================
 // NOTE: API
 //
 // @proc Dqn_List_At
@@ -389,11 +388,10 @@ DQN_API template <typename T> bool        Dqn_List_Iterate      (Dqn_List<T> *li
 // NOTE: Internal ==================================================================================
 DQN_API template <typename T> T *         Dqn_List_Make_        (DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_usize count);
 DQN_API template <typename T> T *         Dqn_List_Add_         (DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_usize count);
+#endif // !defined(DQN_NO_LIST)
 
 #if !defined(DQN_NO_VARRAY)
-// =================================================================================================
-// [$VARR] Dqn_VArray           |                             | Array backed by virtual memory arena
-// =================================================================================================
+// NOTE: [$VARR] Dqn_VArray ========================================================================
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size)
 {
     Dqn_usize byte_size_64k_aligned = Dqn_PowerOfTwoAlign(byte_size, DQN_VMEM_RESERVE_GRANULARITY);
@@ -501,9 +499,7 @@ DQN_API template <typename T> void Dqn_VArray_Reserve(Dqn_VArray<T> *array, Dqn_
 #endif // !defined(DQN_NO_VARRAY)
 
 #if !defined(DQN_NO_DSMAP)
-// =================================================================================================
-// [$DMAP] Dqn_DSMap            | DQN_NO_DSMAP                | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// =================================================================================================
+// NOTE: [$DMAP] Dqn_DSMap =========================================================================
 uint32_t const DQN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
 uint32_t const DQN_DS_MAP_SENTINEL_SLOT = 0;
 
@@ -855,9 +851,7 @@ DQN_API Dqn_DSMapKey Dqn_DSMap_KeyString8Copy(Dqn_DSMap<T> const *map, Dqn_Alloc
 #endif // !defined(DQN_NO_DSMAP)
 
 #if !defined(DQN_NO_FARRAY)
-// =================================================================================================
-// [$FARR] Dqn_FArray           | DQN_NO_FARRAY               | Fixed-size arrays
-// =================================================================================================
+// NOTE: [$FARR] Dqn_FArray ========================================================================
 DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init(T const *array, Dqn_usize count)
 {
     Dqn_FArray<T, N> result = {};
@@ -948,9 +942,8 @@ DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_Clear(Dqn_FArray<T, N
 }
 #endif // !defined(DQN_NO_FARRAY)
 
-// =================================================================================================
-// [$LIST] Dqn_List             |                             | Chunked linked lists, append only
-// =================================================================================================
+#if !defined(DQN_NO_LIST)
+// NOTE: [$LIST] Dqn_List ==========================================================================
 template <typename T> DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_usize chunk_size)
 {
     Dqn_List<T> result = {};
@@ -1070,4 +1063,5 @@ template <typename T> DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_usize index,
 
     return result;
 }
+#endif // !defined(DQN_NO_LIST)
 

@@ -1,6 +1,4 @@
-// =================================================================================================
-// [$ALLO] Dqn_Allocator        |                             | Generic allocator interface
-// =================================================================================================
+// NOTE: [$ALLO] Dqn_Allocator =====================================================================
 DQN_API void *Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
     void *result = NULL;
@@ -23,9 +21,7 @@ DQN_API void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator alloca
     }
 }
 
-// =================================================================================================
-// [$VMEM] Dqn_VMem             |                             | Virtual memory allocation
-// =================================================================================================
+// NOTE: [$VMEM] Dqn_VMem ==========================================================================
 DQN_FILE_SCOPE uint32_t Dqn_VMem_ConvertPageToOSFlags_(uint32_t protect)
 {
     DQN_ASSERT((protect & ~(Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard)) == 0);
@@ -151,9 +147,7 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
     return result;
 }
 
-// =================================================================================================
-// [$AREN] Dqn_Arena            |                             | Growing bump allocator
-// =================================================================================================
+// NOTE: [$AREN] Dqn_Arena =========================================================================
 DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, Dqn_ArenaCommit commit)
 {
     Dqn_usize commit_size = 0;
@@ -581,9 +575,7 @@ DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroM
     arena->stats.blocks   = 0;
 }
 
-// =================================================================================================
-// [$ACAT] Dqn_ArenaCatalog     |                             | Collate, create & manage arenas in a catalog
-// =================================================================================================
+// NOTE: [$ACAT] Dqn_ArenaCatalog ==================================================================
 DQN_API void Dqn_ArenaCatalog_Init(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena)
 {
     catalog->arena         = arena;

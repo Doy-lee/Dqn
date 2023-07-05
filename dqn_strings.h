@@ -1,6 +1,18 @@
+// NOTE: Table Of Contents =========================================================================
+// Index                      | Disable #define             | Description
 // =================================================================================================
-// [$CSTR] Dqn_CString8         |                             | C-string helpers
+// [$CSTR] Dqn_CString8       |                             | C-string helpers
+// [$STR8] Dqn_String8        |                             | Pointer and length strings
+// [$FSTR] Dqn_FString8       | DQN_NO_FSTRING8             | Fixed-size strings
+// [$STRB] Dqn_String8Builder |                             |
+// [$JSON] Dqn_JSONBuilder    | DQN_NO_JSON_BUILDER         | Construct json output
+// [$CHAR] Dqn_Char           |                             | Character ascii/digit.. helpers
+// [$UTFX] Dqn_UTF            |                             | Unicode helpers
+// [$BHEX] Dqn_Bin            | DQN_NO_HEX                  | Binary <-> hex helpers
+// [$STBS] stb_sprintf        | DQN_STB_SPRINTF_HEADER_ONLY | Portable sprintf
 // =================================================================================================
+
+// NOTE: [$CSTR] Dqn_CString8 ======================================================================
 // @proc Dqn_CString8_ArrayCount
 //   @desc Calculate the size of a cstring literal/array at compile time
 //   @param literal The cstring literal/array to calculate the size for
@@ -24,12 +36,8 @@ DQN_API                                  Dqn_usize Dqn_CString8_FVSize     (char
 DQN_API                                  Dqn_usize Dqn_CString8_Size       (char const *a);
 DQN_API                                  Dqn_usize Dqn_CString16_Size      (wchar_t const *a);
 
-// =================================================================================================
-// [$STR8] Dqn_String8          |                             | Pointer and length strings
-// =================================================================================================
-//
+// NOTE: [$STR8] Dqn_String8 =======================================================================
 // NOTE: API
-
 // @proc Dqn_String8_Init
 //   @desc Initialise a string from a pointer and length
 //   The string is invalid (i.e. Dqn_String8_IsValid() returns false) if size is
@@ -360,10 +368,7 @@ DQN_API Dqn_String8 Dqn_String8_CopyCString_         (DQN_LEAK_TRACE_FUNCTION Dq
 DQN_API Dqn_String8 Dqn_String8_Copy_                (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_String8 string);
 
 #if !defined(DQN_NO_FSTRING8)
-// =================================================================================================
-// [$FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
-// =================================================================================================
-//
+// NOTE: [$FSTR] Dqn_FString8 ======================================================================
 // NOTE: API
 //
 // @proc Dqn_FString8_InitF
@@ -461,9 +466,7 @@ template <Dqn_usize A, Dqn_usize B> bool            Dqn_FString8_EqFString8     
 template <Dqn_usize A, Dqn_usize B> bool            Dqn_FString8_EqFString8Insensitive(Dqn_FString8<A> const *lhs, Dqn_FString8<B> const *rhs);
 #endif // !defined(DQN_NO_FSTRING8)
 
-// =================================================================================================
-// [$STRB] Dqn_String8Builder   |                             |
-// =================================================================================================
+// NOTE: [$STRB] Dqn_String8Builder ================================================================
 struct Dqn_String8Builder
 {
     Dqn_Allocator    allocator;   ///< Allocator to use to back the string list
@@ -509,10 +512,8 @@ bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ..
 /// invalid or memory allocation failure.
 Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allocator allocator);
 
-// =================================================================================================
-// [$JSON] Dqn_JSONBuilder      | DQN_NO_JSON_BUILDER         | Construct json output
-// =================================================================================================
 #if !defined(DQN_NO_JSON_BUILDER)
+// NOTE: [$JSON] Dqn_JSONBuilder ===================================================================
 // TODO(dqn): We need to write tests for this
 enum Dqn_JSONBuilderItem {
     Dqn_JSONBuilderItem_Empty,
@@ -625,10 +626,7 @@ void    Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, boo
 #define Dqn_JSONBuilder_Bool(builder, value) Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8(""), value)
 #endif // !defined(DQN_NO_JSON_BUIDLER)
 
-
-// =================================================================================================
-// [$CHAR] Dqn_Char             |                             | Character ascii/digit.. helpers
-// =================================================================================================
+// NOTE: [$CHAR] Dqn_Char ==========================================================================
 DQN_API bool    Dqn_Char_IsAlphabet    (char ch);
 DQN_API bool    Dqn_Char_IsDigit       (char ch);
 DQN_API bool    Dqn_Char_IsAlphaNum    (char ch);
@@ -639,16 +637,12 @@ DQN_API char    Dqn_Char_ToHex         (char ch);
 DQN_API char    Dqn_Char_ToHexUnchecked(char ch);
 DQN_API char    Dqn_Char_ToLower       (char ch);
 
-// =================================================================================================
-// [$UTFX] Dqn_UTF              |                             | Unicode helpers
-// =================================================================================================
+// NOTE: [$UTFX] Dqn_UTF ===========================================================================
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint);
 DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 
 #if !defined(DQN_NO_HEX)
-// =================================================================================================
-// [$BHEX] Dqn_Bin              | DQN_NO_HEX                  | Binary <-> hex helpers
-// =================================================================================================
+// NOTE: [$BHEX] Dqn_Bin ===========================================================================
 //
 // NOTE: API
 //
@@ -790,10 +784,7 @@ struct Dqn_U64String
 /// 0 if no separator is desired.
 DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator);
 
-// =================================================================================================
-// [$STBS] stb_sprintf          |                             | Portable sprintf
-// =================================================================================================
-/// @cond NO_DOXYYGEN
+// NOTE: [$STBS] stb_sprintf =======================================================================
 // stb_sprintf - v1.10 - public domain snprintf() implementation
 // originally by Jeff Roberts / RAD Game Tools, 2015/10/20
 // http://github.com/nothings/stb
@@ -1009,12 +1000,9 @@ STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char c
 STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va);
 STBSP__PUBLICDEC void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
 #endif // STB_SPRINTF_H_INCLUDE
-/// @endcond
 
 #if !defined(DQN_NO_FSTRING8)
-// =================================================================================================
-// [$FSTR] Dqn_FString8         | DQN_NO_FSTRING8             | Fixed-size strings
-// =================================================================================================
+// NOTE: [$FSTR] Dqn_FString8 ======================================================================
 template <Dqn_usize N> Dqn_FString8<N> Dqn_FString8_InitF(char const *fmt, ...)
 {
     Dqn_FString8<N> result = {};

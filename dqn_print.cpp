@@ -1,6 +1,4 @@
-// =================================================================================================
-// [$PRIN] Dqn_Print            |                             | Printing
-// =================================================================================================
+// NOTE: [$PRIN] Dqn_Print =========================================================================
 DQN_API Dqn_PrintStyle Dqn_Print_StyleColour(uint8_t r, uint8_t g, uint8_t b, Dqn_PrintBold bold)
 {
     Dqn_PrintStyle result = {};
@@ -194,9 +192,7 @@ DQN_API Dqn_String8 Dqn_Print_ESCColourU32String(Dqn_PrintESCColour colour, uint
     return result;
 }
 
-// =================================================================================================
-// [$LLOG] Dqn_Log              |                             | Library logging
-// =================================================================================================
+// NOTE: [$LLOG] Dqn_Log  ==========================================================================
 DQN_API Dqn_String8 Dqn_Log_MakeString(Dqn_Allocator allocator,
                                        bool colour,
                                        Dqn_String8 type,

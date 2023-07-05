@@ -1,6 +1,4 @@
-// =================================================================================================
-// [$FNV1] Dqn_FNV1A            |                             | Hash(x) -> 32/64bit via FNV1a
-// =================================================================================================
+// NOTE: [$FNV1] Dqn_FNV1A =========================================================================
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
 DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_usize size, uint32_t hash)
 {
@@ -30,9 +28,7 @@ DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_usize size)
     return result;
 }
 
-// =================================================================================================
-// [$MMUR] Dqn_MurmurHash3      |                             | Hash(x) -> 32/128bit via MurmurHash3
-// =================================================================================================
+// NOTE: [$MMUR] Dqn_MurmurHash3 ===================================================================
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
     #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
     #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)

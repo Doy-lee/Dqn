@@ -1,6 +1,4 @@
-// =================================================================================================
-// [$INTR] Intrinsics           |                             | Atomics, cpuid, ticket mutex
-// =================================================================================================
+// NOTE: [$INTR] Intrinsics ========================================================================
 #if !defined(DQN_OS_ARM64)
 #if defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
 #include <cpuid.h>
@@ -20,9 +18,7 @@ Dqn_CPUIDRegisters Dqn_CPUID(int function_id)
 }
 #endif // !defined(DQN_OS_ARM64)
 
-// =================================================================================================
-// [$TMUT] Dqn_TicketMutex      |                             | Userland mutex via spinlocking atomics
-// =================================================================================================
+// NOTE: [$TMUT] Dqn_TicketMutex ===================================================================
 DQN_API void Dqn_TicketMutex_Begin(Dqn_TicketMutex *mutex)
 {
     unsigned int ticket = Dqn_Atomic_AddU32(&mutex->ticket, 1);
