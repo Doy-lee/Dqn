@@ -10,6 +10,15 @@
 // =================================================================================================
 
 // NOTE: [$FSYS] Dqn_Fs ============================================================================
+// NOTE: FS Manipulation =======================================================
+// TODO(dqn): We should have a Dqn_String8 interface and a CString interface
+//
+// NOTE: API ===================================================================
+// @proc Dqn_FsDelete
+//   @desc Delete the item specified at the path. This function *CAN* not delete directories unless
+//   the directory is empty.
+//   @return True if deletion was successful, false otherwise
+
 enum Dqn_FsInfoType
 {
     Dqn_FsInfoType_Unknown,
@@ -27,45 +36,43 @@ struct Dqn_FsInfo
     uint64_t       size;
 };
 
-// NOTE: File System API
-// =============================================================================
-// TODO(dqn): We should have a Dqn_String8 interface and a CString interface
-DQN_API bool       Dqn_Fs_Exists(Dqn_String8 path);
-DQN_API bool       Dqn_Fs_DirExists(Dqn_String8 path);
-DQN_API Dqn_FsInfo Dqn_Fs_GetInfo(Dqn_String8 path);
-DQN_API bool       Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+DQN_API bool         Dqn_Fs_Exists   (Dqn_String8 path);
+DQN_API bool         Dqn_Fs_DirExists(Dqn_String8 path);
+DQN_API Dqn_FsInfo   Dqn_Fs_GetInfo  (Dqn_String8 path);
+DQN_API bool         Dqn_Fs_Copy     (Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+DQN_API bool         Dqn_Fs_MakeDir  (Dqn_String8 path);
+DQN_API bool         Dqn_Fs_Move     (Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+DQN_API bool         Dqn_Fs_Delete   (Dqn_String8 path);
 
-DQN_API bool       Dqn_Fs_MakeDir(Dqn_String8 path);
-DQN_API bool       Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite);
+// NOTE: R/W Entire File ===========================================================================
+// NOTE: API =======================================================================================
+// @proc Dqn_Fs_WriteString8, Dqn_Fs_WriteCString8
+//   @desc Write the string to a file at the path overwriting if necessary.
 
-// TODO(dqn): This doesn't work on directories unless you delete the files
-// in that directory first.
-DQN_API bool       Dqn_Fs_Delete(Dqn_String8 path);
+// @proc Dqn_Fs_ReadString8, Dqn_Fs_ReadCString8
+//   @desc Read the file at the path to a string.
 
-// NOTE: Read/Write Entire File API
-// =============================================================================
-// file_size: (Optional) The size of the file in bytes, the allocated buffer is (file_size + 1 [null terminator]) in bytes.
-DQN_API bool       Dqn_Fs_WriteCString8(char const *file_path, Dqn_usize file_path_size, char const *buffer, Dqn_usize buffer_size);
-DQN_API bool       Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer);
-
-/// Read a file at the specified path into memory.
-/// @param[in] path Path to the file to read
-/// @param[in] path_size The string size of the file path
-/// @param[out] file_size (Optional) Pass a pointer to receive the number of bytes read
-/// @param[in] allocator Allocator used to read the file to memory with
-/// @return A cstring with the read file, null pointer on failure.
 #define              Dqn_Fs_ReadCString8(path, path_size, file_size, allocator) Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE path, path_size, file_size, allocator)
-DQN_API char        *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator);
-
-/// Read a file at the specified path into memory.
-/// @param[in] file_path Path to the file to read
-/// @param[in] allocator Allocator used to read the file to memory with
-/// @return A string with the read file, invalid string on failure.
 #define              Dqn_Fs_ReadString8(path, allocator) Dqn_Fs_ReadString8_(DQN_LEAK_TRACE path, allocator)
-DQN_API Dqn_String8  Dqn_Fs_ReadString8_(DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator);
 
-// NOTE: Read/Write File Stream API
-// =============================================================================
+DQN_API bool         Dqn_Fs_WriteCString8(char const *file_path, Dqn_usize file_path_size, char const *buffer, Dqn_usize buffer_size);
+DQN_API bool         Dqn_Fs_WriteString8 (Dqn_String8 file_path, Dqn_String8 buffer);
+
+// NOTE: Internal ==================================================================================
+DQN_API char        *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator);
+DQN_API Dqn_String8  Dqn_Fs_ReadString8_ (DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator);
+
+// NOTE: R/W Stream API ============================================================================
+// NOTE: API =======================================================================================
+// @proc Dqn_Fs_OpenFile
+//   @desc Open a handle to the file
+
+// @proc Dqn_Fs_WriteFile
+//   @desc Append to the file specified by the handle with the given buffer.
+
+// @proc Dqn_Fs_CloseFile
+//   @desc Close the file at specified by the handle
+
 struct Dqn_FsFile
 {
     void    *handle;
@@ -90,12 +97,35 @@ enum Dqn_FsFileAccess
     Dqn_FsFileAccess_All        = Dqn_FsFileAccess_ReadWrite | Dqn_FsFileAccess_Execute,
 };
 
-DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access);
-DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize size);
-DQN_API void Dqn_Fs_CloseFile(Dqn_FsFile *file);
+DQN_API Dqn_FsFile Dqn_Fs_OpenFile (Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access);
+DQN_API bool       Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize size);
+DQN_API void       Dqn_Fs_CloseFile(Dqn_FsFile *file);
 
-// NOTE: Filesystem paths
-// =============================================================================
+// NOTE: File system paths =========================================================================
+// Helper data structure for building paths suitable for OS consumption.
+//
+// NOTE: API =======================================================================================
+// @proc Dqn_FsPath_AddRef, Dqn_FsPath_Add
+//   @desc Append a path to the file path. The passed in path can be specify
+//   both a single level or multiple directories with different path separators.
+//   The path will be decomposed into individual sections in the function.
+//
+//   For example passing
+//     - "path/to/your/desired/folder" is valid
+//     - "path" is valid
+//     - "path/to\your/desired\folder" is valid
+
+// @proc Dqn_FsPath_Pop
+//   @desc Remove the last appended path level from the current path stored in
+//   the FsPath.
+//
+//   For example "path/to/your/desired/folder" popped produces
+//   "path/to/your/desired"
+
+// @proc Dqn_FsPath_ConvertString8
+//   @desc Convert the path specified in the string to the OS native separated 
+//   path.
+
 #if !defined(Dqn_FsPathOSSeperator)
     #if defined(DQN_OS_WIN32)
         #define Dqn_FsPathOSSeperator "\\"
@@ -125,7 +155,6 @@ DQN_API bool        Dqn_FsPath_Add               (Dqn_Arena *arena, Dqn_FsPath *
 DQN_API bool        Dqn_FsPath_Pop               (Dqn_FsPath *fs_path);
 DQN_API Dqn_String8 Dqn_FsPath_BuildWithSeparator(Dqn_Arena *arena, Dqn_FsPath const *fs_path, Dqn_String8 path_separator);
 DQN_API Dqn_String8 Dqn_FsPath_ConvertString8    (Dqn_Arena *arena, Dqn_String8 path);
-
 #define             Dqn_FsPath_BuildFwdSlash(arena, fs_path)  Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STRING8("/"))
 #define             Dqn_FsPath_BuildBackSlash(arena, fs_path) Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STRING8("\\"))
 
@@ -138,6 +167,11 @@ DQN_API Dqn_String8 Dqn_FsPath_ConvertString8    (Dqn_Arena *arena, Dqn_String8 
 #endif
 
 // NOTE: [$DATE] Dqn_Date ==========================================================================
+// NOTE: API =======================================================================================
+// @proc Dqn_Date_EpochTime
+//    @desc Produce the time elapsed since the Unix epoch
+//    (e.g. 1970-01-01T00:00:00Z) in seconds
+
 struct Dqn_DateHMSTimeString
 {
     char    date[DQN_ARRAY_UCOUNT("YYYY-MM-SS")];
@@ -158,13 +192,10 @@ struct Dqn_DateHMSTime
     uint8_t seconds;
 };
 
-// @return The current time at the point of invocation
-DQN_API Dqn_DateHMSTime       Dqn_Date_HMSLocalTimeNow();
+DQN_API Dqn_DateHMSTime       Dqn_Date_HMSLocalTimeNow      ();
 DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeStringNow(char date_separator = '-', char hms_separator = ':');
-DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString(Dqn_DateHMSTime time, char date_separator = '-', char hms_separator = ':');
-
-// return: The time elapsed since Unix epoch (1970-01-01T00:00:00Z) in seconds
-DQN_API uint64_t Dqn_Date_EpochTime();
+DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString   (Dqn_DateHMSTime time, char date_separator = '-', char hms_separator = ':');
+DQN_API uint64_t              Dqn_Date_EpochTime            ();
 
 // NOTE: [$W32H] Win32 Min Header ==================================================================
 #if defined(DQN_OS_WIN32)
@@ -192,71 +223,70 @@ DQN_API uint64_t Dqn_Date_EpochTime();
 #endif // !defined(DQN_NO_WIN32_MIN_HEADER) && !defined(_INC_WINDOWS)
 
 // NOTE: [$WIND] Dqn_Win ===========================================================================
+// NOTE: API =======================================================================================
+// @proc Dqn_Win_LastErrorToBuffer, Dqn_Win_LastError
+//   @desc Retrieve the latest error code and message Windows produced for the 
+//   most recent Win32 API call.
+
+// @proc Dqn_Win_MakeProcessDPIAware
+//   @desc Call once at application start-up to ensure that the application is
+//   DPI aware on Windows and ensure that application UI is scaled up
+//   appropriately for the monitor.
+
 struct Dqn_WinErrorMsg
 {
     unsigned long code;
     char          data[DQN_KILOBYTES(64) - 1]; // Maximum error size
     unsigned long size;
 };
-DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_WinErrorMsg *msg);
+DQN_API void            Dqn_Win_LastErrorToBuffer(Dqn_WinErrorMsg *msg);
 DQN_API Dqn_WinErrorMsg Dqn_Win_LastError();
+DQN_API void            Dqn_Win_MakeProcessDPIAware();
 
-/// Call once at application start-up to ensure that the application is DPI
-/// aware on Windows and ensure that application UI is scaled up appropriately
-/// for the monitor.
-DQN_API void Dqn_Win_MakeProcessDPIAware();
+// NOTE: Windows String8 <-> String16 ===========================================
+// Convert a UTF8 <-> UTF16 string.
+//
+// The exact size buffer required for this function can be determined by
+// calling this function with the 'dest' set to null and 'dest_size' set to 0,
+// the return size is the size required for conversion not-including space for
+// the null-terminator. This function *always* null-terminates the input
+// buffer.
+//
+// Returns the number of u8's (for UTF16->8) OR u16's (for UTF8->16)
+// written/required for conversion. 0 if there was a conversion error and can be
+// queried using 'Dqn_Win_LastError'
 
-// NOTE: Windows String8 To String16
-// -----------------------------------------------------------------------------
-/// Convert a UTF8 to UTF16 string.
-///
-/// The exact size buffer required for this function can be determined by
-/// calling this function with the 'dest' set to null and 'dest_size' set to 0,
-/// the return size is the size required for conversion not-including space for
-/// the null-terminator. This function *always* null-terminates the input
-/// buffer.
-///
-/// @return The number of u16's written/required for conversion. 0 if there was
-/// a conversion error and can be queried using 'Dqn_Win_LastError'
-DQN_API int          Dqn_Win_CString8ToCString16(const char *src, int src_size, wchar_t *dest, int dest_size);
-DQN_API int          Dqn_Win_String8ToCString16(Dqn_String8 src, wchar_t *dest, int dest_size);
-DQN_API Dqn_String16 Dqn_Win_String8ToString16Allocator(Dqn_String8 src, Dqn_Allocator allocator);
+DQN_API int             Dqn_Win_CString8ToCString16        (char const *src, int src_size, wchar_t *dest, int dest_size);
+DQN_API int             Dqn_Win_String8ToCString16         (Dqn_String8 src, wchar_t *dest, int dest_size);
+DQN_API Dqn_String16    Dqn_Win_String8ToString16Allocator (Dqn_String8 src, Dqn_Allocator allocator);
 
-// NOTE: Windows String16 To String8
-// -----------------------------------------------------------------------------
-/// Convert a UTF16 to UTF8 string.
-///
-/// The exact size buffer required for this function can be determined by
-/// calling this function with the 'dest' set to null and 'dest_size' set to 0,
-/// the return size is the size required for conversion not-including space for
-/// the null-terminator. This function *always* null-terminates the input
-/// buffer.
-///
-/// @return The number of u8's written/required for conversion. 0 if there was
-/// a conversion error and can be queried using 'Dqn_Win_LastError'
-DQN_API int         Dqn_Win_CString16ToCString8(const wchar_t *src, int src_size, char *dest, int dest_size);
-DQN_API Dqn_String8 Dqn_Win_CString16ToString8Allocator(const wchar_t *src, int src_size, Dqn_Allocator allocator);
-DQN_API int         Dqn_Win_String16ToCString8(Dqn_String16 src, char *dest, int dest_size);
-DQN_API Dqn_String8 Dqn_Win_String16ToString8Allocator(Dqn_String16 src, Dqn_Allocator allocator);
+DQN_API int             Dqn_Win_CString16ToCString8        (wchar_t const *src, int src_size, char *dest, int dest_size);
+DQN_API Dqn_String8     Dqn_Win_CString16ToString8Allocator(wchar_t const *src, int src_size, Dqn_Allocator allocator);
+DQN_API int             Dqn_Win_String16ToCString8         (Dqn_String16 src, char *dest, int dest_size);
+DQN_API Dqn_String8     Dqn_Win_String16ToString8Allocator (Dqn_String16 src, Dqn_Allocator allocator);
 
-// NOTE: Windows Executable Directory
-// -----------------------------------------------------------------------------
-/// Evaluate the current executable's directory that is running when this
-/// function is called.
-/// @param[out] buffer The buffer to write the executable directory into. Set
-/// this to null to calculate the required buffer size for the directory.
-/// @param[in] size The size of the buffer given. Set this to 0 to calculate the
-/// required buffer size for the directory.
-/// @return The length of the executable directory string. If this return value
-/// exceeds the capacity of the 'buffer', the 'buffer' is untouched.
-DQN_API Dqn_usize    Dqn_Win_EXEDirW(wchar_t *buffer, Dqn_usize size);
-DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena);
+// NOTE: Path navigatoin ===========================================================================
+// NOTE: API =======================================================================================
+// @proc Dqn_Win_EXEDirW, Dqn_Win_EXEDirWArena
+//   @desc Evaluate the current executable's directory that is running when this
+//   function is called.
+//   @param[out] buffer The buffer to write the executable directory into. Set
+//   this to null to calculate the required buffer size for the directory.
+//   @param[in] size The size of the buffer given. Set this to 0 to calculate the
+//   required buffer size for the directory.
+//   @return The length of the executable directory string. If this return value
+//   exceeds the capacity of the 'buffer', the 'buffer' is untouched.
 
-// @param[in] size (Optional) The size of the current directory string returned
-// @param[in] suffix (Optional) A suffix to append to the current working directory
-// @param[in] suffix_size (Optional) The size of the suffix to append
-DQN_API Dqn_String8  Dqn_Win_WorkingDir(Dqn_Allocator allocator, Dqn_String8 suffix);
-DQN_API Dqn_String16 Dqn_Win_WorkingDirW(Dqn_Allocator allocator, Dqn_String16 suffix);
+// @proc Dqn_Win_WorkingDir, Dqn_Win_WorkingDirW
+//   @param[in] suffix (Optional) A suffix to append to the current working directory
+
+// @proc Dqn_Win_FolderIterate, Dqn_Win_FolderWIterate
+//   @desc Iterate the files in the specified folder at the path
+#if 0
+    for (Dqn_WinFolderIterator it = {}; Dqn_Win_FolderIterate("C:/your/path/", &it); ) {
+        printf("%.*s\n", DQN_STRING_FMT(it.file_name));
+    }
+#endif
 
 struct Dqn_Win_FolderIteratorW
 {
@@ -272,11 +302,36 @@ struct Dqn_Win_FolderIterator
     char         file_name_buf[512];
 };
 
-DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it);
-DQN_API bool Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it);
+DQN_API Dqn_usize       Dqn_Win_EXEDirW       (wchar_t *buffer, Dqn_usize size);
+DQN_API Dqn_String16    Dqn_Win_EXEDirWArena  (Dqn_Arena *arena);
+DQN_API Dqn_String8     Dqn_Win_WorkingDir    (Dqn_Allocator allocator, Dqn_String8 suffix);
+DQN_API Dqn_String16    Dqn_Win_WorkingDirW   (Dqn_Allocator allocator, Dqn_String16 suffix);
+DQN_API bool            Dqn_Win_FolderIterate (Dqn_String8 path, Dqn_Win_FolderIterator *it);
+DQN_API bool            Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it);
 
 #if !defined(DQN_NO_WINNET)
 // NOTE: [$WINN] Dqn_WinNet ========================================================================
+// TODO(dqn): Useful options to expose in the handle
+// https://docs.microsoft.com/en-us/windows/win32/wininet/option-flags
+// INTERNET_OPTION_CONNECT_RETRIES -- default is 5 retries
+// INTERNET_OPTION_CONNECT_TIMEOUT -- milliseconds
+// INTERNET_OPTION_RECEIVE_TIMEOUT
+// INTERNET_OPTION_SEND_TIMEOUT
+//
+// NOTE: API =======================================================================================
+// @proc Dqn_Win_NetHandleInitHTTPMethod, Dqn_Win_NetHandleInitHTTPMethodCString
+//   @desc Setup a handle to the URL with the given HTTP verb.
+//
+//   This function is the same as calling Dqn_Win_NetHandleInit() followed by
+//   Dqn_Win_NetHandleSetHTTPMethod().
+//
+//   @param http_method The HTTP request type, e.g. "GET" or "POST" e.t.c
+
+// @proc Dqn_Win_NetHandleSetHTTPMethod
+//   @desc Set the HTTP request method for the given handle. This function can
+//   be used on a pre-existing valid handle that has at the minimum been 
+//   initialised.
+
 enum Dqn_WinNetHandleState
 {
     Dqn_WinNetHandleState_Invalid,
@@ -324,34 +379,6 @@ struct Dqn_WinNetHandle
     Dqn_WinNetHandleState state;
 };
 
-// TODO(dqn): Useful options to expose in the handle
-// https://docs.microsoft.com/en-us/windows/win32/wininet/option-flags
-// INTERNET_OPTION_CONNECT_RETRIES -- default is 5 retries
-// INTERNET_OPTION_CONNECT_TIMEOUT -- milliseconds
-// INTERNET_OPTION_RECEIVE_TIMEOUT
-// INTERNET_OPTION_SEND_TIMEOUT
-
-// Setup a handle to the URL with the given HTTP verb.
-DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitCString(char const *url, int url_size);
-DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInit(Dqn_String8 url);
-
-// Setup a handle to the URL with the given HTTP verb.
-//
-// This function is the same as calling Dqn_Win_NetHandleInit() followed by
-// Dqn_Win_NetHandleSetHTTPMethod().
-//
-// @param http_method The HTTP request type, e.g. "GET" or "POST" e.t.c
-DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitHTTPMethodCString(char const *url, int url_size, char const *http_method);
-DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitHTTPMethod(Dqn_String8 url, Dqn_String8 http_method);
-
-DQN_API void             Dqn_Win_NetHandleClose(Dqn_WinNetHandle *handle);
-DQN_API bool             Dqn_Win_NetHandleIsValid(Dqn_WinNetHandle const *handle);
-DQN_API void             Dqn_Win_NetHandleSetUserAgentCString(Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
-
-// Set the HTTP request method for the given handle. This function can be used
-// on a pre-existing valid handle that has at the minimum been initialised.
-DQN_API bool             Dqn_Win_NetHandleSetHTTPMethod(Dqn_WinNetHandle *handle, char const *method);
-
 enum Dqn_WinNetHandleRequestHeaderFlag
 {
     Dqn_WinNetHandleRequestHeaderFlag_Add,
@@ -359,9 +386,6 @@ enum Dqn_WinNetHandleRequestHeaderFlag
     Dqn_WinNetHandleRequestHeaderFlag_Replace,
     Dqn_WinNetHandleRequestHeaderFlag_Count,
 };
-
-DQN_API bool Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle, char const *header, int header_size, uint32_t mode);
-DQN_API bool Dqn_Win_NetHandleSetRequestHeaderString8(Dqn_WinNetHandle *handle, Dqn_String8 header, uint32_t mode);
 
 struct Dqn_WinNetHandleResponse
 {
@@ -373,33 +397,35 @@ struct Dqn_WinNetHandleResponse
     uint64_t     content_length;
     Dqn_String8  content_type;
 };
-DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *handle, Dqn_Allocator allocator, char const *post_data, unsigned long post_data_size);
 
-DQN_API bool             Dqn_Win_NetHandlePump(Dqn_WinNetHandle *handle, char *dest, int dest_size, size_t *download_size);
-DQN_API char *           Dqn_Win_NetHandlePumpCString8(Dqn_WinNetHandle *handle, Dqn_Arena *arena, size_t *download_size);
-DQN_API Dqn_String8      Dqn_Win_NetHandlePumpString8(Dqn_WinNetHandle *handle, Dqn_Arena *arena);
-
-DQN_API void             Dqn_Win_NetHandlePumpToCRTFile(Dqn_WinNetHandle *handle, FILE *file);
-DQN_API char            *Dqn_Win_NetHandlePumpToAllocCString(Dqn_WinNetHandle *handle, size_t *download_size);
-DQN_API Dqn_String8      Dqn_Win_NetHandlePumpToAllocString(Dqn_WinNetHandle *handle);
+DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitCString             (char const *url, int url_size);
+DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInit                    (Dqn_String8 url);
+DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitHTTPMethodCString   (char const *url, int url_size, char const *http_method);
+DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitHTTPMethod          (Dqn_String8 url, Dqn_String8 http_method);
+DQN_API void                     Dqn_Win_NetHandleClose                   (Dqn_WinNetHandle *handle);
+DQN_API bool                     Dqn_Win_NetHandleIsValid                 (Dqn_WinNetHandle const *handle);
+DQN_API void                     Dqn_Win_NetHandleSetUserAgentCString     (Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
+DQN_API bool                     Dqn_Win_NetHandleSetHTTPMethod           (Dqn_WinNetHandle *handle, char const *method);
+DQN_API bool                     Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle, char const *header, int header_size, uint32_t mode);
+DQN_API bool                     Dqn_Win_NetHandleSetRequestHeaderString8 (Dqn_WinNetHandle *handle, Dqn_String8 header, uint32_t mode);
+DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest             (Dqn_WinNetHandle *handle, Dqn_Allocator allocator, char const *post_data, unsigned long post_data_size);
+DQN_API bool                     Dqn_Win_NetHandlePump                    (Dqn_WinNetHandle *handle, char *dest, int dest_size, size_t *download_size);
+DQN_API char *                   Dqn_Win_NetHandlePumpCString8            (Dqn_WinNetHandle *handle, Dqn_Arena *arena, size_t *download_size);
+DQN_API Dqn_String8              Dqn_Win_NetHandlePumpString8             (Dqn_WinNetHandle *handle, Dqn_Arena *arena);
+DQN_API void                     Dqn_Win_NetHandlePumpToCRTFile           (Dqn_WinNetHandle *handle, FILE *file);
+DQN_API char *                   Dqn_Win_NetHandlePumpToAllocCString      (Dqn_WinNetHandle *handle, size_t *download_size);
+DQN_API Dqn_String8              Dqn_Win_NetHandlePumpToAllocString       (Dqn_WinNetHandle *handle);
 #endif // !defined(DQN_NO_WINNET)
 #endif // defined(DQN_OS_WIN32)
 
 // NOTE: [$OSYS] Dqn_OS ============================================================================
-/// Generate cryptographically secure bytes
-DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size);
+// NOTE: API =======================================================================================
+// @proc Dqn_OS_SecureRNGBytes
+//   @desc Generate cryptographically secure bytes
 
-// return: The directory without the trailing '/' or ('\' for windows). Empty
-//         string with a nullptr if it fails.
-DQN_API Dqn_String8 Dqn_OS_EXEDir(Dqn_Allocator allocator);
-
-DQN_API void Dqn_OS_SleepMs(Dqn_uint milliseconds);
-
-DQN_API uint64_t Dqn_OS_PerfCounterNow   ();
-DQN_API Dqn_f64  Dqn_OS_PerfCounterS     (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64  Dqn_OS_PerfCounterMs    (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64  Dqn_OS_PerfCounterMicroS(uint64_t begin, uint64_t end);
-DQN_API Dqn_f64  Dqn_OS_PerfCounterNs    (uint64_t begin, uint64_t end);
+// @proc Dqn_OS_EXEDir
+//   @desc Retrieve the executable directory without the trailing '/' or 
+//   ('\' for windows). If this fails an empty string is returned.
 
 /// Record time between two time-points using the OS's performance counter.
 struct Dqn_OSTimer
@@ -408,12 +434,20 @@ struct Dqn_OSTimer
     uint64_t end;
 };
 
-DQN_API Dqn_OSTimer Dqn_OS_TimerBegin();
-DQN_API void        Dqn_OS_TimerEnd    (Dqn_OSTimer *timer);
-DQN_API Dqn_f64     Dqn_OS_TimerS      (Dqn_OSTimer timer);
-DQN_API Dqn_f64     Dqn_OS_TimerMs     (Dqn_OSTimer timer);
-DQN_API Dqn_f64     Dqn_OS_TimerMicroS (Dqn_OSTimer timer);
-DQN_API Dqn_f64     Dqn_OS_TimerNs     (Dqn_OSTimer timer);
+DQN_API bool        Dqn_OS_SecureRNGBytes   (void *buffer, uint32_t size);
+DQN_API Dqn_String8 Dqn_OS_EXEDir           (Dqn_Allocator allocator);
+DQN_API void        Dqn_OS_SleepMs          (Dqn_uint milliseconds);
+DQN_API uint64_t    Dqn_OS_PerfCounterNow   ();
+DQN_API Dqn_f64     Dqn_OS_PerfCounterS     (uint64_t begin, uint64_t end);
+DQN_API Dqn_f64     Dqn_OS_PerfCounterMs    (uint64_t begin, uint64_t end);
+DQN_API Dqn_f64     Dqn_OS_PerfCounterMicroS(uint64_t begin, uint64_t end);
+DQN_API Dqn_f64     Dqn_OS_PerfCounterNs    (uint64_t begin, uint64_t end);
+DQN_API Dqn_OSTimer Dqn_OS_TimerBegin       ();
+DQN_API void        Dqn_OS_TimerEnd         (Dqn_OSTimer *timer);
+DQN_API Dqn_f64     Dqn_OS_TimerS           (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerMs          (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerMicroS      (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerNs          (Dqn_OSTimer timer);
 
 // OS_TimedBlock provides a extremely primitive way of measuring the duration of
 // code blocks, by sprinkling DQN_OS_TIMED_BLOCK_RECORD("record label"), you can

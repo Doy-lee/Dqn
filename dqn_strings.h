@@ -17,13 +17,13 @@
 //   @desc Calculate the size of a cstring literal/array at compile time
 //   @param literal The cstring literal/array to calculate the size for
 //   @return The size of the cstring not including the null-terminating byte
-//
+
 // @proc Dqn_CString8_FSize, Dqn_CString8_FVSize
 //   Calculate the required size to format the given format cstring.
 //   @param[in] fmt The format string to calculate the size for
 //   @return The size required to format the string, not including the null
 //   terminator.
-//
+
 // @proc Dqn_CString8_Size
 //   @desc Calculate the string length of the null-terminated string.
 //   @param[in] a The string whose length is to be determined
@@ -369,32 +369,31 @@ DQN_API Dqn_String8 Dqn_String8_Copy_                (DQN_LEAK_TRACE_FUNCTION Dq
 
 #if !defined(DQN_NO_FSTRING8)
 // NOTE: [$FSTR] Dqn_FString8 ======================================================================
-// NOTE: API
-//
+// NOTE: API =======================================================================================
 // @proc Dqn_FString8_InitF
 //   @desc Create a fixed string from the format string. The result string is
 //   null-terminated.
 //   @param fmt[in] Format string specifier to create the fixed string from
 //   @return The created string, truncated if there was insufficient space
-//
+
 // @proc Dqn_FString8_Max
 //   @desc @param string[in] The string to query the maximum capacity of
 //   @return Maximum capacity of the fixed string
-//
+
 // @proc Dqn_FString8_Clear
 //   @desc Reset the characters in the string
 //   @param string[in] The string to clear
-//
+
 // @proc Dqn_FString8_AppendFV
 //   @desc Append a format string to the fixed string. On failure the string is
 //   appended to but truncated ensuring null-termination.
 //   @param string[in] The string to append to
 //   @param fmt[in] Format string to append to the fixed string
 //   @return True if append was successful, false otherwise.
-//
+
 // @proc Dqn_FString8_AppendF
 //   @desc @copydocs Dqn_FString8_AppendF
-//
+
 // @proc Dqn_FString8_AppendCString8
 //   @desc Append a cstring to the fixed string. On failure the string is
 //   appended to but truncated ensuring null-termination.
@@ -402,7 +401,7 @@ DQN_API Dqn_String8 Dqn_String8_Copy_                (DQN_LEAK_TRACE_FUNCTION Dq
 //   @param value[in] Cstring to append to the fixed string
 //   @param size[in] Size of the cstring
 //   @return True if append was successful, false otherwise.
-//
+
 // @proc Dqn_FString8_Append
 //   @desc Append a string to the fixed string. On failure the string is
 //   appended to but truncated ensuring null-termination.
@@ -410,23 +409,23 @@ DQN_API Dqn_String8 Dqn_String8_Copy_                (DQN_LEAK_TRACE_FUNCTION Dq
 //   @param value[in] String to append to the fixed string
 //   determined before appending.
 //   @return True if append was successful, false otherwise.
-//
+
 // @proc Dqn_FString8_ToString8
 //   @desc Convert a fixed string to a string. The string holds a reference to the
 //   fixed string and is invalidated once fixed string is deleted.
 //   @param string[in] The fixed string to create a string from
 //   @return String referencing the contents of `string`
-//
+
 // @proc Dqn_FString8_Eq
 //   @desc @see Dqn_String8_Eq
-//
+
 // @proc Dqn_FString8_EqString8
 //   @desc @see Dqn_String8_Eq
-//
+
 // @proc Dqn_FString8_EqInsensitive
 //   @desc Compare a string for equality, case insensitive
 //   @see Dqn_String8_Eq
-//
+
 // @proc Dqn_FString8_EqString8Insensitive
 //   @desc Compare a string for equality, case insensitive
 //   @see Dqn_String8_Eq
@@ -467,6 +466,31 @@ template <Dqn_usize A, Dqn_usize B> bool            Dqn_FString8_EqFString8Insen
 #endif // !defined(DQN_NO_FSTRING8)
 
 // NOTE: [$STRB] Dqn_String8Builder ================================================================
+// NOTE: API =======================================================================================
+// @proc Dqn_String8Builder_AppendRef, Dqn_String8_AppendCopy,
+// Dqn_String8_AppendFV, Dqn_String8_AppendF
+//   @desc Append a string to the list of strings in the builder.
+//
+//   The string is appended to the builder as follows
+//   - AppendRef: By reference
+//   - AppendCopy: By copy using the builder's allocator to copy the string
+//   - AppendFV, AppendF: Using a format string, allocated using the builder's
+//     allocator
+//
+//   The string's data must persist whilst the string builder is being used.
+//   @param builder The builder to append the string to
+//   @param string The string to append to the builder
+//   @return True if append was successful, false if parameters are invalid
+//   or memory allocation failure.
+
+// @proc Dqn_String8Builder_Build
+//   @desc Build the list of strings into the final composite string from the
+//   string builder
+//   @param builder The string builder to build the string from
+//   @param allocator The allocator to use to build the string
+//   @return The string if build was successful, empty string if parameters are
+//   invalid or memory allocation failure.
+
 struct Dqn_String8Builder
 {
     Dqn_Allocator    allocator;   ///< Allocator to use to back the string list
@@ -476,45 +500,50 @@ struct Dqn_String8Builder
     Dqn_usize        count;       ///< The number of links in the linked list of strings
 };
 
-/// Append a string to the list of strings in the builder by reference.
-/// The string's data must persist whilst the string builder is being used.
-/// @param builder The builder to append the string to
-/// @param string The string to append to the builder
-/// @return True if append was successful, false if parameters are invalid
-/// or memory allocation failure.
-bool Dqn_String8Builder_AppendRef(Dqn_String8Builder *builder, Dqn_String8 string);
+#define             Dqn_String8Builder_AppendFV(builder, fmt, args) Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE builder, fmt, args)
+DQN_API bool        Dqn_String8Builder_AppendF   (Dqn_String8Builder *builder, char const *fmt, ...);
+DQN_API bool        Dqn_String8Builder_AppendRef (Dqn_String8Builder *builder, Dqn_String8 string);
+DQN_API bool        Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_String8 string);
+DQN_API Dqn_String8 Dqn_String8Builder_Build     (Dqn_String8Builder const *builder, Dqn_Allocator allocator);
 
-/// Append a string to the list of strings in the builder by copy.
-/// The string is copied using the builder's allocator before appending.
-/// @param builder The builder to append the string to
-/// @param string The string to append to the builder
-/// @return True if append was successful, false if parameters are invalid
-/// or memory allocation failure.
-bool Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_String8 string);
-
-/// @copydoc Dqn_String8Builder_AppendF
-/// @param args The variable argument list to use in the format string
-#define Dqn_String8Builder_AppendFV(builder, fmt, args) Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE builder, fmt, args)
-bool Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *builder, char const *fmt, va_list args);
-
-/// Append a printf-style format string to the list of strings in the builder.
-/// @param builder The builder to append the string to
-/// @param fmt The format string to use
-/// @return True if append was successful, false if parameters are invalid
-/// or memory allocation failure.
-bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ...);
-
-/// Build the list of strings into the final composite string from the string
-/// builder
-/// @param builder The string builder to build the string from
-/// @param allocator The allocator to use to build the string
-/// @return The string if build was successful, empty string if parameters are
-/// invalid or memory allocation failure.
-Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allocator allocator);
+// NOTE: Internal ==================================================================================
+DQN_API bool        Dqn_String8Builder_AppendFV_ (DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *builder, char const *fmt, va_list args);
 
 #if !defined(DQN_NO_JSON_BUILDER)
 // NOTE: [$JSON] Dqn_JSONBuilder ===================================================================
+// Basic helper class to construct JSON output to a string
 // TODO(dqn): We need to write tests for this
+//
+// NOTE: API =======================================================================================
+// @proc Dqn_JSONBuilder_Build
+//   @desc Convert the internal JSON buffer in the builder into a string.
+//   @param[in] arena The allocator to use to build the string
+
+// @proc Dqn_JSONBuilder_KeyValue, Dqn_JSONBuilder_KeyValueF
+//   @desc Add a JSON key value pair untyped. The value is emitted directly 
+//   without checking the contents of value.
+//
+//   All other functions internally call into this function which is the main
+//   workhorse of the builder.
+
+// @proc Dqn_JSON_Builder_ObjectEnd
+//   @desc End a JSON object in the builder, generates internally a '}' string
+
+// @proc Dqn_JSON_Builder_ArrayEnd
+//   @desc End a JSON array in the builder, generates internally a ']' string
+
+// @proc Dqn_JSONBuilder_LiteralNamed
+//   @desc Add a named JSON key-value object whose value is directly written to
+//   the following '"<key>": <value>' (e.g. useful for emitting the 'null'
+//   value)
+
+// @proc Dqn_JSONBuilder_U64Named,  Dqn_JSONBuilder_U64,
+//       Dqn_JSONBuilder_I64Named,  Dqn_JSONBuilder_I64,
+//       Dqn_JSONBuilder_F64Named,  Dqn_JSONBuilder_F64,
+//       Dqn_JSONBuilder_BoolNamed, Dqn_JSONBuilder_Bool,
+//   @desc Add the named JSON data type as a key-value object. Generates 
+//   internally the string '"<key>": <value>'
+
 enum Dqn_JSONBuilderItem {
     Dqn_JSONBuilderItem_Empty,
     Dqn_JSONBuilderItem_OpenContainer,
@@ -522,7 +551,6 @@ enum Dqn_JSONBuilderItem {
     Dqn_JSONBuilderItem_KeyValue,
 };
 
-/// Basic helper class to construct JSON string output
 struct Dqn_JSONBuilder {
     bool                use_stdout;        ///< When set, ignore the string builder and dump immediately to stdout
     Dqn_String8Builder  string_builder;    ///< (Internal)
@@ -548,82 +576,29 @@ struct Dqn_JSONBuilder {
                    Dqn_JSONBuilder_ArrayEnd(builder))
 
 
-/// Initialise a JSON builder
-Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_indent);
+DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init            (Dqn_Allocator allocator, int spaces_per_indent);
+DQN_API Dqn_String8     Dqn_JSONBuilder_Build           (Dqn_JSONBuilder const *builder, Dqn_Allocator allocator);
+DQN_API void            Dqn_JSONBuilder_KeyValue        (Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+DQN_API void            Dqn_JSONBuilder_KeyValueF       (Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, ...);
+DQN_API void            Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
+DQN_API void            Dqn_JSONBuilder_ObjectEnd       (Dqn_JSONBuilder *builder);
+DQN_API void            Dqn_JSONBuilder_ArrayBeginNamed (Dqn_JSONBuilder *builder, Dqn_String8 name);
+DQN_API void            Dqn_JSONBuilder_ArrayEnd        (Dqn_JSONBuilder *builder);
+DQN_API void            Dqn_JSONBuilder_StringNamed     (Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+DQN_API void            Dqn_JSONBuilder_LiteralNamed    (Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
+DQN_API void            Dqn_JSONBuilder_U64Named        (Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
+DQN_API void            Dqn_JSONBuilder_I64Named        (Dqn_JSONBuilder *builder, Dqn_String8 key, int64_t value);
+DQN_API void            Dqn_JSONBuilder_F64Named        (Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places);
+DQN_API void            Dqn_JSONBuilder_BoolNamed       (Dqn_JSONBuilder *builder, Dqn_String8 key, bool value);
 
-/// Convert the internal JSON buffer in the builder into a string.
-///
-/// @param[in] arena The allocator to use to build the string
-Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder const *builder, Dqn_Allocator allocator);
-
-/// Add a JSON key value pair untyped. The value is emitted directly without
-/// checking the contents of value.
-///
-/// All other functions internally call into this function which is the main
-/// workhorse of the builder.
-void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-
-void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, ...);
-
-/// Begin a named JSON object for writing into in the builder
-///
-/// Generates internally a string like '"<name>": {'
-void    Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
-#define Dqn_JSONBuilder_ObjectBegin(builder) Dqn_JSONBuilder_ObjectBeginNamed(builder, DQN_STRING8(""))
-
-/// End a JSON object for writing into in the builder
-///
-/// Generates internally a string like '}'
-void  Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder);
-
-/// Begin a named JSON array for writing into in the builder
-///
-/// Generates internally a string like '"<name>": ['
-void    Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
-#define Dqn_JSONBuilder_ArrayBegin(builder) Dqn_JSONBuilder_ArrayBeginNamed(builder, DQN_STRING8(""))
-
-/// Begin a named JSON array for writing into in the builder
-///
-/// Generates internally a string like ']'
-void Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder);
-
-/// Add a named JSON string key-value object
-///
-/// Generates internally a string like '"<key>": "<value>"'
-void    Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-#define Dqn_JSONBuilder_String(builder, value) Dqn_JSONBuilder_StringNamed(builder, DQN_STRING8(""), value)
-
-/// Add a named JSON key-value object whose value is directly written
-///
-/// Generates internally a string like '"<key>": <value>' (e.g. useful for
-/// emitting the 'null' value)
-void    Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-#define Dqn_JSONBuilder_Literal(builder, value) Dqn_JSONBuilder_LiteralNamed(builder, DQN_STRING8(""), value)
-
-/// Add a named JSON u64 key-value object
-///
-/// Generates internally a string like '"<key>": <value>'
-void    Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
-#define Dqn_JSONBuilder_U64(builder, value) Dqn_JSONBuilder_U64Named(builder, DQN_STRING8(""), value)
-
-/// Add a JSON i64 key-value object
-///
-/// Generates internally a string like '"<key>": <value>'
-void    Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, int64_t value);
-#define Dqn_JSONBuilder_I64(builder, value) Dqn_JSONBuilder_I64Named(builder, DQN_STRING8(""), value)
-
-/// Add a JSON f64 key-value object
-///
-/// Generates internally a string like '"<key>": <value>'
-/// @param[in] decimal_places The number of decimal places to preserve. Maximum 16
-void    Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places);
-#define Dqn_JSONBuilder_F64(builder, value) Dqn_JSONBuilder_F64Named(builder, DQN_STRING8(""), value)
-
-/// Add a JSON bool key-value object
-///
-/// Generates internally a string like '"<key>": <value>'
-void    Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value);
-#define Dqn_JSONBuilder_Bool(builder, value) Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8(""), value)
+#define                 Dqn_JSONBuilder_ObjectBegin(builder) Dqn_JSONBuilder_ObjectBeginNamed(builder, DQN_STRING8(""))
+#define                 Dqn_JSONBuilder_ArrayBegin(builder) Dqn_JSONBuilder_ArrayBeginNamed(builder, DQN_STRING8(""))
+#define                 Dqn_JSONBuilder_String(builder, value) Dqn_JSONBuilder_StringNamed(builder, DQN_STRING8(""), value)
+#define                 Dqn_JSONBuilder_Literal(builder, value) Dqn_JSONBuilder_LiteralNamed(builder, DQN_STRING8(""), value)
+#define                 Dqn_JSONBuilder_U64(builder, value) Dqn_JSONBuilder_U64Named(builder, DQN_STRING8(""), value)
+#define                 Dqn_JSONBuilder_I64(builder, value) Dqn_JSONBuilder_I64Named(builder, DQN_STRING8(""), value)
+#define                 Dqn_JSONBuilder_F64(builder, value) Dqn_JSONBuilder_F64Named(builder, DQN_STRING8(""), value)
+#define                 Dqn_JSONBuilder_Bool(builder, value) Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8(""), value)
 #endif // !defined(DQN_NO_JSON_BUIDLER)
 
 // NOTE: [$CHAR] Dqn_Char ==========================================================================
@@ -643,9 +618,7 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 
 #if !defined(DQN_NO_HEX)
 // NOTE: [$BHEX] Dqn_Bin ===========================================================================
-//
-// NOTE: API
-//
+// NOTE: API =======================================================================================
 // @proc Dqn_Bin_U64ToHexU64String
 //   @desc Convert a 64 bit number to a hex string
 //   @param[in] number Number to convert to hexadecimal representation
@@ -653,21 +626,21 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 //   output of the hexadecimal string.
 //   @return The hexadecimal representation of the number. This string is always
 //   null-terminated.
-//
+
 // @proc Dqn_Bin_U64ToHex
 //   @copybrief Dqn_Bin_U64ToHexU64String
-//
+
 //   @param[in] allocator The memory allocator to use for the memory of the
 //   hexadecimal string.
 //   @copyparams Dqn_Bin_U64ToHexU64String
-//
+
 // @proc Dqn_Bin_HexBufferToU64
 //   @desc Convert a hexadecimal string a 64 bit value.
 //   Asserts if the hex string is too big to be converted into a 64 bit number.
-//
+
 // @proc Dqn_Bin_HexToU64
 //   @copydoc Dqn_Bin_HexToU64
-//
+
 // @proc Dqn_Bin_BytesToHexBuffer
 //   @desc Convert a binary buffer into its hex representation into dest.
 //
@@ -676,15 +649,15 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 //
 //   @return True if the conversion into the dest buffer was successful, false
 //   otherwise (e.g. invalid arguments).
-//
+
 // @proc Dqn_Bin_BytesToHexBufferArena
 //   @desc Convert a series of bytes into a string
 //   @return A null-terminated hex string, null pointer if allocation failed
-//
+
 // @proc Dqn_Bin_BytesToHexArena
 //   @copydoc Dqn_Bin_BytesToHexBufferArena
 //   @return A hex string, the string is invalid if conversion failed.
-//
+
 // @proc Dqn_Bin_HexBufferToBytes
 //   @desc Convert a hex string into binary at `dest`.
 //
@@ -700,20 +673,20 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 //
 //   @return The number of bytes written to `dest_size`, this value will *never*
 //   be greater than `dest_size`.
-//
+
 // @proc Dqn_Bin_HexToBytes
 //   @desc String8 variant of @see Dqn_Bin_HexBufferToBytes
-//
+
 // @proc Dqn_Bin_StringHexBufferToBytesUnchecked
 //   @desc Unchecked variant of @see Dqn_Bin_HexBufferToBytes
 //
 //   This function skips some string checks, it assumes the hex is a valid hex
 //   stream and that the arguments are valid e.g. no trimming or 0x prefix
 //   stripping is performed
-//
+
 // @proc Dqn_Bin_String
 //   @desc String8 variant of @see Dqn_Bin_HexBufferToBytesUnchecked
-//
+
 // @proc Dqn_Bin_HexBufferToBytesArena
 //   Dynamic allocating variant of @see Dqn_Bin_HexBufferToBytesUnchecked
 //
@@ -723,7 +696,7 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 //   @param[out] real_size The size of the buffer returned by the function
 //
 //   @return The byte representation of the hex string.
-//
+
 // @proc Dqn_Bin_HexToBytesArena
 //   @copybrief Dqn_Bin_HexBufferToBytesArena
 //
@@ -731,6 +704,7 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 //   @param[in] hex Hex string to convert into bytes
 //
 //   @return The byte representation of the hex string.
+
 struct Dqn_BinHexU64String
 {
     char    data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
@@ -765,12 +739,20 @@ DQN_API Dqn_usize            Dqn_Bin_HexToBytes               (Dqn_String8 hex, 
 DQN_API Dqn_String8          Dqn_Bin_HexToBytesArena          (Dqn_Arena *arena, Dqn_String8 hex);
 #endif // !defined(DQN_NO_HEX)
 
-/// Write the format string to the buffer truncating with a trailing ".." if
-/// there is insufficient space in the buffer followed by null-terminating the
-/// buffer (uses stb_sprintf underneath).
-/// @return The size of the string written to the buffer *not* including the
-/// null-terminator.
-DQN_API int Dqn_SNPrintF2DotsOnOverflow(char *buffer, int size, char const *fmt, ...);
+// NOTE: Other =====================================================================================
+// NOTE: API =======================================================================================
+// @proc Dqn_SNPrintFDotTruncate
+//   @desc Write the format string to the buffer truncating with a trailing ".."
+//   if there is insufficient space in the buffer followed by null-terminating
+//   the buffer (uses stb_sprintf underneath).
+//   @return The size of the string written to the buffer *not* including the
+//   null-terminator.
+//
+// @proc Dqn_U64ToString
+//   @desc Convert a 64 bit unsigned value to its string representation.
+//   @param[in] val Value to convert into a string
+//   @param[in] separator The separator to insert every 3 digits. Set this to
+//   0 if no separator is desired.
 
 struct Dqn_U64String
 {
@@ -778,11 +760,8 @@ struct Dqn_U64String
     uint8_t size;
 };
 
-/// Convert a 64 bit unsigned value to its string representation.
-/// @param[in] val Value to convert into a string
-/// @param[in] separator The separator to insert every 3 digits. Set this to
-/// 0 if no separator is desired.
-DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator);
+DQN_API int           Dqn_SNPrintFDotTruncate(char *buffer, int size, char const *fmt, ...);
+DQN_API Dqn_U64String Dqn_U64ToString        (uint64_t val, char separator);
 
 // NOTE: [$STBS] stb_sprintf =======================================================================
 // stb_sprintf - v1.10 - public domain snprintf() implementation

@@ -924,16 +924,16 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
     if (handle == INVALID_HANDLE_VALUE) {
         Dqn_WinErrorMsg msg = Dqn_Win_LastError();
         result.error_size =
-            DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(result.error,
-                                                           DQN_ARRAY_UCOUNT(result.error),
-                                                           "Open file failed: %.*s for \"%.*s\"",
-                                                           DQN_STRING_FMT(msg),
-                                                           DQN_STRING_FMT(path));
+            DQN_CAST(uint16_t) Dqn_SNPrintFDotTruncate(result.error,
+                                                       DQN_ARRAY_UCOUNT(result.error),
+                                                       "Open file failed: %.*s for \"%.*s\"",
+                                                       DQN_STRING_FMT(msg),
+                                                       DQN_STRING_FMT(path));
         return result;
     }
     #else
     if (access & Dqn_FsFileAccess_Execute) {
-        result.error_size = DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(
+        result.error_size = DQN_CAST(uint16_t) Dqn_SNPrintFDotTruncate(
             result.error,
             DQN_ARRAY_UCOUNT(result.error),
             "Open file failed: execute access not supported for \"%.*s\"",
@@ -1008,10 +1008,10 @@ DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize si
     if (!result) {
         Dqn_WinErrorMsg msg = Dqn_Win_LastError();
         file->error_size =
-            DQN_CAST(uint16_t) Dqn_SNPrintF2DotsOnOverflow(file->error,
-                                                           DQN_ARRAY_UCOUNT(file->error),
-                                                           "Write file failed: %.*s for %.*s",
-                                                           DQN_STRING_FMT(msg));
+            DQN_CAST(uint16_t) Dqn_SNPrintFDotTruncate(file->error,
+                                                       DQN_ARRAY_UCOUNT(file->error),
+                                                       "Write file failed: %.*s for %.*s",
+                                                       DQN_STRING_FMT(msg));
     }
     #else
     result = fwrite(buffer, DQN_CAST(Dqn_usize)size, 1 /*count*/, file->handle) == 1 /*count*/;

@@ -78,264 +78,157 @@ DQN_API void Dqn_Library_LeakTraceMarkFree         (Dqn_CallSite call_site, void
 
 // NOTE: [$BITS] Dqn_Bit ===========================================================================
 DQN_API void Dqn_Bit_UnsetInplace(uint32_t *flags, uint32_t bitfield);
-DQN_API void Dqn_Bit_SetInplace(uint32_t *flags, uint32_t bitfield);
-DQN_API bool Dqn_Bit_IsSet(uint32_t bits, uint32_t bits_to_set);
-DQN_API bool Dqn_Bit_IsNotSet(uint32_t bits, uint32_t bits_to_check);
+DQN_API void Dqn_Bit_SetInplace  (uint32_t *flags, uint32_t bitfield);
+DQN_API bool Dqn_Bit_IsSet       (uint32_t bits, uint32_t bits_to_set);
+DQN_API bool Dqn_Bit_IsNotSet    (uint32_t bits, uint32_t bits_to_check);
 
 // NOTE: [$SAFE] Dqn_Safe ==========================================================================
-// Assert the expression given in debug, whilst in release- assertion is
-// removed and the expression is evaluated and returned.
+// @proc Dqn_Safe_AddI64, Dqn_Safe_MulI64
+//   @desc Add/multiply 2 I64's together, safe asserting that the operation does 
+//   not overflow.
+//   @return The result of operation, INT64_MAX if it overflowed.
+
+// @proc Dqn_Safe_AddU64, Dqn_Safe_MulU64
+//   @desc Add/multiply 2 U64's together, safe asserting that the operation does 
+//   not overflow.
+//   @return The result of operation, UINT64_MAX if it overflowed.
+
+// @proc Dqn_Safe_SubU64, Dqn_Safe_SubU32
+//   @desc Subtract 2xU64 or 2xU32's together, safe asserting that the operation
+//   does not overflow.
+//   @return The result of operation, 0 if it overflowed.
+
+// @proc Dqn_Safe_SaturateCastUSizeToInt,
+//       Dqn_Safe_SaturateCastUSizeToI8,
+//       Dqn_Safe_SaturateCastUSizeToI16,
+//       Dqn_Safe_SaturateCastUSizeToI32,
+//       Dqn_Safe_SaturateCastUSizeToI64
 //
-// This function provides dual logic which allows handling of the condition
-// gracefully in release mode, but asserting in debug mode. This is an internal
-// function, prefer the @see DQN_CHECK macros.
+//       Dqn_Safe_SaturateCastU64ToUInt,
+//       Dqn_Safe_SaturateCastU64ToU8,
+//       Dqn_Safe_SaturateCastU64ToU16,
+//       Dqn_Safe_SaturateCastU64ToU32,
 //
-// @param assertion_expr[in] Expressin to assert on
-// @param fmt[in] Format string for providing a message on assertion
-// @return True if the expression evaluated to true, false otherwise.
-DQN_API bool DQN_CHECKF_(bool assertion_expr, Dqn_CallSite call_site, char const *fmt, ...);
+//       Dqn_Safe_SaturateCastUSizeToU8,
+//       Dqn_Safe_SaturateCastUSizeToU16,
+//       Dqn_Safe_SaturateCastUSizeToU32,
+//       Dqn_Safe_SaturateCastUSizeToU64
+//
+//       Dqn_Safe_SaturateCastISizeToInt,
+//       Dqn_Safe_SaturateCastISizeToI8,
+//       Dqn_Safe_SaturateCastISizeToI16,
+//       Dqn_Safe_SaturateCastISizeToI32,
+//       Dqn_Safe_SaturateCastISizeToI64,
+//
+//       int Dqn_Safe_SaturateCastISizeToUInt,
+//       Dqn_Safe_SaturateCastISizeToU8,
+//       Dqn_Safe_SaturateCastISizeToU16,
+//       Dqn_Safe_SaturateCastISizeToU32,
+//       Dqn_Safe_SaturateCastISizeToU64,
+//
+//       Dqn_Safe_SaturateCastI64ToISize,
+//       Dqn_Safe_SaturateCastI64ToI8,
+//       Dqn_Safe_SaturateCastI64ToI16,
+//       Dqn_Safe_SaturateCastI64ToI32,
+//
+//       Dqn_Safe_SaturateCastIntToI8,
+//       Dqn_Safe_SaturateCastIntToU8,
+//       Dqn_Safe_SaturateCastIntToU16,
+//       Dqn_Safe_SaturateCastIntToU32,
+//       Dqn_Safe_SaturateCastIntToU64,
+//
+//   @desc Truncate the lhs operand to the right clamping the result to the max
+//   value of the desired data type. Safe asserts if clamping occurs.
+//
+//   The following sentinel values are returned when saturated,
+//   USize -> Int:  INT_MAX
+//   USize -> I8:   INT8_MAX
+//   USize -> I16:  INT16_MAX
+//   USize -> I32:  INT32_MAX
+//   USize -> I64:  INT64_MAX
+//
+//   U64   -> UInt: UINT_MAX
+//   U64   -> U8:   UINT8_MAX
+//   U64   -> U16:  UINT16_MAX
+//   U64   -> U32:  UINT32_MAX
+//
+//   USize -> U8:   UINT8_MAX
+//   USize -> U16:  UINT16_MAX
+//   USize -> U32:  UINT32_MAX
+//   USize -> U64:  UINT64_MAX
+//
+//   ISize -> Int:  INT_MIN   or INT_MAX
+//   ISize -> I8:   INT8_MIN  or INT8_MAX
+//   ISize -> I16:  INT16_MIN or INT16_MAX
+//   ISize -> I32:  INT32_MIN or INT32_MAX
+//   ISize -> I64:  INT64_MIN or INT64_MAX
+//
+//   ISize -> UInt: 0 or UINT_MAX
+//   ISize -> U8:   0 or UINT8_MAX
+//   ISize -> U16:  0 or UINT16_MAX
+//   ISize -> U32:  0 or UINT32_MAX
+//   ISize -> U64:  0 or UINT64_MAX
+//
+//   I64 -> ISize:  DQN_ISIZE_MIN or DQN_ISIZE_MAX
+//   I64 -> I8:     INT8_MIN      or INT8_MAX
+//   I64 -> I16:    INT16_MIN     or INT16_MAX
+//   I64 -> I32:    INT32_MIN     or INT32_MAX
+//
+//   Int -> I8:     INT8_MIN  or INT8_MAX
+//   Int -> I16:    INT16_MIN or INT16_MAX
+//   Int -> U8:     0         or UINT8_MAX
+//   Int -> U16:    0         or UINT16_MAX
+//   Int -> U32:    0         or UINT32_MAX
+//   Int -> U64:    0         or UINT64_MAX
 
-// NOTE: Dqn_Safe Arithmetic
-// -----------------------------------------------------------------------------
-/// Add 2 I64's together, safe asserting that the operation does not overflow.
-/// @return The result of operation, INT64_MAX if it overflowed.
-DQN_API int64_t  Dqn_Safe_AddI64(int64_t a,  int64_t b);
+DQN_API int64_t      Dqn_Safe_AddI64                 (int64_t a,  int64_t b);
+DQN_API int64_t      Dqn_Safe_MulI64                 (int64_t a,  int64_t b);
 
-/// Multiply 2 I64's together, safe asserting that the operation does not
-/// overflow.
-/// @return The result of operation, IINT64_MAX if it overflowed.
-DQN_API int64_t Dqn_Safe_MulI64(int64_t a,  int64_t b);
+DQN_API uint64_t     Dqn_Safe_AddU64                 (uint64_t a, uint64_t b);
+DQN_API uint64_t     Dqn_Safe_MulU64                 (uint64_t a, uint64_t b);
 
-/// Add 2 U64's together, safe asserting that the operation does not overflow.
-/// @return The result of operation, UINT64_MAX if it overflowed.
-DQN_API uint64_t Dqn_Safe_AddU64(uint64_t a, uint64_t b);
+DQN_API uint64_t     Dqn_Safe_SubU64                 (uint64_t a, uint64_t b);
+DQN_API uint32_t     Dqn_Safe_SubU32                 (uint32_t a, uint32_t b);
 
-/// Subtract 2 U64's together, safe asserting that the operation does not
-/// overflow.
-/// @return The result of operation, 0 if it overflowed.
-DQN_API uint64_t Dqn_Safe_SubU64(uint64_t a, uint64_t b);
+DQN_API int          Dqn_Safe_SaturateCastUSizeToInt (Dqn_usize val);
+DQN_API int8_t       Dqn_Safe_SaturateCastUSizeToI8  (Dqn_usize val);
+DQN_API int16_t      Dqn_Safe_SaturateCastUSizeToI16 (Dqn_usize val);
+DQN_API int32_t      Dqn_Safe_SaturateCastUSizeToI32 (Dqn_usize val);
+DQN_API int64_t      Dqn_Safe_SaturateCastUSizeToI64 (Dqn_usize val);
 
-/// Multiple 2 U64's together, safe asserting that the operation does not
-/// overflow.
-/// @return The result of operation, UINT64_MAX if it overflowed.
-DQN_API uint64_t Dqn_Safe_MulU64(uint64_t a, uint64_t b);
+DQN_API unsigned int Dqn_Safe_SaturateCastU64ToUInt  (uint64_t val);
+DQN_API uint8_t      Dqn_Safe_SaturateCastU64ToU8    (uint64_t val);
+DQN_API uint16_t     Dqn_Safe_SaturateCastU64ToU16   (uint64_t val);
+DQN_API uint32_t     Dqn_Safe_SaturateCastU64ToU32   (uint64_t val);
 
-/// Subtract 2 U32's together, safe asserting that the operation does not
-/// overflow.
-/// @return The result of operation, 0 if it overflowed.
-DQN_API uint32_t Dqn_Safe_SubU32(uint32_t a, uint32_t b);
+DQN_API uint8_t      Dqn_Safe_SaturateCastUSizeToU8  (Dqn_usize val);
+DQN_API uint16_t     Dqn_Safe_SaturateCastUSizeToU16 (Dqn_usize val);
+DQN_API uint32_t     Dqn_Safe_SaturateCastUSizeToU32 (Dqn_usize val);
+DQN_API uint64_t     Dqn_Safe_SaturateCastUSizeToU64 (Dqn_usize val);
 
-// NOTE: Dqn_Safe_SaturateCastUSizeToI*
-// -----------------------------------------------------------------------------
-/// Truncate a usize to int clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API int Dqn_Safe_SaturateCastUSizeToInt(Dqn_usize val);
+DQN_API int          Dqn_Safe_SaturateCastISizeToInt (Dqn_isize val);
+DQN_API int8_t       Dqn_Safe_SaturateCastISizeToI8  (Dqn_isize val);
+DQN_API int16_t      Dqn_Safe_SaturateCastISizeToI16 (Dqn_isize val);
+DQN_API int32_t      Dqn_Safe_SaturateCastISizeToI32 (Dqn_isize val);
+DQN_API int64_t      Dqn_Safe_SaturateCastISizeToI64 (Dqn_isize val);
 
-/// Truncate a usize to I8 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT8_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API int8_t Dqn_Safe_SaturateCastUSizeToI8(Dqn_usize val);
-
-/// Truncate a usize to I16 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT16_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API int16_t Dqn_Safe_SaturateCastUSizeToI16(Dqn_usize val);
-
-/// Truncate a usize to I32 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT32_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API int32_t Dqn_Safe_SaturateCastUSizeToI32(Dqn_usize val);
-
-/// Truncate a usize to I64 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT64_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API int64_t Dqn_Safe_SaturateCastUSizeToI64(Dqn_usize val);
-
-// NOTE: Dqn_Safe_SaturateCastU64ToU*
-// -----------------------------------------------------------------------------
-/// Truncate a u64 to uint clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or UINT_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API unsigned int Dqn_Safe_SaturateCastU64ToUInt(uint64_t val);
-
-/// Truncate a u64 to u8 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or UINT8_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API uint8_t Dqn_Safe_SaturateCastU64ToU8(uint64_t val);
-
-/// Truncate a u64 to u16 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or UINT16_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API uint16_t Dqn_Safe_SaturateCastU64ToU16(uint64_t val);
-
-/// Truncate a u64 to u32 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or UINT32_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API uint32_t Dqn_Safe_SaturateCastU64ToU32(uint64_t val);
-
-// NOTE: Dqn_Safe_SaturateCastUSizeToU*
-// -----------------------------------------------------------------------------
-/// Truncate a usize to U8 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or UINT8_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API uint8_t Dqn_Safe_SaturateCastUSizeToU8(Dqn_usize val);
-
-/// Truncate a usize to U16 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or UINT16_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API uint16_t Dqn_Safe_SaturateCastUSizeToU16(Dqn_usize val);
-
-/// Truncate a usize to U32 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or UINT32_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API uint32_t Dqn_Safe_SaturateCastUSizeToU32(Dqn_usize val);
-
-/// Truncate a usize to U64 clamping the result to the max value of the desired
-/// data type. Safe asserts if clamping occurs.
-/// @return The truncated value or UINT64_MAX if the value would go out of the
-/// valid range when casted.
-DQN_API uint64_t Dqn_Safe_SaturateCastUSizeToU64(Dqn_usize val);
-
-// NOTE: Dqn_Safe_SaturateCastISizeToI*
-// -----------------------------------------------------------------------------
-/// Truncate an isize to int clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT_MIN or INT_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API int Dqn_Safe_SaturateCastISizeToInt(Dqn_isize val);
-
-/// Truncate an isize to I8 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT8_MIN or INT8_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API int8_t Dqn_Safe_SaturateCastISizeToI8(Dqn_isize val);
-
-/// Truncate an isize to I16 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT16_MIN or INT16_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API int16_t Dqn_Safe_SaturateCastISizeToI16(Dqn_isize val);
-
-/// Truncate an isize to I32 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT32_MIN or INT32_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API int32_t Dqn_Safe_SaturateCastISizeToI32(Dqn_isize val);
-
-/// Truncate an isize to I64 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT64_MIN or INT64_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API int64_t Dqn_Safe_SaturateCastISizeToI64(Dqn_isize val);
-
-// NOTE: Dqn_Safe_SaturateCastISizeToU*
-// -----------------------------------------------------------------------------
-/// Truncate an isize to uint clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT_MAX if the value would go
-/// out of the valid range when casted.
 DQN_API unsigned int Dqn_Safe_SaturateCastISizeToUInt(Dqn_isize val);
+DQN_API uint8_t      Dqn_Safe_SaturateCastISizeToU8  (Dqn_isize val);
+DQN_API uint16_t     Dqn_Safe_SaturateCastISizeToU16 (Dqn_isize val);
+DQN_API uint32_t     Dqn_Safe_SaturateCastISizeToU32 (Dqn_isize val);
+DQN_API uint64_t     Dqn_Safe_SaturateCastISizeToU64 (Dqn_isize val);
 
-/// Truncate an isize to U8 clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT8_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API uint8_t Dqn_Safe_SaturateCastISizeToU8(Dqn_isize val);
+DQN_API Dqn_isize    Dqn_Safe_SaturateCastI64ToISize (int64_t val);
+DQN_API int8_t       Dqn_Safe_SaturateCastI64ToI8    (int64_t val);
+DQN_API int16_t      Dqn_Safe_SaturateCastI64ToI16   (int64_t val);
+DQN_API int32_t      Dqn_Safe_SaturateCastI64ToI32   (int64_t val);
 
-/// Truncate an isize to U16 clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT16_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API uint16_t Dqn_Safe_SaturateCastISizeToU16(Dqn_isize val);
-
-/// Truncate an isize to U32 clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT32_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API uint32_t Dqn_Safe_SaturateCastISizeToU32(Dqn_isize val);
-
-/// Truncate an isize to U64 clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT64_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API uint64_t Dqn_Safe_SaturateCastISizeToU64(Dqn_isize val);
-
-// NOTE: Dqn_Safe_SaturateCastI64To*
-// -----------------------------------------------------------------------------
-/// Truncate an I64 to isize clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or DQN_ISIZE_MIN or DQN_ISIZE_MAX if the value
-/// would go out of the valid range when casted.
-DQN_API Dqn_isize Dqn_Safe_SaturateCastI64ToISize(Dqn_isize val);
-
-/// Truncate an I64 to I8 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT8_MIN or INT8_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API int8_t Dqn_Safe_SaturateCastI64ToI8(int64_t val);
-
-/// Truncate an I64 to I16 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT16_MIN or INT16_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API int16_t Dqn_Safe_SaturateCastI64ToI16(int64_t val);
-
-/// Truncate an I64 to I32 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT32_MIN or INT32_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API int32_t Dqn_Safe_SaturateCastI64ToI32(int64_t val);
-
-// NOTE: Dqn_Safe_SaturateCastIntTo*
-// -----------------------------------------------------------------------------
-/// Truncate an int to I8 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT8_MIN or INT8_MAX if the value
-/// would go out of the valid range when casted.
-DQN_API int8_t Dqn_Safe_SaturateCastIntToI8(int val);
-
-/// Truncate an int to I16 clamping the result to the min and max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or INT16_MIN or INT16_MAX if the value
-/// would go out of the valid range when casted.
-DQN_API int16_t Dqn_Safe_SaturateCastIntToI16(int val);
-
-/// Truncate an int to U8 clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT8_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API uint8_t Dqn_Safe_SaturateCastIntToU8(int val);
-
-/// Truncate an int to U16 clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT16_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API uint16_t Dqn_Safe_SaturateCastIntToU16(int val);
-
-/// Truncate an int to U32 clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT32_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API uint32_t Dqn_Safe_SaturateCastIntToU32(int val);
-
-/// Truncate an int to U64 clamping the result to 0 and the max value of the
-/// desired data type. Safe asserts if clamping occurs.
-/// @return The truncated value or 0 or UINT64_MAX if the value would go
-/// out of the valid range when casted.
-DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val);
+DQN_API int8_t       Dqn_Safe_SaturateCastIntToI8    (int val);
+DQN_API int16_t      Dqn_Safe_SaturateCastIntToI16   (int val);
+DQN_API uint8_t      Dqn_Safe_SaturateCastIntToU8    (int val);
+DQN_API uint16_t     Dqn_Safe_SaturateCastIntToU16   (int val);
+DQN_API uint32_t     Dqn_Safe_SaturateCastIntToU32   (int val);
+DQN_API uint64_t     Dqn_Safe_SaturateCastIntToU64   (int val);
 
 // NOTE: [$TCTX] Dqn_ThreadContext =================================================================
 // Each thread is assigned in their thread-local storage (TLS) scratch and

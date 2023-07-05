@@ -589,7 +589,7 @@ DQN_API Dqn_String8 Dqn_String8_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allo
 }
 
 // NOTE: [$STRB] Dqn_String8Builder ================================================================
-bool Dqn_String8Builder_AppendRef(Dqn_String8Builder *builder, Dqn_String8 string)
+DQN_API bool Dqn_String8Builder_AppendRef(Dqn_String8Builder *builder, Dqn_String8 string)
 {
     if (!builder || !string.data || string.size <= 0)
         return false;
@@ -612,14 +612,14 @@ bool Dqn_String8Builder_AppendRef(Dqn_String8Builder *builder, Dqn_String8 strin
     return true;
 }
 
-bool Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_String8 string)
+DQN_API bool Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_String8 string)
 {
     Dqn_String8 copy = Dqn_String8_Copy(builder->allocator, string);
     bool result      = Dqn_String8Builder_AppendRef(builder, copy);
     return result;
 }
 
-bool Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *builder, char const *fmt, va_list args)
+DQN_API bool Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *builder, char const *fmt, va_list args)
 {
     Dqn_String8 string = Dqn_String8_InitFV(builder->allocator, fmt, args);
     if (string.size == 0)
@@ -631,7 +631,7 @@ bool Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *bu
     return result;
 }
 
-bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ...)
+DQN_API bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -640,7 +640,7 @@ bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ..
     return result;
 }
 
-Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allocator allocator)
+DQN_API Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allocator allocator)
 {
     Dqn_String8 result = DQN_ZERO_INIT;
     if (!builder || builder->string_size <= 0 || builder->count <= 0)
@@ -662,7 +662,7 @@ Dqn_String8 Dqn_String8Builder_Build(Dqn_String8Builder const *builder, Dqn_Allo
 
 #if !defined(DQN_NO_JSON_BUILDER)
 // NOTE: [$JSON] Dqn_JSONBuilder ===================================================================
-Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_indent)
+DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_indent)
 {
     Dqn_JSONBuilder result          = {};
     result.spaces_per_indent        = spaces_per_indent;
@@ -670,13 +670,13 @@ Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_ind
     return result;
 }
 
-Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder const *builder, Dqn_Allocator allocator)
+DQN_API Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder const *builder, Dqn_Allocator allocator)
 {
     Dqn_String8 result = Dqn_String8Builder_Build(&builder->string_builder, allocator);
     return result;
 }
 
-void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
+DQN_API void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
 {
     if (key.size == 0 && value.size == 0)
         return;
@@ -729,14 +729,14 @@ void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_Str
     builder->last_item = item;
 }
 
-void Dqn_JSONBuilder_KeyValueFV(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, va_list args)
+DQN_API void Dqn_JSONBuilder_KeyValueFV(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, va_list args)
 {
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(builder->string_builder.allocator.user_context);
     Dqn_String8 value         = Dqn_String8_InitFV(scratch.allocator, value_fmt, args);
     Dqn_JSONBuilder_KeyValue(builder, key, value);
 }
 
-void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, ...)
+DQN_API void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, ...)
 {
     va_list args;
     va_start(args, value_fmt);
@@ -744,47 +744,47 @@ void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_String8 key, char c
     va_end(args);
 }
 
-void Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
+DQN_API void Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
 {
     Dqn_JSONBuilder_KeyValue(builder, name, DQN_STRING8("{"));
 }
 
-void Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder)
+DQN_API void Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder)
 {
     Dqn_JSONBuilder_KeyValue(builder, DQN_STRING8(""), DQN_STRING8("}"));
 }
 
-void Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
+DQN_API void Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
 {
     Dqn_JSONBuilder_KeyValue(builder, name, DQN_STRING8("["));
 }
 
-void Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder)
+DQN_API void Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder)
 {
     Dqn_JSONBuilder_KeyValue(builder, DQN_STRING8(""), DQN_STRING8("]"));
 }
 
-void Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
+DQN_API void Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
 {
     Dqn_JSONBuilder_KeyValueF(builder, key, "\"%.*s\"", value.size, value.data);
 }
 
-void Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
+DQN_API void Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
 {
     Dqn_JSONBuilder_KeyValueF(builder, key, "%.*s", value.size, value.data);
 }
 
-void Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value)
+DQN_API void Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value)
 {
     Dqn_JSONBuilder_KeyValueF(builder, key, "%I64u", value);
 }
 
-void Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, int64_t value)
+DQN_API void Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, int64_t value)
 {
     Dqn_JSONBuilder_KeyValueF(builder, key, "%I64d", value);
 }
 
-void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places)
+DQN_API void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places)
 {
     if (!builder)
         return;
@@ -797,22 +797,22 @@ void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double 
     char float_fmt[16];
     if (decimal_places > 0) {
         // NOTE: Emit the format string "%.<decimal_places>f" i.e. %.1f
-        snprintf(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
+        STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%.%df", decimal_places);
     } else {
         // NOTE: Emit the format string "%f"
-        snprintf(float_fmt, sizeof(float_fmt), "%%f");
+        STB_SPRINTF_DECORATE(snprintf)(float_fmt, sizeof(float_fmt), "%%f");
     }
 
     char fmt[32];
     if (key.size)
-        snprintf(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
+        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "\"%%.*s\": %s", float_fmt);
     else
-        snprintf(fmt, sizeof(fmt), "%s", float_fmt);
+        STB_SPRINTF_DECORATE(snprintf)(fmt, sizeof(fmt), "%s", float_fmt);
 
     Dqn_JSONBuilder_KeyValueF(builder, key, fmt, value);
 }
 
-void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value)
+DQN_API void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value)
 {
     Dqn_String8 value_string = value ? DQN_STRING8("true") : DQN_STRING8("false");
     Dqn_JSONBuilder_KeyValueF(builder, key, "%.*s", value_string.size, value_string.data);
@@ -1193,7 +1193,8 @@ DQN_API Dqn_String8 Dqn_Bin_HexToBytesArena(Dqn_Arena *arena, Dqn_String8 hex)
 }
 #endif // !defined(DQN_NO_HEX)
 
-DQN_API int Dqn_SNPrintF2DotsOnOverflow(char *buffer, int size, char const *fmt, ...)
+// NOTE: Other =====================================================================================
+DQN_API int Dqn_SNPrintFDotTruncate(char *buffer, int size, char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
