@@ -6,20 +6,22 @@
 // =================================================================================================
 
 // NOTE: [$FNV1] Dqn_FNV1A =========================================================================
-#ifndef DQN_FNV1A32_SEED
+// NOTE: API =======================================================================================
+#if 0
+    char buffer1[128] = {random bytes};
+    char buffer2[128] = {random bytes};
+    uint64_t hash     = Dqn_FNV1A64_Hash(buffer1, sizeof(buffer1));
+    hash              = Dqn_FNV1A64_Iterate(buffer2, sizeof(buffer2), hash); // subsequent hashing
+#endif
+
+#if !defined(DQN_FNV1A32_SEED)
     #define DQN_FNV1A32_SEED 2166136261U
 #endif
 
-#ifndef DQN_FNV1A64_SEED
+#if !defined(DQN_FNV1A64_SEED)
     #define DQN_FNV1A64_SEED 14695981039346656037ULL
 #endif
 
-/// @begincode
-/// char buffer1[128] = {random bytes};
-/// char buffer2[128] = {random bytes};
-/// uint64_t hash     = Dqn_FNV1A64_Hash(buffer1, sizeof(buffer1));
-/// hash              = Dqn_FNV1A64_Iterate(buffer2, sizeof(buffer2), hash); // subsequent hashing
-/// @endcode
 DQN_API uint32_t Dqn_FNV1A32_Hash   (void const *bytes, Dqn_usize size);
 DQN_API uint64_t Dqn_FNV1A64_Hash   (void const *bytes, Dqn_usize size);
 DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_usize size, uint32_t hash);

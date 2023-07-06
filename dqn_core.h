@@ -234,11 +234,9 @@ int main()
     DQN_DEFER { printf("Three ..\n"); };
     printf("One ..\n");
     printf("Two ..\n");
-
     // One ..
     // Two ..
     // Three ..
-
     return 0;
 }
 #endif
@@ -278,16 +276,16 @@ typedef int32_t      Dqn_b32;
 #define DQN_ISIZE_MIN INTPTR_MIN
 
 // NOTE [$GSTR] Global Structs =====================================================================
-struct Dqn_String8 ///< Pointer and length style UTF8 strings
+struct Dqn_String8
 {
-    char      *data; ///< The UTF8 bytes of the string
-    Dqn_usize  size; ///< The number of bytes in the string
+    char     *data;  // The bytes of the string
+    Dqn_usize  size; // The number of bytes in the string
 
     #if defined(__cplusplus)
-    char const *begin() const { return data; }        ///< Const begin iterator for range-for loops
-    char const *end  () const { return data + size; } ///< Const end iterator for range-for loops
-    char       *begin()       { return data; }        ///< Begin iterator for range-for loops
-    char       *end  ()       { return data + size; } ///< End iterator for range-for loops
+    char const *begin() const { return data; }        // Const begin iterator for range-for loops
+    char const *end  () const { return data + size; } // Const end iterator for range-for loops
+    char       *begin()       { return data; }        // Begin iterator for range-for loops
+    char       *end  ()       { return data + size; } // End iterator for range-for loops
     #endif
 };
 
@@ -401,22 +399,22 @@ Dqn_CPUIDRegisters Dqn_CPUID(int function_id);
 //
 // @proc Dqn_TicketMutex_Begin, End
 //   @desc Lock and unlock the mutex respectively
-//
+
 // @proc Dqn_TicketMutex_MakeTicket
 //   @desc Allocate the next available ticket from the mutex for locking using
 //   Dqn_TicketMutex_BeginTicket().
 //   @param[in] mutex The mutex
-//   @code
-//   Dqn_TicketMutex mutex = {};
-//   unsigned int ticket = Dqn_TicketMutex_MakeTicket(&mutex);
-//   Dqn_TicketMutex_BeginTicket(&mutex, ticket); // Blocking call until we attain the lock
-//   Dqn_TicketMutex_End(&mutex);
-//   @endcode
-//
+#if 0
+    Dqn_TicketMutex mutex = {};
+    unsigned int ticket   = Dqn_TicketMutex_MakeTicket(&mutex);
+    Dqn_TicketMutex_BeginTicket(&mutex, ticket); // Blocking call until we attain the lock
+    Dqn_TicketMutex_End(&mutex);
+#endif
+
 // @proc Dqn_TicketMutex_BeginTicket
 //   @desc Lock the mutex using the given ticket if possible, otherwise block
 //   waiting until the mutex can be locked.
-//
+
 // @proc Dqn_TicketMutex_CanLock
 //   @desc Determine if the mutex can be locked using the given ticket number
 
@@ -433,10 +431,10 @@ void     Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint tick
 bool     Dqn_TicketMutex_CanLock    (Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 
 // NOTE: [$CALL] Dqn_CallSite ======================================================================
-typedef struct Dqn_CallSite {
+struct Dqn_CallSite
+{
     Dqn_String8  file;
     Dqn_String8  function;
     unsigned int line;
-} Dqn_CalSite;
-
+};
 #define DQN_CALL_SITE Dqn_CallSite{DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__}

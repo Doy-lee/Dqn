@@ -1,11 +1,16 @@
 // NOTE: Table Of Contents =========================================================================
 // Index                   | Disable #define | Description
 // =================================================================================================
-// [$MATH] Math            | DQN_NO_MATH     | v2i, V2, V3, V4, Mat4, Rect, RectI32, Lerp
+// [$VEC2] Dqn_V2, V2i     | DQN_NO_V2       |
+// [$VEC3] Dqn_V3, V3i     | DQN_NO_V3       |
+// [$VEC4] Dqn_V4, V4i     | DQN_NO_V4       |
+// [$MAT4] Dqn_M4          | DQN_NO_M4       |
+// [$RECT] Dqn_Rect        | DQN_NO_RECT     |
+// [$MATH] Other           |                 |
 // =================================================================================================
 
-#if !defined(DQN_NO_MATH)
-// NOTE: [$MATH] Math ==============================================================================
+#if !defined(DQN_NO_V2)
+// NOTE: [$VEC2] Vector2 ===========================================================================
 struct Dqn_V2I
 {
     int32_t x, y;
@@ -71,6 +76,18 @@ struct Dqn_V2
     Dqn_V2 &operator+=(Dqn_V2  other)       { *this = *this + other;               return *this;  }
 };
 
+DQN_API Dqn_V2I Dqn_V2ToV2I(Dqn_V2 a);
+DQN_API Dqn_V2  Dqn_V2Min(Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_V2  Dqn_V2Max(Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_V2  Dqn_V2Abs(Dqn_V2 a);
+DQN_API Dqn_f32 Dqn_V2Dot(Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_f32 Dqn_V2LengthSq(Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_V2  Dqn_V2Normalise(Dqn_V2 a);
+DQN_API Dqn_V2  Dqn_V2Perpendicular(Dqn_V2 a);
+#endif // !defined(DQN_NO_V2)
+
+#if !defined(DQN_NO_V3)
+// NOTE: [$VEC3] Vector3 ===========================================================================
 struct Dqn_V3
 {
     Dqn_f32 x, y, z;
@@ -106,6 +123,18 @@ struct Dqn_V3
     Dqn_V3 &operator+=(Dqn_V3  other)       { *this = *this + other; return *this;  }
 };
 
+DQN_API Dqn_f32 Dqn_V3LengthSq(Dqn_V3 a);
+DQN_API Dqn_f32 Dqn_V3Length(Dqn_V3 a);
+DQN_API Dqn_V3  Dqn_V3Normalise(Dqn_V3 a);
+#endif // !defined(DQN_NO_V3)
+
+#if !defined(DQN_NO_V4)
+// NOTE: [$VEC4] Vector4 ===========================================================================
+
+#if defined(DQN_NO_V3)
+    #error "Dqn_Rect requires Dqn_V3 hence DQN_NO_V3 must *not* be defined"
+#endif
+
 union Dqn_V4
 {
   struct { Dqn_f32 x, y, z, w; };
@@ -139,25 +168,15 @@ union Dqn_V4
   Dqn_V4 &operator-=(Dqn_V4  other)       { *this = *this - other;                                             return *this;   }
   Dqn_V4 &operator+=(Dqn_V4  other)       { *this = *this + other;                                             return *this;   }
 };
+#endif // !defined(DQN_NO_V4)
 
+#if !defined(DQN_NO_M4)
+// NOTE: [$MAT4] Dqn_M4 ============================================================================
 // NOTE: Column major matrix
 struct Dqn_M4
 {
     Dqn_f32 columns[4][4];
 };
-
-DQN_API Dqn_V2I Dqn_V2ToV2I(Dqn_V2 a);
-DQN_API Dqn_V2  Dqn_V2Min(Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2Max(Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2Abs(Dqn_V2 a);
-DQN_API Dqn_f32 Dqn_V2Dot(Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_f32 Dqn_V2LengthSq(Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2Normalise(Dqn_V2 a);
-DQN_API Dqn_V2  Dqn_V2Perpendicular(Dqn_V2 a);
-
-DQN_API Dqn_f32 Dqn_V3LengthSq(Dqn_V3 a);
-DQN_API Dqn_f32 Dqn_V3Length(Dqn_V3 a);
-DQN_API Dqn_V3  Dqn_V3Normalise(Dqn_V3 a);
 
 DQN_API Dqn_f32 Dqn_V4Dot(Dqn_V4 a, Dqn_V4 b);
 
@@ -181,6 +200,13 @@ DQN_API Dqn_M4  Dqn_M4_DivF(Dqn_M4 lhs, Dqn_f32 rhs);
 
 #if !defined(DQN_NO_FSTRING8)
 DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat);
+#endif
+#endif // !defined(DQN_M4)
+
+// NOTE: [$RECT] Dqn_Rect ==========================================================================
+#if !defined(DQN_NO_RECT)
+#if defined(DQN_NO_V2)
+    #error "Dqn_Rect requires Dqn_V2 hence DQN_NO_V2 must *not* be defined"
 #endif
 
 struct Dqn_Rect
@@ -212,8 +238,9 @@ DQN_API Dqn_Rect Dqn_Rect_Intersection(Dqn_Rect a, Dqn_Rect b);
 DQN_API Dqn_Rect Dqn_Rect_Union(Dqn_Rect a, Dqn_Rect b);
 DQN_API Dqn_Rect Dqn_Rect_FromRectI32(Dqn_RectI32 a);
 DQN_API Dqn_V2I  Dqn_RectI32_Size(Dqn_RectI32 rect);
+#endif // !defined(DQN_NO_RECT)
 
+// NOTE: [$MATH] Other =============================================================================
 DQN_API Dqn_V2  Dqn_Lerp_V2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
 DQN_API Dqn_f32 Dqn_Lerp_F32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b);
-#endif // !defined(DQN_NO_MATH)
 

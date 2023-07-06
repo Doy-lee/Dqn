@@ -1,5 +1,5 @@
-#if !defined(DQN_NO_MATH)
-// NOTE: [$MATH] Math ==============================================================================
+#if !defined(DQN_NO_V2)
+// NOTE: [$VEC2] Vector2 ===========================================================================
 DQN_API Dqn_V2I Dqn_V2ToV2I(Dqn_V2 a)
 {
     Dqn_V2I result = Dqn_V2I(DQN_CAST(int32_t)a.x, DQN_CAST(int32_t)a.y);
@@ -51,9 +51,10 @@ DQN_API Dqn_V2 Dqn_V2Perpendicular(Dqn_V2 a)
     Dqn_V2 result = Dqn_V2(-a.y, a.x);
     return result;
 }
+#endif // !defined(DQN_NO_V2)
 
-// NOTE: Dqn_V3 Implementation
-// -------------------------------------------------------------------------------------------------
+#if !defined(DQN_NO_V3)
+// NOTE: [$VEC3] Vector3 ===========================================================================
 DQN_API Dqn_f32 Dqn_V3LengthSq(Dqn_V3 a)
 {
     Dqn_f32 result = DQN_SQUARED(a.x) + DQN_SQUARED(a.y) + DQN_SQUARED(a.z);
@@ -73,17 +74,19 @@ DQN_API Dqn_V3 Dqn_V3Normalise(Dqn_V3 a)
     Dqn_V3  result = a / length;
     return result;
 }
+#endif // !defined(DQN_NO_V3)
 
-// NOTE: Dqn_V4 Implementation
-// -------------------------------------------------------------------------------------------------
+#if !defined(DQN_NO_V4)
+// NOTE: [$VEC4] Vector4 ===========================================================================
 DQN_API Dqn_f32 Dqn_V4Dot(Dqn_V4 a, Dqn_V4 b)
 {
     Dqn_f32 result = (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
     return result;
 }
+#endif // !defined(DQN_NO_V4)
 
-// NOTE: Dqn_M4 Implementation
-// -------------------------------------------------------------------------------------------------
+#if !defined(DQN_NO_M4)
+// NOTE: [$MAT4] Dqn_M4 ============================================================================
 DQN_API Dqn_M4 Dqn_M4_Identity()
 {
     Dqn_M4 result =
@@ -331,9 +334,10 @@ DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
     return result;
 }
 #endif
+#endif // !defined(DQN_M4)
 
-// NOTE: Dqn_Rect
-// -------------------------------------------------------------------------------------------------
+#if !defined(DQN_NO_RECT)
+// NOTE: [$RECT] Dqn_Rect ==========================================================================
 DQN_API Dqn_Rect Dqn_Rect_InitFromPosAndSize(Dqn_V2 pos, Dqn_V2 size)
 {
     Dqn_Rect result = {};
@@ -428,9 +432,9 @@ DQN_API Dqn_V2I Dqn_RectI32_Size(Dqn_RectI32 rect)
     Dqn_V2I result = rect.max - rect.min;
     return result;
 }
+#endif // !defined(DQN_NO_RECT)
 
-// NOTE: Math Utils
-// -------------------------------------------------------------------------------------------------
+// NOTE: [$MATH] Other =============================================================================
 DQN_API Dqn_V2 Dqn_Lerp_V2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b)
 {
     Dqn_V2 result = {};
@@ -444,5 +448,3 @@ DQN_API Dqn_f32 Dqn_Lerp_F32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b)
     Dqn_f32 result = a + ((b - a) * t);
     return result;
 }
-#endif // !defined(DQN_NO_MATH)
-

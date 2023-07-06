@@ -15,7 +15,7 @@
 // possibly ever need (e.g. 16GB) and let the array commit physical pages on
 // demand. On 64 bit operating systems you are given 48 bits of addressable
 // space giving you 256 TB of reservable memory. This gives you practically
-// an unlimited array capacity that avoids reallocs and only consumes memory 
+// an unlimited array capacity that avoids reallocs and only consumes memory
 // that is actually occupied by the array.
 //
 // Each page that is committed into the array will be at page/allocation
@@ -28,24 +28,26 @@
 //
 // In addition to no realloc on expansion or shrinking.
 //
-// NOTE: API
+// TODO(doyle): Add an API for shrinking the array by decomitting pages back to 
+// the OS.
 //
+// NOTE: API
 // @proc Dqn_VArray_InitByteSize, Dqn_VArray_Init
 //   @desc Initialise an array with the requested byte size or item capacity
 //   respectively. The returned array may have a higher capacity than the
 //   requested amount since requested memory from the OS may have a certain
 //   alignment requirement (e.g. on Windows reserve/commit are 64k/4k aligned).
-//
+
 // @proc Dqn_VArray_IsValid
 //   @desc Verify if the array has been initialised
-//
+
 // @proc Dqn_VArray_Make, Dqn_VArray_Add
 //   @desc Allocate items into the array
 //     'Make' creates the `count` number of requested items
 //     'Add' adds the array of items into the array
 //   @return The array of items allocated. Null pointer if the array is invalid
 //   or the array has insufficient space for the requested items.
-//
+
 // @proc Dqn_VArray_EraseRange
 //   @desc Erase the next `count` items at `begin_index` in the array. `count`
 //   can be positive or negative which dictates the if we erase forward from the
@@ -56,10 +58,10 @@
 //   @param erase The erase method, stable erase will shift all elements after
 //   the erase ranged into the range. Unstable erase will copy the tail elements
 //   into the range to delete.
-//
+
 // @proc Dqn_VArray_Clear
 //   @desc Set the size of the array to 0
-//
+
 // @proc Dqn_VArray_Reserve
 //   @desc Ensure that the requested number of items are backed by physical
 //   pages from the OS. Calling this pre-emptively will minimise syscalls into
@@ -67,17 +69,13 @@
 //   in bytes to the allocation granularity of OS allocation APIs hence the
 //   reserved space may be greater than the requested amount (e.g. this is 4k
 //   on Windows).
-//
-// TODO(doyle)
-//
-// Add an API for shrinking the array by decomitting pages back to the OS.
 
 template <typename T> struct Dqn_VArray
 {
-    Dqn_ArenaBlock *block; ///< Block of memory from the allocator for this array
-    T              *data;  ///< Pointer to the start of the array items in the block of memory
-    Dqn_usize       size;  ///< Number of items currently in the array
-    Dqn_usize       max;   ///< Maximum number of items this array can store
+    Dqn_ArenaBlock *block; // Block of memory from the allocator for this array
+    T              *data;  // Pointer to the start of the array items in the block of memory
+    Dqn_usize       size;  // Number of items currently in the array
+    Dqn_usize       max;   // Maximum number of items this array can store
 
     T       *begin()       { return data; }
     T       *end  ()       { return data + size; }
@@ -91,14 +89,19 @@ enum Dqn_VArrayErase
     Dqn_VArrayErase_Stable,
 };
 
-DQN_API template <typename T> Dqn_VArray<T>  Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size);
-DQN_API template <typename T> Dqn_VArray<T>  Dqn_VArray_Init        (Dqn_Arena *arena, Dqn_usize max);
-DQN_API template <typename T> bool           Dqn_VArray_IsValid     (Dqn_VArray<T> const *array);
-DQN_API template <typename T> T *            Dqn_VArray_Make        (Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T> T *            Dqn_VArray_Add         (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
-DQN_API template <typename T> void           Dqn_VArray_EraseRange  (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_VArrayErase erase);
-DQN_API template <typename T> void           Dqn_VArray_Clear       (Dqn_VArray<T> *array);
-DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<T> *array, Dqn_usize count);
+// NOTE: Setup =====================================================================================
+DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size);
+DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_Init        (Dqn_Arena *arena, Dqn_usize max);
+DQN_API template <typename T> bool          Dqn_VArray_IsValid     (Dqn_VArray<T> const *array);
+DQN_API template <typename T> void          Dqn_VArray_Reserve     (Dqn_VArray<T> *array, Dqn_usize count);
+
+// NOTE: Insert ====================================================================================
+DQN_API template <typename T> T *           Dqn_VArray_Make        (Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
+DQN_API template <typename T> T *           Dqn_VArray_Add         (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
+
+// NOTE: Modify ====================================================================================
+DQN_API template <typename T> void          Dqn_VArray_EraseRange  (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_VArrayErase erase);
+DQN_API template <typename T> void          Dqn_VArray_Clear       (Dqn_VArray<T> *array);
 #endif // !defined(DQN_NO_VARRAY)
 
 #if !defined(DQN_NO_DSMAP)
@@ -149,27 +152,27 @@ DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<
 //
 // - Functions that return a pointer or boolean will always return null or false
 // if the passed in map is invalid e.g. `DSMap_IsValid()` returns false.
-//
+
 // @proc Dqn_DSMap_Init
 //   @param size[in] The number of slots in the table. This size must be a
 //   power-of-two or otherwise an assert will be triggered.
 //   @return The hash table. On memory allocation failure, the table will be
 //   zero initialised whereby calling Dqn_DSMap_IsValid() will return false.
-//
+
 // @proc Dqn_DSMap_Deinit
 //   @desc Free the memory allocated by the table
-//
+
 // @proc Dqn_DSMap_IsValid
 //   @desc Verify that the table is in a valid state (e.g. initialised 
 //   correctly).
-//
+
 // @proc Dqn_DSMap_Hash
 //   @desc Hash the input key using the custom hash function if it's set on the
 //   map, otherwise uses the default hashing function (32bit Murmur3).
 //
 // @proc Dqn_DSMap_HashToSlotIndex
 //   @desc Calculate the index into the map's `slots` array from the given hash.
-//
+
 // @proc Dqn_DSMap_FindSlot, Dqn_DSMap_Find
 //   @desc Find the slot in the map's `slots` array corresponding to the given
 //   key and hash. If the map does not contain the key, a null pointer is
@@ -177,7 +180,7 @@ DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<
 //
 //   `Find`     returns the value.
 //   `FindSlot` returns the map's hash table slot.
-//
+
 // @proc Dqn_DSMap_MakeSlot, Dqn_DSMap_Make, Dqn_DSMap_Set, Dqn_DSMap_SetSlot
 //   @desc Same as `DSMap_Find*` except if the key does not exist in the table,
 //   a hash-table slot will be made.
@@ -194,20 +197,20 @@ DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<
 //   @param found[out] Pass a pointer to a bool. The bool will be set to true
 //   if the item already existed in the map before, or false if the item was
 //   just created by this call.
-//
+
 // @proc Dqn_DSMap_Resize
 //   @desc Resize the table and move all elements to the new map.
 //   the elements currently set in the
 //   @param size[in] New size of the table, must be a power of two.
 //   @return False if memory allocation fails, or the requested size is smaller
 //   than the current number of elements in the map to resize. True otherwise.
-//
+
 // @proc Dqn_DSMap_Erase
 //   @desc Remove the key-value pair from the table. If by erasing the key-value
 //   pair from the table puts the table under 25% load, the table will be shrunk
 //   by 1/2 the current size after erasing. The table will not shrink below the
 //   initial size that the table was initialised as.
-//
+
 // @proc Dqn_DSMap_KeyCStringLit, Dqn_DSMap_KeyU64, Dqn_DSMap_KeyBuffer,
 // Dqn_DSMap_KeyString8 Dqn_DSMap_KeyString8Copy
 //   @desc Create a hash-table key given
@@ -221,7 +224,7 @@ DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<
 //   If the key points to an array of bytes, the lifetime of those bytes *must*
 //   remain valid throughout the lifetime of the map as the pointers are value
 //   copied into the hash table!
-//
+
 // @proc Dqn_DSMap_KeyU64NoHash
 //   @desc Create a hash-table key given the uint64. This u64 is *not* hashed to
 //   map values into the table. This is useful if you already have a source of
@@ -234,9 +237,9 @@ DQN_API template <typename T> void           Dqn_VArray_Reserve     (Dqn_VArray<
 enum Dqn_DSMapKeyType
 {
     Dqn_DSMapKeyType_Invalid,
-    Dqn_DSMapKeyType_U64,       ///< Use a U64 key that is `hash(u64) % size` to map into the table
-    Dqn_DSMapKeyType_U64NoHash, ///< Use a U64 key that is `u64 % size` to map into the table
-    Dqn_DSMapKeyType_Buffer,    ///< Use a buffer key that is `hash(buffer) % size` to map into the table
+    Dqn_DSMapKeyType_U64,       // Use a U64 key that is `hash(u64) % size` to map into the table
+    Dqn_DSMapKeyType_U64NoHash, // Use a U64 key that is `u64 % size` to map into the table
+    Dqn_DSMapKeyType_Buffer,    // Use a buffer key that is `hash(buffer) % size` to map into the table
 };
 
 struct Dqn_DSMapKey
@@ -261,14 +264,14 @@ template <typename T> struct Dqn_DSMapSlot
 using Dqn_DSMapHashFunction = uint32_t(Dqn_DSMapKey key, uint32_t seed);
 template <typename T> struct Dqn_DSMap
 {
-    uint32_t              *hash_to_slot;  ///< Mapping from hash to a index in the slots array
-    Dqn_DSMapSlot<T>      *slots;         ///< Values of the array stored contiguously, non-sorted order
-    uint32_t               size;          ///< Total capacity of the map and is a power of two
-    uint32_t               occupied;      ///< Number of slots used in the hash table
-    Dqn_Allocator          allocator;     ///< Backing allocator for the hash table
-    uint32_t               initial_size;  ///< Initial map size, map cannot shrink on erase below this size
-    Dqn_DSMapHashFunction *hash_function; ///< Custom hashing function to use if field is set
-    uint32_t               hash_seed;     ///< Seed for the hashing function, when 0, DQN_DS_MAP_DEFAULT_HASH_SEED is used
+    uint32_t              *hash_to_slot;  // Mapping from hash to a index in the slots array
+    Dqn_DSMapSlot<T>      *slots;         // Values of the array stored contiguously, non-sorted order
+    uint32_t               size;          // Total capacity of the map and is a power of two
+    uint32_t               occupied;      // Number of slots used in the hash table
+    Dqn_Allocator          allocator;     // Backing allocator for the hash table
+    uint32_t               initial_size;  // Initial map size, map cannot shrink on erase below this size
+    Dqn_DSMapHashFunction *hash_function; // Custom hashing function to use if field is set
+    uint32_t               hash_seed;     // Seed for the hashing function, when 0, DQN_DS_MAP_DEFAULT_HASH_SEED is used
 };
 
 // NOTE: Setup =====================================================================================
@@ -305,8 +308,8 @@ DQN_API bool                                    operator==               (Dqn_DS
 // NOTE: [$FARR] Dqn_FArray ========================================================================
 template <typename T, Dqn_usize N> struct Dqn_FArray
 {
-    T         data[N]; ///< Pointer to the start of the array items in the block of memory
-    Dqn_usize size;    ///< Number of items currently in the array
+    T         data[N]; // Pointer to the start of the array items in the block of memory
+    Dqn_usize size;    // Number of items currently in the array
 
     T       *begin()       { return data; }
     T       *end  ()       { return data + size; }
@@ -320,35 +323,40 @@ enum Dqn_FArrayErase
     Dqn_FArrayErase_Stable,
 };
 
+// NOTE: Setup =====================================================================================
 DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init      (T const *array, Dqn_usize count);
 DQN_API template <typename T, Dqn_usize N> bool             Dqn_FArray_IsValid   (Dqn_FArray<T, N> const *array);
+
+// NOTE: Insert ====================================================================================
 DQN_API template <typename T, Dqn_usize N> T *              Dqn_FArray_Make      (Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
 DQN_API template <typename T, Dqn_usize N> T *              Dqn_FArray_Add       (Dqn_FArray<T, N> *array, T const *items, Dqn_usize count);
+
+// NOTE: Modify ====================================================================================
 DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_FArrayErase erase);
 DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_Clear     (Dqn_FArray<T, N> *array);
 #endif // !defined(DQN_NO_FARRAY)
 
 #if !defined(DQN_NO_LIST)
 // NOTE: [$LIST] Dqn_List ==========================================================================
-// NOTE: API
 //
+// NOTE: API
 // @proc Dqn_List_At
 //   @param at_chunk[out] (Optional) The chunk that the index belongs to will 
 //   be set in this parameter if given
 //   @return The element, or null pointer if it is not a valid index.
-//
+
 // @proc Dqn_List_Iterate
 //   @desc Produce an iterator for the data in the list
 //
 //   @param[in] start_index The index to start iterating from
 //
-//   @begincode
-//   Dqn_List<int> list = {};
-//   for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);)
-//   {
-//       int *item = it.data;
-//   }
-//   @endcode
+#if 0
+    Dqn_List<int> list = {};
+    for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);)
+    {
+        int *item = it.data;
+    }
+#endif
 
 template <typename T> struct Dqn_ListChunk
 {
@@ -361,10 +369,10 @@ template <typename T> struct Dqn_ListChunk
 
 template <typename T> struct Dqn_ListIterator
 {
-    Dqn_b32           init;             // (Internal): True if Dqn_List_Iterate has been called at-least once on this iterator
-    Dqn_ListChunk<T> *chunk;            // (Internal): The chunk that the iterator is reading from
-    Dqn_usize         chunk_data_index; // (Internal): The index in the chunk the iterator is referencing
-    T                *data;             // (Read):     Pointer to the data the iterator is referencing. Nullptr if invalid.
+    Dqn_b32           init;             // True if Dqn_List_Iterate has been called at-least once on this iterator
+    Dqn_ListChunk<T> *chunk;            // The chunk that the iterator is reading from
+    Dqn_usize         chunk_data_index; // The index in the chunk the iterator is referencing
+    T                *data;             // Pointer to the data the iterator is referencing. Nullptr if invalid.
 };
 
 template <typename T> struct Dqn_List
@@ -1064,4 +1072,3 @@ template <typename T> DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_usize index,
     return result;
 }
 #endif // !defined(DQN_NO_LIST)
-
