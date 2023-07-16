@@ -3,9 +3,9 @@
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "wininet")
 
-    #if defined(DQN_NO_WIN32_MINIMAL_HEADER) || defined(_INC_WINDOWS)
-        #include <bcrypt.h>          // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
-        #include <shellscalingapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
+    #if defined(DQN_NO_WIN32_MIN_HEADER)
+        #include <bcrypt.h>   // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
+        #include <shellapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
         #if !defined(DQN_NO_WINNET)
             #include <wininet.h> // Dqn_Win_Net -> InternetConnect ... etc
         #endif // DQN_NO_WINNET

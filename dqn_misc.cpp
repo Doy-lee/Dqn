@@ -538,7 +538,7 @@ DQN_API uint32_t Dqn_Thread_GetID()
 DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext_(DQN_LEAK_TRACE_FUNCTION_NO_COMMA)
 {
 
-    thread_local Dqn_ThreadContext result = {};
+    DQN_THREAD_LOCAL Dqn_ThreadContext result = {};
     if (!result.init) {
         result.init = true;
         DQN_ASSERTF(dqn_library.lib_init, "Library must be initialised by calling Dqn_Library_Init(nullptr)");

@@ -33,10 +33,10 @@ DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string)
     #if defined(DQN_OS_WIN32)
     // NOTE: Get the output handles from kernel
     // =========================================================================
-    thread_local void *std_out_print_handle     = nullptr;
-    thread_local void *std_err_print_handle     = nullptr;
-    thread_local bool  std_out_print_to_console = false;
-    thread_local bool  std_err_print_to_console = false;
+    DQN_THREAD_LOCAL void *std_out_print_handle     = nullptr;
+    DQN_THREAD_LOCAL void *std_err_print_handle     = nullptr;
+    DQN_THREAD_LOCAL bool  std_out_print_to_console = false;
+    DQN_THREAD_LOCAL bool  std_err_print_to_console = false;
 
     if (!std_out_print_handle) {
         unsigned long mode = 0; (void)mode;
@@ -171,7 +171,7 @@ DQN_API void Dqn_Print_StdLnFVStyle(Dqn_PrintStd std_handle, Dqn_PrintStyle styl
 
 DQN_API Dqn_String8 Dqn_Print_ESCColourString(Dqn_PrintESCColour colour, uint8_t r, uint8_t g, uint8_t b)
 {
-    thread_local char buffer[32];
+    DQN_THREAD_LOCAL char buffer[32];
     buffer[0]          = 0;
     Dqn_String8 result = {};
     result.size        = STB_SPRINTF_DECORATE(snprintf)(buffer,

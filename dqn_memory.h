@@ -189,7 +189,8 @@ DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
 
 enum Dqn_ArenaBlockFlags
 {
-    Dqn_ArenaBlockFlags_Private = 1 << 0, ///< Private blocks can only allocate its memory when used in the 'FromBlock' API variants
+    Dqn_ArenaBlockFlags_Private           = 1 << 0, // Private blocks can only allocate its memory when used in the 'FromBlock' API variants
+    Dqn_ArenaBlockFlags_UseAfterFreeGuard = 1 << 1, // Block was allocated with use-after-free guard semantics
 };
 
 struct Dqn_ArenaStat

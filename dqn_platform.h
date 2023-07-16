@@ -199,7 +199,12 @@ DQN_API uint64_t              Dqn_Date_EpochTime            ();
 
 // NOTE: [$W32H] Win32 Min Header ==================================================================
 #if defined(DQN_OS_WIN32)
+
 #if !defined(DQN_NO_WIN32_MIN_HEADER) && !defined(_INC_WINDOWS)
+    #if defined(DQN_COMPILER_W32_MSVC)
+        #pragma warning(push)
+        #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
+    #endif
     // Taken from Windows.h
     // typedef unsigned long DWORD;
     // typedef unsigned short WORD;
@@ -220,6 +225,9 @@ DQN_API uint64_t              Dqn_Date_EpochTime            ();
         } u;
         uint64_t QuadPart;
     } LARGE_INTEGER;
+    #if defined(DQN_COMPILER_W32_MSVC)
+        #pragma warning(pop)
+    #endif
 #endif // !defined(DQN_NO_WIN32_MIN_HEADER) && !defined(_INC_WINDOWS)
 
 // NOTE: [$WIND] Dqn_Win ===========================================================================

@@ -289,6 +289,24 @@ DQN_API void Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaBlock *block
         Dqn_VMem_Release(block, block_metadata_size + block->size);
         Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG block);
     } else {
+        if (block->arena->use_after_free_guard) {
+            DQN_ASSERTF(
+                block->flags & Dqn_ArenaBlockFlags_UseAfterFreeGuard,
+                "Arena has set use-after-free guard but the memory it uses was not initialised "
+                "with use-after-free semantics. You might have set the arena use-after-free "
+                "flag after it has already done an allocation which is not valid. Make sure "
+                "you set the flag first before the arena is used.");
+        } else {
+            DQN_ASSERTF(
+                (block->flags & Dqn_ArenaBlockFlags_UseAfterFreeGuard) == 0,
+                "The arena's memory block has the use-after-free guard set but the arena does "
+                "not have the use-after-free flag set. This is not valid, a block that has "
+                "use-after-free semantics was allocated from an arena with the equivalent flag set "
+                "and for the lifetime of the block the owning arena must also have the same flag "
+                "set for correct behaviour. Make sure you do not unset the flag on the arena "
+                "whilst it still has memory blocks that it owns.");
+        }
+
         block->used = reset_info.used_value;
         // NOTE: Guard all the committed pages again
         if (block->arena->use_after_free_guard)
@@ -472,6 +490,9 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena
         result->commit = commit_aligned - block_metadata_size;
         result->flags  = flags;
         result->arena  = arena;
+
+        if (arena->use_after_free_guard)
+            result->flags |= Dqn_ArenaBlockFlags_UseAfterFreeGuard;
 
         // NOTE: Reset the block (this will guard the memory pages if required, otherwise no-op).
         Dqn_ArenaBlockResetInfo_ reset_info = {};

@@ -24,11 +24,30 @@
     #define DQN_COMPILER_GCC
 #endif
 
+// Declare struct literals that work in both C and C++ because the syntax is 
+// different between languages.
+#if 0
+    struct Foo { int a; }
+    struct Foo foo = DQN_LITERAL(Foo){32}; // Works on both C and C++
+#endif
+
+#if defined(__cplusplus)
+    #define DQN_LITERAL(T) T
+#else
+    #define DQN_LITERAL(T) (T)
+#endif
+
+#if defined(__cplusplus)
+    #define DQN_THREAD_LOCAL thread_local
+#else
+    #define DQN_THREAD_LOCAL _Thread_local
+#endif
+
 #if defined(_WIN32)
     #define DQN_OS_WIN32
 #elif defined(__aarch64__) || defined(_M_ARM64)
     #define DQN_OS_ARM64
-#else
+#elif defined(__linux__)
     #define DQN_OS_UNIX
 #endif
 
@@ -121,7 +140,6 @@
 // NOTE: Preprocessor Token Tricks =================================================================
 #define DQN_TOKEN_COMBINE2(x, y) x ## y
 #define DQN_TOKEN_COMBINE(x, y) DQN_TOKEN_COMBINE2(x, y)
-#define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
 
 #define DQN_SWAP(a, b)   \
     do                   \
@@ -194,19 +212,17 @@
 #define DQN_INVALID_CODE_PATH DQN_INVALID_CODE_PATHF("Invalid code path triggered")
 
 // NOTE: Check macro ===============================================================================
-// Assert the expression given in debug, whilst in release- assertion is
-// removed and the expression is evaluated and returned.
+// Check the expression trapping in debug, whilst in release- trapping is
+// removed and the expression is evaluated as if it were a normal 'if' branch.
 //
-// This function provides dual logic which allows handling of the condition
-// gracefully in release mode, but asserting in debug mode. This is an internal
-// function, prefer the @see DQN_CHECK macros.
-//
-// Returns true if the expression evaluated to true, false otherwise.
-//
+// This allows handling of the condition gracefully when compiled out but traps 
+// to notify the developer in builds when it's compiled in.
 #if 0
     bool flag = true;
-    if (!DQN_CHECKF(flag, "Flag was false!")) {
+    if (DQN_CHECKF(flag, "Flag was false!")) {
         // This branch will execute!
+    } else {
+        // Prints "Flag was false!"
     }
 #endif
 #define DQN_CHECK(expr) DQN_CHECKF(expr, "")
@@ -255,6 +271,7 @@ struct Dqn_DeferHelper
     Dqn_Defer<Lambda> operator+(Lambda lambda) { return Dqn_Defer<Lambda>(lambda); };
 };
 
+#define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
 #define DQN_DEFER const auto DQN_UNIQUE_NAME(defer_lambda_) = Dqn_DeferHelper() + [&]()
 
 #define DQN_DEFER_LOOP(begin, end)                   \

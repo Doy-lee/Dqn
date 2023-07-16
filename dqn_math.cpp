@@ -1,36 +1,295 @@
 #if !defined(DQN_NO_V2)
 // NOTE: [$VEC2] Vector2 ===========================================================================
-DQN_API Dqn_V2I Dqn_V2ToV2I(Dqn_V2 a)
+DQN_API bool operator!=(Dqn_V2I lhs, Dqn_V2I rhs)
 {
-    Dqn_V2I result = Dqn_V2I(DQN_CAST(int32_t)a.x, DQN_CAST(int32_t)a.y);
+    bool result = !(lhs == rhs);
     return result;
 }
 
-DQN_API Dqn_V2 Dqn_V2Min(Dqn_V2 a, Dqn_V2 b)
+DQN_API bool operator==(Dqn_V2I lhs, Dqn_V2I rhs)
 {
-    Dqn_V2 result = Dqn_V2(DQN_MIN(a.x, b.x), DQN_MIN(a.y, b.y));
+    bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y);
     return result;
 }
 
-DQN_API Dqn_V2 Dqn_V2Max(Dqn_V2 a, Dqn_V2 b)
+DQN_API bool operator>=(Dqn_V2I lhs, Dqn_V2I rhs)
 {
-    Dqn_V2 result = Dqn_V2(DQN_MAX(a.x, b.x), DQN_MAX(a.y, b.y));
+    bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
     return result;
 }
 
-DQN_API Dqn_V2 Dqn_V2Abs(Dqn_V2 a)
+DQN_API bool operator<=(Dqn_V2I lhs, Dqn_V2I rhs)
 {
-    Dqn_V2 result = Dqn_V2(DQN_ABS(a.x), DQN_ABS(a.y));
+    bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y);
     return result;
 }
 
-DQN_API Dqn_f32 Dqn_V2Dot(Dqn_V2 a, Dqn_V2 b)
+DQN_API bool operator<(Dqn_V2I lhs, Dqn_V2I rhs)
+{
+    bool result = (lhs.x <  rhs.x) && (lhs.y <  rhs.y);
+    return result;
+}
+
+DQN_API bool operator>(Dqn_V2I lhs, Dqn_V2I rhs)
+{
+    bool result = (lhs.x >  rhs.x) && (lhs.y >  rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2I operator-(Dqn_V2I lhs, Dqn_V2I rhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x - rhs.x, lhs.y - rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2I operator+(Dqn_V2I lhs, Dqn_V2I rhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x + rhs.x, lhs.y + rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2I operator*(Dqn_V2I lhs, Dqn_V2I rhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x * rhs.x, lhs.y * rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2I operator*(Dqn_V2I lhs, Dqn_f32 rhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x * rhs, lhs.y * rhs);
+    return result;
+}
+
+DQN_API Dqn_V2I operator*(Dqn_V2I lhs, int32_t rhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x * rhs, lhs.y * rhs);
+    return result;
+}
+
+DQN_API Dqn_V2I operator/(Dqn_V2I lhs, Dqn_V2I  rhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x / rhs.x, lhs.y / rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2I operator/(Dqn_V2I lhs, Dqn_f32 rhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x / rhs, lhs.y / rhs);
+    return result;
+}
+
+DQN_API Dqn_V2I operator/(Dqn_V2I lhs, int32_t rhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x / rhs, lhs.y / rhs);
+    return result;
+}
+
+DQN_API Dqn_V2I &operator*=(Dqn_V2I &lhs, Dqn_V2I rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2I &operator*=(Dqn_V2I &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2I &operator*=(Dqn_V2I &lhs, int32_t rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2I &operator/=(Dqn_V2I &lhs, Dqn_V2I rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2I &operator/=(Dqn_V2I &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2I &operator/=(Dqn_V2I &lhs, int32_t rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2I &operator-=(Dqn_V2I &lhs, Dqn_V2I rhs)
+{
+    lhs = lhs - rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2I &operator+=(Dqn_V2I &lhs, Dqn_V2I rhs)
+{
+    lhs = lhs + rhs;
+    return lhs;
+}
+
+// NOTE: Vector2
+DQN_API bool operator!=(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    bool result = !(lhs == rhs);
+    return result;
+}
+
+DQN_API bool operator==(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y);
+    return result;
+}
+
+DQN_API bool operator>=(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
+    return result;
+}
+
+DQN_API bool operator<=(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y);
+    return result;
+}
+
+DQN_API bool operator<(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    bool result = (lhs.x <  rhs.x) && (lhs.y <  rhs.y);
+    return result;
+}
+
+DQN_API bool operator>(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    bool result = (lhs.x >  rhs.x) && (lhs.y >  rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator-(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x - rhs.x, lhs.y - rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator+(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x + rhs.x, lhs.y + rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator*(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x * rhs.x, lhs.y * rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator*(Dqn_V2 lhs, Dqn_f32 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x * rhs, lhs.y * rhs);
+    return result;
+}
+
+DQN_API Dqn_V2 operator*(Dqn_V2 lhs, int32_t rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x * rhs, lhs.y * rhs);
+    return result;
+}
+
+DQN_API Dqn_V2 operator/(Dqn_V2 lhs, Dqn_V2  rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x / rhs.x, lhs.y / rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator/(Dqn_V2 lhs, Dqn_f32 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x / rhs, lhs.y / rhs);
+    return result;
+}
+
+DQN_API Dqn_V2 operator/(Dqn_V2 lhs, int32_t rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x / rhs, lhs.y / rhs);
+    return result;
+}
+
+DQN_API Dqn_V2 &operator*=(Dqn_V2 &lhs, Dqn_V2 rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator*=(Dqn_V2 &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator*=(Dqn_V2 &lhs, int32_t rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator/=(Dqn_V2 &lhs, Dqn_V2 rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator/=(Dqn_V2 &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator/=(Dqn_V2 &lhs, int32_t rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator-=(Dqn_V2 &lhs, Dqn_V2 rhs)
+{
+    lhs = lhs - rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator+=(Dqn_V2 &lhs, Dqn_V2 rhs)
+{
+    lhs = lhs + rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Min(Dqn_V2 a, Dqn_V2 b)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(DQN_MIN(a.x, b.x), DQN_MIN(a.y, b.y));
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Max(Dqn_V2 a, Dqn_V2 b)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(DQN_MAX(a.x, b.x), DQN_MAX(a.y, b.y));
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Abs(Dqn_V2 a)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(DQN_ABS(a.x), DQN_ABS(a.y));
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b)
 {
     Dqn_f32 result = (a.x * b.x) + (a.y * b.y);
     return result;
 }
 
-DQN_API Dqn_f32 Dqn_V2LengthSq(Dqn_V2 a, Dqn_V2 b)
+DQN_API Dqn_f32 Dqn_V2_LengthSq(Dqn_V2 a, Dqn_V2 b)
 {
     Dqn_f32 x_side = b.x - a.x;
     Dqn_f32 y_side = b.y - a.y;
@@ -38,7 +297,7 @@ DQN_API Dqn_f32 Dqn_V2LengthSq(Dqn_V2 a, Dqn_V2 b)
     return result;
 }
 
-DQN_API Dqn_V2 Dqn_V2Normalise(Dqn_V2 a)
+DQN_API Dqn_V2 Dqn_V2_Normalise(Dqn_V2 a)
 {
     Dqn_f32 length_sq = DQN_SQUARED(a.x) + DQN_SQUARED(a.y);
     Dqn_f32 length    = DQN_SQRTF(length_sq);
@@ -46,31 +305,163 @@ DQN_API Dqn_V2 Dqn_V2Normalise(Dqn_V2 a)
     return result;
 }
 
-DQN_API Dqn_V2 Dqn_V2Perpendicular(Dqn_V2 a)
+DQN_API Dqn_V2 Dqn_V2_Perpendicular(Dqn_V2 a)
 {
-    Dqn_V2 result = Dqn_V2(-a.y, a.x);
+    Dqn_V2 result = Dqn_V2_InitNx2(-a.y, a.x);
     return result;
 }
 #endif // !defined(DQN_NO_V2)
 
 #if !defined(DQN_NO_V3)
 // NOTE: [$VEC3] Vector3 ===========================================================================
-DQN_API Dqn_f32 Dqn_V3LengthSq(Dqn_V3 a)
+DQN_API bool operator!=(Dqn_V3 lhs, Dqn_V3  rhs)
+{
+    bool result = !(lhs == rhs);
+    return result;
+}
+
+DQN_API bool operator==(Dqn_V3 lhs, Dqn_V3 rhs)
+{
+    bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z);
+    return result;
+}
+
+DQN_API bool operator>=(Dqn_V3 lhs, Dqn_V3 rhs)
+{
+    bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y) && (lhs.z >= rhs.z);
+    return result;
+}
+
+DQN_API bool operator<=(Dqn_V3 lhs, Dqn_V3 rhs)
+{
+    bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y) && (lhs.z <= rhs.z);
+    return result;
+}
+
+DQN_API bool operator< (Dqn_V3 lhs, Dqn_V3 rhs)
+{
+    bool result = (lhs.x <  rhs.x) && (lhs.y <  rhs.y) && (lhs.z <  rhs.z);
+    return result;
+}
+
+DQN_API bool operator>(Dqn_V3 lhs, Dqn_V3 rhs)
+{
+    bool result = (lhs.x >  rhs.x) && (lhs.y >  rhs.y) && (lhs.z >  rhs.z);
+    return result;
+}
+
+DQN_API Dqn_V3 operator-(Dqn_V3 lhs, Dqn_V3 rhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+    return result;
+}
+
+DQN_API Dqn_V3 operator+(Dqn_V3 lhs, Dqn_V3  rhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
+    return result;
+}
+
+DQN_API Dqn_V3 operator*(Dqn_V3 lhs, Dqn_V3  rhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z);
+    return result;
+}
+
+DQN_API Dqn_V3 operator*(Dqn_V3 lhs, Dqn_f32 rhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+    return result;
+}
+
+DQN_API Dqn_V3 operator*(Dqn_V3 lhs, int32_t rhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+    return result;
+}
+
+DQN_API Dqn_V3 operator/(Dqn_V3 lhs, Dqn_V3  rhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
+    return result;
+}
+
+DQN_API Dqn_V3 operator/(Dqn_V3 lhs, Dqn_f32 rhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
+    return result;
+}
+
+DQN_API Dqn_V3 operator/(Dqn_V3 lhs, int32_t rhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
+    return result;
+}
+
+DQN_API Dqn_V3 &operator*=(Dqn_V3 &lhs, Dqn_V3 rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V3 &operator*=(Dqn_V3 &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V3 &operator*=(Dqn_V3 &lhs, int32_t rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V3 &operator/=(Dqn_V3 &lhs, Dqn_V3 rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V3 &operator/=(Dqn_V3 &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V3 &operator/=(Dqn_V3 &lhs, int32_t rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V3 &operator-=(Dqn_V3 &lhs, Dqn_V3 rhs)
+{
+    lhs = lhs - rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V3 &operator+=(Dqn_V3 &lhs, Dqn_V3 rhs)
+{
+    lhs = lhs + rhs;
+    return lhs;
+}
+
+DQN_API Dqn_f32 Dqn_V3_LengthSq(Dqn_V3 a)
 {
     Dqn_f32 result = DQN_SQUARED(a.x) + DQN_SQUARED(a.y) + DQN_SQUARED(a.z);
     return result;
 }
 
-DQN_API Dqn_f32 Dqn_V3Length(Dqn_V3 a)
+DQN_API Dqn_f32 Dqn_V3_Length(Dqn_V3 a)
 {
     Dqn_f32 length_sq = DQN_SQUARED(a.x) + DQN_SQUARED(a.y) + DQN_SQUARED(a.z);
     Dqn_f32 result    = DQN_SQRTF(length_sq);
     return result;
 }
 
-DQN_API Dqn_V3 Dqn_V3Normalise(Dqn_V3 a)
+DQN_API Dqn_V3 Dqn_V3_Normalise(Dqn_V3 a)
 {
-    Dqn_f32 length = Dqn_V3Length(a);
+    Dqn_f32 length = Dqn_V3_Length(a);
     Dqn_V3  result = a / length;
     return result;
 }
@@ -78,6 +469,108 @@ DQN_API Dqn_V3 Dqn_V3Normalise(Dqn_V3 a)
 
 #if !defined(DQN_NO_V4)
 // NOTE: [$VEC4] Vector4 ===========================================================================
+DQN_API bool operator!=(Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    bool result = !(lhs == rhs);
+    return result;
+}
+
+DQN_API bool operator==(Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z) && (lhs.w == rhs.w);
+    return result;
+}
+
+DQN_API bool operator>=(Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y) && (lhs.z >= rhs.z) && (lhs.w >= rhs.w);
+    return result;
+}
+
+DQN_API bool operator<=(Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y) && (lhs.z <= rhs.z) && (lhs.w <= rhs.w);
+    return result;
+}
+
+DQN_API bool operator< (Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    bool result = (lhs.x < rhs.x) && (lhs.y < rhs.y) && (lhs.z < rhs.z) && (lhs.w < rhs.w);
+    return result;
+}
+
+DQN_API bool operator>(Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    bool result = (lhs.x >  rhs.x) && (lhs.y > rhs.y) && (lhs.z > rhs.z) && (lhs.w > rhs.w);
+    return result;
+}
+
+DQN_API Dqn_V4 operator-(Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    Dqn_V4 result = Dqn_V4_InitNx4(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
+    return result;
+}
+
+DQN_API Dqn_V4 operator+(Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    Dqn_V4 result = Dqn_V4_InitNx4(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
+    return result;
+}
+
+DQN_API Dqn_V4 operator* (Dqn_V4 lhs, Dqn_V4 rhs)
+{
+    Dqn_V4 result = Dqn_V4_InitNx4(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w);
+    return result;
+}
+
+DQN_API Dqn_V4 operator*(Dqn_V4 lhs, Dqn_f32 rhs)
+{
+    Dqn_V4 result = Dqn_V4_InitNx4(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
+    return result;
+}
+
+DQN_API Dqn_V4 operator*(Dqn_V4 lhs, int32_t rhs)
+{
+    Dqn_V4 result = Dqn_V4_InitNx4(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
+    return result;
+}
+
+DQN_API Dqn_V4 operator/(Dqn_V4 lhs, Dqn_f32 rhs)
+{
+    Dqn_V4 result = Dqn_V4_InitNx4(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs);
+    return result;
+}
+
+DQN_API Dqn_V4 &operator*=(Dqn_V4 &lhs, Dqn_V4 rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V4 &operator*=(Dqn_V4 &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V4 &operator*=(Dqn_V4 &lhs, int32_t rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V4 &operator-=(Dqn_V4 &lhs, Dqn_V4  rhs)
+{
+    lhs = lhs - rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V4 &operator+=(Dqn_V4 &lhs, Dqn_V4  rhs)
+{
+    lhs = lhs + rhs;
+    return lhs;
+}
+
 DQN_API Dqn_f32 Dqn_V4Dot(Dqn_V4 a, Dqn_V4 b)
 {
     Dqn_f32 result = (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
@@ -163,9 +656,9 @@ DQN_API Dqn_M4 Dqn_M4_Transpose(Dqn_M4 mat)
 
 DQN_API Dqn_M4 Dqn_M4_Rotate(Dqn_V3 axis01, Dqn_f32 radians)
 {
-    DQN_ASSERTF(DQN_ABS(Dqn_V3Length(axis01) - 1.f) <= 0.01f,
+    DQN_ASSERTF(DQN_ABS(Dqn_V3_Length(axis01) - 1.f) <= 0.01f,
                 "Rotation axis must be normalised, length = %f",
-                Dqn_V3Length(axis01));
+                Dqn_V3_Length(axis01));
 
     Dqn_f32 sin           = DQN_SINF(radians);
     Dqn_f32 cos           = DQN_COSF(radians);
@@ -338,98 +831,80 @@ DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
 
 #if !defined(DQN_NO_RECT)
 // NOTE: [$RECT] Dqn_Rect ==========================================================================
-DQN_API Dqn_Rect Dqn_Rect_InitFromPosAndSize(Dqn_V2 pos, Dqn_V2 size)
+DQN_API bool operator==(const Dqn_Rect& lhs, const Dqn_Rect& rhs)
 {
-    Dqn_Rect result = {};
-    result.min      = pos;
-    if (size.x < 0) result.min.x -= size.x;
-    if (size.y < 0) result.min.y -= size.y;
-    result.max  = result.min + Dqn_V2Abs(size);
+    bool result = (lhs.pos == rhs.pos) && (lhs.size == rhs.size);
     return result;
 }
 
 DQN_API Dqn_V2 Dqn_Rect_Center(Dqn_Rect rect)
 {
-    Dqn_V2 size   = rect.max - rect.min;
-    Dqn_V2 result = rect.min + (size * 0.5f);
+    Dqn_V2 result = rect.pos + (rect.size * .5f);
     return result;
 }
 
 DQN_API bool Dqn_Rect_ContainsPoint(Dqn_Rect rect, Dqn_V2 p)
 {
-    bool result = (p.x >= rect.min.x && p.x <= rect.max.x && p.y >= rect.min.y && p.y <= rect.max.y);
+    Dqn_V2 min  = rect.pos;
+    Dqn_V2 max  = rect.pos + rect.size;
+    bool result = (p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y);
     return result;
 }
 
 DQN_API bool Dqn_Rect_ContainsRect(Dqn_Rect a, Dqn_Rect b)
 {
-    bool result = (b.min >= a.min && b.max <= a.max);
-    return result;
-}
-
-DQN_API Dqn_V2 Dqn_Rect_Size(Dqn_Rect rect)
-{
-    Dqn_V2 result = rect.max - rect.min;
-    return result;
-}
-
-DQN_API Dqn_Rect Dqn_Rect_Move(Dqn_Rect src, Dqn_V2 move_amount)
-{
-    Dqn_Rect result = src;
-    result.min += move_amount;
-    result.max += move_amount;
-    return result;
-}
-
-DQN_API Dqn_Rect Dqn_Rect_MoveTo(Dqn_Rect src, Dqn_V2 dest)
-{
-    Dqn_V2 move_amount = dest - src.min;
-    Dqn_Rect result    = src;
-    result.min += move_amount;
-    result.max += move_amount;
+    Dqn_V2 a_min = a.pos;
+    Dqn_V2 a_max = a.pos + a.size;
+    Dqn_V2 b_min = b.pos;
+    Dqn_V2 b_max = b.pos + b.size;
+    bool result = (b_min >= a_min && b_max <= a_max);
     return result;
 }
 
 DQN_API bool Dqn_Rect_Intersects(Dqn_Rect a, Dqn_Rect b)
 {
-    bool result = (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
-                     (a.min.y <= b.max.y && a.max.y >= b.min.y);
+    Dqn_V2 a_min = a.pos;
+    Dqn_V2 a_max = a.pos + a.size;
+    Dqn_V2 b_min = b.pos;
+    Dqn_V2 b_max = b.pos + b.size;
+    bool result = (a_min.x <= b_max.x && a_max.x >= b_min.x) &&
+                  (a_min.y <= b_max.y && a_max.y >= b_min.y);
     return result;
 }
 
 DQN_API Dqn_Rect Dqn_Rect_Intersection(Dqn_Rect a, Dqn_Rect b)
 {
     Dqn_Rect result  = {};
-    if (Dqn_Rect_Intersects(a, b))
-    {
-        result.min.x = DQN_MAX(a.min.x, b.min.x);
-        result.min.y = DQN_MAX(a.min.y, b.min.y);
-        result.max.x = DQN_MIN(a.max.x, b.max.x);
-        result.max.y = DQN_MIN(a.max.y, b.max.y);
-    }
+    if (Dqn_Rect_Intersects(a, b)) {
+        Dqn_V2 a_min = a.pos;
+        Dqn_V2 a_max = a.pos + a.size;
+        Dqn_V2 b_min = b.pos;
+        Dqn_V2 b_max = b.pos + b.size;
 
+        Dqn_V2 min = {};
+        Dqn_V2 max = {};
+        min.x      = DQN_MAX(a_min.x, b_min.x);
+        min.y      = DQN_MAX(a_min.y, b_min.y);
+        max.x      = DQN_MIN(a_max.x, b_max.x);
+        max.y      = DQN_MIN(a_max.y, b_max.y);
+        result     = Dqn_Rect_InitV2x2(min, max - min);
+    }
     return result;
 }
 
 DQN_API Dqn_Rect Dqn_Rect_Union(Dqn_Rect a, Dqn_Rect b)
 {
-    Dqn_Rect result  = {};
-    result.min.x = DQN_MIN(a.min.x, b.min.x);
-    result.min.y = DQN_MIN(a.min.y, b.min.y);
-    result.max.x = DQN_MAX(a.max.x, b.max.x);
-    result.max.y = DQN_MAX(a.max.y, b.max.y);
-    return result;
-}
+    Dqn_V2 a_min = a.pos;
+    Dqn_V2 a_max = a.pos + a.size;
+    Dqn_V2 b_min = b.pos;
+    Dqn_V2 b_max = b.pos + b.size;
 
-DQN_API Dqn_Rect Dqn_Rect_FromRectI32(Dqn_RectI32 a)
-{
-    Dqn_Rect result = Dqn_Rect(a.min, a.max);
-    return result;
-}
-
-DQN_API Dqn_V2I Dqn_RectI32_Size(Dqn_RectI32 rect)
-{
-    Dqn_V2I result = rect.max - rect.min;
+    Dqn_V2 min, max;
+    min.x = DQN_MIN(a_min.x, b_min.x);
+    min.y = DQN_MIN(a_min.y, b_min.y);
+    max.x = DQN_MAX(a_max.x, b_max.x);
+    max.y = DQN_MAX(a_max.y, b_max.y);
+    Dqn_Rect result = Dqn_Rect_InitV2x2(min, max - min);
     return result;
 }
 #endif // !defined(DQN_NO_RECT)
