@@ -9,20 +9,34 @@ amalgamates all the files into one translation unit.
 ## Build
 
 To build with this library, copy all the `*.[h|cpp]` files at the root of the
-repository and in one header file,
+repository to your desired location, accessible by your project and in one
+header file include the header.
 
 ```cpp
 #include "dqn.h"
 ```
 
-Which includes all other files and their declaration into your header. In one
-`.cpp` file defined the implementation macro to enable the implementation of the
-header in that translation unit,
+`dqn.h` includes all other files and their declaration into your header. In
+*one* `.cpp` file define the macro to enable the implementation of the header in
+the translation unit.
 
 ```cpp
 #define DQN_IMPLEMENTATION
 #include "dqn.h"
 ```
 
-Ensure that the folder containing the files is part of the include search path
-for the compiler for the amalgamated `dqn.h` to successfully locate the files.
+Finally ensure that the compiler has in its search paths for the include
+directory where headers are located, e.g. `-I <path/to/dqn/headers>`.
+
+## Customisation
+
+The headers provide macros to compile out sections that are not needed. This can
+be useful to speed up compile times if you want a particular part of the
+library. Each header contains a table-of-contents that denotes the macro to
+define to disable that section that should be defined before the header include.
+
+```cpp
+#define DQN_NO_VARRAY       // Disable virtual array container
+#define DQN_NO_JSON_BUILDER // Disable the JSON string builder
+#include "dqn.h"
+```
