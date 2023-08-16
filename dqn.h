@@ -49,7 +49,8 @@
     defined(DQN_ONLY_M4)           || \
     defined(DQN_ONLY_RECT)         || \
     defined(DQN_ONLY_JSON_BUILDER) || \
-    defined(DQN_ONLY_BIN)
+    defined(DQN_ONLY_BIN)          || \
+    defined(DQN_ONLY_PROFILER)
 
     #if !defined(DQN_ONLY_VARRAY)
     #define DQN_NO_VARRAY
