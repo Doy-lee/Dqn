@@ -288,6 +288,24 @@ enum Dqn_String8FindFlag
     Dqn_String8FindFlag_AlphaNum   = Dqn_String8FindFlag_Alphabet | Dqn_String8FindFlag_Digit,
 };
 
+struct Dqn_String8SplitAllocResult
+{
+    Dqn_String8 *data;
+    Dqn_usize    size;
+};
+
+struct Dqn_String8ToU64Result
+{
+    bool     success;
+    uint64_t value;
+};
+
+struct Dqn_String8ToI64Result
+{
+    bool    success;
+    int64_t value;
+};
+
 DQN_API Dqn_String8                  Dqn_String8_InitCString8          (char const *src);
 DQN_API bool                         Dqn_String8_IsValid               (Dqn_String8 string);
 DQN_API bool                         Dqn_String8_IsAll                 (Dqn_String8 string, Dqn_String8IsAll is_all);
@@ -302,6 +320,8 @@ DQN_API Dqn_String8                  Dqn_String8_Slice                 (Dqn_Stri
 DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplitArray      (Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size);
 DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplit           (Dqn_String8 string, Dqn_String8 find);
 DQN_API Dqn_usize                    Dqn_String8_Split                 (Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_usize splits_count);
+DQN_API Dqn_String8SplitAllocResult  Dqn_String8_SplitAlloc            (Dqn_Allocator allocator, Dqn_String8 string, Dqn_String8 delimiter);
+
 DQN_API Dqn_String8FindResult        Dqn_String8_FindFirstStringArray  (Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size);
 DQN_API Dqn_String8FindResult        Dqn_String8_FindFirstString       (Dqn_String8 string, Dqn_String8 find);
 DQN_API Dqn_String8FindResult        Dqn_String8_FindFirst             (Dqn_String8 string, uint32_t flags);
@@ -321,18 +341,6 @@ DQN_API Dqn_String8                  Dqn_String8_TrimWhitespaceAround  (Dqn_Stri
 DQN_API Dqn_String8                  Dqn_String8_TrimByteOrderMark     (Dqn_String8 string);
 
 DQN_API Dqn_String8                  Dqn_String8_FileNameFromPath      (Dqn_String8 path);
-
-struct Dqn_String8ToU64Result
-{
-    bool     success;
-    uint64_t value;
-};
-
-struct Dqn_String8ToI64Result
-{
-    bool    success;
-    int64_t value;
-};
 
 DQN_API Dqn_String8ToU64Result       Dqn_String8_ToU64                 (Dqn_String8 string, char separator);
 DQN_API Dqn_String8ToI64Result       Dqn_String8_ToI64                 (Dqn_String8 string, char separator);

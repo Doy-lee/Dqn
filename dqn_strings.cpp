@@ -149,6 +149,20 @@ DQN_API Dqn_usize Dqn_String8_Split(Dqn_String8 string, Dqn_String8 delimiter, D
     return result;
 }
 
+DQN_API Dqn_String8SplitAllocResult Dqn_String8_SplitAlloc(Dqn_Allocator allocator,
+                                                           Dqn_String8   string,
+                                                           Dqn_String8   delimiter)
+{
+    Dqn_String8SplitAllocResult result = {};
+    Dqn_usize splits_required          = Dqn_String8_Split(string, delimiter, /*splits*/ nullptr, /*count*/ 0);
+    result.data                        = Dqn_Allocator_NewArray(allocator, Dqn_String8, splits_required, Dqn_ZeroMem_No);
+    if (result.data) {
+        result.size = Dqn_String8_Split(string, delimiter, result.data, splits_required);
+        DQN_ASSERT(splits_required == result.size);
+    }
+    return result;
+}
+
 DQN_API Dqn_String8FindResult Dqn_String8_FindFirstStringArray(Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size)
 {
     Dqn_String8FindResult result = {};
