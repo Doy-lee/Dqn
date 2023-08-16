@@ -1,14 +1,91 @@
-// NOTE: Table Of Contents =========================================================================
-// Index                    | Disable #define         | Description
-// =================================================================================================
-// [$FSYS] Dqn_Fs           |                         | Filesystem helpers
-// [$DATE] Dqn_Date         |                         | Date-time helpers
-// [$W32H] Win32 Min Header | DQN_NO_WIN32_MIN_HEADER | Minimal windows.h subset
-// [$WIND] Dqn_Win          |                         | Windows OS helpers
-// [$WINN] Dqn_WinNet       | DQN_NO_WINNET           | Windows internet download/query helpers
-// [$OSYS] Dqn_OS           | DQN_NO_WIN              | Operating-system APIs
-// =================================================================================================
+// NOTE: [$PRIN] Dqn_Print =========================================================================
+enum Dqn_PrintStd
+{
+    Dqn_PrintStd_Out,
+    Dqn_PrintStd_Err,
+};
 
+enum Dqn_PrintBold
+{
+    Dqn_PrintBold_No,
+    Dqn_PrintBold_Yes,
+};
+
+struct Dqn_PrintStyle
+{
+    Dqn_PrintBold bold;
+    bool          colour;
+    uint8_t       r, g, b;
+};
+
+enum Dqn_PrintESCColour
+{
+    Dqn_PrintESCColour_Fg,
+    Dqn_PrintESCColour_Bg,
+};
+
+// NOTE: Print Style ===============================================================================
+DQN_API Dqn_PrintStyle Dqn_Print_StyleColour       (uint8_t r, uint8_t g, uint8_t b, Dqn_PrintBold bold);
+DQN_API Dqn_PrintStyle Dqn_Print_StyleColourU32    (uint32_t rgb, Dqn_PrintBold bold);
+DQN_API Dqn_PrintStyle Dqn_Print_StyleBold         ();
+
+// NOTE: Print Standard Out ========================================================================
+#define                Dqn_Print(string)                        Dqn_Print_Std(Dqn_PrintStd_Out, string)
+#define                Dqn_Print_F(fmt, ...)                    Dqn_Print_StdF(Dqn_PrintStd_Out, fmt, ## __VA_ARGS__)
+#define                Dqn_Print_FV(fmt, args)                  Dqn_Print_StdFV(Dqn_PrintStd_Out, fmt, args)
+
+#define                Dqn_Print_Style(style, string)           Dqn_Print_StdStyle(Dqn_PrintStd_Out, style, string)
+#define                Dqn_Print_FStyle(style, fmt, ...)        Dqn_Print_StdFStyle(Dqn_PrintStd_Out, style, fmt, ## __VA_ARGS__)
+#define                Dqn_Print_FVStyle(style, fmt, args, ...) Dqn_Print_StdFVStyle(Dqn_PrintStd_Out, style, fmt, args)
+
+#define                Dqn_Print_Ln(string)                     Dqn_Print_StdLn(Dqn_PrintStd_Out, string)
+#define                Dqn_Print_LnF(fmt, ...)                  Dqn_Print_StdLnF(Dqn_PrintStd_Out, fmt, ## __VA_ARGS__)
+#define                Dqn_Print_LnFV(fmt, args)                Dqn_Print_StdLnFV(Dqn_PrintStd_Out, fmt, args)
+
+#define                Dqn_Print_LnStyle(style, string)         Dqn_Print_StdLnStyle(Dqn_PrintStd_Out, style, string);
+#define                Dqn_Print_LnFStyle(style, fmt, ...)      Dqn_Print_StdLnFStyle(Dqn_PrintStd_Out, style, fmt, ## __VA_ARGS__);
+#define                Dqn_Print_LnFVStyle(style, fmt, args)    Dqn_Print_StdLnFVStyle(Dqn_PrintStd_Out, style, fmt, args);
+
+// NOTE: Print =====================================================================================
+DQN_API void           Dqn_Print_Std               (Dqn_PrintStd std_handle, Dqn_String8 string);
+DQN_API void           Dqn_Print_StdF              (Dqn_PrintStd std_handle, char const *fmt, ...);
+DQN_API void           Dqn_Print_StdFV             (Dqn_PrintStd std_handle, char const *fmt, va_list args);
+
+DQN_API void           Dqn_Print_StdStyle          (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_String8 string);
+DQN_API void           Dqn_Print_StdFStyle         (Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, ...);
+DQN_API void           Dqn_Print_StdFVStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, va_list args);
+
+DQN_API void           Dqn_Print_StdLn             (Dqn_PrintStd std_handle, Dqn_String8 string);
+DQN_API void           Dqn_Print_StdLnF            (Dqn_PrintStd std_handle, char const *fmt, ...);
+DQN_API void           Dqn_Print_StdLnFV           (Dqn_PrintStd std_handle, char const *fmt, va_list args);
+
+DQN_API void           Dqn_Print_StdLnStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_String8 string);
+DQN_API void           Dqn_Print_StdLnFStyle       (Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, ...);
+DQN_API void           Dqn_Print_StdLnFVStyle      (Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, va_list args);
+
+// NOTE: ANSI Formatting Codes =====================================================================
+Dqn_String8            Dqn_Print_ESCColourString   (Dqn_PrintESCColour colour, uint8_t r, uint8_t g, uint8_t b);
+Dqn_String8            Dqn_Print_ESCColourU32String(Dqn_PrintESCColour colour, uint32_t value);
+
+#define                Dqn_Print_ESCColourFgString(r, g, b)  Dqn_Print_ESCColourString(Dqn_PrintESCColour_Fg, r, g, b)
+#define                Dqn_Print_ESCColourBgString(r, g, b)  Dqn_Print_ESCColourString(Dqn_PrintESCColour_Bg, r, g, b)
+#define                Dqn_Print_ESCColourFg(r, g, b)        Dqn_Print_ESCColourString(Dqn_PrintESCColour_Fg, r, g, b).data
+#define                Dqn_Print_ESCColourBg(r, g, b)        Dqn_Print_ESCColourString(Dqn_PrintESCColour_Bg, r, g, b).data
+
+#define                Dqn_Print_ESCColourFgU32String(value) Dqn_Print_ESCColourU32String(Dqn_PrintESCColour_Fg, value)
+#define                Dqn_Print_ESCColourBgU32String(value) Dqn_Print_ESCColourU32String(Dqn_PrintESCColour_Bg, value)
+#define                Dqn_Print_ESCColourFgU32(value)       Dqn_Print_ESCColourU32String(Dqn_PrintESCColour_Fg, value).data
+#define                Dqn_Print_ESCColourBgU32(value)       Dqn_Print_ESCColourU32String(Dqn_PrintESCColour_Bg, value).data
+
+#define                Dqn_Print_ESCReset                    "\x1b[0m"
+#define                Dqn_Print_ESCBold                     "\x1b[1m"
+#define                Dqn_Print_ESCResetString              DQN_STRING8(Dqn_Print_ESCReset)
+#define                Dqn_Print_ESCBoldString               DQN_STRING8(Dqn_Print_ESCBold)
+
+#if !defined(DQN_NO_FS)
+#if defined(DQN_OS_WIN32) && defined(DQN_NO_WIN)
+    #error "Filesystem APIs requires Windows API, DQN_NO_WIN must not be defined"
+#endif
 // NOTE: [$FSYS] Dqn_Fs ============================================================================
 // NOTE: FS Manipulation =======================================================
 // TODO(dqn): We should have a Dqn_String8 interface and a CString interface
@@ -52,15 +129,10 @@ DQN_API bool         Dqn_Fs_Delete   (Dqn_String8 path);
 // @proc Dqn_Fs_ReadString8, Dqn_Fs_ReadCString8
 //   @desc Read the file at the path to a string.
 
-#define              Dqn_Fs_ReadCString8(path, path_size, file_size, allocator) Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE path, path_size, file_size, allocator)
-#define              Dqn_Fs_ReadString8(path, allocator) Dqn_Fs_ReadString8_(DQN_LEAK_TRACE path, allocator)
-
 DQN_API bool         Dqn_Fs_WriteCString8(char const *file_path, Dqn_usize file_path_size, char const *buffer, Dqn_usize buffer_size);
-DQN_API bool         Dqn_Fs_WriteString8 (Dqn_String8 file_path, Dqn_String8 buffer);
-
-// NOTE: Internal ==================================================================================
-DQN_API char        *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator);
-DQN_API Dqn_String8  Dqn_Fs_ReadString8_ (DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator);
+DQN_API bool         Dqn_Fs_Write        (Dqn_String8 file_path, Dqn_String8 buffer);
+DQN_API char        *Dqn_Fs_ReadCString8 (char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator);
+DQN_API Dqn_String8  Dqn_Fs_Read         (Dqn_String8 path, Dqn_Allocator allocator);
 
 // NOTE: R/W Stream API ============================================================================
 // NOTE: API =======================================================================================
@@ -100,6 +172,7 @@ enum Dqn_FsFileAccess
 DQN_API Dqn_FsFile Dqn_Fs_OpenFile (Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access);
 DQN_API bool       Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize size);
 DQN_API void       Dqn_Fs_CloseFile(Dqn_FsFile *file);
+#endif // !defined(DQN_NO_FS)
 
 // NOTE: File system paths =========================================================================
 // Helper data structure for building paths suitable for OS consumption.
@@ -122,8 +195,8 @@ DQN_API void       Dqn_Fs_CloseFile(Dqn_FsFile *file);
 //   For example "path/to/your/desired/folder" popped produces
 //   "path/to/your/desired"
 
-// @proc Dqn_FsPath_ConvertString8
-//   @desc Convert the path specified in the string to the OS native separated 
+// @proc Dqn_FsPath_Convert
+//   @desc Convert the path specified in the string to the OS native separated
 //   path.
 
 #if !defined(Dqn_FsPathOSSeperator)
@@ -152,9 +225,11 @@ struct Dqn_FsPath
 
 DQN_API bool        Dqn_FsPath_AddRef            (Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String8 path);
 DQN_API bool        Dqn_FsPath_Add               (Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String8 path);
+DQN_API bool        Dqn_FsPath_AddF              (Dqn_Arena *arena, Dqn_FsPath *fs_path, char const *fmt, ...);
 DQN_API bool        Dqn_FsPath_Pop               (Dqn_FsPath *fs_path);
 DQN_API Dqn_String8 Dqn_FsPath_BuildWithSeparator(Dqn_Arena *arena, Dqn_FsPath const *fs_path, Dqn_String8 path_separator);
-DQN_API Dqn_String8 Dqn_FsPath_ConvertString8    (Dqn_Arena *arena, Dqn_String8 path);
+DQN_API Dqn_String8 Dqn_FsPath_Convert           (Dqn_Arena *arena, Dqn_String8 path);
+DQN_API Dqn_String8 Dqn_FsPath_ConvertF          (Dqn_Arena *arena, char const *fmt, ...);
 #define             Dqn_FsPath_BuildFwdSlash(arena, fs_path)  Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STRING8("/"))
 #define             Dqn_FsPath_BuildBackSlash(arena, fs_path) Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STRING8("\\"))
 
@@ -197,39 +272,8 @@ DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeStringNow(char date_separator
 DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString   (Dqn_DateHMSTime time, char date_separator = '-', char hms_separator = ':');
 DQN_API uint64_t              Dqn_Date_EpochTime            ();
 
-// NOTE: [$W32H] Win32 Min Header ==================================================================
 #if defined(DQN_OS_WIN32)
-
-#if !defined(DQN_NO_WIN32_MIN_HEADER) && !defined(_INC_WINDOWS)
-    #if defined(DQN_COMPILER_W32_MSVC)
-        #pragma warning(push)
-        #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
-    #endif
-    // Taken from Windows.h
-    // typedef unsigned long DWORD;
-    // typedef unsigned short WORD;
-    // typedef int BOOL;
-    // typedef void * HWND;
-    // typedef void * HANDLE;
-    // typedef long NTSTATUS;
-
-    typedef void * HMODULE;
-    typedef union {
-        struct {
-            unsigned long LowPart;
-            long          HighPart;
-        };
-        struct {
-            unsigned long LowPart;
-            long          HighPart;
-        } u;
-        uint64_t QuadPart;
-    } LARGE_INTEGER;
-    #if defined(DQN_COMPILER_W32_MSVC)
-        #pragma warning(pop)
-    #endif
-#endif // !defined(DQN_NO_WIN32_MIN_HEADER) && !defined(_INC_WINDOWS)
-
+#if !defined(DQN_NO_WIN)
 // NOTE: [$WIND] Dqn_Win ===========================================================================
 // NOTE: API =======================================================================================
 // @proc Dqn_Win_LastErrorToBuffer, Dqn_Win_LastError
@@ -316,6 +360,7 @@ DQN_API Dqn_String8     Dqn_Win_WorkingDir    (Dqn_Allocator allocator, Dqn_Stri
 DQN_API Dqn_String16    Dqn_Win_WorkingDirW   (Dqn_Allocator allocator, Dqn_String16 suffix);
 DQN_API bool            Dqn_Win_FolderIterate (Dqn_String8 path, Dqn_Win_FolderIterator *it);
 DQN_API bool            Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it);
+#endif // !defined(DQN_NO_WIN)
 
 #if !defined(DQN_NO_WINNET)
 // NOTE: [$WINN] Dqn_WinNet ========================================================================
@@ -435,6 +480,20 @@ DQN_API Dqn_String8              Dqn_Win_NetHandlePumpToAllocString       (Dqn_W
 //   @desc Retrieve the executable directory without the trailing '/' or 
 //   ('\' for windows). If this fails an empty string is returned.
 
+// @proc Dqn_OS_PerfCounterFrequency
+//   @desc Get the number of ticks in the performance counter per second for the
+//   operating system you're running on. This value can be used to calculate 
+//   duration from OS performance counter ticks.
+
+// @proc Dqn_OS_EstimateTSCPerSecond
+//   @desc Estimate how many timestamp count's (TSC) there are per second. TSC
+//   is evaluated by calling __rdtsc() or the equivalent on the platform. This
+//   value can be used to convert TSC durations into seconds.
+//
+//   @param duration_ms_to_gauge_tsc_frequency How many milliseconds to spend
+//   measuring the TSC rate of the current machine. 100ms is sufficient to
+//   produce a fairly accurate result with minimal blocking in applications.
+
 /// Record time between two time-points using the OS's performance counter.
 struct Dqn_OSTimer
 {
@@ -442,74 +501,96 @@ struct Dqn_OSTimer
     uint64_t end;
 };
 
-DQN_API bool        Dqn_OS_SecureRNGBytes   (void *buffer, uint32_t size);
-DQN_API Dqn_String8 Dqn_OS_EXEDir           (Dqn_Allocator allocator);
-DQN_API void        Dqn_OS_SleepMs          (Dqn_uint milliseconds);
-DQN_API uint64_t    Dqn_OS_PerfCounterNow   ();
-DQN_API Dqn_f64     Dqn_OS_PerfCounterS     (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64     Dqn_OS_PerfCounterMs    (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64     Dqn_OS_PerfCounterMicroS(uint64_t begin, uint64_t end);
-DQN_API Dqn_f64     Dqn_OS_PerfCounterNs    (uint64_t begin, uint64_t end);
-DQN_API Dqn_OSTimer Dqn_OS_TimerBegin       ();
-DQN_API void        Dqn_OS_TimerEnd         (Dqn_OSTimer *timer);
-DQN_API Dqn_f64     Dqn_OS_TimerS           (Dqn_OSTimer timer);
-DQN_API Dqn_f64     Dqn_OS_TimerMs          (Dqn_OSTimer timer);
-DQN_API Dqn_f64     Dqn_OS_TimerMicroS      (Dqn_OSTimer timer);
-DQN_API Dqn_f64     Dqn_OS_TimerNs          (Dqn_OSTimer timer);
+DQN_API bool        Dqn_OS_SecureRNGBytes      (void *buffer, uint32_t size);
+#if (defined(DQN_OS_WIN32) && !defined(DQN_NO_WIN)) || !defined(DQN_OS_WIN32)
+DQN_API Dqn_String8 Dqn_OS_EXEDir              (Dqn_Allocator allocator);
+#endif
+DQN_API void        Dqn_OS_SleepMs             (Dqn_uint milliseconds);
+DQN_API uint64_t    Dqn_OS_PerfCounterNow      ();
+DQN_API uint64_t    Dqn_OS_PerfCounterFrequency();
+DQN_API Dqn_f64     Dqn_OS_PerfCounterS        (uint64_t begin, uint64_t end);
+DQN_API Dqn_f64     Dqn_OS_PerfCounterMs       (uint64_t begin, uint64_t end);
+DQN_API Dqn_f64     Dqn_OS_PerfCounterMicroS   (uint64_t begin, uint64_t end);
+DQN_API Dqn_f64     Dqn_OS_PerfCounterNs       (uint64_t begin, uint64_t end);
+DQN_API Dqn_OSTimer Dqn_OS_TimerBegin          ();
+DQN_API void        Dqn_OS_TimerEnd            (Dqn_OSTimer *timer);
+DQN_API Dqn_f64     Dqn_OS_TimerS              (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerMs             (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerMicroS         (Dqn_OSTimer timer);
+DQN_API Dqn_f64     Dqn_OS_TimerNs             (Dqn_OSTimer timer);
+DQN_API uint64_t    Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_frequency);
 
-// OS_TimedBlock provides a extremely primitive way of measuring the duration of
-// code blocks, by sprinkling DQN_OS_TIMED_BLOCK_RECORD("record label"), you can
-// measure the time between the macro and the next record call.
+// NOTE: [$TCTX] Dqn_ThreadContext =================================================================
+// Each thread is assigned in their thread-local storage (TLS) scratch and
+// permanent arena allocators. These can be used for allocations with a lifetime
+// scoped to the lexical scope or for storing data permanently using the arena
+// paradigm.
 //
-// Example: Record the duration of the for-loop below and print it at the end.
-/*
-   int main()
-   {
-       DQN_OS_TIMED_BLOCK_INIT("Profiling Region", 32); // name, records to allocate
-       DQN_OS_TIMED_BLOCK_RECORD("a");
-       for (int unused1_ = 0; unused1_ < 1000000; unused1_++)
-       {
-           for (int unused2_ = 0; unused2_ < 1000000; unused2_++)
-           {
-               (void)unused1_;
-               (void)unused2_;
-           }
-       }
-       DQN_OS_TIMED_BLOCK_RECORD("b");
-       DQN_OS_TIMED_BLOCK_DUMP;
-       return 0;
-   }
-*/
-struct Dqn_OSTimedBlock
+// TLS in this implementation is implemented using the `thread_local` C/C++
+// keyword.
+//
+// NOTE: API
+//
+// @proc Dqn_Thread_GetContext
+//   @desc Get the current thread's context- this contains all the metadata for managing
+//   the thread scratch data. In general you probably want Dqn_Thread_GetScratch()
+//   which ensures you get a usable scratch arena for temporary allocations
+//   without having to worry about selecting the right arena from the state.
+//
+// @proc Dqn_Thread_GetScratch
+//   @desc Retrieve the per-thread temporary arena allocator that is reset on scope
+//   exit.
+//
+//   The scratch arena must be deconflicted with any existing arenas in the
+//   function to avoid trampling over each other's memory. Consider the situation
+//   where the scratch arena is passed into the function. Inside the function, if
+//   the same arena is reused then, if both arenas allocate, when the inner arena
+//   is reset, this will undo the passed in arena's allocations in the function.
+//
+//   @param[in] conflict_arena A pointer to the arena currently being used in the
+//   function
+
+#if !defined(DQN_THREAD_CONTEXT_ARENAS)
+    #define DQN_THREAD_CONTEXT_ARENAS 2
+#endif
+
+struct Dqn_ThreadContext
 {
-    char const *label;
-    uint64_t     tick;
+    Dqn_b32        init;
+
+    Dqn_Arena     *arena;     ///< Per thread arena
+    Dqn_Allocator  allocator; ///< Allocator that uses the arena
+
+    /// Temp memory arena's for the calling thread
+    Dqn_Arena     *temp_arenas[DQN_THREAD_CONTEXT_ARENAS];
+
+    /// Allocators that use the corresponding arena from the thread context.
+    /// Provided for convenience when interfacing with allocator interfaces.
+    Dqn_Allocator  temp_allocators[DQN_THREAD_CONTEXT_ARENAS];
+
+    #if defined(DQN_DEBUG_THREAD_CONTEXT)
+    Dqn_ArenaStat  temp_arenas_stat[DQN_THREAD_CONTEXT_ARENAS];
+    #endif
 };
 
-// Initialise a timing block region,
-#define DQN_OS_TIMED_BLOCK_INIT(label, size) \
-    Dqn_OSTimedBlock timings_[size];        \
-    Dqn_usize timings_size_ = 0;          \
-    DQN_OS_TIMED_BLOCK_RECORD(label)
+struct Dqn_ThreadScratch
+{
+    Dqn_ThreadScratch(Dqn_ThreadContext *context, uint8_t context_index);
+    ~Dqn_ThreadScratch();
 
-// Add a timing record at the current location this macro is invoked.
-// DQN_OS_TIMED_BLOCK_INIT must have been called in a scope visible to the macro
-// prior.
-// label: The label to give to the timing record
-#define DQN_OS_TIMED_BLOCK_RECORD(label) timings_[timings_size_++] = {label, Dqn_OS_PerfCounterNow()}
+    /// Index into the arena/allocator/stat array in the thread context
+    /// specifying what arena was assigned.
+    uint8_t              index;
+    Dqn_Allocator        allocator;
+    Dqn_Arena           *arena;
+    Dqn_b32              destructed = false; /// Detect copies of the scratch
+    Dqn_ArenaTempMemory  temp_memory;
+    #if defined(DQN_LEAK_TRACING)
+    Dqn_CallSite         leak_site__;
+    #endif
+};
 
-// Dump the timing block via Dqn_Log
-#define DQN_OS_TIMED_BLOCK_DUMP                                                                         \
-    DQN_ASSERTF(timings_size_ < sizeof(timings_) / sizeof(timings_[0]),                              \
-                   "Timings array indexed out-of-bounds, use a bigger size");                           \
-    for (int timings_index_ = 0; timings_index_ < (timings_size_ - 1); timings_index_++) {              \
-        Dqn_OSTimedBlock t1 = timings_[timings_index_ + 0];                                             \
-        Dqn_OSTimedBlock t2 = timings_[timings_index_ + 1];                                             \
-        DQN_LOG_D("%s -> %s: %fms", t1.label, t2.label, Dqn_OS_PerfCounterMs(t1.tick, t2.tick));        \
-    }                                                                                                   \
-                                                                                                        \
-    if (timings_size_ >= 1) {                                                                           \
-        Dqn_OSTimedBlock t1 = timings_[0];                                                              \
-        Dqn_OSTimedBlock t2 = timings_[timings_size_ - 1];                                              \
-        DQN_LOG_D("%s -> %s (total): %fms", t1.label, t2.label, Dqn_OS_PerfCounterMs(t1.tick, t2.tick));\
-    }
+// NOTE: Context ===================================================================================
+DQN_API uint32_t           Dqn_Thread_GetID();
+DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext();
+DQN_API Dqn_ThreadScratch  Dqn_Thread_GetScratch(void const *conflict_arena);

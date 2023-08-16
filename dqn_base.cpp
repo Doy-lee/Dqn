@@ -7,13 +7,13 @@
 Dqn_CPUIDRegisters Dqn_CPUID(int function_id)
 {
     Dqn_CPUIDRegisters result = {};
-#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+    #if defined(DQN_COMPILER_W32_MSVC)
     __cpuid(DQN_CAST(int *)result.array, function_id);
-#elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
+    #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     __get_cpuid(function_id, &result.array[0] /*eax*/, &result.array[1] /*ebx*/, &result.array[2] /*ecx*/ , &result.array[3] /*edx*/);
-#else
+    #else
     #error "Compiler not supported"
-#endif
+    #endif
     return result;
 }
 #endif // !defined(DQN_OS_ARM64)

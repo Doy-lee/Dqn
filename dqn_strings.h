@@ -1,17 +1,3 @@
-// NOTE: Table Of Contents =========================================================================
-// Index                      | Disable #define             | Description
-// =================================================================================================
-// [$CSTR] Dqn_CString8       |                             | C-string helpers
-// [$STR8] Dqn_String8        |                             | Pointer and length strings
-// [$FSTR] Dqn_FString8       | DQN_NO_FSTRING8             | Fixed-size strings
-// [$STRB] Dqn_String8Builder |                             |
-// [$JSON] Dqn_JSONBuilder    | DQN_NO_JSON_BUILDER         | Construct json output
-// [$CHAR] Dqn_Char           |                             | Character ascii/digit.. helpers
-// [$UTFX] Dqn_UTF            |                             | Unicode helpers
-// [$BHEX] Dqn_Bin            | DQN_NO_HEX                  | Binary <-> hex helpers
-// [$STBS] stb_sprintf        | DQN_STB_SPRINTF_HEADER_ONLY | Portable sprintf
-// =================================================================================================
-
 // NOTE: [$CSTR] Dqn_CString8 ======================================================================
 // @proc Dqn_CString8_ArrayCount
 //   @desc Calculate the size of a cstring literal/array at compile time
@@ -192,8 +178,7 @@ DQN_API                                  Dqn_usize Dqn_CString16_Size      (wcha
 //   @return The file name in the file path, if none is found, the original path
 //   string is returned. Null pointer if arguments are null or invalid.
 
-// @proc Dqn_String8_ToI64Checked, Dqn_String8_ToI64,
-//  Dqn_String8_ToU64Checked, Dqn_String8_ToU64
+// @proc Dqn_String8_ToI64, Dqn_String8_ToU64
 //   @desc Convert a number represented as a string to a signed 64 bit number.
 //
 //   The `separator` is an optional digit separator for example, if `separator`
@@ -203,23 +188,14 @@ DQN_API                                  Dqn_usize Dqn_CString16_Size      (wcha
 //   i.e. "+1234" -> 1234 and "-1234" -> -1234. Strings must consist entirely of
 //   digits, the seperator or the permitted prefixes as previously mentioned
 //   otherwise this function will return false, i.e. "1234 dog" will cause the
-//   function to return false, however, the output is greedily converted and will
-//   be evaluated to "1234".
+//   function to return false, however, the output is greedily converted and
+//   will be evaluated to "1234".
 //
-//   `ToU64Checked` and `ToU64` only '+' prefix is permitted
-//   `ToI64Checked` and `ToI64` both '+' and '-' prefix is permitted
+//   `ToU64` only   '+'        prefix is permitted
+//   `ToI64` either '+' or '-' prefix is permitted
 //
-//   @param[in] buf The string to convert
-//   @param[in] size The size of the string, pass '-1' to calculate the
-//   null-terminated string length in the function.
 //   @param[in] separator The character used to separate the digits, if any. Set
 //   this to 0, if no separators are permitted.
-//   @param[out] output The number to write the parsed value to
-//
-//   @return The checked variants return false if there were invalid characters
-//   in the string true otherwise.
-//   The non-checked variant returns the number that could optimistically be
-//   parsed from the string e.g. "1234 dog" will return 1234.
 
 // @proc Dqn_String8_Replace, Dqn_String8_ReplaceInsensitive
 //   @desc TODO(doyle): Write description
@@ -247,14 +223,14 @@ DQN_API                                  Dqn_usize Dqn_CString16_Size      (wcha
 
 struct Dqn_String8Link
 {
-    Dqn_String8      string; ///< The string
-    Dqn_String8Link *next;   ///< The next string in the linked list
+    Dqn_String8      string; // The string
+    Dqn_String8Link *next;   // The next string in the linked list
 };
 
 struct Dqn_String16 /// A pointer and length style string that holds slices to UTF16 bytes.
 {
-    wchar_t   *data; ///< The UTF16 bytes of the string
-    Dqn_usize  size; ///< The number of characters in the string
+    wchar_t   *data; // The UTF16 bytes of the string
+    Dqn_usize  size; // The number of characters in the string
 
     #if defined(__cplusplus)
     wchar_t const *begin() const { return data; }        ///< Const begin iterator for range-for loops
@@ -289,12 +265,6 @@ struct Dqn_String8FindResult
 #define Dqn_String8_Init(data, size)                     (Dqn_String8){(data), (size)}
 #endif
 
-#define Dqn_String8_InitF(allocator, fmt, ...)           Dqn_String8_InitF_(DQN_LEAK_TRACE allocator, fmt, ## __VA_ARGS__)
-#define Dqn_String8_InitFV(allocator, fmt, args)         Dqn_String8_InitFV_(DQN_LEAK_TRACE allocator, fmt, args)
-#define Dqn_String8_Allocate(allocator, size, zero_mem)  Dqn_String8_Allocate_(DQN_LEAK_TRACE allocator, size, zero_mem)
-#define Dqn_String8_CopyCString(allocator, string, size) Dqn_String8_CopyCString_(DQN_LEAK_TRACE allocator, string, size)
-#define Dqn_String8_Copy(allocator, string)              Dqn_String8_Copy_(DQN_LEAK_TRACE allocator, string)
-
 // NOTE: API =======================================================================================
 enum Dqn_String8IsAll
 {
@@ -322,6 +292,12 @@ DQN_API Dqn_String8                  Dqn_String8_InitCString8          (char con
 DQN_API bool                         Dqn_String8_IsValid               (Dqn_String8 string);
 DQN_API bool                         Dqn_String8_IsAll                 (Dqn_String8 string, Dqn_String8IsAll is_all);
 
+DQN_API Dqn_String8                  Dqn_String8_InitF                 (Dqn_Allocator allocator, char const *fmt, ...);
+DQN_API Dqn_String8                  Dqn_String8_InitFV                (Dqn_Allocator allocator, char const *fmt, va_list args);
+DQN_API Dqn_String8                  Dqn_String8_Allocate              (Dqn_Allocator allocator, Dqn_usize size, Dqn_ZeroMem zero_mem);
+DQN_API Dqn_String8                  Dqn_String8_CopyCString           (Dqn_Allocator allocator, char const *string, Dqn_usize size);
+DQN_API Dqn_String8                  Dqn_String8_Copy                  (Dqn_Allocator allocator, Dqn_String8 string);
+
 DQN_API Dqn_String8                  Dqn_String8_Slice                 (Dqn_String8 string, Dqn_usize offset, Dqn_usize size);
 DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplitArray      (Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size);
 DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplit           (Dqn_String8 string, Dqn_String8 find);
@@ -346,10 +322,20 @@ DQN_API Dqn_String8                  Dqn_String8_TrimByteOrderMark     (Dqn_Stri
 
 DQN_API Dqn_String8                  Dqn_String8_FileNameFromPath      (Dqn_String8 path);
 
-DQN_API bool                         Dqn_String8_ToU64Checked          (Dqn_String8 string, char separator, uint64_t *output);
-DQN_API uint64_t                     Dqn_String8_ToU64                 (Dqn_String8 string, char separator);
-DQN_API bool                         Dqn_String8_ToI64Checked          (Dqn_String8 string, char separator, int64_t *output);
-DQN_API int64_t                      Dqn_String8_ToI64                 (Dqn_String8 string, char separator);
+struct Dqn_String8ToU64Result
+{
+    bool     success;
+    uint64_t value;
+};
+
+struct Dqn_String8ToI64Result
+{
+    bool    success;
+    int64_t value;
+};
+
+DQN_API Dqn_String8ToU64Result       Dqn_String8_ToU64                 (Dqn_String8 string, char separator);
+DQN_API Dqn_String8ToI64Result       Dqn_String8_ToI64                 (Dqn_String8 string, char separator);
 
 DQN_API Dqn_String8                  Dqn_String8_Replace               (Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Allocator allocator, Dqn_String8EqCase eq_case = Dqn_String8EqCase_Sensitive);
 DQN_API Dqn_String8                  Dqn_String8_ReplaceInsensitive    (Dqn_String8 string, Dqn_String8 find, Dqn_String8 replace, Dqn_usize start_index, Dqn_Allocator allocator);
@@ -359,13 +345,6 @@ DQN_API void                         Dqn_String8_Remove                (Dqn_Stri
 DQN_API bool                         operator==                        (Dqn_String8 const &lhs, Dqn_String8 const &rhs);
 DQN_API bool                         operator!=                        (Dqn_String8 const &lhs, Dqn_String8 const &rhs);
 #endif
-
-// NOTE: Internal ==================================================================================
-DQN_API Dqn_String8 Dqn_String8_InitF_               (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, ...);
-DQN_API Dqn_String8 Dqn_String8_InitFV_              (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *fmt, va_list args);
-DQN_API Dqn_String8 Dqn_String8_Allocate_            (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_usize size, Dqn_ZeroMem zero_mem);
-DQN_API Dqn_String8 Dqn_String8_CopyCString_         (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, char const *string, Dqn_usize size);
-DQN_API Dqn_String8 Dqn_String8_Copy_                (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, Dqn_String8 string);
 
 #if !defined(DQN_NO_FSTRING8)
 // NOTE: [$FSTR] Dqn_FString8 ======================================================================
@@ -500,106 +479,11 @@ struct Dqn_String8Builder
     Dqn_usize        count;       ///< The number of links in the linked list of strings
 };
 
-#define             Dqn_String8Builder_AppendFV(builder, fmt, args) Dqn_String8Builder_AppendFV_(DQN_LEAK_TRACE builder, fmt, args)
 DQN_API bool        Dqn_String8Builder_AppendF   (Dqn_String8Builder *builder, char const *fmt, ...);
+DQN_API bool        Dqn_String8Builder_AppendFV  (Dqn_String8Builder *builder, char const *fmt, va_list args);
 DQN_API bool        Dqn_String8Builder_AppendRef (Dqn_String8Builder *builder, Dqn_String8 string);
 DQN_API bool        Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_String8 string);
 DQN_API Dqn_String8 Dqn_String8Builder_Build     (Dqn_String8Builder const *builder, Dqn_Allocator allocator);
-
-// NOTE: Internal ==================================================================================
-DQN_API bool        Dqn_String8Builder_AppendFV_ (DQN_LEAK_TRACE_FUNCTION Dqn_String8Builder *builder, char const *fmt, va_list args);
-
-#if !defined(DQN_NO_JSON_BUILDER)
-// NOTE: [$JSON] Dqn_JSONBuilder ===================================================================
-// Basic helper class to construct JSON output to a string
-// TODO(dqn): We need to write tests for this
-//
-// NOTE: API =======================================================================================
-// @proc Dqn_JSONBuilder_Build
-//   @desc Convert the internal JSON buffer in the builder into a string.
-//   @param[in] arena The allocator to use to build the string
-
-// @proc Dqn_JSONBuilder_KeyValue, Dqn_JSONBuilder_KeyValueF
-//   @desc Add a JSON key value pair untyped. The value is emitted directly 
-//   without checking the contents of value.
-//
-//   All other functions internally call into this function which is the main
-//   workhorse of the builder.
-
-// @proc Dqn_JSON_Builder_ObjectEnd
-//   @desc End a JSON object in the builder, generates internally a '}' string
-
-// @proc Dqn_JSON_Builder_ArrayEnd
-//   @desc End a JSON array in the builder, generates internally a ']' string
-
-// @proc Dqn_JSONBuilder_LiteralNamed
-//   @desc Add a named JSON key-value object whose value is directly written to
-//   the following '"<key>": <value>' (e.g. useful for emitting the 'null'
-//   value)
-
-// @proc Dqn_JSONBuilder_U64Named,  Dqn_JSONBuilder_U64,
-//       Dqn_JSONBuilder_I64Named,  Dqn_JSONBuilder_I64,
-//       Dqn_JSONBuilder_F64Named,  Dqn_JSONBuilder_F64,
-//       Dqn_JSONBuilder_BoolNamed, Dqn_JSONBuilder_Bool,
-//   @desc Add the named JSON data type as a key-value object. Generates 
-//   internally the string '"<key>": <value>'
-
-enum Dqn_JSONBuilderItem {
-    Dqn_JSONBuilderItem_Empty,
-    Dqn_JSONBuilderItem_OpenContainer,
-    Dqn_JSONBuilderItem_CloseContainer,
-    Dqn_JSONBuilderItem_KeyValue,
-};
-
-struct Dqn_JSONBuilder {
-    bool                use_stdout;        ///< When set, ignore the string builder and dump immediately to stdout
-    Dqn_String8Builder  string_builder;    ///< (Internal)
-    int                 indent_level;      ///< (Internal)
-    int                 spaces_per_indent; ///< The number of spaces per indent level
-    Dqn_JSONBuilderItem last_item;
-};
-
-#define Dqn_JSONBuilder_Object(builder)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBegin(builder), \
-                   Dqn_JSONBuilder_ObjectEnd(builder))
-
-#define Dqn_JSONBuilder_ObjectNamed(builder, name)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBeginNamed(builder, name), \
-                   Dqn_JSONBuilder_ObjectEnd(builder))
-
-#define Dqn_JSONBuilder_Array(builder)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBegin(builder), \
-                   Dqn_JSONBuilder_ArrayEnd(builder))
-
-#define Dqn_JSONBuilder_ArrayNamed(builder, name)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBeginNamed(builder, name), \
-                   Dqn_JSONBuilder_ArrayEnd(builder))
-
-
-DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init            (Dqn_Allocator allocator, int spaces_per_indent);
-DQN_API Dqn_String8     Dqn_JSONBuilder_Build           (Dqn_JSONBuilder const *builder, Dqn_Allocator allocator);
-DQN_API void            Dqn_JSONBuilder_KeyValue        (Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-DQN_API void            Dqn_JSONBuilder_KeyValueF       (Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, ...);
-DQN_API void            Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name);
-DQN_API void            Dqn_JSONBuilder_ObjectEnd       (Dqn_JSONBuilder *builder);
-DQN_API void            Dqn_JSONBuilder_ArrayBeginNamed (Dqn_JSONBuilder *builder, Dqn_String8 name);
-DQN_API void            Dqn_JSONBuilder_ArrayEnd        (Dqn_JSONBuilder *builder);
-DQN_API void            Dqn_JSONBuilder_StringNamed     (Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-DQN_API void            Dqn_JSONBuilder_LiteralNamed    (Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value);
-DQN_API void            Dqn_JSONBuilder_U64Named        (Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value);
-DQN_API void            Dqn_JSONBuilder_I64Named        (Dqn_JSONBuilder *builder, Dqn_String8 key, int64_t value);
-DQN_API void            Dqn_JSONBuilder_F64Named        (Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places);
-DQN_API void            Dqn_JSONBuilder_BoolNamed       (Dqn_JSONBuilder *builder, Dqn_String8 key, bool value);
-
-#define                 Dqn_JSONBuilder_ObjectBegin(builder) Dqn_JSONBuilder_ObjectBeginNamed(builder, DQN_STRING8(""))
-#define                 Dqn_JSONBuilder_ArrayBegin(builder) Dqn_JSONBuilder_ArrayBeginNamed(builder, DQN_STRING8(""))
-#define                 Dqn_JSONBuilder_String(builder, value) Dqn_JSONBuilder_StringNamed(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_Literal(builder, value) Dqn_JSONBuilder_LiteralNamed(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_U64(builder, value) Dqn_JSONBuilder_U64Named(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_I64(builder, value) Dqn_JSONBuilder_I64Named(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_F64(builder, value) Dqn_JSONBuilder_F64Named(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_Bool(builder, value) Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8(""), value)
-#endif // !defined(DQN_NO_JSON_BUIDLER)
 
 // NOTE: [$CHAR] Dqn_Char ==========================================================================
 DQN_API bool    Dqn_Char_IsAlphabet    (char ch);
@@ -615,370 +499,6 @@ DQN_API char    Dqn_Char_ToLower       (char ch);
 // NOTE: [$UTFX] Dqn_UTF ===========================================================================
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint);
 DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
-
-#if !defined(DQN_NO_HEX)
-// NOTE: [$BHEX] Dqn_Bin ===========================================================================
-// NOTE: API =======================================================================================
-// @proc Dqn_Bin_U64ToHexU64String
-//   @desc Convert a 64 bit number to a hex string
-//   @param[in] number Number to convert to hexadecimal representation
-//   @param[in] flags Bit flags from Dqn_BinHexU64StringFlags to customise the
-//   output of the hexadecimal string.
-//   @return The hexadecimal representation of the number. This string is always
-//   null-terminated.
-
-// @proc Dqn_Bin_U64ToHex
-//   @copybrief Dqn_Bin_U64ToHexU64String
-
-//   @param[in] allocator The memory allocator to use for the memory of the
-//   hexadecimal string.
-//   @copyparams Dqn_Bin_U64ToHexU64String
-
-// @proc Dqn_Bin_HexBufferToU64
-//   @desc Convert a hexadecimal string a 64 bit value.
-//   Asserts if the hex string is too big to be converted into a 64 bit number.
-
-// @proc Dqn_Bin_HexToU64
-//   @copydoc Dqn_Bin_HexToU64
-
-// @proc Dqn_Bin_BytesToHexBuffer
-//   @desc Convert a binary buffer into its hex representation into dest.
-//
-//   The dest buffer must be large enough to contain the hex representation, i.e.
-//   atleast (src_size * 2).
-//
-//   @return True if the conversion into the dest buffer was successful, false
-//   otherwise (e.g. invalid arguments).
-
-// @proc Dqn_Bin_BytesToHexBufferArena
-//   @desc Convert a series of bytes into a string
-//   @return A null-terminated hex string, null pointer if allocation failed
-
-// @proc Dqn_Bin_BytesToHexArena
-//   @copydoc Dqn_Bin_BytesToHexBufferArena
-//   @return A hex string, the string is invalid if conversion failed.
-
-// @proc Dqn_Bin_HexBufferToBytes
-//   @desc Convert a hex string into binary at `dest`.
-//
-//   The dest buffer must be large enough to contain the binary representation,
-//   i.e. atleast ceil(hex_size / 2). This function will strip whitespace,
-//   leading 0x/0X prefix from the string before conversion.
-//
-//   @param[in] hex The hexadecimal string to convert
-//   @param[in] hex_size Size of the hex buffer. This function can handle an odd
-//   size hex string i.e. "fff" produces 0xfff0.
-//   @param[out] dest Buffer to write the bytes to
-//   @param[out] dest_size Maximum number of bytes to write to dest
-//
-//   @return The number of bytes written to `dest_size`, this value will *never*
-//   be greater than `dest_size`.
-
-// @proc Dqn_Bin_HexToBytes
-//   @desc String8 variant of @see Dqn_Bin_HexBufferToBytes
-
-// @proc Dqn_Bin_StringHexBufferToBytesUnchecked
-//   @desc Unchecked variant of @see Dqn_Bin_HexBufferToBytes
-//
-//   This function skips some string checks, it assumes the hex is a valid hex
-//   stream and that the arguments are valid e.g. no trimming or 0x prefix
-//   stripping is performed
-
-// @proc Dqn_Bin_String
-//   @desc String8 variant of @see Dqn_Bin_HexBufferToBytesUnchecked
-
-// @proc Dqn_Bin_HexBufferToBytesArena
-//   Dynamic allocating variant of @see Dqn_Bin_HexBufferToBytesUnchecked
-//
-//   @param[in] arena The arena to allocate the bytes from
-//   @param[in] hex Hex string to convert into bytes
-//   @param[in] size Size of the hex string
-//   @param[out] real_size The size of the buffer returned by the function
-//
-//   @return The byte representation of the hex string.
-
-// @proc Dqn_Bin_HexToBytesArena
-//   @copybrief Dqn_Bin_HexBufferToBytesArena
-//
-//   @param[in] arena The arena to allocate the bytes from
-//   @param[in] hex Hex string to convert into bytes
-//
-//   @return The byte representation of the hex string.
-
-struct Dqn_BinHexU64String
-{
-    char    data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
-    uint8_t size;
-};
-
-enum Dqn_BinHexU64StringFlags
-{
-    Dqn_BinHexU64StringFlags_No0xPrefix   = 1 << 0, /// Remove the 0x prefix from the string
-    Dqn_BinHexU64StringFlags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
-};
-
-DQN_API char const *         Dqn_Bin_HexBufferTrim0x          (char const *hex, Dqn_usize size, Dqn_usize *real_size);
-DQN_API Dqn_String8          Dqn_Bin_HexTrim0x                (Dqn_String8 string);
-
-DQN_API Dqn_BinHexU64String  Dqn_Bin_U64ToHexU64String        (uint64_t number, uint32_t flags);
-DQN_API Dqn_String8          Dqn_Bin_U64ToHex                 (Dqn_Allocator allocator, uint64_t number, uint32_t flags);
-
-DQN_API uint64_t             Dqn_Bin_HexBufferToU64           (char const *hex, Dqn_usize size);
-DQN_API uint64_t             Dqn_Bin_HexToU64                 (Dqn_String8 hex);
-
-DQN_API Dqn_String8          Dqn_Bin_BytesToHexArena          (Dqn_Arena *arena, void const *src, Dqn_usize size);
-DQN_API char *               Dqn_Bin_BytesToHexBufferArena    (Dqn_Arena *arena, void const *src, Dqn_usize size);
-DQN_API bool                 Dqn_Bin_BytesToHexBuffer         (void const *src, Dqn_usize src_size, char *dest, Dqn_usize dest_size);
-
-DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytesUnchecked(char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytes         (char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
-DQN_API char *               Dqn_Bin_HexBufferToBytesArena    (Dqn_Arena *arena, char const *hex, Dqn_usize hex_size, Dqn_usize *real_size);
-
-DQN_API Dqn_usize            Dqn_Bin_HexToBytesUnchecked      (Dqn_String8 hex, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_usize            Dqn_Bin_HexToBytes               (Dqn_String8 hex, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_String8          Dqn_Bin_HexToBytesArena          (Dqn_Arena *arena, Dqn_String8 hex);
-#endif // !defined(DQN_NO_HEX)
-
-// NOTE: Other =====================================================================================
-// NOTE: API =======================================================================================
-// @proc Dqn_SNPrintFDotTruncate
-//   @desc Write the format string to the buffer truncating with a trailing ".."
-//   if there is insufficient space in the buffer followed by null-terminating
-//   the buffer (uses stb_sprintf underneath).
-//   @return The size of the string written to the buffer *not* including the
-//   null-terminator.
-//
-// @proc Dqn_U64ToString
-//   @desc Convert a 64 bit unsigned value to its string representation.
-//   @param[in] val Value to convert into a string
-//   @param[in] separator The separator to insert every 3 digits. Set this to
-//   0 if no separator is desired.
-
-struct Dqn_U64String
-{
-    char    data[27+1]; // NOTE(dqn): 27 is the maximum size of uint64_t including a separtor
-    uint8_t size;
-};
-
-DQN_API int           Dqn_SNPrintFDotTruncate(char *buffer, int size, char const *fmt, ...);
-DQN_API Dqn_U64String Dqn_U64ToString        (uint64_t val, char separator);
-
-// NOTE: [$STBS] stb_sprintf =======================================================================
-// stb_sprintf - v1.10 - public domain snprintf() implementation
-// originally by Jeff Roberts / RAD Game Tools, 2015/10/20
-// http://github.com/nothings/stb
-//
-// allowed types:  sc uidBboXx p AaGgEef n
-// lengths      :  hh h ll j z t I64 I32 I
-//
-// Contributors:
-//    Fabian "ryg" Giesen (reformatting)
-//    github:aganm (attribute format)
-//
-// Contributors (bugfixes):
-//    github:d26435
-//    github:trex78
-//    github:account-login
-//    Jari Komppa (SI suffixes)
-//    Rohit Nirmal
-//    Marcin Wojdyr
-//    Leonard Ritter
-//    Stefano Zanotti
-//    Adam Allison
-//    Arvid Gerstmann
-//    Markus Kolb
-//
-// LICENSE:
-//
-//   See end of file for license information.
-
-#ifndef STB_SPRINTF_H_INCLUDE
-#define STB_SPRINTF_H_INCLUDE
-
-/*
-Single file sprintf replacement.
-
-Originally written by Jeff Roberts at RAD Game Tools - 2015/10/20.
-Hereby placed in public domain.
-
-This is a full sprintf replacement that supports everything that
-the C runtime sprintfs support, including float/double, 64-bit integers,
-hex floats, field parameters (%*.*d stuff), length reads backs, etc.
-
-Why would you need this if sprintf already exists?  Well, first off,
-it's *much* faster (see below). It's also much smaller than the CRT
-versions code-space-wise. We've also added some simple improvements
-that are super handy (commas in thousands, callbacks at buffer full,
-for example). Finally, the format strings for MSVC and GCC differ
-for 64-bit integers (among other small things), so this lets you use
-the same format strings in cross platform code.
-
-It uses the standard single file trick of being both the header file
-and the source itself. If you just include it normally, you just get
-the header file function definitions. To get the code, you include
-it from a C or C++ file and define STB_SPRINTF_IMPLEMENTATION first.
-
-It only uses va_args macros from the C runtime to do it's work. It
-does cast doubles to S64s and shifts and divides U64s, which does
-drag in CRT code on most platforms.
-
-It compiles to roughly 8K with float support, and 4K without.
-As a comparison, when using MSVC static libs, calling sprintf drags
-in 16K.
-
-API:
-====
-int stbsp_sprintf( char * buf, char const * fmt, ... )
-int stbsp_snprintf( char * buf, int count, char const * fmt, ... )
-  Convert an arg list into a buffer.  stbsp_snprintf always returns
-  a zero-terminated string (unlike regular snprintf).
-
-int stbsp_vsprintf( char * buf, char const * fmt, va_list va )
-int stbsp_vsnprintf( char * buf, int count, char const * fmt, va_list va )
-  Convert a va_list arg list into a buffer.  stbsp_vsnprintf always returns
-  a zero-terminated string (unlike regular snprintf).
-
-int stbsp_vsprintfcb( STBSP_SPRINTFCB * callback, void * user, char * buf, char const * fmt, va_list va )
-    typedef char * STBSP_SPRINTFCB( char const * buf, void * user, int len );
-  Convert into a buffer, calling back every STB_SPRINTF_MIN chars.
-  Your callback can then copy the chars out, print them or whatever.
-  This function is actually the workhorse for everything else.
-  The buffer you pass in must hold at least STB_SPRINTF_MIN characters.
-    // you return the next buffer to use or 0 to stop converting
-
-void stbsp_set_separators( char comma, char period )
-  Set the comma and period characters to use.
-
-FLOATS/DOUBLES:
-===============
-This code uses a internal float->ascii conversion method that uses
-doubles with error correction (double-doubles, for ~105 bits of
-precision).  This conversion is round-trip perfect - that is, an atof
-of the values output here will give you the bit-exact double back.
-
-One difference is that our insignificant digits will be different than
-with MSVC or GCC (but they don't match each other either).  We also
-don't attempt to find the minimum length matching float (pre-MSVC15
-doesn't either).
-
-If you don't need float or doubles at all, define STB_SPRINTF_NOFLOAT
-and you'll save 4K of code space.
-
-64-BIT INTS:
-============
-This library also supports 64-bit integers and you can use MSVC style or
-GCC style indicators (%I64d or %lld).  It supports the C99 specifiers
-for size_t and ptr_diff_t (%jd %zd) as well.
-
-EXTRAS:
-=======
-Like some GCCs, for integers and floats, you can use a ' (single quote)
-specifier and commas will be inserted on the thousands: "%'d" on 12345
-would print 12,345.
-
-For integers and floats, you can use a "$" specifier and the number
-will be converted to float and then divided to get kilo, mega, giga or
-tera and then printed, so "%$d" 1000 is "1.0 k", "%$.2d" 2536000 is
-"2.53 M", etc. For byte values, use two $:s, like "%$$d" to turn
-2536000 to "2.42 Mi". If you prefer JEDEC suffixes to SI ones, use three
-$:s: "%$$$d" -> "2.42 M". To remove the space between the number and the
-suffix, add "_" specifier: "%_$d" -> "2.53M".
-
-In addition to octal and hexadecimal conversions, you can print
-integers in binary: "%b" for 256 would print 100.
-
-PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
-===================================================================
-"%d" across all 32-bit ints (4.8x/4.0x faster than 32-/64-bit MSVC)
-"%24d" across all 32-bit ints (4.5x/4.2x faster)
-"%x" across all 32-bit ints (4.5x/3.8x faster)
-"%08x" across all 32-bit ints (4.3x/3.8x faster)
-"%f" across e-10 to e+10 floats (7.3x/6.0x faster)
-"%e" across e-10 to e+10 floats (8.1x/6.0x faster)
-"%g" across e-10 to e+10 floats (10.0x/7.1x faster)
-"%f" for values near e-300 (7.9x/6.5x faster)
-"%f" for values near e+300 (10.0x/9.1x faster)
-"%e" for values near e-300 (10.1x/7.0x faster)
-"%e" for values near e+300 (9.2x/6.0x faster)
-"%.320f" for values near e-300 (12.6x/11.2x faster)
-"%a" for random values (8.6x/4.3x faster)
-"%I64d" for 64-bits with 32-bit values (4.8x/3.4x faster)
-"%I64d" for 64-bits > 32-bit values (4.9x/5.5x faster)
-"%s%s%s" for 64 char strings (7.1x/7.3x faster)
-"...512 char string..." ( 35.0x/32.5x faster!)
-*/
-
-#if defined(__clang__)
- #if defined(__has_feature) && defined(__has_attribute)
-  #if __has_feature(address_sanitizer)
-   #if __has_attribute(__no_sanitize__)
-    #define STBSP__ASAN __attribute__((__no_sanitize__("address")))
-   #elif __has_attribute(__no_sanitize_address__)
-    #define STBSP__ASAN __attribute__((__no_sanitize_address__))
-   #elif __has_attribute(__no_address_safety_analysis__)
-    #define STBSP__ASAN __attribute__((__no_address_safety_analysis__))
-   #endif
-  #endif
- #endif
-#elif defined(__GNUC__) && (__GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8))
- #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
-  #define STBSP__ASAN __attribute__((__no_sanitize_address__))
- #endif
-#endif
-
-#ifndef STBSP__ASAN
-#define STBSP__ASAN
-#endif
-
-#ifdef STB_SPRINTF_STATIC
-#define STBSP__PUBLICDEC static
-#define STBSP__PUBLICDEF static STBSP__ASAN
-#else
-#ifdef __cplusplus
-#define STBSP__PUBLICDEC extern "C"
-#define STBSP__PUBLICDEF extern "C" STBSP__ASAN
-#else
-#define STBSP__PUBLICDEC extern
-#define STBSP__PUBLICDEF STBSP__ASAN
-#endif
-#endif
-
-#if defined(__has_attribute)
- #if __has_attribute(format)
-   #define STBSP__ATTRIBUTE_FORMAT(fmt,va) __attribute__((format(printf,fmt,va)))
- #endif
-#endif
-
-#ifndef STBSP__ATTRIBUTE_FORMAT
-#define STBSP__ATTRIBUTE_FORMAT(fmt,va)
-#endif
-
-#ifdef _MSC_VER
-#define STBSP__NOTUSED(v)  (void)(v)
-#else
-#define STBSP__NOTUSED(v)  (void)sizeof(v)
-#endif
-
-#include <stdarg.h> // for va_arg(), va_list()
-#include <stddef.h> // size_t, ptrdiff_t
-
-#ifndef STB_SPRINTF_MIN
-#define STB_SPRINTF_MIN 512 // how many characters per callback
-#endif
-typedef char *STBSP_SPRINTFCB(const char *buf, void *user, int len);
-
-#ifndef STB_SPRINTF_DECORATE
-#define STB_SPRINTF_DECORATE(name) stbsp_##name // define this before including if you want to change the names
-#endif
-
-STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(vsprintf)(char *buf, char const *fmt, va_list va);
-STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(vsnprintf)(char *buf, int count, char const *fmt, va_list va);
-STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(sprintf)(char *buf, char const *fmt, ...) STBSP__ATTRIBUTE_FORMAT(2,3);
-STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char const *fmt, ...) STBSP__ATTRIBUTE_FORMAT(3,4);
-
-STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va);
-STBSP__PUBLICDEC void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
-#endif // STB_SPRINTF_H_INCLUDE
 
 #if !defined(DQN_NO_FSTRING8)
 // NOTE: [$FSTR] Dqn_FString8 ======================================================================

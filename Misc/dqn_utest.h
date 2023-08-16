@@ -194,14 +194,14 @@ void Dqn_UTest_Begin(Dqn_UTest *test, char const *fmt, ...)
 void Dqn_UTest_End(Dqn_UTest *test)
 {
     assert(test->state != Dqn_UTestState_Nil && "Test was marked as ended but a test was never commenced using Dqn_UTest_Begin");
-    int pad_size = DQN_UTEST_RESULT_LPAD - (DQN_UTEST_SPACING + test->name_size);
+    size_t pad_size = DQN_UTEST_RESULT_LPAD - (DQN_UTEST_SPACING + test->name_size);
     if (pad_size < 0)
         pad_size = 0;
 
     char pad_buffer[DQN_UTEST_RESULT_LPAD] = {};
     memset(pad_buffer, DQN_UTEST_RESULT_PAD_CHAR, pad_size);
 
-    printf("%*s%.*s%.*s", DQN_UTEST_SPACING, "", (int)test->name_size, test->name, pad_size, pad_buffer);
+    printf("%*s%.*s%.*s", DQN_UTEST_SPACING, "", (int)test->name_size, test->name, (int)pad_size, pad_buffer);
     if (test->state == Dqn_UTestState_TestFailed) {
         printf(DQN_UTEST_BAD_COLOR " FAILED");
     } else {

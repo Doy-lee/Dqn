@@ -1,23 +1,21 @@
 // NOTE: [$ALLO] Dqn_Allocator =====================================================================
-DQN_API void *Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem)
+DQN_API void *Dqn_Allocator_Alloc(Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
     void *result = NULL;
     if (allocator.alloc) {
-        result = allocator.alloc(DQN_LEAK_TRACE_ARG size, align, zero_mem, allocator.user_context);
+        result = allocator.alloc(size, align, zero_mem, allocator.user_context);
     } else {
         result = DQN_ALLOC(size);
-        Dqn_Library_LeakTraceAdd(DQN_LEAK_TRACE_ARG result, size);
     }
     return result;
 }
 
-DQN_API void Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, void *ptr, size_t size)
+DQN_API void Dqn_Allocator_Dealloc(Dqn_Allocator allocator, void *ptr, size_t size)
 {
     if (allocator.dealloc) {
-        allocator.dealloc(DQN_LEAK_TRACE_ARG ptr, size, allocator.user_context);
+        allocator.dealloc(ptr, size, allocator.user_context);
     } else {
         DQN_DEALLOC(ptr, size);
-        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG ptr);
     }
 }
 
@@ -79,16 +77,22 @@ DQN_API void *Dqn_VMem_Reserve(Dqn_usize size, Dqn_VMemCommit commit, uint32_t p
     #else
         #error "Missing implementation for Dqn_VMem_Reserve"
     #endif
+
+    Dqn_Debug_TrackAlloc(result, size, (page_flags & Dqn_VMemPage_AllocRecordLeakPermitted));
     return result;
 }
 
 DQN_API bool Dqn_VMem_Commit(void *ptr, Dqn_usize size, uint32_t page_flags)
 {
+    bool result = false;
+    if (!ptr || size == 0)
+        return false;
+
     unsigned long os_page_flags = Dqn_VMem_ConvertPageToOSFlags_(page_flags);
     #if defined(DQN_OS_WIN32)
-    bool result = VirtualAlloc(ptr, size, MEM_COMMIT, os_page_flags) != nullptr;
+    result = VirtualAlloc(ptr, size, MEM_COMMIT, os_page_flags) != nullptr;
     #elif defined(DQN_OS_UNIX)
-    bool result = mprotect(ptr, size, os_page_flags) == 0;
+    result = mprotect(ptr, size, os_page_flags) == 0;
     #else
         #error "Missing implementation for Dqn_VMem_Commit"
     #endif
@@ -117,6 +121,7 @@ DQN_API void Dqn_VMem_Release(void *ptr, Dqn_usize size)
     #else
         #error "Missing implementation for Dqn_VMem_Release"
     #endif
+    Dqn_Debug_TrackDealloc(ptr);
 }
 
 DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
@@ -127,8 +132,8 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
     static Dqn_String8 const ALIGNMENT_ERROR_MSG =
         DQN_STRING8("Page protection requires pointers to be page aligned because we "
                     "can only guard memory at a multiple of the page boundary.");
-    DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(DQN_CAST(uintptr_t)ptr, DQN_VMEM_PAGE_GRANULARITY), "%s", ALIGNMENT_ERROR_MSG.data);
-    DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(size,                   DQN_VMEM_PAGE_GRANULARITY), "%s", ALIGNMENT_ERROR_MSG.data);
+    DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(DQN_CAST(uintptr_t)ptr, g_dqn_library->os_page_size), "%s", ALIGNMENT_ERROR_MSG.data);
+    DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(size,                   g_dqn_library->os_page_size), "%s", ALIGNMENT_ERROR_MSG.data);
 
     unsigned long os_page_flags = Dqn_VMem_ConvertPageToOSFlags_(page_flags);
     #if defined(DQN_OS_WIN32)
@@ -136,8 +141,12 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
     int result = VirtualProtect(ptr, size, os_page_flags, &prev_flags);
     (void)prev_flags;
     if (result == 0) {
+        #if defined(DQN_NO_WIN)
+        DQN_ASSERTF(result, "VirtualProtect failed");
+        #else
         Dqn_WinErrorMsg error = Dqn_Win_LastError();
         DQN_ASSERTF(result, "VirtualProtect failed (%d): %.*s", error.code, error.size, error.data);
+        #endif
     }
     #else
     int result = mprotect(result->memory, result->size, os_page_flags);
@@ -147,112 +156,107 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
     return result;
 }
 
-// NOTE: [$AREN] Dqn_Arena =========================================================================
-DQN_API void Dqn_Arena_CommitFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, Dqn_ArenaCommit commit)
+// NOTE: [$MEMB] Dqn_MemBlock ======================================================================
+DQN_API Dqn_usize Dqn_MemBlock_MetadataSize(uint8_t flags)
 {
-    Dqn_usize commit_size = 0;
-    switch (commit) {
-        case Dqn_ArenaCommit_GetNewPages: {
-            commit_size = Dqn_PowerOfTwoAlign(size, DQN_VMEM_COMMIT_GRANULARITY);
-        } break;
-
-        case Dqn_ArenaCommit_EnsureSpace: {
-            DQN_ASSERT(block->commit >= block->used);
-            Dqn_usize const unused_commit_space = block->commit - block->used;
-            if (unused_commit_space < size)
-                commit_size = Dqn_PowerOfTwoAlign(size - unused_commit_space, DQN_VMEM_COMMIT_GRANULARITY);
-        } break;
-    }
-
-    if (commit_size) {
-        uint32_t page_flags = Dqn_VMemPage_ReadWrite;
-        char *commit_ptr = DQN_CAST(char *)block->memory + block->commit;
-        Dqn_VMem_Commit(commit_ptr, commit_size, page_flags);
-        block->commit += commit_size;
-
-        DQN_ASSERTF(block->commit < block->size,
-                    "Block size should be PoT aligned and its alignment should be greater than the commit granularity [block_size=%_$$d, block_commit=%_$$d]",
-                    block->size, block->commit);
-
-        // NOTE: Guard new pages being allocated from the block
-        if (block->arena->use_after_free_guard)
-            Dqn_VMem_Protect(commit_ptr, commit_size, page_flags | Dqn_VMemPage_Guard);
-    }
+    Dqn_usize result = sizeof(Dqn_MemBlock);
+    if (flags & Dqn_MemBlockFlag_PageGuard)
+        result = g_dqn_library->os_page_size;
+    return result;
 }
 
-DQN_API void *Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem)
+DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uint8_t flags)
 {
+    DQN_ASSERTF(g_dqn_library->os_page_size,                   "Library needs to be initialised by called Dqn_Library_Init()");
+    DQN_ASSERTF(Dqn_IsPowerOfTwo(g_dqn_library->os_page_size), "Invalid page size");
+    DQN_ASSERTF((flags & ~Dqn_MemBlockFlag_All) == 0,         "Invalid flag combination, must adhere to Dqn_MemBlockFlags");
+
+    if (reserve == 0)
+        return nullptr;
+
+    Dqn_usize metadata_size   = Dqn_MemBlock_MetadataSize(flags);
+    Dqn_usize reserve_aligned = Dqn_AlignUpPowerOfTwo(reserve + metadata_size, g_dqn_library->os_page_size);
+    Dqn_usize commit_aligned  = Dqn_AlignUpPowerOfTwo(commit  + metadata_size, g_dqn_library->os_page_size);
+    commit_aligned            = DQN_MIN(commit_aligned, reserve_aligned);
+
+    // NOTE: Avoid 1 syscall by committing on reserve if amounts are equal
+    Dqn_VMemCommit commit_on_reserve = commit_aligned == reserve_aligned ? Dqn_VMemCommit_Yes : Dqn_VMemCommit_No;
+    auto *result                     = DQN_CAST(Dqn_MemBlock *)Dqn_VMem_Reserve(reserve_aligned, commit_on_reserve, Dqn_VMemPage_ReadWrite);
+    if (result) {
+        // NOTE: Commit pages if we did not commit on the initial range.
+        if (!commit_on_reserve)
+            Dqn_VMem_Commit(result, commit_aligned, Dqn_VMemPage_ReadWrite);
+
+        result->data   = DQN_CAST(uint8_t *)result + metadata_size;
+        result->size   = reserve_aligned           - metadata_size;
+        result->commit = commit_aligned            - metadata_size;
+        result->flags  = flags;
+
+        // NOTE: Guard pages
+        if (flags & Dqn_MemBlockFlag_PageGuard)
+            Dqn_VMem_Protect(result->data, commit_aligned, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
+    }
+    return result;
+}
+
+DQN_API void *Dqn_MemBlock_Alloc(Dqn_MemBlock *block, Dqn_usize size, uint8_t alignment, Dqn_ZeroMem zero_mem)
+{
+    void *result = nullptr;
     if (!block)
-        return nullptr;
+        return result;
 
-    DQN_ASSERTF((align & (align - 1)) == 0, "Power of two alignment required");
-    align = DQN_MAX(align, 1);
+    DQN_ASSERT(Dqn_IsPowerOfTwo(alignment));
+    Dqn_usize aligned_used = Dqn_AlignUpPowerOfTwo(block->used, alignment);
+    Dqn_usize new_used     = aligned_used + size;
+    if (new_used > block->size)
+        return result;
 
-    DQN_ASSERT(block->hwm_used <= block->commit);
-    DQN_ASSERT(block->hwm_used >= block->used);
-    DQN_ASSERTF(block->commit >= block->used,
-                "Internal error: Committed size must always be greater than the used size [commit=%_$$zd, used=%_$$zd]",
-                block->commit, block->used);
+    result      = DQN_CAST(char *)block->data + aligned_used;
+    block->used = new_used;
 
-    // NOTE: Calculate how much we need to pad the next pointer to divvy out
-    // (only if it is unaligned)
-    uintptr_t next_ptr     = DQN_CAST(uintptr_t)block->memory + block->used;
-    Dqn_usize align_offset = 0;
-    if (next_ptr & (align - 1))
-        align_offset = (align - (next_ptr & (align - 1)));
-
-    Dqn_usize allocation_size = size + align_offset;
-    if ((block->used + allocation_size) > block->size)
-        return nullptr;
-
-    void *result = DQN_CAST(char *)next_ptr + align_offset;
     if (zero_mem == Dqn_ZeroMem_Yes) {
-        // NOTE: Newly commit pages are always 0-ed out, we only need to
-        // memset the memory that are being reused.
-        Dqn_usize const reused_bytes = DQN_MIN(block->hwm_used - block->used, allocation_size);
-        DQN_MEMSET(DQN_CAST(void *)next_ptr, DQN_MEMSET_BYTE, reused_bytes);
+        Dqn_usize reused_bytes = DQN_MIN(block->commit - aligned_used, size);
+        DQN_MEMSET(result, DQN_MEMSET_BYTE, reused_bytes);
     }
 
-    // NOTE: Ensure requested bytes are backed by physical pages from the OS
-    Dqn_Arena_CommitFromBlock(block, allocation_size, Dqn_ArenaCommit_EnsureSpace);
+    if (block->commit < block->used) {
+        Dqn_usize commit_size = Dqn_AlignUpPowerOfTwo(block->used - block->commit, g_dqn_library->os_page_size);
+        void *commit_ptr      = (void *)Dqn_AlignUpPowerOfTwo((char *)block->data + block->commit, g_dqn_library->os_page_size);
+        block->commit        += commit_size - Dqn_MemBlock_MetadataSize(block->flags);
+        Dqn_VMem_Commit(commit_ptr, commit_size, Dqn_VMemPage_ReadWrite);
+        DQN_ASSERT(block->commit <= block->size);
+    }
 
-    // NOTE: Unlock the pages requested
-    if (block->arena->use_after_free_guard)
-        Dqn_VMem_Protect(result, allocation_size, Dqn_VMemPage_ReadWrite);
-
-    // NOTE: Update arena
-    Dqn_Arena *arena       = block->arena;
-    arena->stats.used     += allocation_size;
-    arena->stats.used_hwm  = DQN_MAX(arena->stats.used_hwm, arena->stats.used);
-    block->used           += allocation_size;
-    block->hwm_used        = DQN_MAX(block->hwm_used, block->used);
-
-    DQN_ASSERTF(block->used   <= block->commit,                   "Internal error: Committed size must be greater than used size [used=%_$$zd, commit=%_$$zd]", block->used, block->commit);
-    DQN_ASSERTF(block->commit <= block->size,                     "Internal error: Allocation exceeded block capacity [commit=%_$$zd, size=%_$$zd]", block->commit, block->size);
-    DQN_ASSERTF(((DQN_CAST(uintptr_t)result) & (align - 1)) == 0, "Internal error: Pointer alignment failed [address=%p, align=%x]", result, align);
+    if (block->flags & Dqn_MemBlockFlag_PageGuard)
+        Dqn_VMem_Protect(result, size, Dqn_VMemPage_ReadWrite);
 
     return result;
 }
 
-DQN_FILE_SCOPE void *Dqn_Arena_AllocatorAlloc_(DQN_LEAK_TRACE_FUNCTION size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context)
+DQN_API void Dqn_MemBlock_Free(Dqn_MemBlock *block)
+{
+    if (block) {
+        Dqn_usize release_size = block->size + Dqn_MemBlock_MetadataSize(block->flags);
+        Dqn_VMem_Release(block, release_size);
+    }
+}
+
+// NOTE: [$AREN] Dqn_Arena =========================================================================
+DQN_FILE_SCOPE void *Dqn_Arena_AllocatorAlloc(size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context)
 {
     void *result = NULL;
     if (!user_context)
         return result;
 
     Dqn_Arena *arena = DQN_CAST(Dqn_Arena *)user_context;
-    result           = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, align, zero_mem);
+    result           = Dqn_Arena_Alloc(arena, size, align, zero_mem);
     return result;
 }
 
-DQN_FILE_SCOPE void Dqn_Arena_AllocatorDealloc_(DQN_LEAK_TRACE_FUNCTION void *ptr, size_t size, void *user_context)
+DQN_FILE_SCOPE void Dqn_Arena_AllocatorDealloc(void *, size_t, void *)
 {
     // NOTE: No-op, arenas batch allocate and batch deallocate. Call free on the
     // underlying arena, since we can't free individual pointers.
-    DQN_LEAK_TRACE_UNUSED;
-    (void)ptr;
-    (void)size;
-    (void)user_context;
 }
 
 DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena)
@@ -260,151 +264,155 @@ DQN_API Dqn_Allocator Dqn_Arena_Allocator(Dqn_Arena *arena)
     Dqn_Allocator result = {};
     if (arena) {
         result.user_context = arena;
-        result.alloc        = Dqn_Arena_AllocatorAlloc_;
-        result.dealloc      = Dqn_Arena_AllocatorDealloc_;
+        result.alloc        = Dqn_Arena_AllocatorAlloc;
+        result.dealloc      = Dqn_Arena_AllocatorDealloc;
     }
     return result;
 }
 
-struct Dqn_ArenaBlockResetInfo_
+DQN_API Dqn_MemBlock *Dqn_Arena_Grow(Dqn_Arena *arena, Dqn_usize reserve, Dqn_usize commit, uint8_t flags)
 {
-    bool      free_memory;
-    Dqn_usize used_value;
-};
+    if (!arena)
+        return nullptr;
 
-// Calculate the size in bytes required to allocate the memory for the block
-// (*not* including the memory required for the user in the block!)
-#define Dqn_Arena_BlockMetadataSize_(arena) ((arena)->use_after_free_guard ? (Dqn_PowerOfTwoAlign(sizeof(Dqn_ArenaBlock), DQN_VMEM_PAGE_GRANULARITY)) : sizeof(Dqn_ArenaBlock))
+    uint8_t mem_block_flags = flags;
+    if (arena->allocs_are_allowed_to_leak)
+        mem_block_flags |= Dqn_MemBlockFlag_AllocRecordLeakPermitted;
 
-DQN_API void Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaBlock *block, Dqn_ZeroMem zero_mem, Dqn_ArenaBlockResetInfo_ reset_info)
-{
-    if (!block)
-        return;
+    Dqn_MemBlock *result = Dqn_MemBlock_Init(reserve, commit, mem_block_flags);
+    if (result) {
+        if (!arena->head)
+            arena->head = result;
 
-    if (zero_mem == Dqn_ZeroMem_Yes)
-        DQN_MEMSET(block->memory, DQN_MEMSET_BYTE, block->commit);
+        if (arena->tail)
+            arena->tail->next = result;
 
-    if (reset_info.free_memory) {
-        Dqn_usize block_metadata_size = Dqn_Arena_BlockMetadataSize_(block->arena);
-        Dqn_VMem_Release(block, block_metadata_size + block->size);
-        Dqn_Library_LeakTraceMarkFree(DQN_LEAK_TRACE_ARG block);
-    } else {
-        if (block->arena->use_after_free_guard) {
-            DQN_ASSERTF(
-                block->flags & Dqn_ArenaBlockFlags_UseAfterFreeGuard,
-                "Arena has set use-after-free guard but the memory it uses was not initialised "
-                "with use-after-free semantics. You might have set the arena use-after-free "
-                "flag after it has already done an allocation which is not valid. Make sure "
-                "you set the flag first before the arena is used.");
-        } else {
-            DQN_ASSERTF(
-                (block->flags & Dqn_ArenaBlockFlags_UseAfterFreeGuard) == 0,
-                "The arena's memory block has the use-after-free guard set but the arena does "
-                "not have the use-after-free flag set. This is not valid, a block that has "
-                "use-after-free semantics was allocated from an arena with the equivalent flag set "
-                "and for the lifetime of the block the owning arena must also have the same flag "
-                "set for correct behaviour. Make sure you do not unset the flag on the arena "
-                "whilst it still has memory blocks that it owns.");
-        }
+        if (!arena->curr)
+            arena->curr = result;
 
-        block->used = reset_info.used_value;
-        // NOTE: Guard all the committed pages again
-        if (block->arena->use_after_free_guard)
-            Dqn_VMem_Protect(block->memory, block->commit, Dqn_VMemPage_ReadWrite | Dqn_VMemPage_Guard);
+        result->prev   = arena->tail;
+        arena->tail    = result;
+        arena->blocks += 1;
     }
+    return result;
 }
 
-DQN_API void Dqn_Arena_Reset(Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
+DQN_API void *Dqn_Arena_Alloc(Dqn_Arena *arena, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem)
+{
+    DQN_ASSERT(Dqn_IsPowerOfTwo(align));
+
+    void *result = nullptr;
+    if (!arena || size == 0 || align == 0)
+        return result;
+
+    for (;;) {
+        while (arena->curr && (arena->curr->flags & Dqn_MemBlockFlag_ArenaPrivate))
+            arena->curr = arena->curr->next;
+
+        if (!arena->curr) {
+            if (!Dqn_Arena_Grow(arena, size, size /*commit*/, 0 /*flags*/))
+                return result;
+        }
+
+        result = Dqn_MemBlock_Alloc(arena->curr, size, align, zero_mem);
+        if (result)
+            break;
+
+        arena->curr = arena->curr->next;
+    }
+
+    return result;
+}
+
+DQN_API void *Dqn_Arena_Copy(Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t align)
+{
+    void *result = Dqn_Arena_Alloc(arena, size, align, Dqn_ZeroMem_No);
+    DQN_MEMCPY(result, src, size);
+    return result;
+}
+
+DQN_API void *Dqn_Arena_CopyZ(Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t align)
+{
+    void *result = Dqn_Arena_Alloc(arena, size + 1, align, Dqn_ZeroMem_No);
+    DQN_MEMCPY(result, src, size);
+    (DQN_CAST(char *)result)[size] = 0;
+    return result;
+}
+
+DQN_API void Dqn_Arena_Free(Dqn_Arena *arena)
 {
     if (!arena)
         return;
 
-    // NOTE: Zero all the blocks until we reach the first block in the list
-    for (Dqn_ArenaBlock *block = arena->head; block; block = block->next) {
-        Dqn_ArenaBlockResetInfo_ reset_info = {};
-        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE block, zero_mem, reset_info);
+    for (Dqn_MemBlock *block = arena->head; block; ) {
+        Dqn_MemBlock *next = block->next;
+        Dqn_MemBlock_Free(block);
+        block = next;
     }
 
-    arena->curr         = arena->head;
-    arena->stats.used   = 0;
-    arena->stats.wasted = 0;
+    arena->curr   = arena->head = arena->tail = nullptr;
+    arena->blocks = 0;
 }
 
 DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena)
 {
     Dqn_ArenaTempMemory result = {};
     if (arena) {
-        arena->temp_memory_count++;
         result.arena     = arena;
         result.head      = arena->head;
         result.curr      = arena->curr;
         result.tail      = arena->tail;
         result.curr_used = (arena->curr) ? arena->curr->used : 0;
-        result.stats     = arena->stats;
+        result.blocks    = arena->blocks;
     }
     return result;
 }
 
-DQN_API void Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory scope)
+DQN_API void Dqn_Arena_EndTempMemory(Dqn_ArenaTempMemory temp_memory, bool cancel)
 {
-    if (!scope.arena)
+    if (cancel || !temp_memory.arena)
         return;
 
-    Dqn_Arena *arena = scope.arena;
-    if (!DQN_CHECKF(arena->temp_memory_count > 0, "End temp memory has been called without a matching begin pair on the arena"))
+    // NOTE: The arena has been freed or invalidly manipulated (e.g. freed)
+    // since the temp memory started as the head cannot change once it is
+    // captured in the temp memory.
+    Dqn_Arena *arena = temp_memory.arena;
+    if (arena->head != temp_memory.head)
         return;
 
-    // NOTE: Revert arena stats
-    arena->temp_memory_count--;
-    arena->stats.capacity = scope.stats.capacity;
-    arena->stats.used     = scope.stats.used;
-    arena->stats.wasted   = scope.stats.wasted;
-    arena->stats.blocks   = scope.stats.blocks;
-
-    // NOTE: Revert the current block to the scope's current block
-    arena->head = scope.head;
-    arena->curr = scope.curr;
+    // NOTE: Revert the current block to the temp_memory's current block
+    arena->blocks    = temp_memory.blocks;
+    arena->head      = temp_memory.head;
+    arena->curr      = temp_memory.curr;
     if (arena->curr) {
-        Dqn_ArenaBlock *curr                = arena->curr;
-        Dqn_ArenaBlockResetInfo_ reset_info = {};
-        reset_info.used_value               = scope.curr_used;
-        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG curr, Dqn_ZeroMem_No, reset_info);
+        Dqn_MemBlock *curr = arena->curr;
+        curr->used         = temp_memory.curr_used;
     }
 
-    // NOTE: Free the tail blocks until we reach the scope's tail block
-    while (arena->tail != scope.tail) {
-        Dqn_ArenaBlock *tail                = arena->tail;
-        arena->tail                         = tail->prev;
-        Dqn_ArenaBlockResetInfo_ reset_info = {};
-        reset_info.free_memory              = true;
-        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG tail, Dqn_ZeroMem_No, reset_info);
+    // NOTE: Free the tail blocks until we reach the temp_memory's tail block
+    while (arena->tail != temp_memory.tail) {
+        Dqn_MemBlock *tail = arena->tail;
+        arena->tail        = tail->prev;
+        Dqn_MemBlock_Free(tail);
     }
+
+    // NOTE: Chop the restored tail link
+    if (arena->tail)
+        arena->tail->next = nullptr;
 
     // NOTE: Reset the usage of all the blocks between the tail and current block's
-    if (arena->tail) {
-        arena->tail->next = nullptr;
-        for (Dqn_ArenaBlock *block = arena->tail; block && block != arena->curr; block = block->prev) {
-            Dqn_ArenaBlockResetInfo_ reset_info = {};
-            Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG block, Dqn_ZeroMem_No, reset_info);
-        }
-    }
+    for (Dqn_MemBlock *block = arena->tail; block != arena->curr; block = block->prev)
+        block->used = 0;
 }
 
-Dqn_ArenaTempMemoryScope_::Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena)
+Dqn_ArenaTempMemoryScope::Dqn_ArenaTempMemoryScope(Dqn_Arena *arena)
 {
     temp_memory = Dqn_Arena_BeginTempMemory(arena);
-    #if defined(DQN_LEAK_TRACING)
-    leak_site__ = DQN_LEAK_TRACE_ARG_NO_COMMA;
-    #endif
 }
 
-Dqn_ArenaTempMemoryScope_::~Dqn_ArenaTempMemoryScope_()
+Dqn_ArenaTempMemoryScope::~Dqn_ArenaTempMemoryScope()
 {
-    #if defined(DQN_LEAK_TRACING)
-    Dqn_Arena_EndTempMemory_(leak_site__, temp_memory);
-    #else
-    Dqn_Arena_EndTempMemory_(temp_memory);
-    #endif
+    Dqn_Arena_EndTempMemory(temp_memory, cancel);
 }
 
 DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat)
@@ -445,155 +453,6 @@ DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat)
     #endif
 
     return result;
-}
-
-DQN_API void Dqn_Arena_LogStats(Dqn_Arena const *arena)
-{
-    Dqn_ArenaStatString string = Dqn_Arena_StatString(&arena->stats);
-    Dqn_Log_InfoF("%.*s\n", DQN_STRING_FMT(string));
-}
-
-DQN_API Dqn_ArenaBlock *Dqn_Arena_Grow_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_usize size, Dqn_usize commit, uint8_t flags)
-{
-    DQN_ASSERT(commit <= size);
-    if (!arena || size == 0)
-        return nullptr;
-
-    Dqn_usize block_metadata_size = Dqn_Arena_BlockMetadataSize_(arena);
-    commit                        = DQN_MIN(commit, size);
-    Dqn_usize reserve_aligned     = Dqn_PowerOfTwoAlign(size   + block_metadata_size, DQN_VMEM_RESERVE_GRANULARITY);
-    Dqn_usize commit_aligned      = Dqn_PowerOfTwoAlign(commit + block_metadata_size, DQN_VMEM_COMMIT_GRANULARITY);
-    DQN_ASSERT(commit_aligned < reserve_aligned);
-
-    // NOTE: If the commit amount is the same as reserve size we can save one
-    // syscall by asking the OS to reserve+commit in the same call.
-    Dqn_VMemCommit commit_on_reserve = reserve_aligned == commit_aligned ? Dqn_VMemCommit_Yes : Dqn_VMemCommit_No;
-    uint32_t page_flags              = Dqn_VMemPage_ReadWrite;
-    auto *result                     = DQN_CAST(Dqn_ArenaBlock *)Dqn_VMem_Reserve(reserve_aligned, commit_on_reserve, page_flags);
-    if (result) {
-        // NOTE: Commit the amount requested by the user if we did not commit
-        // on reserve the initial range.
-        if (commit_on_reserve == Dqn_VMemCommit_No) {
-            Dqn_VMem_Commit(result, commit_aligned, page_flags);
-        } else {
-            DQN_ASSERT(commit_aligned == reserve_aligned);
-        }
-
-        // NOTE: Sanity check memory is zero-ed out
-        DQN_ASSERT(result->used == 0);
-        DQN_ASSERT(result->next == nullptr);
-        DQN_ASSERT(result->prev == nullptr);
-
-        // NOTE: Setup the block
-        result->memory = DQN_CAST(uint8_t *)result + block_metadata_size;
-        result->size   = reserve_aligned - block_metadata_size;
-        result->commit = commit_aligned - block_metadata_size;
-        result->flags  = flags;
-        result->arena  = arena;
-
-        if (arena->use_after_free_guard)
-            result->flags |= Dqn_ArenaBlockFlags_UseAfterFreeGuard;
-
-        // NOTE: Reset the block (this will guard the memory pages if required, otherwise no-op).
-        Dqn_ArenaBlockResetInfo_ reset_info = {};
-        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG result, Dqn_ZeroMem_No, reset_info);
-
-        // NOTE: Attach the block to the arena
-        if (arena->tail) {
-            arena->tail->next = result;
-            result->prev      = arena->tail;
-        } else {
-            DQN_ASSERT(!arena->curr);
-            arena->curr = result;
-            arena->head = result;
-        }
-        arena->tail = result;
-
-        // NOTE: Update stats
-        arena->stats.syscalls += (commit_on_reserve ? 1 : 2);
-        arena->stats.blocks   += 1;
-        arena->stats.capacity += arena->curr->size;
-
-        arena->stats.blocks_hwm   = DQN_MAX(arena->stats.blocks_hwm,   arena->stats.blocks);
-        arena->stats.capacity_hwm = DQN_MAX(arena->stats.capacity_hwm, arena->stats.capacity);
-
-        Dqn_Library_LeakTraceAdd(DQN_LEAK_TRACE_ARG result, size);
-    }
-
-    return result;
-}
-
-DQN_API void *Dqn_Arena_Allocate_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem)
-{
-    DQN_ASSERTF((align & (align - 1)) == 0, "Power of two alignment required");
-    align = DQN_MAX(align, 1);
-
-    if (arena->use_after_free_guard) {
-        size  = Dqn_PowerOfTwoAlign(size, DQN_VMEM_PAGE_GRANULARITY);
-        align = 1;
-    }
-
-    void *result = nullptr;
-    for (; !result;) {
-        while (arena->curr && (arena->curr->flags & Dqn_ArenaBlockFlags_Private))
-            arena->curr = arena->curr->next;
-
-        result = Dqn_Arena_AllocateFromBlock(arena->curr, size, align, zero_mem);
-        if (!result) {
-            if (!arena->curr || arena->curr == arena->tail) {
-                Dqn_usize allocation_size = size + (align - 1);
-                if (!Dqn_Arena_Grow(DQN_LEAK_TRACE_ARG arena, allocation_size, allocation_size /*commit*/, 0 /*flags*/)) {
-                    break;
-                }
-            }
-
-            if (arena->curr != arena->tail)
-                arena->curr = arena->curr->next;
-        }
-    }
-
-    if (result)
-        DQN_ASSERT((arena->curr->flags & Dqn_ArenaBlockFlags_Private) == 0);
-
-    return result;
-}
-
-DQN_API void *Dqn_Arena_Copy_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t align)
-{
-    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size, align, Dqn_ZeroMem_No);
-    DQN_MEMCPY(result, src, size);
-    return result;
-}
-
-DQN_API void *Dqn_Arena_CopyZ_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t align)
-{
-    void *result = Dqn_Arena_Allocate_(DQN_LEAK_TRACE_ARG arena, size + 1, align, Dqn_ZeroMem_No);
-    DQN_MEMCPY(result, src, size);
-    (DQN_CAST(char *)result)[size] = 0;
-    return result;
-}
-
-DQN_API void Dqn_Arena_Free_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem)
-{
-    if (!arena)
-        return;
-
-    if (!DQN_CHECKF(arena->temp_memory_count == 0, "You cannot free an arena whilst in an temp memory region"))
-        return;
-
-    while (arena->tail) {
-        Dqn_ArenaBlock *block               = arena->tail;
-        arena->tail                         = block->prev;
-        Dqn_ArenaBlockResetInfo_ reset_info = {};
-        reset_info.free_memory              = true;
-        Dqn_Arena_BlockReset_(DQN_LEAK_TRACE_ARG block, zero_mem, reset_info);
-    }
-
-    arena->curr           = arena->tail = nullptr;
-    arena->stats.capacity = 0;
-    arena->stats.used     = 0;
-    arena->stats.wasted   = 0;
-    arena->stats.blocks   = 0;
 }
 
 // NOTE: [$ACAT] Dqn_ArenaCatalog ==================================================================

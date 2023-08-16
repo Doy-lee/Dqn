@@ -1,356 +1,206 @@
-#if defined(DQN_OS_WIN32)
-// NOTE: [$W32H] Win32 Min Header ==================================================================
-    #pragma comment(lib, "bcrypt")
-    #pragma comment(lib, "wininet")
+// NOTE: [$PRIN] Dqn_Print =========================================================================
+DQN_API Dqn_PrintStyle Dqn_Print_StyleColour(uint8_t r, uint8_t g, uint8_t b, Dqn_PrintBold bold)
+{
+    Dqn_PrintStyle result = {};
+    result.bold           = bold;
+    result.colour         = true;
+    result.r              = r;
+    result.g              = g;
+    result.b              = b;
+    return result;
+}
 
-    #if defined(DQN_NO_WIN32_MIN_HEADER)
-        #include <bcrypt.h>   // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
-        #include <shellapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
-        #if !defined(DQN_NO_WINNET)
-            #include <wininet.h> // Dqn_Win_Net -> InternetConnect ... etc
-        #endif // DQN_NO_WINNET
+DQN_API Dqn_PrintStyle Dqn_Print_StyleColourU32(uint32_t rgb, Dqn_PrintBold bold)
+{
+    uint8_t r             = (rgb >> 24) & 0xFF;
+    uint8_t g             = (rgb >> 16) & 0xFF;
+    uint8_t b             = (rgb >>  8) & 0xFF;
+    Dqn_PrintStyle result = Dqn_Print_StyleColour(r, g, b, bold);
+    return result;
+}
+
+DQN_API Dqn_PrintStyle Dqn_Print_StyleBold()
+{
+    Dqn_PrintStyle result = {};
+    result.bold           = Dqn_PrintBold_Yes;
+    return result;
+}
+
+DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string)
+{
+    DQN_ASSERT(std_handle == Dqn_PrintStd_Out || std_handle == Dqn_PrintStd_Err);
+
+    #if defined(DQN_OS_WIN32)
+    // NOTE: Get the output handles from kernel
+    // =========================================================================
+    DQN_THREAD_LOCAL void *std_out_print_handle     = nullptr;
+    DQN_THREAD_LOCAL void *std_err_print_handle     = nullptr;
+    DQN_THREAD_LOCAL bool  std_out_print_to_console = false;
+    DQN_THREAD_LOCAL bool  std_err_print_to_console = false;
+
+    if (!std_out_print_handle) {
+        unsigned long mode = 0; (void)mode;
+        std_out_print_handle     = GetStdHandle(STD_OUTPUT_HANDLE);
+        std_out_print_to_console = GetConsoleMode(std_out_print_handle, &mode) != 0;
+
+        std_err_print_handle     = GetStdHandle(STD_ERROR_HANDLE);
+        std_err_print_to_console = GetConsoleMode(std_err_print_handle, &mode) != 0;
+    }
+
+    // NOTE: Select the output handle
+    // =========================================================================
+    void *print_handle    = std_out_print_handle;
+    bool print_to_console = std_out_print_to_console;
+    if (std_handle == Dqn_PrintStd_Err) {
+        print_handle     = std_err_print_handle;
+        print_to_console = std_err_print_to_console;
+    }
+
+    // NOTE: Write the string
+    // =========================================================================
+    DQN_ASSERT(string.size < DQN_CAST(unsigned long)-1);
+    unsigned long bytes_written = 0; (void)bytes_written;
+    if (print_to_console) {
+        WriteConsoleA(print_handle, string.data, DQN_CAST(unsigned long)string.size, &bytes_written, nullptr);
+    } else {
+        WriteFile(print_handle, string.data, DQN_CAST(unsigned long)string.size, &bytes_written, nullptr);
+    }
     #else
-        // Taken from Windows.h
-        // Defines
-        // ---------------------------------------------------------------------
-        #define MAX_PATH 260
+    fprintf(std_handle == Dqn_PrintStd_Out ? stdout : stderr, "%.*s", DQN_STRING_FMT(string));
+    #endif
+}
 
-        // NOTE: Wait/Synchronization
-        #define INFINITE 0xFFFFFFFF // Infinite timeout
+DQN_API void Dqn_Print_StdStyle(Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_String8 string)
+{
+    if (string.data && string.size) {
+        if (style.colour)
+            Dqn_Print_Std(std_handle, Dqn_Print_ESCColourFgString(style.r, style.g, style.b));
+        if (style.bold == Dqn_PrintBold_Yes)
+            Dqn_Print_Std(std_handle, Dqn_Print_ESCBoldString);
+        Dqn_Print_Std(std_handle, string);
+        if (style.colour || style.bold == Dqn_PrintBold_Yes)
+            Dqn_Print_Std(std_handle, Dqn_Print_ESCResetString);
+    }
+}
 
-        // NOTE: FormatMessageA
-        #define FORMAT_MESSAGE_FROM_SYSTEM 0x00001000
-        #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
-        #define FORMAT_MESSAGE_FROM_HMODULE    0x00000800
-        #define MAKELANGID(p, s) ((((unsigned short  )(s)) << 10) | (unsigned short  )(p))
-        #define SUBLANG_DEFAULT 0x01    // user default
-        #define LANG_NEUTRAL 0x00
+DQN_FILE_SCOPE char *Dqn_Print_VSPrintfChunker_(const char *buf, void *user, int len)
+{
+    Dqn_String8 string = {};
+    string.data        = DQN_CAST(char *)buf;
+    string.size        = len;
 
-        // NOTE: MultiByteToWideChar
-        #define CP_UTF8 65001 // UTF-8 translation
+    Dqn_PrintStd std_handle = DQN_CAST(Dqn_PrintStd)DQN_CAST(uintptr_t)user;
+    Dqn_Print_Std(std_handle, string);
+    return (char *)buf;
+}
 
-        // NOTE: VirtualAlloc
-        // NOTE: Allocation Type
-        #define MEM_RESERVE 0x00002000
-        #define MEM_COMMIT 0x00001000
-        #define MEM_DECOMMIT 0x00004000
-        #define MEM_RELEASE 0x00008000
+DQN_API void Dqn_Print_StdF(Dqn_PrintStd std_handle, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Print_StdFV(std_handle, fmt, args);
+    va_end(args);
+}
 
-        // NOTE: Protect
-        #define PAGE_NOACCESS 0x01
-        #define PAGE_READONLY 0x02
-        #define PAGE_READWRITE 0x04
-        #define PAGE_GUARD 0x100
+DQN_API void Dqn_Print_StdFStyle(Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Print_StdFVStyle(std_handle, style, fmt, args);
+    va_end(args);
+}
 
-        // NOTE: FindFirstFile
-        #define INVALID_HANDLE_VALUE ((void *)(long *)-1)
-        #define INVALID_FILE_ATTRIBUTES ((unsigned long)-1)
-        #define FILE_ATTRIBUTE_NORMAL 0x00000080
-        #define FIND_FIRST_EX_LARGE_FETCH 0x00000002
-        #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
-        #define FILE_ATTRIBUTE_READONLY 0x00000001
-        #define FILE_ATTRIBUTE_HIDDEN 0x00000002
+DQN_API void Dqn_Print_StdFV(Dqn_PrintStd std_handle, char const *fmt, va_list args)
+{
+    char buffer[STB_SPRINTF_MIN];
+    STB_SPRINTF_DECORATE(vsprintfcb)(Dqn_Print_VSPrintfChunker_, DQN_CAST(void *)DQN_CAST(uintptr_t)std_handle, buffer, fmt, args);
+}
 
-        // NOTE: GetModuleFileNameW
-        #define ERROR_INSUFFICIENT_BUFFER 122L
+DQN_API void Dqn_Print_StdFVStyle(Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, va_list args)
+{
+    if (fmt) {
+        if (style.colour)
+            Dqn_Print_Std(std_handle, Dqn_Print_ESCColourFgString(style.r, style.g, style.b));
+        if (style.bold == Dqn_PrintBold_Yes)
+            Dqn_Print_Std(std_handle, Dqn_Print_ESCBoldString);
+        Dqn_Print_StdFV(std_handle, fmt, args);
+        if (style.colour || style.bold == Dqn_PrintBold_Yes)
+            Dqn_Print_Std(std_handle, Dqn_Print_ESCResetString);
+    }
+}
 
-        // NOTE: MoveFile
-        #define MOVEFILE_REPLACE_EXISTING 0x00000001
-        #define MOVEFILE_COPY_ALLOWED 0x00000002
+DQN_API void Dqn_Print_StdLn(Dqn_PrintStd std_handle, Dqn_String8 string)
+{
+    Dqn_Print_Std(std_handle, string);
+    Dqn_Print_Std(std_handle, DQN_STRING8("\n"));
+}
 
-        // NOTE: Wininet
-        typedef unsigned short INTERNET_PORT;
-        #define INTERNET_OPEN_TYPE_PRECONFIG 0 // use registry configuration
-        #define INTERNET_DEFAULT_HTTPS_PORT 443 // HTTPS
-        #define INTERNET_SERVICE_HTTP 3
-        #define INTERNET_OPTION_USER_AGENT 41
-        #define INTERNET_FLAG_NO_AUTH 0x00040000  // no automatic authentication handling
-        #define INTERNET_FLAG_SECURE 0x00800000  // use PCT/SSL if applicable (HTTP)
+DQN_API void Dqn_Print_StdLnF(Dqn_PrintStd std_handle, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Print_StdLnFV(std_handle, fmt, args);
+    va_end(args);
+}
 
-        // NOTE: CreateFile
-        #define GENERIC_READ (0x80000000L)
-        #define GENERIC_WRITE (0x40000000L)
-        #define GENERIC_EXECUTE (0x20000000L)
-        #define GENERIC_ALL (0x10000000L)
-        #define FILE_ATTRIBUTE_NORMAL 0x00000080
-        #define FILE_APPEND_DATA 4
+DQN_API void Dqn_Print_StdLnFV(Dqn_PrintStd std_handle, char const *fmt, va_list args)
+{
+    Dqn_Print_StdFV(std_handle, fmt, args);
+    Dqn_Print_Std(std_handle, DQN_STRING8("\n"));
+}
 
-        #define CREATE_NEW          1
-        #define CREATE_ALWAYS       2
-        #define OPEN_EXISTING       3
-        #define OPEN_ALWAYS         4
-        #define TRUNCATE_EXISTING   5
+DQN_API void Dqn_Print_StdLnStyle(Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_String8 string)
+{
+    Dqn_Print_StdStyle(std_handle, style, string);
+    Dqn_Print_Std(std_handle, DQN_STRING8("\n"));
+}
 
-        #define STD_INPUT_HANDLE ((unsigned long)-10)
-        #define STD_OUTPUT_HANDLE ((unsigned long)-11)
-        #define STD_ERROR_HANDLE ((unsigned long)-12)
+DQN_API void Dqn_Print_StdLnFStyle(Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Print_StdLnFVStyle(std_handle, style, fmt, args);
+    va_end(args);
+}
 
-        #define INVALID_FILE_SIZE ((unsigned long)0xFFFFFFFF)
+DQN_API void Dqn_Print_StdLnFVStyle(Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, va_list args)
+{
+    Dqn_Print_StdFVStyle(std_handle, style, fmt, args);
+    Dqn_Print_Std(std_handle, DQN_STRING8("\n"));
+}
 
-        #define HTTP_QUERY_RAW_HEADERS 21
-        #define HTTP_QUERY_RAW_HEADERS_CRLF 22
+DQN_API Dqn_String8 Dqn_Print_ESCColourString(Dqn_PrintESCColour colour, uint8_t r, uint8_t g, uint8_t b)
+{
+    DQN_THREAD_LOCAL char buffer[32];
+    buffer[0]          = 0;
+    Dqn_String8 result = {};
+    result.size        = STB_SPRINTF_DECORATE(snprintf)(buffer,
+                                                        DQN_ARRAY_UCOUNT(buffer),
+                                                        "\x1b[%d;2;%u;%u;%um",
+                                                        colour == Dqn_PrintESCColour_Fg ? 38 : 48,
+                                                        r, g, b);
+    result.data        = buffer;
+    return result;
+}
 
-        // NOTE: HttpAddRequestHeadersA
-        #define HTTP_ADDREQ_FLAG_ADD_IF_NEW 0x10000000
-        #define HTTP_ADDREQ_FLAG_ADD        0x20000000
-        #define HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA       0x40000000
-        #define HTTP_ADDREQ_FLAG_COALESCE_WITH_SEMICOLON   0x01000000
-        #define HTTP_ADDREQ_FLAG_COALESCE                  HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA
-        #define HTTP_ADDREQ_FLAG_REPLACE    0x80000000
+DQN_API Dqn_String8 Dqn_Print_ESCColourU32String(Dqn_PrintESCColour colour, uint32_t value)
+{
+    uint8_t r          = DQN_CAST(uint8_t)(value >> 24);
+    uint8_t g          = DQN_CAST(uint8_t)(value >> 16);
+    uint8_t b          = DQN_CAST(uint8_t)(value >>  8);
+    Dqn_String8 result = Dqn_Print_ESCColourString(colour, r, g, b);
+    return result;
+}
 
-        #define SW_MAXIMIZED 3
-        #define SW_SHOW 5
-
-        typedef enum PROCESS_DPI_AWARENESS {
-            PROCESS_DPI_UNAWARE           = 0,
-            PROCESS_SYSTEM_DPI_AWARE      = 1,
-            PROCESS_PER_MONITOR_DPI_AWARE = 2
-        } PROCESS_DPI_AWARENESS;
-
-        #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((void *)-4)
-
-        typedef union {
-            struct {
-                unsigned long LowPart;
-                unsigned long HighPart;
-            } DUMMYSTRUCTNAME;
-            struct {
-                unsigned long LowPart;
-                unsigned long HighPart;
-            } u;
-            uint64_t QuadPart;
-        } ULARGE_INTEGER;
-
-        typedef struct
-        {
-            unsigned long dwLowDateTime;
-            unsigned long dwHighDateTime;
-        } FILETIME;
-
-        typedef struct
-        {
-            unsigned long dwFileAttributes;
-            FILETIME ftCreationTime;
-            FILETIME ftLastAccessTime;
-            FILETIME ftLastWriteTime;
-            unsigned long nFileSizeHigh;
-            unsigned long nFileSizeLow;
-        } WIN32_FILE_ATTRIBUTE_DATA;
-
-        typedef enum
-        {
-            GetFileExInfoStandard,
-            GetFileExMaxInfoLevel
-        } GET_FILEEX_INFO_LEVELS;
-
-        typedef struct {
-            unsigned long nLength;
-            void *lpSecurityDescriptor;
-            bool bInheritHandle;
-        } SECURITY_ATTRIBUTES;
-
-        typedef struct {
-          long left;
-          long top;
-          long right;
-          long bottom;
-        } RECT, *PRECT, *NPRECT, *LPRECT;
-
-        typedef struct {
-            union {
-                unsigned long dwOemId;          // Obsolete field...do not use
-                struct {
-                    uint16_t wProcessorArchitecture;
-                    uint16_t wReserved;
-                } DUMMYSTRUCTNAME;
-            } DUMMYUNIONNAME;
-            unsigned long dwPageSize;
-            void *lpMinimumApplicationAddress;
-            void *lpMaximumApplicationAddress;
-            unsigned long *dwActiveProcessorMask;
-            unsigned long dwNumberOfProcessors;
-            unsigned long dwProcessorType;
-            unsigned long dwAllocationGranularity;
-            uint16_t wProcessorLevel;
-            uint16_t wProcessorRevision;
-        } SYSTEM_INFO;
-
-        typedef struct {
-            unsigned short wYear;
-            unsigned short wMonth;
-            unsigned short wDayOfWeek;
-            unsigned short wDay;
-            unsigned short wHour;
-            unsigned short wMinute;
-            unsigned short wSecond;
-            unsigned short wMilliseconds;
-        } SYSTEMTIME;
-
-        typedef struct {
-            unsigned long dwFileAttributes;
-            FILETIME ftCreationTime;
-            FILETIME ftLastAccessTime;
-            FILETIME ftLastWriteTime;
-            unsigned long nFileSizeHigh;
-            unsigned long nFileSizeLow;
-            unsigned long dwReserved0;
-            unsigned long dwReserved1;
-            wchar_t cFileName[MAX_PATH];
-            wchar_t cAlternateFileName[14];
-            #ifdef _MAC
-            unsigned long dwFileType;
-            unsigned long dwCreatorType;
-            unsigned short wFinderFlags;
-            #endif
-        } WIN32_FIND_DATAW;
-
-        typedef enum {
-            FindExInfoStandard,
-            FindExInfoBasic,
-            FindExInfoMaxInfoLevel,
-        } FINDEX_INFO_LEVELS;
-
-        typedef enum {
-            FindExSearchNameMatch,
-            FindExSearchLimitToDirectories,
-            FindExSearchLimitToDevices,
-            FindExSearchMaxSearchOp
-        } FINDEX_SEARCH_OPS;
-
-        typedef enum {
-            INTERNET_SCHEME_PARTIAL = -2,
-            INTERNET_SCHEME_UNKNOWN = -1,
-            INTERNET_SCHEME_DEFAULT = 0,
-            INTERNET_SCHEME_FTP,
-            INTERNET_SCHEME_GOPHER,
-            INTERNET_SCHEME_HTTP,
-            INTERNET_SCHEME_HTTPS,
-            INTERNET_SCHEME_FILE,
-            INTERNET_SCHEME_NEWS,
-            INTERNET_SCHEME_MAILTO,
-            INTERNET_SCHEME_SOCKS,
-            INTERNET_SCHEME_JAVASCRIPT,
-            INTERNET_SCHEME_VBSCRIPT,
-            INTERNET_SCHEME_RES,
-            INTERNET_SCHEME_FIRST = INTERNET_SCHEME_FTP,
-            INTERNET_SCHEME_LAST = INTERNET_SCHEME_RES
-        } INTERNET_SCHEME;
-
-        typedef struct {
-            unsigned long    dwStructSize;       // size of this structure. Used in version check
-            char            *lpszScheme;         // pointer to scheme name
-            unsigned long    dwSchemeLength;     // length of scheme name
-            INTERNET_SCHEME  nScheme;            // enumerated scheme type (if known)
-            char            *lpszHostName;       // pointer to host name
-            unsigned long    dwHostNameLength;   // length of host name
-            INTERNET_PORT    nPort;              // converted port number
-            char            *lpszUserName;       // pointer to user name
-            unsigned long    dwUserNameLength;   // length of user name
-            char            *lpszPassword;       // pointer to password
-            unsigned long    dwPasswordLength;   // length of password
-            char            *lpszUrlPath;        // pointer to URL-path
-            unsigned long    dwUrlPathLength;    // length of URL-path
-            char            *lpszExtraInfo;      // pointer to extra information (e.g. ?foo or #foo)
-            unsigned long    dwExtraInfoLength;  // length of extra information
-        } URL_COMPONENTSA;
-
-        // Functions
-        // ---------------------------------------------------------------------
-        extern "C"
-        {
-        /*BOOL*/      int            __stdcall CreateDirectoryW           (wchar_t const *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
-        /*BOOL*/      int            __stdcall RemoveDirectoryW           (wchar_t const *lpPathName);
-        /*DWORD*/     unsigned long  __stdcall GetCurrentDirectoryW       (unsigned long nBufferLength, wchar_t *lpBuffer);
-
-        /*BOOL*/      int            __stdcall FindNextFileW              (void *hFindFile, WIN32_FIND_DATAW *lpFindFileData);
-        /*HANDLE*/    void *         __stdcall FindFirstFileExW           (wchar_t const *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, unsigned long dwAdditionalFlags);
-        /*DWORD*/     unsigned long  __stdcall GetFileAttributesExW       (wchar_t const *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, WIN32_FILE_ATTRIBUTE_DATA *lpFileInformation);
-        /*BOOL*/      int            __stdcall GetFileSizeEx              (void *hFile, LARGE_INTEGER *lpFileSize);
-
-        /*BOOL*/      int            __stdcall MoveFileExW                (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, unsigned long dwFlags);
-        /*BOOL*/      int            __stdcall CopyFileW                  (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, int bFailIfExists);
-        /*BOOL*/      int            __stdcall DeleteFileW                (wchar_t const *lpExistingFileName);
-        /*HANDLE*/    void *         __stdcall CreateFileW                (wchar_t const *lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void *hTemplateFile);
-        /*BOOL*/      int            __stdcall ReadFile                   (void *hFile, void *lpBuffer, unsigned long nNumberOfBytesToRead, unsigned long *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
-        /*BOOL*/      int            __stdcall WriteFile                  (void *hFile, void const *lpBuffer, unsigned long nNumberOfBytesToWrite, unsigned long *lpNumberOfBytesWritten, struct OVERLAPPED *lpOverlapped);
-        /*BOOL*/      int            __stdcall CloseHandle                (void *hObject);
-
-        /*BOOL*/      int            __stdcall WriteConsoleA              (void *hConsoleOutput, const char *lpBuffer, unsigned long nNumberOfCharsToWrite, unsigned long *lpNumberOfCharsWritten, void *lpReserved);
-        /*BOOL*/      int            __stdcall AllocConsole               ();
-        /*BOOL*/      int            __stdcall FreeConsole                ();
-        /*BOOL*/      int            __stdcall AttachConsole              (unsigned long dwProcessId);
-        /*HANDLE*/    void *         __stdcall GetStdHandle               (unsigned long nStdHandle);
-        /*BOOL*/      int            __stdcall GetConsoleMode             (void *hConsoleHandle, unsigned long *lpMode);
-
-        /*HMODULE*/   void *         __stdcall LoadLibraryA               (char const *lpFileName);
-        /*BOOL*/      int            __stdcall FreeLibrary                (void *hModule);
-        /*FARPROC*/   void *         __stdcall GetProcAddress             (void *hModule, char const *lpProcName);
-
-        /*BOOL*/      int            __stdcall GetWindowRect              (void *hWnd, RECT *lpRect);
-        /*BOOL*/      int            __stdcall SetWindowPos               (void *hWnd, void *hWndInsertAfter, int X, int Y, int cx, int cy, unsigned int uFlags);
-
-        /*DWORD*/     unsigned long  __stdcall GetWindowModuleFileNameA   (void *hwnd, char *pszFileName, unsigned int cchFileNameMax);
-        /*HMODULE*/   void *         __stdcall GetModuleHandleA           (char const *lpModuleName);
-        /*DWORD*/     unsigned long  __stdcall GetModuleFileNameW         (void *hModule, wchar_t *lpFilename, unsigned long nSize);
-
-        /*DWORD*/     unsigned long  __stdcall WaitForSingleObject        (void *hHandle, unsigned long dwMilliseconds);
-
-        /*BOOL*/      int            __stdcall QueryPerformanceCounter    (LARGE_INTEGER *lpPerformanceCount);
-        /*BOOL*/      int            __stdcall QueryPerformanceFrequency  (LARGE_INTEGER *lpFrequency);
-
-        /*HANDLE*/    void *         __stdcall CreateThread               (SECURITY_ATTRIBUTES *lpThreadAttributes, size_t dwStackSize, unsigned long (*lpStartAddress)(void *), void *lpParameter, unsigned long dwCreationFlags, unsigned long *lpThreadId);
-        /*HANDLE*/    void *         __stdcall CreateSemaphoreA           (SECURITY_ATTRIBUTES *lpSecurityAttributes, long lInitialCount, long lMaxCount, char *lpName);
-        /*BOOL*/      int            __stdcall ReleaseSemaphore           (void *semaphore, long lReleaseCount, long *lpPreviousCount);
-                      void           __stdcall Sleep                      (unsigned long dwMilliseconds);
-        /*DWORD*/     unsigned long  __stdcall GetCurrentThreadId         ();
-
-                      void *         __stdcall VirtualAlloc               (void *lpAddress, size_t dwSize, unsigned long flAllocationType, unsigned long flProtect);
-        /*BOOL*/      int            __stdcall VirtualProtect             (void *lpAddress, size_t dwSize, unsigned long flNewProtect, unsigned long *lpflOldProtect);
-        /*BOOL*/      int            __stdcall VirtualFree                (void *lpAddress, size_t dwSize, unsigned long dwFreeType);
-
-                      void           __stdcall GetSystemInfo              (SYSTEM_INFO *system_info);
-                      void           __stdcall GetSystemTime              (SYSTEMTIME  *lpSystemTime);
-                      void           __stdcall GetSystemTimeAsFileTime    (FILETIME    *lpFileTime);
-                      void           __stdcall GetLocalTime               (SYSTEMTIME  *lpSystemTime);
-
-        /*DWORD*/     unsigned long  __stdcall FormatMessageA             (unsigned long dwFlags, void *lpSource, unsigned long dwMessageId, unsigned long dwLanguageId, char *lpBuffer, unsigned long nSize, va_list *Arguments);
-        /*DWORD*/     unsigned long  __stdcall GetLastError               ();
-
-                      int            __stdcall MultiByteToWideChar        (unsigned int CodePage, unsigned long dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
-                      int            __stdcall WideCharToMultiByte        (unsigned int CodePage, unsigned long dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
-
-        /*NTSTATUS*/  long           __stdcall BCryptOpenAlgorithmProvider(void *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
-        /*NTSTATUS*/  long           __stdcall BCryptGenRandom            (void *hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
-
-        /*BOOLAPI*/   int            __stdcall InternetCrackUrlA          (char const *lpszUrl, unsigned long dwUrlLength, unsigned long dwFlags, URL_COMPONENTSA *lpUrlComponents);
-        /*HANDLE*/    void *         __stdcall InternetOpenA              (char const *lpszAgent, unsigned long dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, unsigned long dwFlags);
-        /*HANDLE*/    void *         __stdcall InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, unsigned long dwService, unsigned long dwFlags, unsigned long *dwContext);
-        /*BOOLAPI*/   int            __stdcall InternetSetOptionA         (void *hInternet, unsigned long dwOption, void *lpBuffer, unsigned long dwBufferLength);
-        /*BOOLAPI*/   int            __stdcall InternetReadFile           (void *hFile, void *lpBuffer, unsigned long dwNumberOfBytesToRead, unsigned long *lpdwNumberOfBytesRead);
-        /*BOOLAPI*/   int            __stdcall InternetCloseHandle        (void *hInternet);
-        /*HANDLE*/    void *         __stdcall HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, unsigned long dwFlags, unsigned long *dwContext);
-        /*BOOLAPI*/   int            __stdcall HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
-        /*BOOLAPI*/   int            __stdcall HttpAddRequestHeadersA     (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, unsigned long dwModifiers);
-        /*BOOL*/      int            __stdcall HttpQueryInfoA             (void *hRequest, unsigned long dwInfoLevel, void *lpBuffer, unsigned long *lpdwBufferLength, unsigned long *lpdwIndex);
-
-        /*HINSTANCE*/ void *         __stdcall ShellExecuteA              (void *hwnd, char const *lpOperation, char const *lpFile, char const *lpParameters, char const *lpDirectory, int nShowCmd);
-        /*BOOL*/      int            __stdcall ShowWindow                 (void *hWnd, int nCmdShow);
-        }
-    #endif // !defined(DQN_NO_WIN32_MINIMAL_HEADER) && !defined(_INC_WINDOWS)
-#elif defined(DQN_OS_UNIX)
-    #include <errno.h>        // errno
-    #include <fcntl.h>        // O_RDONLY ... etc
-    #include <linux/fs.h>     // FICLONE
-    #include <sys/ioctl.h>    // ioctl
-    #include <sys/types.h>    // pid_t
-    #include <sys/random.h>   // getrandom
-    #include <sys/stat.h>     // stat
-    #include <sys/sendfile.h> // sendfile
-    #include <sys/mman.h>     // mmap
-    #include <time.h>         // clock_gettime, nanosleep
-    #include <unistd.h>       // access, gettid
+// TODO(doyle): Use our temp scratch arenas instead of a massive array on the 
+// stack.
+// NOTE: Max size from MSDN, using \\? syntax, but the ? bit can be expanded
+// even more so the max size is kind of not well defined.
+#if defined(DQN_OS_WIN32) && !defined(DQN_OS_WIN32_MAX_PATH)
+    #define DQN_OS_WIN32_MAX_PATH 32767 + 128 /*fudge*/
 #endif
 
+#if !defined(DQN_NO_FS)
 // NOTE: [$FSYS] Dqn_Fs ============================================================================
 #if defined(DQN_OS_WIN32)
 DQN_API uint64_t Dqn__WinFileTimeToSeconds(FILETIME const *time)
@@ -363,16 +213,10 @@ DQN_API uint64_t Dqn__WinFileTimeToSeconds(FILETIME const *time)
 }
 #endif
 
-// NOTE: Max size from MSDN, using \\? syntax, but the ? bit can be expanded
-// even more so the max size is kind of not well defined.
-#if defined(DQN_OS_WIN32) && !defined(DQN_OS_WIN32_MAX_PATH)
-    #define DQN_OS_WIN32_MAX_PATH 32767 + 128 /*fudge*/
-#endif
-
 DQN_API bool Dqn_Fs_Exists(Dqn_String8 path)
 {
     bool result = false;
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
     int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
     if (path16_size) {
@@ -382,16 +226,13 @@ DQN_API bool Dqn_Fs_Exists(Dqn_String8 path)
                      !(attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
         }
     }
-
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     struct stat stat_result;
     if (lstat(path.data, &stat_result) != -1)
         result = S_ISREG(stat_result.st_mode) || S_ISLNK(stat_result.st_mode);
-
-#else
+    #else
     #error Unimplemented
-
-#endif
+    #endif
 
     return result;
 }
@@ -399,7 +240,7 @@ DQN_API bool Dqn_Fs_Exists(Dqn_String8 path)
 DQN_API bool Dqn_Fs_DirExists(Dqn_String8 path)
 {
     bool result = false;
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
     int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
     if (path16_size) {
@@ -410,14 +251,13 @@ DQN_API bool Dqn_Fs_DirExists(Dqn_String8 path)
         }
     }
 
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     struct stat stat_result;
     if (lstat(path.data, &stat_result) != -1)
         result = S_ISDIR(stat_result.st_mode);
-#else
+    #else
     #error Unimplemented
-#endif
-
+    #endif
     return result;
 }
 
@@ -472,7 +312,7 @@ DQN_API Dqn_FsInfo Dqn_Fs_GetInfo(Dqn_String8 path)
 DQN_API bool Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
 {
     bool result = false;
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
     Dqn_String16      src16   = Dqn_Win_String8ToString16Allocator(src, Dqn_Arena_Allocator(scratch.arena));
     Dqn_String16      dest16  = Dqn_Win_String8ToString16Allocator(dest, Dqn_Arena_Allocator(scratch.arena));
@@ -488,7 +328,7 @@ DQN_API bool Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
                        DQN_STRING_FMT(error));
     }
 
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     int src_fd  = open(src.data, O_RDONLY);
     int dest_fd = open(dest.data, O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : 0));
 
@@ -504,9 +344,9 @@ DQN_API bool Dqn_Fs_Copy(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
 
     if (dest_fd != -1)
         close(dest_fd);
-#else
+    #else
     #error Unimplemented
-#endif
+    #endif
 
     return result;
 }
@@ -518,7 +358,7 @@ DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
     Dqn_usize path_indexes_size = 0;
     uint16_t path_indexes[64]   = {};
 
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     Dqn_String16 path16 = Dqn_Win_String8ToString16Allocator(path, Dqn_Arena_Allocator(scratch.arena));
 
     // NOTE: Go back from the end of the string to all the directories in the
@@ -573,7 +413,7 @@ DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
         if (index != 0) path16.data[path_index] = temp;
     }
 
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     Dqn_String8 copy = Dqn_String8_Copy(scratch.arena, path);
     for (Dqn_usize index = copy.size - 1; index < copy.size; index--) {
         bool first_char = index == (copy.size - 1);
@@ -613,9 +453,9 @@ DQN_API bool Dqn_Fs_MakeDir(Dqn_String8 path)
         if (index != 0) copy.data[path_index] = temp;
     }
 
-#else
+    #else
     #error Unimplemented
-#endif
+    #endif
 
     return result;
 }
@@ -624,7 +464,7 @@ DQN_API bool Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
 {
     bool result = false;
 
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
     Dqn_String16      src16   = Dqn_Win_String8ToString16Allocator(src, Dqn_Arena_Allocator(scratch.arena));
     Dqn_String16      dest16  = Dqn_Win_String8ToString16Allocator(dest, Dqn_Arena_Allocator(scratch.arena));
@@ -642,7 +482,7 @@ DQN_API bool Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
                        DQN_STRING_FMT(Dqn_Win_LastError()));
     }
 
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     // See: https://github.com/gingerBill/gb/blob/master/gb.h
     bool file_moved = true;
     if (link(src.data, dest.data) == -1)
@@ -655,17 +495,16 @@ DQN_API bool Dqn_Fs_Move(Dqn_String8 src, Dqn_String8 dest, bool overwrite)
     if (file_moved)
         result = (unlink(src.data) != -1); // Remove original file
 
-#else
+    #else
     #error Unimplemented
-
-#endif
+    #endif
     return result;
 }
 
 DQN_API bool Dqn_Fs_Delete(Dqn_String8 path)
 {
     bool result = false;
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     wchar_t path16[DQN_OS_WIN32_MAX_PATH];
     int path16_size = Dqn_Win_String8ToCString16(path, path16, DQN_ARRAY_ICOUNT(path16));
     if (path16_size) {
@@ -673,18 +512,16 @@ DQN_API bool Dqn_Fs_Delete(Dqn_String8 path)
         if (!result)
             result = RemoveDirectoryW(path16);
     }
-#elif defined(DQN_OS_UNIX)
+    #elif defined(DQN_OS_UNIX)
     result = remove(path.data) == 0;
-#else
+    #else
     #error Unimplemented
-#endif
-
+    #endif
     return result;
 }
 
-// NOTE: Read/Write Entire File API
-// =============================================================================
-DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator)
+// NOTE: R/W Entire File ===========================================================================
+DQN_API char *Dqn_Fs_ReadCString8(char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator)
 {
     char *result = nullptr;
     if (!path)
@@ -696,7 +533,7 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
     (void)allocator;
     (void)file_size;
 
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     // NOTE: Convert to UTF16
     // -------------------------------------------------------------------------
     Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(allocator.user_context);
@@ -737,10 +574,10 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
 
     // NOTE: Read the file from disk
     // -------------------------------------------------------------------------
-    result = DQN_CAST(char *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE_ARG allocator,
-                                                  bytes_desired,
-                                                  alignof(char),
-                                                  Dqn_ZeroMem_No);
+    result = DQN_CAST(char *)Dqn_Allocator_Alloc(allocator,
+                                                 bytes_desired,
+                                                 alignof(char),
+                                                 Dqn_ZeroMem_No);
     unsigned long bytes_read    = 0;
     unsigned long read_result   = ReadFile(/*HANDLE hFile*/               file_handle,
                                            /*LPVOID lpBuffer*/            result,
@@ -769,7 +606,7 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
     if (file_size) {
         *file_size = Dqn_Safe_SaturateCastI64ToISize(bytes_read);
     }
-#else
+    #else
     Dqn_usize file_size_ = 0;
     if (!file_size)
         file_size = &file_size_;
@@ -790,7 +627,7 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
     }
 
     rewind(file_handle);
-    result = DQN_CAST(char *)Dqn_Allocator_Alloc(DQN_LEAK_TRACE_ARG allocator,
+    result = DQN_CAST(char *)Dqn_Allocator_Alloc(allocator,
                                                  *file_size,
                                                  alignof(char),
                                                  Dqn_ZeroMem_No);
@@ -805,14 +642,14 @@ DQN_API char *Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_FUNCTION char const *path, Dqn
         Dqn_Log_ErrorF("Failed to read %td bytes into buffer from '%s'\n", *file_size, file);
         return result;
     }
-#endif
+    #endif
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Fs_ReadString8_(DQN_LEAK_TRACE_FUNCTION Dqn_String8 path, Dqn_Allocator allocator)
+DQN_API Dqn_String8 Dqn_Fs_Read(Dqn_String8 path, Dqn_Allocator allocator)
 {
     Dqn_usize   file_size = 0;
-    char *      string    = Dqn_Fs_ReadCString8_(DQN_LEAK_TRACE_ARG path.data, path.size, &file_size, allocator);
+    char *      string    = Dqn_Fs_ReadCString8(path.data, path.size, &file_size, allocator);
     Dqn_String8 result    = Dqn_String8_Init(string, file_size);
     return result;
 }
@@ -823,7 +660,7 @@ DQN_API bool Dqn_Fs_WriteCString8(char const *path, Dqn_usize path_size, char co
     if (!path || !buffer || buffer_size <= 0)
         return result;
 
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     if (path_size <= 0)
         path_size = Dqn_CString8_Size(path);
 
@@ -849,7 +686,7 @@ DQN_API bool Dqn_Fs_WriteCString8(char const *path, Dqn_usize path_size, char co
     result                      = WriteFile(file_handle, buffer, DQN_CAST(unsigned long)buffer_size, &bytes_written, nullptr /*lpOverlapped*/);
     DQN_ASSERT(bytes_written == buffer_size);
     return result;
-#else
+    #else
     // TODO(dqn): Use OS apis
     (void)path_size;
 
@@ -866,17 +703,16 @@ DQN_API bool Dqn_Fs_WriteCString8(char const *path, Dqn_usize path_size, char co
         Dqn_Log_ErrorF("Failed to 'fwrite' memory to file [file=%s]", path);
 
     return result;
-#endif
+    #endif
 }
 
-DQN_API bool Dqn_Fs_WriteString8(Dqn_String8 file_path, Dqn_String8 buffer)
+DQN_API bool Dqn_Fs_Write(Dqn_String8 file_path, Dqn_String8 buffer)
 {
     bool result = Dqn_Fs_WriteCString8(file_path.data, file_path.size, buffer.data, buffer.size);
     return result;
 }
 
-// NOTE: Read/Write File Stream API
-// =============================================================================
+// NOTE: R/W Stream API ============================================================================
 DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access)
 {
     Dqn_FsFile result = {};
@@ -1031,6 +867,7 @@ DQN_API void Dqn_Fs_CloseFile(Dqn_FsFile *file)
     #endif
     *file = {};
 }
+#endif // !defined(DQN_NO_FS)
 
 DQN_API bool Dqn_FsPath_AddRef(Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String8 path)
 {
@@ -1046,7 +883,7 @@ DQN_API bool Dqn_FsPath_AddRef(Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String
     };
     for (;;) {
         Dqn_String8BinarySplitResult delimiter = Dqn_String8_BinarySplitArray(path, delimiter_array, DQN_ARRAY_UCOUNT(delimiter_array));
-        for (; delimiter.lhs.data; delimiter = Dqn_String8_BinarySplitArray(delimiter.rhs, delimiter_array, DQN_ARRAY_UCOUNT(delimiter_array))) {
+        for (; delimiter.lhs.data; delimiter   = Dqn_String8_BinarySplitArray(delimiter.rhs, delimiter_array, DQN_ARRAY_UCOUNT(delimiter_array))) {
             if (delimiter.lhs.size <= 0)
                 continue;
 
@@ -1080,6 +917,16 @@ DQN_API bool Dqn_FsPath_Add(Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String8 p
     return result;
 }
 
+DQN_API bool Dqn_FsPath_AddF(Dqn_Arena *arena, Dqn_FsPath *fs_path, char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_String8 path = Dqn_String8_InitFV(Dqn_Arena_Allocator(arena), fmt, args);
+    va_end(args);
+    bool result = Dqn_FsPath_AddRef(arena, fs_path, path);
+    return result;
+}
+
 DQN_API bool Dqn_FsPath_Pop(Dqn_FsPath *fs_path)
 {
     if (!fs_path)
@@ -1102,11 +949,22 @@ DQN_API bool Dqn_FsPath_Pop(Dqn_FsPath *fs_path)
     return true;
 }
 
-DQN_API Dqn_String8 Dqn_FsPath_ConvertString8(Dqn_Arena *arena, Dqn_String8 path)
+DQN_API Dqn_String8 Dqn_FsPath_Convert(Dqn_Arena *arena, Dqn_String8 path)
 {
     Dqn_FsPath fs_path = {};
     Dqn_FsPath_AddRef(arena, &fs_path, path);
     Dqn_String8 result = Dqn_FsPath_Build(arena, &fs_path);
+    return result;
+}
+
+DQN_API Dqn_String8 Dqn_FsPath_ConvertF(Dqn_Arena *arena, char const *fmt, ...)
+{
+    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(arena);
+    va_list args;
+    va_start(args, fmt);
+    Dqn_String8 path = Dqn_String8_InitFV(scratch.allocator, fmt, args);
+    va_end(args);
+    Dqn_String8 result = Dqn_FsPath_Convert(arena, path);
     return result;
 }
 
@@ -1235,6 +1093,7 @@ DQN_API uint64_t Dqn_Date_EpochTime()
 }
 
 #if defined(DQN_OS_WIN32)
+#if !defined(DQN_NO_WIN)
 // NOTE: [$WIND] Dqn_Win ===========================================================================
 DQN_API void Dqn_Win_LastErrorToBuffer(Dqn_WinErrorMsg *msg)
 {
@@ -1416,7 +1275,7 @@ DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena)
 
     Dqn_String16 result = {};
     if (dir_size > 0) {
-        result.data = Dqn_Arena_CopyZ(arena, wchar_t, dir, dir_size);
+        result.data = Dqn_Arena_NewCopyZ(arena, wchar_t, dir, dir_size);
         if (result.data) {
             result.size = dir_size;
         }
@@ -1554,8 +1413,9 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_String8 path, Dqn_Win_FolderIterator *it)
 
     return result;
 }
+#endif // !defined(DQN_NO_WIN)
 
-#if !defined(DQN_NO_WIN_NET)
+#if !defined(DQN_NO_WINNET)
 // NOTE: [$WINN] Dqn_WinNet ========================================================================
 DQN_API Dqn_WinNetHandle Dqn_Win_NetHandleInitCString(char const *url, int url_size)
 {
@@ -1792,7 +1652,7 @@ DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest(Dqn_WinNetHandle *
             DQN_ASSERT(!found_content_length);
             if (!found_content_length) {
                 found_content_length = true;
-                result.content_length = Dqn_String8_ToU64(value, 0 /*separator*/);
+                result.content_length = Dqn_String8_ToU64(value, 0 /*separator*/).value;
             }
         }
 
@@ -1962,23 +1822,23 @@ DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
 
 #if defined(DQN_OS_WIN32)
     bool init = true;
-    Dqn_TicketMutex_Begin(&dqn_library.win32_bcrypt_rng_mutex);
-    if (!dqn_library.win32_bcrypt_rng_handle)
+    Dqn_TicketMutex_Begin(&g_dqn_library->win32_bcrypt_rng_mutex);
+    if (!g_dqn_library->win32_bcrypt_rng_handle)
     {
         wchar_t const BCRYPT_ALGORITHM[] = L"RNG";
-        long /*NTSTATUS*/ init_status = BCryptOpenAlgorithmProvider(&dqn_library.win32_bcrypt_rng_handle, BCRYPT_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
-        if (!dqn_library.win32_bcrypt_rng_handle || init_status != 0)
+        long /*NTSTATUS*/ init_status = BCryptOpenAlgorithmProvider(&g_dqn_library->win32_bcrypt_rng_handle, BCRYPT_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
+        if (!g_dqn_library->win32_bcrypt_rng_handle || init_status != 0)
         {
             Dqn_Log_ErrorF("Failed to initialise random number generator, error: %d", init_status);
             init = false;
         }
     }
-    Dqn_TicketMutex_End(&dqn_library.win32_bcrypt_rng_mutex);
+    Dqn_TicketMutex_End(&g_dqn_library->win32_bcrypt_rng_mutex);
 
     if (!init)
         return false;
 
-    long gen_status = BCryptGenRandom(dqn_library.win32_bcrypt_rng_handle, DQN_CAST(unsigned char *)buffer, size, 0 /*flags*/);
+    long gen_status = BCryptGenRandom(g_dqn_library->win32_bcrypt_rng_handle, DQN_CAST(unsigned char *)buffer, size, 0 /*flags*/);
     if (gen_status != 0)
     {
         Dqn_Log_ErrorF("Failed to generate random bytes: %d", gen_status);
@@ -2003,17 +1863,16 @@ DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
     return true;
 }
 
+#if (defined(DQN_OS_WIN32) && !defined(DQN_NO_WIN)) || !defined(DQN_OS_WIN32)
 DQN_API Dqn_String8 Dqn_OS_EXEDir(Dqn_Allocator allocator)
 {
     Dqn_String8 result = {};
 
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     wchar_t exe_dir[DQN_OS_WIN32_MAX_PATH];
     Dqn_usize exe_dir_size = Dqn_Win_EXEDirW(exe_dir, DQN_ARRAY_ICOUNT(exe_dir));
     result = Dqn_Win_CString16ToString8Allocator(exe_dir, DQN_CAST(int)exe_dir_size, allocator);
-
-#elif defined(DQN_OS_UNIX)
-
+    #elif defined(DQN_OS_UNIX)
     int required_size_wo_null_terminator = 0;
     for (int try_size = 128;
          ;
@@ -2084,43 +1943,43 @@ DQN_API Dqn_String8 Dqn_OS_EXEDir(Dqn_Allocator allocator)
             result = Dqn_String8_Init(exe_path, required_size_wo_null_terminator);
         }
     }
-
-#else
+    #else
     #error Unimplemented
-#endif
-
+    #endif
     return result;
 }
+#endif
 
 DQN_API void Dqn_OS_SleepMs(Dqn_uint milliseconds)
 {
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     Sleep(milliseconds);
-#else
+    #else
     struct timespec ts;
     ts.tv_sec  = milliseconds / 1000;
     ts.tv_nsec = (milliseconds % 1000) * 1'000'000;
     nanosleep(&ts, nullptr);
-#endif
+    #endif
 }
 
 DQN_FILE_SCOPE void Dqn_OS_PerfCounter_Init()
 {
-#if defined(DQN_OS_WIN32)
-    if (dqn_library.win32_qpc_frequency.QuadPart == 0)
-        QueryPerformanceFrequency(&dqn_library.win32_qpc_frequency);
-#endif
+    // TODO(doyle): Move this to Dqn_Library_Init
+    #if defined(DQN_OS_WIN32)
+    if (g_dqn_library->win32_qpc_frequency.QuadPart == 0)
+        QueryPerformanceFrequency(&g_dqn_library->win32_qpc_frequency);
+    #endif
 }
 
 DQN_API Dqn_f64 Dqn_OS_PerfCounterS(uint64_t begin, uint64_t end)
 {
     Dqn_OS_PerfCounter_Init();
     uint64_t ticks  = end - begin;
-#if defined(DQN_OS_WIN32)
-    Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)dqn_library.win32_qpc_frequency.QuadPart;
-#else
+    #if defined(DQN_OS_WIN32)
+    Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)g_dqn_library->win32_qpc_frequency.QuadPart;
+    #else
     Dqn_f64 result = ticks / 1'000'000'000;
-#endif
+    #endif
     return result;
 }
 
@@ -2128,11 +1987,11 @@ DQN_API Dqn_f64 Dqn_OS_PerfCounterMs(uint64_t begin, uint64_t end)
 {
     Dqn_OS_PerfCounter_Init();
     uint64_t ticks  = end - begin;
-#if defined(DQN_OS_WIN32)
-    Dqn_f64 result = (ticks * 1'000) / DQN_CAST(Dqn_f64)dqn_library.win32_qpc_frequency.QuadPart;
-#else
+    #if defined(DQN_OS_WIN32)
+    Dqn_f64 result = (ticks * 1'000) / DQN_CAST(Dqn_f64)g_dqn_library->win32_qpc_frequency.QuadPart;
+    #else
     Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)1'000'000;
-#endif
+    #endif
     return result;
 }
 
@@ -2140,11 +1999,11 @@ DQN_API Dqn_f64 Dqn_OS_PerfCounterMicroS(uint64_t begin, uint64_t end)
 {
     Dqn_OS_PerfCounter_Init();
     uint64_t ticks  = end - begin;
-#if defined(DQN_OS_WIN32)
-    Dqn_f64 result = (ticks * 1'000'000) / DQN_CAST(Dqn_f64)dqn_library.win32_qpc_frequency.QuadPart;
-#else
+    #if defined(DQN_OS_WIN32)
+    Dqn_f64 result = (ticks * 1'000'000) / DQN_CAST(Dqn_f64)g_dqn_library->win32_qpc_frequency.QuadPart;
+    #else
     Dqn_f64 result = ticks / DQN_CAST(Dqn_f64)1'000;
-#endif
+    #endif
     return result;
 }
 
@@ -2152,28 +2011,41 @@ DQN_API Dqn_f64 Dqn_OS_PerfCounterNs(uint64_t begin, uint64_t end)
 {
     Dqn_OS_PerfCounter_Init();
     uint64_t ticks  = end - begin;
-#if defined(DQN_OS_WIN32)
-    Dqn_f64 result = (ticks * 1'000'000'000) / DQN_CAST(Dqn_f64)dqn_library.win32_qpc_frequency.QuadPart;
-#else
+    #if defined(DQN_OS_WIN32)
+    Dqn_f64 result = (ticks * 1'000'000'000) / DQN_CAST(Dqn_f64)g_dqn_library->win32_qpc_frequency.QuadPart;
+    #else
     Dqn_f64 result = ticks;
-#endif
+    #endif
+    return result;
+}
+
+DQN_API uint64_t Dqn_OS_PerfCounterFrequency()
+{
+    uint64_t result = 0;
+    #if defined(DQN_OS_WIN32)
+    LARGE_INTEGER integer = {};
+    QueryPerformanceFrequency(&integer);
+    result = integer.QuadPart;
+    #else
+    // NOTE: On Linux we use clock_gettime(CLOCK_MONOTONIC_RAW) which
+    // increments at nanosecond granularity.
+    result = 1'000'000'000;
+    #endif
     return result;
 }
 
 DQN_API uint64_t Dqn_OS_PerfCounterNow()
 {
     uint64_t result = 0;
-#if defined(DQN_OS_WIN32)
+    #if defined(DQN_OS_WIN32)
     LARGE_INTEGER integer = {};
-    int qpc_result = QueryPerformanceCounter(&integer);
-    (void)qpc_result;
-    DQN_ASSERTF(qpc_result, "MSDN says this can only fail when running on a version older than Windows XP");
+    QueryPerformanceCounter(&integer);
     result = integer.QuadPart;
-#else
+    #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     result = DQN_CAST(uint64_t)ts.tv_sec * 1'000'000'000 + DQN_CAST(uint64_t)ts.tv_nsec;
-#endif
+    #endif
 
     return result;
 }
@@ -2212,5 +2084,98 @@ DQN_API Dqn_f64 Dqn_OS_TimerNs(Dqn_OSTimer timer)
 {
     Dqn_f64 result = Dqn_OS_PerfCounterNs(timer.start, timer.end);
     return result;
+}
+
+DQN_API uint64_t Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_frequency)
+{
+    uint64_t os_frequency      = Dqn_OS_PerfCounterFrequency();
+    uint64_t os_target_elapsed = duration_ms_to_gauge_tsc_frequency * os_frequency / 1000ULL;
+    uint64_t tsc_begin         = Dqn_CPU_TSC();
+    uint64_t os_elapsed        = 0;
+    for (uint64_t os_begin = Dqn_OS_PerfCounterNow(); os_elapsed < os_target_elapsed; )
+        os_elapsed = Dqn_OS_PerfCounterNow() - os_begin;
+    uint64_t tsc_end     = Dqn_CPU_TSC();
+    uint64_t tsc_elapsed = tsc_end - tsc_begin;
+    uint64_t result      = tsc_elapsed / os_elapsed * os_frequency;
+    return result;
+}
+
+// NOTE: [$TCTX] Dqn_ThreadContext =================================================================
+Dqn_ThreadScratch::Dqn_ThreadScratch(Dqn_ThreadContext *context, uint8_t context_index)
+{
+    index       = context_index;
+    allocator   = context->temp_allocators[index];
+    arena       = context->temp_arenas[index];
+    temp_memory = Dqn_Arena_BeginTempMemory(arena);
+}
+
+Dqn_ThreadScratch::~Dqn_ThreadScratch()
+{
+    #if defined(DQN_DEBUG_THREAD_CONTEXT)
+    temp_arenas_stat[index] = arena->stats;
+    #endif
+    DQN_ASSERT(destructed == false);
+    Dqn_Arena_EndTempMemory(temp_memory, /*cancel*/ false);
+    destructed = true;
+}
+
+DQN_API uint32_t Dqn_Thread_GetID()
+{
+    #if defined(DQN_OS_WIN32)
+    unsigned long result = GetCurrentThreadId();
+    #else
+    pid_t result = gettid();
+    assert(gettid() >= 0);
+    #endif
+    return (uint32_t)result;
+}
+
+DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext()
+{
+    DQN_THREAD_LOCAL Dqn_ThreadContext result = {};
+    if (!result.init) {
+        result.init = true;
+        DQN_ASSERTF(g_dqn_library->lib_init, "Library must be initialised by calling Dqn_Library_Init(nullptr)");
+
+        // NOTE: Setup permanent arena
+        Dqn_ArenaCatalog *catalog = &g_dqn_library->arena_catalog;
+        result.allocator          = Dqn_Arena_Allocator(result.arena);
+        result.arena              = Dqn_ArenaCatalog_AllocF(catalog,
+                                                            DQN_GIGABYTES(1) /*size*/,
+                                                            DQN_KILOBYTES(64) /*commit*/,
+                                                            "Thread %u Arena",
+                                                            Dqn_Thread_GetID());
+
+        // NOTE: Setup temporary arenas
+        for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
+            result.temp_arenas[index]     = Dqn_ArenaCatalog_AllocF(catalog,
+                                                                    DQN_GIGABYTES(1) /*size*/,
+                                                                    DQN_KILOBYTES(64) /*commit*/,
+                                                                    "Thread %u Temp Arena %u",
+                                                                    Dqn_Thread_GetID(),
+                                                                    index);
+            result.temp_allocators[index] = Dqn_Arena_Allocator(result.temp_arenas[index]);
+        }
+    }
+    return &result;
+}
+
+// TODO: Is there a way to handle conflict arenas without the user needing to
+// manually pass it in?
+DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch(void const *conflict_arena)
+{
+    static_assert(DQN_THREAD_CONTEXT_ARENAS < (uint8_t)-1, "We use UINT8_MAX as a sentinel value");
+    Dqn_ThreadContext *context = Dqn_Thread_GetContext();
+    uint8_t context_index      = (uint8_t)-1;
+    for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
+        Dqn_Arena *arena = context->temp_arenas[index];
+        if (!conflict_arena || arena != conflict_arena) {
+            context_index = index;
+            break;
+        }
+    }
+
+    DQN_ASSERT(context_index != (uint8_t)-1);
+    return Dqn_ThreadScratch(context, context_index);
 }
 

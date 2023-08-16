@@ -32,189 +32,134 @@
 #define DQN_UTEST_IMPLEMENTATION
 #include "dqn_utest.h"
 
-enum Guard {
-    Guard_None,
-    Guard_UseAfterFree,
-    Guard_Count,
-};
-
-static Dqn_String8 ArenaGuardTestSuffix(uint32_t guard)
-{
-    Dqn_String8 result = {};
-    switch (guard) {
-        case Guard_None:         result = DQN_STRING8(" ");      break;
-        case Guard_UseAfterFree: result = DQN_STRING8(" [UAF]"); break;
-    }
-    return result;
-}
-
 Dqn_UTest TestArena()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Arena") {
-        for (Dqn_usize guard = 0; guard < Guard_Count; guard++) {
-            Dqn_String8 test_suffix = ArenaGuardTestSuffix(guard);
-            DQN_UTEST_TEST("Reused memory is zeroed out%.*s", DQN_STRING_FMT(test_suffix)) {
-                Dqn_Arena arena            = {};
-                arena.use_after_free_guard = guard == Guard_UseAfterFree;
-
-                // NOTE: Allocate 128 kilobytes, fill it with garbage, then reset the arena
-                Dqn_usize size              = DQN_KILOBYTES(128);
-                uintptr_t first_ptr_address = 0;
-                {
-                    Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
-                    void *ptr         = Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
-                    first_ptr_address = DQN_CAST(uintptr_t)ptr;
-                    DQN_MEMSET(ptr, 'z', size);
-                    Dqn_Arena_EndTempMemory(temp_mem);
-                }
-
-                // NOTE: Reallocate 128 kilobytes
-                char *ptr = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
-
-                // NOTE: Double check we got the same pointer
-                DQN_UTEST_ASSERT(&test, first_ptr_address == DQN_CAST(uintptr_t)ptr);
-
-                // NOTE: Check that the bytes are set to 0
-                for (Dqn_usize i = 0; i < size; i++)
-                    DQN_UTEST_ASSERT(&test, ptr[i] == 0);
-                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
-            }
+        DQN_UTEST_TEST("Grow arena, reserve 4k, commit 1k (e.g. different sizes)") {
+            Dqn_Arena arena = {};
+            Dqn_Arena_Grow(&arena, DQN_KILOBYTES(4), DQN_KILOBYTES(1), /*flags*/ 0);
+            Dqn_Arena_Free(&arena);
         }
 
-        for (Dqn_usize guard = 0; guard < Guard_Count; guard++) {
-            Dqn_String8 test_suffix = ArenaGuardTestSuffix(guard);
-            DQN_UTEST_TEST("Test arena grows naturally, 1mb + 4mb%.*s", DQN_STRING_FMT(test_suffix)) {
-                Dqn_Arena arena            = {};
-                arena.use_after_free_guard = guard == Guard_UseAfterFree;
+        DQN_UTEST_TEST("Reused memory is zeroed out") {
 
-                // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
-                char *ptr_1mb = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
-                char *ptr_4mb = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(4), 1 /*align*/, Dqn_ZeroMem_Yes);
-                DQN_UTEST_ASSERT(&test, ptr_1mb);
+            Dqn_usize size  = DQN_KILOBYTES(128);
+            Dqn_Arena arena = {};
+            Dqn_Arena_Grow(&arena, size, /*commit*/ size, /*flags*/ 0);
+
+            // NOTE: Allocate 128 kilobytes, fill it with garbage, then reset the arena
+            uintptr_t first_ptr_address = 0;
+            {
+                Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
+                void *ptr         = Dqn_Arena_Alloc(&arena, size, 1, Dqn_ZeroMem_Yes);
+                first_ptr_address = DQN_CAST(uintptr_t)ptr;
+                DQN_MEMSET(ptr, 'z', size);
+                Dqn_Arena_EndTempMemory(temp_mem, false /*cancel*/);
+            }
+
+            // NOTE: Reallocate 128 kilobytes
+            char *ptr = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, size, 1, Dqn_ZeroMem_Yes);
+
+            // NOTE: Double check we got the same pointer
+            DQN_UTEST_ASSERT(&test, first_ptr_address == DQN_CAST(uintptr_t)ptr);
+
+            // NOTE: Check that the bytes are set to 0
+            for (Dqn_usize i = 0; i < size; i++)
+                DQN_UTEST_ASSERT(&test, ptr[i] == 0);
+            Dqn_Arena_Free(&arena);
+        }
+
+        DQN_UTEST_TEST("Test arena grows naturally, 1mb + 4mb") {
+            Dqn_Arena arena = {};
+
+            // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
+            char *ptr_1mb = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
+            char *ptr_4mb = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(4), 1 /*align*/, Dqn_ZeroMem_Yes);
+            DQN_UTEST_ASSERT(&test, ptr_1mb);
+            DQN_UTEST_ASSERT(&test, ptr_4mb);
+
+            Dqn_MemBlock const *block_1mb       = arena.head;
+            char         const *block_1mb_begin = DQN_CAST(char *)block_1mb->data;
+            char         const *block_1mb_end   = DQN_CAST(char *)block_1mb->data + block_1mb->size;
+
+            Dqn_MemBlock const *block_4mb       = arena.curr;
+            char         const *block_4mb_begin = DQN_CAST(char *)block_4mb->data;
+            char         const *block_4mb_end   = DQN_CAST(char *)block_4mb->data + block_4mb->size;
+
+            DQN_UTEST_ASSERTF(&test, block_1mb != block_4mb,                                 "New block should have been allocated and linked");
+            DQN_UTEST_ASSERTF(&test, ptr_1mb >= block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
+            DQN_UTEST_ASSERTF(&test, ptr_4mb >= block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
+            DQN_UTEST_ASSERT (&test, arena.curr == arena.tail);
+            DQN_UTEST_ASSERT (&test, arena.curr != arena.head);
+
+            Dqn_Arena_Free(&arena);
+        }
+
+        DQN_UTEST_TEST("Test arena grows naturally, 1mb, temp memory 4mb") {
+            Dqn_Arena arena = {};
+
+            // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
+            char *ptr_1mb = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
+            DQN_UTEST_ASSERT(&test, ptr_1mb);
+
+            Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
+            {
+                char *ptr_4mb = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(4), 1 /*align*/, Dqn_ZeroMem_Yes);
                 DQN_UTEST_ASSERT(&test, ptr_4mb);
 
-                Dqn_ArenaBlock const *block_1mb       = arena.head;
-                char           const *block_1mb_begin = DQN_CAST(char *)block_1mb->memory;
-                char           const *block_1mb_end   = DQN_CAST(char *)block_1mb->memory + block_1mb->size;
+                Dqn_MemBlock const *block_1mb       = arena.head;
+                char         const *block_1mb_begin = DQN_CAST(char *)block_1mb->data;
+                char         const *block_1mb_end   = DQN_CAST(char *)block_1mb->data + block_1mb->size;
 
-                Dqn_ArenaBlock const *block_4mb       = arena.curr;
-                char           const *block_4mb_begin = DQN_CAST(char *)block_4mb->memory;
-                char           const *block_4mb_end   = DQN_CAST(char *)block_4mb->memory + block_4mb->size;
+                Dqn_MemBlock const *block_4mb       = arena.curr;
+                char         const *block_4mb_begin = DQN_CAST(char *)block_4mb->data;
+                char         const *block_4mb_end   = DQN_CAST(char *)block_4mb->data + block_4mb->size;
 
                 DQN_UTEST_ASSERTF(&test, block_1mb != block_4mb,                                 "New block should have been allocated and linked");
                 DQN_UTEST_ASSERTF(&test, ptr_1mb >= block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
                 DQN_UTEST_ASSERTF(&test, ptr_4mb >= block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
                 DQN_UTEST_ASSERT (&test, arena.curr == arena.tail);
                 DQN_UTEST_ASSERT (&test, arena.curr != arena.head);
-
-                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
             }
+            Dqn_Arena_EndTempMemory(temp_memory, false /*cancel*/);
+
+            DQN_UTEST_ASSERT (&test, arena.curr       == arena.head);
+            DQN_UTEST_ASSERT (&test, arena.curr       == arena.tail);
+            DQN_UTEST_ASSERT (&test, arena.curr->next == nullptr);
+            DQN_UTEST_ASSERTF(&test, arena.curr->size >= DQN_MEGABYTES(1),
+                               "size=%zuMiB (%zuB), expect=%zuB", (arena.curr->size / 1024 / 1024), arena.curr->size, DQN_MEGABYTES(1));
+
+            Dqn_Arena_Free(&arena);
         }
 
-        for (Dqn_usize guard = 0; guard < Guard_Count; guard++) {
-            Dqn_String8 test_suffix = ArenaGuardTestSuffix(guard);
-            DQN_UTEST_TEST("Test arena grows naturally, 1mb, temp memory 4mb%.*s", DQN_STRING_FMT(test_suffix)) {
-                Dqn_Arena arena            = {};
-                arena.use_after_free_guard = guard == Guard_UseAfterFree;
+        DQN_UTEST_TEST("Init arena, temp region then free inside regions") {
+            Dqn_Arena arena = {};
+            Dqn_Arena_Grow(&arena, DQN_KILOBYTES(1), 0, Dqn_ZeroMem_No);
 
-                // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
-                char *ptr_1mb = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
-                DQN_UTEST_ASSERT(&test, ptr_1mb);
-
-                Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
-                {
-                    char *ptr_4mb = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(4), 1 /*align*/, Dqn_ZeroMem_Yes);
-                    DQN_UTEST_ASSERT(&test, ptr_4mb);
-
-                    Dqn_ArenaBlock const *block_1mb       = arena.head;
-                    char           const *block_1mb_begin = DQN_CAST(char *)block_1mb->memory;
-                    char           const *block_1mb_end   = DQN_CAST(char *)block_1mb->memory + block_1mb->size;
-
-                    Dqn_ArenaBlock const *block_4mb       = arena.curr;
-                    char           const *block_4mb_begin = DQN_CAST(char *)block_4mb->memory;
-                    char           const *block_4mb_end   = DQN_CAST(char *)block_4mb->memory + block_4mb->size;
-
-                    DQN_UTEST_ASSERTF(&test, block_1mb != block_4mb,                                 "New block should have been allocated and linked");
-                    DQN_UTEST_ASSERTF(&test, ptr_1mb >= block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
-                    DQN_UTEST_ASSERTF(&test, ptr_4mb >= block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
-                    DQN_UTEST_ASSERT (&test, arena.curr == arena.tail);
-                    DQN_UTEST_ASSERT (&test, arena.curr != arena.head);
-                }
-                Dqn_Arena_EndTempMemory(temp_memory);
-
-                DQN_UTEST_ASSERT (&test, arena.curr       == arena.head);
-                DQN_UTEST_ASSERT (&test, arena.curr       == arena.tail);
-                DQN_UTEST_ASSERT (&test, arena.curr->next == nullptr);
-                DQN_UTEST_ASSERTF(&test, arena.curr->size >= DQN_MEGABYTES(1),
-                                   "size=%zuMiB (%zuB), expect=%zuB", (arena.curr->size / 1024 / 1024), arena.curr->size, DQN_MEGABYTES(1));
-
-                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
+            Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
+            {
+                char *ptr = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
+                DQN_UTEST_ASSERT(&test, ptr);
+                Dqn_Arena_Free(&arena);
             }
+            Dqn_Arena_EndTempMemory(temp_memory, false /*cancel*/);
+            Dqn_Arena_Free(&arena);
         }
 
-        for (Dqn_usize guard = 0; guard < Guard_Count; guard++) {
-            Dqn_String8 test_suffix = ArenaGuardTestSuffix(guard);
-            DQN_UTEST_TEST("Zero init arena, temp region then free inside region%.*s", DQN_STRING_FMT(test_suffix)) {
-                Dqn_Arena arena            = {};
-                arena.use_after_free_guard = guard == Guard_UseAfterFree;
-                Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
-                {
-                    char *ptr = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
-                    DQN_UTEST_ASSERT(&test, ptr);
-                    Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
-                }
-                Dqn_Arena_EndTempMemory(temp_memory);
-                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
+        DQN_UTEST_TEST("Init arena, allocate, temp region then free inside region") {
+            Dqn_Arena arena = {};
+            char *outside   = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
+            DQN_UTEST_ASSERT(&test, outside);
+
+            Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
+            {
+                char *inside = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(2), 1 /*align*/, Dqn_ZeroMem_Yes);
+                DQN_UTEST_ASSERT(&test, inside);
+                Dqn_Arena_Free(&arena);
             }
-        }
-
-        for (Dqn_usize guard = 0; guard < Guard_Count; guard++) {
-            Dqn_String8 test_suffix = ArenaGuardTestSuffix(guard);
-            DQN_UTEST_TEST("Zero init arena, allocate, temp region then free inside region%.*s", DQN_STRING_FMT(test_suffix)) {
-                Dqn_Arena arena            = {};
-                arena.use_after_free_guard = guard == Guard_UseAfterFree;
-
-                char *outside = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
-                DQN_UTEST_ASSERT(&test, outside);
-
-                Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
-                {
-                    char *inside = DQN_CAST(char *)Dqn_Arena_Allocate(&arena, DQN_MEGABYTES(2), 1 /*align*/, Dqn_ZeroMem_Yes);
-                    DQN_UTEST_ASSERT(&test, inside);
-                    Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
-                }
-                Dqn_Arena_EndTempMemory(temp_memory);
-                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
-            }
-        }
-
-        Dqn_usize sizes[] = {DQN_KILOBYTES(1), DQN_KILOBYTES(4), DQN_KILOBYTES(5)};
-        for (Dqn_usize size : sizes) {
-            DQN_UTEST_TEST("Use-after-free guard on %.1f KiB allocation", size / 1024.0) {
-                Dqn_Arena arena            = {};
-                arena.use_after_free_guard = true;
-                Dqn_Arena_Grow(&arena, size, false /*commit*/, 0 /*flags*/);
-
-                // NOTE: Wrap in temp memory, allocate and write
-                Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
-                uintptr_t first_ptr_address  = 0;
-                void *ptr                    = Dqn_Arena_Allocate(&arena, size, 1, Dqn_ZeroMem_Yes);
-                DQN_MEMSET(ptr, 'z', size);
-                Dqn_Arena_EndTempMemory(temp_mem);
-
-                // NOTE: Temp memory is ended, try and write the pointer
-                // we should trigger the use-after-free guard.
-                bool caught = false;
-                __try {
-                    DQN_MEMSET(ptr, 'a', size);
-                } __except (1) {
-                    caught = true;
-                }
-
-                DQN_UTEST_ASSERTF(&test, caught, "Exception was not triggered, was page protected properly?");
-                Dqn_Arena_Free(&arena, Dqn_ZeroMem_No);
-            }
+            Dqn_Arena_EndTempMemory(temp_memory, false /*cancel*/);
+            Dqn_Arena_Free(&arena);
         }
     }
     return test;
@@ -483,7 +428,7 @@ Dqn_UTest TestDSMap()
         Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
         {
             uint32_t const MAP_SIZE = 64;
-            Dqn_DSMap<uint64_t>  map      = Dqn_DSMap_Init<uint64_t>(MAP_SIZE);
+            Dqn_DSMap<uint64_t> map = Dqn_DSMap_Init<uint64_t>(MAP_SIZE);
             DQN_DEFER { Dqn_DSMap_Deinit(&map); };
 
             DQN_UTEST_TEST("Find non-existent value") {
@@ -524,7 +469,7 @@ Dqn_UTest TestDSMap()
                 case DSMapTestType_MakeSlot: prefix = DQN_STRING8("Make slot"); break;
             }
 
-            DQN_ARENA_TEMP_MEMORY_SCOPE(scratch.arena);
+            Dqn_Arena_TempMemoryScope(scratch.arena);
             uint32_t const MAP_SIZE = 64;
             Dqn_DSMap<uint64_t>  map      = Dqn_DSMap_Init<uint64_t>(MAP_SIZE);
             DQN_DEFER { Dqn_DSMap_Deinit(&map); };
@@ -534,7 +479,7 @@ Dqn_UTest TestDSMap()
                 uint64_t value          = 0;
                 uint64_t grow_threshold = map_start_size * 3 / 4;
                 for (; map.occupied != grow_threshold; value++) {
-                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     DQN_UTEST_ASSERT(&test, !Dqn_DSMap_Find<uint64_t>(&map, key));
                     DQN_UTEST_ASSERT(&test, !Dqn_DSMap_FindSlot<uint64_t>(&map, key));
@@ -553,7 +498,7 @@ Dqn_UTest TestDSMap()
                 DQN_UTEST_ASSERT(&test, map.occupied     == 1 /*Sentinel*/ + value);
 
                 { // NOTE: One more item should cause the table to grow by 2x
-                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     bool found         = false;
                     if (test_type == DSMapTestType_Set) {
@@ -603,7 +548,7 @@ Dqn_UTest TestDSMap()
                 uint64_t value              = 0;
                 uint64_t shrink_threshold   = map.size * 1 / 4;
                 for (; map.occupied != shrink_threshold; value++) {
-                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
 
                     DQN_UTEST_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key));
@@ -616,7 +561,7 @@ Dqn_UTest TestDSMap()
                 DQN_UTEST_ASSERT(&test, map.occupied == start_map_occupied - value);
 
                 { // NOTE: One more item should cause the table to grow by 2x
-                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     Dqn_DSMap_Erase(&map, key);
                     value++;
@@ -655,7 +600,7 @@ Dqn_UTest TestDSMap()
                 }
 
                 for (; map.occupied != 1; value++) { // NOTE: Remove all items from the table
-                    uint64_t *val_copy = Dqn_Arena_Copy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     DQN_UTEST_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key));
                     Dqn_DSMap_Erase(&map, key);
@@ -710,7 +655,7 @@ Dqn_UTest TestFs()
 
             // NOTE: Read step
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_String8 read_file = Dqn_Fs_ReadString8(SRC_FILE, scratch.allocator);
+            Dqn_String8 read_file = Dqn_Fs_Read(SRC_FILE, scratch.allocator);
             DQN_UTEST_ASSERTF(&test, Dqn_String8_IsValid(read_file), "Failed to load file");
             DQN_UTEST_ASSERTF(&test, read_file.size == 4, "File read wrong amount of bytes");
             DQN_UTEST_ASSERTF(&test, Dqn_String8_Eq(read_file, DQN_STRING8("test")), "read(%zu): %.*s", read_file.size, DQN_STRING_FMT(read_file));
@@ -840,8 +785,8 @@ Dqn_UTest TestIntrinsics()
             DQN_UTEST_ASSERTF(&test, a == b, "a: %I64i, b: %I64i", a, b);
         }
 
-        Dqn_UTest_Begin(&test, "Dqn_CPUClockCycle");
-        Dqn_CPUClockCycle();
+        Dqn_UTest_Begin(&test, "Dqn_CPU_TSC");
+        Dqn_CPU_TSC();
         Dqn_UTest_End(&test);
 
         Dqn_UTest_Begin(&test, "Dqn_CompilerReadBarrierAndCPUReadFence");
@@ -1159,116 +1104,124 @@ Dqn_UTest TestRect()
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Rect") {
         DQN_UTEST_TEST("No intersection") {
-            Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(0, 0), Dqn_V2(100, 100));
-            Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(200, 0), Dqn_V2(200, 200));
+            Dqn_Rect a  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx1(0),      Dqn_V2_InitNx2(100, 100));
+            Dqn_Rect b  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(200, 0), Dqn_V2_InitNx2(200, 200));
             Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
 
+            Dqn_V2 ab_max = ab.pos + ab.size;
             DQN_UTEST_ASSERTF(&test,
-                            ab.min.x == 0 && ab.min.y == 0 && ab.max.x == 0 && ab.max.y == 0,
-                            "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                            ab.min.x,
-                            ab.min.y,
-                            ab.max.x,
-                            ab.max.y);
+                              ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 0 && ab_max.y == 0,
+                              "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                              ab.pos.x,
+                              ab.pos.y,
+                              ab_max.x,
+                              ab_max.y);
         }
 
         DQN_UTEST_TEST("A's min intersects B") {
-            Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(50, 50), Dqn_V2(100, 100));
-            Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2( 0,  0), Dqn_V2(100, 100));
+            Dqn_Rect a  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(50, 50), Dqn_V2_InitNx2(100, 100));
+            Dqn_Rect b  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2( 0,  0), Dqn_V2_InitNx2(100, 100));
             Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
 
+            Dqn_V2 ab_max = ab.pos + ab.size;
             DQN_UTEST_ASSERTF(&test,
-                            ab.min.x == 50 && ab.min.y == 50 && ab.max.x == 100 && ab.max.y == 100,
+                            ab.pos.x == 50 && ab.pos.y == 50 && ab_max.x == 100 && ab_max.y == 100,
                             "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                            ab.min.x,
-                            ab.min.y,
-                            ab.max.x,
-                            ab.max.y);
+                            ab.pos.x,
+                            ab.pos.y,
+                            ab_max.x,
+                            ab_max.y);
         }
 
         DQN_UTEST_TEST("B's min intersects A") {
-            Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2( 0,  0), Dqn_V2(100, 100));
-            Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(50, 50), Dqn_V2(100, 100));
+            Dqn_Rect a  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2( 0,  0), Dqn_V2_InitNx2(100, 100));
+            Dqn_Rect b  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(50, 50), Dqn_V2_InitNx2(100, 100));
             Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
 
+            Dqn_V2 ab_max = ab.pos + ab.size;
             DQN_UTEST_ASSERTF(&test,
-                            ab.min.x == 50 && ab.min.y == 50 && ab.max.x == 100 && ab.max.y == 100,
+                            ab.pos.x == 50 && ab.pos.y == 50 && ab_max.x == 100 && ab_max.y == 100,
                             "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                            ab.min.x,
-                            ab.min.y,
-                            ab.max.x,
-                            ab.max.y);
+                            ab.pos.x,
+                            ab.pos.y,
+                            ab_max.x,
+                            ab_max.y);
         }
 
         DQN_UTEST_TEST("A's max intersects B") {
-            Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(-50, -50), Dqn_V2(100, 100));
-            Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(  0,   0), Dqn_V2(100, 100));
+            Dqn_Rect a  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(-50, -50), Dqn_V2_InitNx2(100, 100));
+            Dqn_Rect b  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(  0,   0), Dqn_V2_InitNx2(100, 100));
             Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
 
+            Dqn_V2 ab_max = ab.pos + ab.size;
             DQN_UTEST_ASSERTF(&test,
-                            ab.min.x == 0 && ab.min.y == 0 && ab.max.x == 50 && ab.max.y == 50,
+                            ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 50 && ab_max.y == 50,
                             "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                            ab.min.x,
-                            ab.min.y,
-                            ab.max.x,
-                            ab.max.y);
+                            ab.pos.x,
+                            ab.pos.y,
+                            ab_max.x,
+                            ab_max.y);
         }
 
         DQN_UTEST_TEST("B's max intersects A") {
-            Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(  0,   0), Dqn_V2(100, 100));
-            Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(-50, -50), Dqn_V2(100, 100));
+            Dqn_Rect a  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(  0,   0), Dqn_V2_InitNx2(100, 100));
+            Dqn_Rect b  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(-50, -50), Dqn_V2_InitNx2(100, 100));
             Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
 
+            Dqn_V2 ab_max = ab.pos + ab.size;
             DQN_UTEST_ASSERTF(&test,
-                            ab.min.x == 0 && ab.min.y == 0 && ab.max.x == 50 && ab.max.y == 50,
+                            ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 50 && ab_max.y == 50,
                             "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                            ab.min.x,
-                            ab.min.y,
-                            ab.max.x,
-                            ab.max.y);
+                            ab.pos.x,
+                            ab.pos.y,
+                            ab_max.x,
+                            ab_max.y);
         }
 
 
         DQN_UTEST_TEST("B contains A") {
-            Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(25, 25), Dqn_V2( 25,  25));
-            Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2( 0,  0), Dqn_V2(100, 100));
+            Dqn_Rect a  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(25, 25), Dqn_V2_InitNx2( 25,  25));
+            Dqn_Rect b  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2( 0,  0), Dqn_V2_InitNx2(100, 100));
             Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
 
+            Dqn_V2 ab_max = ab.pos + ab.size;
             DQN_UTEST_ASSERTF(&test,
-                            ab.min.x == 25 && ab.min.y == 25 && ab.max.x == 50 && ab.max.y == 50,
+                            ab.pos.x == 25 && ab.pos.y == 25 && ab_max.x == 50 && ab_max.y == 50,
                             "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                            ab.min.x,
-                            ab.min.y,
-                            ab.max.x,
-                            ab.max.y);
+                            ab.pos.x,
+                            ab.pos.y,
+                            ab_max.x,
+                            ab_max.y);
         }
 
         DQN_UTEST_TEST("A contains B") {
-            Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2( 0,  0), Dqn_V2(100, 100));
-            Dqn_Rect b  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(25, 25), Dqn_V2( 25,  25));
+            Dqn_Rect a  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2( 0,  0), Dqn_V2_InitNx2(100, 100));
+            Dqn_Rect b  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(25, 25), Dqn_V2_InitNx2( 25,  25));
             Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
 
+            Dqn_V2 ab_max = ab.pos + ab.size;
             DQN_UTEST_ASSERTF(&test,
-                            ab.min.x == 25 && ab.min.y == 25 && ab.max.x == 50 && ab.max.y == 50,
+                            ab.pos.x == 25 && ab.pos.y == 25 && ab_max.x == 50 && ab_max.y == 50,
                             "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                            ab.min.x,
-                            ab.min.y,
-                            ab.max.x,
-                            ab.max.y);
+                            ab.pos.x,
+                            ab.pos.y,
+                            ab_max.x,
+                            ab_max.y);
         }
 
         DQN_UTEST_TEST("A equals B") {
-            Dqn_Rect a  = Dqn_Rect_InitFromPosAndSize(Dqn_V2(0, 0), Dqn_V2(100, 100));
+            Dqn_Rect a  = Dqn_Rect_InitV2x2(Dqn_V2_InitNx2(0, 0), Dqn_V2_InitNx2(100, 100));
             Dqn_Rect b  = a;
             Dqn_Rect ab = Dqn_Rect_Intersection(a, b);
 
+            Dqn_V2 ab_max = ab.pos + ab.size;
             DQN_UTEST_ASSERTF(&test,
-                            ab.min.x == 0 && ab.min.y == 0 && ab.max.x == 100 && ab.max.y == 100,
+                            ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 100 && ab_max.y == 100,
                             "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                            ab.min.x,
-                            ab.min.y,
-                            ab.max.x,
-                            ab.max.y);
+                            ab.pos.x,
+                            ab.pos.y,
+                            ab_max.x,
+                            ab_max.y);
         }
     }
     return test;
@@ -1416,95 +1369,113 @@ Dqn_UTest TestString8()
         // NOTE: Dqn_String8_ToI64
         // =========================================================================================
         DQN_UTEST_TEST("To I64: Convert null string") {
-            int64_t result = Dqn_String8_ToI64(Dqn_String8_Init(nullptr, 5), 0);
-            DQN_UTEST_ASSERT(&test, result == 0);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(Dqn_String8_Init(nullptr, 5), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERT(&test, result.value == 0);
         }
 
         DQN_UTEST_TEST("To I64: Convert empty string") {
-            int64_t result = Dqn_String8_ToI64(DQN_STRING8(""), 0);
-            DQN_UTEST_ASSERT(&test, result == 0);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(DQN_STRING8(""), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERT(&test, result.value == 0);
         }
 
         DQN_UTEST_TEST("To I64: Convert \"1\"") {
-            int64_t result = Dqn_String8_ToI64(DQN_STRING8("1"), 0);
-            DQN_UTEST_ASSERT(&test, result == 1);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(DQN_STRING8("1"), 0);
+            DQN_UTEST_ASSERT(&test, result.success);
+            DQN_UTEST_ASSERT(&test, result.value == 1);
         }
 
         DQN_UTEST_TEST("To I64: Convert \"-0\"") {
-            int64_t result = Dqn_String8_ToI64(DQN_STRING8("-0"), 0);
-            DQN_UTEST_ASSERT(&test, result == 0);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(DQN_STRING8("-0"), 0);
+            DQN_UTEST_ASSERT(&test, result.success);
+            DQN_UTEST_ASSERT(&test, result.value == 0);
         }
 
         DQN_UTEST_TEST("To I64: Convert \"-1\"") {
-            int64_t result = Dqn_String8_ToI64(DQN_STRING8("-1"), 0);
-            DQN_UTEST_ASSERT(&test, result == -1);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(DQN_STRING8("-1"), 0);
+            DQN_UTEST_ASSERT(&test, result.success);
+            DQN_UTEST_ASSERT(&test, result.value == -1);
         }
 
         DQN_UTEST_TEST("To I64: Convert \"1.2\"") {
-            int64_t result = Dqn_String8_ToI64(DQN_STRING8("1.2"), 0);
-            DQN_UTEST_ASSERT(&test, result == 1);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(DQN_STRING8("1.2"), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERT(&test, result.value == 1);
         }
 
         DQN_UTEST_TEST("To I64: Convert \"1,234\"") {
-            int64_t result = Dqn_String8_ToI64(DQN_STRING8("1,234"), ',');
-            DQN_UTEST_ASSERT(&test, result == 1234);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(DQN_STRING8("1,234"), ',');
+            DQN_UTEST_ASSERT(&test, result.success);
+            DQN_UTEST_ASSERT(&test, result.value == 1234);
         }
 
         DQN_UTEST_TEST("To I64: Convert \"1,2\"") {
-            int64_t result = Dqn_String8_ToI64(DQN_STRING8("1,2"), ',');
-            DQN_UTEST_ASSERT(&test, result == 12);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(DQN_STRING8("1,2"), ',');
+            DQN_UTEST_ASSERT(&test, result.success);
+            DQN_UTEST_ASSERT(&test, result.value == 12);
         }
 
         DQN_UTEST_TEST("To I64: Convert \"12a3\"") {
-            int64_t result = Dqn_String8_ToI64(DQN_STRING8("12a3"), 0);
-            DQN_UTEST_ASSERT(&test, result == 12);
+            Dqn_String8ToI64Result result = Dqn_String8_ToI64(DQN_STRING8("12a3"), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERT(&test, result.value == 12);
         }
 
         // NOTE: Dqn_String8_ToU64
         // ---------------------------------------------------------------------------------------------
         DQN_UTEST_TEST("To U64: Convert nullptr") {
-            uint64_t result = Dqn_String8_ToU64(Dqn_String8_Init(nullptr, 5), 0);
-            DQN_UTEST_ASSERTF(&test, result == 0, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(Dqn_String8_Init(nullptr, 5), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert empty string") {
-            uint64_t result = Dqn_String8_ToU64(DQN_STRING8(""), 0);
-            DQN_UTEST_ASSERTF(&test, result == 0, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(DQN_STRING8(""), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1\"") {
-            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("1"), 0);
-            DQN_UTEST_ASSERTF(&test, result == 1, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(DQN_STRING8("1"), 0);
+            DQN_UTEST_ASSERT(&test, result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"-0\"") {
-            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("-0"), 0);
-            DQN_UTEST_ASSERTF(&test, result == 0, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(DQN_STRING8("-0"), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"-1\"") {
-            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("-1"), 0);
-            DQN_UTEST_ASSERTF(&test, result == 0, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(DQN_STRING8("-1"), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1.2\"") {
-            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("1.2"), 0);
-            DQN_UTEST_ASSERTF(&test, result == 1, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(DQN_STRING8("1.2"), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1,234\"") {
-            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("1,234"), ',');
-            DQN_UTEST_ASSERTF(&test, result == 1234, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(DQN_STRING8("1,234"), ',');
+            DQN_UTEST_ASSERT(&test, result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 1234, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1,2\"") {
-            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("1,2"), ',');
-            DQN_UTEST_ASSERTF(&test, result == 12, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(DQN_STRING8("1,2"), ',');
+            DQN_UTEST_ASSERT(&test, result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"12a3\"") {
-            uint64_t result = Dqn_String8_ToU64(DQN_STRING8("12a3"), 0);
-            DQN_UTEST_ASSERTF(&test, result == 12, "result: %zu", result);
+            Dqn_String8ToU64Result result = Dqn_String8_ToU64(DQN_STRING8("12a3"), 0);
+            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %I64u", result.value);
         }
 
         // NOTE: Dqn_String8_Find
@@ -1786,14 +1757,15 @@ Dqn_UTest TestWin()
 
 void CustomLogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
 {
+    (void)user_data;
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
     Dqn_String8 log           = Dqn_Log_MakeString(scratch.allocator, true /*colour*/, type, log_type, call_site, fmt, args);
     DQN_UTEST_LOG("%.*s", DQN_STRING_FMT(log));
 }
 
-void TestRunSuite()
+void Dqn_TestRunSuite()
 {
-    Dqn_Library *dqn_library = Dqn_Library_Init(nullptr);
+    Dqn_Library *dqn_library = Dqn_Library_Init();
     dqn_library->log_callback = CustomLogProc;
 
     Dqn_UTest tests[] =
@@ -1832,7 +1804,7 @@ void TestRunSuite()
 int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;
-    TestRunSuite();
+    Dqn_TestRunSuite();
     return 0;
 }
 #endif

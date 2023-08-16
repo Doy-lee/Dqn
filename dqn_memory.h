@@ -1,46 +1,6 @@
-// NOTE: Table Of Contents =========================================================================
-// Index                    | Disable #define | Description
-// =================================================================================================
-// [$ALLO] Dqn_Allocator    |                 | Generic allocator interface
-// [$VMEM] Dqn_VMem         |                 | Virtual memory allocation
-// [$AREN] Dqn_Arena        |                 | Growing bump allocator
-// [$ACAT] Dqn_ArenaCatalog |                 | Collate, create & manage arenas in a catalog
-// =================================================================================================
-
 // NOTE: [$ALLO] Dqn_Allocator =====================================================================
-#if defined(DQN_LEAK_TRACING)
-    #if defined(DQN_NO_DSMAP)
-        #error "DSMap is required for allocation tracing"
-    #endif
-    #define DQN_LEAK_TRACE DQN_CALL_SITE,
-    #define DQN_LEAK_TRACE_NO_COMMA DQN_CALL_SITE
-    #define DQN_LEAK_TRACE_FUNCTION Dqn_CallSite leak_site_,
-    #define DQN_LEAK_TRACE_FUNCTION_NO_COMMA Dqn_CallSite leak_site_
-    #define DQN_LEAK_TRACE_ARG leak_site_,
-    #define DQN_LEAK_TRACE_ARG_NO_COMMA leak_site_
-    #define DQN_LEAK_TRACE_UNUSED (void)leak_site_;
-#else
-    #define DQN_LEAK_TRACE
-    #define DQN_LEAK_TRACE_NO_COMMA
-    #define DQN_LEAK_TRACE_FUNCTION
-    #define DQN_LEAK_TRACE_FUNCTION_NO_COMMA
-    #define DQN_LEAK_TRACE_ARG
-    #define DQN_LEAK_TRACE_ARG_NO_COMMA
-    #define DQN_LEAK_TRACE_UNUSED
-#endif
-
-struct Dqn_LeakTrace
-{
-    void         *ptr;             // The pointer we are tracking
-    Dqn_usize     size;            // Size of the allocation
-    Dqn_CallSite  call_site;       // Call site where the allocation was allocated
-    bool          freed;           // True if this pointer has been freed
-    Dqn_usize     freed_size;      // Size of the allocation that has been freed
-    Dqn_CallSite  freed_call_site; // Call site where the allocation was freed
-};
-
-typedef void *Dqn_Allocator_AllocProc(DQN_LEAK_TRACE_FUNCTION size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context);
-typedef void  Dqn_Allocator_DeallocProc(DQN_LEAK_TRACE_FUNCTION void *ptr, size_t size, void *user_context);
+typedef void *Dqn_Allocator_AllocProc(size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context);
+typedef void  Dqn_Allocator_DeallocProc(void *ptr, size_t size, void *user_context);
 
 struct Dqn_Allocator
 {
@@ -49,15 +9,13 @@ struct Dqn_Allocator
     Dqn_Allocator_DeallocProc *dealloc;      // Memory deallocating routine
 };
 
-// NOTE: Macros ==================================================================================
-#define Dqn_Allocator_Alloc(allocator, size, align, zero_mem) Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, size, align, zero_mem)
-#define Dqn_Allocator_Dealloc(allocator, ptr, size) Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE allocator, ptr, size)
-#define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type) * count, alignof(Type), zero_mem)
-#define Dqn_Allocator_New(allocator, Type, zero_mem) (Type *)Dqn_Allocator_Alloc_(DQN_LEAK_TRACE allocator, sizeof(Type), alignof(Type), zero_mem)
+// NOTE: Macros ====================================================================================
+#define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc(allocator, sizeof(Type) * count, alignof(Type), zero_mem)
+#define Dqn_Allocator_New(allocator, Type, zero_mem) (Type *)Dqn_Allocator_Alloc(allocator, sizeof(Type), alignof(Type), zero_mem)
 
-// NOTE: Internal ==================================================================================
-void *Dqn_Allocator_Alloc_  (DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem);
-void  Dqn_Allocator_Dealloc_(DQN_LEAK_TRACE_FUNCTION Dqn_Allocator allocator, void *ptr, size_t size);
+// NOTE: API =======================================================================================
+void   *Dqn_Allocator_Alloc  (Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem);
+void    Dqn_Allocator_Dealloc(Dqn_Allocator allocator, void *ptr, size_t size);
 
 // NOTE: [$VMEM] Dqn_VMem ==========================================================================
 enum Dqn_VMemCommit
@@ -85,33 +43,54 @@ enum Dqn_VMemPage
     // first access to the page, then, the underlying protection flags are
     // active. This is supported on Windows, on other OS's using this flag will
     // set the OS equivalent of Dqn_VMemPage_NoAccess.
+    // This flag must only be used in Dqn_VMem_Protect
     Dqn_VMemPage_Guard     = 1 << 3,
+
+    // If leak tracing is enabled, this flag will allow the allocation recorded
+    // from the reserve call to be leaked, e.g. not printed when leaks are
+    // dumped to the console.
+    Dqn_VMemPage_AllocRecordLeakPermitted = 1 << 2,
 };
-
-#if !defined(DQN_VMEM_PAGE_GRANULARITY)
-    #define DQN_VMEM_PAGE_GRANULARITY DQN_KILOBYTES(4)
-#endif
-
-#if !defined(DQN_VMEM_RESERVE_GRANULARITY)
-    #define DQN_VMEM_RESERVE_GRANULARITY DQN_KILOBYTES(64)
-#endif
-
-#if !defined(DQN_VMEM_COMMIT_GRANULARITY)
-    #define DQN_VMEM_COMMIT_GRANULARITY DQN_VMEM_PAGE_GRANULARITY
-#endif
-
-static_assert(Dqn_IsPowerOfTwo(DQN_VMEM_RESERVE_GRANULARITY),
-              "This library assumes that the memory allocation routines from the OS has PoT allocation granularity");
-static_assert(Dqn_IsPowerOfTwo(DQN_VMEM_COMMIT_GRANULARITY),
-              "This library assumes that the memory allocation routines from the OS has PoT allocation granularity");
-static_assert(DQN_VMEM_COMMIT_GRANULARITY < DQN_VMEM_RESERVE_GRANULARITY,
-              "Minimum commit size must be lower than the reserve size to avoid OOB math on pointers in this library");
 
 DQN_API void *Dqn_VMem_Reserve (Dqn_usize size, Dqn_VMemCommit commit, uint32_t page_flags);
 DQN_API bool  Dqn_VMem_Commit  (void *ptr, Dqn_usize size, uint32_t page_flags);
 DQN_API void  Dqn_VMem_Decommit(void *ptr, Dqn_usize size);
 DQN_API void  Dqn_VMem_Release (void *ptr, Dqn_usize size);
 DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
+
+// NOTE: [$MEMB] Dqn_MemBlock ======================================================================
+enum Dqn_MemBlockFlag
+{
+    Dqn_MemBlockFlag_PageGuard               = 1 << 0,
+    Dqn_MemBlockFlag_ArenaPrivate            = 1 << 1,
+
+    // If leak tracing is enabled, this flag will allow the allocation recorded
+    // from the reserve call to be leaked, e.g. not printed when leaks are
+    // dumped to the console.
+    Dqn_MemBlockFlag_AllocRecordLeakPermitted = 1 << 2,
+    Dqn_MemBlockFlag_All                      = Dqn_MemBlockFlag_PageGuard |
+                                                Dqn_MemBlockFlag_ArenaPrivate |
+                                                Dqn_MemBlockFlag_AllocRecordLeakPermitted,
+};
+
+struct Dqn_MemBlock
+{
+    void         *data;
+    Dqn_usize     used;
+    Dqn_usize     size;
+    Dqn_usize     commit;
+    Dqn_MemBlock *next;
+    Dqn_MemBlock *prev;
+    uint8_t       flags;
+};
+
+DQN_API Dqn_usize     Dqn_MemBlock_MetadataSize(uint8_t flags);
+DQN_API Dqn_MemBlock *Dqn_MemBlock_Init        (Dqn_usize reserve, Dqn_usize commit, uint8_t flags);
+DQN_API void         *Dqn_MemBlock_Alloc       (Dqn_MemBlock *block, Dqn_usize size, uint8_t alignment, Dqn_ZeroMem zero_mem);
+DQN_API void          Dqn_MemBlock_Free        (Dqn_MemBlock *block);
+
+#define               Dqn_MemBlock_New(block, Type, zero_mem)             (Type *)Dqn_MemBlock_Alloc(block, sizeof(Type),         alignof(Type), zero_mem)
+#define               Dqn_MemBlock_NewArray(block, Type, count, zero_mem) (Type *)Dqn_MemBlock_Alloc(block, sizeof(Type) * count, alignof(Type), zero_mem)
 
 // NOTE: [$AREN] Dqn_Arena =========================================================================
 // A bump-allocator that can grow dynamically by chaining blocks of memory
@@ -144,17 +123,17 @@ DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
 //   @param flags[in] Bit flags from 'Dqn_ArenaBlockFlags', set to 0 if none
 //   @return The block of memory that
 
-// @proc Dqn_Arena_Allocate, Dqn_Arena_New, Dqn_Arena_NewArray,
+// @proc Dqn_Arena_Alloc, Dqn_Arena_New, Dqn_Arena_NewArray,
 // Dqn_Arena_NewArrayWithBlock,
-//   @desc Allocate byte/objects
-//   `Allocate`          allocates bytes
+//   @desc Alloc byte/objects
+//   `Alloc`          allocates bytes
 //   `New`               allocates an object
 //   `NewArray`          allocates an array of objects
 //   `NewArrayWithBlock` allocates an array of objects from the given memory 'block'
 //   @return A pointer to the allocated bytes/object. Null pointer on failure
 
 // @proc Dqn_Arena_Copy, Dqn_Arena_CopyZ
-//   @desc Allocate a copy of an object's bytes. The 'Z' variant adds
+//   @desc Alloc a copy of an object's bytes. The 'Z' variant adds
 //   a null-terminating byte at the end of the stream.
 //   @return A pointer to the allocated object. Null pointer on failure.
 
@@ -186,13 +165,6 @@ DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
 // @proc Dqn_Arena_LogStats
 //   @desc Dump the stats of the given arena to the memory log-stream.
 //   @param[in] arena The arena to dump stats for
-
-enum Dqn_ArenaBlockFlags
-{
-    Dqn_ArenaBlockFlags_Private           = 1 << 0, // Private blocks can only allocate its memory when used in the 'FromBlock' API variants
-    Dqn_ArenaBlockFlags_UseAfterFreeGuard = 1 << 1, // Block was allocated with use-after-free guard semantics
-};
-
 struct Dqn_ArenaStat
 {
     Dqn_usize capacity;     // Total allocating capacity of the arena in bytes
@@ -228,36 +200,35 @@ struct Dqn_ArenaStatString
 
 struct Dqn_Arena
 {
-    bool            use_after_free_guard;
-    uint32_t        temp_memory_count;
+    bool            allocs_are_allowed_to_leak;
     Dqn_String8     label; // Optional label to describe the arena
-    Dqn_ArenaBlock *head;  // Active block the arena is allocating from
-    Dqn_ArenaBlock *curr;  // Active block the arena is allocating from
-    Dqn_ArenaBlock *tail;  // Last block in the linked list of blocks
-    Dqn_ArenaStat   stats; // Current arena stats, reset when reset usage is invoked.
+    Dqn_MemBlock   *head;  // Active block the arena is allocating from
+    Dqn_MemBlock   *curr;  // Active block the arena is allocating from
+    Dqn_MemBlock   *tail;  // Last block in the linked list of blocks
+    uint64_t        blocks;
 };
 
 struct Dqn_ArenaTempMemory
 {
-    Dqn_Arena      *arena;     // Arena the scope is for
-    Dqn_ArenaBlock *head;      // Head block of the arena at the beginning of the scope
-    Dqn_ArenaBlock *curr;      // Current block of the arena at the beginning of the scope
-    Dqn_ArenaBlock *tail;      // Tail block of the arena at the beginning of the scope
-    Dqn_usize       curr_used; // Current used amount of the current block
-    Dqn_ArenaStat   stats;     // Stats of the arena at the beginning of the scope
+    Dqn_Arena    *arena;     // Arena the scope is for
+    Dqn_MemBlock *head;      // Head block of the arena at the beginning of the scope
+    Dqn_MemBlock *curr;      // Current block of the arena at the beginning of the scope
+    Dqn_MemBlock *tail;      // Tail block of the arena at the beginning of the scope
+    Dqn_usize     blocks;
+    Dqn_usize     curr_used; // Current used amount of the current block
 };
 
 // Automatically begin and end a temporary memory scope on object construction
 // and destruction respectively.
-#define DQN_ARENA_TEMP_MEMORY_SCOPE(arena) Dqn_ArenaTempMemoryScope_ DQN_UNIQUE_NAME(temp_memory_) = Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE arena)
-#define Dqn_ArenaTempMemoryScope(arena) Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE arena)
-struct Dqn_ArenaTempMemoryScope_
+#define Dqn_Arena_TempMemoryScope(arena) Dqn_ArenaTempMemoryScope DQN_UNIQUE_NAME(temp_memory_) = Dqn_ArenaTempMemoryScope(arena)
+struct Dqn_ArenaTempMemoryScope
 {
-    Dqn_ArenaTempMemoryScope_(DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena);
-    ~Dqn_ArenaTempMemoryScope_();
+    Dqn_ArenaTempMemoryScope(Dqn_Arena *arena);
+    ~Dqn_ArenaTempMemoryScope();
     Dqn_ArenaTempMemory temp_memory;
+    bool                cancel = false;
     #if defined(DQN_LEAK_TRACING)
-    Dqn_CallSite        leak_site__;
+    Dqn_CallSite        leak_site_;
     #endif
 };
 
@@ -270,35 +241,25 @@ enum Dqn_ArenaCommit
 };
 
 // NOTE: Allocation ================================================================================
-#define                     Dqn_Arena_Grow(arena, size, commit, flags)                Dqn_Arena_Grow_(DQN_LEAK_TRACE arena, size, commit, flags)
-#define                     Dqn_Arena_Allocate(arena, size, align, zero_mem)          Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, size, align, zero_mem)
-#define                     Dqn_Arena_New(arena, Type, zero_mem)                      (Type *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, sizeof(Type), alignof(Type), zero_mem)
-#define                     Dqn_Arena_NewArray(arena, Type, count, zero_mem)          (Type *)Dqn_Arena_Allocate_(DQN_LEAK_TRACE arena, sizeof(Type) * count, alignof(Type), zero_mem)
-#define                     Dqn_Arena_NewArrayWithBlock(block, Type, count, zero_mem) (Type *)Dqn_Arena_AllocateFromBlock(block, sizeof(Type) * count, alignof(Type), zero_mem)
-#define                     Dqn_Arena_Copy(arena, Type, src, count)                   (Type *)Dqn_Arena_Copy_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
-#define                     Dqn_Arena_CopyZ(arena, Type, src, count)                  (Type *)Dqn_Arena_CopyZ_(DQN_LEAK_TRACE arena, src, sizeof(*src) * count, alignof(Type))
-#define                     Dqn_Arena_Free(arena, zero_mem)                           Dqn_Arena_Free_(DQN_LEAK_TRACE arena, zero_mem)
+#define                     Dqn_Arena_New(arena, Type, zero_mem)              (Type *)Dqn_Arena_Alloc(arena, sizeof(Type), alignof(Type), zero_mem)
+#define                     Dqn_Arena_NewArray(arena, Type, count, zero_mem)  (Type *)Dqn_Arena_Alloc(arena, sizeof(Type) * count, alignof(Type), zero_mem)
+#define                     Dqn_Arena_NewCopy(arena, Type, src, count)        (Type *)Dqn_Arena_Copy(arena, src, sizeof(*src) * count, alignof(Type))
+#define                     Dqn_Arena_NewCopyZ(arena, Type, src, count)       (Type *)Dqn_Arena_CopyZ(arena, src, sizeof(*src) * count, alignof(Type))
 
-DQN_API void                Dqn_Arena_CommitFromBlock  (Dqn_ArenaBlock *block, Dqn_usize size, Dqn_ArenaCommit commit);
-DQN_API void *              Dqn_Arena_AllocateFromBlock(Dqn_ArenaBlock *block, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem);
-DQN_API Dqn_Allocator       Dqn_Arena_Allocator        (Dqn_Arena *arena);
-DQN_API void                Dqn_Arena_Reset            (Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
+DQN_API Dqn_Allocator       Dqn_Arena_Allocator      (Dqn_Arena *arena);
+DQN_API Dqn_MemBlock *      Dqn_Arena_Grow           (Dqn_Arena *arena, Dqn_usize size, Dqn_usize commit, uint8_t flags);
+DQN_API void *              Dqn_Arena_Alloc          (Dqn_Arena *arena, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem);
+DQN_API void *              Dqn_Arena_Copy           (Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t alignment);
+DQN_API void *              Dqn_Arena_CopyZ          (Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t alignment);
+DQN_API void                Dqn_Arena_Free           (Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
 
 // NOTE: Temp Memory ===============================================================================
-DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory  (Dqn_Arena *arena);
-#define                     Dqn_Arena_EndTempMemory(arena_temp_memory)                Dqn_Arena_EndTempMemory_(DQN_LEAK_TRACE arena_temp_memory)
+DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena);
+DQN_API void                Dqn_Arena_EndTempMemory  (Dqn_ArenaTempMemory temp_memory, bool cancel);
 
 // NOTE: Arena Stats ===============================================================================
-DQN_API Dqn_ArenaStatString Dqn_Arena_StatString       (Dqn_ArenaStat const *stat);
-DQN_API void                Dqn_Arena_LogStats         (Dqn_Arena const *arena);
-
-// NOTE: Internal ==================================================================================
-DQN_API Dqn_ArenaBlock *    Dqn_Arena_Grow_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_usize size, Dqn_usize commit, uint8_t flags);
-DQN_API void *              Dqn_Arena_Allocate_        (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_usize size, uint8_t align, Dqn_ZeroMem zero_mem);
-DQN_API void *              Dqn_Arena_Copy_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t alignment);
-DQN_API void                Dqn_Arena_Free_            (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, Dqn_ZeroMem zero_mem);
-DQN_API void *              Dqn_Arena_CopyZ_           (DQN_LEAK_TRACE_FUNCTION Dqn_Arena *arena, void *src, Dqn_usize size, uint8_t alignment);
-DQN_API void                Dqn_Arena_EndTempMemory_   (DQN_LEAK_TRACE_FUNCTION Dqn_ArenaTempMemory arena_temp_memory);
+DQN_API Dqn_ArenaStatString Dqn_Arena_StatString     (Dqn_ArenaStat const *stat);
+DQN_API void                Dqn_Arena_LogStats       (Dqn_Arena const *arena);
 
 // NOTE: [$ACAT] Dqn_ArenaCatalog ==================================================================
 struct Dqn_ArenaCatalogItem

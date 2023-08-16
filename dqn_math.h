@@ -1,13 +1,3 @@
-// NOTE: Table Of Contents =========================================================================
-// Index                   | Disable #define | Description
-// =================================================================================================
-// [$VEC2] Dqn_V2, V2i     | DQN_NO_V2       |
-// [$VEC3] Dqn_V3, V3i     | DQN_NO_V3       |
-// [$VEC4] Dqn_V4, V4i     | DQN_NO_V4       |
-// [$MAT4] Dqn_M4          | DQN_NO_M4       |
-// [$RECT] Dqn_Rect        | DQN_NO_RECT     |
-// [$MATH] Other           |                 |
-// =================================================================================================
 #if defined(DQN_COMPILER_W32_MSVC)
     #pragma warning(push)
     #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
@@ -22,8 +12,8 @@ union Dqn_V2I
     int32_t data[2];
 };
 
-#define Dqn_V2I_InitNx1(x)    DQN_LITERAL(Dqn_V2I){(int32_t)(x),  (int32_t)(x)}
-#define Dqn_V2I_InitNx2(x, y) DQN_LITERAL(Dqn_V2I){(int32_t)(x),  (int32_t)(y)}
+#define Dqn_V2I_InitNx1(x)    DQN_LITERAL(Dqn_V2I){{(int32_t)(x),  (int32_t)(x)}}
+#define Dqn_V2I_InitNx2(x, y) DQN_LITERAL(Dqn_V2I){{(int32_t)(x),  (int32_t)(y)}}
 
 DQN_API bool     operator!=(Dqn_V2I  lhs, Dqn_V2I rhs);
 DQN_API bool     operator==(Dqn_V2I  lhs, Dqn_V2I rhs);
@@ -48,6 +38,39 @@ DQN_API Dqn_V2I &operator/=(Dqn_V2I& lhs, int32_t rhs);
 DQN_API Dqn_V2I &operator-=(Dqn_V2I& lhs, Dqn_V2I rhs);
 DQN_API Dqn_V2I &operator+=(Dqn_V2I& lhs, Dqn_V2I rhs);
 
+union Dqn_V2U16
+{
+    struct { uint16_t x, y; };
+    struct { uint16_t w, h; };
+    uint16_t data[2];
+};
+
+#define Dqn_V2U16_InitNx1(x)    DQN_LITERAL(Dqn_V2U16){{(uint16_t)(x),  (uint16_t)(x)}}
+#define Dqn_V2U16_InitNx2(x, y) DQN_LITERAL(Dqn_V2U16){{(uint16_t)(x),  (uint16_t)(y)}}
+
+DQN_API bool       operator!=(Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API bool       operator==(Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API bool       operator>=(Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API bool       operator<=(Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API bool       operator< (Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API bool       operator> (Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API Dqn_V2U16  operator- (Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API Dqn_V2U16  operator+ (Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API Dqn_V2U16  operator* (Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API Dqn_V2U16  operator* (Dqn_V2U16  lhs, Dqn_f32 rhs);
+DQN_API Dqn_V2U16  operator* (Dqn_V2U16  lhs, int32_t rhs);
+DQN_API Dqn_V2U16  operator/ (Dqn_V2U16  lhs, Dqn_V2U16 rhs);
+DQN_API Dqn_V2U16  operator/ (Dqn_V2U16  lhs, Dqn_f32 rhs);
+DQN_API Dqn_V2U16  operator/ (Dqn_V2U16  lhs, int32_t rhs);
+DQN_API Dqn_V2U16 &operator*=(Dqn_V2U16& lhs, Dqn_V2U16 rhs);
+DQN_API Dqn_V2U16 &operator*=(Dqn_V2U16& lhs, Dqn_f32 rhs);
+DQN_API Dqn_V2U16 &operator*=(Dqn_V2U16& lhs, int32_t rhs);
+DQN_API Dqn_V2U16 &operator/=(Dqn_V2U16& lhs, Dqn_V2U16 rhs);
+DQN_API Dqn_V2U16 &operator/=(Dqn_V2U16& lhs, Dqn_f32 rhs);
+DQN_API Dqn_V2U16 &operator/=(Dqn_V2U16& lhs, int32_t rhs);
+DQN_API Dqn_V2U16 &operator-=(Dqn_V2U16& lhs, Dqn_V2U16 rhs);
+DQN_API Dqn_V2U16 &operator+=(Dqn_V2U16& lhs, Dqn_V2U16 rhs);
+
 union Dqn_V2
 {
     struct { Dqn_f32 x, y; };
@@ -55,8 +78,8 @@ union Dqn_V2
     Dqn_f32 data[2];
 };
 
-#define Dqn_V2_InitNx1(x)    DQN_LITERAL(Dqn_V2){(Dqn_f32)(x),  (Dqn_f32)(x)}
-#define Dqn_V2_InitNx2(x, y) DQN_LITERAL(Dqn_V2){(Dqn_f32)(x),  (Dqn_f32)(y)}
+#define Dqn_V2_InitNx1(x)    DQN_LITERAL(Dqn_V2){{(Dqn_f32)(x), (Dqn_f32)(x)}}
+#define Dqn_V2_InitNx2(x, y) DQN_LITERAL(Dqn_V2){{(Dqn_f32)(x), (Dqn_f32)(y)}}
 
 DQN_API bool    operator!=(Dqn_V2  lhs, Dqn_V2  rhs);
 DQN_API bool    operator==(Dqn_V2  lhs, Dqn_V2  rhs);
@@ -100,9 +123,9 @@ union Dqn_V3
     Dqn_f32 data[3];
 };
 
-#define Dqn_V3_InitNx1(x)          DQN_LITERAL(Dqn_V3){(Dqn_f32)(x),    (Dqn_f32)(x),    (Dqn_f32)(x)}
-#define Dqn_V3_InitNx3(x, y, z)    DQN_LITERAL(Dqn_V3){(Dqn_f32)(x),    (Dqn_f32)(y),    (Dqn_f32)(z)}
-#define Dqn_V3_InitV2x1_Nx1(xy, z) DQN_LITERAL(Dqn_V3){(Dqn_f32)(xy.x), (Dqn_f32)(xy.y), (Dqn_f32)(z)}
+#define Dqn_V3_InitNx1(x)          DQN_LITERAL(Dqn_V3){{(Dqn_f32)(x),    (Dqn_f32)(x),    (Dqn_f32)(x)}}
+#define Dqn_V3_InitNx3(x, y, z)    DQN_LITERAL(Dqn_V3){{(Dqn_f32)(x),    (Dqn_f32)(y),    (Dqn_f32)(z)}}
+#define Dqn_V3_InitV2x1_Nx1(xy, z) DQN_LITERAL(Dqn_V3){{(Dqn_f32)(xy.x), (Dqn_f32)(xy.y), (Dqn_f32)(z)}}
 
 DQN_API bool    operator!=(Dqn_V3  lhs, Dqn_V3  rhs);
 DQN_API bool    operator==(Dqn_V3  lhs, Dqn_V3  rhs);
@@ -135,10 +158,6 @@ DQN_API Dqn_V3  Dqn_V3_Normalise(Dqn_V3 a);
 #if !defined(DQN_NO_V4)
 // NOTE: [$VEC4] Vector4 ===========================================================================
 
-#if defined(DQN_NO_V3)
-    #error "Dqn_Rect requires Dqn_V3 hence DQN_NO_V3 must *not* be defined"
-#endif
-
 #if defined(DQN_COMPILER_W32_MSVC)
     #pragma warning(push)
     #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
@@ -147,12 +166,14 @@ union Dqn_V4
 {
     struct { Dqn_f32 x, y, z, w; };
     struct { Dqn_f32 r, g, b, a; };
+    #if !defined(DQN_NO_V3)
     Dqn_V3  rgb;
+    #endif
     Dqn_f32 data[4];
 };
 
-#define Dqn_V4_InitNx1(x)          DQN_LITERAL(Dqn_V4){(Dqn_f32)(x), (Dqn_f32)(x), (Dqn_f32)(x), (Dqn_f32)(x)}
-#define Dqn_V4_InitNx4(x, y, z, w) DQN_LITERAL(Dqn_V4){(Dqn_f32)(x), (Dqn_f32)(y), (Dqn_f32)(z), (Dqn_f32)(w)}
+#define Dqn_V4_InitNx1(x)          DQN_LITERAL(Dqn_V4){{(Dqn_f32)(x), (Dqn_f32)(x), (Dqn_f32)(x), (Dqn_f32)(x)}}
+#define Dqn_V4_InitNx4(x, y, z, w) DQN_LITERAL(Dqn_V4){{(Dqn_f32)(x), (Dqn_f32)(y), (Dqn_f32)(z), (Dqn_f32)(w)}}
 
 bool    operator!=(Dqn_V4  lhs, Dqn_V4  rhs);
 bool    operator==(Dqn_V4  lhs, Dqn_V4  rhs);
@@ -213,7 +234,7 @@ DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat);
 // NOTE: [$RECT] Dqn_Rect ==========================================================================
 #if !defined(DQN_NO_RECT)
 #if defined(DQN_NO_V2)
-    #error "Dqn_Rect requires Dqn_V2 hence DQN_NO_V2 must *not* be defined"
+    #error "Rectangles requires V2, DQN_NO_V2 must not be defined"
 #endif
 
 struct Dqn_Rect
@@ -221,19 +242,65 @@ struct Dqn_Rect
     Dqn_V2 pos, size;
 };
 
-#if defined(__cplusplus)
-#define Dqn_Rect_InitV2x2(pos, size) Dqn_Rect{pos, size}
-#else
-#define Dqn_Rect_InitV2x2(pos, size) (Dqn_Rect){pos, size}
-#endif
+struct Dqn_RectMinMax
+{
+    Dqn_V2 min, max;
+};
 
-DQN_API bool     operator==            (const Dqn_Rect& lhs, const Dqn_Rect& rhs);
-DQN_API Dqn_V2   Dqn_Rect_Center       (Dqn_Rect rect);
-DQN_API bool     Dqn_Rect_ContainsPoint(Dqn_Rect rect, Dqn_V2 p);
-DQN_API bool     Dqn_Rect_ContainsRect (Dqn_Rect a, Dqn_Rect b);
-DQN_API bool     Dqn_Rect_Intersects   (Dqn_Rect a, Dqn_Rect b);
-DQN_API Dqn_Rect Dqn_Rect_Intersection (Dqn_Rect a, Dqn_Rect b);
-DQN_API Dqn_Rect Dqn_Rect_Union        (Dqn_Rect a, Dqn_Rect b);
+#define Dqn_Rect_InitV2x2(pos, size)                   DQN_LITERAL(Dqn_Rect){(pos), (size)}
+#define Dqn_Rect_InitNx4(pos_x, pos_y, size_w, size_h) DQN_LITERAL(Dqn_Rect){DQN_LITERAL(Dqn_V2){{pos_x, pos_y}}, DQN_LITERAL(Dqn_V2){{size_w, size_h}}}
+
+DQN_API bool           operator==            (const Dqn_Rect& lhs, const Dqn_Rect& rhs);
+DQN_API Dqn_V2         Dqn_Rect_Center       (Dqn_Rect rect);
+DQN_API bool           Dqn_Rect_ContainsPoint(Dqn_Rect rect, Dqn_V2 p);
+DQN_API bool           Dqn_Rect_ContainsRect (Dqn_Rect a, Dqn_Rect b);
+DQN_API bool           Dqn_Rect_Intersects   (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_Rect       Dqn_Rect_Intersection (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_Rect       Dqn_Rect_Union        (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_RectMinMax Dqn_Rect_MinMax       (Dqn_Rect a);
+
+enum Dqn_RectCutClip
+{
+    Dqn_RectCutClip_No,
+    Dqn_RectCutClip_Yes,
+};
+
+DQN_API Dqn_Rect Dqn_Rect_CutLeftClip(Dqn_Rect *rect, Dqn_f32 amount, Dqn_RectCutClip clip);
+DQN_API Dqn_Rect Dqn_Rect_CutRightClip(Dqn_Rect *rect, Dqn_f32 amount, Dqn_RectCutClip clip);
+DQN_API Dqn_Rect Dqn_Rect_CutTopClip(Dqn_Rect *rect, Dqn_f32 amount, Dqn_RectCutClip clip);
+DQN_API Dqn_Rect Dqn_Rect_CutBottomClip(Dqn_Rect *rect, Dqn_f32 amount, Dqn_RectCutClip clip);
+
+#define Dqn_Rect_CutLeft(rect, amount)         Dqn_Rect_CutLeftClip(rect, amount, Dqn_RectCutClip_Yes)
+#define Dqn_Rect_CutRight(rect, amount)        Dqn_Rect_CutRightClip(rect, amount, Dqn_RectCutClip_Yes)
+#define Dqn_Rect_CutTop(rect, amount)          Dqn_Rect_CutTopClip(rect, amount, Dqn_RectCutClip_Yes)
+#define Dqn_Rect_CutBottom(rect, amount)       Dqn_Rect_CutBottomClip(rect, amount, Dqn_RectCutClip_Yes)
+
+#define Dqn_Rect_CutLeftNoClip(rect, amount)   Dqn_Rect_CutLeftClip(rect, amount, Dqn_RectCutClip_No)
+#define Dqn_Rect_CutRightNoClip(rect, amount)  Dqn_Rect_CutRightClip(rect, amount, Dqn_RectCutClip_No)
+#define Dqn_Rect_CutTopNoClip(rect, amount)    Dqn_Rect_CutTopClip(rect, amount, Dqn_RectCutClip_No)
+#define Dqn_Rect_CutBottomNoClip(rect, amount) Dqn_Rect_CutBottomClip(rect, amount, Dqn_RectCutClip_No)
+
+enum Dqn_RectCutSide
+{
+    Dqn_RectCutSide_Left,
+    Dqn_RectCutSide_Right,
+    Dqn_RectCutSide_Top,
+    Dqn_RectCutSide_Bottom,
+};
+
+struct Dqn_RectCut
+{
+    Dqn_Rect*       rect;
+    Dqn_RectCutSide side;
+};
+
+#define Dqn_RectCut_Init(rect, side) DQN_LITERAL(Dqn_RectCut){rect, side}
+#define Dqn_RectCut_Left(rect)       DQN_LITERAL(Dqn_RectCut){rect, Dqn_RectCutSide_Left}
+#define Dqn_RectCut_Right(rect)      DQN_LITERAL(Dqn_RectCut){rect, Dqn_RectCutSide_Right}
+#define Dqn_RectCut_Top(rect)        DQN_LITERAL(Dqn_RectCut){rect, Dqn_RectCutSide_Top}
+#define Dqn_RectCut_Bottom(rect)     DQN_LITERAL(Dqn_RectCut){rect, Dqn_RectCutSide_Bottom}
+
+DQN_API Dqn_Rect Dqn_RectCut_Cut(Dqn_RectCut rect_cut, Dqn_V2 size, Dqn_RectCutClip clip);
 #endif // !defined(DQN_NO_RECT)
 
 // NOTE: [$MATH] Other =============================================================================

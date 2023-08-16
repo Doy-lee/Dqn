@@ -1,20 +1,9 @@
-// NOTE: Table Of Contents =========================================================================
-// Index                   | Disable #define | Description
-// =================================================================================================
-// [$CMAC] Compiler macros |                 | Macros for the compiler
-// [$MACR] Macros          |                 | Define macros used in the library
-// [$TYPE] Typedefs        |                 | Typedefs used in the library
-// [$GSTR] Global Structs  |                 | Forward declare useful structs
-// [$INTR] Intrinsics      |                 | Atomics, cpuid, ticket mutex
-// [$TMUT] Dqn_TicketMutex |                 | Userland mutex via spinlocking atomics
-// [$CALL] Dqn_CallSite    |                 | Source code location/tracing
-// ===================+=================+===========================================================
-
 // NOTE: [$CMAC] Compiler macros ===================================================================
 // NOTE: Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
     #if defined(__clang__)
         #define DQN_COMPILER_W32_CLANG
+        #define DQN_COMPILER_CLANG
     #else
         #define DQN_COMPILER_W32_MSVC
     #endif
@@ -24,8 +13,8 @@
     #define DQN_COMPILER_GCC
 #endif
 
-// Declare struct literals that work in both C and C++ because the syntax is 
-// different between languages.
+// NOTE: Declare struct literals that work in both C and C++ because the syntax 
+// is different between languages.
 #if 0
     struct Foo { int a; }
     struct Foo foo = DQN_LITERAL(Foo){32}; // Works on both C and C++
@@ -63,9 +52,10 @@
 #define DQN_FOR_UINDEX(index, size) for (Dqn_usize index = 0; index < size; index++)
 #define DQN_FOR_IINDEX(index, size) for (Dqn_isize index = 0; index < size; index++)
 
-#define Dqn_PowerOfTwoAlign(value, power_of_two) (((value) + ((power_of_two) - 1)) & ~((power_of_two) - 1))
-#define Dqn_IsPowerOfTwo(value) (((value) & (value - 1)) == 0)
-#define Dqn_IsPowerOfTwoAligned(value, power_of_two) (((value) & (power_of_two - 1)) == 0)
+#define Dqn_AlignUpPowerOfTwo(value, pot) (((uintptr_t)(value) + ((uintptr_t)(pot) - 1)) & ~((uintptr_t)(pot) - 1))
+#define Dqn_AlignDownPowerOfTwo(value, pot) ((uintptr_t)(value) & ((uintptr_t)(pot) - 1))
+#define Dqn_IsPowerOfTwo(value) ((((uintptr_t)(value)) & (((uintptr_t)(value)) - 1)) == 0)
+#define Dqn_IsPowerOfTwoAligned(value, pot) ((((uintptr_t)value) & (((uintptr_t)pot) - 1)) == 0)
 
 // NOTE: Alloc Macros ==============================================================================
 #if !defined(DQN_ALLOC)
@@ -76,7 +66,7 @@
     #define DQN_DEALLOC(ptr, size) Dqn_VMem_Release(ptr, size)
 #endif
 
-// NOTE: String.h Dependnecies =====================================================================
+// NOTE: String.h Dependencies =====================================================================
 #if !defined(DQN_MEMCPY) || !defined(DQN_MEMSET) || !defined(DQN_MEMCMP) || !defined(DQN_MEMMOVE)
     #include <string.h>
     #if !defined(DQN_MEMCPY)
@@ -86,14 +76,14 @@
         #define DQN_MEMSET(dest, value, count) memset(dest, value, count)
     #endif
     #if !defined(DQN_MEMCMP)
-        #define DQN_MEMCMP(ptr1, ptr2, num) memcmp(ptr1, ptr2, num)
+        #define DQN_MEMCMP(lhs, rhs, count) memcmp(lhs, rhs, count)
     #endif
     #if !defined(DQN_MEMMOVE)
-        #define DQN_MEMMOVE(dest, src, num) memmove(dest, src, num)
+        #define DQN_MEMMOVE(dest, src, count) memmove(dest, src, count)
     #endif
 #endif
 
-// NOTE: Math.h Dependnecies =======================================================================
+// NOTE: Math.h Dependencies =======================================================================
 #if !defined(DQN_SQRTF) || !defined(DQN_SINF) || !defined(DQN_COSF) || !defined(DQN_TANF)
     #include <math.h>
     #define DQN_SQRTF(val) sqrtf(val)
@@ -115,8 +105,8 @@
 #define DQN_RADIAN_TO_DEGREE(radians) ((radians) * (180.f * DQN_PI))
 
 #define DQN_ABS(val) (((val) < 0) ? (-(val)) : (val))
-#define DQN_MAX(a, b) ((a > b) ? (a) : (b))
-#define DQN_MIN(a, b) ((a < b) ? (a) : (b))
+#define DQN_MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define DQN_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define DQN_CLAMP(val, lo, hi) DQN_MAX(DQN_MIN(val, hi), lo)
 #define DQN_SQUARED(val) ((val) * (val))
 
@@ -168,31 +158,12 @@
 #define DQN_DAYS_TO_S(val) (DQN_HOURS_TO_S(val) * 24ULL)
 #define DQN_YEARS_TO_S(val) (DQN_DAYS_TO_S(val) * 365ULL)
 
-// NOTE: Debug Macros ==============================================================================
-#if !defined(DQN_DEBUG_BREAK)
-    #if defined(NDEBUG)
-        #define DQN_DEBUG_BREAK
-    #else
-        #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
-            #define DQN_DEBUG_BREAK __debugbreak()
-        #elif defined(DQN_COMPILER_CLANG) || defined(DQN_COMPILER_GCC)
-            #include <signal.h>
-            #define DQN_DEBUG_BREAK raise(SIGTRAP)
-        #elif
-            #error "Unhandled compiler"
-        #endif
-    #endif
-#endif
-
-#if !defined(DQN_MEMSET_BYTE)
-    #define DQN_MEMSET_BYTE 0
-#endif
-
 // NOTE: Assert Macros =============================================================================
 #define DQN_HARD_ASSERT(expr) DQN_HARD_ASSERTF(expr, "")
 #define DQN_HARD_ASSERTF(expr, fmt, ...)                                         \
     if (!(expr)) {                                                               \
         Dqn_Log_ErrorF("Hard assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
+        DQN_DUMP_STACK_TRACE;                                                    \
         DQN_DEBUG_BREAK;                                                         \
     }
 
@@ -204,6 +175,7 @@
     #define DQN_ASSERTF(expr, fmt, ...)                                         \
         if (!(expr)) {                                                          \
             Dqn_Log_ErrorF("Assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
+            DQN_DUMP_STACK_TRACE;                                               \
             DQN_DEBUG_BREAK;                                                    \
         }
 #endif
@@ -243,6 +215,7 @@
 #endif
 
 // NOTE: Defer Macro ===============================================================================
+#if defined(__cplusplus)
 #if 0
 #include <stdio.h>
 int main()
@@ -273,13 +246,14 @@ struct Dqn_DeferHelper
 
 #define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
 #define DQN_DEFER const auto DQN_UNIQUE_NAME(defer_lambda_) = Dqn_DeferHelper() + [&]()
+#endif // defined(__cplusplus)
 
 #define DQN_DEFER_LOOP(begin, end)                   \
     for (bool DQN_UNIQUE_NAME(once) = (begin, true); \
          DQN_UNIQUE_NAME(once);                      \
          end, DQN_UNIQUE_NAME(once) = false)
 
-// NOTE: [$TYPE] Typedefs ==========================================================================
+// NOTE: [$TYPE] Types =============================================================================
 typedef intptr_t     Dqn_isize;
 typedef uintptr_t    Dqn_usize;
 typedef intptr_t     Dqn_isize;
@@ -292,25 +266,40 @@ typedef int32_t      Dqn_b32;
 #define DQN_ISIZE_MAX INTPTR_MAX
 #define DQN_ISIZE_MIN INTPTR_MIN
 
-// NOTE [$GSTR] Global Structs =====================================================================
+typedef enum Dqn_ZeroMem
+{
+    Dqn_ZeroMem_No,  // Memory can be handed out without zero-ing it out
+    Dqn_ZeroMem_Yes, // Memory should be zero-ed out before giving to the callee
+}
+Dqn_ZeroMem;
+
 struct Dqn_String8
 {
     char     *data;  // The bytes of the string
     Dqn_usize  size; // The number of bytes in the string
 
     #if defined(__cplusplus)
-    char const *begin() const { return data; }        // Const begin iterator for range-for loops
-    char const *end  () const { return data + size; } // Const end iterator for range-for loops
-    char       *begin()       { return data; }        // Begin iterator for range-for loops
-    char       *end  ()       { return data + size; } // End iterator for range-for loops
+    char const *begin() const { return data; }
+    char const *end  () const { return data + size; }
+    char       *begin()       { return data; }
+    char       *end  ()       { return data + size; }
     #endif
 };
 
 // NOTE: [$INTR] Intrinsics ========================================================================
-typedef enum Dqn_ZeroMem {
-    Dqn_ZeroMem_No,  ///< Memory can be handed out without zero-ing it out
-    Dqn_ZeroMem_Yes, ///< Memory should be zero-ed out before giving to the callee
-} Dqn_ZeroMem;
+// Platform agnostic functions for CPU level instructions like atomics, barriers
+// and timestamp counters.
+//
+// NOTE: API
+// @proc Dqn_Atomic_SetValue64, Dqn_Atomic_SetValue32
+//   @desc Atomically set the value into the target using an atomic compare and 
+//   swap.
+//   @param[in,out] target The target pointer to set atomically
+//   @param[in] value The value to set atomically into the target
+//   @return The value that was last stored in the target
+
+// @proc Dqn_CPUID
+//   Execute 'CPUID' instruction to query the capabilities of the current CPU.
 
 // NOTE: Dqn_Atomic_Add/Exchange return the previous value store in the target
 #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
@@ -321,24 +310,22 @@ typedef enum Dqn_ZeroMem {
     #define Dqn_Atomic_AddU64(target, value)                          _InterlockedExchangeAdd64((__int64 volatile *)target, value)
     #define Dqn_Atomic_SubU32(target, value)                          Dqn_Atomic_AddU32(DQN_CAST(long volatile *)target, (long)-value)
     #define Dqn_Atomic_SubU64(target, value)                          Dqn_Atomic_AddU64(target, (uint64_t)-value)
-    #define Dqn_CPUClockCycle()                                       __rdtsc()
+    #define Dqn_CPU_TSC()                                             __rdtsc()
     #define Dqn_CompilerReadBarrierAndCPUReadFence                    _ReadBarrier(); _mm_lfence()
     #define Dqn_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
 #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     #if defined(__ANDROID__)
-        
     #else
         #include <x86intrin.h>
     #endif
-
     #define Dqn_Atomic_AddU32(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_AddU64(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_SubU32(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_SubU64(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
     #if defined(DQN_COMPILER_GCC)
-        #define Dqn_CPUClockCycle() __rdtsc()
+        #define Dqn_CPU_TSC() __rdtsc()
     #else
-        #define Dqn_CPUClockCycle() __builtin_readcyclecounter()
+        #define Dqn_CPU_TSC() __builtin_readcyclecounter()
     #endif
     #define Dqn_CompilerReadBarrierAndCPUReadFence   asm volatile("lfence" ::: "memory")
     #define Dqn_CompilerWriteBarrierAndCPUWriteFence asm volatile("sfence" ::: "memory")
@@ -346,10 +333,6 @@ typedef enum Dqn_ZeroMem {
     #error "Compiler not supported"
 #endif
 
-/// Atomically set the value into the target using an atomic compare and swap.
-/// @param[in,out] target The target pointer to set atomically
-/// @param[in] value The value to set atomically into the target
-/// @return The value that was last stored in the target
 DQN_FORCE_INLINE uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint64_t value)
 {
     #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
@@ -366,10 +349,6 @@ DQN_FORCE_INLINE uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint6
     #endif
 }
 
-/// Atomically set the value into the target using an atomic compare and swap.
-/// @param[in,out] target The target pointer to set atomically
-/// @param[in] value The value to set atomically into the target
-/// @return The value that was last stored in the target
 DQN_FORCE_INLINE long Dqn_Atomic_SetValue32(long volatile *target, long value)
 {
     #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
@@ -392,7 +371,6 @@ struct Dqn_CPUIDRegisters
     Dqn_uint array[4]; ///< Values from 'CPUID' instruction for each register (EAX, EBX, ECX, EDX)
 };
 
-/// Execute 'CPUID' instruction to query the capabilities of the current CPU.
 Dqn_CPUIDRegisters Dqn_CPUID(int function_id);
 #endif // DQN_OS_ARM64
 
@@ -446,12 +424,3 @@ void     Dqn_TicketMutex_End        (Dqn_TicketMutex *mutex);
 Dqn_uint Dqn_TicketMutex_MakeTicket (Dqn_TicketMutex *mutex);
 void     Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 bool     Dqn_TicketMutex_CanLock    (Dqn_TicketMutex const *mutex, Dqn_uint ticket);
-
-// NOTE: [$CALL] Dqn_CallSite ======================================================================
-struct Dqn_CallSite
-{
-    Dqn_String8  file;
-    Dqn_String8  function;
-    unsigned int line;
-};
-#define DQN_CALL_SITE Dqn_CallSite{DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__}

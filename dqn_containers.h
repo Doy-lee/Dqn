@@ -1,12 +1,3 @@
-// NOTE: Table Of Contents =========================================================================
-// Index              | Disable #define | Description
-// =================================================================================================
-// [$VARR] Dqn_VArray | DQN_NO_VARRAY   | Array backed by virtual memory arena
-// [$FARR] Dqn_FArray | DQN_NO_FARRAY   | Fixed-size arrays
-// [$DMAP] Dqn_DSMap  | DQN_NO_DSMAP    | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// [$LIST] Dqn_List   | DQN_NO_LIST     | Chunked linked lists, append only
-// =================================================================================================
-
 #if !defined(DQN_NO_VARRAY)
 // NOTE: [$VARR] Dqn_VArray ========================================================================
 // An array that is backed by virtual memory by reserving addressing space and
@@ -72,10 +63,10 @@
 
 template <typename T> struct Dqn_VArray
 {
-    Dqn_ArenaBlock *block; // Block of memory from the allocator for this array
-    T              *data;  // Pointer to the start of the array items in the block of memory
-    Dqn_usize       size;  // Number of items currently in the array
-    Dqn_usize       max;   // Maximum number of items this array can store
+    Dqn_MemBlock *block; // Block of memory from the allocator for this array
+    T            *data;  // Pointer to the start of the array items in the block of memory
+    Dqn_usize     size;  // Number of items currently in the array
+    Dqn_usize     max;   // Maximum number of items this array can store
 
     T       *begin()       { return data; }
     T       *end  ()       { return data + size; }
@@ -389,30 +380,25 @@ DQN_API template <typename T> Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *aren
 DQN_API template <typename T> T *         Dqn_List_At           (Dqn_List<T> *list, Dqn_usize index, Dqn_ListChunk<T> *at_chunk);
 DQN_API template <typename T> bool        Dqn_List_Iterate      (Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index);
 
-// NOTE: Macros ====================================================================================
-#define Dqn_List_Make(list, count)        Dqn_List_Make_(DQN_LEAK_TRACE list, count)
-#define Dqn_List_Add(list, count)         Dqn_List_Add_(DQN_LEAK_TRACE list, count)
-
-// NOTE: Internal ==================================================================================
-DQN_API template <typename T> T *         Dqn_List_Make_        (DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_usize count);
-DQN_API template <typename T> T *         Dqn_List_Add_         (DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_usize count);
+DQN_API template <typename T> T *         Dqn_List_Make         (Dqn_List<T> *list, Dqn_usize count);
+DQN_API template <typename T> T *         Dqn_List_Add          (Dqn_List<T> *list, Dqn_usize count);
 #endif // !defined(DQN_NO_LIST)
 
 #if !defined(DQN_NO_VARRAY)
 // NOTE: [$VARR] Dqn_VArray ========================================================================
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size)
 {
-    Dqn_usize byte_size_64k_aligned = Dqn_PowerOfTwoAlign(byte_size, DQN_VMEM_RESERVE_GRANULARITY);
-    Dqn_VArray<T> result            = {};
-    result.block                    = Dqn_Arena_Grow(arena, byte_size_64k_aligned, 0 /*commit*/, Dqn_ArenaBlockFlags_Private);
-    result.max                      = result.block->size / sizeof(T);
-    result.data                     = DQN_CAST(T *)Dqn_PowerOfTwoAlign((uintptr_t)result.block->memory, alignof(T));
+    Dqn_VArray<T> result = {};
+    result.block         = Dqn_Arena_Grow(arena, byte_size, 0 /*commit*/, Dqn_MemBlockFlag_ArenaPrivate);
+    result.data          = DQN_CAST(T *)Dqn_MemBlock_Alloc(result.block, /*size*/ 0, alignof(T), Dqn_ZeroMem_No);
+    result.max           = (result.block->size - result.block->used) / sizeof(T);
     return result;
 }
 
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_Init(Dqn_Arena *arena, Dqn_usize max)
 {
     Dqn_VArray<T> result = Dqn_VArray_InitByteSize<T>(arena, max * sizeof(T));
+    DQN_ASSERT(result.max >= max);
     return result;
 }
 
@@ -431,7 +417,7 @@ DQN_API template <typename T> T *Dqn_VArray_Make(Dqn_VArray<T> *array, Dqn_usize
         return nullptr;
 
     // TODO: Use placement new? Why doesn't this work?
-    T *result = Dqn_Arena_NewArrayWithBlock(array->block, T, count, zero_mem);
+    T *result = Dqn_MemBlock_NewArray(array->block, T, count, zero_mem);
     if (result)
         array->size += count;
     return result;
@@ -960,17 +946,17 @@ template <typename T> DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *aren
     return result;
 }
 
-template <typename T> DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, Dqn_usize count)
+template <typename T> DQN_API T *Dqn_List_Make(Dqn_List<T> *list, Dqn_usize count)
 {
     if (list->chunk_size == 0)
         list->chunk_size = 128;
     if (!list->tail || (list->tail->count + count) > list->tail->size) {
-        auto *tail = (Dqn_ListChunk<T> * )Dqn_Arena_Allocate_(list->arena, sizeof(Dqn_ListChunk<T>), alignof(Dqn_ListChunk<T>), Dqn_ZeroMem_Yes DQN_LEAK_TRACE_ARG);
+        auto *tail = Dqn_Arena_New(list->arena, Dqn_ListChunk<T>, Dqn_ZeroMem_Yes);
         if (!tail)
           return nullptr;
 
         Dqn_usize items = DQN_MAX(list->chunk_size, count);
-        tail->data      = DQN_CAST(T * )Dqn_Arena_Allocate_(list->arena, sizeof(T) * items, alignof(T), Dqn_ZeroMem_Yes DQN_LEAK_TRACE_ARG);
+        tail->data      = Dqn_Arena_NewArray(list->arena, T, items, Dqn_ZeroMem_Yes);
         tail->size      = items;
 
         if (!tail->data)
@@ -993,10 +979,10 @@ template <typename T> DQN_API T *Dqn_List_Make_(DQN_LEAK_TRACE_FUNCTION Dqn_List
     return result;
 }
 
-template <typename T> DQN_API T *Dqn_List_Add_(DQN_LEAK_TRACE_FUNCTION Dqn_List<T> *list, T const &value)
+template <typename T> DQN_API T *Dqn_List_Add(Dqn_List<T> *list, T const &value)
 {
-    T *result = Dqn_List_Make_(list, 1);
-    *result = value;
+    T *result = Dqn_List_Make(list, 1);
+    *result   = value;
     return result;
 }
 
