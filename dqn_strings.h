@@ -248,10 +248,11 @@ struct Dqn_String8BinarySplitResult
 
 struct Dqn_String8FindResult
 {
-    bool        found;
-    Dqn_usize   index;
-    Dqn_String8 match;
-    Dqn_String8 match_to_end_of_buffer;
+    bool        found;                  // True if string was found. If false, the subsequent fields below are not set.
+    Dqn_usize   index;                  // The index in the buffer where the found string starts
+    Dqn_String8 match;                  // The matching string in the buffer that was searched
+    Dqn_String8 match_to_end_of_buffer; // The substring containing the found string to the end of the buffer
+    Dqn_String8 start_to_before_match;  // The substring from the start of the buffer up until the found string, not including it
 };
 
 // NOTE: Macros ====================================================================================
@@ -317,6 +318,7 @@ DQN_API Dqn_String8                  Dqn_String8_CopyCString           (Dqn_Allo
 DQN_API Dqn_String8                  Dqn_String8_Copy                  (Dqn_Allocator allocator, Dqn_String8 string);
 
 DQN_API Dqn_String8                  Dqn_String8_Slice                 (Dqn_String8 string, Dqn_usize offset, Dqn_usize size);
+DQN_API Dqn_String8                  Dqn_String8_Advance               (Dqn_String8 string, Dqn_usize amount);
 DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplitArray      (Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size);
 DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplit           (Dqn_String8 string, Dqn_String8 find);
 DQN_API Dqn_usize                    Dqn_String8_Split                 (Dqn_String8 string, Dqn_String8 delimiter, Dqn_String8 *splits, Dqn_usize splits_count);

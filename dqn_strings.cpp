@@ -90,6 +90,12 @@ DQN_API Dqn_String8 Dqn_String8_Slice(Dqn_String8 string, Dqn_usize offset, Dqn_
     return result;
 }
 
+DQN_API Dqn_String8 Dqn_String8_Advance(Dqn_String8 string, Dqn_usize amount)
+{
+    Dqn_String8 result = Dqn_String8_Slice(string, amount, UINT64_MAX);
+    return result;
+}
+
 DQN_API Dqn_String8BinarySplitResult Dqn_String8_BinarySplitArray(Dqn_String8 string, Dqn_String8 const *find, Dqn_usize find_size)
 {
     Dqn_String8BinarySplitResult result = {};
@@ -176,6 +182,7 @@ DQN_API Dqn_String8FindResult Dqn_String8_FindFirstStringArray(Dqn_String8 strin
             if (Dqn_String8_Eq(string_slice, find_item)) {
                 result.found                  = true;
                 result.index                  = index;
+                result.start_to_before_match  = Dqn_String8_Init(string.data, index);
                 result.match                  = Dqn_String8_Init(string.data + index, find_item.size);
                 result.match_to_end_of_buffer = Dqn_String8_Init(result.match.data, string.size - index);
                 break;

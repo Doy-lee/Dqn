@@ -479,7 +479,7 @@ Dqn_UTest TestDSMap()
                 uint64_t value          = 0;
                 uint64_t grow_threshold = map_start_size * 3 / 4;
                 for (; map.occupied != grow_threshold; value++) {
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     DQN_UTEST_ASSERT(&test, !Dqn_DSMap_Find<uint64_t>(&map, key));
                     DQN_UTEST_ASSERT(&test, !Dqn_DSMap_FindSlot<uint64_t>(&map, key));
@@ -498,7 +498,7 @@ Dqn_UTest TestDSMap()
                 DQN_UTEST_ASSERT(&test, map.occupied     == 1 /*Sentinel*/ + value);
 
                 { // NOTE: One more item should cause the table to grow by 2x
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     bool found         = false;
                     if (test_type == DSMapTestType_Set) {
@@ -548,7 +548,7 @@ Dqn_UTest TestDSMap()
                 uint64_t value              = 0;
                 uint64_t shrink_threshold   = map.size * 1 / 4;
                 for (; map.occupied != shrink_threshold; value++) {
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
 
                     DQN_UTEST_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key));
@@ -561,7 +561,7 @@ Dqn_UTest TestDSMap()
                 DQN_UTEST_ASSERT(&test, map.occupied == start_map_occupied - value);
 
                 { // NOTE: One more item should cause the table to grow by 2x
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     Dqn_DSMap_Erase(&map, key);
                     value++;
@@ -600,7 +600,7 @@ Dqn_UTest TestDSMap()
                 }
 
                 for (; map.occupied != 1; value++) { // NOTE: Remove all items from the table
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value, 1);
+                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
                     Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
                     DQN_UTEST_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key));
                     Dqn_DSMap_Erase(&map, key);

@@ -309,9 +309,21 @@ DQN_API Dqn_V2 operator-(Dqn_V2 lhs, Dqn_V2 rhs)
     return result;
 }
 
+DQN_API Dqn_V2 operator-(Dqn_V2 lhs, Dqn_f32 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x - rhs, lhs.y - rhs);
+    return result;
+}
+
 DQN_API Dqn_V2 operator+(Dqn_V2 lhs, Dqn_V2 rhs)
 {
     Dqn_V2 result = Dqn_V2_InitNx2(lhs.x + rhs.x, lhs.y + rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator+(Dqn_V2 lhs, Dqn_f32 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x + rhs, lhs.y + rhs);
     return result;
 }
 

@@ -242,9 +242,11 @@ enum Dqn_ArenaCommit
 
 // NOTE: Allocation ================================================================================
 #define                     Dqn_Arena_New(arena, Type, zero_mem)              (Type *)Dqn_Arena_Alloc(arena, sizeof(Type), alignof(Type), zero_mem)
+#define                     Dqn_Arena_NewCopy(arena, Type, src)               (Type *)Dqn_Arena_Copy(arena, src, sizeof(*src), alignof(Type))
+#define                     Dqn_Arena_NewCopyZ(arena, Type, src)              (Type *)Dqn_Arena_Copy(arena, src, sizeof(*src), alignof(Type))
 #define                     Dqn_Arena_NewArray(arena, Type, count, zero_mem)  (Type *)Dqn_Arena_Alloc(arena, sizeof(Type) * count, alignof(Type), zero_mem)
-#define                     Dqn_Arena_NewCopy(arena, Type, src, count)        (Type *)Dqn_Arena_Copy(arena, src, sizeof(*src) * count, alignof(Type))
-#define                     Dqn_Arena_NewCopyZ(arena, Type, src, count)       (Type *)Dqn_Arena_CopyZ(arena, src, sizeof(*src) * count, alignof(Type))
+#define                     Dqn_Arena_NewArrayCopy(arena, Type, src, count)   (Type *)Dqn_Arena_Copy(arena, src, sizeof(*src) * count, alignof(Type))
+#define                     Dqn_Arena_NewArrayCopyZ(arena, Type, src, count)  (Type *)Dqn_Arena_CopyZ(arena, src, sizeof(*src) * count, alignof(Type))
 
 DQN_API Dqn_Allocator       Dqn_Arena_Allocator      (Dqn_Arena *arena);
 DQN_API Dqn_MemBlock *      Dqn_Arena_Grow           (Dqn_Arena *arena, Dqn_usize size, Dqn_usize commit, uint8_t flags);

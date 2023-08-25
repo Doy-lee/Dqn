@@ -1275,7 +1275,7 @@ DQN_API Dqn_String16 Dqn_Win_EXEDirWArena(Dqn_Arena *arena)
 
     Dqn_String16 result = {};
     if (dir_size > 0) {
-        result.data = Dqn_Arena_NewCopyZ(arena, wchar_t, dir, dir_size);
+        result.data = Dqn_Arena_NewArrayCopyZ(arena, wchar_t, dir, dir_size);
         if (result.data) {
             result.size = dir_size;
         }
