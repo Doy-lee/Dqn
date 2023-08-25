@@ -1195,7 +1195,7 @@ DQN_API Dqn_String16 Dqn_Win_String8ToString16(Dqn_Arena *arena, Dqn_String8 src
     return result;
 }
 
-DQN_API int Dqn_Win_String8ToString16Buffer(Dqn_String8 src, wchar_t *dest, Dqn_usize dest_size)
+DQN_API int Dqn_Win_String8ToString16Buffer(Dqn_String8 src, wchar_t *dest, int dest_size)
 {
     int result = 0;
     if (!Dqn_String8_IsValid(src))
@@ -1211,7 +1211,7 @@ DQN_API int Dqn_Win_String8ToString16Buffer(Dqn_String8 src, wchar_t *dest, Dqn_
 }
 
 // NOTE: Windows String16 To UTF8 ==================================================================
-DQN_API int Dqn_Win_String16ToString8Buffer(Dqn_String16 src, char *dest, Dqn_usize dest_size)
+DQN_API int Dqn_Win_String16ToString8Buffer(Dqn_String16 src, char *dest, int dest_size)
 {
     int result = 0;
     if (!Dqn_String8_IsValid(src))

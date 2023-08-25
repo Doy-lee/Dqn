@@ -720,13 +720,13 @@ DQN_API char Dqn_Char_ToHex(char ch)
 {
     char result = DQN_CAST(char)-1;
     if (ch < 16)
-        result = DQN_HEX_LUT[ch];
+        result = DQN_HEX_LUT[DQN_CAST(uint8_t)ch];
     return result;
 }
 
 DQN_API char Dqn_Char_ToHexUnchecked(char ch)
 {
-    char result = DQN_HEX_LUT[ch];
+    char result = DQN_HEX_LUT[DQN_CAST(uint8_t)ch];
     return result;
 }
 

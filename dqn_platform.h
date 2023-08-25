@@ -307,9 +307,9 @@ DQN_API void         Dqn_Win_MakeProcessDPIAware();
 // queried using 'Dqn_Win_LastError'
 
 DQN_API Dqn_String16 Dqn_Win_String8ToString16(Dqn_Arena *arena, Dqn_String8 src);
-DQN_API int          Dqn_Win_String8ToString16Buffer(Dqn_String16 src, char *dest, Dqn_usize dest_size);
+DQN_API int          Dqn_Win_String8ToString16Buffer(Dqn_String16 src, char *dest, int dest_size);
 DQN_API Dqn_String8  Dqn_Win_String16ToString8(Dqn_Arena *arena, Dqn_String16 src);
-DQN_API int          Dqn_Win_String16ToString8Buffer(Dqn_String16 src, char *dest, Dqn_usize dest_size);
+DQN_API int          Dqn_Win_String16ToString8Buffer(Dqn_String16 src, char *dest, int dest_size);
 
 // NOTE: Path navigation ===========================================================================
 // NOTE: API =======================================================================================

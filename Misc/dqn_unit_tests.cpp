@@ -1770,8 +1770,8 @@ Dqn_UTest TestWin()
             int size_returned = Dqn_Win_String8ToString16Buffer(INPUT, nullptr, 0);
             wchar_t const EXPECTED[] = {L'S', L't', L'r', L'i', L'n', L'g', 0};
 
-            DQN_UTEST_ASSERTF(&test, string16.size == size_returned, "string_size: %d, result: %d", DQN_CAST(int)string16.size, size_returned);
-            DQN_UTEST_ASSERTF(&test, string16.size == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", DQN_CAST(int)string16.size, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
+            DQN_UTEST_ASSERTF(&test, DQN_CAST(int)string16.size == size_returned, "string_size: %d, result: %d", DQN_CAST(int)string16.size, size_returned);
+            DQN_UTEST_ASSERTF(&test, DQN_CAST(int)string16.size == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", DQN_CAST(int)string16.size, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
             DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string16.data, sizeof(EXPECTED)) == 0);
         }
 
@@ -1783,8 +1783,8 @@ Dqn_UTest TestWin()
             int size_returned         = Dqn_Win_String16ToString8Buffer(INPUT, nullptr, 0);
             char const EXPECTED[]     = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
-            DQN_UTEST_ASSERTF(&test, string8.size == size_returned, "string_size: %d, result: %d", DQN_CAST(int)string8.size, size_returned);
-            DQN_UTEST_ASSERTF(&test, string8.size == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", DQN_CAST(int)string8.size, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
+            DQN_UTEST_ASSERTF(&test, DQN_CAST(int)string8.size == size_returned, "string_size: %d, result: %d", DQN_CAST(int)string8.size, size_returned);
+            DQN_UTEST_ASSERTF(&test, DQN_CAST(int)string8.size == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", DQN_CAST(int)string8.size, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
             DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string8.data, sizeof(EXPECTED)) == 0);
         }
     }
