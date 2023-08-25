@@ -1,5 +1,5 @@
 // NOTE: [$CSTR] Dqn_CString8 ======================================================================
-DQN_API Dqn_usize Dqn_CString8_FSize(char const *fmt, ...)
+DQN_API Dqn_usize Dqn_CString8_FSize(DQN_FMT_STRING_ANNOTATE char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -8,7 +8,7 @@ DQN_API Dqn_usize Dqn_CString8_FSize(char const *fmt, ...)
     return result;
 }
 
-DQN_API Dqn_usize Dqn_CString8_FVSize(char const *fmt, va_list args)
+DQN_API Dqn_usize Dqn_CString8_FVSize(DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args)
 {
     va_list args_copy;
     va_copy(args_copy, args);
@@ -44,12 +44,6 @@ DQN_API Dqn_String8 Dqn_String8_InitCString8(char const *src)
 {
     Dqn_usize size     = Dqn_CString8_Size(src);
     Dqn_String8 result = Dqn_String8_Init(src, size);
-    return result;
-}
-
-DQN_API bool Dqn_String8_IsValid(Dqn_String8 string)
-{
-    bool result = string.data;
     return result;
 }
 
@@ -364,14 +358,17 @@ DQN_API Dqn_String8 Dqn_String8_FileNameFromPath(Dqn_String8 path)
     if (!Dqn_String8_IsValid(result))
         return result;
 
-    for (Dqn_usize i = result.size - 1; i < result.size; --i) {
-        if (result.data[i] == '\\' || result.data[i] == '/') {
+    DQN_MSVC_WARNING_PUSH
+    DQN_MSVC_WARNING_DISABLE(6293) // Ill-defined for-loop.
+    for (Dqn_usize index = result.size - 1; index < result.size; --index) {
+        if (result.data[index] == '\\' || result.data[index] == '/') {
             char const *end = result.data + result.size;
-            result.data     = result.data + (i + 1);
+            result.data     = result.data + (index + 1);
             result.size     = end - result.data;
             break;
         }
     }
+    DQN_MSVC_WARNING_POP
     return result;
 }
 
@@ -548,7 +545,7 @@ DQN_API bool operator!=(Dqn_String8 const &lhs, Dqn_String8 const &rhs)
 }
 #endif
 
-DQN_API Dqn_String8 Dqn_String8_InitF(Dqn_Allocator allocator, char const *fmt, ...)
+DQN_API Dqn_String8 Dqn_String8_InitF(Dqn_Allocator allocator, DQN_FMT_STRING_ANNOTATE char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
@@ -557,7 +554,7 @@ DQN_API Dqn_String8 Dqn_String8_InitF(Dqn_Allocator allocator, char const *fmt, 
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_String8_InitFV(Dqn_Allocator allocator, char const *fmt, va_list args)
+DQN_API Dqn_String8 Dqn_String8_InitFV(Dqn_Allocator allocator, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args)
 {
     Dqn_String8 result = {};
     if (!fmt)
@@ -632,7 +629,7 @@ DQN_API bool Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_Stri
     return result;
 }
 
-DQN_API bool Dqn_String8Builder_AppendFV(Dqn_String8Builder *builder, char const *fmt, va_list args)
+DQN_API bool Dqn_String8Builder_AppendFV(Dqn_String8Builder *builder, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args)
 {
     Dqn_String8 string = Dqn_String8_InitFV(builder->allocator, fmt, args);
     if (string.size == 0)
@@ -644,7 +641,7 @@ DQN_API bool Dqn_String8Builder_AppendFV(Dqn_String8Builder *builder, char const
     return result;
 }
 
-DQN_API bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, char const *fmt, ...)
+DQN_API bool Dqn_String8Builder_AppendF(Dqn_String8Builder *builder, DQN_FMT_STRING_ANNOTATE char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -718,17 +715,18 @@ DQN_API uint8_t Dqn_Char_HexToU8(char ch)
     return result;
 }
 
-char constexpr DQN_HEX_LUT[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+static char constexpr DQN_HEX_LUT[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 DQN_API char Dqn_Char_ToHex(char ch)
 {
     char result = DQN_CAST(char)-1;
-    if (ch <= 16) result = DQN_HEX_LUT[DQN_CAST(unsigned)ch];
+    if (ch < 16)
+        result = DQN_HEX_LUT[ch];
     return result;
 }
 
 DQN_API char Dqn_Char_ToHexUnchecked(char ch)
 {
-    char result = DQN_HEX_LUT[DQN_CAST(unsigned)ch];
+    char result = DQN_HEX_LUT[ch];
     return result;
 }
 

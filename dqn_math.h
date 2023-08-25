@@ -1,7 +1,5 @@
-#if defined(DQN_COMPILER_W32_MSVC)
-    #pragma warning(push)
-    #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
-#endif
+DQN_MSVC_WARNING_PUSH
+DQN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
 
 #if !defined(DQN_NO_V2)
 // NOTE: [$VEC2] Vector2 ===========================================================================
@@ -159,11 +157,6 @@ DQN_API Dqn_V3  Dqn_V3_Normalise(Dqn_V3 a);
 
 #if !defined(DQN_NO_V4)
 // NOTE: [$VEC4] Vector4 ===========================================================================
-
-#if defined(DQN_COMPILER_W32_MSVC)
-    #pragma warning(push)
-    #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
-#endif
 union Dqn_V4
 {
     struct { Dqn_f32 x, y, z, w; };
@@ -194,10 +187,6 @@ Dqn_V4 &operator*=(Dqn_V4 &lhs, Dqn_f32 rhs);
 Dqn_V4 &operator*=(Dqn_V4 &lhs, int32_t rhs);
 Dqn_V4 &operator-=(Dqn_V4 &lhs, Dqn_V4  rhs);
 Dqn_V4 &operator+=(Dqn_V4 &lhs, Dqn_V4  rhs);
-
-#if defined(DQN_COMPILER_W32_MSVC)
-    #pragma warning(pop)
-#endif
 #endif // !defined(DQN_NO_V4)
 
 #if !defined(DQN_NO_M4)
@@ -308,7 +297,4 @@ DQN_API Dqn_Rect Dqn_RectCut_Cut(Dqn_RectCut rect_cut, Dqn_V2 size, Dqn_RectCutC
 // NOTE: [$MATH] Other =============================================================================
 DQN_API Dqn_V2  Dqn_Lerp_V2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);
 DQN_API Dqn_f32 Dqn_Lerp_F32(Dqn_f32 a, Dqn_f32 t, Dqn_f32 b);
-
-#if defined(DQN_COMPILER_W32_MSVC)
-    #pragma warning(pop)
-#endif
+DQN_MSVC_WARNING_POP

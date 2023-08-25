@@ -48,20 +48,20 @@ DQN_API Dqn_PrintStyle Dqn_Print_StyleBold         ();
 
 // NOTE: Print =====================================================================================
 DQN_API void           Dqn_Print_Std               (Dqn_PrintStd std_handle, Dqn_String8 string);
-DQN_API void           Dqn_Print_StdF              (Dqn_PrintStd std_handle, char const *fmt, ...);
-DQN_API void           Dqn_Print_StdFV             (Dqn_PrintStd std_handle, char const *fmt, va_list args);
+DQN_API void           Dqn_Print_StdF              (Dqn_PrintStd std_handle, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API void           Dqn_Print_StdFV             (Dqn_PrintStd std_handle, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
 
 DQN_API void           Dqn_Print_StdStyle          (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_String8 string);
-DQN_API void           Dqn_Print_StdFStyle         (Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, ...);
-DQN_API void           Dqn_Print_StdFVStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, va_list args);
+DQN_API void           Dqn_Print_StdFStyle         (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API void           Dqn_Print_StdFVStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
 
 DQN_API void           Dqn_Print_StdLn             (Dqn_PrintStd std_handle, Dqn_String8 string);
-DQN_API void           Dqn_Print_StdLnF            (Dqn_PrintStd std_handle, char const *fmt, ...);
-DQN_API void           Dqn_Print_StdLnFV           (Dqn_PrintStd std_handle, char const *fmt, va_list args);
+DQN_API void           Dqn_Print_StdLnF            (Dqn_PrintStd std_handle, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API void           Dqn_Print_StdLnFV           (Dqn_PrintStd std_handle, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
 
 DQN_API void           Dqn_Print_StdLnStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_String8 string);
-DQN_API void           Dqn_Print_StdLnFStyle       (Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, ...);
-DQN_API void           Dqn_Print_StdLnFVStyle      (Dqn_PrintStd std_handle, Dqn_PrintStyle style, char const *fmt, va_list args);
+DQN_API void           Dqn_Print_StdLnFStyle       (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API void           Dqn_Print_StdLnFVStyle      (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
 
 // NOTE: ANSI Formatting Codes =====================================================================
 Dqn_String8            Dqn_Print_ESCColourString   (Dqn_PrintESCColour colour, uint8_t r, uint8_t g, uint8_t b);
@@ -225,11 +225,11 @@ struct Dqn_FsPath
 
 DQN_API bool        Dqn_FsPath_AddRef            (Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String8 path);
 DQN_API bool        Dqn_FsPath_Add               (Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String8 path);
-DQN_API bool        Dqn_FsPath_AddF              (Dqn_Arena *arena, Dqn_FsPath *fs_path, char const *fmt, ...);
+DQN_API bool        Dqn_FsPath_AddF              (Dqn_Arena *arena, Dqn_FsPath *fs_path, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
 DQN_API bool        Dqn_FsPath_Pop               (Dqn_FsPath *fs_path);
 DQN_API Dqn_String8 Dqn_FsPath_BuildWithSeparator(Dqn_Arena *arena, Dqn_FsPath const *fs_path, Dqn_String8 path_separator);
 DQN_API Dqn_String8 Dqn_FsPath_Convert           (Dqn_Arena *arena, Dqn_String8 path);
-DQN_API Dqn_String8 Dqn_FsPath_ConvertF          (Dqn_Arena *arena, char const *fmt, ...);
+DQN_API Dqn_String8 Dqn_FsPath_ConvertF          (Dqn_Arena *arena, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
 #define             Dqn_FsPath_BuildFwdSlash(arena, fs_path)  Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STRING8("/"))
 #define             Dqn_FsPath_BuildBackSlash(arena, fs_path) Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STRING8("\\"))
 
@@ -285,15 +285,13 @@ DQN_API uint64_t              Dqn_Date_EpochTime            ();
 //   DPI aware on Windows and ensure that application UI is scaled up
 //   appropriately for the monitor.
 
-struct Dqn_WinErrorMsg
+struct Dqn_WinError
 {
     unsigned long code;
-    char          data[DQN_KILOBYTES(64) - 1]; // Maximum error size
-    unsigned long size;
+    Dqn_String8   msg;
 };
-DQN_API void            Dqn_Win_LastErrorToBuffer(Dqn_WinErrorMsg *msg);
-DQN_API Dqn_WinErrorMsg Dqn_Win_LastError();
-DQN_API void            Dqn_Win_MakeProcessDPIAware();
+DQN_API Dqn_WinError Dqn_Win_LastError(Dqn_Arena *arena);
+DQN_API void         Dqn_Win_MakeProcessDPIAware();
 
 // NOTE: Windows String8 <-> String16 ===========================================
 // Convert a UTF8 <-> UTF16 string.
@@ -308,16 +306,12 @@ DQN_API void            Dqn_Win_MakeProcessDPIAware();
 // written/required for conversion. 0 if there was a conversion error and can be
 // queried using 'Dqn_Win_LastError'
 
-DQN_API int             Dqn_Win_CString8ToCString16        (char const *src, int src_size, wchar_t *dest, int dest_size);
-DQN_API int             Dqn_Win_String8ToCString16         (Dqn_String8 src, wchar_t *dest, int dest_size);
-DQN_API Dqn_String16    Dqn_Win_String8ToString16Allocator (Dqn_String8 src, Dqn_Allocator allocator);
+DQN_API Dqn_String16 Dqn_Win_String8ToString16(Dqn_Arena *arena, Dqn_String8 src);
+DQN_API int          Dqn_Win_String8ToString16Buffer(Dqn_String16 src, char *dest, Dqn_usize dest_size);
+DQN_API Dqn_String8  Dqn_Win_String16ToString8(Dqn_Arena *arena, Dqn_String16 src);
+DQN_API int          Dqn_Win_String16ToString8Buffer(Dqn_String16 src, char *dest, Dqn_usize dest_size);
 
-DQN_API int             Dqn_Win_CString16ToCString8        (wchar_t const *src, int src_size, char *dest, int dest_size);
-DQN_API Dqn_String8     Dqn_Win_CString16ToString8Allocator(wchar_t const *src, int src_size, Dqn_Allocator allocator);
-DQN_API int             Dqn_Win_String16ToCString8         (Dqn_String16 src, char *dest, int dest_size);
-DQN_API Dqn_String8     Dqn_Win_String16ToString8Allocator (Dqn_String16 src, Dqn_Allocator allocator);
-
-// NOTE: Path navigatoin ===========================================================================
+// NOTE: Path navigation ===========================================================================
 // NOTE: API =======================================================================================
 // @proc Dqn_Win_EXEDirW, Dqn_Win_EXEDirWArena
 //   @desc Evaluate the current executable's directory that is running when this
@@ -354,8 +348,7 @@ struct Dqn_Win_FolderIterator
     char         file_name_buf[512];
 };
 
-DQN_API Dqn_usize       Dqn_Win_EXEDirW       (wchar_t *buffer, Dqn_usize size);
-DQN_API Dqn_String16    Dqn_Win_EXEDirWArena  (Dqn_Arena *arena);
+DQN_API Dqn_String16    Dqn_Win_EXEDirW       (Dqn_Arena *arena);
 DQN_API Dqn_String8     Dqn_Win_WorkingDir    (Dqn_Allocator allocator, Dqn_String8 suffix);
 DQN_API Dqn_String16    Dqn_Win_WorkingDirW   (Dqn_Allocator allocator, Dqn_String16 suffix);
 DQN_API bool            Dqn_Win_FolderIterate (Dqn_String8 path, Dqn_Win_FolderIterator *it);
@@ -503,7 +496,7 @@ struct Dqn_OSTimer
 
 DQN_API bool        Dqn_OS_SecureRNGBytes      (void *buffer, uint32_t size);
 #if (defined(DQN_OS_WIN32) && !defined(DQN_NO_WIN)) || !defined(DQN_OS_WIN32)
-DQN_API Dqn_String8 Dqn_OS_EXEDir              (Dqn_Allocator allocator);
+DQN_API Dqn_String8 Dqn_OS_EXEDir              (Dqn_Arena* arena);
 #endif
 DQN_API void        Dqn_OS_SleepMs             (Dqn_uint milliseconds);
 DQN_API uint64_t    Dqn_OS_PerfCounterNow      ();

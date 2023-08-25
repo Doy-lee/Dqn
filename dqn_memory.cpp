@@ -102,7 +102,14 @@ DQN_API bool Dqn_VMem_Commit(void *ptr, Dqn_usize size, uint32_t page_flags)
 DQN_API void Dqn_VMem_Decommit(void *ptr, Dqn_usize size)
 {
     #if defined(DQN_OS_WIN32)
+
+    // NOTE: This is a decommit call, which is explicitly saying to free the
+    // pages but not the VADs, you would use VMem_Release to release everything.
+    DQN_MSVC_WARNING_PUSH
+    DQN_MSVC_WARNING_DISABLE(6250) // Calling 'VirtualFree' without the MEM_RELEASE flag might free memory but not address descriptors (VADs).  This causes address space leaks.
     VirtualFree(ptr, size, MEM_DECOMMIT);
+    DQN_MSVC_WARNING_POP
+
     #elif defined(DQN_OS_UNIX)
     mprotect(ptr, size, PROT_NONE);
     madvise(ptr, size, MADV_FREE);
@@ -144,8 +151,9 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
         #if defined(DQN_NO_WIN)
         DQN_ASSERTF(result, "VirtualProtect failed");
         #else
-        Dqn_WinErrorMsg error = Dqn_Win_LastError();
-        DQN_ASSERTF(result, "VirtualProtect failed (%d): %.*s", error.code, error.size, error.data);
+        Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+        Dqn_WinError error        = Dqn_Win_LastError(scratch.arena);
+        DQN_ASSERTF(result, "VirtualProtect failed (%d): %.*s", error.code, DQN_STRING_FMT(error.msg));
         #endif
     }
     #else
@@ -312,6 +320,7 @@ DQN_API void *Dqn_Arena_Alloc(Dqn_Arena *arena, Dqn_usize size, uint8_t align, D
         if (!arena->curr) {
             if (!Dqn_Arena_Grow(arena, size, size /*commit*/, 0 /*flags*/))
                 return result;
+            DQN_ASSERT(arena->curr);
         }
 
         result = Dqn_MemBlock_Alloc(arena->curr, size, align, zero_mem);
@@ -401,7 +410,7 @@ DQN_API void Dqn_Arena_EndTempMemory(Dqn_ArenaTempMemory temp_memory, bool cance
         arena->tail->next = nullptr;
 
     // NOTE: Reset the usage of all the blocks between the tail and current block's
-    for (Dqn_MemBlock *block = arena->tail; block != arena->curr; block = block->prev)
+    for (Dqn_MemBlock *block = arena->tail; block && (block != arena->curr); block = block->prev)
         block->used = 0;
 }
 

@@ -208,15 +208,15 @@ DQN_API Dqn_String8 Dqn_Log_MakeString(Dqn_Allocator allocator,
                                                              "%.*s"    // reset
                                                              " %.*s"   // file name
                                                              ":%05u ", // line number
-                                                             time.date_size - 2, time.date + 2,
-                                                             time.hms_size,      time.hms,
-                                                             colour_esc.size,    colour_esc.data,
-                                                             bold_esc.size,      bold_esc.data,
-                                                             type.size,          type.data,
-                                                             type_padding,       "",
-                                                             reset_esc.size,     reset_esc.data,
-                                                             file_name.size,     file_name.data,
-                                                             call_site.line);
+                                                             DQN_CAST(uint32_t)time.date_size - 2, time.date + 2,   // date
+                                                             DQN_CAST(uint32_t)time.hms_size,      time.hms,        // hms
+                                                             DQN_CAST(uint32_t)colour_esc.size,    colour_esc.data, // colour
+                                                             DQN_CAST(uint32_t)bold_esc.size,      bold_esc.data,   // bold
+                                                             DQN_CAST(uint32_t)type.size,          type.data,       // type
+                                                             DQN_CAST(uint32_t)type_padding,       "",              // type padding
+                                                             DQN_CAST(uint32_t)reset_esc.size,     reset_esc.data,  // reset
+                                                             DQN_CAST(uint32_t)file_name.size,     file_name.data,  // file name
+                                                             call_site.line);                                       // line number
         header_size_no_ansi_codes = header.size - colour_esc.size - Dqn_Print_ESCResetString.size;
     }
 
@@ -244,13 +244,12 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *use
     (void)log_type;
     (void)user_data;
 
-    // NOTE: Open log file for appending if requested
-    // =========================================================================
+    // NOTE: Open log file for appending if requested ==========================
     Dqn_TicketMutex_Begin(&g_dqn_library->log_file_mutex);
     if (g_dqn_library->log_to_file && !g_dqn_library->log_file) {
         Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(nullptr);
         #if (defined(DQN_OS_WIN32) && !defined(DQN_NO_WIN)) || !defined(DQN_OS_WIN32)
-        Dqn_String8        exe_dir  = Dqn_OS_EXEDir(scratch.allocator);
+        Dqn_String8        exe_dir  = Dqn_OS_EXEDir(scratch.arena);
         #else
         Dqn_String8        exe_dir  = DQN_STRING8(".");
         #endif
@@ -259,8 +258,7 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *use
     }
     Dqn_TicketMutex_End(&g_dqn_library->log_file_mutex);
 
-    // NOTE: Generate the log header
-    // =========================================================================
+    // NOTE: Generate the log header ===========================================
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
     Dqn_String8 log_line      = Dqn_Log_MakeString(scratch.allocator,
                                                    !g_dqn_library->log_no_colour,
@@ -270,12 +268,11 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *use
                                                    fmt,
                                                    args);
 
-    // NOTE: Print log
-    // =========================================================================
+    // NOTE: Print log =========================================================
     Dqn_Print_StdLn(Dqn_PrintStd_Out, log_line);
 
     Dqn_TicketMutex_Begin(&g_dqn_library->log_file_mutex);
-    if (g_dqn_library->log_to_file) {
+    if (g_dqn_library->log_to_file && g_dqn_library->log_file) {
         fprintf(DQN_CAST(FILE *)g_dqn_library->log_file, "%.*s\n", DQN_STRING_FMT(log_line));
     }
     Dqn_TicketMutex_End(&g_dqn_library->log_file_mutex);

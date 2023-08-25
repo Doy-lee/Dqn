@@ -746,6 +746,18 @@ Dqn_UTest TestIntrinsics()
     // atomics/intrinsics are implemented using macros we ensure the macro was
     // written properly with these tests.
 
+    DQN_MSVC_WARNING_PUSH
+
+    // NOTE: MSVC SAL complains that we are using Interlocked functionality on
+    // variables it has detected as *not* being shared across threads. This is
+    // fine, we're just running some basic tests, so permit it.
+    //
+    // Warning 28112 is a knock-on effect of this that it doesn't like us
+    // reading the value of the variable that has been used in an Interlocked
+    // function locally.
+    DQN_MSVC_WARNING_DISABLE(28113) // Accessing a local variable val via an Interlocked function.
+    DQN_MSVC_WARNING_DISABLE(28112) // A variable (val) which is accessed via an Interlocked function must always be accessed via an Interlocked function. See line 759.
+
     DQN_UTEST_GROUP(test, "Dqn_Atomic") {
         DQN_UTEST_TEST("Dqn_Atomic_AddU32") {
             uint32_t val = 0;
@@ -775,7 +787,7 @@ Dqn_UTest TestIntrinsics()
             long a = 0;
             long b = 111;
             Dqn_Atomic_SetValue32(&a, b);
-            DQN_UTEST_ASSERTF(&test, a == b, "a: %lu, b: %lu", a, b);
+            DQN_UTEST_ASSERTF(&test, a == b, "a: %ld, b: %ld", a, b);
         }
 
         DQN_UTEST_TEST("Dqn_Atomic_SetValue64") {
@@ -797,6 +809,7 @@ Dqn_UTest TestIntrinsics()
         Dqn_CompilerWriteBarrierAndCPUWriteFence;
         Dqn_UTest_End(&test);
     }
+    DQN_MSVC_WARNING_POP
 
     return test;
 }
@@ -1067,7 +1080,7 @@ Dqn_UTest TestOS()
 
         DQN_UTEST_TEST("Query executable directory") {
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_String8 result = Dqn_OS_EXEDir(scratch.allocator);
+            Dqn_String8 result = Dqn_OS_EXEDir(scratch.arena);
             DQN_UTEST_ASSERT(&test, Dqn_String8_IsValid(result));
             DQN_UTEST_ASSERTF(&test, Dqn_Fs_DirExists(result), "result(%zu): %.*s", result.size, DQN_STRING_FMT(result));
         }
@@ -1233,7 +1246,7 @@ Dqn_UTest TestString8()
     DQN_UTEST_GROUP(test, "Dqn_String8") {
         DQN_UTEST_TEST("Initialise with string literal w/ macro") {
             Dqn_String8 string = DQN_STRING8("AB");
-            DQN_UTEST_ASSERTF(&test, string.size == 2, "size: %I64d", string.size);
+            DQN_UTEST_ASSERTF(&test, string.size == 2,      "size: %I64u",   string.size);
             DQN_UTEST_ASSERTF(&test, string.data[0] == 'A', "string[0]: %c", string.data[0]);
             DQN_UTEST_ASSERTF(&test, string.data[1] == 'B', "string[1]: %c", string.data[1]);
         }
@@ -1241,17 +1254,17 @@ Dqn_UTest TestString8()
         DQN_UTEST_TEST("Initialise with format string") {
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
             Dqn_String8 string = Dqn_String8_InitF(scratch.allocator, "%s", "AB");
-            DQN_UTEST_ASSERTF(&test, string.size == 2, "size: %I64d", string.size);
+            DQN_UTEST_ASSERTF(&test, string.size == 2,      "size: %I64u",   string.size);
             DQN_UTEST_ASSERTF(&test, string.data[0] == 'A', "string[0]: %c", string.data[0]);
             DQN_UTEST_ASSERTF(&test, string.data[1] == 'B', "string[1]: %c", string.data[1]);
-            DQN_UTEST_ASSERTF(&test, string.data[2] == 0, "string[2]: %c", string.data[2]);
+            DQN_UTEST_ASSERTF(&test, string.data[2] == 0,   "string[2]: %c", string.data[2]);
         }
 
         DQN_UTEST_TEST("Copy string") {
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
             Dqn_String8 string        = DQN_STRING8("AB");
             Dqn_String8 copy          = Dqn_String8_Copy(scratch.allocator, string);
-            DQN_UTEST_ASSERTF(&test, copy.size == 2, "size: %I64d", copy.size);
+            DQN_UTEST_ASSERTF(&test, copy.size == 2,      "size: %I64u", copy.size);
             DQN_UTEST_ASSERTF(&test, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
             DQN_UTEST_ASSERTF(&test, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
             DQN_UTEST_ASSERTF(&test, copy.data[2] ==  0,  "copy[2]: %c", copy.data[2]);
@@ -1265,7 +1278,7 @@ Dqn_UTest TestString8()
         DQN_UTEST_TEST("Allocate string from arena") {
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
             Dqn_String8 string = Dqn_String8_Allocate(scratch.allocator, 2, Dqn_ZeroMem_No);
-            DQN_UTEST_ASSERTF(&test, string.size == 2, "size: %I64d", string.size);
+            DQN_UTEST_ASSERTF(&test, string.size == 2, "size: %I64u", string.size);
         }
 
         // NOTE: Dqn_CString8_Trim[Prefix/Suffix]
@@ -1652,15 +1665,12 @@ Dqn_UTest TestVArray()
             // from the memory block (and hence the array) contiguously
             // when the size of the object is not aligned with the required 
             // alignment of the object.
-
-            #if defined(_MSC_VER)
-            #pragma warning(push)
-            #pragma warning(disable: 4324) // warning C4324: 'TestVArray::UnalignedObject': structure was padded due to alignment specifier
+            DQN_MSVC_WARNING_PUSH
+            DQN_MSVC_WARNING_DISABLE(4324) // warning C4324: 'TestVArray::UnalignedObject': structure was padded due to alignment specifier
             struct alignas(8) UnalignedObject {
                 char data[511];
             };
-            #pragma warning(pop)
-            #endif // _MSC_VER
+            DQN_MSVC_WARNING_POP
 
             Dqn_ThreadScratch scratch         = Dqn_Thread_GetScratch(nullptr);
             Dqn_VArray<UnalignedObject> array = Dqn_VArray_InitByteSize<UnalignedObject>(scratch.arena, DQN_KILOBYTES(64));
@@ -1699,35 +1709,35 @@ Dqn_UTest TestWin()
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Win") {
         DQN_UTEST_TEST("String8 to String16 size required") {
-            int result = Dqn_Win_String8ToCString16(DQN_STRING8("a"), nullptr, 0);
+            int result = Dqn_Win_String8ToString16Buffer(DQN_STRING8("a"), nullptr, 0);
             DQN_UTEST_ASSERTF(&test, result == 1, "Size returned: %d. This size should not include the null-terminator", result);
         }
 
         DQN_UTEST_TEST("String16 to String8 size required") {
-            int result = Dqn_Win_String16ToCString8(DQN_STRING16(L"a"), nullptr, 0);
+            int result = Dqn_Win_String16ToString8Buffer(DQN_STRING16(L"a"), nullptr, 0);
             DQN_UTEST_ASSERTF(&test, result == 1, "Size returned: %d. This size should not include the null-terminator", result);
         }
 
         DQN_UTEST_TEST("String8 to String16 size required") {
-            int result = Dqn_Win_String8ToCString16(DQN_STRING8("String"), nullptr, 0);
+            int result = Dqn_Win_String8ToString16Buffer(DQN_STRING8("String"), nullptr, 0);
             DQN_UTEST_ASSERTF(&test, result == 6, "Size returned: %d. This size should not include the null-terminator", result);
         }
 
         DQN_UTEST_TEST("String16 to String8 size required") {
-            int result = Dqn_Win_String16ToCString8(DQN_STRING16(L"String"), nullptr, 0);
+            int result = Dqn_Win_String16ToString8Buffer(DQN_STRING16(L"String"), nullptr, 0);
             DQN_UTEST_ASSERTF(&test, result == 6, "Size returned: %d. This size should not include the null-terminator", result);
         }
 
         DQN_UTEST_TEST("String8 to String16") {
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
             Dqn_String8 const INPUT   = DQN_STRING8("String");
-            int size_required         = Dqn_Win_String8ToCString16(INPUT, nullptr, 0);
+            int size_required         = Dqn_Win_String8ToString16Buffer(INPUT, nullptr, 0);
             wchar_t *string           = Dqn_Arena_NewArray(scratch.arena, wchar_t, size_required + 1, Dqn_ZeroMem_No);
 
             // Fill the string with error sentinels, which ensures the string is zero terminated
             DQN_MEMSET(string, 'Z', size_required + 1);
 
-            int size_returned = Dqn_Win_String8ToCString16(INPUT, string, size_required + 1);
+            int size_returned = Dqn_Win_String8ToString16Buffer(INPUT, string, size_required + 1);
             wchar_t const EXPECTED[] = {L'S', L't', L'r', L'i', L'n', L'g', 0};
 
             DQN_UTEST_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
@@ -1738,18 +1748,44 @@ Dqn_UTest TestWin()
         DQN_UTEST_TEST("String16 to String8: No null-terminate") {
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
             Dqn_String16 INPUT        = DQN_STRING16(L"String");
-            int size_required         = Dqn_Win_String16ToCString8(INPUT, nullptr, 0);
+            int size_required         = Dqn_Win_String16ToString8Buffer(INPUT, nullptr, 0);
             char *string              = Dqn_Arena_NewArray(scratch.arena, char, size_required + 1, Dqn_ZeroMem_No);
 
             // Fill the string with error sentinels, which ensures the string is zero terminated
             DQN_MEMSET(string, 'Z', size_required + 1);
 
-            int size_returned = Dqn_Win_String16ToCString8(INPUT, string, size_required + 1);
+            int size_returned = Dqn_Win_String16ToString8Buffer(INPUT, string, size_required + 1);
             char const EXPECTED[] = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
             DQN_UTEST_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
             DQN_UTEST_ASSERTF(&test, size_returned == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", size_returned, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
             DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
+        }
+
+        DQN_UTEST_TEST("String8 to String16 arena") {
+            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+            Dqn_String8 const INPUT   = DQN_STRING8("String");
+            Dqn_String16 string16     = Dqn_Win_String8ToString16(scratch.arena, INPUT);
+
+            int size_returned = Dqn_Win_String8ToString16Buffer(INPUT, nullptr, 0);
+            wchar_t const EXPECTED[] = {L'S', L't', L'r', L'i', L'n', L'g', 0};
+
+            DQN_UTEST_ASSERTF(&test, string16.size == size_returned, "string_size: %d, result: %d", DQN_CAST(int)string16.size, size_returned);
+            DQN_UTEST_ASSERTF(&test, string16.size == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", DQN_CAST(int)string16.size, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
+            DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string16.data, sizeof(EXPECTED)) == 0);
+        }
+
+        DQN_UTEST_TEST("String16 to String8: No null-terminate arena") {
+            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+            Dqn_String16 INPUT        = DQN_STRING16(L"String");
+            Dqn_String8 string8       = Dqn_Win_String16ToString8(scratch.arena, INPUT);
+
+            int size_returned         = Dqn_Win_String16ToString8Buffer(INPUT, nullptr, 0);
+            char const EXPECTED[]     = {'S', 't', 'r', 'i', 'n', 'g', 0};
+
+            DQN_UTEST_ASSERTF(&test, string8.size == size_returned, "string_size: %d, result: %d", DQN_CAST(int)string8.size, size_returned);
+            DQN_UTEST_ASSERTF(&test, string8.size == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", DQN_CAST(int)string8.size, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
+            DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string8.data, sizeof(EXPECTED)) == 0);
         }
     }
     return test;

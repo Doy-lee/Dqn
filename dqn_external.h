@@ -5,6 +5,7 @@
     #include <Windows.h>
     #include <shellscalingapi.h>
 #endif
+
 #define B_STACKTRACE_API static
 #include "b_stacktrace.h"
 
@@ -17,13 +18,14 @@
         #include <bcrypt.h>   // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
         #include <shellapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
         #if !defined(DQN_NO_WINNET)
+            DQN_MSVC_WARNING_PUSH
+            DQN_MSVC_WARNING_DISABLE(6553) // wininet.h|940 warning| The annotation for function 'InternetConnectA' on _Param_(8) does not apply to a value type.
             #include <wininet.h> // Dqn_Win_Net -> InternetConnect ... etc
+            DQN_MSVC_WARNING_POP
         #endif // DQN_NO_WINNET
     #elif !defined(_INC_WINDOWS)
-        #if defined(DQN_COMPILER_W32_MSVC)
-            #pragma warning(push)
-            #pragma warning(disable: 4201) // warning C4201: nonstandard extension used: nameless struct/union
-        #endif
+        DQN_MSVC_WARNING_PUSH
+        DQN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
         #define MAX_PATH 260
 
         // NOTE: Wait/Synchronization
@@ -358,9 +360,7 @@
         /*HINSTANCE*/ void *         __stdcall ShellExecuteA              (void *hwnd, char const *lpOperation, char const *lpFile, char const *lpParameters, char const *lpDirectory, int nShowCmd);
         /*BOOL*/      int            __stdcall ShowWindow                 (void *hWnd, int nCmdShow);
         }
-        #if defined(DQN_COMPILER_W32_MSVC)
-            #pragma warning(pop)
-        #endif
+        DQN_MSVC_WARNING_POP
     #endif // !defined(_INC_WINDOWS)
 #elif defined(DQN_OS_UNIX)
     #include <errno.h>        // errno

@@ -17,8 +17,8 @@
 
 DQN_API template <Dqn_usize N> constexpr Dqn_usize Dqn_CString8_ArrayUCount(char const (&literal)[N]) { (void)literal; return N - 1; }
 DQN_API template <Dqn_usize N> constexpr Dqn_usize Dqn_CString8_ArrayICount(char const (&literal)[N]) { (void)literal; return N - 1; }
-DQN_API                                  Dqn_usize Dqn_CString8_FSize      (char const *fmt, ...);
-DQN_API                                  Dqn_usize Dqn_CString8_FVSize     (char const *fmt, va_list args);
+DQN_API                                  Dqn_usize Dqn_CString8_FSize      (DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API                                  Dqn_usize Dqn_CString8_FVSize     (DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
 DQN_API                                  Dqn_usize Dqn_CString8_Size       (char const *a);
 DQN_API                                  Dqn_usize Dqn_CString16_Size      (wchar_t const *a);
 
@@ -308,11 +308,11 @@ struct Dqn_String8ToI64Result
 };
 
 DQN_API Dqn_String8                  Dqn_String8_InitCString8          (char const *src);
-DQN_API bool                         Dqn_String8_IsValid               (Dqn_String8 string);
+#define                              Dqn_String8_IsValid(string) ((string).data)
 DQN_API bool                         Dqn_String8_IsAll                 (Dqn_String8 string, Dqn_String8IsAll is_all);
 
-DQN_API Dqn_String8                  Dqn_String8_InitF                 (Dqn_Allocator allocator, char const *fmt, ...);
-DQN_API Dqn_String8                  Dqn_String8_InitFV                (Dqn_Allocator allocator, char const *fmt, va_list args);
+DQN_API Dqn_String8                  Dqn_String8_InitF                 (Dqn_Allocator allocator, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API Dqn_String8                  Dqn_String8_InitFV                (Dqn_Allocator allocator, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
 DQN_API Dqn_String8                  Dqn_String8_Allocate              (Dqn_Allocator allocator, Dqn_usize size, Dqn_ZeroMem zero_mem);
 DQN_API Dqn_String8                  Dqn_String8_CopyCString           (Dqn_Allocator allocator, char const *string, Dqn_usize size);
 DQN_API Dqn_String8                  Dqn_String8_Copy                  (Dqn_Allocator allocator, Dqn_String8 string);
@@ -438,11 +438,11 @@ template <Dqn_usize N> struct Dqn_FString8
     char const *end  () const { return data + size; }
 };
 
-template <Dqn_usize N>              Dqn_FString8<N> Dqn_FString8_InitF                (char const *fmt, ...);
+template <Dqn_usize N>              Dqn_FString8<N> Dqn_FString8_InitF                (DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
 template <Dqn_usize N>              Dqn_usize       Dqn_FString8_Max                  (Dqn_FString8<N> const *string);
 template <Dqn_usize N>              void            Dqn_FString8_Clear                (Dqn_FString8<N> *string);
-template <Dqn_usize N>              bool            Dqn_FString8_AppendFV             (Dqn_FString8<N> *string, char const *fmt, va_list va);
-template <Dqn_usize N>              bool            Dqn_FString8_AppendF              (Dqn_FString8<N> *string, char const *fmt, ...);
+template <Dqn_usize N>              bool            Dqn_FString8_AppendFV             (Dqn_FString8<N> *string, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list va);
+template <Dqn_usize N>              bool            Dqn_FString8_AppendF              (Dqn_FString8<N> *string, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
 template <Dqn_usize N>              bool            Dqn_FString8_AppendCString8       (Dqn_FString8<N> *string, char const *value, Dqn_usize size);
 template <Dqn_usize N>              bool            Dqn_FString8_Append               (Dqn_FString8<N> *string, Dqn_String8 value);
 template <Dqn_usize N>              Dqn_String8     Dqn_FString8_ToString8            (Dqn_FString8<N> const *string);
@@ -489,8 +489,8 @@ struct Dqn_String8Builder
     Dqn_usize        count;       ///< The number of links in the linked list of strings
 };
 
-DQN_API bool        Dqn_String8Builder_AppendF   (Dqn_String8Builder *builder, char const *fmt, ...);
-DQN_API bool        Dqn_String8Builder_AppendFV  (Dqn_String8Builder *builder, char const *fmt, va_list args);
+DQN_API bool        Dqn_String8Builder_AppendF   (Dqn_String8Builder *builder, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API bool        Dqn_String8Builder_AppendFV  (Dqn_String8Builder *builder, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
 DQN_API bool        Dqn_String8Builder_AppendRef (Dqn_String8Builder *builder, Dqn_String8 string);
 DQN_API bool        Dqn_String8Builder_AppendCopy(Dqn_String8Builder *builder, Dqn_String8 string);
 DQN_API Dqn_String8 Dqn_String8Builder_Build     (Dqn_String8Builder const *builder, Dqn_Allocator allocator);
@@ -512,7 +512,7 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint);
 
 #if !defined(DQN_NO_FSTRING8)
 // NOTE: [$FSTR] Dqn_FString8 ======================================================================
-template <Dqn_usize N> Dqn_FString8<N> Dqn_FString8_InitF(char const *fmt, ...)
+template <Dqn_usize N> Dqn_FString8<N> Dqn_FString8_InitF(DQN_FMT_STRING_ANNOTATE char const *fmt, ...)
 {
     Dqn_FString8<N> result = {};
     if (fmt) {
@@ -535,7 +535,7 @@ template <Dqn_usize N> void Dqn_FString8_Clear(Dqn_FString8<N> *string)
     *string = {};
 }
 
-template <Dqn_usize N> bool Dqn_FString8_AppendFV(Dqn_FString8<N> *string, char const *fmt, va_list args)
+template <Dqn_usize N> bool Dqn_FString8_AppendFV(Dqn_FString8<N> *string, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args)
 {
     bool result = false;
     if (!string || !fmt)
@@ -553,7 +553,7 @@ template <Dqn_usize N> bool Dqn_FString8_AppendFV(Dqn_FString8<N> *string, char 
     return result;
 }
 
-template <Dqn_usize N> bool Dqn_FString8_AppendF(Dqn_FString8<N> *string, char const *fmt, ...)
+template <Dqn_usize N> bool Dqn_FString8_AppendF(Dqn_FString8<N> *string, DQN_FMT_STRING_ANNOTATE char const *fmt, ...)
 {
     bool result = false;
     if (!string || !fmt)

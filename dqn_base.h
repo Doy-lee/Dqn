@@ -48,6 +48,18 @@
     #endif
 #endif
 
+#if defined(DQN_COMPILER_W32_MSVC)
+    #define DQN_FMT_STRING_ANNOTATE _Printf_format_string_
+    #define DQN_MSVC_WARNING_PUSH __pragma(warning(push))
+    #define DQN_MSVC_WARNING_DISABLE(...) __pragma(warning(disable: ##__VA_ARGS__))
+    #define DQN_MSVC_WARNING_POP __pragma(warning(pop))
+#else
+    #define DQN_FMT_STRING_ANNOTATE
+    #define DQN_MSVC_WARNING_PUSH
+    #define DQN_MSVC_WARNING_DISABLE(...)
+    #define DQN_MSVC_WARNING_POP
+#endif
+
 // NOTE: [$MACR] Macros ============================================================================
 #define DQN_FOR_UINDEX(index, size) for (Dqn_usize index = 0; index < size; index++)
 #define DQN_FOR_IINDEX(index, size) for (Dqn_isize index = 0; index < size; index++)

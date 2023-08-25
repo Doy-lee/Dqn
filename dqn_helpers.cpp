@@ -761,10 +761,9 @@ DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator)
         // dividing by 10, so we write it in, then reverse it out after all is
         // done.
         Dqn_U64String temp = {};
-        for (size_t digit_count = 0; val > 0; digit_count++) {
-            if (separator && (digit_count != 0) && (digit_count % 3 == 0)) {
+        for (Dqn_usize digit_count = 0; val > 0; digit_count++) {
+            if (separator && (digit_count != 0) && (digit_count % 3 == 0))
                 temp.data[temp.size++] = separator;
-            }
 
             auto digit             = DQN_CAST(char)(val % 10);
             temp.data[temp.size++] = '0' + digit;
@@ -772,10 +771,14 @@ DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator)
         }
 
         // NOTE: Reverse the string
-        for (size_t temp_index = temp.size - 1; temp_index < temp.size; temp_index--) {
+        DQN_MSVC_WARNING_PUSH
+        DQN_MSVC_WARNING_DISABLE(6293) // Ill-defined for-loop
+        DQN_MSVC_WARNING_DISABLE(6385) // Reading invalid data from 'temp.data' NOTE(doyle): Unsigned overflow is valid for loop termination
+        for (Dqn_usize temp_index = temp.size - 1; temp_index < temp.size; temp_index--) {
             char ch = temp.data[temp_index];
             result.data[result.size++] = ch;
         }
+        DQN_MSVC_WARNING_POP
     }
 
     return result;

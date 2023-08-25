@@ -376,12 +376,12 @@ template <typename T> struct Dqn_List
 };
 
 // NOTE: API =======================================================================================
-DQN_API template <typename T> Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_usize chunk_size = 128);
-DQN_API template <typename T> T *         Dqn_List_At           (Dqn_List<T> *list, Dqn_usize index, Dqn_ListChunk<T> *at_chunk);
-DQN_API template <typename T> bool        Dqn_List_Iterate      (Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index);
+template <typename T> Dqn_List<T> Dqn_List_Init   (Dqn_Arena *arena, Dqn_usize chunk_size);
+template <typename T> T *         Dqn_List_At     (Dqn_List<T> *list, Dqn_usize index, Dqn_ListChunk<T> *at_chunk);
+template <typename T> bool        Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index);
 
-DQN_API template <typename T> T *         Dqn_List_Make         (Dqn_List<T> *list, Dqn_usize count);
-DQN_API template <typename T> T *         Dqn_List_Add          (Dqn_List<T> *list, Dqn_usize count);
+template <typename T> T *         Dqn_List_Make   (Dqn_List<T> *list, Dqn_usize count);
+template <typename T> T *         Dqn_List_Add    (Dqn_List<T> *list, T const &value);
 #endif // !defined(DQN_NO_LIST)
 
 #if !defined(DQN_NO_VARRAY)
