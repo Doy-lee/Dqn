@@ -31,4 +31,7 @@ pushd Build
         exit /b 0
     )
     clang-cl %compile_flags% %clang_flags% %code_dir%\Misc\dqn_unit_tests.cpp -I %code_dir% /Fe:dqn_unit_tests_clang %link_flags% || exit /b 1
+
+    REM Compiler: zig ==============================================================================
+    REM zig c++ -g -D DQN_TEST_WITH_MAIN -I %code_dir% %code_dir%\Misc\dqn_unit_tests.cpp -o dqn_unit_tests_zig || exit /b 1
 popd

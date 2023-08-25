@@ -1,12 +1,8 @@
-// -------------------------------------------------------------------------------------------------
-// NOTE: Preprocessor Config
-// -------------------------------------------------------------------------------------------------
-/*
-#define DQN_TEST_WITH_MAIN   Define this to enable the main function and allow standalone compiling
-                             and running of the file.
-#define DQN_TEST_WITH_KECCAK Define this to enable the main function and allow standalone compiling
-                             and running of the file.
-*/
+// NOTE: Preprocessor Config =======================================================================
+// #define DQN_TEST_WITH_MAIN   Define this to enable the main function and allow standalone compiling
+//                              and running of the file.
+// #define DQN_TEST_WITH_KECCAK Define this to enable the main function and allow standalone compiling
+//                              and running of the file.
 
 #if defined(DQN_TEST_WITH_MAIN)
     #if defined(_MSC_VER) && !defined(__clang__)

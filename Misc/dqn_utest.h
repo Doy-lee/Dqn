@@ -1,13 +1,12 @@
 #if !defined(DQN_UTEST_H)
 #define DQN_UTEST_H
 //
-// NOTE: Overview
-// -----------------------------------------------------------------------------
+// NOTE: Overview ==================================================================================
 // A super minimal testing framework, most of the logic here is the pretty
 // printing of test results.
 
-// NOTE: Configuration
-// -----------------------------------------------------------------------------
+// NOTE: Configuration =============================================================================
+//
 // #define DQN_UTEST_IMPLEMENTATION
 //     Define this in one and only one C++ file to enable the implementation
 //     code of the header file. This will also automatically enable the JSMN
@@ -33,11 +32,11 @@
 //     Define this to a terminal color code to specify what color sucess will be
 //     presented as.
 
-// NOTE: Macros
-// -----------------------------------------------------------------------------
+// NOTE: Macros ====================================================================================
 #include <stdio.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <string.>
 
 #if !defined(DQN_UTEST_RESULT_LPAD)
     #define DQN_UTEST_RESULT_LPAD 90
@@ -122,8 +121,7 @@
         }                                              \
     } while (0)
 
-// NOTE: Header
-// -----------------------------------------------------------------------------
+// NOTE: Header ====================================================================================
 typedef enum Dqn_UTestState {
     Dqn_UTestState_Nil,
     Dqn_UTestState_TestBegun,
@@ -144,8 +142,7 @@ void Dqn_UTest_BeginV(Dqn_UTest *test, char const *fmt, va_list args);
 void Dqn_UTest_Begin(Dqn_UTest *test, char const *fmt, ...);
 void Dqn_UTest_End(Dqn_UTest *test);
 
-// NOTE: Implementation
-// -----------------------------------------------------------------------------
+// NOTE: Implementation ============================================================================
 #if defined(DQN_UTEST_IMPLEMENTATION)
 void Dqn_UTest_PrintStats(Dqn_UTest *test)
 {
