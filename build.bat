@@ -24,22 +24,22 @@ pushd Build
     set clang_link_flags=%msvc_link_flags%
 
     REM msvc =======================================================================================
-    REM set has_msvc=1
-    REM where /q cl || set has_msvc=0
-    REM if %has_msvc% == 1 (
-    REM     echo [BUILD] MSVC's cl detected, compiling ...
-    REM     set msvc_cmd=cl %msvc_compile_flags% %msvc_link_flags%
-    REM     powershell -Command "$time = Measure-Command { !msvc_cmd! | Out-Default }; Write-Host '[BUILD] msvc:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
-    REM )
+    set has_msvc=1
+    where /q cl || set has_msvc=0
+    if %has_msvc% == 1 (
+        echo [BUILD] MSVC's cl detected, compiling ...
+        set msvc_cmd=cl %msvc_compile_flags% %msvc_link_flags%
+        powershell -Command "$time = Measure-Command { !msvc_cmd! | Out-Default }; Write-Host '[BUILD] msvc:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
+    )
 
     REM REM clang-cl ===================================================================================
-    REM set has_clang_cl=1
-    REM where /q clang-cl || set has_clang_cl=0
-    REM if %has_clang_cl% == 1 (
-    REM     echo [BUILD] clang-cl detected, compiling ...
-    REM     set clang_cmd=clang-cl %clang_compile_flags% %clang_link_flags%
-    REM     powershell -Command "$time = Measure-Command { !clang_cmd! | Out-Default }; Write-Host '[BUILD] clang-cl:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
-    REM )
+    set has_clang_cl=1
+    where /q clang-cl || set has_clang_cl=0
+    if %has_clang_cl% == 1 (
+        echo [BUILD] clang-cl detected, compiling ...
+        set clang_cmd=clang-cl %clang_compile_flags% %clang_link_flags%
+        powershell -Command "$time = Measure-Command { !clang_cmd! | Out-Default }; Write-Host '[BUILD] clang-cl:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
+    )
 
     REM zig ========================================================================================
     REM TODO(doyle):Can't build "Misc\dqn_unit_tests.cpp|1 col 1| error: unable to build C object: FileNotFound"

@@ -28,7 +28,7 @@
 #define DQN_UTEST_IMPLEMENTATION
 #include "dqn_utest.h"
 
-Dqn_UTest TestArena()
+static Dqn_UTest Dqn_Test_Arena()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Arena") {
@@ -161,7 +161,7 @@ Dqn_UTest TestArena()
     return test;
 }
 
-Dqn_UTest TestBin()
+static Dqn_UTest Dqn_Test_Bin()
 {
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
     Dqn_UTest test           = {};
@@ -247,7 +247,7 @@ Dqn_UTest TestBin()
 }
 
 
-Dqn_UTest TestBinarySearch()
+static Dqn_UTest Dqn_Test_BinarySearch()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_BinarySearch") {
@@ -417,7 +417,7 @@ Dqn_UTest TestBinarySearch()
     return test;
 }
 
-Dqn_UTest TestDSMap()
+static Dqn_UTest Dqn_Test_DSMap()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_DSMap") {
@@ -611,7 +611,7 @@ Dqn_UTest TestDSMap()
     return test;
 }
 
-Dqn_UTest TestFString8()
+static Dqn_UTest Dqn_Test_FString8()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_FString8") {
@@ -628,7 +628,7 @@ Dqn_UTest TestFString8()
     return test;
 }
 
-Dqn_UTest TestFs()
+static Dqn_UTest Dqn_Test_Fs()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Fs") {
@@ -685,7 +685,7 @@ Dqn_UTest TestFs()
     return test;
 }
 
-Dqn_UTest TestFixedArray()
+static Dqn_UTest Dqn_Test_FixedArray()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_FArray") {
@@ -735,7 +735,7 @@ Dqn_UTest TestFixedArray()
     return test;
 }
 
-Dqn_UTest TestIntrinsics()
+static Dqn_UTest Dqn_Test_Intrinsics()
 {
     Dqn_UTest test = {};
     // TODO(dqn): We don't have meaningful tests here, but since
@@ -836,7 +836,7 @@ Dqn_String8 const DQN_UTEST_HASH_STRING_[] =
 #undef DQN_UTEST_HASH_X_ENTRY
 };
 
-void TestKeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_String8 input)
+void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_String8 input)
 {
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
     Dqn_String8 input_hex     = Dqn_Hex_BytesToString8Arena(scratch.arena, input.data, input.size);
@@ -982,7 +982,7 @@ void TestKeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_String8 input)
     }
 }
 
-Dqn_UTest TestKeccak()
+Dqn_UTest Dqn_Test_Keccak()
 {
     Dqn_UTest test = {};
     Dqn_String8 const INPUTS[] = {
@@ -1001,7 +1001,7 @@ Dqn_UTest TestKeccak()
 
             for (Dqn_String8 input : INPUTS) {
                 Dqn_UTest_Begin(&test, "%.*s - Input: %.*s", DQN_STRING_FMT(DQN_UTEST_HASH_STRING_[hash_type]), DQN_CAST(int)DQN_MIN(input.size, 54), input.data);
-                TestKeccakDispatch_(&test, hash_type, input);
+                Dqn_Test_KeccakDispatch_(&test, hash_type, input);
                 Dqn_UTest_End(&test);
             }
 
@@ -1023,7 +1023,7 @@ Dqn_UTest TestKeccak()
 }
 #endif // defined(DQN_TEST_WITH_KECCAK)
 
-Dqn_UTest TestM4()
+static Dqn_UTest Dqn_Test_M4()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_M4") {
@@ -1049,7 +1049,7 @@ Dqn_UTest TestM4()
     return test;
 }
 
-Dqn_UTest TestOS()
+static Dqn_UTest Dqn_Test_OS()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_OS") {
@@ -1108,7 +1108,7 @@ Dqn_UTest TestOS()
     return test;
 }
 
-Dqn_UTest TestRect()
+static Dqn_UTest Dqn_Test_Rect()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Rect") {
@@ -1236,7 +1236,7 @@ Dqn_UTest TestRect()
     return test;
 }
 
-Dqn_UTest TestString8()
+static Dqn_UTest Dqn_Test_String8()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_String8") {
@@ -1534,7 +1534,7 @@ Dqn_UTest TestString8()
     return test;
 }
 
-Dqn_UTest TestTicketMutex()
+static Dqn_UTest Dqn_Test_TicketMutex()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_TicketMutex") {
@@ -1567,7 +1567,7 @@ Dqn_UTest TestTicketMutex()
     return test;
 }
 
-Dqn_UTest TestVArray()
+static Dqn_UTest Dqn_Test_VArray()
 {
     Dqn_UTest test            = {};
     DQN_UTEST_GROUP(test, "Dqn_VArray") {
@@ -1700,7 +1700,7 @@ Dqn_UTest TestVArray()
     return test;
 }
 
-Dqn_UTest TestWin()
+static Dqn_UTest Dqn_Test_Win()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Win") {
@@ -1787,7 +1787,7 @@ Dqn_UTest TestWin()
     return test;
 }
 
-void CustomLogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
+static void Dqn_Test_CustomLogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
 {
     (void)user_data;
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
@@ -1795,48 +1795,50 @@ void CustomLogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite
     DQN_UTEST_LOG("%.*s", DQN_STRING_FMT(log));
 }
 
-void Dqn_TestRunSuite()
+static void Dqn_Test_RunSuite()
 {
     Dqn_Library *dqn_library = Dqn_Library_Init();
-    dqn_library->log_callback = CustomLogProc;
+    auto *prev_log_callback   = dqn_library->log_callback;
+    dqn_library->log_callback = Dqn_Test_CustomLogProc;
 
     Dqn_UTest tests[] =
     {
-        TestArena(),
-        TestBin(),
-        TestBinarySearch(),
-        TestDSMap(),
-        TestFString8(),
-        TestFs(),
-        TestFixedArray(),
-        TestIntrinsics(),
+        Dqn_Test_Arena(),
+        Dqn_Test_Bin(),
+        Dqn_Test_BinarySearch(),
+        Dqn_Test_DSMap(),
+        Dqn_Test_FString8(),
+        Dqn_Test_Fs(),
+        Dqn_Test_FixedArray(),
+        Dqn_Test_Intrinsics(),
         #if defined(DQN_TEST_WITH_KECCAK)
-        TestKeccak(),
+        Dqn_Test_Keccak(),
         #endif
-        TestM4(),
-        TestOS(),
-        TestRect(),
-        TestString8(),
-        TestTicketMutex(),
-        TestVArray(),
-        TestWin(),
+        Dqn_Test_M4(),
+        Dqn_Test_OS(),
+        Dqn_Test_Rect(),
+        Dqn_Test_String8(),
+        Dqn_Test_TicketMutex(),
+        Dqn_Test_VArray(),
+        Dqn_Test_Win(),
     };
 
     int total_tests = 0;
     int total_good_tests = 0;
-    for (Dqn_UTest &test : tests) {
+    for (const Dqn_UTest &test : tests) {
         total_tests += test.num_tests_in_group;
         total_good_tests += test.num_tests_ok_in_group;
     }
 
     fprintf(stdout, "Summary: %d/%d tests succeeded\n", total_good_tests, total_tests);
+    dqn_library->log_callback = prev_log_callback;
 }
 
 #if defined(DQN_TEST_WITH_MAIN)
 int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;
-    Dqn_TestRunSuite();
+    Dqn_Test_RunSuite();
     return 0;
 }
 #endif

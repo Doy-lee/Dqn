@@ -294,6 +294,7 @@
 #include "dqn_base.cpp"
 #include "dqn_external.cpp"
 #include "dqn_memory.cpp"
+#include "dqn_platform_print.cpp"
 #include "dqn_debug.cpp"
 #include "dqn_strings.cpp"
 #include "dqn_containers.cpp"
