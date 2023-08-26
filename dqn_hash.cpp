@@ -29,7 +29,7 @@ DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_usize size)
 }
 
 // NOTE: [$MMUR] Dqn_MurmurHash3 ===================================================================
-#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
     #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)
 #else

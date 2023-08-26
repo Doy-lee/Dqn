@@ -1,37 +1,53 @@
 @echo OFF
-setlocal
+setlocal EnableDelayedExpansion
 
-set code_dir=%~dp0
+set script_dir_backslash=%~dp0
+set script_dir=%script_dir_backslash:~0,-1%
+
 if not exist Build mkdir Build
 pushd Build
     REM Flags ======================================================================================
-    REM MT     Static CRT
-    REM EHa-   Disable exception handling
-    REM GR-    Disable C RTTI
-    REM O2     Optimisation Level 2
-    REM Oi     Use CPU Intrinsics
-    REM Z7     Combine multi-debug files to one debug file
-    REM wd4201 Nonstandard extension used: nameless struct/union
-    REM Tp     Treat header file as CPP source file
-    set compile_flags=-MT -EHa -GR- -Od -Oi -Z7 -wd4201 -W4 -WX -D DQN_TEST_WITH_MAIN -nologo
-    set link_flags=-link
-    set msvc_flags=-fsanitize=address -analyze
-    set clang_flags=-fsanitize=address,undefined
+    REM MT   Static CRT
+    REM EHa- Disable exception handling
+    REM GR-  Disable C RTTI
+    REM O2   Optimisation Level 2
+    REM Oi   Use CPU Intrinsics
+    REM Z7   Combine multi-debug files to one debug file
+    set common_flags=-D DQN_TEST_WITH_MAIN -I %script_dir% %script_dir%\Misc\dqn_unit_tests.cpp
 
-    REM Compiler: MSVC cl ==========================================================================
-    where /q cl || (
-        echo [ERROR] cl is not found, please put MSVC's cl on the path
-        exit /b 1
-    )
-    cl %compile_flags% %msvc_flags% %code_dir%\Misc\dqn_unit_tests.cpp -I %code_dir% /Fe:dqn_unit_tests_msvc %link_flags% || exit /b 1
+    set msvc_driver_flags=%common_flags%        -MT -EHa -GR- -Od -Oi -Z7 -wd4201 -W4 -WX -nologo
+    set msvc_compile_flags=%msvc_driver_flags%  -fsanitize=address -analyze             /Fe:dqn_unit_tests_msvc
+    set clang_compile_flags=%msvc_driver_flags% -fsanitize=address -fsanitize=undefined /Fe:dqn_unit_tests_clang
+    set zig_compile_flags=%common_flags%        -fsanitize=address -fsanitize=undefined -o dqn_unit_tests_zig
 
-    REM Compiler: clang-cl =========================================================================
-    where /q clang-cl || (
-        echo [WARN] Optional clang compile via clang-cl if it's in the path, please put clang-cl on the path for this feature
-        exit /b 0
-    )
-    clang-cl %compile_flags% %clang_flags% %code_dir%\Misc\dqn_unit_tests.cpp -I %code_dir% /Fe:dqn_unit_tests_clang %link_flags% || exit /b 1
+    set msvc_link_flags=-link
+    set clang_link_flags=%msvc_link_flags%
 
-    REM Compiler: zig ==============================================================================
-    REM zig c++ -g -D DQN_TEST_WITH_MAIN -I %code_dir% %code_dir%\Misc\dqn_unit_tests.cpp -o dqn_unit_tests_zig || exit /b 1
+    REM msvc =======================================================================================
+    REM set has_msvc=1
+    REM where /q cl || set has_msvc=0
+    REM if %has_msvc% == 1 (
+    REM     echo [BUILD] MSVC's cl detected, compiling ...
+    REM     set msvc_cmd=cl %msvc_compile_flags% %msvc_link_flags%
+    REM     powershell -Command "$time = Measure-Command { !msvc_cmd! | Out-Default }; Write-Host '[BUILD] msvc:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
+    REM )
+
+    REM REM clang-cl ===================================================================================
+    REM set has_clang_cl=1
+    REM where /q clang-cl || set has_clang_cl=0
+    REM if %has_clang_cl% == 1 (
+    REM     echo [BUILD] clang-cl detected, compiling ...
+    REM     set clang_cmd=clang-cl %clang_compile_flags% %clang_link_flags%
+    REM     powershell -Command "$time = Measure-Command { !clang_cmd! | Out-Default }; Write-Host '[BUILD] clang-cl:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
+    REM )
+
+    REM zig ========================================================================================
+    REM TODO(doyle):Can't build "Misc\dqn_unit_tests.cpp|1 col 1| error: unable to build C object: FileNotFound"
+    REM set has_zig=1
+    REM where /q zig || set has_zig=0
+    REM if %has_zig% == 1 (
+    REM     echo [BUILD] zig detected, compiling ...
+    REM     set zig_cmd=zig c++ %zig_compile_flags%
+    REM     powershell -Command "$time = Measure-Command { !zig_cmd! | Out-Default }; Write-Host '[BUILD] zig:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
+    REM )
 popd

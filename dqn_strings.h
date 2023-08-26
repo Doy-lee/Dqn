@@ -541,7 +541,6 @@ template <Dqn_usize N> bool Dqn_FString8_AppendFV(Dqn_FString8<N> *string, DQN_F
     if (!string || !fmt)
         return result;
 
-    DQN_HARD_ASSERT(string->size >= 0);
     Dqn_usize require = Dqn_CString8_FVSize(fmt, args) + 1 /*null_terminate*/;
     Dqn_usize space   = (N + 1) - string->size;
     result            = require <= space;
@@ -558,9 +557,6 @@ template <Dqn_usize N> bool Dqn_FString8_AppendF(Dqn_FString8<N> *string, DQN_FM
     bool result = false;
     if (!string || !fmt)
         return result;
-
-    DQN_HARD_ASSERT(string->size >= 0);
-
     va_list args;
     va_start(args, fmt);
     result = Dqn_FString8_AppendFV(string, fmt, args);

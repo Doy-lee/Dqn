@@ -191,6 +191,10 @@
 // [$ACAT] Dqn_ArenaCatalog   |                             | Collate, create & manage arenas in a catalog
 #include "dqn_memory.h"
 
+// NOTE: Dqn_Platform Print ========================================================================
+// [$PRIN] Dqn_Print          |                             | Console printing
+#include "dqn_platform_print.h"
+
 // NOTE: Dqn_Debug =================================================================================
 // [$DEBM] Debug Macros       |                             |
 // [$CALL] Dqn_CallSite       |                             | Source code location/tracing
@@ -244,7 +248,6 @@
 #include "dqn_containers.h"
 
 // NOTE: Dqn_Platform ==============================================================================
-// [$PRIN] Dqn_Print          |                             | Console printing
 // [$FSYS] Dqn_Fs             | DQN_FS                      | Filesystem helpers
 // [$DATE] Dqn_Date           |                             | Date-time helpers
 // [$WIND] Dqn_Win            |                             | Windows OS helpers

@@ -428,17 +428,9 @@ DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat)
 {
     // NOTE: We use a non-standard format string that is only usable via
     // stb sprintf that GCC warns about as an error. This pragma mutes that.
-    #if defined(DQN_COMPILER_GCC)
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wformat="
-        #pragma GCC diagnostic ignored "-Wformat-extra-args"
-    #elif defined(DQN_COMPILER_W32_CLANG)
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wformat"
-        #pragma GCC diagnostic ignored "-Wformat-invalid-specifier"
-        #pragma GCC diagnostic ignored "-Wformat-extra-args"
-    #endif
-
+    DQN_GCC_WARNING_PUSH
+    DQN_GCC_WARNING_DISABLE("-Wformat-invalid-specifier")
+    DQN_GCC_WARNING_DISABLE("-Wformat-extra-args")
     Dqn_ArenaStatString result = {};
     int size16 = STB_SPRINTF_DECORATE(snprintf)(result.data, DQN_ARRAY_ICOUNT(result.data),
                                                 "ArenaStat{"
@@ -454,13 +446,7 @@ DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat)
                                                 stat->blocks,   stat->blocks_hwm,
                                                 stat->syscalls);
     result.size = Dqn_Safe_SaturateCastIntToU16(size16);
-
-    #if defined(DQN_COMPILER_GCC)
-        #pragma GCC diagnostic pop
-    #elif defined(DQN_COMPILER_W32_CLANG)
-        #pragma GCC diagnostic pop
-    #endif
-
+    DQN_GCC_WARNING_POP
     return result;
 }
 

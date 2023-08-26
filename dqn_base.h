@@ -1,11 +1,16 @@
+// NOTE: Preprocessor Token Tricks =================================================================
+#define DQN_STRINGIFY(x) #x
+#define DQN_TOKEN_COMBINE2(x, y) x ## y
+#define DQN_TOKEN_COMBINE(x, y) DQN_TOKEN_COMBINE2(x, y)
+
 // NOTE: [$CMAC] Compiler macros ===================================================================
 // NOTE: Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
     #if defined(__clang__)
-        #define DQN_COMPILER_W32_CLANG
+        #define DQN_COMPILER_CLANG_CL
         #define DQN_COMPILER_CLANG
     #else
-        #define DQN_COMPILER_W32_MSVC
+        #define DQN_COMPILER_MSVC
     #endif
 #elif defined(__clang__)
     #define DQN_COMPILER_CLANG
@@ -40,7 +45,7 @@
     #define DQN_OS_UNIX
 #endif
 
-#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     #if defined(_CRT_SECURE_NO_WARNINGS)
         #define DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED
     #else
@@ -48,7 +53,7 @@
     #endif
 #endif
 
-#if defined(DQN_COMPILER_W32_MSVC)
+#if defined(DQN_COMPILER_MSVC)
     #define DQN_FMT_STRING_ANNOTATE _Printf_format_string_
     #define DQN_MSVC_WARNING_PUSH __pragma(warning(push))
     #define DQN_MSVC_WARNING_DISABLE(...) __pragma(warning(disable: ##__VA_ARGS__))
@@ -58,6 +63,17 @@
     #define DQN_MSVC_WARNING_PUSH
     #define DQN_MSVC_WARNING_DISABLE(...)
     #define DQN_MSVC_WARNING_POP
+#endif
+
+#if defined(DQN_COMPILER_CLANG) || defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG_CL)
+    #define DQN_GCC_WARNING_PUSH _Pragma("GCC diagnostic push")
+    #define DQN_GCC_WARNING_DISABLE(warning) DQN_GCC_WARNING_DISABLE_HELPER(GCC diagnostic ignored warning)
+    #define DQN_GCC_WARNING_DISABLE_HELPER(warning) _Pragma(#warning)
+    #define DQN_GCC_WARNING_POP _Pragma("GCC diagnostic pop")
+#else
+    #define DQN_GCC_WARNING_PUSH
+    #define DQN_GCC_WARNING_DISABLE(...)
+    #define DQN_GCC_WARNING_POP
 #endif
 
 // NOTE: [$MACR] Macros ============================================================================
@@ -122,6 +138,14 @@
 #define DQN_CLAMP(val, lo, hi) DQN_MAX(DQN_MIN(val, hi), lo)
 #define DQN_SQUARED(val) ((val) * (val))
 
+#define DQN_SWAP(a, b)   \
+    do                   \
+    {                    \
+        auto temp = a;   \
+        a        = b;    \
+        b        = temp; \
+    } while (0)
+
 // NOTE: Function/Variable Annotations =============================================================
 #if defined(DQN_STATIC_API)
     #define DQN_API static
@@ -133,23 +157,11 @@
 #define DQN_FILE_SCOPE static
 #define DQN_CAST(val) (val)
 
-#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     #define DQN_FORCE_INLINE __forceinline
 #else
     #define DQN_FORCE_INLINE inline __attribute__((always_inline))
 #endif
-
-// NOTE: Preprocessor Token Tricks =================================================================
-#define DQN_TOKEN_COMBINE2(x, y) x ## y
-#define DQN_TOKEN_COMBINE(x, y) DQN_TOKEN_COMBINE2(x, y)
-
-#define DQN_SWAP(a, b)   \
-    do                   \
-    {                    \
-        auto temp = a;   \
-        a        = b;    \
-        b        = temp; \
-    } while (0)
 
 // NOTE: Size Macros ===============================================================================
 #define DQN_ISIZEOF(val) DQN_CAST(ptrdiff_t)sizeof(val)
@@ -314,7 +326,7 @@ struct Dqn_String8
 //   Execute 'CPUID' instruction to query the capabilities of the current CPU.
 
 // NOTE: Dqn_Atomic_Add/Exchange return the previous value store in the target
-#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     #include <intrin.h>
     #define Dqn_Atomic_CompareExchange64(dest, desired_val, prev_val) _InterlockedCompareExchange64((__int64 volatile *)dest, desired_val, prev_val)
     #define Dqn_Atomic_CompareExchange32(dest, desired_val, prev_val) _InterlockedCompareExchange((long volatile *)dest, desired_val, prev_val)
@@ -347,7 +359,7 @@ struct Dqn_String8
 
 DQN_FORCE_INLINE uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint64_t value)
 {
-    #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+    #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     __int64 result;
     do {
         result = *target;
@@ -363,7 +375,7 @@ DQN_FORCE_INLINE uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint6
 
 DQN_FORCE_INLINE long Dqn_Atomic_SetValue32(long volatile *target, long value)
 {
-    #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+    #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     long result;
     do {
         result = *target;

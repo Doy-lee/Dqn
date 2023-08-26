@@ -3,8 +3,10 @@
     #if defined(NDEBUG)
         #define DQN_DEBUG_BREAK
     #else
-        #if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+        #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
             #define DQN_DEBUG_BREAK __debugbreak()
+        #elif defined(DQN_COMPILER_CLANG)
+            #define DQN_DEBUG_BREAK __builtin_debugtrap()
         #elif defined(DQN_COMPILER_CLANG) || defined(DQN_COMPILER_GCC)
             #include <signal.h>
             #define DQN_DEBUG_BREAK raise(SIGTRAP)

@@ -7,7 +7,7 @@
 Dqn_CPUIDRegisters Dqn_CPUID(int function_id)
 {
     Dqn_CPUIDRegisters result = {};
-    #if defined(DQN_COMPILER_W32_MSVC)
+    #if defined(DQN_COMPILER_MSVC)
     __cpuid(DQN_CAST(int *)result.array, function_id);
     #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     __get_cpuid(function_id, &result.array[0] /*eax*/, &result.array[1] /*ebx*/, &result.array[2] /*ecx*/ , &result.array[3] /*edx*/);
@@ -55,7 +55,7 @@ DQN_API bool Dqn_TicketMutex_CanLock(Dqn_TicketMutex const *mutex, Dqn_uint tick
     return result;
 }
 
-#if defined(DQN_COMPILER_W32_MSVC) || defined(DQN_COMPILER_W32_CLANG)
+#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     #if !defined(DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED)
         #undef _CRT_SECURE_NO_WARNINGS
     #endif
