@@ -14,6 +14,7 @@
     #define STBSP__ASAN __declspec(no_sanitize_address)
     #endif
 
+    #define DQN_ASAN_POISON 1
     #define DQN_NO_CHECK_BREAK
     #define DQN_IMPLEMENTATION
     #include "dqn.h"
@@ -40,28 +41,30 @@ static Dqn_UTest Dqn_Test_Arena()
 
         DQN_UTEST_TEST("Reused memory is zeroed out") {
 
-            Dqn_usize size  = DQN_KILOBYTES(128);
-            Dqn_Arena arena = {};
-            Dqn_Arena_Grow(&arena, size, /*commit*/ size, /*flags*/ 0);
+            uint8_t alignment                            = 1;
+            Dqn_usize alloc_size                         = DQN_KILOBYTES(128);
+            Dqn_MemBlockSizeRequiredResult size_required = Dqn_MemBlock_SizeRequired(nullptr, alloc_size, alignment, Dqn_MemBlockFlag_Nil);
+            Dqn_Arena arena                              = {};
+            Dqn_Arena_Grow(&arena, size_required.block_size, /*commit*/ size_required.block_size, /*flags*/ 0);
 
             // NOTE: Allocate 128 kilobytes, fill it with garbage, then reset the arena
             uintptr_t first_ptr_address = 0;
             {
                 Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
-                void *ptr         = Dqn_Arena_Alloc(&arena, size, 1, Dqn_ZeroMem_Yes);
+                void *ptr         = Dqn_Arena_Alloc(&arena, alloc_size, alignment, Dqn_ZeroMem_Yes);
                 first_ptr_address = DQN_CAST(uintptr_t)ptr;
-                DQN_MEMSET(ptr, 'z', size);
+                DQN_MEMSET(ptr, 'z', alloc_size);
                 Dqn_Arena_EndTempMemory(temp_mem, false /*cancel*/);
             }
 
             // NOTE: Reallocate 128 kilobytes
-            char *ptr = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, size, 1, Dqn_ZeroMem_Yes);
+            char *ptr = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, alloc_size, alignment, Dqn_ZeroMem_Yes);
 
             // NOTE: Double check we got the same pointer
             DQN_UTEST_ASSERT(&test, first_ptr_address == DQN_CAST(uintptr_t)ptr);
 
             // NOTE: Check that the bytes are set to 0
-            for (Dqn_usize i = 0; i < size; i++)
+            for (Dqn_usize i = 0; i < alloc_size; i++)
                 DQN_UTEST_ASSERT(&test, ptr[i] == 0);
             Dqn_Arena_Free(&arena);
         }
@@ -1646,6 +1649,15 @@ static Dqn_UTest Dqn_Test_VArray()
                 uint32_t array_literal[] = {14, 6};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
+            }
+
+            DQN_UTEST_TEST("Test adding an array of items after erase") {
+                uint32_t array_literal[] = {0, 1, 2, 3};
+                Dqn_VArray_Add<uint32_t>(&array, array_literal, DQN_ARRAY_UCOUNT(array_literal));
+
+                uint32_t expected_literal[] = {14, 6, 0, 1, 2, 3};
+                DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(expected_literal));
+                DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, expected_literal, DQN_ARRAY_UCOUNT(expected_literal) * sizeof(expected_literal[0])) == 0);
             }
         }
 

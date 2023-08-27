@@ -30,6 +30,15 @@
         } while (0)
 #endif
 
+#if !defined(DQN_ASAN_POISON)
+    #define DQN_ASAN_POISON 0
+#endif
+
+#if !defined(DQN_ASAN_POISON_ALIGNMENT)
+    #define DQN_ASAN_POISON_ALIGNMENT 8
+#endif
+
+
 // NOTE: [$CALL] Dqn_CallSite ======================================================================
 struct Dqn_CallSite
 {

@@ -10,6 +10,8 @@
 #include "b_stacktrace.h"
 
 // NOTE: [$OS_H] OS Headers ========================================================================
+#include <sanitizer/asan_interface.h>
+
 #if defined(DQN_OS_WIN32)
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "wininet")

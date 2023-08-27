@@ -256,6 +256,14 @@
 // [$TCTX] Dqn_ThreadContext  |                             | Per-thread data structure e.g. temp arenas
 
 // NOTE: Additional Configuration
+// - When compiling with ASAN, set this macro to `1` to enable poisoning of the
+//   memory allocated and freed by memory arenas in the library. By default this
+//   is set to `0`. By enabling this, all allocations will be guarded by a page,
+//   before and after the returned pointer. All allocations will be aligned to
+//   and padded to atleast DQN_ASAN_POISON_ALIGNMENT (e.g. 8 bytes).
+//
+//       DQN_ASAN_POISON 1
+//
 // - Define this macro to record allocation stats for arenas used in the
 //   thread context. The thread context arena stats can be printed by using
 //   Dqn_Library_DumpThreadContextArenaStat.

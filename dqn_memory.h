@@ -59,17 +59,64 @@ DQN_API void  Dqn_VMem_Release (void *ptr, Dqn_usize size);
 DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
 
 // NOTE: [$MEMB] Dqn_MemBlock ======================================================================
+// Encapsulates allocation of objects from a raw block of memory by bumping a
+// a pointer in the block. Some examples include our memory arenas are
+// implemented as light wrappers over chained memory blocks and our arrays
+// backed by virtual memory take memory blocks.
+//
+// One pattern we take advantage of under this design is that our virtual arrays
+// can ask an arena for a memory block and sub-allocate its contiguous items
+// from it. Since the arena created the memory block, the array's lifetime is
+// bound to the arena which could also be managing a bunch of other allocations
+// with the same lifetime.
+//
+// This provides an advantage over creating a specific arena for that array that
+// is configured not to grow or chain (in order to adhere to the contiguous
+// layout requirement) thus limiting the arena to that 1 specific usecase.
+//
+// NOTE: API =======================================================================================
+// @proc Dqn_MemBlockSizeRequiredResult
+//   @desc Calculate various size metrics about how many bytes it'd take to
+//   allocate a pointer from the given block. The size of the allocation is
+//   treated as one object and the padding and page-guards are applied
+//   accordingly to the one object
+//
+//   If you are trying to determine how many bytes are required for `N` distinct
+//   objects then you must multiple the result of this function by `N` to
+//   account for the per-item page-guard paddding.
+//
+//   @param `block` Pass in the block you wish to allocate from to calculate
+//   size metrics for. You may pass in `null` to calculate how many bytes are 
+//   needed to `Dqn_MemBlock_Init` a fresh block capable of allocating the size 
+//   requested.
+//
+//   @param `flags` The `Dqn_MemBlockFlag`s to apply in the calculation. Various
+//   features may influence the sizes required for allocating the requested
+//   amount of bytes. If `block` is passed in, the flags will be OR'ed together 
+//   to determine the flags to account for.
+
 enum Dqn_MemBlockFlag
 {
-    Dqn_MemBlockFlag_PageGuard               = 1 << 0,
-    Dqn_MemBlockFlag_ArenaPrivate            = 1 << 1,
+    Dqn_MemBlockFlag_Nil                      = 0,
+    Dqn_MemBlockFlag_ArenaPrivate             = 1 << 0,
+
+    // Enforce that adjacent allocations from this block are contiguous in
+    // memory (as long as the alignment used between allocations are
+    /// consistent).
+    //
+    // This flag is currently only used when ASAN memory poison-ing is enabled
+    // via `DQN_ASAN_POISON`. In this mode all allocations are sandwiched with a
+    // page's worth of poison-ed memory breaking the contiguous requirement of
+    // arrays. Passing this flag will stop the block from padding pointers with
+    // poison.
+    Dqn_MemBlockFlag_AllocsAreContiguous      = 1 << 1,
 
     // If leak tracing is enabled, this flag will allow the allocation recorded
     // from the reserve call to be leaked, e.g. not printed when leaks are
     // dumped to the console.
     Dqn_MemBlockFlag_AllocRecordLeakPermitted = 1 << 2,
-    Dqn_MemBlockFlag_All                      = Dqn_MemBlockFlag_PageGuard |
-                                                Dqn_MemBlockFlag_ArenaPrivate |
+    Dqn_MemBlockFlag_All                      = Dqn_MemBlockFlag_ArenaPrivate |
+                                                Dqn_MemBlockFlag_AllocsAreContiguous |
                                                 Dqn_MemBlockFlag_AllocRecordLeakPermitted,
 };
 
@@ -84,10 +131,31 @@ struct Dqn_MemBlock
     uint8_t       flags;
 };
 
-DQN_API Dqn_usize     Dqn_MemBlock_MetadataSize(uint8_t flags);
-DQN_API Dqn_MemBlock *Dqn_MemBlock_Init        (Dqn_usize reserve, Dqn_usize commit, uint8_t flags);
-DQN_API void         *Dqn_MemBlock_Alloc       (Dqn_MemBlock *block, Dqn_usize size, uint8_t alignment, Dqn_ZeroMem zero_mem);
-DQN_API void          Dqn_MemBlock_Free        (Dqn_MemBlock *block);
+struct Dqn_MemBlockSizeRequiredResult
+{
+    // Offset from the block's data pointer that the allocation will start at
+    // If `block` was null then this is always set to 0.
+    Dqn_usize data_offset;
+
+    // How many bytes will be allocated for the amount requested by the user.
+    // This is usually the same as the number requested except when ASAN
+    // poison-ing is enabled. In that case, the pointer will be padded at the
+    // end with a page's worth of poison-ed memory.
+    Dqn_usize alloc_size;
+
+    // How many bytes of space is needed in a block for allocating the requested
+    // pointer. This may differ from the allocation size depending on additional
+    // alignment requirements *and* whether or not ASAN poison-ing is required.
+    Dqn_usize block_size;
+};
+
+DQN_API Dqn_usize                      Dqn_MemBlock_MetadataSize(uint8_t flags);
+DQN_API Dqn_MemBlockSizeRequiredResult Dqn_MemBlock_SizeRequired(Dqn_MemBlock const *block, Dqn_usize size, uint8_t alignment, uint32_t flags);
+DQN_API Dqn_MemBlock *                 Dqn_MemBlock_Init        (Dqn_usize reserve, Dqn_usize commit, uint32_t flags);
+DQN_API void         *                 Dqn_MemBlock_Alloc       (Dqn_MemBlock *block, Dqn_usize size, uint8_t alignment, Dqn_ZeroMem zero_mem);
+DQN_API void                           Dqn_MemBlock_Free        (Dqn_MemBlock *block);
+DQN_API void                           Dqn_MemBlock_Pop         (Dqn_MemBlock *block, Dqn_usize size);
+DQN_API void                           Dqn_MemBlock_PopTo       (Dqn_MemBlock *block, Dqn_usize to);
 
 #define               Dqn_MemBlock_New(block, Type, zero_mem)             (Type *)Dqn_MemBlock_Alloc(block, sizeof(Type),         alignof(Type), zero_mem)
 #define               Dqn_MemBlock_NewArray(block, Type, count, zero_mem) (Type *)Dqn_MemBlock_Alloc(block, sizeof(Type) * count, alignof(Type), zero_mem)
@@ -126,7 +194,7 @@ DQN_API void          Dqn_MemBlock_Free        (Dqn_MemBlock *block);
 // @proc Dqn_Arena_Alloc, Dqn_Arena_New, Dqn_Arena_NewArray,
 // Dqn_Arena_NewArrayWithBlock,
 //   @desc Alloc byte/objects
-//   `Alloc`          allocates bytes
+//   `Alloc`             allocates bytes
 //   `New`               allocates an object
 //   `NewArray`          allocates an array of objects
 //   `NewArrayWithBlock` allocates an array of objects from the given memory 'block'
@@ -241,12 +309,12 @@ enum Dqn_ArenaCommit
 };
 
 // NOTE: Allocation ================================================================================
-#define                     Dqn_Arena_New(arena, Type, zero_mem)              (Type *)Dqn_Arena_Alloc(arena, sizeof(Type), alignof(Type), zero_mem)
-#define                     Dqn_Arena_NewCopy(arena, Type, src)               (Type *)Dqn_Arena_Copy(arena, src, sizeof(*src), alignof(Type))
-#define                     Dqn_Arena_NewCopyZ(arena, Type, src)              (Type *)Dqn_Arena_Copy(arena, src, sizeof(*src), alignof(Type))
-#define                     Dqn_Arena_NewArray(arena, Type, count, zero_mem)  (Type *)Dqn_Arena_Alloc(arena, sizeof(Type) * count, alignof(Type), zero_mem)
-#define                     Dqn_Arena_NewArrayCopy(arena, Type, src, count)   (Type *)Dqn_Arena_Copy(arena, src, sizeof(*src) * count, alignof(Type))
-#define                     Dqn_Arena_NewArrayCopyZ(arena, Type, src, count)  (Type *)Dqn_Arena_CopyZ(arena, src, sizeof(*src) * count, alignof(Type))
+#define                     Dqn_Arena_New(arena, Type, zero_mem)             (Type *)Dqn_Arena_Alloc(arena, sizeof(Type), alignof(Type), zero_mem)
+#define                     Dqn_Arena_NewCopy(arena, Type, src)              (Type *)Dqn_Arena_Copy(arena, (src), sizeof(*src), alignof(Type))
+#define                     Dqn_Arena_NewCopyZ(arena, Type, src)             (Type *)Dqn_Arena_Copy(arena, (src), sizeof(*src), alignof(Type))
+#define                     Dqn_Arena_NewArray(arena, Type, count, zero_mem) (Type *)Dqn_Arena_Alloc(arena, sizeof(Type) * (count), alignof(Type), zero_mem)
+#define                     Dqn_Arena_NewArrayCopy(arena, Type, src, count)  (Type *)Dqn_Arena_Copy(arena, (src), sizeof(*src) * (count), alignof(Type))
+#define                     Dqn_Arena_NewArrayCopyZ(arena, Type, src, count) (Type *)Dqn_Arena_CopyZ(arena, (src), sizeof(*src) * (count), alignof(Type))
 
 DQN_API Dqn_Allocator       Dqn_Arena_Allocator      (Dqn_Arena *arena);
 DQN_API Dqn_MemBlock *      Dqn_Arena_Grow           (Dqn_Arena *arena, Dqn_usize size, Dqn_usize commit, uint8_t flags);

@@ -50,4 +50,6 @@ pushd Build
     REM     set zig_cmd=zig c++ %zig_compile_flags%
     REM     powershell -Command "$time = Measure-Command { !zig_cmd! | Out-Default }; Write-Host '[BUILD] zig:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
     REM )
+
+    exit /b 1
 popd

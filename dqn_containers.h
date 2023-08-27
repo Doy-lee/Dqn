@@ -389,7 +389,7 @@ template <typename T> T *         Dqn_List_Add    (Dqn_List<T> *list, T const &v
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size)
 {
     Dqn_VArray<T> result = {};
-    result.block         = Dqn_Arena_Grow(arena, byte_size, 0 /*commit*/, Dqn_MemBlockFlag_ArenaPrivate);
+    result.block         = Dqn_Arena_Grow(arena, byte_size, 0 /*commit*/, Dqn_MemBlockFlag_ArenaPrivate | Dqn_MemBlockFlag_AllocsAreContiguous);
     result.data          = DQN_CAST(T *)Dqn_MemBlock_Alloc(result.block, /*size*/ 0, alignof(T), Dqn_ZeroMem_No);
     result.max           = (result.block->size - result.block->used) / sizeof(T);
     return result;
@@ -474,6 +474,7 @@ DQN_API template <typename T> void Dqn_VArray_EraseRange(Dqn_VArray<T> *array, D
             DQN_MEMCPY(dest, src, (end - src) * sizeof(T));
         }
         array->size -= erase_count;
+        Dqn_MemBlock_Pop(array->block, erase_count * sizeof(T));
     }
 }
 

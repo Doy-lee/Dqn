@@ -3,10 +3,10 @@
     #error "Filesystem APIs requires Windows API, DQN_NO_WIN must not be defined"
 #endif
 // NOTE: [$FSYS] Dqn_Fs ============================================================================
-// NOTE: FS Manipulation =======================================================
+// NOTE: FS Manipulation ===========================================================================
 // TODO(dqn): We should have a Dqn_String8 interface and a CString interface
 //
-// NOTE: API ===================================================================
+// NOTE: API =======================================================================================
 // @proc Dqn_FsDelete
 //   @desc Delete the item specified at the path. This function *CAN* not delete directories unless
 //   the directory is empty.
