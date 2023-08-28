@@ -31,8 +31,7 @@ DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string)
     DQN_ASSERT(std_handle == Dqn_PrintStd_Out || std_handle == Dqn_PrintStd_Err);
 
     #if defined(DQN_OS_WIN32)
-    // NOTE: Get the output handles from kernel
-    // =========================================================================
+    // NOTE: Get the output handles from kernel ====================================================
     DQN_THREAD_LOCAL void *std_out_print_handle     = nullptr;
     DQN_THREAD_LOCAL void *std_err_print_handle     = nullptr;
     DQN_THREAD_LOCAL bool  std_out_print_to_console = false;
@@ -47,8 +46,7 @@ DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string)
         std_err_print_to_console = GetConsoleMode(std_err_print_handle, &mode) != 0;
     }
 
-    // NOTE: Select the output handle
-    // =========================================================================
+    // NOTE: Select the output handle ==============================================================
     void *print_handle    = std_out_print_handle;
     bool print_to_console = std_out_print_to_console;
     if (std_handle == Dqn_PrintStd_Err) {
@@ -56,8 +54,7 @@ DQN_API void Dqn_Print_Std(Dqn_PrintStd std_handle, Dqn_String8 string)
         print_to_console = std_err_print_to_console;
     }
 
-    // NOTE: Write the string
-    // =========================================================================
+    // NOTE: Write the string ======================================================================
     DQN_ASSERT(string.size < DQN_CAST(unsigned long)-1);
     unsigned long bytes_written = 0; (void)bytes_written;
     if (print_to_console) {

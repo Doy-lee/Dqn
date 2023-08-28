@@ -1,6 +1,4 @@
 // NOTE: [$ALLO] Dqn_Allocator =====================================================================
-#include <ios>
-#include <sanitizer/asan_interface.h>
 DQN_API void *Dqn_Allocator_Alloc(Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem)
 {
     void *result = NULL;
@@ -237,8 +235,9 @@ DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uin
         if (DQN_ASAN_POISON) { // NOTE: Poison (guard page + entire block), we unpoison as we allocate
             DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result->data, DQN_ASAN_POISON_ALIGNMENT));
             DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result->size, DQN_ASAN_POISON_ALIGNMENT));
-            void *poison_ptr = DQN_CAST(void *)Dqn_AlignUpPowerOfTwo(DQN_CAST(char *)result + sizeof(Dqn_MemBlock), DQN_ASAN_POISON_ALIGNMENT);
-            ASAN_POISON_MEMORY_REGION(poison_ptr, g_dqn_library->os_page_size + result->size);
+            void *poison_ptr          = DQN_CAST(void *)Dqn_AlignUpPowerOfTwo(DQN_CAST(char *)result + sizeof(Dqn_MemBlock), DQN_ASAN_POISON_ALIGNMENT);
+            Dqn_usize bytes_to_poison = g_dqn_library->os_page_size + result->size;
+            DQN_ASAN_POISON_MEMORY_REGION(poison_ptr, bytes_to_poison);
         }
     }
     return result;
@@ -261,9 +260,8 @@ DQN_API void *Dqn_MemBlock_Alloc(Dqn_MemBlock *block, Dqn_usize size, uint8_t al
     block->used = new_used;
     DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result, alignment));
 
-    if (DQN_ASAN_POISON) {
-        ASAN_UNPOISON_MEMORY_REGION(result, size);
-    }
+    if (DQN_ASAN_POISON)
+        DQN_ASAN_UNPOISON_MEMORY_REGION(result, size);
 
     if (zero_mem == Dqn_ZeroMem_Yes) {
         Dqn_usize reused_bytes = DQN_MIN(block->commit - size_required.data_offset, size);
@@ -286,9 +284,8 @@ DQN_API void Dqn_MemBlock_Free(Dqn_MemBlock *block)
     if (!block)
         return;
     Dqn_usize release_size = block->size + Dqn_MemBlock_MetadataSize();
-    if (DQN_ASAN_POISON) {
-        ASAN_UNPOISON_MEMORY_REGION(block, release_size);
-    }
+    if (DQN_ASAN_POISON)
+        DQN_ASAN_UNPOISON_MEMORY_REGION(block, release_size);
     Dqn_VMem_Release(block, release_size);
 }
 
@@ -307,13 +304,10 @@ DQN_API void Dqn_MemBlock_PopTo(Dqn_MemBlock *block, Dqn_usize to)
         return;
 
     if (DQN_ASAN_POISON) {
-        // TODO(doyle): The poison API takes addresses that are 8 byte aligned
-        // so there are gaps here if we are dealing with objects that aren't 8
-        // byte aligned unfortunately.
-        void *poison_ptr          = DQN_CAST(void *)Dqn_AlignUpPowerOfTwo(DQN_CAST(char *)block->data + to, DQN_ASAN_POISON_ALIGNMENT);
-        void *end_ptr             = DQN_CAST(char *)block->data + block->used;
+        void *poison_ptr          = DQN_CAST(char *)block->data + to;
+        void *end_ptr             = DQN_CAST(void *)Dqn_AlignUpPowerOfTwo((DQN_CAST(uintptr_t)block->data + block->used), DQN_ASAN_POISON_ALIGNMENT);
         uintptr_t bytes_to_poison = DQN_CAST(uintptr_t)end_ptr - DQN_CAST(uintptr_t)poison_ptr;
-        ASAN_POISON_MEMORY_REGION(poison_ptr, bytes_to_poison);
+        DQN_ASAN_POISON_MEMORY_REGION(poison_ptr, bytes_to_poison);
     }
     block->used = to;
 }

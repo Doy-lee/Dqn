@@ -220,8 +220,7 @@ DQN_API Dqn_String8 Dqn_Log_MakeString(Dqn_Allocator allocator,
         header_size_no_ansi_codes = header.size - colour_esc.size - Dqn_Print_ESCResetString.size;
     }
 
-    // NOTE: Header padding
-    // =========================================================================
+    // NOTE: Header padding ========================================================================
     Dqn_usize header_padding = 0;
     {
         DQN_LOCAL_PERSIST Dqn_usize max_header_length = 0;
@@ -229,8 +228,7 @@ DQN_API Dqn_String8 Dqn_Log_MakeString(Dqn_Allocator allocator,
         header_padding                                = max_header_length - header_size_no_ansi_codes;
     }
 
-    // NOTE: Construct final log
-    // =========================================================================
+    // NOTE: Construct final log ===================================================================
     Dqn_String8 user_msg = Dqn_String8_InitFV(allocator, fmt, args);
     Dqn_String8 result   = Dqn_String8_Allocate(allocator, header.size + header_padding + user_msg.size, Dqn_ZeroMem_No);
     DQN_MEMCPY(result.data,                                header.data, header.size);

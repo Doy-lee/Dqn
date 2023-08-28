@@ -840,6 +840,17 @@ DQN_API Dqn_Library *Dqn_Library_Init()
     }
     #endif
 
+    // ============================================================================================
+
+    Dqn_Log_DebugF("Dqn Library initialised with features\n");
+
+    if (DQN_ASAN_POISON)
+        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  - ASAN manual poisoning");
+
+    #if defined(DQN_ASAN_VET_POISON)
+    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  - ASAN manual poisoning vetting");
+    #endif
+
     return result;
 }
 

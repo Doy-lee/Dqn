@@ -230,6 +230,23 @@
 //   flag.
 //
 //     DQN_LEAK_TRACING
+//
+// - Define this macro to 1 to enable poisoning of memory from arenas when ASAN
+//   `-fsanitize=address` is enabled. Enabling this will detect memory overwrite
+//   by padding allocated before and after with poisoned memory which will raise
+//   a use-after-poison in ASAN on read/write. This is a no-op if the library is
+//   not compiled with ASAN.
+//
+//     DQN_ASAN_POISON 1
+//
+// - Define this macro to enable sanity checks for manually poisoned memory in
+//   this library when ASAN `-fsanitize=address` is enabled. These sanity checks
+//   ensure that memory from arenas are correctly un/poisoned when pointers are
+//   allocated and returned to the memory arena's. This is a no-op if we are not
+//   compiled with ASAN or `DQN_ASAN_POISON` is not set to `1`.
+//
+//     DQN_ASAN_VET_POISON
+//
 
 // NOTE: Dqn_Strings ===============================================================================
 // [$CSTR] Dqn_CString8       |                             | C-string helpers
