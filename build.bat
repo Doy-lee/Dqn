@@ -16,7 +16,10 @@ pushd Build
     set common_flags=-D DQN_TEST_WITH_MAIN -I %script_dir% %script_dir%\Misc\dqn_unit_tests.cpp
 
     set msvc_driver_flags=%common_flags%        -MT -EHa -GR- -Od -Oi -Z7 -wd4201 -W4 -WX -nologo
-    set msvc_compile_flags=%msvc_driver_flags%  -fsanitize=address -analyze             /Fe:dqn_unit_tests_msvc
+
+    REM Optionally pass `-analyze` to `msvc_compile_flags` for more checks, but,
+    REM it slows down compilation by around 5s on my old laptop.
+    set msvc_compile_flags=%msvc_driver_flags%  -fsanitize=address /Fe:dqn_unit_tests_msvc
     set clang_compile_flags=%msvc_driver_flags% -fsanitize=address -fsanitize=undefined /Fe:dqn_unit_tests_clang
     set zig_compile_flags=%common_flags%        -fsanitize=address -fsanitize=undefined -o dqn_unit_tests_zig
 

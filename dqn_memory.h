@@ -295,9 +295,6 @@ struct Dqn_ArenaTempMemoryScope
     ~Dqn_ArenaTempMemoryScope();
     Dqn_ArenaTempMemory temp_memory;
     bool                cancel = false;
-    #if defined(DQN_LEAK_TRACING)
-    Dqn_CallSite        leak_site_;
-    #endif
 };
 
 enum Dqn_ArenaCommit

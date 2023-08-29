@@ -237,7 +237,7 @@ DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uin
             DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result->size, DQN_ASAN_POISON_ALIGNMENT));
             void *poison_ptr          = DQN_CAST(void *)Dqn_AlignUpPowerOfTwo(DQN_CAST(char *)result + sizeof(Dqn_MemBlock), DQN_ASAN_POISON_ALIGNMENT);
             Dqn_usize bytes_to_poison = g_dqn_library->os_page_size + result->size;
-            DQN_ASAN_POISON_MEMORY_REGION(poison_ptr, bytes_to_poison);
+            Dqn_ASAN_PoisonMemoryRegion(poison_ptr, bytes_to_poison);
         }
     }
     return result;
@@ -261,7 +261,7 @@ DQN_API void *Dqn_MemBlock_Alloc(Dqn_MemBlock *block, Dqn_usize size, uint8_t al
     DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result, alignment));
 
     if (DQN_ASAN_POISON)
-        DQN_ASAN_UNPOISON_MEMORY_REGION(result, size);
+        Dqn_ASAN_UnpoisonMemoryRegion(result, size);
 
     if (zero_mem == Dqn_ZeroMem_Yes) {
         Dqn_usize reused_bytes = DQN_MIN(block->commit - size_required.data_offset, size);
@@ -285,7 +285,7 @@ DQN_API void Dqn_MemBlock_Free(Dqn_MemBlock *block)
         return;
     Dqn_usize release_size = block->size + Dqn_MemBlock_MetadataSize();
     if (DQN_ASAN_POISON)
-        DQN_ASAN_UNPOISON_MEMORY_REGION(block, release_size);
+        Dqn_ASAN_UnpoisonMemoryRegion(block, release_size);
     Dqn_VMem_Release(block, release_size);
 }
 
@@ -307,7 +307,7 @@ DQN_API void Dqn_MemBlock_PopTo(Dqn_MemBlock *block, Dqn_usize to)
         void *poison_ptr          = DQN_CAST(char *)block->data + to;
         void *end_ptr             = DQN_CAST(void *)Dqn_AlignUpPowerOfTwo((DQN_CAST(uintptr_t)block->data + block->used), DQN_ASAN_POISON_ALIGNMENT);
         uintptr_t bytes_to_poison = DQN_CAST(uintptr_t)end_ptr - DQN_CAST(uintptr_t)poison_ptr;
-        DQN_ASAN_POISON_MEMORY_REGION(poison_ptr, bytes_to_poison);
+        Dqn_ASAN_PoisonMemoryRegion(poison_ptr, bytes_to_poison);
     }
     block->used = to;
 }

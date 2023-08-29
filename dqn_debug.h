@@ -34,6 +34,10 @@
     #define DQN_ASAN_POISON 0
 #endif
 
+#if !defined(DQN_ASAN_POISON_VET)
+    #define DQN_ASAN_POISON_VET 0
+#endif
+
 #if !defined(DQN_ASAN_POISON_ALIGNMENT)
     #define DQN_ASAN_POISON_ALIGNMENT 8
 #endif
@@ -44,30 +48,13 @@
     #define __has_feature(x) 0
 #endif
 
+// NOTE: [$ASAN] Dqn_Asan ========================================================================== ===
 #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
     #include <sanitizer/asan_interface.h>
-    #if defined(DQN_ASAN_VET_POISON)
-        #define DQN_ASAN_POISON_MEMORY_REGION(ptr, size) \
-            do { \
-                __asan_poison_memory_region((ptr), (size)); \
-                DQN_ASSERT(__asan_address_is_poisoned((ptr))); \
-                DQN_ASSERT(__asan_address_is_poisoned((char *)(ptr) + ((size) - 1))); \
-                DQN_ASSERT(!__asan_address_is_poisoned((char *)(ptr) + (size))); \
-            } while (0)
-
-        #define DQN_ASAN_UNPOISON_MEMORY_REGION(ptr, size) \
-            do { \
-                __asan_unpoison_memory_region((ptr), (size)); \
-                DQN_ASSERT(__asan_region_is_poisoned((ptr), (size)) == 0); \
-            } while (0)
-    #else
-        #define DQN_ASAN_POISON_MEMORY_REGION(ptr, size) __asan_poison_memory_region(ptr, size)
-        #define DQN_ASAN_UNPOISON_MEMORY_REGION(ptr, size) __asan_unpoison_memory_region(ptr, size)
-    #endif
-#else
-    #define DQN_ASAN_POISON_MEMORY_REGION(ptr, size) (void)(ptr); (void)(size)
-    #define DQN_ASAN_UNPOISON_MEMORY_REGION(ptr, size) (void)(ptr); (void)(size)
 #endif
+
+void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize size);
+void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize size);
 
 // NOTE: [$CALL] Dqn_CallSite ======================================================================
 struct Dqn_CallSite

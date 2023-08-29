@@ -15,7 +15,7 @@
     #endif
 
     #define DQN_ASAN_POISON 1
-    #define DQN_ASAN_VET_POISON
+    #define DQN_ASAN_VET_POISON 1
     #define DQN_NO_CHECK_BREAK
     #define DQN_IMPLEMENTATION
     #include "dqn.h"

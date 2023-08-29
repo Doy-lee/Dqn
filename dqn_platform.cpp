@@ -645,15 +645,15 @@ DQN_API Dqn_FsFile Dqn_Fs_OpenFile(Dqn_String8 path, Dqn_FsFileOpen open_mode, u
     return result;
 }
 
-DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize size)
+DQN_API bool Dqn_Fs_WriteFileBuffer(Dqn_FsFile *file, void const *buffer, Dqn_usize size)
 {
     if (!file || !file->handle || !buffer || size <= 0 || file->error_size)
         return false;
 
     bool result = true;
     #if defined(DQN_OS_WIN32)
-    char const *end = buffer + size;
-    for (char const *ptr = buffer; result && ptr != end; ) {
+    char const *end = DQN_CAST(char *)buffer + size;
+    for (char const *ptr = DQN_CAST(char const *)buffer; result && ptr != end; ) {
         unsigned long write_size = DQN_CAST(unsigned long)DQN_MIN((unsigned long)-1, end - ptr);
         unsigned long bytes_written  = 0;
         result = WriteFile(file->handle, ptr, write_size, &bytes_written, nullptr /*lpOverlapped*/) != 0;
@@ -672,6 +672,32 @@ DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize si
     #else
     result = fwrite(buffer, DQN_CAST(Dqn_usize)size, 1 /*count*/, file->handle) == 1 /*count*/;
     #endif
+    return result;
+}
+
+DQN_API bool Dqn_Fs_WriteFile(Dqn_FsFile *file, Dqn_String8 buffer)
+{
+    bool result = Dqn_Fs_WriteFileBuffer(file, buffer.data, buffer.size);
+    return result;
+}
+
+DQN_API bool Dqn_Fs_WriteFileFV(Dqn_FsFile *file, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args)
+{
+    bool result = false;
+    if (!file || !fmt)
+        return result;
+     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+     Dqn_String8 buffer        = Dqn_String8_InitFV(scratch.allocator, fmt, args);
+     result                    = Dqn_Fs_WriteFileBuffer(file, buffer.data, buffer.size);
+     return result;
+}
+
+DQN_API bool Dqn_Fs_WriteFileF(Dqn_FsFile *file, DQN_FMT_STRING_ANNOTATE char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    bool result = Dqn_Fs_WriteFileFV(file, fmt, args);
+    va_end(args);
     return result;
 }
 
@@ -1902,17 +1928,14 @@ DQN_API uint64_t Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_f
 // NOTE: [$TCTX] Dqn_ThreadContext =================================================================
 Dqn_ThreadScratch::Dqn_ThreadScratch(Dqn_ThreadContext *context, uint8_t context_index)
 {
-    index       = context_index;
-    allocator   = context->temp_allocators[index];
-    arena       = context->temp_arenas[index];
+    allocator   = context->scratch_allocators[context_index];
+    arena       = context->scratch_arenas[context_index];
     temp_memory = Dqn_Arena_BeginTempMemory(arena);
+    destructed  = false;
 }
 
 Dqn_ThreadScratch::~Dqn_ThreadScratch()
 {
-    #if defined(DQN_DEBUG_THREAD_CONTEXT)
-    temp_arenas_stat[index] = arena->stats;
-    #endif
     DQN_ASSERT(destructed == false);
     Dqn_Arena_EndTempMemory(temp_memory, /*cancel*/ false);
     destructed = true;
@@ -1933,27 +1956,19 @@ DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext()
 {
     DQN_THREAD_LOCAL Dqn_ThreadContext result = {};
     if (!result.init) {
-        result.init = true;
+        result.init               = true;
+        Dqn_ArenaCatalog *catalog = &g_dqn_library->arena_catalog;
         DQN_ASSERTF(g_dqn_library->lib_init, "Library must be initialised by calling Dqn_Library_Init(nullptr)");
 
-        // NOTE: Setup permanent arena
-        Dqn_ArenaCatalog *catalog = &g_dqn_library->arena_catalog;
-        result.allocator          = Dqn_Arena_Allocator(result.arena);
-        result.arena              = Dqn_ArenaCatalog_AllocF(catalog,
-                                                            DQN_GIGABYTES(1) /*size*/,
-                                                            DQN_KILOBYTES(64) /*commit*/,
-                                                            "Thread %u Arena",
-                                                            Dqn_Thread_GetID());
-
-        // NOTE: Setup temporary arenas
-        for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
-            result.temp_arenas[index]     = Dqn_ArenaCatalog_AllocF(catalog,
-                                                                    DQN_GIGABYTES(1) /*size*/,
-                                                                    DQN_KILOBYTES(64) /*commit*/,
-                                                                    "Thread %u Temp Arena %u",
-                                                                    Dqn_Thread_GetID(),
-                                                                    index);
-            result.temp_allocators[index] = Dqn_Arena_Allocator(result.temp_arenas[index]);
+        // NOTE: Setup scratch arenas
+        for (uint8_t index = 0; index < DQN_ARRAY_UCOUNT(result.scratch_arenas); index++) {
+            result.scratch_arenas[index]     = Dqn_ArenaCatalog_AllocF(catalog,
+                                                                       DQN_GIGABYTES(1) /*size*/,
+                                                                       DQN_KILOBYTES(64) /*commit*/,
+                                                                       "Thread %u Scratch Arena %u",
+                                                                       Dqn_Thread_GetID(),
+                                                                       index);
+            result.scratch_allocators[index] = Dqn_Arena_Allocator(result.scratch_arenas[index]);
         }
     }
     return &result;
@@ -1963,11 +1978,10 @@ DQN_API Dqn_ThreadContext *Dqn_Thread_GetContext()
 // manually pass it in?
 DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch(void const *conflict_arena)
 {
-    static_assert(DQN_THREAD_CONTEXT_ARENAS < (uint8_t)-1, "We use UINT8_MAX as a sentinel value");
     Dqn_ThreadContext *context = Dqn_Thread_GetContext();
     uint8_t context_index      = (uint8_t)-1;
-    for (uint8_t index = 0; index < DQN_THREAD_CONTEXT_ARENAS; index++) {
-        Dqn_Arena *arena = context->temp_arenas[index];
+    for (uint8_t index = 0; index < DQN_ARRAY_UCOUNT(context->scratch_arenas); index++) {
+        Dqn_Arena *arena = context->scratch_arenas[index];
         if (!conflict_arena || arena != conflict_arena) {
             context_index = index;
             break;
@@ -1977,4 +1991,3 @@ DQN_API Dqn_ThreadScratch Dqn_Thread_GetScratch(void const *conflict_arena)
     DQN_ASSERT(context_index != (uint8_t)-1);
     return Dqn_ThreadScratch(context, context_index);
 }
-

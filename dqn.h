@@ -116,6 +116,7 @@
 // [$TYPE] Types              |                             | Basic types and typedefs
 // [$INTR] Intrinsics         |                             | Atomics, cpuid, ticket mutex
 // [$TMUT] Dqn_TicketMutex    |                             | Userland mutex via spinlocking atomics
+// [$PRIN] Dqn_Print          |                             | Console printing
 
 // NOTE: Additional Configuration
 // - Override the default heap-allocation routine that is called when the
@@ -191,10 +192,6 @@
 // [$ACAT] Dqn_ArenaCatalog   |                             | Collate, create & manage arenas in a catalog
 #include "dqn_memory.h"
 
-// NOTE: Dqn_Platform Print ========================================================================
-// [$PRIN] Dqn_Print          |                             | Console printing
-#include "dqn_platform_print.h"
-
 // NOTE: Dqn_Debug =================================================================================
 // [$DEBM] Debug Macros       |                             |
 // [$CALL] Dqn_CallSite       |                             | Source code location/tracing
@@ -219,8 +216,10 @@
 //
 //     DQN_DUMP_STACK_TRACE
 //
-// - Enable memory leak tracking when requesting memory from the OS via this
-//   library. For example calls to Dqn_VMem_Reserve or DQN_ALLOC are recorded.
+// - Define this macro to enable emory leak tracking when requesting memory
+//   from the OS via this library. For example calls to Dqn_VMem_Reserve or
+//   DQN_ALLOC are recorded to the leak table.
+//
 //   Allocations are stored in a global hash-table and their respective stack
 //   traces for the allocation location. Memory leaks can be dumped at the end
 //   of the program or some epoch by calling Dqn_Library_DumpLeaks()
@@ -239,13 +238,13 @@
 //
 //     DQN_ASAN_POISON 1
 //
-// - Define this macro to enable sanity checks for manually poisoned memory in
+// - Define this macro 1 to enable sanity checks for manually poisoned memory in
 //   this library when ASAN `-fsanitize=address` is enabled. These sanity checks
 //   ensure that memory from arenas are correctly un/poisoned when pointers are
 //   allocated and returned to the memory arena's. This is a no-op if we are not
 //   compiled with ASAN or `DQN_ASAN_POISON` is not set to `1`.
 //
-//     DQN_ASAN_VET_POISON
+//     DQN_ASAN_VET_POISON 1
 //
 
 // NOTE: Dqn_Strings ===============================================================================
@@ -280,12 +279,6 @@
 //   and padded to atleast DQN_ASAN_POISON_ALIGNMENT (e.g. 8 bytes).
 //
 //       DQN_ASAN_POISON 1
-//
-// - Define this macro to record allocation stats for arenas used in the
-//   thread context. The thread context arena stats can be printed by using
-//   Dqn_Library_DumpThreadContextArenaStat.
-//
-//       DQN_DEBUG_THREAD_CONTEXT
 
 #include "dqn_platform.h"
 
@@ -319,7 +312,6 @@
 #include "dqn_base.cpp"
 #include "dqn_external.cpp"
 #include "dqn_memory.cpp"
-#include "dqn_platform_print.cpp"
 #include "dqn_debug.cpp"
 #include "dqn_strings.cpp"
 #include "dqn_containers.cpp"

@@ -794,24 +794,17 @@ DQN_API Dqn_Library *Dqn_Library_Init()
         g_dqn_library                       = &default_instance;
     }
 
+    // NOTE: Init check ===========================================================================
+
     Dqn_Library *result = g_dqn_library;
     Dqn_TicketMutex_Begin(&result->lib_mutex);
     DQN_DEFER { Dqn_TicketMutex_End(&result->lib_mutex); };
     if (result->lib_init)
         return result;
 
-    // =============================================================================================
+    // NOTE: Query OS page size ====================================================================
 
-    Dqn_ArenaCatalog_Init(&result->arena_catalog, &result->arena_catalog_backup_arena);
-    result->lib_init = true;
-
-    #if !defined(DQN_NO_PROFILER)
-    result->profiler = &result->profiler_default_instance;
-    #endif
-
-    // =============================================================================================
-
-    { // NOTE: Query OS page size
+    {
         SYSTEM_INFO system_info = {};
         #if defined(DQN_OS_WIN32)
         GetSystemInfo(&system_info);
@@ -824,7 +817,17 @@ DQN_API Dqn_Library *Dqn_Library_Init()
         #endif
     }
 
-    // =============================================================================================
+    // NOTE Initialise fields ======================================================================
+
+    #if !defined(DQN_NO_PROFILER)
+    result->profiler = &result->profiler_default_instance;
+    #endif
+
+    result->lib_init = true;
+    Dqn_ArenaCatalog_Init(&result->arena_catalog, &result->arena);
+    result->exe_dir  = Dqn_OS_EXEDir(&result->arena);
+
+    // NOTE: Leak tracing ==========================================================================
 
     #if defined(DQN_LEAK_TRACING) // NOTE: Initialise the allocation leak tracker
     {
@@ -840,17 +843,23 @@ DQN_API Dqn_Library *Dqn_Library_Init()
     }
     #endif
 
-    // ============================================================================================
+    // NOTE: Print out init features ===============================================================
 
-    Dqn_Log_DebugF("Dqn Library initialised with features\n");
+    Dqn_Log_DebugF("Dqn Library initialised:\n");
+    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  OS Page Size/Alloc Granularity: %$$_I32u/%$$_I32u", result->os_page_size, result->os_alloc_granularity);
 
     if (DQN_ASAN_POISON)
-        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  - ASAN manual poisoning");
+        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  ASAN manual poisoning%s", DQN_ASAN_VET_POISON ? " (+vet sanity checks)" : "");
 
-    #if defined(DQN_ASAN_VET_POISON)
-    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  - ASAN manual poisoning vetting");
+    #if defined(DQN_LEAK_TRACING)
+    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  Allocation leak tracing");
     #endif
 
+    #if !defined(DQN_NO_PROFILER)
+    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  TSC profiler available");
+    #endif
+
+    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "");
     return result;
 }
 
@@ -872,14 +881,6 @@ DQN_API void Dqn_Library_SetLogCallback(Dqn_LogProc *proc, void *user_data)
 {
     g_dqn_library->log_callback  = proc;
     g_dqn_library->log_user_data = user_data;
-}
-
-DQN_API void Dqn_Library_SetLogFile(FILE *file)
-{
-    Dqn_TicketMutex_Begin(&g_dqn_library->log_file_mutex);
-    g_dqn_library->log_file    = file;
-    g_dqn_library->log_to_file = file ? true : false;
-    Dqn_TicketMutex_End(&g_dqn_library->log_file_mutex);
 }
 
 DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)

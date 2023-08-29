@@ -70,9 +70,9 @@ struct Dqn_FsFile
 
 enum Dqn_FsFileOpen
 {
-    Dqn_FsFileOpen_CreateAlways, ///< Create file if it does not exist, otherwise, zero out the file and open
-    Dqn_FsFileOpen_OpenIfExist,  ///< Open file at path only if it exists
-    Dqn_FsFileOpen_OpenAlways,   ///< Open file at path, create file if it does not exist
+    Dqn_FsFileOpen_CreateAlways, // Create file if it does not exist, otherwise, zero out the file and open
+    Dqn_FsFileOpen_OpenIfExist,  // Open file at path only if it exists
+    Dqn_FsFileOpen_OpenAlways,   // Open file at path, create file if it does not exist
 };
 
 enum Dqn_FsFileAccess
@@ -80,14 +80,17 @@ enum Dqn_FsFileAccess
     Dqn_FsFileAccess_Read       = 1 << 0,
     Dqn_FsFileAccess_Write      = 1 << 1,
     Dqn_FsFileAccess_Execute    = 1 << 2,
-    Dqn_FsFileAccess_AppendOnly = 1 << 3, ///< This flag cannot be combined with any other acess mode
+    Dqn_FsFileAccess_AppendOnly = 1 << 3, // This flag cannot be combined with any other access mode
     Dqn_FsFileAccess_ReadWrite  = Dqn_FsFileAccess_Read      | Dqn_FsFileAccess_Write,
     Dqn_FsFileAccess_All        = Dqn_FsFileAccess_ReadWrite | Dqn_FsFileAccess_Execute,
 };
 
-DQN_API Dqn_FsFile Dqn_Fs_OpenFile (Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access);
-DQN_API bool       Dqn_Fs_WriteFile(Dqn_FsFile *file, char const *buffer, Dqn_usize size);
-DQN_API void       Dqn_Fs_CloseFile(Dqn_FsFile *file);
+DQN_API Dqn_FsFile Dqn_Fs_OpenFile       (Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access);
+DQN_API bool       Dqn_Fs_WriteFileBuffer(Dqn_FsFile *file, void const *data, Dqn_usize size);
+DQN_API bool       Dqn_Fs_WriteFile      (Dqn_FsFile *file, Dqn_String8 buffer);
+DQN_API bool       Dqn_Fs_WriteFileFV    (Dqn_FsFile *file, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
+DQN_API bool       Dqn_Fs_WriteFileF     (Dqn_FsFile *file, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API void       Dqn_Fs_CloseFile      (Dqn_FsFile *file);
 #endif // !defined(DQN_NO_FS)
 
 // NOTE: File system paths =========================================================================
@@ -459,27 +462,16 @@ DQN_API uint64_t    Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_ts
 //   @param[in] conflict_arena A pointer to the arena currently being used in the
 //   function
 
-#if !defined(DQN_THREAD_CONTEXT_ARENAS)
-    #define DQN_THREAD_CONTEXT_ARENAS 2
-#endif
-
 struct Dqn_ThreadContext
 {
     Dqn_b32        init;
 
-    Dqn_Arena     *arena;     ///< Per thread arena
-    Dqn_Allocator  allocator; ///< Allocator that uses the arena
+    // Scratch memory arena's for the calling thread
+    Dqn_Arena     *scratch_arenas[2];
 
-    /// Temp memory arena's for the calling thread
-    Dqn_Arena     *temp_arenas[DQN_THREAD_CONTEXT_ARENAS];
-
-    /// Allocators that use the corresponding arena from the thread context.
-    /// Provided for convenience when interfacing with allocator interfaces.
-    Dqn_Allocator  temp_allocators[DQN_THREAD_CONTEXT_ARENAS];
-
-    #if defined(DQN_DEBUG_THREAD_CONTEXT)
-    Dqn_ArenaStat  temp_arenas_stat[DQN_THREAD_CONTEXT_ARENAS];
-    #endif
+    // Allocators that use the corresponding arena from the thread context.
+    // Provided for convenience when interfacing with allocator interfaces.
+    Dqn_Allocator  scratch_allocators[2];
 };
 
 struct Dqn_ThreadScratch
@@ -487,16 +479,10 @@ struct Dqn_ThreadScratch
     Dqn_ThreadScratch(Dqn_ThreadContext *context, uint8_t context_index);
     ~Dqn_ThreadScratch();
 
-    /// Index into the arena/allocator/stat array in the thread context
-    /// specifying what arena was assigned.
-    uint8_t              index;
     Dqn_Allocator        allocator;
     Dqn_Arena           *arena;
-    Dqn_b32              destructed = false; /// Detect copies of the scratch
+    Dqn_b32              destructed;
     Dqn_ArenaTempMemory  temp_memory;
-    #if defined(DQN_LEAK_TRACING)
-    Dqn_CallSite         leak_site__;
-    #endif
 };
 
 // NOTE: Context ===================================================================================

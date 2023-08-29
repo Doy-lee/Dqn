@@ -1,3 +1,30 @@
+// NOTE: [$ASAN] Dqn_Asan ========================================================================== ===
+void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
+{
+    #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+    __asan_poison_memory_region(ptr, size);
+    if (DQN_ASAN_VET_POISON) {
+        DQN_HARD_ASSERT(__asan_address_is_poisoned(ptr));
+        DQN_HARD_ASSERT(__asan_address_is_poisoned((char *)ptr + (size - 1)));
+    }
+    #else
+    (void)ptr; (void)size;
+    #endif
+}
+
+void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
+{
+    #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+    __asan_unpoison_memory_region(ptr, size);
+    if (DQN_ASAN_VET_POISON) {
+        DQN_HARD_ASSERT(__asan_region_is_poisoned((void *)ptr, size) == 0);
+    }
+    #else
+    (void)ptr; (void)size;
+    #endif
+}
+
+// NOTE: [$DEBG] Dqn_Debug =========================================================================
 DQN_API Dqn_String8 Dqn_Debug_CleanStackTrace(Dqn_String8 stack_trace)
 {
     // NOTE: Remove the stacktrace's library invocations from the stack trace
@@ -164,7 +191,7 @@ DQN_API void Dqn_Debug_DumpLeaks()
         Dqn_Log_WarningF("There were %I64u leaked allocations totalling %_$$I64u", leak_count, leaked_bytes);
     }
 }
-#endif /// defined(DQN_LEAK_TRACING)
+#endif // defined(DQN_LEAK_TRACING)
 
 // NOTE: [$LLOG] Dqn_Log  ==========================================================================
 DQN_API Dqn_String8 Dqn_Log_MakeString(Dqn_Allocator allocator,
@@ -239,27 +266,23 @@ DQN_API Dqn_String8 Dqn_Log_MakeString(Dqn_Allocator allocator,
 
 DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
 {
+    Dqn_Library *lib = g_dqn_library;
     (void)log_type;
     (void)user_data;
 
     // NOTE: Open log file for appending if requested ==========================
-    Dqn_TicketMutex_Begin(&g_dqn_library->log_file_mutex);
-    if (g_dqn_library->log_to_file && !g_dqn_library->log_file) {
-        Dqn_ThreadScratch scratch   = Dqn_Thread_GetScratch(nullptr);
-        #if (defined(DQN_OS_WIN32) && !defined(DQN_NO_WIN)) || !defined(DQN_OS_WIN32)
-        Dqn_String8        exe_dir  = Dqn_OS_EXEDir(scratch.arena);
-        #else
-        Dqn_String8        exe_dir  = DQN_STRING8(".");
-        #endif
-        Dqn_String8        log_file = Dqn_String8_InitF(scratch.allocator, "%.*s/dqn.log", DQN_STRING_FMT(exe_dir));
-        fopen_s(DQN_CAST(FILE **)&g_dqn_library->log_file, log_file.data, "a");
+    Dqn_TicketMutex_Begin(&lib->log_file_mutex);
+    if (lib->log_to_file && !lib->log_file.handle && lib->log_file.error_size == 0) {
+        Dqn_ThreadScratch scratch  = Dqn_Thread_GetScratch(nullptr);
+        Dqn_String8       log_path = Dqn_FsPath_ConvertF(scratch.arena, "%.*s/dqn.log", DQN_STRING_FMT(lib->exe_dir));
+        lib->log_file              = Dqn_Fs_OpenFile(log_path, Dqn_FsFileOpen_CreateAlways, Dqn_FsFileAccess_AppendOnly);
     }
-    Dqn_TicketMutex_End(&g_dqn_library->log_file_mutex);
+    Dqn_TicketMutex_End(&lib->log_file_mutex);
 
     // NOTE: Generate the log header ===========================================
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
     Dqn_String8 log_line      = Dqn_Log_MakeString(scratch.allocator,
-                                                   !g_dqn_library->log_no_colour,
+                                                   !lib->log_no_colour,
                                                    type,
                                                    log_type,
                                                    call_site,
@@ -269,11 +292,10 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *use
     // NOTE: Print log =========================================================
     Dqn_Print_StdLn(Dqn_PrintStd_Out, log_line);
 
-    Dqn_TicketMutex_Begin(&g_dqn_library->log_file_mutex);
-    if (g_dqn_library->log_to_file && g_dqn_library->log_file) {
-        fprintf(DQN_CAST(FILE *)g_dqn_library->log_file, "%.*s\n", DQN_STRING_FMT(log_line));
-    }
-    Dqn_TicketMutex_End(&g_dqn_library->log_file_mutex);
+    Dqn_TicketMutex_Begin(&lib->log_file_mutex);
+    Dqn_Fs_WriteFile(&lib->log_file, log_line);
+    Dqn_Fs_WriteFile(&lib->log_file, DQN_STRING8("\n"));
+    Dqn_TicketMutex_End(&lib->log_file_mutex);
 }
 
 DQN_API void Dqn_Log_FVCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, va_list args)

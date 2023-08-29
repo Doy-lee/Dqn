@@ -587,19 +587,19 @@ void                Dqn_Profiler_SwapAnchorBuffer (uint32_t anchor_count);
 
 struct Dqn_Library
 {
-    bool                     lib_init;
+    bool                     lib_init;       // True if the library has been initialised via `Dqn_Library_Init`
     Dqn_TicketMutex          lib_mutex;
+    Dqn_String8              exe_dir;        // The directory of the current executable
 
-    Dqn_LogProc             *log_callback;   ///< Set this pointer to override the logging routine
-    void *                   log_user_data;
-    bool                     log_to_file;    ///< Output logs to file as well as standard out
-    void *                   log_file;       ///< TODO(dqn): Hmmm, how should we do this... ?
-    Dqn_TicketMutex          log_file_mutex; ///< Is locked when instantiating the log_file for the first time
-    bool                     log_no_colour;  ///< Disable colours in the logging output
-
-    /// The backup arena to use if no arena is passed into Dqn_Library_Init
-    Dqn_Arena                arena_catalog_backup_arena;
+    Dqn_Arena                arena;
     Dqn_ArenaCatalog         arena_catalog;
+
+    Dqn_LogProc             *log_callback;   // Set this pointer to override the logging routine
+    void *                   log_user_data;
+    bool                     log_to_file;    // Output logs to file as well as standard out
+    Dqn_FsFile               log_file;       // TODO(dqn): Hmmm, how should we do this... ?
+    Dqn_TicketMutex          log_file_mutex; // Is locked when instantiating the log_file for the first time
+    bool                     log_no_colour;  // Disable colours in the logging output
 
     // NOTE: Leak Tracing ==========================================================================
 
@@ -627,14 +627,6 @@ struct Dqn_Library
     uint32_t                 os_page_size;
     uint32_t                 os_alloc_granularity;
 
-    // NOTE: Thread Context ========================================================================
-
-    #if defined(DQN_DEBUG_THREAD_CONTEXT)
-    Dqn_TicketMutex          thread_context_mutex;
-    Dqn_ArenaStat            thread_context_arena_stats[256];
-    uint8_t                  thread_context_arena_stats_count;
-    #endif
-
     // NOTE: Profiler ==============================================================================
 
     #if !defined(DQN_NO_PROFILER)
@@ -650,6 +642,5 @@ DQN_API void         Dqn_Library_SetPointer                (Dqn_Library *library
 DQN_API void         Dqn_Library_SetProfiler               (Dqn_Profiler *profiler);
 #endif
 DQN_API void         Dqn_Library_SetLogCallback            (Dqn_LogProc *proc, void *user_data);
-DQN_API void         Dqn_Library_SetLogFile                (void *file);
 DQN_API void         Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path);
 
