@@ -844,8 +844,10 @@ DQN_API Dqn_Library *Dqn_Library_Init()
     Dqn_Log_DebugF("Dqn Library initialised:\n");
     Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  OS Page Size/Alloc Granularity: %$$_I32u/%$$_I32u", result->os_page_size, result->os_alloc_granularity);
 
-    if (DQN_ASAN_POISON)
+    if (DQN_ASAN_POISON) {
         Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  ASAN manual poisoning%s", DQN_ASAN_VET_POISON ? " (+vet sanity checks)" : "");
+        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  ASAN poison guard size: %$$_I32u", DQN_ASAN_POISON_GUARD_SIZE);
+    }
 
     #if defined(DQN_LEAK_TRACING)
     Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  Allocation leak tracing");

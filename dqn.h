@@ -246,6 +246,11 @@
 //
 //     DQN_ASAN_VET_POISON 1
 //
+// - Define this macro to the size of the guard memory reserved before and after
+//   allocations made that are poisoned to protect against out-of-bounds memory
+//   accesses. By default the library sets the guard to 128 bytes.
+//
+//     DQN_ASAN_POISON_GUARD_SIZE 128
 
 // NOTE: Dqn_Strings ===============================================================================
 // [$CSTR] Dqn_CString8       |                             | C-string helpers

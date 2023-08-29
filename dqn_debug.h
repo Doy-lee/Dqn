@@ -38,9 +38,13 @@
     #define DQN_ASAN_POISON_VET 0
 #endif
 
-#if !defined(DQN_ASAN_POISON_ALIGNMENT)
-    #define DQN_ASAN_POISON_ALIGNMENT 8
+#define DQN_ASAN_POISON_ALIGNMENT 8
+#if !defined(DQN_ASAN_POISON_GUARD_SIZE)
+    #define DQN_ASAN_POISON_GUARD_SIZE 128
 #endif
+static_assert(Dqn_IsPowerOfTwoAligned(DQN_ASAN_POISON_GUARD_SIZE, DQN_ASAN_POISON_ALIGNMENT),
+              "ASAN poison guard size must be a power-of-two and aligned to ASAN's alignment"
+              "requirement (8 bytes)");
 
 // NOTE: MSVC does not support the feature detection macro for instance so we
 // compile it out
@@ -48,7 +52,7 @@
     #define __has_feature(x) 0
 #endif
 
-// NOTE: [$ASAN] Dqn_Asan ========================================================================== ===
+// NOTE: [$ASAN] Dqn_Asan ==========================================================================
 #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
     #include <sanitizer/asan_interface.h>
 #endif

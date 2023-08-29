@@ -179,7 +179,7 @@ DQN_API Dqn_MemBlockSizeRequiredResult Dqn_MemBlock_SizeRequired(Dqn_MemBlock co
         // is always guarded with poison-ed memory to prevent read/writes behind
         // the block of memory.
         if ((block_flags & Dqn_MemBlockFlag_AllocsAreContiguous) == 0) {
-            result.alloc_size = Dqn_AlignUpPowerOfTwo(size + g_dqn_library->os_page_size, DQN_ASAN_POISON_ALIGNMENT);
+            result.alloc_size = Dqn_AlignUpPowerOfTwo(size + DQN_ASAN_POISON_GUARD_SIZE, DQN_ASAN_POISON_ALIGNMENT);
         }
         ptr_alignment = DQN_MAX(alignment, DQN_ASAN_POISON_ALIGNMENT);
     }
@@ -199,8 +199,8 @@ DQN_API Dqn_MemBlockSizeRequiredResult Dqn_MemBlock_SizeRequired(Dqn_MemBlock co
 
 Dqn_usize Dqn_MemBlock_MetadataSize()
 {
-    Dqn_usize init_poison_page = DQN_ASAN_POISON ? g_dqn_library->os_page_size : 0;
-    Dqn_usize poison_alignment = DQN_ASAN_POISON ? DQN_ASAN_POISON_ALIGNMENT : 0;
+    Dqn_usize init_poison_page = DQN_ASAN_POISON ? DQN_ASAN_POISON_GUARD_SIZE : 0;
+    Dqn_usize poison_alignment = DQN_ASAN_POISON ? DQN_ASAN_POISON_ALIGNMENT  : 0;
     Dqn_usize result           = Dqn_AlignUpPowerOfTwo(sizeof(Dqn_MemBlock), poison_alignment) + init_poison_page;
     return result;
 }
@@ -236,7 +236,7 @@ DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uin
             DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result->data, DQN_ASAN_POISON_ALIGNMENT));
             DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result->size, DQN_ASAN_POISON_ALIGNMENT));
             void *poison_ptr          = DQN_CAST(void *)Dqn_AlignUpPowerOfTwo(DQN_CAST(char *)result + sizeof(Dqn_MemBlock), DQN_ASAN_POISON_ALIGNMENT);
-            Dqn_usize bytes_to_poison = g_dqn_library->os_page_size + result->size;
+            Dqn_usize bytes_to_poison = DQN_ASAN_POISON_GUARD_SIZE + result->size;
             Dqn_ASAN_PoisonMemoryRegion(poison_ptr, bytes_to_poison);
         }
     }
