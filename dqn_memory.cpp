@@ -232,11 +232,15 @@ DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uin
         result->commit = commit_aligned            - metadata_size;
         result->flags  = DQN_CAST(uint8_t)flags;
 
-        if (DQN_ASAN_POISON) { // NOTE: Poison (guard page + entire block), we unpoison as we allocate
+        // NOTE: Poison (guard page + commit). We do *not* poison the entire
+        // block, only the commit pages. Since we may reserve large amounts of
+        // space vs commit we'd waste time marking those pages as poisoned as
+        // reads or writes outside of committed pages will page fault.
+        if (DQN_ASAN_POISON) {
             DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result->data, DQN_ASAN_POISON_ALIGNMENT));
             DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result->size, DQN_ASAN_POISON_ALIGNMENT));
             void *poison_ptr          = DQN_CAST(void *)Dqn_AlignUpPowerOfTwo(DQN_CAST(char *)result + sizeof(Dqn_MemBlock), DQN_ASAN_POISON_ALIGNMENT);
-            Dqn_usize bytes_to_poison = DQN_ASAN_POISON_GUARD_SIZE + result->size;
+            Dqn_usize bytes_to_poison = DQN_ASAN_POISON_GUARD_SIZE + result->commit;
             Dqn_ASAN_PoisonMemoryRegion(poison_ptr, bytes_to_poison);
         }
     }
@@ -274,6 +278,12 @@ DQN_API void *Dqn_MemBlock_Alloc(Dqn_MemBlock *block, Dqn_usize size, uint8_t al
         block->commit        += commit_size;
         Dqn_VMem_Commit(commit_ptr, commit_size, Dqn_VMemPage_ReadWrite);
         DQN_ASSERT(block->commit <= block->size);
+
+        if (DQN_ASAN_POISON) { // NOTE: Poison newly committed pages that aren't being used.
+            void *poison_ptr          = DQN_CAST(char *)block->data + block->used;
+            Dqn_usize bytes_to_poison = block->commit - block->used;
+            Dqn_ASAN_PoisonMemoryRegion(poison_ptr, bytes_to_poison);
+        }
     }
 
     return result;
