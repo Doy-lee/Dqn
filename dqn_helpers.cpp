@@ -229,19 +229,15 @@ DQN_API uint64_t Dqn_Bin_HexBufferToU64(char const *hex, Dqn_usize size)
 
     DQN_ASSERT(DQN_CAST(Dqn_usize)(trim_size * 4 / 8) /*maximum amount of bytes represented in the hex string*/ <= sizeof(uint64_t));
 
-    uint64_t   result      = 0;
-    Dqn_usize bits_written = 0;
-    Dqn_usize max_size     = DQN_MIN(size, 8 /*bytes*/ * 2 /*hex chars per byte*/);
-    for (Dqn_usize hex_index = 0; hex_index < max_size; hex_index++, bits_written += 4) {
+    uint64_t   result  = 0;
+    Dqn_usize max_size = DQN_MIN(size, 8 /*bytes*/ * 2 /*hex chars per byte*/);
+    for (Dqn_usize hex_index = 0; hex_index < max_size; hex_index++) {
         char ch = trim_hex[hex_index];
         if (!Dqn_Char_IsHex(ch))
             break;
         uint8_t val = Dqn_Char_HexToU8(ch);
-        Dqn_usize bit_shift = 60 - bits_written;
-        result |= (DQN_CAST(uint64_t)val << bit_shift);
+        result      = (result << 4) | val;
     }
-
-    result >>= (64 - bits_written); // Shift the remainder digits to the end.
     return result;
 }
 
