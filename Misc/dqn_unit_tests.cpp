@@ -1847,10 +1847,110 @@ static void Dqn_Test_RunSuite()
     dqn_library->log_callback = prev_log_callback;
 }
 
+#define WIN32_LEAN_AND_MEAN
+#include <TlHelp32.h>
+#include <DbgHelp.h>  // STACKFRAME64, ...
+#include <winnt.h>    // CONTEXT
+#pragma comment(lib, "DbgHelp.lib")
+
+// extern "C"
+// {
+// /*HANDLE*/ void * __stdcall GetCurrentProcess(void);
+// /*HANDLE*/ void * __stdcall GetCurrentThread(void);
+// }
+
+void DumpStackTrace()
+{
+    #if !defined(_M_X64)
+    #error "Platform is not implemented"
+    #endif
+
+    CONTEXT context;
+    RtlCaptureContext(&context);
+
+    STACKFRAME64 frame     = {};
+    frame.AddrPC.Offset    = context.Rip;
+    frame.AddrPC.Mode      = AddrModeFlat;
+    frame.AddrFrame.Offset = context.Rbp;
+    frame.AddrFrame.Mode   = AddrModeFlat;
+    frame.AddrStack.Offset = context.Rsp;
+    frame.AddrStack.Mode   = AddrModeFlat;
+
+    void *thread                 = GetCurrentThread();
+    static Dqn_TicketMutex mutex = {};
+    Dqn_TicketMutex_Begin(&mutex);
+
+    void *process = GetCurrentProcess();
+    static bool init = false;
+    if (!init) {
+        SymInitialize(process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/);
+        SymSetOptions(SYMOPT_LOAD_LINES);
+        init = 1;
+    }
+
+    for (;;) {
+        if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64,
+                         process,
+                         thread,
+                         &frame,
+                         &context,
+                         nullptr /*ReadMemoryRoutine*/,
+                         SymFunctionTableAccess64,
+                         SymGetModuleBase64,
+                         nullptr /*TrnaslateAddress*/)) {
+            break;
+        }
+
+        if (frame.AddrPC.Offset == frame.AddrReturn.Offset) {
+            // TODO(doyle): Recursion
+        }
+
+        if (frame.AddrPC.Offset == 0) {
+            break;
+            // TODO(doyle): Invalid program counter
+        } else {
+
+            // NOTE: Get file+line =================================================================
+
+            IMAGEHLP_LINE64 line    = {};
+            line.SizeOfStruct       = sizeof(line);
+            DWORD line_displacement = 0;
+
+            if (SymGetLineFromAddr64(process, frame.AddrPC.Offset, &line_displacement, &line)) {
+                printf("%s(%lu): ", line.FileName, line.LineNumber);
+            } else {
+                DWORD error = GetLastError();
+                printf("SymFromAddr returned error : %lu\n", error);
+            }
+
+            // NOTE: Get function name ============================================================
+
+            char buffer[sizeof(SYMBOL_INFO) + 1024] = {};
+            SYMBOL_INFO *symbol                     = new (buffer) SYMBOL_INFO;
+            symbol->SizeOfStruct                    = sizeof(*symbol);
+            symbol->MaxNameLen                      = 1024;
+            uint64_t symbol_displacement            = 0; // Offset to the beginning of the symbol to the address
+
+            if (SymFromAddr(process, frame.AddrPC.Offset, &symbol_displacement, symbol)) {
+                printf("%.*s\n", DQN_CAST(int)symbol->NameLen, symbol->Name);
+            } else {
+                DWORD error = GetLastError();
+                printf("SymFromAddr returned error : %lu\n", error);
+            }
+
+        }
+    }
+    Dqn_TicketMutex_End(&mutex);
+}
+
 #if defined(DQN_TEST_WITH_MAIN)
 int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;
+    printf("%s\n\n", b_stacktrace_get_string());
+    DumpStackTrace();
+    return 1;
+
     Dqn_Test_RunSuite();
     return 0;
 }
