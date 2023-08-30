@@ -1,12 +1,3 @@
-// NOTE: [$BSTK] b_stacktrace ======================================================================
-DQN_MSVC_WARNING_PUSH
-DQN_MSVC_WARNING_DISABLE(6308) // b_stacktrace.h|147 'realloc' might return null pointer: assigning null pointer to 'b->buf', which is passed as an argument to 'realloc', will cause the original memory block to be leaked.
-DQN_MSVC_WARNING_DISABLE(6011) // b_stacktrace.h|244 Dereferencing NULL pointer 'cur'. : Lines: 183, 184, 185, 186, 187, 188, 189, 191, 196, 198, 208, 209, 210, 211, 212, 213, 214, 229, 230, 231, 237, 244
-DQN_MSVC_WARNING_DISABLE(6387) // b_stacktrace.h|284 'symbol' could be '0'.: Lines: 256, 257, 258, 259, 260, 261, 262, 264, 265, 266, 267, 268, 270, 276, 281, 282, 284
-#define B_STACKTRACE_IMPL
-#include "b_stacktrace.h"
-DQN_MSVC_WARNING_POP
-
 // NOTE: [$STBS] stb_sprintf =======================================================================
 #if !defined(DQN_STB_SPRINTF_HEADER_ONLY)
 #define STB_SPRINTF_IMPLEMENTATION

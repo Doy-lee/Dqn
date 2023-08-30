@@ -169,6 +169,7 @@
 // [$BSTK] b_stacktrace       |                             | Generating call stacktraces
 // [$OS_H] OS Headers         |                             | Headers from the operating system
 // [$STBS] stb_sprintf        |                             | Portable sprintf
+#include "dqn_win32.h"
 #include "dqn_external.h"
 
 // NOTE: Additional Configuration
@@ -210,11 +211,6 @@
 //   which scrubs memory with this #define-d value.
 //
 //     DQN_MEMSET_BYTE
-//
-// - Override the stack trace dump functionality on invocation of this macro. 
-//   Currently this is only used in asserts.
-//
-//     DQN_DUMP_STACK_TRACE
 //
 // - Define this macro to enable emory leak tracking when requesting memory
 //   from the OS via this library. For example calls to Dqn_VMem_Reserve or

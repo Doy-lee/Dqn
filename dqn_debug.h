@@ -20,14 +20,9 @@
     #define DQN_MEMSET_BYTE 0
 #endif
 
+// TODO(doyle): Use our new stacktrace library
 #if !defined(DQN_DUMP_STACK_TRACE)
-    #define DQN_DUMP_STACK_TRACE                                                                  \
-        do {                                                                                      \
-            Dqn_String8 stack_trace_       = Dqn_String8_InitCString8(b_stacktrace_get_string()); \
-            Dqn_String8 clean_stack_trace_ = Dqn_Debug_CleanStackTrace(stack_trace_);             \
-            Dqn_Print_StdF(Dqn_PrintStd_Err, "%.*s", DQN_STRING_FMT(clean_stack_trace_));         \
-            free(stack_trace_.data);                                                              \
-        } while (0)
+    #define DQN_DUMP_STACK_TRACE
 #endif
 
 #if !defined(DQN_ASAN_POISON)
@@ -57,8 +52,47 @@ static_assert(Dqn_IsPowerOfTwoAligned(DQN_ASAN_POISON_GUARD_SIZE, DQN_ASAN_POISO
     #include <sanitizer/asan_interface.h>
 #endif
 
-void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize size);
-void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize size);
+DQN_API void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize size);
+DQN_API void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize size);
+
+// NOTE: [$STKT] Dqn_StackTrace ====================================================================
+struct Dqn_StackTraceFrame
+{
+    uint64_t    address;
+    uint64_t    line_number;
+    Dqn_String8 file_name;
+    Dqn_String8 function_name;
+};
+
+struct Dqn_StackTraceRawFrame
+{
+    void     *process;
+    uint64_t  base_addr;
+};
+
+struct Dqn_StackTraceWalkResult
+{
+    void     *process;
+    uint64_t *base_addr;
+    uint16_t  size;
+};
+
+struct Dqn_StackTraceWalkResultIterator
+{
+    Dqn_StackTraceRawFrame raw_frame;
+    uint16_t               index;
+};
+
+struct Dqn_StackTraceFrames
+{
+    Dqn_StackTraceFrame *data;
+    uint16_t             size;
+};
+
+DQN_API Dqn_StackTraceWalkResult Dqn_StackTrace_Walk             (Dqn_Arena *arena, uint16_t limit);
+DQN_API bool                     Dqn_StackTrace_WalkResultIterate(Dqn_StackTraceWalkResultIterator *it, Dqn_StackTraceWalkResult *walk);
+DQN_API Dqn_StackTraceFrames     Dqn_StackTrace_GetFrames        (Dqn_Arena *arena, uint16_t limit);
+DQN_API Dqn_StackTraceFrame      Dqn_StackTrace_RawFrameToFrame  (Dqn_Arena *arena, Dqn_StackTraceRawFrame raw_frame);
 
 // NOTE: [$CALL] Dqn_CallSite ======================================================================
 struct Dqn_CallSite
@@ -92,8 +126,6 @@ static_assert(sizeof(Dqn_AllocRecord) == 48,
               "We aim to keep the allocation record as light as possible as "
               "memory tracking can get expensive. Enforce that there is no "
               "unexpected padding.");
-
-DQN_API Dqn_String8 Dqn_Debug_CleanStackTrace(Dqn_String8 stack_trace);
 
 #if defined(DQN_LEAK_TRACING)
 #define Dqn_Debug_TrackAlloc(ptr, size, leak_permitted) Dqn_Debug_TrackAlloc_  (Dqn_String8_InitCString8(b_stacktrace_get_string()), ptr, size, leak_permitted)

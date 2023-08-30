@@ -939,7 +939,7 @@ DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_Clear(Dqn_FArray<T, N
 
 #if !defined(DQN_NO_LIST)
 // NOTE: [$LIST] Dqn_List ==========================================================================
-template <typename T> DQN_API Dqn_List<T> Dqn_List_InitWithArena(Dqn_Arena *arena, Dqn_usize chunk_size)
+template <typename T> DQN_API Dqn_List<T> Dqn_List_Init(Dqn_Arena *arena, Dqn_usize chunk_size)
 {
     Dqn_List<T> result = {};
     result.arena       = arena;

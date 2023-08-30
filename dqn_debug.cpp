@@ -1,5 +1,5 @@
 // NOTE: [$ASAN] Dqn_Asan ========================================================================== ===
-void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
+DQN_API void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
 {
     #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
     __asan_poison_memory_region(ptr, size);
@@ -12,7 +12,7 @@ void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
     #endif
 }
 
-void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
+DQN_API void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
 {
     #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
     __asan_unpoison_memory_region(ptr, size);
@@ -24,22 +24,145 @@ void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
     #endif
 }
 
-// NOTE: [$DEBG] Dqn_Debug =========================================================================
-DQN_API Dqn_String8 Dqn_Debug_CleanStackTrace(Dqn_String8 stack_trace)
+DQN_API Dqn_StackTraceWalkResult Dqn_StackTrace_Walk(Dqn_Arena *arena, uint16_t limit)
 {
-    // NOTE: Remove the stacktrace's library invocations from the stack trace
-    // which just adds noise to the actual trace we want to look at, e.g:
-    //
-    // dqn\b_stacktrace.h(198): b_stacktrace_get
-    // dqn\b_stacktrace.h(156): b_stacktrace_get_string
+    Dqn_StackTraceWalkResult result = {};
+    #if defined(DQN_OS_WIN32)
+    if (!arena)
+        return result;
 
-    Dqn_String8BinarySplitResult split_line0 = Dqn_String8_BinarySplit(stack_trace, DQN_STRING8("\n"));
-    Dqn_String8BinarySplitResult split_line1 = Dqn_String8_BinarySplit(split_line0.rhs, DQN_STRING8("\n"));
+    static Dqn_TicketMutex mutex = {};
+    Dqn_TicketMutex_Begin(&mutex);
 
-    Dqn_String8 result = split_line1.rhs;
+    HANDLE thread  = GetCurrentThread();
+    result.process = GetCurrentProcess();
+
+    for (static bool init = false; !init; init = true) {
+        SymSetOptions(SYMOPT_LOAD_LINES);
+        if (!SymInitialize(result.process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/)) {
+            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+            Dqn_WinError error        = Dqn_Win_LastError(scratch.arena);
+            Dqn_Log_ErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DQN_STRING_FMT(error.msg));
+        }
+    }
+
+    CONTEXT context;
+    RtlCaptureContext(&context);
+
+    STACKFRAME64 frame     = {};
+    frame.AddrPC.Offset    = context.Rip;
+    frame.AddrPC.Mode      = AddrModeFlat;
+    frame.AddrFrame.Offset = context.Rbp;
+    frame.AddrFrame.Mode   = AddrModeFlat;
+    frame.AddrStack.Offset = context.Rsp;
+    frame.AddrStack.Mode   = AddrModeFlat;
+
+    Dqn_ThreadScratch scratch     = Dqn_Thread_GetScratch(arena);
+    Dqn_List<uint64_t> raw_frames = Dqn_List_Init<uint64_t>(scratch.arena, 32 /*chunk size*/);
+
+    while (raw_frames.count < limit) {
+        if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64,
+                         result.process,
+                         thread,
+                         &frame,
+                         &context,
+                         nullptr /*ReadMemoryRoutine*/,
+                         SymFunctionTableAccess64,
+                         SymGetModuleBase64,
+                         nullptr /*TranslateAddress*/)) {
+            break;
+        }
+
+        // NOTE: It might be useful one day to use frame.AddrReturn.Offset.
+        // If AddrPC.Offset == AddrReturn.Offset then we can detect recursion.
+        Dqn_List_Add(&raw_frames, frame.AddrPC.Offset);
+    }
+    Dqn_TicketMutex_End(&mutex);
+
+    result.base_addr = Dqn_Arena_NewArray(arena, uint64_t, raw_frames.count, Dqn_ZeroMem_No);
+    for (Dqn_ListChunk<uint64_t> *chunk = raw_frames.head; chunk; chunk = chunk->next) {
+        DQN_MEMCPY(result.base_addr + result.size, chunk->data, sizeof(*chunk->data) * chunk->count);
+        result.size += DQN_CAST(uint16_t)chunk->count;
+    }
+    #else
+    (void)limit; (void)arena;
+    #endif
     return result;
 }
 
+DQN_API bool Dqn_StackTrace_WalkResultIterate(Dqn_StackTraceWalkResultIterator *it, Dqn_StackTraceWalkResult *walk)
+{
+    bool result = false;
+    if (!it || !walk || !walk->base_addr || !walk->process)
+        return result;
+
+    if (it->index >= walk->size)
+        return false;
+
+    result                  = true;
+    it->raw_frame.process   = walk->process;
+    it->raw_frame.base_addr = walk->base_addr[it->index++];
+    return result;
+}
+
+DQN_API Dqn_StackTraceFrame Dqn_StackTrace_RawFrameToFrame(Dqn_Arena *arena, Dqn_StackTraceRawFrame raw_frame)
+{
+    #if defined(DQN_OS_WIN32)
+    // NOTE: Get line+filename =====================================================================
+
+    // TODO: Why does zero-initialising this with `line = {};` cause
+    // SymGetLineFromAddr64 function to fail once we are at
+    // __scrt_commain_main_seh and hit BaseThreadInitThunk frame? The
+    // line and file number are still valid in the result which we use, so,
+    // we silently ignore this error.
+    IMAGEHLP_LINEW64 line;
+    line.SizeOfStruct       = sizeof(line);
+    DWORD line_displacement = 0;
+    SymGetLineFromAddrW64(raw_frame.process, raw_frame.base_addr, &line_displacement, &line);
+
+    // NOTE: Get function name =====================================================================
+
+    alignas(SYMBOL_INFOW) char buffer[sizeof(SYMBOL_INFOW) + (MAX_SYM_NAME * sizeof(wchar_t))] = {};
+    SYMBOL_INFOW *symbol = DQN_CAST(SYMBOL_INFOW *)buffer;
+    symbol->SizeOfStruct = sizeof(*symbol);
+    symbol->MaxNameLen   = sizeof(buffer) - sizeof(*symbol);
+
+    uint64_t symbol_displacement = 0; // Offset to the beginning of the symbol to the address
+    SymFromAddrW(raw_frame.process, raw_frame.base_addr, &symbol_displacement, symbol);
+
+    // NOTE: Construct result ======================================================================
+
+    Dqn_String16 file_name16     = Dqn_String16{line.FileName, Dqn_CString16_Size(line.FileName)};
+    Dqn_String16 function_name16 = Dqn_String16{symbol->Name, symbol->NameLen};
+
+    Dqn_StackTraceFrame result   = {};
+    result.address               = raw_frame.base_addr;
+    result.line_number           = line.LineNumber;
+    result.file_name             = Dqn_Win_String16ToString8(arena, file_name16);
+    result.function_name         = Dqn_Win_String16ToString8(arena, function_name16);
+    #else
+    Dqn_StackTraceFrame result   = {};
+    #endif
+    return result;
+}
+
+DQN_API Dqn_StackTraceFrames Dqn_StackTrace_GetFrames(Dqn_Arena *arena, uint16_t limit)
+{
+    Dqn_StackTraceFrames result   = {};
+    Dqn_ThreadScratch scratch     = Dqn_Thread_GetScratch(arena);
+    Dqn_StackTraceWalkResult walk = Dqn_StackTrace_Walk(scratch.arena, limit);
+
+    if (!walk.size)
+        return result;
+
+    result.data = Dqn_Arena_NewArray(arena, Dqn_StackTraceFrame, walk.size, Dqn_ZeroMem_No);
+    for (Dqn_StackTraceWalkResultIterator it = {}; Dqn_StackTrace_WalkResultIterate(&it, &walk); ) {
+        result.data[result.size++] = Dqn_StackTrace_RawFrameToFrame(arena, it.raw_frame);
+    }
+    return result;
+}
+
+// NOTE: [$DEBG] Dqn_Debug =========================================================================
 #if defined(DQN_LEAK_TRACING)
 DQN_API void Dqn_Debug_TrackAlloc_(Dqn_String8 stack_trace, void *ptr, Dqn_usize size, bool leak_permitted)
 {
