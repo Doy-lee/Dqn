@@ -56,6 +56,38 @@ DQN_API void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize siz
 DQN_API void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize size);
 
 // NOTE: [$STKT] Dqn_StackTrace ====================================================================
+// Create a stack trace at the calling site that these functions are invoked
+// from.
+//
+// NOTE: API =======================================================================================
+//   @proc Dqn_StackTrace_Walk
+//   @desc This functions generates the stack trace as a series of U64's that
+//   represent the base address of the functions on the call-stack at the point
+//   of execution. These functions are stored in order from the current
+//   executing function first and the most ancestor function last in the walk.
+
+//   @proc Dqn_StackTrace_WalkResultIterate
+//   @desc Create an iterator to iterate the walk result and produce
+//   `Dqn_StackTraceRawFrame` from each level of the call-stack. These frames
+//   can then be converted into `Dqn_StackTraceFrame` which is a human readable
+//   representation of the frame.
+#if 0
+    Dqn_ThreadScratch scratch     = Dqn_Thread_GetScratch(nullptr);
+    Dqn_StackTraceWalkResult walk = Dqn_StackTrace_Walk(scratch.arena, 128 /*limit*/);
+    for (Dqn_StackTraceWalkResultIterator it = {}; Dqn_StackTrace_WalkResultIterate(&it, &walk); ) {
+        Dqn_StackTraceFrame frame = Dqn_StackTrace_RawFrameToFrame(scratch.arena, it.raw_frame);
+        Dqn_Print_LnF("%.*s(%I64u): %.*s", DQN_STRING_FMT(frame.file_name), frame.line_number, DQN_STRING_FMT(frame.function_name));
+    }
+#endif
+
+//   @proc Dqn_StackTrace_GetFrames
+//   @desc Create a stack trace at the point of execution and return the frames
+//   converted into its human readable format.
+
+//   @proc Dqn_StackTrace_RawFrameToFrame
+//   @desc Convert a raw frame from a stack trace walk into the human readable
+//   format (e.g. with function names, line number and file name).
+
 struct Dqn_StackTraceFrame
 {
     uint64_t    address;
@@ -72,9 +104,9 @@ struct Dqn_StackTraceRawFrame
 
 struct Dqn_StackTraceWalkResult
 {
-    void     *process;
-    uint64_t *base_addr;
-    uint16_t  size;
+    void     *process;   // [Internal] Windows handle to the process
+    uint64_t *base_addr; // The addresses of the functions in the stack trace
+    uint16_t  size;      // The number of `base_addr`'s stored from the walk
 };
 
 struct Dqn_StackTraceWalkResultIterator
