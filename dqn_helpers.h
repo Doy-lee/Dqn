@@ -489,7 +489,7 @@ DQN_API Dqn_U64String Dqn_U64ToString        (uint64_t val, char separator);
         for (size_t index = 0; index < Zone_Count; index++) {
             Dqn_ProfilerAnchor *anchor = anchors + index;
             printf("%.*s[%u] %zu cycles (%.1fms)\n",
-                   DQN_STRING_FMT(anchor->label),
+                   DQN_STRING_FMT(anchor->anchor_index),
                    anchor->hit_count,
                    anchor->tsc_inclusive,
                    anchor->tsc_inclusive * tsc_per_seconds * 1000.f);
@@ -524,27 +524,29 @@ struct Dqn_ProfilerAnchor
     // time spent in children functions that we call that are also being
     // profiled. If we recursively call into ourselves, the time we spent in
     // our function is accumulated.
-    uint64_t tsc_inclusive;
-    uint64_t tsc_exclusive;
-    uint16_t hit_count;
+    uint64_t    tsc_inclusive;
+    uint64_t    tsc_exclusive;
+    uint16_t    hit_count;
+    Dqn_String8 name;
 };
 
 struct Dqn_ProfilerZone
 {
-    uint16_t label;
-    uint64_t begin_tsc;
-    uint16_t parent_zone;
-    uint64_t elapsed_tsc_at_zone_start;
+    uint16_t    anchor_index;
+    uint64_t    begin_tsc;
+    uint16_t    parent_zone;
+    uint64_t    elapsed_tsc_at_zone_start;
 };
 
 #if defined(__cplusplus)
 struct Dqn_ProfilerZoneScope
 {
-    Dqn_ProfilerZoneScope(uint16_t label);
+    Dqn_ProfilerZoneScope(Dqn_String8 name, uint16_t anchor_index);
     ~Dqn_ProfilerZoneScope();
     Dqn_ProfilerZone zone;
 };
-#define Dqn_Profiler_ZoneScope(label) auto DQN_UNIQUE_NAME(profile_zone_##label_) = Dqn_ProfilerZoneScope(label)
+#define Dqn_Profiler_ZoneScope(name) auto DQN_UNIQUE_NAME(profile_zone_) = Dqn_ProfilerZoneScope(DQN_STRING8(name), __COUNTER__ + 1)
+#define Dqn_Profiler_ZoneScopeWithIndex(name, anchor_index) auto DQN_UNIQUE_NAME(profile_zone_) = Dqn_ProfilerZoneScope(DQN_STRING8(name), anchor_index)
 #endif
 
 enum Dqn_ProfilerAnchorBuffer
@@ -560,10 +562,15 @@ struct Dqn_Profiler
     uint16_t           parent_zone;
 };
 
-Dqn_ProfilerZone    Dqn_Profiler_BeginZone        (uint16_t label);
-void                Dqn_Profiler_EndZone          (Dqn_ProfilerZone zone);
-Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer     (Dqn_ProfilerAnchorBuffer buffer);
-void                Dqn_Profiler_SwapAnchorBuffer (uint32_t anchor_count);
+// NOTE: Macros ====================================================================================
+#define             Dqn_Profiler_BeginZone(name) Dqn_Profiler_BeginZoneWithIndex(DQN_STRING8(name), __COUNTER__ + 1)
+
+// NOTE: API =======================================================================================
+Dqn_ProfilerZone    Dqn_Profiler_BeginZoneWithIndex(Dqn_String8 name, uint16_t anchor_index);
+void                Dqn_Profiler_EndZone           (Dqn_ProfilerZone zone);
+Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer      (Dqn_ProfilerAnchorBuffer buffer);
+void                Dqn_Profiler_SwapAnchorBuffer  (uint32_t anchor_count);
+void                Dqn_Profiler_Dump              (uint64_t tsc_per_second);
 #endif // !defined(DQN_NO_PROFILER)
 
 // NOTE: [$DLIB] Dqn_Library =======================================================================

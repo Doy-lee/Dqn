@@ -179,8 +179,8 @@ DQN_API Dqn_MemBlockSizeRequiredResult Dqn_MemBlock_SizeRequired(Dqn_MemBlock co
 Dqn_usize Dqn_MemBlock_MetadataSize()
 {
     Dqn_usize init_poison_page = DQN_ASAN_POISON ? DQN_ASAN_POISON_GUARD_SIZE : 0;
-    Dqn_usize poison_alignment = DQN_ASAN_POISON ? DQN_ASAN_POISON_ALIGNMENT  : 0;
-    Dqn_usize result           = Dqn_AlignUpPowerOfTwo(sizeof(Dqn_MemBlock), poison_alignment) + init_poison_page;
+    Dqn_usize alignment        = DQN_ASAN_POISON ? DQN_ASAN_POISON_ALIGNMENT  : alignof(Dqn_MemBlock);
+    Dqn_usize result           = Dqn_AlignUpPowerOfTwo(sizeof(Dqn_MemBlock), alignment) + init_poison_page;
     return result;
 }
 

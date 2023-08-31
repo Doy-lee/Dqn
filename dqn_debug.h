@@ -2,8 +2,8 @@
     #define DQN_ASAN_POISON 0
 #endif
 
-#if !defined(DQN_ASAN_POISON_VET)
-    #define DQN_ASAN_POISON_VET 0
+#if !defined(DQN_ASAN_VET_POISON)
+    #define DQN_ASAN_VET_POISON 0
 #endif
 
 #define DQN_ASAN_POISON_ALIGNMENT 8

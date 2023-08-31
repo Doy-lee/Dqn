@@ -952,9 +952,9 @@ DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
 
 #if !defined(DQN_NO_PROFILER)
 // NOTE: [$PROF] Dqn_Profiler ======================================================================
-Dqn_ProfilerZoneScope::Dqn_ProfilerZoneScope(uint16_t label)
+Dqn_ProfilerZoneScope::Dqn_ProfilerZoneScope(Dqn_String8 name, uint16_t anchor_index)
 {
-    zone = Dqn_Profiler_BeginZone(label);
+    zone = Dqn_Profiler_BeginZoneWithIndex(name, anchor_index);
 }
 
 Dqn_ProfilerZoneScope::~Dqn_ProfilerZoneScope()
@@ -962,15 +962,16 @@ Dqn_ProfilerZoneScope::~Dqn_ProfilerZoneScope()
     Dqn_Profiler_EndZone(zone);
 }
 
-Dqn_ProfilerZone Dqn_Profiler_BeginZone(uint16_t label)
+Dqn_ProfilerZone Dqn_Profiler_BeginZoneWithIndex(Dqn_String8 name, uint16_t anchor_index)
 {
-    Dqn_ProfilerAnchor *anchor           = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back) + label;
+    Dqn_ProfilerAnchor *anchor           = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back) + anchor_index;
+    anchor->name                         = name;
     Dqn_ProfilerZone result              = {};
     result.begin_tsc                     = Dqn_CPU_TSC();
-    result.label                         = label;
+    result.anchor_index                  = anchor_index;
     result.parent_zone                   = g_dqn_library->profiler->parent_zone;
     result.elapsed_tsc_at_zone_start     = anchor->tsc_inclusive;
-    g_dqn_library->profiler->parent_zone = label;
+    g_dqn_library->profiler->parent_zone = anchor_index;
     return result;
 }
 
@@ -978,15 +979,15 @@ void Dqn_Profiler_EndZone(Dqn_ProfilerZone zone)
 {
     uint64_t elapsed_tsc              = Dqn_CPU_TSC() - zone.begin_tsc;
     Dqn_ProfilerAnchor *anchor_buffer = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back);
-    Dqn_ProfilerAnchor *anchor        = anchor_buffer + zone.label;
+    Dqn_ProfilerAnchor *anchor        = anchor_buffer + zone.anchor_index;
 
     anchor->hit_count++;
     anchor->tsc_inclusive  = zone.elapsed_tsc_at_zone_start + elapsed_tsc;
     anchor->tsc_exclusive += elapsed_tsc;
 
-    Dqn_ProfilerAnchor *parent_anchor  = anchor_buffer + zone.parent_zone;
-    parent_anchor->tsc_exclusive      -= elapsed_tsc;
-    g_dqn_library->profiler->parent_zone        = zone.parent_zone;
+    Dqn_ProfilerAnchor *parent_anchor     = anchor_buffer + zone.parent_zone;
+    parent_anchor->tsc_exclusive         -= elapsed_tsc;
+    g_dqn_library->profiler->parent_zone  = zone.parent_zone;
 }
 
 Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer buffer)
@@ -1002,5 +1003,32 @@ void Dqn_Profiler_SwapAnchorBuffer(uint32_t anchor_count)
     g_dqn_library->profiler->active_anchor_buffer++;
     Dqn_ProfilerAnchor *anchors = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back);
     DQN_MEMSET(anchors, 0, anchor_count * sizeof(g_dqn_library->profiler->anchors[0][0]));
+}
+
+void Dqn_Profiler_Dump(uint64_t tsc_per_second)
+{
+    Dqn_ProfilerAnchor *anchors = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back);
+    for (size_t anchor_index = 1; anchor_index < DQN_PROFILER_ANCHOR_BUFFER_SIZE; anchor_index++) {
+        Dqn_ProfilerAnchor const *anchor   = anchors + anchor_index;
+        if (!anchor->hit_count)
+            continue;
+
+        uint64_t tsc_exclusive             = anchor->tsc_exclusive;
+        uint64_t tsc_inclusive             = anchor->tsc_inclusive;
+        Dqn_f64 tsc_exclusive_milliseconds = tsc_exclusive * 1000 / DQN_CAST(Dqn_f64)tsc_per_second;
+        if (tsc_exclusive == tsc_inclusive) {
+            Dqn_Print_LnF("%.*s[%u]: %.1fms",
+                          DQN_STRING_FMT(anchor->name),
+                          anchor->hit_count,
+                          tsc_exclusive_milliseconds);
+        } else {
+            Dqn_f64 tsc_inclusive_milliseconds        = tsc_inclusive * 1000 / DQN_CAST(Dqn_f64)tsc_per_second;
+            Dqn_Print_LnF("%.*s[%u]: %.1f/%.1fms",
+                          DQN_STRING_FMT(anchor->name),
+                          anchor->hit_count,
+                          tsc_exclusive_milliseconds,
+                          tsc_inclusive_milliseconds);
+        }
+    }
 }
 #endif // !defined(DQN_NO_PROFILER)
