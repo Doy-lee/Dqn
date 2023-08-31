@@ -695,7 +695,7 @@ static Dqn_UTest Dqn_Test_FixedArray()
         DQN_UTEST_TEST("Erase stable 1 element from array") {
             int raw_array[] = {1, 2, 3};
             auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_UCOUNT(raw_array));
-            Dqn_FArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, Dqn_FArrayErase_Stable);
+            Dqn_FArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, Dqn_ArrayErase_Stable);
             DQN_UTEST_ASSERT(&test, array.size == 2);
             DQN_UTEST_ASSERT(&test, array.data[0] == 1);
             DQN_UTEST_ASSERT(&test, array.data[1] == 3);
@@ -704,7 +704,7 @@ static Dqn_UTest Dqn_Test_FixedArray()
         DQN_UTEST_TEST("Erase unstable 1 element from array") {
             int raw_array[] = {1, 2, 3};
             auto array = Dqn_FArray_Init<int, 4>(raw_array, DQN_ARRAY_UCOUNT(raw_array));
-            Dqn_FArray_EraseRange(&array, 0 /*begin_index*/, 1 /*count*/, Dqn_FArrayErase_Unstable);
+            Dqn_FArray_EraseRange(&array, 0 /*begin_index*/, 1 /*count*/, Dqn_ArrayErase_Unstable);
             DQN_UTEST_ASSERT(&test, array.size == 2);
             DQN_UTEST_ASSERT(&test, array.data[0] == 3);
             DQN_UTEST_ASSERT(&test, array.data[1] == 2);
@@ -1578,22 +1578,22 @@ static Dqn_UTest Dqn_Test_VArray()
             }
 
             DQN_UTEST_TEST("Test stable erase, 1 item, the '2' value from the array") {
-                Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, 1 /*count*/, Dqn_VArrayErase_Stable);
+                Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, 1 /*count*/, Dqn_ArrayErase_Stable);
                 uint32_t array_literal[] = {0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
             }
 
             DQN_UTEST_TEST("Test unstable erase, 1 item, the '1' value from the array") {
-                Dqn_VArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, Dqn_VArrayErase_Unstable);
+                Dqn_VArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, Dqn_ArrayErase_Unstable);
                 uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
             }
 
-            Dqn_VArrayErase erase_enums[] = {Dqn_VArrayErase_Stable, Dqn_VArrayErase_Unstable};
+            Dqn_ArrayErase erase_enums[] = {Dqn_ArrayErase_Stable, Dqn_ArrayErase_Unstable};
             DQN_UTEST_TEST("Test un/stable erase, OOB") {
-                for (Dqn_VArrayErase erase : erase_enums) {
+                for (Dqn_ArrayErase erase : erase_enums) {
                     uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
                     Dqn_VArray_EraseRange(&array, DQN_ARRAY_UCOUNT(array_literal) /*begin_index*/, DQN_ARRAY_UCOUNT(array_literal) + 100 /*count*/, erase);
                     DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
@@ -1602,42 +1602,42 @@ static Dqn_UTest Dqn_Test_VArray()
             }
 
             DQN_UTEST_TEST("Test flipped begin/end index stable erase, 2 items, the '15, 3' value from the array") {
-                Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, Dqn_VArrayErase_Stable);
+                Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, Dqn_ArrayErase_Stable);
                 uint32_t array_literal[] = {0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
             }
 
             DQN_UTEST_TEST("Test flipped begin/end index unstable erase, 2 items, the '4, 5' value from the array") {
-                Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, Dqn_VArrayErase_Unstable);
+                Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, Dqn_ArrayErase_Unstable);
                 uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10, 11, 12};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
             }
 
             DQN_UTEST_TEST("Test stable erase range, 2+1 (oob) item, the '13, 14, +1 OOB' value from the array") {
-                Dqn_VArray_EraseRange(&array, 8 /*begin_index*/, 3 /*count*/, Dqn_VArrayErase_Stable);
+                Dqn_VArray_EraseRange(&array, 8 /*begin_index*/, 3 /*count*/, Dqn_ArrayErase_Stable);
                 uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
             }
 
             DQN_UTEST_TEST("Test unstable erase range, 3+1 (oob) item, the '11, 12, +1 OOB' value from the array") {
-                Dqn_VArray_EraseRange(&array, 6 /*begin_index*/, 3 /*count*/, Dqn_VArrayErase_Unstable);
+                Dqn_VArray_EraseRange(&array, 6 /*begin_index*/, 3 /*count*/, Dqn_ArrayErase_Unstable);
                 uint32_t array_literal[] = {0, 13, 14, 6, 7, 8};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
             }
 
             DQN_UTEST_TEST("Test stable erase -overflow OOB, erasing the '0, 13' value from the array") {
-                Dqn_VArray_EraseRange(&array, 1 /*begin_index*/, -DQN_ISIZE_MAX /*count*/, Dqn_VArrayErase_Stable);
+                Dqn_VArray_EraseRange(&array, 1 /*begin_index*/, -DQN_ISIZE_MAX /*count*/, Dqn_ArrayErase_Stable);
                 uint32_t array_literal[] = {14, 6, 7, 8};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
             }
 
             DQN_UTEST_TEST("Test unstable erase +overflow OOB, erasing the '7, 8' value from the array") {
-                Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, DQN_ISIZE_MAX /*count*/, Dqn_VArrayErase_Unstable);
+                Dqn_VArray_EraseRange(&array, 2 /*begin_index*/, DQN_ISIZE_MAX /*count*/, Dqn_ArrayErase_Unstable);
                 uint32_t array_literal[] = {14, 6};
                 DQN_UTEST_ASSERT(&test, array.size == DQN_ARRAY_UCOUNT(array_literal));
                 DQN_UTEST_ASSERT(&test, DQN_MEMCMP(array.data, array_literal, DQN_ARRAY_UCOUNT(array_literal) * sizeof(array_literal[0])) == 0);
@@ -1843,14 +1843,6 @@ int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;
     Dqn_Library_Init();
-
-    Dqn_ThreadScratch scratch        = Dqn_Thread_GetScratch(nullptr);
-    Dqn_StackTraceFrames stack_trace = Dqn_StackTrace_GetFrames(scratch.arena, 128 /*limit*/);
-    DQN_FOR_UINDEX (index, stack_trace.size) {
-        Dqn_StackTraceFrame frame = stack_trace.data[index];
-        Dqn_Print_LnF("%.*s(%I64u): %.*s", DQN_STRING_FMT(frame.file_name), frame.line_number, DQN_STRING_FMT(frame.function_name));
-    }
-
     Dqn_Test_RunSuite();
     return 0;
 }

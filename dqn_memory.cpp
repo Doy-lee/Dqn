@@ -1,24 +1,3 @@
-// NOTE: [$ALLO] Dqn_Allocator =====================================================================
-DQN_API void *Dqn_Allocator_Alloc(Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem)
-{
-    void *result = NULL;
-    if (allocator.alloc) {
-        result = allocator.alloc(size, align, zero_mem, allocator.user_context);
-    } else {
-        result = DQN_ALLOC(size);
-    }
-    return result;
-}
-
-DQN_API void Dqn_Allocator_Dealloc(Dqn_Allocator allocator, void *ptr, size_t size)
-{
-    if (allocator.dealloc) {
-        allocator.dealloc(ptr, size, allocator.user_context);
-    } else {
-        DQN_DEALLOC(ptr, size);
-    }
-}
-
 // NOTE: [$VMEM] Dqn_VMem ==========================================================================
 DQN_FILE_SCOPE uint32_t Dqn_VMem_ConvertPageToOSFlags_(uint32_t protect)
 {

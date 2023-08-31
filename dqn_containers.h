@@ -1,3 +1,13 @@
+// NOTE: [$CARR] Dqn_CArray ========================================================================
+enum Dqn_ArrayErase
+{
+    Dqn_ArrayErase_Unstable,
+    Dqn_ArrayErase_Stable,
+};
+
+template <typename T> Dqn_usize Dqn_CArray_EraseRange(T* data, Dqn_usize *size, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
+template <typename T> T *       Dqn_CArray_Make      (T* data, Dqn_usize *size, Dqn_usize max, Dqn_usize count, Dqn_ZeroMem zero_mem);
+
 #if !defined(DQN_NO_VARRAY)
 // NOTE: [$VARR] Dqn_VArray ========================================================================
 // An array that is backed by virtual memory by reserving addressing space and
@@ -74,12 +84,6 @@ template <typename T> struct Dqn_VArray
     T const *end  () const { return data + size; }
 };
 
-enum Dqn_VArrayErase
-{
-    Dqn_VArrayErase_Unstable,
-    Dqn_VArrayErase_Stable,
-};
-
 // NOTE: Setup =====================================================================================
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size);
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_Init        (Dqn_Arena *arena, Dqn_usize max);
@@ -91,9 +95,82 @@ DQN_API template <typename T> T *           Dqn_VArray_Make        (Dqn_VArray<T
 DQN_API template <typename T> T *           Dqn_VArray_Add         (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
 
 // NOTE: Modify ====================================================================================
-DQN_API template <typename T> void          Dqn_VArray_EraseRange  (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_VArrayErase erase);
+DQN_API template <typename T> void          Dqn_VArray_EraseRange  (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
 DQN_API template <typename T> void          Dqn_VArray_Clear       (Dqn_VArray<T> *array);
 #endif // !defined(DQN_NO_VARRAY)
+
+#if !defined(DQN_NO_SARRAY)
+// NOTE: [$SARR] Dqn_SArray ========================================================================
+template <typename T> struct Dqn_SArray
+{
+    T        *data; // Pointer to the start of the array items in the block of memory
+    Dqn_usize size; // Number of items currently in the array
+    Dqn_usize max;  // Maximum number of items this array can store
+
+    T       *begin()       { return data; }
+    T       *end  ()       { return data + size; }
+    T const *begin() const { return data; }
+    T const *end  () const { return data + size; }
+};
+
+// NOTE: Setup =====================================================================================
+DQN_API template <typename T> Dqn_SArray<T> Dqn_SArray_Init    (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
+DQN_API template <typename T> bool          Dqn_SArray_IsValid (Dqn_SArray<T> const *array);
+
+// NOTE: Insert ====================================================================================
+DQN_API template <typename T> T *           Dqn_SArray_Make    (Dqn_SArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
+DQN_API template <typename T> T *           Dqn_SArray_AddArray(Dqn_SArray<T> *array, T const *items, Dqn_usize count);
+DQN_API template <typename T> T *           Dqn_SArray_Add     (Dqn_SArray<T> *array, T const &item);
+
+// NOTE: Modify ====================================================================================
+DQN_API template <typename T> void          Dqn_SArray_EraseRange(Dqn_SArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
+DQN_API template <typename T> void          Dqn_SArray_Clear     (Dqn_SArray<T> *array);
+#endif // !defined(DQN_NO_SARRAY)
+
+#if !defined(DQN_NO_FARRAY)
+// NOTE: [$FARR] Dqn_FArray ========================================================================
+template <typename T, Dqn_usize N> struct Dqn_FArray
+{
+    T         data[N]; // Pointer to the start of the array items in the block of memory
+    Dqn_usize size;    // Number of items currently in the array
+
+    T       *begin()       { return data; }
+    T       *end  ()       { return data + size; }
+    T const *begin() const { return data; }
+    T const *end  () const { return data + size; }
+};
+
+// NOTE: Setup =====================================================================================
+DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init      (T const *array, Dqn_usize count);
+DQN_API template <typename T, Dqn_usize N> bool             Dqn_FArray_IsValid   (Dqn_FArray<T, N> const *array);
+
+// NOTE: Insert ====================================================================================
+DQN_API template <typename T, Dqn_usize N> T *              Dqn_FArray_Make      (Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
+DQN_API template <typename T, Dqn_usize N> T *              Dqn_FArray_Add       (Dqn_FArray<T, N> *array, T const *items, Dqn_usize count);
+
+// NOTE: Modify ====================================================================================
+DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
+DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_Clear     (Dqn_FArray<T, N> *array);
+#endif // !defined(DQN_NO_FARRAY)
+
+#if !defined(DQN_NO_SLICE)
+// NOTE: [$SLIC] Dqn_Slice =========================================================================
+// A pointer and length container of data
+
+template <typename T> struct Dqn_Slice
+{
+    T         *data;
+    Dqn_usize  size;
+
+    T       *begin()       { return data; }
+    T       *end  ()       { return data + size; }
+    T const *begin() const { return data; }
+    T const *end  () const { return data + size; }
+};
+
+template <typename T> Dqn_Slice<T> Dqn_Slice_Init (T* const data, Dqn_usize size);
+template <typename T> Dqn_Slice<T> Dqn_Slice_Alloc(Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
+#endif // !defined(DQN_NO_SLICE)
 
 #if !defined(DQN_NO_DSMAP)
 // NOTE: [$DMAP] Dqn_DSMap =========================================================================
@@ -295,38 +372,6 @@ DQN_API bool                                    Dqn_DSMap_KeyEquals      (Dqn_DS
 DQN_API bool                                    operator==               (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
 #endif // !defined(DQN_NO_DSMAP)
 
-#if !defined(DQN_NO_FARRAY)
-// NOTE: [$FARR] Dqn_FArray ========================================================================
-template <typename T, Dqn_usize N> struct Dqn_FArray
-{
-    T         data[N]; // Pointer to the start of the array items in the block of memory
-    Dqn_usize size;    // Number of items currently in the array
-
-    T       *begin()       { return data; }
-    T       *end  ()       { return data + size; }
-    T const *begin() const { return data; }
-    T const *end  () const { return data + size; }
-};
-
-enum Dqn_FArrayErase
-{
-    Dqn_FArrayErase_Unstable,
-    Dqn_FArrayErase_Stable,
-};
-
-// NOTE: Setup =====================================================================================
-DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init      (T const *array, Dqn_usize count);
-DQN_API template <typename T, Dqn_usize N> bool             Dqn_FArray_IsValid   (Dqn_FArray<T, N> const *array);
-
-// NOTE: Insert ====================================================================================
-DQN_API template <typename T, Dqn_usize N> T *              Dqn_FArray_Make      (Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T, Dqn_usize N> T *              Dqn_FArray_Add       (Dqn_FArray<T, N> *array, T const *items, Dqn_usize count);
-
-// NOTE: Modify ====================================================================================
-DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_FArrayErase erase);
-DQN_API template <typename T, Dqn_usize N> void             Dqn_FArray_Clear     (Dqn_FArray<T, N> *array);
-#endif // !defined(DQN_NO_FARRAY)
-
 #if !defined(DQN_NO_LIST)
 // NOTE: [$LIST] Dqn_List ==========================================================================
 //
@@ -384,6 +429,73 @@ template <typename T> T *         Dqn_List_Make   (Dqn_List<T> *list, Dqn_usize 
 template <typename T> T *         Dqn_List_Add    (Dqn_List<T> *list, T const &value);
 #endif // !defined(DQN_NO_LIST)
 
+// NOTE: [$CARR] Dqn_CArray ========================================================================
+template <typename T> Dqn_usize Dqn_CArray_EraseRange(T* data, Dqn_usize *size, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
+{
+    Dqn_usize result = 0;
+    if (!data || !size || *size == 0 || count == 0)
+        return result;
+
+    // NOTE: Caculate the end index of the erase range
+    Dqn_isize abs_count = DQN_ABS(count);
+    Dqn_usize end_index = 0;
+    if (count < 0) {
+        end_index = begin_index - (abs_count - 1);
+        if (end_index > begin_index)
+            end_index = 0;
+    } else {
+        end_index = begin_index + (abs_count - 1);
+        if (end_index < begin_index)
+            end_index = (*size) - 1;
+    }
+
+    // NOTE: Ensure begin_index < one_past_end_index
+    if (end_index < begin_index) {
+        Dqn_usize tmp = begin_index;
+        begin_index   = end_index;
+        end_index     = tmp;
+    }
+
+    // NOTE: Ensure indexes are within valid bounds
+    begin_index = DQN_MIN(begin_index, *size);
+    end_index   = DQN_MIN(end_index,   *size - 1);
+
+    // NOTE: Erase the items in the range [begin_index, one_past_end_index)
+    Dqn_usize one_past_end_index = end_index + 1;
+    Dqn_usize erase_count        = one_past_end_index - begin_index;
+    if (erase_count) {
+        T *end  = data + *size;
+        T *dest = data + begin_index;
+        if (erase == Dqn_ArrayErase_Stable) {
+            T *src = dest + erase_count;
+            DQN_MEMMOVE(dest, src, (end - src) * sizeof(T));
+        } else {
+            T *src = end - erase_count;
+            DQN_MEMCPY(dest, src, (end - src) * sizeof(T));
+        }
+        *size -= erase_count;
+    }
+
+    result = erase_count;
+    return result;
+}
+
+template <typename T> T *Dqn_CArray_Make(T* data, Dqn_usize *size, Dqn_usize max, Dqn_usize count, Dqn_ZeroMem zero_mem)
+{
+    if (!data || !size || count == 0)
+        return nullptr;
+
+    if (!DQN_CHECKF((*size + count) < max, "Array is out of memory"))
+        return nullptr;
+
+    // TODO: Use placement new? Why doesn't this work?
+    T *result  = data + *size;
+    *size     += count;
+    if (zero_mem == Dqn_ZeroMem_Yes)
+        DQN_MEMSET(result, DQN_MEMSET_BYTE, sizeof(*result) * count);
+    return result;
+}
+
 #if !defined(DQN_NO_VARRAY)
 // NOTE: [$VARR] Dqn_VArray ========================================================================
 DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size)
@@ -431,51 +543,12 @@ DQN_API template <typename T> T *Dqn_VArray_Add(Dqn_VArray<T> *array, T const *i
     return result;
 }
 
-DQN_API template <typename T> void Dqn_VArray_EraseRange(Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_VArrayErase erase)
+DQN_API template <typename T> void Dqn_VArray_EraseRange(Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
 {
-    if (!Dqn_VArray_IsValid(array) || array->size == 0 || count == 0)
+    if (!Dqn_VArray_IsValid(array))
         return;
-
-    // NOTE: Caculate the end index of the erase range
-    Dqn_isize abs_count = DQN_ABS(count);
-    Dqn_usize end_index = 0;
-    if (count < 0) {
-        end_index = begin_index - (abs_count - 1);
-        if (end_index > begin_index)
-            end_index = 0;
-    } else {
-        end_index = begin_index + (abs_count - 1);
-        if (end_index < begin_index)
-            end_index = array->size - 1;
-    }
-
-    // NOTE: Ensure begin_index < one_past_end_index
-    if (end_index < begin_index) {
-        Dqn_usize tmp = begin_index;
-        begin_index   = end_index;
-        end_index     = tmp;
-    }
-
-    // NOTE: Ensure indexes are within valid bounds
-    begin_index = DQN_MIN(begin_index, array->size);
-    end_index   = DQN_MIN(end_index,   array->size - 1);
-
-    // NOTE: Erase the items in the range [begin_index, one_past_end_index)
-    Dqn_usize one_past_end_index = end_index + 1;
-    Dqn_usize erase_count        = one_past_end_index - begin_index;
-    if (erase_count) {
-        T *end  = array->data + array->size;
-        T *dest = array->data + begin_index;
-        if (erase == Dqn_VArrayErase_Stable) {
-            T *src = dest + erase_count;
-            DQN_MEMMOVE(dest, src, (end - src) * sizeof(T));
-        } else {
-            T *src = end - erase_count;
-            DQN_MEMCPY(dest, src, (end - src) * sizeof(T));
-        }
-        array->size -= erase_count;
-        Dqn_MemBlock_Pop(array->block, erase_count * sizeof(T));
-    }
+    Dqn_usize erase_count = Dqn_CArray_EraseRange<T>(array->data, &array->size, begin_index, count, erase);
+    Dqn_MemBlock_Pop(array->block, erase_count * sizeof(T));
 }
 
 DQN_API template <typename T> void Dqn_VArray_Clear(Dqn_VArray<T> *array)
@@ -492,6 +565,128 @@ DQN_API template <typename T> void Dqn_VArray_Reserve(Dqn_VArray<T> *array, Dqn_
     Dqn_Arena_CommitFromBlock(array->block, count * sizeof(T), Dqn_ArenaCommit_EnsureSpace);
 }
 #endif // !defined(DQN_NO_VARRAY)
+
+#if !defined(DQN_NO_SARRAY)
+// NOTE: [$FARR] Dqn_SArray ========================================================================
+DQN_API template <typename T> Dqn_SArray<T> Dqn_SArray_Init(Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem)
+{
+    Dqn_SArray<T> result = {};
+    if (!arena || !count)
+        return result;
+
+    result.data = Dqn_Arena_NewArray(arena, T, size, zero_mem);
+    if (result.data)
+        result.max = size;
+    return result;
+}
+DQN_API template <typename T> bool Dqn_SArray_IsValid(Dqn_SArray<T> const *array)
+{
+    bool result = array && array->data && array->size <= array->max;
+    return result;
+}
+
+DQN_API template <typename T> T *Dqn_SArray_Make(Dqn_SArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
+{
+    if (!Dqn_SArray_IsValid(array))
+        return nullptr;
+    T *result = Dqn_CArray_Make(array->data, &array->size, array->max, count, zero_mem);
+    return result;
+}
+
+DQN_API template <typename T> T *Dqn_SArray_AddArray(Dqn_SArray<T> *array, T const *items, Dqn_usize count)
+{
+    T *result = Dqn_SArray_Make(array, count, Dqn_ZeroMem_No);
+    if (result)
+        DQN_MEMCPY(result, items, count * sizeof(T));
+}
+
+DQN_API template <typename T> T *Dqn_SArray_Add(Dqn_SArray<T> *array, T const &item)
+{
+    T *result = Dqn_SArray_AddArray(array, &item, 1);
+    return result;
+}
+
+DQN_API template <typename T> void Dqn_SArray_EraseRange(Dqn_SArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
+{
+    if (!Dqn_SArray_IsValid(array) || array->size == 0 || count == 0)
+        return;
+    Dqn_CArray_EraseRange(array->data, &array->size, being_index, count, erase);
+}
+
+DQN_API template <typename T> void Dqn_SArray_Clear(Dqn_SArray<T> *array)
+{
+    if (array)
+        array->size = 0;
+}
+#endif // !defined(DQN_NO_SARRAY)
+
+#if !defined(DQN_NO_FARRAY)
+// NOTE: [$FARR] Dqn_FArray ========================================================================
+DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init(T const *array, Dqn_usize count)
+{
+    Dqn_FArray<T, N> result = {};
+    bool added              = Dqn_FArray_Add(&result, array, count);
+    DQN_ASSERT(added);
+    return result;
+}
+DQN_API template <typename T, Dqn_usize N> bool Dqn_FArray_IsValid(Dqn_FArray<T, N> const *array)
+{
+    bool result = array && array->size <= DQN_ARRAY_UCOUNT(array->data);
+    return result;
+}
+
+DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Make(Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
+{
+    if (!Dqn_FArray_IsValid(array))
+        return nullptr;
+    T *result = Dqn_CArray_Make(array->data, &array->size, N, count, zero_mem);
+    return result;
+}
+
+DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Add(Dqn_FArray<T, N> *array, T const *items, Dqn_usize count)
+{
+    T *result = Dqn_FArray_Make(array, count, Dqn_ZeroMem_No);
+    if (result)
+        DQN_MEMCPY(result, items, count * sizeof(T));
+    return result;
+}
+
+DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
+{
+    if (!Dqn_FArray_IsValid(array) || array->size == 0 || count == 0)
+        return;
+    Dqn_CArray_EraseRange(array->data, &array->size, begin_index, count, erase);
+}
+
+DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_Clear(Dqn_FArray<T, N> *array)
+{
+    if (array)
+        array->size = 0;
+}
+#endif // !defined(DQN_NO_FARRAY)
+
+#if !defined(DQN_NO_SLICE)
+template <typename T> Dqn_Slice<T> Dqn_Slice_Init(T* const data, Dqn_usize size)
+{
+    Dqn_Slice<T> result = {};
+    if (data) {
+        result.data = data;
+        result.size = size;
+    }
+    return result;
+}
+
+template <typename T> Dqn_Slice<T> Dqn_Slice_Alloc(Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem)
+{
+    Dqn_Slice<T> result = {};
+    if (!arena || size == 0)
+        return result;
+    result.data = Dqn_Arena_NewArray(arena, T, size, zero_mem);
+    if (result.data)
+        result.size = size;
+    return result;
+}
+#endif // !defined(DQN_NO_SLICE)
 
 #if !defined(DQN_NO_DSMAP)
 // NOTE: [$DMAP] Dqn_DSMap =========================================================================
@@ -844,98 +1039,6 @@ DQN_API Dqn_DSMapKey Dqn_DSMap_KeyString8Copy(Dqn_DSMap<T> const *map, Dqn_Alloc
     return result;
 }
 #endif // !defined(DQN_NO_DSMAP)
-
-#if !defined(DQN_NO_FARRAY)
-// NOTE: [$FARR] Dqn_FArray ========================================================================
-DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init(T const *array, Dqn_usize count)
-{
-    Dqn_FArray<T, N> result = {};
-    bool added              = Dqn_FArray_Add(&result, array, count);
-    DQN_ASSERT(added);
-    return result;
-}
-DQN_API template <typename T, Dqn_usize N> bool Dqn_FArray_IsValid(Dqn_FArray<T, N> const *array)
-{
-    bool result = array && array->size <= DQN_ARRAY_UCOUNT(array->data);
-    return result;
-}
-
-DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Make(Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
-{
-    if (!Dqn_FArray_IsValid(array))
-        return nullptr;
-
-    if (!DQN_CHECKF((array->size + count) < DQN_ARRAY_UCOUNT(array->data), "Array is out of memory"))
-        return nullptr;
-
-    // TODO: Use placement new? Why doesn't this work?
-    T *result    = array->data + array->size;
-    array->size += count;
-    if (zero_mem == Dqn_ZeroMem_Yes)
-        DQN_MEMSET(result, DQN_MEMSET_BYTE, sizeof(*result) * count);
-    return result;
-}
-
-DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Add(Dqn_FArray<T, N> *array, T const *items, Dqn_usize count)
-{
-    T *result = Dqn_FArray_Make(array, count, Dqn_ZeroMem_No);
-    if (result)
-        DQN_MEMCPY(result, items, count * sizeof(T));
-    return result;
-}
-
-DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_FArrayErase erase)
-{
-    if (!Dqn_FArray_IsValid(array) || array->size == 0 || count == 0)
-        return;
-
-    // NOTE: Caculate the end index of the erase range
-    Dqn_isize abs_count = DQN_ABS(count);
-    Dqn_usize end_index = 0;
-    if (count < 0) {
-        end_index = begin_index - (abs_count - 1);
-        if (end_index > begin_index)
-            end_index = 0;
-    } else {
-        end_index = begin_index + (abs_count - 1);
-        if (end_index < begin_index)
-            end_index = array->size - 1;
-    }
-
-    // NOTE: Ensure begin_index < one_past_end_index
-    if (end_index < begin_index) {
-        Dqn_usize tmp = begin_index;
-        begin_index   = end_index;
-        end_index     = tmp;
-    }
-
-    // NOTE: Ensure indexes are within valid bounds
-    begin_index = DQN_MIN(begin_index, array->size);
-    end_index   = DQN_MIN(end_index,   array->size - 1);
-
-    // NOTE: Erase the items in the range [begin_index, one_past_end_index)
-    Dqn_usize one_past_end_index = end_index + 1;
-    Dqn_usize erase_count        = one_past_end_index - begin_index;
-    if (erase_count) {
-        T *end  = array->data + array->size;
-        T *dest = array->data + begin_index;
-        if (erase == Dqn_FArrayErase_Stable) {
-            T *src = dest + erase_count;
-            DQN_MEMMOVE(dest, src, (end - src) * sizeof(T));
-        } else {
-            T *src = end - erase_count;
-            DQN_MEMCPY(dest, src, (end - src) * sizeof(T));
-        }
-        array->size -= erase_count;
-    }
-}
-
-DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_Clear(Dqn_FArray<T, N> *array)
-{
-    if (array)
-        array->size = 0;
-}
-#endif // !defined(DQN_NO_FARRAY)
 
 #if !defined(DQN_NO_LIST)
 // NOTE: [$LIST] Dqn_List ==========================================================================

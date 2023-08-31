@@ -146,20 +146,29 @@ DQN_API Dqn_StackTraceFrame Dqn_StackTrace_RawFrameToFrame(Dqn_Arena *arena, Dqn
     return result;
 }
 
-DQN_API Dqn_StackTraceFrames Dqn_StackTrace_GetFrames(Dqn_Arena *arena, uint16_t limit)
+DQN_API Dqn_Slice<Dqn_StackTraceFrame> Dqn_StackTrace_GetFrames(Dqn_Arena *arena, uint16_t limit)
 {
-    Dqn_StackTraceFrames result   = {};
-    Dqn_ThreadScratch scratch     = Dqn_Thread_GetScratch(arena);
-    Dqn_StackTraceWalkResult walk = Dqn_StackTrace_Walk(scratch.arena, limit);
+    Dqn_Slice<Dqn_StackTraceFrame> result = {};
+    Dqn_ThreadScratch scratch             = Dqn_Thread_GetScratch(arena);
+    Dqn_StackTraceWalkResult walk         = Dqn_StackTrace_Walk(scratch.arena, limit);
 
     if (!walk.size)
         return result;
 
-    result.data = Dqn_Arena_NewArray(arena, Dqn_StackTraceFrame, walk.size, Dqn_ZeroMem_No);
+    Dqn_usize slice_index = 0;
+    result                = Dqn_Slice_Alloc<Dqn_StackTraceFrame>(arena, walk.size, Dqn_ZeroMem_No);
     for (Dqn_StackTraceWalkResultIterator it = {}; Dqn_StackTrace_WalkResultIterate(&it, &walk); ) {
-        result.data[result.size++] = Dqn_StackTrace_RawFrameToFrame(arena, it.raw_frame);
+        result.data[slice_index++] = Dqn_StackTrace_RawFrameToFrame(arena, it.raw_frame);
     }
     return result;
+}
+
+DQN_API void Dqn_StackTrace_Print(uint16_t limit)
+{
+    Dqn_ThreadScratch scratch                  = Dqn_Thread_GetScratch(nullptr);
+    Dqn_Slice<Dqn_StackTraceFrame> stack_trace = Dqn_StackTrace_GetFrames(scratch.arena, limit);
+    for (Dqn_StackTraceFrame& frame : stack_trace)
+        Dqn_Print_ErrLnF("%.*s(%I64u): %.*s", DQN_STRING_FMT(frame.file_name), frame.line_number, DQN_STRING_FMT(frame.function_name));
 }
 
 // NOTE: [$DEBG] Dqn_Debug =========================================================================
@@ -315,146 +324,3 @@ DQN_API void Dqn_Debug_DumpLeaks()
     }
 }
 #endif // defined(DQN_LEAK_TRACING)
-
-// NOTE: [$LLOG] Dqn_Log  ==========================================================================
-DQN_API Dqn_String8 Dqn_Log_MakeString(Dqn_Allocator allocator,
-                                       bool colour,
-                                       Dqn_String8 type,
-                                       int log_type,
-                                       Dqn_CallSite call_site,
-                                       char const *fmt,
-                                       va_list args)
-{
-    Dqn_usize     header_size_no_ansi_codes = 0;
-    Dqn_String8   header                    = {};
-    {
-        DQN_LOCAL_PERSIST Dqn_usize max_type_length = 0;
-        max_type_length                             = DQN_MAX(max_type_length, type.size);
-        int type_padding                            = DQN_CAST(int)(max_type_length - type.size);
-
-        Dqn_String8 colour_esc = {};
-        Dqn_String8 bold_esc   = {};
-        Dqn_String8 reset_esc  = {};
-        if (colour) {
-            bold_esc  = Dqn_Print_ESCBoldString;
-            reset_esc = Dqn_Print_ESCResetString;
-            switch (log_type) {
-                case Dqn_LogType_Debug:                                                                          break;
-                case Dqn_LogType_Info:    colour_esc = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Info);    break;
-                case Dqn_LogType_Warning: colour_esc = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Warning); break;
-                case Dqn_LogType_Error:   colour_esc = Dqn_Print_ESCColourFgU32String(Dqn_LogTypeColourU32_Error);   break;
-            }
-        }
-
-        Dqn_String8 file_name            = Dqn_String8_FileNameFromPath(call_site.file);
-        Dqn_DateHMSTimeString const time = Dqn_Date_HMSLocalTimeStringNow();
-        header                           = Dqn_String8_InitF(allocator,
-                                                             "%.*s "   // date
-                                                             "%.*s "   // hms
-                                                             "%.*s"    // colour
-                                                             "%.*s"    // bold
-                                                             "%.*s"    // type
-                                                             "%*s"     // type padding
-                                                             "%.*s"    // reset
-                                                             " %.*s"   // file name
-                                                             ":%05u ", // line number
-                                                             DQN_CAST(uint32_t)time.date_size - 2, time.date + 2,   // date
-                                                             DQN_CAST(uint32_t)time.hms_size,      time.hms,        // hms
-                                                             DQN_CAST(uint32_t)colour_esc.size,    colour_esc.data, // colour
-                                                             DQN_CAST(uint32_t)bold_esc.size,      bold_esc.data,   // bold
-                                                             DQN_CAST(uint32_t)type.size,          type.data,       // type
-                                                             DQN_CAST(uint32_t)type_padding,       "",              // type padding
-                                                             DQN_CAST(uint32_t)reset_esc.size,     reset_esc.data,  // reset
-                                                             DQN_CAST(uint32_t)file_name.size,     file_name.data,  // file name
-                                                             call_site.line);                                       // line number
-        header_size_no_ansi_codes = header.size - colour_esc.size - Dqn_Print_ESCResetString.size;
-    }
-
-    // NOTE: Header padding ========================================================================
-    Dqn_usize header_padding = 0;
-    {
-        DQN_LOCAL_PERSIST Dqn_usize max_header_length = 0;
-        max_header_length                             = DQN_MAX(max_header_length, header_size_no_ansi_codes);
-        header_padding                                = max_header_length - header_size_no_ansi_codes;
-    }
-
-    // NOTE: Construct final log ===================================================================
-    Dqn_String8 user_msg = Dqn_String8_InitFV(allocator, fmt, args);
-    Dqn_String8 result   = Dqn_String8_Allocate(allocator, header.size + header_padding + user_msg.size, Dqn_ZeroMem_No);
-    DQN_MEMCPY(result.data,                                header.data, header.size);
-    DQN_MEMSET(result.data + header.size,                  ' ',         header_padding);
-    DQN_MEMCPY(result.data + header.size + header_padding, user_msg.data, user_msg.size);
-    return result;
-}
-
-DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
-{
-    Dqn_Library *lib = g_dqn_library;
-    (void)log_type;
-    (void)user_data;
-
-    // NOTE: Open log file for appending if requested ==========================
-    Dqn_TicketMutex_Begin(&lib->log_file_mutex);
-    if (lib->log_to_file && !lib->log_file.handle && lib->log_file.error_size == 0) {
-        Dqn_ThreadScratch scratch  = Dqn_Thread_GetScratch(nullptr);
-        Dqn_String8       log_path = Dqn_FsPath_ConvertF(scratch.arena, "%.*s/dqn.log", DQN_STRING_FMT(lib->exe_dir));
-        lib->log_file              = Dqn_Fs_OpenFile(log_path, Dqn_FsFileOpen_CreateAlways, Dqn_FsFileAccess_AppendOnly);
-    }
-    Dqn_TicketMutex_End(&lib->log_file_mutex);
-
-    // NOTE: Generate the log header ===========================================
-    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-    Dqn_String8 log_line      = Dqn_Log_MakeString(scratch.allocator,
-                                                   !lib->log_no_colour,
-                                                   type,
-                                                   log_type,
-                                                   call_site,
-                                                   fmt,
-                                                   args);
-
-    // NOTE: Print log =========================================================
-    Dqn_Print_StdLn(Dqn_PrintStd_Out, log_line);
-
-    Dqn_TicketMutex_Begin(&lib->log_file_mutex);
-    Dqn_Fs_WriteFile(&lib->log_file, log_line);
-    Dqn_Fs_WriteFile(&lib->log_file, DQN_STRING8("\n"));
-    Dqn_TicketMutex_End(&lib->log_file_mutex);
-}
-
-DQN_API void Dqn_Log_FVCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, va_list args)
-{
-    Dqn_LogProc *logging_function = g_dqn_library->log_callback ? g_dqn_library->log_callback : Dqn_Log_FVDefault_;
-    logging_function(type, -1 /*log_type*/, g_dqn_library->log_user_data, call_site, fmt, args);
-}
-
-DQN_API void Dqn_Log_FCallSite(Dqn_String8 type, Dqn_CallSite call_site, char const  *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    Dqn_Log_FVCallSite(type, call_site, fmt, args);
-    va_end(args);
-}
-
-DQN_API void Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, va_list args)
-{
-    Dqn_String8 type_string = DQN_STRING8("DQN-BAD-LOG-TYPE");
-    switch (type) {
-        case Dqn_LogType_Error:   type_string = DQN_STRING8("ERROR"); break;
-        case Dqn_LogType_Info:    type_string = DQN_STRING8("INFO"); break;
-        case Dqn_LogType_Warning: type_string = DQN_STRING8("WARN"); break;
-        case Dqn_LogType_Debug:   type_string = DQN_STRING8("DEBUG"); break;
-        case Dqn_LogType_Count:   type_string = DQN_STRING8("BADXX"); break;
-    }
-
-    Dqn_LogProc *logging_function = g_dqn_library->log_callback ? g_dqn_library->log_callback : Dqn_Log_FVDefault_;
-    logging_function(type_string, type /*log_type*/, g_dqn_library->log_user_data, call_site, fmt, args);
-}
-
-DQN_API void Dqn_Log_TypeFCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const  *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    Dqn_Log_TypeFVCallSite(type, call_site, fmt, args);
-    va_end(args);
-}
-

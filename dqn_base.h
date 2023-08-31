@@ -182,12 +182,34 @@
 #define DQN_DAYS_TO_S(val) (DQN_HOURS_TO_S(val) * 24ULL)
 #define DQN_YEARS_TO_S(val) (DQN_DAYS_TO_S(val) * 365ULL)
 
+// NOTE: Debug Break ===============================================================================
+#if !defined(DQN_DEBUG_BREAK)
+    #if defined(NDEBUG)
+        #define DQN_DEBUG_BREAK
+    #else
+        #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
+            #define DQN_DEBUG_BREAK __debugbreak()
+        #elif defined(DQN_COMPILER_CLANG)
+            #define DQN_DEBUG_BREAK __builtin_debugtrap()
+        #elif defined(DQN_COMPILER_CLANG) || defined(DQN_COMPILER_GCC)
+            #include <signal.h>
+            #define DQN_DEBUG_BREAK raise(SIGTRAP)
+        #elif
+            #error "Unhandled compiler"
+        #endif
+    #endif
+#endif
+
+#if !defined(DQN_MEMSET_BYTE)
+    #define DQN_MEMSET_BYTE 0
+#endif
+
 // NOTE: Assert Macros =============================================================================
 #define DQN_HARD_ASSERT(expr) DQN_HARD_ASSERTF(expr, "")
 #define DQN_HARD_ASSERTF(expr, fmt, ...)                                         \
     if (!(expr)) {                                                               \
         Dqn_Log_ErrorF("Hard assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
-        DQN_DUMP_STACK_TRACE;                                                    \
+        Dqn_StackTrace_Print(128 /*limit*/);                                     \
         DQN_DEBUG_BREAK;                                                         \
     }
 
@@ -199,7 +221,7 @@
     #define DQN_ASSERTF(expr, fmt, ...)                                         \
         if (!(expr)) {                                                          \
             Dqn_Log_ErrorF("Assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
-            DQN_DUMP_STACK_TRACE;                                               \
+            Dqn_StackTrace_Print(128 /*limit*/);                                \
             DQN_DEBUG_BREAK;                                                    \
         }
 #endif
@@ -306,6 +328,15 @@ struct Dqn_String8
     char       *begin()       { return data; }
     char       *end  ()       { return data + size; }
 };
+
+// NOTE: [$CALL] Dqn_CallSite ======================================================================
+struct Dqn_CallSite
+{
+    Dqn_String8  file;
+    Dqn_String8  function;
+    unsigned int line;
+};
+#define DQN_CALL_SITE Dqn_CallSite{DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__}
 
 // NOTE: [$INTR] Intrinsics ========================================================================
 // Platform agnostic functions for CPU level instructions like atomics, barriers
@@ -446,6 +477,25 @@ Dqn_uint Dqn_TicketMutex_MakeTicket (Dqn_TicketMutex *mutex);
 void     Dqn_TicketMutex_BeginTicket(Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 bool     Dqn_TicketMutex_CanLock    (Dqn_TicketMutex const *mutex, Dqn_uint ticket);
 
+// NOTE: [$ALLO] Dqn_Allocator =====================================================================
+typedef void *Dqn_Allocator_AllocProc(size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context);
+typedef void  Dqn_Allocator_DeallocProc(void *ptr, size_t size, void *user_context);
+
+struct Dqn_Allocator
+{
+    void                      *user_context; // User assigned pointer that is passed into the allocator functions
+    Dqn_Allocator_AllocProc   *alloc;        // Memory allocating routine
+    Dqn_Allocator_DeallocProc *dealloc;      // Memory deallocating routine
+};
+
+// NOTE: Macros ====================================================================================
+#define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc(allocator, sizeof(Type) * count, alignof(Type), zero_mem)
+#define Dqn_Allocator_New(allocator, Type, zero_mem) (Type *)Dqn_Allocator_Alloc(allocator, sizeof(Type), alignof(Type), zero_mem)
+
+// NOTE: API =======================================================================================
+void   *Dqn_Allocator_Alloc  (Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem);
+void    Dqn_Allocator_Dealloc(Dqn_Allocator allocator, void *ptr, size_t size);
+
 // NOTE: [$PRIN] Dqn_Print =========================================================================
 enum Dqn_PrintStd
 {
@@ -547,3 +597,52 @@ Dqn_String8            Dqn_Print_ESCColourU32String(Dqn_PrintESCColour colour, u
 #define                Dqn_Print_ESCResetString              DQN_STRING8(Dqn_Print_ESCReset)
 #define                Dqn_Print_ESCBoldString               DQN_STRING8(Dqn_Print_ESCBold)
 
+// NOTE: [$LLOG] Dqn_Log  ==========================================================================
+// NOTE: API
+// @proc Dqn_LogProc
+//   @desc The logging procedure of the library. Users can override the default
+//   logging function by setting the logging function pointer in Dqn_Library.
+//   This function will be invoked every time a log is recorded using the
+//   following functions.
+//
+//   @param[in] log_type This value is one of the Dqn_LogType values if the log
+//   was generated from one of the default categories. -1 if the log is not from
+//   one of the default categories.
+
+enum Dqn_LogType
+{
+    Dqn_LogType_Debug,
+    Dqn_LogType_Info,
+    Dqn_LogType_Warning,
+    Dqn_LogType_Error,
+    Dqn_LogType_Count,
+};
+
+/// RGBA
+#define Dqn_LogTypeColourU32_Info    0x00'87'ff'ff // Blue
+#define Dqn_LogTypeColourU32_Warning 0xff'ff'00'ff // Yellow
+#define Dqn_LogTypeColourU32_Error   0xff'00'00'ff // Red
+
+typedef void Dqn_LogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list va);
+
+#define Dqn_Log_DebugF(fmt, ...)        Dqn_Log_TypeFCallSite(Dqn_LogType_Debug, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define Dqn_Log_InfoF(fmt, ...)         Dqn_Log_TypeFCallSite(Dqn_LogType_Info, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define Dqn_Log_WarningF(fmt, ...)      Dqn_Log_TypeFCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define Dqn_Log_ErrorF(fmt, ...)        Dqn_Log_TypeFCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+
+#define Dqn_Log_DebugFV(fmt, args)      Dqn_Log_TypeFVCallSite(Dqn_LogType_Debug, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_InfoFV(fmt, args)       Dqn_Log_TypeFVCallSite(Dqn_LogType_Info, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_WarningFV(fmt, args)    Dqn_Log_TypeFVCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_ErrorFV(fmt, args)      Dqn_Log_TypeFVCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, args)
+
+#define Dqn_Log_TypeFV(type, fmt, args) Dqn_Log_TypeFVCallSite(type, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_TypeF(type, fmt, ...)   Dqn_Log_TypeFCallSite(type, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+
+#define Dqn_Log_FV(type, fmt, args)     Dqn_Log_FVCallSite(type, DQN_CALL_SITE, fmt, args)
+#define Dqn_Log_F(type, fmt, ...)       Dqn_Log_FCallSite(type, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+
+DQN_API Dqn_String8 Dqn_Log_MakeString    (Dqn_Allocator allocator, bool colour, Dqn_String8 type, int log_type, Dqn_CallSite call_site, char const *fmt, va_list args);
+DQN_API void        Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list va);
+DQN_API void        Dqn_Log_TypeFCallSite (Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API void        Dqn_Log_FVCallSite    (Dqn_String8 type, Dqn_CallSite call_site, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list va);
+DQN_API void        Dqn_Log_FCallSite     (Dqn_String8 type, Dqn_CallSite call_site, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);

@@ -36,7 +36,9 @@
 
 #if !defined(DQN_H)
 #if defined(DQN_ONLY_VARRAY)       || \
+    defined(DQN_ONLY_SARRAY)       || \
     defined(DQN_ONLY_FARRAY)       || \
+    defined(DQN_ONLY_SLICE)        || \
     defined(DQN_ONLY_DSMAP)        || \
     defined(DQN_ONLY_LIST)         || \
     defined(DQN_ONLY_FSTRING8)     || \
@@ -57,6 +59,12 @@
     #endif
     #if !defined(DQN_ONLY_FARRAY)
     #define DQN_NO_FARRAY
+    #endif
+    #if !defined(DQN_ONLY_SARRAY)
+    #define DQN_NO_SARRAY
+    #endif
+    #if !defined(DQN_ONLY_SLICE)
+    #define DQN_NO_SLICE
     #endif
     #if !defined(DQN_ONLY_DSMAP)
     #define DQN_NO_DSMAP
@@ -115,8 +123,11 @@
 // [$MACR] Macros             |                             | Define macros used in the library
 // [$TYPE] Types              |                             | Basic types and typedefs
 // [$INTR] Intrinsics         |                             | Atomics, cpuid, ticket mutex
+// [$CALL] Dqn_CallSite       |                             | Source code location/tracing
 // [$TMUT] Dqn_TicketMutex    |                             | Userland mutex via spinlocking atomics
+// [$ALLO] Dqn_Allocator      |                             | Generic allocator interface
 // [$PRIN] Dqn_Print          |                             | Console printing
+// [$LLOG] Dqn_Log            |                             | Console logging macros
 
 // NOTE: Additional Configuration
 // - Override the default heap-allocation routine that is called when the
@@ -166,7 +177,6 @@
 #include "dqn_base.h"
 
 // NOTE: Dqn_External ==============================================================================
-// [$BSTK] b_stacktrace       |                             | Generating call stacktraces
 // [$OS_H] OS Headers         |                             | Headers from the operating system
 // [$STBS] stb_sprintf        |                             | Portable sprintf
 #include "dqn_external.h"
@@ -186,18 +196,36 @@
 //     DQN_STB_SPRINTF_HEADER_ONLY
 
 // NOTE: Dqn_Memory ================================================================================
-// [$ALLO] Dqn_Allocator      |                             | Generic allocator interface
 // [$VMEM] Dqn_VMem           |                             | Virtual memory allocation
 // [$MEMB] Dqn_MemBlock       |                             | Virtual memory blocks
 // [$AREN] Dqn_Arena          |                             | Growing bump allocator
 // [$ACAT] Dqn_ArenaCatalog   |                             | Collate, create & manage arenas in a catalog
 #include "dqn_memory.h"
 
+// NOTE: Dqn_Strings ===============================================================================
+// [$CSTR] Dqn_CString8       |                             | C-string helpers
+// [$STR8] Dqn_String8        |                             | Pointer and length strings
+// [$FSTR] Dqn_FString8       | DQN_FSTRING8                | Fixed-size strings
+// [$STRB] Dqn_String8Builder |                             |
+// [$CHAR] Dqn_Char           |                             | Character ascii/digit.. helpers
+// [$UTFX] Dqn_UTF            |                             | Unicode helpers
+#include "dqn_strings.h"
+
+// NOTE: Dqn_Containers ============================================================================
+// [$CARR] Dqn_CArray         |                             | Basic operations on C arrays for VArray/SArray/FArray to reuse
+// [$VARR] Dqn_VArray         | DQN_VARRAY                  | Array backed by virtual memory arena
+// [$SARR] Dqn_SArray         | DQN_SARRAY                  | Array that are allocated but cannot resize
+// [$FARR] Dqn_FArray         | DQN_FARRAY                  | Fixed-size arrays
+// [$SLIC] Dqn_Slice          | DQN_SLICE                   | Pointe and length container of data
+// [$DMAP] Dqn_DSMap          | DQN_DSMAP                   | Hashtable, 70% max load, PoT size, linear probe, chain repair
+// [$LIST] Dqn_List           | DQN_LIST                    | Chunked linked lists, append only
+#include "dqn_containers.h"
+
 // NOTE: Dqn_Debug =================================================================================
 // [$DEBM] Debug Macros       |                             |
-// [$CALL] Dqn_CallSite       |                             | Source code location/tracing
+// [$ASAN] Dqn_Asan           |                             | Helpers to manually poison memory using ASAN
+// [$STKT] Dqn_StackTrace     |                             | Create stack traces
 // [$DEBG] Dqn_Debug          |                             | Debugging tools/helpers
-// [$LLOG] Dqn_Log            |                             | Console logging macros
 #include "dqn_debug.h"
 
 // NOTE: Additional Configuration
@@ -248,22 +276,6 @@
 //
 //     DQN_ASAN_POISON_GUARD_SIZE 128
 
-// NOTE: Dqn_Strings ===============================================================================
-// [$CSTR] Dqn_CString8       |                             | C-string helpers
-// [$STR8] Dqn_String8        |                             | Pointer and length strings
-// [$FSTR] Dqn_FString8       | DQN_FSTRING8                | Fixed-size strings
-// [$STRB] Dqn_String8Builder |                             |
-// [$CHAR] Dqn_Char           |                             | Character ascii/digit.. helpers
-// [$UTFX] Dqn_UTF            |                             | Unicode helpers
-#include "dqn_strings.h"
-
-// NOTE: Dqn_Containers ============================================================================
-// [$VARR] Dqn_VArray         | DQN_VARRAY                  | Array backed by virtual memory arena
-// [$FARR] Dqn_FArray         | DQN_FARRAY                  | Fixed-size arrays
-// [$DMAP] Dqn_DSMap          | DQN_DSMAP                   | Hashtable, 70% max load, PoT size, linear probe, chain repair
-// [$LIST] Dqn_List           | DQN_LIST                    | Chunked linked lists, append only
-#include "dqn_containers.h"
-
 // NOTE: Dqn_Platform ==============================================================================
 // [$FSYS] Dqn_Fs             | DQN_FS                      | Filesystem helpers
 // [$DATE] Dqn_Date           |                             | Date-time helpers
@@ -271,16 +283,6 @@
 // [$WINN] Dqn_WinNet         | DQN_WINNET                  | Windows internet download/query helpers
 // [$OSYS] Dqn_OS             | DQN_WIN                     | Operating-system APIs
 // [$TCTX] Dqn_ThreadContext  |                             | Per-thread data structure e.g. temp arenas
-
-// NOTE: Additional Configuration
-// - When compiling with ASAN, set this macro to `1` to enable poisoning of the
-//   memory allocated and freed by memory arenas in the library. By default this
-//   is set to `0`. By enabling this, all allocations will be guarded by a page,
-//   before and after the returned pointer. All allocations will be aligned to
-//   and padded to atleast DQN_ASAN_POISON_ALIGNMENT (e.g. 8 bytes).
-//
-//       DQN_ASAN_POISON 1
-
 #include "dqn_platform.h"
 
 // NOTE: Dqn_Math ==================================================================================

@@ -1,22 +1,3 @@
-// NOTE: [$ALLO] Dqn_Allocator =====================================================================
-typedef void *Dqn_Allocator_AllocProc(size_t size, uint8_t align, Dqn_ZeroMem zero_mem, void *user_context);
-typedef void  Dqn_Allocator_DeallocProc(void *ptr, size_t size, void *user_context);
-
-struct Dqn_Allocator
-{
-    void                      *user_context; // User assigned pointer that is passed into the allocator functions
-    Dqn_Allocator_AllocProc   *alloc;        // Memory allocating routine
-    Dqn_Allocator_DeallocProc *dealloc;      // Memory deallocating routine
-};
-
-// NOTE: Macros ====================================================================================
-#define Dqn_Allocator_NewArray(allocator, Type, count, zero_mem) (Type *)Dqn_Allocator_Alloc(allocator, sizeof(Type) * count, alignof(Type), zero_mem)
-#define Dqn_Allocator_New(allocator, Type, zero_mem) (Type *)Dqn_Allocator_Alloc(allocator, sizeof(Type), alignof(Type), zero_mem)
-
-// NOTE: API =======================================================================================
-void   *Dqn_Allocator_Alloc  (Dqn_Allocator allocator, size_t size, uint8_t align, Dqn_ZeroMem zero_mem);
-void    Dqn_Allocator_Dealloc(Dqn_Allocator allocator, void *ptr, size_t size);
-
 // NOTE: [$VMEM] Dqn_VMem ==========================================================================
 enum Dqn_VMemCommit
 {

@@ -36,13 +36,13 @@ pushd Build
     )
 
     REM REM clang-cl ===================================================================================
-    REM set has_clang_cl=1
-    REM where /q clang-cl || set has_clang_cl=0
-    REM if %has_clang_cl% == 1 (
-    REM     echo [BUILD] clang-cl detected, compiling ...
-    REM     set clang_cmd=clang-cl %clang_compile_flags% %clang_link_flags%
-    REM     powershell -Command "$time = Measure-Command { !clang_cmd! | Out-Default }; Write-Host '[BUILD] clang-cl:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
-    REM )
+    set has_clang_cl=1
+    where /q clang-cl || set has_clang_cl=0
+    if %has_clang_cl% == 1 (
+        echo [BUILD] clang-cl detected, compiling ...
+        set clang_cmd=clang-cl %clang_compile_flags% %clang_link_flags%
+        powershell -Command "$time = Measure-Command { !clang_cmd! | Out-Default }; Write-Host '[BUILD] clang-cl:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
+    )
 
     REM zig ========================================================================================
     REM TODO(doyle):Can't build "Misc\dqn_unit_tests.cpp|1 col 1| error: unable to build C object: FileNotFound"

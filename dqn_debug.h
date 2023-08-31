@@ -1,30 +1,3 @@
-// NOTE: Debug Macros ==============================================================================
-#if !defined(DQN_DEBUG_BREAK)
-    #if defined(NDEBUG)
-        #define DQN_DEBUG_BREAK
-    #else
-        #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
-            #define DQN_DEBUG_BREAK __debugbreak()
-        #elif defined(DQN_COMPILER_CLANG)
-            #define DQN_DEBUG_BREAK __builtin_debugtrap()
-        #elif defined(DQN_COMPILER_CLANG) || defined(DQN_COMPILER_GCC)
-            #include <signal.h>
-            #define DQN_DEBUG_BREAK raise(SIGTRAP)
-        #elif
-            #error "Unhandled compiler"
-        #endif
-    #endif
-#endif
-
-#if !defined(DQN_MEMSET_BYTE)
-    #define DQN_MEMSET_BYTE 0
-#endif
-
-// TODO(doyle): Use our new stacktrace library
-#if !defined(DQN_DUMP_STACK_TRACE)
-    #define DQN_DUMP_STACK_TRACE
-#endif
-
 #if !defined(DQN_ASAN_POISON)
     #define DQN_ASAN_POISON 0
 #endif
@@ -115,25 +88,11 @@ struct Dqn_StackTraceWalkResultIterator
     uint16_t               index;
 };
 
-struct Dqn_StackTraceFrames
-{
-    Dqn_StackTraceFrame *data;
-    uint16_t             size;
-};
-
-DQN_API Dqn_StackTraceWalkResult Dqn_StackTrace_Walk             (Dqn_Arena *arena, uint16_t limit);
-DQN_API bool                     Dqn_StackTrace_WalkResultIterate(Dqn_StackTraceWalkResultIterator *it, Dqn_StackTraceWalkResult *walk);
-DQN_API Dqn_StackTraceFrames     Dqn_StackTrace_GetFrames        (Dqn_Arena *arena, uint16_t limit);
-DQN_API Dqn_StackTraceFrame      Dqn_StackTrace_RawFrameToFrame  (Dqn_Arena *arena, Dqn_StackTraceRawFrame raw_frame);
-
-// NOTE: [$CALL] Dqn_CallSite ======================================================================
-struct Dqn_CallSite
-{
-    Dqn_String8  file;
-    Dqn_String8  function;
-    unsigned int line;
-};
-#define DQN_CALL_SITE Dqn_CallSite{DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__}
+DQN_API Dqn_StackTraceWalkResult       Dqn_StackTrace_Walk             (Dqn_Arena *arena, uint16_t limit);
+DQN_API bool                           Dqn_StackTrace_WalkResultIterate(Dqn_StackTraceWalkResultIterator *it, Dqn_StackTraceWalkResult *walk);
+DQN_API Dqn_Slice<Dqn_StackTraceFrame> Dqn_StackTrace_GetFrames        (Dqn_Arena *arena, uint16_t limit);
+DQN_API void                           Dqn_StackTrace_Print            (uint16_t limit);
+DQN_API Dqn_StackTraceFrame            Dqn_StackTrace_RawFrameToFrame  (Dqn_Arena *arena, Dqn_StackTraceRawFrame raw_frame);
 
 // NOTE: [$DEBG] Dqn_Debug =========================================================================
 enum Dqn_AllocRecordFlag
@@ -171,53 +130,3 @@ DQN_API void Dqn_Debug_DumpLeaks();
 #define      Dqn_Debug_TrackDealloc(...)
 #define      Dqn_Debug_DumpLeaks(...)
 #endif
-
-// NOTE: [$LLOG] Dqn_Log  ==========================================================================
-// NOTE: API
-// @proc Dqn_LogProc
-//   @desc The logging procedure of the library. Users can override the default
-//   logging function by setting the logging function pointer in Dqn_Library.
-//   This function will be invoked every time a log is recorded using the
-//   following functions.
-//
-//   @param[in] log_type This value is one of the Dqn_LogType values if the log
-//   was generated from one of the default categories. -1 if the log is not from
-//   one of the default categories.
-
-enum Dqn_LogType
-{
-    Dqn_LogType_Debug,
-    Dqn_LogType_Info,
-    Dqn_LogType_Warning,
-    Dqn_LogType_Error,
-    Dqn_LogType_Count,
-};
-
-/// RGBA
-#define Dqn_LogTypeColourU32_Info    0x00'87'ff'ff // Blue
-#define Dqn_LogTypeColourU32_Warning 0xff'ff'00'ff // Yellow
-#define Dqn_LogTypeColourU32_Error   0xff'00'00'ff // Red
-
-typedef void Dqn_LogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list va);
-
-#define Dqn_Log_DebugF(fmt, ...)        Dqn_Log_TypeFCallSite(Dqn_LogType_Debug, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-#define Dqn_Log_InfoF(fmt, ...)         Dqn_Log_TypeFCallSite(Dqn_LogType_Info, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-#define Dqn_Log_WarningF(fmt, ...)      Dqn_Log_TypeFCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-#define Dqn_Log_ErrorF(fmt, ...)        Dqn_Log_TypeFCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-
-#define Dqn_Log_DebugFV(fmt, args)      Dqn_Log_TypeFVCallSite(Dqn_LogType_Debug, DQN_CALL_SITE, fmt, args)
-#define Dqn_Log_InfoFV(fmt, args)       Dqn_Log_TypeFVCallSite(Dqn_LogType_Info, DQN_CALL_SITE, fmt, args)
-#define Dqn_Log_WarningFV(fmt, args)    Dqn_Log_TypeFVCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, args)
-#define Dqn_Log_ErrorFV(fmt, args)      Dqn_Log_TypeFVCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, args)
-
-#define Dqn_Log_TypeFV(type, fmt, args) Dqn_Log_TypeFVCallSite(type, DQN_CALL_SITE, fmt, args)
-#define Dqn_Log_TypeF(type, fmt, ...)   Dqn_Log_TypeFCallSite(type, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-
-#define Dqn_Log_FV(type, fmt, args)     Dqn_Log_FVCallSite(type, DQN_CALL_SITE, fmt, args)
-#define Dqn_Log_F(type, fmt, ...)       Dqn_Log_FCallSite(type, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-
-DQN_API Dqn_String8 Dqn_Log_MakeString    (Dqn_Allocator allocator, bool colour, Dqn_String8 type, int log_type, Dqn_CallSite call_site, char const *fmt, va_list args);
-DQN_API void        Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, va_list va);
-DQN_API void        Dqn_Log_TypeFCallSite (Dqn_LogType type, Dqn_CallSite call_site, char const *fmt, ...);
-DQN_API void        Dqn_Log_FVCallSite    (Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, va_list va);
-DQN_API void        Dqn_Log_FCallSite     (Dqn_String8 type, Dqn_CallSite call_site, char const *fmt, ...);
