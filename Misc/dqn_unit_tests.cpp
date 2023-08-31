@@ -5,15 +5,6 @@
 //                              and running of the file.
 
 #if defined(DQN_TEST_WITH_MAIN)
-    #if defined(_MSC_VER) && !defined(__clang__)
-    // NOTE: C-strings declared in a ternary cause global-buffer-overflow in 
-    // MSVC2022.
-    // stb_sprintf assumes c-string literals are 4 byte aligned which is always
-    // true, however, reading past the end of a string whose size is not a multiple
-    // of 4 is UB causing ASAN to complain.
-    #define STBSP__ASAN __declspec(no_sanitize_address)
-    #endif
-
     #define DQN_ASAN_POISON 1
     #define DQN_ASAN_VET_POISON 1
     #define DQN_NO_CHECK_BREAK

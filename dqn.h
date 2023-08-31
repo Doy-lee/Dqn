@@ -169,8 +169,8 @@
 // [$BSTK] b_stacktrace       |                             | Generating call stacktraces
 // [$OS_H] OS Headers         |                             | Headers from the operating system
 // [$STBS] stb_sprintf        |                             | Portable sprintf
-#include "dqn_win32.h"
 #include "dqn_external.h"
+#include "dqn_win32.h"
 
 // NOTE: Additional Configuration
 // - Define this to stop this library from defining a minimal subset of Win32

@@ -925,9 +925,9 @@ DQN_API uint64_t Dqn_Date_EpochTime()
    GetSystemTimeAsFileTime(&file_time);
 
    LARGE_INTEGER date_time;
-   date_time.LowPart  = file_time.dwLowDateTime;
-   date_time.HighPart = file_time.dwHighDateTime;
-   uint64_t result     = (date_time.QuadPart - UNIX_TIME_START) / TICKS_PER_SECOND;
+   date_time.u.LowPart  = file_time.dwLowDateTime;
+   date_time.u.HighPart = file_time.dwHighDateTime;
+   uint64_t result      = (date_time.QuadPart - UNIX_TIME_START) / TICKS_PER_SECOND;
 
 #elif defined(DQN_OS_UNIX)
     uint64_t result = time(nullptr);
@@ -983,7 +983,7 @@ DQN_API Dqn_WinError Dqn_Win_LastError(Dqn_Arena *arena)
 DQN_API void Dqn_Win_MakeProcessDPIAware()
 {
     typedef bool SetProcessDpiAwareProc(void);
-    typedef bool SetProcessDpiAwarenessProc(PROCESS_DPI_AWARENESS);
+    typedef bool SetProcessDpiAwarenessProc(DPI_AWARENESS);
     typedef bool SetProcessDpiAwarenessContextProc(void * /*DPI_AWARENESS_CONTEXT*/);
 
     // NOTE(doyle): Taken from cmuratori/refterm snippet on DPI awareness. It
@@ -997,7 +997,7 @@ DQN_API void Dqn_Win_MakeProcessDPIAware()
     if (auto *set_process_dpi_awareness_context = DQN_CAST(SetProcessDpiAwarenessContextProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAwarenessContext")) {
         set_process_dpi_awareness_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     } else if (auto *set_process_dpi_awareness = DQN_CAST(SetProcessDpiAwarenessProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAwareness")) {
-        set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
+        set_process_dpi_awareness(DPI_AWARENESS_PER_MONITOR_AWARE);
     } else if (auto *set_process_dpi_aware = DQN_CAST(SetProcessDpiAwareProc *)GetProcAddress(DQN_CAST(HMODULE)lib_handle, "SetProcessDpiAware")) {
         set_process_dpi_aware();
     }

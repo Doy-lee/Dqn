@@ -6,6 +6,7 @@
 #if defined(DQN_NO_WIN32_MIN_HEADER)
     #include <bcrypt.h>   // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
     #include <shellapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
+    #include <DbgHelp.h>
     #if !defined(DQN_NO_WINNET)
         DQN_MSVC_WARNING_PUSH
         DQN_MSVC_WARNING_DISABLE(6553) // wininet.h|940 warning| The annotation for function 'InternetConnectA' on _Param_(8) does not apply to a value type.
@@ -16,286 +17,115 @@
     DQN_MSVC_WARNING_PUSH
     DQN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
 
-    // NOTE: Windows typedefs ======================================================================
-    typedef unsigned long    DWORD;
-    typedef unsigned __int64 DWORD64;
-    typedef int              BOOL;
-    typedef char             CHAR;
-    typedef void*            HANDLE;
-    typedef unsigned long    ULONG;
-    typedef unsigned __int64 ULONG64;
-    typedef wchar_t          WCHAR;
+    // NOTE: basetsd.h =============================================================================
+    typedef unsigned __int64 ULONG_PTR, *PULONG_PTR;
+    typedef ULONG_PTR        SIZE_T,    *PSIZE_T;
+    typedef __int64          LONG_PTR,  *PLONG_PTR;
+    typedef ULONG_PTR        DWORD_PTR, *PDWORD_PTR;
+    typedef unsigned __int64 ULONG64,   *PULONG64;
+    typedef unsigned __int64 DWORD64,   *PDWORD64;
 
-    // NOTE: Windows Defines =======================================================================
+    // NOTE: shared/minwindef.h ====================================================================
+    struct HINSTANCE__ {
+      int unused;
+    };
+    typedef struct HINSTANCE__ *HINSTANCE;
+
+    typedef unsigned long  DWORD;
+    typedef int            BOOL;
+    typedef int            INT;
+    typedef unsigned long  ULONG;
+    typedef unsigned int   UINT;
+    typedef unsigned short WORD;
+    typedef unsigned char  BYTE;
+    typedef unsigned char  UCHAR;
+    typedef HINSTANCE      HMODULE; /* HMODULEs can be used in place of HINSTANCEs */
+
     #define MAX_PATH 260
 
-    // NOTE: Wait/Synchronization ==================================================================
-    #define INFINITE 0xFFFFFFFF // Infinite timeout
+    typedef struct _FILETIME {
+        DWORD dwLowDateTime;
+        DWORD dwHighDateTime;
+    } FILETIME, *PFILETIME, *LPFILETIME;
 
-    // NOTE: FormatMessageA ========================================================================
-    #define FORMAT_MESSAGE_FROM_SYSTEM 0x00001000
-    #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
-    #define FORMAT_MESSAGE_FROM_HMODULE    0x00000800
-    #define MAKELANGID(p, s) ((((unsigned short  )(s)) << 10) | (unsigned short  )(p))
-    #define SUBLANG_DEFAULT 0x01    // user default
-    #define LANG_NEUTRAL 0x00
+    // NOTE: shared/winerror.h =====================================================================
+    // NOTE: GetModuleFileNameW
+    #define ERROR_INSUFFICIENT_BUFFER 122L // dderror
 
+    // NOTE: um/winnls.h ===========================================================================
     // NOTE: MultiByteToWideChar
     #define CP_UTF8 65001 // UTF-8 translation
 
-    // NOTE: VirtualAlloc ==========================================================================
-    // NOTE: Allocation Type
+    // NOTE: um/winnt.h ============================================================================
+    typedef void             VOID;
+    typedef __int64          LONGLONG;
+    typedef unsigned __int64 ULONGLONG;
+    typedef void *           HANDLE;
+    typedef char             CHAR;
+    typedef short            SHORT;
+    typedef long             LONG;
+    typedef wchar_t          WCHAR; // wc, 16-bit UNICODE character
+    typedef CHAR *           NPSTR, *LPSTR, *PSTR;
+
+    // NOTE: VirtualAlloc: Allocation Type
     #define MEM_RESERVE  0x00002000
     #define MEM_COMMIT   0x00001000
     #define MEM_DECOMMIT 0x00004000
     #define MEM_RELEASE  0x00008000
 
-    // NOTE: Protect
+    // NOTE: VirtualAlloc: Page Permissions
     #define PAGE_NOACCESS 0x01
     #define PAGE_READONLY 0x02
     #define PAGE_READWRITE 0x04
     #define PAGE_GUARD 0x100
 
-    // NOTE: FindFirstFile =========================================================================
-    #define INVALID_HANDLE_VALUE      ((void *)(long *)-1)
-    #define INVALID_FILE_ATTRIBUTES   ((unsigned long)-1)
-    #define FILE_ATTRIBUTE_NORMAL     0x00000080
-    #define FIND_FIRST_EX_LARGE_FETCH 0x00000002
-    #define FILE_ATTRIBUTE_DIRECTORY  0x00000010
-    #define FILE_ATTRIBUTE_READONLY   0x00000001
-    #define FILE_ATTRIBUTE_HIDDEN     0x00000002
+    // NOTE: FormatMessageA
+    #define MAKELANGID(p, s) ((((WORD  )(s)) << 10) | (WORD  )(p))
+    #define LANG_NEUTRAL    0x00
+    #define SUBLANG_DEFAULT 0x01 // user default
 
-    // NOTE: GetModuleFileNameW ====================================================================
-    #define ERROR_INSUFFICIENT_BUFFER 122L
+    // NOTE: CreateFile
+    #define GENERIC_READ     (0x80000000L)
+    #define GENERIC_WRITE    (0x40000000L)
+    #define GENERIC_EXECUTE  (0x20000000L)
+    #define GENERIC_ALL      (0x10000000L)
 
-    // NOTE: MoveFile ==============================================================================
-    #define MOVEFILE_REPLACE_EXISTING 0x00000001
-    #define MOVEFILE_COPY_ALLOWED 0x00000002
+    #define FILE_APPEND_DATA (0x0004) // file
 
-    // NOTE: Wininet ===============================================================================
-    typedef unsigned short INTERNET_PORT;
-    #define INTERNET_OPEN_TYPE_PRECONFIG 0 // use registry configuration
-    #define INTERNET_DEFAULT_HTTPS_PORT 443 // HTTPS
-    #define INTERNET_SERVICE_HTTP 3
-    #define INTERNET_OPTION_USER_AGENT 41
-    #define INTERNET_FLAG_NO_AUTH 0x00040000  // no automatic authentication handling
-    #define INTERNET_FLAG_SECURE 0x00800000  // use PCT/SSL if applicable (HTTP)
+    // NOTE: CreateFile/FindFirstFile
+    #define FILE_ATTRIBUTE_READONLY  0x00000001
+    #define FILE_ATTRIBUTE_HIDDEN    0x00000002
+    #define FILE_ATTRIBUTE_SYSTEM    0x00000004
+    #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
+    #define FILE_ATTRIBUTE_NORMAL    0x00000080
 
-    // NOTE: CreateFile ============================================================================
-    #define GENERIC_READ (0x80000000L)
-    #define GENERIC_WRITE (0x40000000L)
-    #define GENERIC_EXECUTE (0x20000000L)
-    #define GENERIC_ALL (0x10000000L)
-    #define FILE_ATTRIBUTE_NORMAL 0x00000080
-    #define FILE_APPEND_DATA 4
+    // NOTE: STACKFRAME64
+    #define IMAGE_FILE_MACHINE_AMD64 0x8664  // AMD64 (K8)
 
-    #define CREATE_NEW          1
-    #define CREATE_ALWAYS       2
-    #define OPEN_EXISTING       3
-    #define OPEN_ALWAYS         4
-    #define TRUNCATE_EXISTING   5
-
-    #define STD_INPUT_HANDLE ((unsigned long)-10)
-    #define STD_OUTPUT_HANDLE ((unsigned long)-11)
-    #define STD_ERROR_HANDLE ((unsigned long)-12)
-
-    #define INVALID_FILE_SIZE ((unsigned long)0xFFFFFFFF)
-
-    #define HTTP_QUERY_RAW_HEADERS 21
-    #define HTTP_QUERY_RAW_HEADERS_CRLF 22
-
-    // NOTE: HttpAddRequestHeadersA ================================================================
-    #define HTTP_ADDREQ_FLAG_ADD_IF_NEW 0x10000000
-    #define HTTP_ADDREQ_FLAG_ADD        0x20000000
-    #define HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA       0x40000000
-    #define HTTP_ADDREQ_FLAG_COALESCE_WITH_SEMICOLON   0x01000000
-    #define HTTP_ADDREQ_FLAG_COALESCE                  HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA
-    #define HTTP_ADDREQ_FLAG_REPLACE    0x80000000
-
-    #define SW_MAXIMIZED 3
-    #define SW_SHOW 5
-
-    // NOTE: Windows Structs =======================================================================
-    typedef enum PROCESS_DPI_AWARENESS {
-        PROCESS_DPI_UNAWARE           = 0,
-        PROCESS_SYSTEM_DPI_AWARE      = 1,
-        PROCESS_PER_MONITOR_DPI_AWARE = 2
-    } PROCESS_DPI_AWARENESS;
-
-    #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((void *)-4)
-
-    typedef union {
+    typedef union _ULARGE_INTEGER {
         struct {
-            unsigned long LowPart;
-            unsigned long HighPart;
+            DWORD LowPart;
+            DWORD HighPart;
         } DUMMYSTRUCTNAME;
         struct {
-            unsigned long LowPart;
-            unsigned long HighPart;
+            DWORD LowPart;
+            DWORD HighPart;
         } u;
-        uint64_t QuadPart;
+        ULONGLONG QuadPart;
     } ULARGE_INTEGER;
 
-    typedef struct
-    {
-        unsigned long dwLowDateTime;
-        unsigned long dwHighDateTime;
-    } FILETIME;
-
-    typedef struct
-    {
-        unsigned long dwFileAttributes;
-        FILETIME ftCreationTime;
-        FILETIME ftLastAccessTime;
-        FILETIME ftLastWriteTime;
-        unsigned long nFileSizeHigh;
-        unsigned long nFileSizeLow;
-    } WIN32_FILE_ATTRIBUTE_DATA;
-
-    typedef enum
-    {
-        GetFileExInfoStandard,
-        GetFileExMaxInfoLevel
-    } GET_FILEEX_INFO_LEVELS;
-
-    typedef struct {
-        unsigned long nLength;
-        void *lpSecurityDescriptor;
-        bool bInheritHandle;
-    } SECURITY_ATTRIBUTES;
-
-    typedef struct {
-      long left;
-      long top;
-      long right;
-      long bottom;
-    } RECT, *PRECT, *NPRECT, *LPRECT;
-
-    typedef struct {
-        union {
-            unsigned long dwOemId;          // Obsolete field...do not use
-            struct {
-                uint16_t wProcessorArchitecture;
-                uint16_t wReserved;
-            } DUMMYSTRUCTNAME;
-        } DUMMYUNIONNAME;
-        unsigned long dwPageSize;
-        void *lpMinimumApplicationAddress;
-        void *lpMaximumApplicationAddress;
-        unsigned long *dwActiveProcessorMask;
-        unsigned long dwNumberOfProcessors;
-        unsigned long dwProcessorType;
-        unsigned long dwAllocationGranularity;
-        uint16_t wProcessorLevel;
-        uint16_t wProcessorRevision;
-    } SYSTEM_INFO;
-
-    typedef struct {
-        unsigned short wYear;
-        unsigned short wMonth;
-        unsigned short wDayOfWeek;
-        unsigned short wDay;
-        unsigned short wHour;
-        unsigned short wMinute;
-        unsigned short wSecond;
-        unsigned short wMilliseconds;
-    } SYSTEMTIME;
-
-    typedef struct {
-        unsigned long dwFileAttributes;
-        FILETIME ftCreationTime;
-        FILETIME ftLastAccessTime;
-        FILETIME ftLastWriteTime;
-        unsigned long nFileSizeHigh;
-        unsigned long nFileSizeLow;
-        unsigned long dwReserved0;
-        unsigned long dwReserved1;
-        wchar_t cFileName[MAX_PATH];
-        wchar_t cAlternateFileName[14];
-        #ifdef _MAC
-        unsigned long dwFileType;
-        unsigned long dwCreatorType;
-        unsigned short wFinderFlags;
-        #endif
-    } WIN32_FIND_DATAW;
-
-    typedef enum {
-        FindExInfoStandard,
-        FindExInfoBasic,
-        FindExInfoMaxInfoLevel,
-    } FINDEX_INFO_LEVELS;
-
-    typedef enum {
-        FindExSearchNameMatch,
-        FindExSearchLimitToDirectories,
-        FindExSearchLimitToDevices,
-        FindExSearchMaxSearchOp
-    } FINDEX_SEARCH_OPS;
-
-    typedef enum {
-        INTERNET_SCHEME_PARTIAL = -2,
-        INTERNET_SCHEME_UNKNOWN = -1,
-        INTERNET_SCHEME_DEFAULT = 0,
-        INTERNET_SCHEME_FTP,
-        INTERNET_SCHEME_GOPHER,
-        INTERNET_SCHEME_HTTP,
-        INTERNET_SCHEME_HTTPS,
-        INTERNET_SCHEME_FILE,
-        INTERNET_SCHEME_NEWS,
-        INTERNET_SCHEME_MAILTO,
-        INTERNET_SCHEME_SOCKS,
-        INTERNET_SCHEME_JAVASCRIPT,
-        INTERNET_SCHEME_VBSCRIPT,
-        INTERNET_SCHEME_RES,
-        INTERNET_SCHEME_FIRST = INTERNET_SCHEME_FTP,
-        INTERNET_SCHEME_LAST = INTERNET_SCHEME_RES
-    } INTERNET_SCHEME;
-
-    typedef struct {
-        unsigned long    dwStructSize;       // size of this structure. Used in version check
-        char            *lpszScheme;         // pointer to scheme name
-        unsigned long    dwSchemeLength;     // length of scheme name
-        INTERNET_SCHEME  nScheme;            // enumerated scheme type (if known)
-        char            *lpszHostName;       // pointer to host name
-        unsigned long    dwHostNameLength;   // length of host name
-        INTERNET_PORT    nPort;              // converted port number
-        char            *lpszUserName;       // pointer to user name
-        unsigned long    dwUserNameLength;   // length of user name
-        char            *lpszPassword;       // pointer to password
-        unsigned long    dwPasswordLength;   // length of password
-        char            *lpszUrlPath;        // pointer to URL-path
-        unsigned long    dwUrlPathLength;    // length of URL-path
-        char            *lpszExtraInfo;      // pointer to extra information (e.g. ?foo or #foo)
-        unsigned long    dwExtraInfoLength;  // length of extra information
-    } URL_COMPONENTSA;
-
-    typedef void * HMODULE;
-    typedef union {
+    typedef union _LARGE_INTEGER {
         struct {
-            unsigned long LowPart;
-            long          HighPart;
-        };
+            DWORD LowPart;
+            LONG HighPart;
+        } DUMMYSTRUCTNAME;
         struct {
-            unsigned long LowPart;
-            long          HighPart;
+            DWORD LowPart;
+            LONG HighPart;
         } u;
-        uint64_t QuadPart;
+        LONGLONG QuadPart;
     } LARGE_INTEGER;
 
-    // NOTE: minwinddef.h ==========================================================================
-    typedef unsigned long  DWORD;
-    typedef int            BOOL;
-    typedef int            INT;
-    typedef unsigned int   UINT;
-    typedef unsigned short WORD;
-    typedef unsigned char  BYTE;
-
-    // NOTE: winnt.h Typedefs ======================================================================
-    typedef void             VOID;
-    typedef __int64          LONGLONG;
-    typedef unsigned __int64 ULONGLONG;
-
-    // NOTE: winnt.h Structs =======================================================================
     typedef struct __declspec(align(16)) _M128A {
         ULONGLONG Low;
         LONGLONG High;
@@ -400,21 +230,329 @@
         DWORD64 LastExceptionFromRip;
     } CONTEXT;
 
-    // NOTE: winnt.h Defines =======================================================================
-    #define IMAGE_FILE_MACHINE_AMD64 0x8664  // AMD64 (K8)
+    extern "C"
+    {
+    __declspec(dllimport) VOID   __stdcall RtlCaptureContext(CONTEXT *ContextRecord);
+    __declspec(dllimport) HANDLE __stdcall GetCurrentProcess(void);
+    __declspec(dllimport) HANDLE __stdcall GetCurrentThread(void);
+    __declspec(dllimport) DWORD  __stdcall SymSetOptions(DWORD SymOptions);
+    __declspec(dllimport) BOOL   __stdcall SymInitialize(HANDLE hProcess, const CHAR* UserSearchPath, BOOL fInvadeProcess);
+    }
+
+    // NOTE: handleapi.h ===========================================================================
+    #define INVALID_HANDLE_VALUE ((HANDLE)(LONG_PTR)-1)
 
     extern "C"
     {
-    VOID   __declspec(dllimport) __stdcall RtlCaptureContext(CONTEXT *ContextRecord);
-    HANDLE __declspec(dllimport) __stdcall GetCurrentProcess(void);
-    HANDLE __declspec(dllimport) __stdcall GetCurrentThread(void);
-    DWORD  __declspec(dllimport) __stdcall SymSetOptions(DWORD SymOptions);
-    BOOL   __declspec(dllimport) __stdcall SymInitialize(HANDLE hProcess, const CHAR* UserSearchPath, BOOL fInvadeProcess);
+    __declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE hObject);
     }
 
-    // NOTE: DbgHelp.h =============================================================================
+    // NOTE: consoleapi.h ===========================================================================
+    extern "C"
+    {
+    __declspec(dllimport) BOOL __stdcall WriteConsoleA(HANDLE hConsoleOutput, const VOID* lpBuffer, DWORD nNumberOfCharsToWrite, DWORD *lpNumberOfCharsWritten, VOID *lpReserved);
+    __declspec(dllimport) BOOL __stdcall AllocConsole(VOID);
+    __declspec(dllimport) BOOL __stdcall FreeConsole(VOID);
+    __declspec(dllimport) BOOL __stdcall AttachConsole(DWORD dwProcessId);
+    __declspec(dllimport) BOOL __stdcall GetConsoleMode(HANDLE hConsoleHandle, DWORD *lpMode);
+    }
 
-    // NOTE: DbgHelp.h Defines =====================================================================
+    // NOTE: um/minwinbase.h =======================================================================
+    // NOTE: FindFirstFile
+    #define FIND_FIRST_EX_CASE_SENSITIVE 0x00000001
+    #define FIND_FIRST_EX_LARGE_FETCH    0x00000002
+
+    typedef enum _GET_FILEEX_INFO_LEVELS {
+        GetFileExInfoStandard,
+        GetFileExMaxInfoLevel
+    } GET_FILEEX_INFO_LEVELS;
+
+    typedef struct _SECURITY_ATTRIBUTES {
+        DWORD nLength;
+        VOID *lpSecurityDescriptor;
+        BOOL  bInheritHandle;
+    } SECURITY_ATTRIBUTES, *PSECURITY_ATTRIBUTES, *LPSECURITY_ATTRIBUTES;
+
+    typedef enum _FINDEX_INFO_LEVELS {
+        FindExInfoStandard,
+        FindExInfoBasic,
+        FindExInfoMaxInfoLevel
+    } FINDEX_INFO_LEVELS;
+
+    typedef enum _FINDEX_SEARCH_OPS {
+        FindExSearchNameMatch,
+        FindExSearchLimitToDirectories,
+        FindExSearchLimitToDevices,
+        FindExSearchMaxSearchOp
+    } FINDEX_SEARCH_OPS;
+
+    typedef struct _WIN32_FIND_DATAW {
+        DWORD    dwFileAttributes;
+        FILETIME ftCreationTime;
+        FILETIME ftLastAccessTime;
+        FILETIME ftLastWriteTime;
+        DWORD    nFileSizeHigh;
+        DWORD    nFileSizeLow;
+        DWORD    dwReserved0;
+        DWORD    dwReserved1;
+        WCHAR    cFileName[ MAX_PATH ];
+        WCHAR    cAlternateFileName[ 14 ];
+        #ifdef _MAC
+        DWORD    dwFileType;
+        DWORD    dwCreatorType;
+        WORD     wFinderFlags;
+        #endif
+    } WIN32_FIND_DATAW, *PWIN32_FIND_DATAW, *LPWIN32_FIND_DATAW;
+
+    typedef struct _SYSTEMTIME {
+        WORD wYear;
+        WORD wMonth;
+        WORD wDayOfWeek;
+        WORD wDay;
+        WORD wHour;
+        WORD wMinute;
+        WORD wSecond;
+        WORD wMilliseconds;
+    } SYSTEMTIME, *PSYSTEMTIME, *LPSYSTEMTIME;
+
+    typedef struct _OVERLAPPED {
+        ULONG_PTR Internal;
+        ULONG_PTR InternalHigh;
+        union {
+            struct {
+                DWORD Offset;
+                DWORD OffsetHigh;
+            } DUMMYSTRUCTNAME;
+            VOID *Pointer;
+        } DUMMYUNIONNAME;
+
+        HANDLE  hEvent;
+    } OVERLAPPED, *LPOVERLAPPED;
+
+    // NOTE: um/winbase.h ==========================================================================
+    #define INFINITE 0xFFFFFFFF // Wait/Synchronisation: Infinite timeout
+
+    #define STD_INPUT_HANDLE  ((DWORD)-10)
+    #define STD_OUTPUT_HANDLE ((DWORD)-11)
+    #define STD_ERROR_HANDLE  ((DWORD)-12)
+
+    // NOTE: MoveFile
+    #define MOVEFILE_REPLACE_EXISTING 0x00000001
+    #define MOVEFILE_COPY_ALLOWED     0x00000002
+
+    // NOTE: FormatMessageA
+    #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
+    #define FORMAT_MESSAGE_FROM_HMODULE   0x00000800
+    #define FORMAT_MESSAGE_FROM_SYSTEM    0x00001000
+
+    extern "C"
+    {
+    __declspec(dllimport) BOOL   __stdcall MoveFileExW     (const WCHAR *lpExistingFileName, const WCHAR *lpNewFileName, DWORD dwFlags);
+    __declspec(dllimport) BOOL   __stdcall CopyFileW       (const WCHAR *lpExistingFileName, const WCHAR *lpNewFileName, BOOL bFailIfExists);
+    __declspec(dllimport) HANDLE __stdcall CreateSemaphoreA(SECURITY_ATTRIBUTES *lpSemaphoreAttributes, LONG lInitialCount, LONG lMaximumCount, const CHAR *lpName);
+    __declspec(dllimport) DWORD  __stdcall FormatMessageA  (DWORD dwFlags, const VOID *lpSource, DWORD dwMessageId, DWORD dwLanguageId, LPSTR lpBuffer, DWORD nSize, va_list *Arguments);
+    }
+
+    // NOTE: um/stringapiset.h =====================================================================
+    extern "C"
+    {
+    __declspec(dllimport) int __stdcall MultiByteToWideChar(UINT CodePage, DWORD dwFlags, const CHAR *lpMultiByteStr, int cbMultiByte, WCHAR *lpWideCharStr, int cchWideChar);
+    __declspec(dllimport) int __stdcall WideCharToMultiByte(UINT CodePage, DWORD dwFlags, const WCHAR *lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, const CHAR *lpDefaultChar, BOOL *lpUsedDefaultChar);
+    }
+
+    // NOTE: um/fileapi.h ==========================================================================
+    #define INVALID_FILE_SIZE ((DWORD)0xFFFFFFFF)
+    #define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
+
+    // NOTE: CreateFile
+    #define CREATE_NEW        1
+    #define CREATE_ALWAYS     2
+    #define OPEN_EXISTING     3
+    #define OPEN_ALWAYS       4
+    #define TRUNCATE_EXISTING 5
+
+    typedef struct _WIN32_FILE_ATTRIBUTE_DATA {
+        DWORD dwFileAttributes;
+        FILETIME ftCreationTime;
+        FILETIME ftLastAccessTime;
+        FILETIME ftLastWriteTime;
+        DWORD nFileSizeHigh;
+        DWORD nFileSizeLow;
+    } WIN32_FILE_ATTRIBUTE_DATA, *LPWIN32_FILE_ATTRIBUTE_DATA;
+
+    extern "C"
+    {
+    __declspec(dllimport) BOOL   __stdcall CreateDirectoryW    (const WCHAR *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
+    __declspec(dllimport) BOOL   __stdcall RemoveDirectoryW    (const WCHAR *lpPathName);
+    __declspec(dllimport) BOOL   __stdcall FindNextFileW       (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+    __declspec(dllimport) HANDLE __stdcall FindFirstFileExW    (const WCHAR *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, VOID *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, VOID *lpSearchFilter, DWORD dwAdditionalFlags);
+    __declspec(dllimport) BOOL   __stdcall GetFileAttributesExW(const WCHAR *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, VOID *lpFileInformation);
+    __declspec(dllimport) BOOL   __stdcall GetFileSizeEx       (HANDLE hFile, LARGE_INTEGER *lpFileSize);
+    __declspec(dllimport) BOOL   __stdcall DeleteFileW         (const WCHAR *lpFileName);
+    __declspec(dllimport) HANDLE __stdcall CreateFileW         (const WCHAR *lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+    __declspec(dllimport) BOOL   __stdcall ReadFile            (HANDLE hFile, VOID *lpBuffer, DWORD nNumberOfBytesToRead, DWORD *lpNumberOfBytesRead, OVERLAPPED *lpOverlapped);
+    __declspec(dllimport) BOOL   __stdcall WriteFile           (HANDLE hFile, const VOID *lpBuffer, DWORD nNumberOfBytesToWrite, DWORD *lpNumberOfBytesWritten, OVERLAPPED *lpOverlapped);
+
+    }
+
+    // NOTE: um/processenv.h =======================================================================
+    extern "C"
+    {
+    __declspec(dllimport) DWORD  __stdcall GetCurrentDirectoryW(DWORD nBufferLength, WCHAR *lpBuffer);
+    __declspec(dllimport) HANDLE __stdcall GetStdHandle(DWORD nStdHandle);
+    }
+
+    // NOTE: um/sysinfoapi.h =======================================================================
+    typedef struct _SYSTEM_INFO {
+        union {
+            DWORD dwOemId;          // Obsolete field...do not use
+            struct {
+                WORD wProcessorArchitecture;
+                WORD wReserved;
+            } DUMMYSTRUCTNAME;
+        } DUMMYUNIONNAME;
+        DWORD dwPageSize;
+        VOID *lpMinimumApplicationAddress;
+        VOID *lpMaximumApplicationAddress;
+        DWORD_PTR dwActiveProcessorMask;
+        DWORD dwNumberOfProcessors;
+        DWORD dwProcessorType;
+        DWORD dwAllocationGranularity;
+        WORD wProcessorLevel;
+        WORD wProcessorRevision;
+    } SYSTEM_INFO, *LPSYSTEM_INFO;
+
+    extern "C"
+    {
+    __declspec(dllimport) VOID __stdcall GetSystemInfo(SYSTEM_INFO *lpSystemInfo);
+    __declspec(dllimport) VOID __stdcall GetSystemTime(SYSTEMTIME *lpSystemTime);
+    __declspec(dllimport) VOID __stdcall GetSystemTimeAsFileTime(FILETIME *lpSystemTimeAsFileTime);
+    __declspec(dllimport) VOID __stdcall GetLocalTime(SYSTEMTIME *lpSystemTime);
+    }
+
+    // NOTE: shared/windef.h =======================================================================
+    typedef struct tagRECT {
+        LONG left;
+        LONG top;
+        LONG right;
+        LONG bottom;
+    } RECT;
+
+    struct HWND__ {
+      int unused;
+    };
+    typedef struct HWND__ *HWND;
+
+    struct DPI_AWARENESS_CONTEXT__ {
+        int unused;
+    };
+    typedef struct DPI_AWARENESS_CONTEXT__ *DPI_AWARENESS_CONTEXT;
+
+    typedef enum DPI_AWARENESS {
+        DPI_AWARENESS_INVALID           = -1,
+        DPI_AWARENESS_UNAWARE           = 0,
+        DPI_AWARENESS_SYSTEM_AWARE      = 1,
+        DPI_AWARENESS_PER_MONITOR_AWARE = 2
+    } DPI_AWARENESS;
+
+    #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
+
+    // NOTE: um/winuser.h ==========================================================================
+    #define SW_HIDE           0
+    #define SW_NORMAL         1
+    #define SW_MAXIMIZE       3
+    #define SW_SHOWNOACTIVATE 4
+    #define SW_SHOW           5
+    #define SW_FORCEMINIMIZE  11
+
+    extern "C"
+    {
+    __declspec(dllimport) BOOL __stdcall GetWindowRect           (HWND hWnd, RECT *lpRect);
+    __declspec(dllimport) BOOL __stdcall SetWindowPos            (HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags);
+    __declspec(dllimport) UINT __stdcall GetWindowModuleFileNameA(HWND hwnd, LPSTR pszFileName, UINT cchFileNameMax);
+    __declspec(dllimport) BOOL __stdcall ShowWindow              (HWND hWnd, int nCmdShow);
+    }
+
+    // NOTE: um/wininet.h ==========================================================================
+    typedef WORD INTERNET_PORT;
+    typedef VOID *HINTERNET;
+
+    #define INTERNET_OPEN_TYPE_PRECONFIG             0   // use registry configuration
+    #define INTERNET_INVALID_PORT_NUMBER             0   // use the protocol-specific default
+    #define INTERNET_DEFAULT_FTP_PORT                21  // default for FTP servers
+    #define INTERNET_DEFAULT_HTTP_PORT               80  //    "     "  HTTP   "
+    #define INTERNET_DEFAULT_HTTPS_PORT              443 //    "     "  HTTPS  "
+    #define INTERNET_SERVICE_HTTP                    3
+
+    #define INTERNET_OPTION_USERNAME                 28
+    #define INTERNET_OPTION_PASSWORD                 29
+    #define INTERNET_OPTION_USER_AGENT               41
+
+    #define INTERNET_FLAG_NO_AUTH                    0x00040000 // no automatic authentication handling
+    #define INTERNET_FLAG_SECURE                     0x00800000 // use PCT/SSL if applicable (HTTP)
+
+    #define HTTP_QUERY_RAW_HEADERS                   21  // special: all headers as ASCIIZ
+    #define HTTP_QUERY_RAW_HEADERS_CRLF              22  // special: all headers
+
+    #define HTTP_ADDREQ_FLAG_ADD_IF_NEW              0x10000000
+    #define HTTP_ADDREQ_FLAG_ADD                     0x20000000
+    #define HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA     0x40000000
+    #define HTTP_ADDREQ_FLAG_COALESCE_WITH_SEMICOLON 0x01000000
+    #define HTTP_ADDREQ_FLAG_COALESCE                HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA
+    #define HTTP_ADDREQ_FLAG_REPLACE                 0x80000000
+
+    typedef enum {
+        INTERNET_SCHEME_PARTIAL = -2,
+        INTERNET_SCHEME_UNKNOWN = -1,
+        INTERNET_SCHEME_DEFAULT = 0,
+        INTERNET_SCHEME_FTP,
+        INTERNET_SCHEME_GOPHER,
+        INTERNET_SCHEME_HTTP,
+        INTERNET_SCHEME_HTTPS,
+        INTERNET_SCHEME_FILE,
+        INTERNET_SCHEME_NEWS,
+        INTERNET_SCHEME_MAILTO,
+        INTERNET_SCHEME_SOCKS,
+        INTERNET_SCHEME_JAVASCRIPT,
+        INTERNET_SCHEME_VBSCRIPT,
+        INTERNET_SCHEME_RES,
+        INTERNET_SCHEME_FIRST = INTERNET_SCHEME_FTP,
+        INTERNET_SCHEME_LAST = INTERNET_SCHEME_RES
+    } INTERNET_SCHEME, * LPINTERNET_SCHEME;
+
+    typedef struct {
+        DWORD   dwStructSize;       // size of this structure. Used in version check
+        LPSTR   lpszScheme;         // pointer to scheme name
+        DWORD   dwSchemeLength;     // length of scheme name
+        INTERNET_SCHEME nScheme;    // enumerated scheme type (if known)
+        LPSTR   lpszHostName;       // pointer to host name
+        DWORD   dwHostNameLength;   // length of host name
+        INTERNET_PORT nPort;        // converted port number
+        LPSTR   lpszUserName;       // pointer to user name
+        DWORD   dwUserNameLength;   // length of user name
+        LPSTR   lpszPassword;       // pointer to password
+        DWORD   dwPasswordLength;   // length of password
+        LPSTR   lpszUrlPath;        // pointer to URL-path
+        DWORD   dwUrlPathLength;    // length of URL-path
+        LPSTR   lpszExtraInfo;      // pointer to extra information (e.g. ?foo or #foo)
+        DWORD   dwExtraInfoLength;  // length of extra information
+    } URL_COMPONENTSA, * LPURL_COMPONENTSA;
+
+    extern "C"
+    {
+    __declspec(dllimport) BOOL      __stdcall InternetCrackUrlA     (CHAR const *lpszUrl, DWORD dwUrlLength, DWORD dwFlags, URL_COMPONENTSA *lpUrlComponents);
+    __declspec(dllimport) HINTERNET __stdcall InternetOpenA         (CHAR const *lpszAgent, DWORD dwAccessType, CHAR const *lpszProxy, CHAR const *lpszProxyBypass, DWORD dwFlags);
+    __declspec(dllimport) HINTERNET __stdcall InternetConnectA      (HINTERNET hInternet, CHAR const *lpszServerName, INTERNET_PORT nServerPort, CHAR const *lpszUserName, CHAR const *lpszPassword, DWORD dwService, DWORD dwFlags, DWORD_PTR dwContext);
+    __declspec(dllimport) BOOL      __stdcall InternetSetOptionA    (HINTERNET hInternet, DWORD dwOption, VOID *lpBuffer, DWORD dwBufferLength);
+    __declspec(dllimport) BOOL      __stdcall InternetReadFile      (HINTERNET hFile, VOID *lpBuffer, DWORD dwNumberOfBytesToRead, DWORD *lpdwNumberOfBytesRead);
+    __declspec(dllimport) BOOL      __stdcall InternetCloseHandle   (HINTERNET hInternet);
+    __declspec(dllimport) HINTERNET __stdcall HttpOpenRequestA      (HINTERNET hConnect, CHAR const *lpszVerb, CHAR const *lpszObjectName, CHAR const *lpszVersion, CHAR const *lpszReferrer, CHAR const *lplpszAcceptTypes, DWORD dwFlags, DWORD_PTR dwContext);
+    __declspec(dllimport) BOOL      __stdcall HttpSendRequestA      (HINTERNET hRequest, CHAR const *lpszHeaders, DWORD dwHeadersLength, VOID *lpOptional, DWORD dwOptionalLength);
+    __declspec(dllimport) BOOL      __stdcall HttpAddRequestHeadersA(HINTERNET hRequest, CHAR const *lpszHeaders, DWORD dwHeadersLength, DWORD dwModifiers);
+    __declspec(dllimport) BOOL      __stdcall HttpQueryInfoA        (HINTERNET hRequest, DWORD dwInfoLevel, VOID *lpBuffer, DWORD *lpdwBufferLength, DWORD *lpdwIndex);
+    }
+
+    // NOTE: um/DbgHelp.h ==========================================================================
     #define SYMOPT_CASE_INSENSITIVE           0x00000001
     #define SYMOPT_UNDNAME                    0x00000002
     #define SYMOPT_DEFERRED_LOADS             0x00000004
@@ -450,7 +588,6 @@
 
     #define MAX_SYM_NAME                      2000
 
-    // NOTE: DbgHelp.h Structs =====================================================================
     typedef enum {
         AddrMode1616,
         AddrMode1632,
@@ -525,103 +662,87 @@
         WCHAR   Name[1]; // Name of symbol
     } SYMBOL_INFOW;
 
-    // NOTE: DbgHelp.h Typedefs ====================================================================
     typedef BOOL   (__stdcall READ_PROCESS_MEMORY_ROUTINE64)(HANDLE hProcess, DWORD64 qwBaseAddress, VOID *lpBuffer, DWORD nSize, DWORD *lpNumberOfBytesRead);
     typedef VOID * (__stdcall FUNCTION_TABLE_ACCESS_ROUTINE64)(HANDLE ahProcess, DWORD64 AddrBase);
     typedef DWORD64(__stdcall GET_MODULE_BASE_ROUTINE64)(HANDLE hProcess, DWORD64 Address);
     typedef DWORD64(__stdcall TRANSLATE_ADDRESS_ROUTINE64)(HANDLE hProcess, HANDLE hThread, ADDRESS64 *lpaddr);
 
-    // NOTE: DbgHelp.h Funtions ====================================================================
     extern "C"
     {
-        __declspec(dllimport) BOOL    __stdcall StackWalk64(DWORD MachineType, HANDLE hProcess, HANDLE hThread, STACKFRAME64 *StackFrame, VOID *ContextRecord, READ_PROCESS_MEMORY_ROUTINE64 *ReadMemoryRoutine, FUNCTION_TABLE_ACCESS_ROUTINE64 *FunctionTableAccessRoutine, GET_MODULE_BASE_ROUTINE64 *GetModuleBaseRoutine, TRANSLATE_ADDRESS_ROUTINE64 *TranslateAddress);
-        __declspec(dllimport) BOOL    __stdcall SymFromAddrW(HANDLE hProcess, DWORD64 Address, DWORD64 *Displacement, SYMBOL_INFOW *Symbol);
-        __declspec(dllimport) VOID *  __stdcall SymFunctionTableAccess64(HANDLE hProcess, DWORD64 AddrBase);
-        __declspec(dllimport) BOOL    __stdcall SymGetLineFromAddrW64(HANDLE hProcess, DWORD64 dwAddr, DWORD *pdwDisplacement, IMAGEHLP_LINEW64 *Line);
-        __declspec(dllimport) DWORD64 __stdcall SymGetModuleBase64(HANDLE hProcess, DWORD64 qwAddr);
+    __declspec(dllimport) BOOL    __stdcall StackWalk64             (DWORD MachineType, HANDLE hProcess, HANDLE hThread, STACKFRAME64 *StackFrame, VOID *ContextRecord, READ_PROCESS_MEMORY_ROUTINE64 *ReadMemoryRoutine, FUNCTION_TABLE_ACCESS_ROUTINE64 *FunctionTableAccessRoutine, GET_MODULE_BASE_ROUTINE64 *GetModuleBaseRoutine, TRANSLATE_ADDRESS_ROUTINE64 *TranslateAddress);
+    __declspec(dllimport) BOOL    __stdcall SymFromAddrW            (HANDLE hProcess, DWORD64 Address, DWORD64 *Displacement, SYMBOL_INFOW *Symbol);
+    __declspec(dllimport) VOID *  __stdcall SymFunctionTableAccess64(HANDLE hProcess, DWORD64 AddrBase);
+    __declspec(dllimport) BOOL    __stdcall SymGetLineFromAddrW64   (HANDLE hProcess, DWORD64 dwAddr, DWORD *pdwDisplacement, IMAGEHLP_LINEW64 *Line);
+    __declspec(dllimport) DWORD64 __stdcall SymGetModuleBase64      (HANDLE hProcess, DWORD64 qwAddr);
     };
 
-    // NOTE: Windows.h ===============================================================================
+    // NOTE: um/errhandlingapi.h ===================================================================
     extern "C"
     {
-    /*BOOL*/      int            __stdcall CreateDirectoryW           (wchar_t const *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
-    /*BOOL*/      int            __stdcall RemoveDirectoryW           (wchar_t const *lpPathName);
-    /*DWORD*/     unsigned long  __stdcall GetCurrentDirectoryW       (unsigned long nBufferLength, wchar_t *lpBuffer);
-
-    /*BOOL*/      int            __stdcall FindNextFileW              (void *hFindFile, WIN32_FIND_DATAW *lpFindFileData);
-    /*HANDLE*/    void *         __stdcall FindFirstFileExW           (wchar_t const *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, void *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void *lpSearchFilter, unsigned long dwAdditionalFlags);
-    /*DWORD*/     unsigned long  __stdcall GetFileAttributesExW       (wchar_t const *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, WIN32_FILE_ATTRIBUTE_DATA *lpFileInformation);
-    /*BOOL*/      int            __stdcall GetFileSizeEx              (void *hFile, LARGE_INTEGER *lpFileSize);
-
-    /*BOOL*/      int            __stdcall MoveFileExW                (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, unsigned long dwFlags);
-    /*BOOL*/      int            __stdcall CopyFileW                  (wchar_t const *lpExistingFileName, wchar_t const *lpNewFileName, int bFailIfExists);
-    /*BOOL*/      int            __stdcall DeleteFileW                (wchar_t const *lpExistingFileName);
-    /*HANDLE*/    void *         __stdcall CreateFileW                (wchar_t const *lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void *hTemplateFile);
-    /*BOOL*/      int            __stdcall ReadFile                   (void *hFile, void *lpBuffer, unsigned long nNumberOfBytesToRead, unsigned long *lpNumberOfBytesRead, struct OVERLAPPED *lpOverlapped);
-    /*BOOL*/      int            __stdcall WriteFile                  (void *hFile, void const *lpBuffer, unsigned long nNumberOfBytesToWrite, unsigned long *lpNumberOfBytesWritten, struct OVERLAPPED *lpOverlapped);
-    /*BOOL*/      int            __stdcall CloseHandle                (void *hObject);
-
-    /*BOOL*/      int            __stdcall WriteConsoleA              (void *hConsoleOutput, const char *lpBuffer, unsigned long nNumberOfCharsToWrite, unsigned long *lpNumberOfCharsWritten, void *lpReserved);
-    /*BOOL*/      int            __stdcall AllocConsole               ();
-    /*BOOL*/      int            __stdcall FreeConsole                ();
-    /*BOOL*/      int            __stdcall AttachConsole              (unsigned long dwProcessId);
-    /*HANDLE*/    void *         __stdcall GetStdHandle               (unsigned long nStdHandle);
-    /*BOOL*/      int            __stdcall GetConsoleMode             (void *hConsoleHandle, unsigned long *lpMode);
-
-    /*HMODULE*/   void *         __stdcall LoadLibraryA               (char const *lpFileName);
-    /*BOOL*/      int            __stdcall FreeLibrary                (void *hModule);
-    /*FARPROC*/   void *         __stdcall GetProcAddress             (void *hModule, char const *lpProcName);
-
-    /*BOOL*/      int            __stdcall GetWindowRect              (void *hWnd, RECT *lpRect);
-    /*BOOL*/      int            __stdcall SetWindowPos               (void *hWnd, void *hWndInsertAfter, int X, int Y, int cx, int cy, unsigned int uFlags);
-
-    /*DWORD*/     unsigned long  __stdcall GetWindowModuleFileNameA   (void *hwnd, char *pszFileName, unsigned int cchFileNameMax);
-    /*HMODULE*/   void *         __stdcall GetModuleHandleA           (char const *lpModuleName);
-    /*DWORD*/     unsigned long  __stdcall GetModuleFileNameW         (void *hModule, wchar_t *lpFilename, unsigned long nSize);
-
-    /*DWORD*/     unsigned long  __stdcall WaitForSingleObject        (void *hHandle, unsigned long dwMilliseconds);
-
-    /*BOOL*/      int            __stdcall QueryPerformanceCounter    (LARGE_INTEGER *lpPerformanceCount);
-    /*BOOL*/      int            __stdcall QueryPerformanceFrequency  (LARGE_INTEGER *lpFrequency);
-
-    /*HANDLE*/    void *         __stdcall CreateThread               (SECURITY_ATTRIBUTES *lpThreadAttributes, size_t dwStackSize, unsigned long (*lpStartAddress)(void *), void *lpParameter, unsigned long dwCreationFlags, unsigned long *lpThreadId);
-    /*HANDLE*/    void *         __stdcall CreateSemaphoreA           (SECURITY_ATTRIBUTES *lpSecurityAttributes, long lInitialCount, long lMaxCount, char *lpName);
-    /*BOOL*/      int            __stdcall ReleaseSemaphore           (void *semaphore, long lReleaseCount, long *lpPreviousCount);
-                  void           __stdcall Sleep                      (unsigned long dwMilliseconds);
-    /*DWORD*/     unsigned long  __stdcall GetCurrentThreadId         ();
-
-                  void *         __stdcall VirtualAlloc               (void *lpAddress, size_t dwSize, unsigned long flAllocationType, unsigned long flProtect);
-    /*BOOL*/      int            __stdcall VirtualProtect             (void *lpAddress, size_t dwSize, unsigned long flNewProtect, unsigned long *lpflOldProtect);
-    /*BOOL*/      int            __stdcall VirtualFree                (void *lpAddress, size_t dwSize, unsigned long dwFreeType);
-
-                  void           __stdcall GetSystemInfo              (SYSTEM_INFO *system_info);
-                  void           __stdcall GetSystemTime              (SYSTEMTIME  *lpSystemTime);
-                  void           __stdcall GetSystemTimeAsFileTime    (FILETIME    *lpFileTime);
-                  void           __stdcall GetLocalTime               (SYSTEMTIME  *lpSystemTime);
-
-    /*DWORD*/     unsigned long  __stdcall FormatMessageA             (unsigned long dwFlags, void *lpSource, unsigned long dwMessageId, unsigned long dwLanguageId, char *lpBuffer, unsigned long nSize, va_list *Arguments);
-    /*DWORD*/     unsigned long  __stdcall GetLastError               ();
-
-                  int            __stdcall MultiByteToWideChar        (unsigned int CodePage, unsigned long dwFlags, char const *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
-                  int            __stdcall WideCharToMultiByte        (unsigned int CodePage, unsigned long dwFlags, wchar_t const *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, char const *lpDefaultChar, bool *lpUsedDefaultChar);
-
-    /*NTSTATUS*/  long           __stdcall BCryptOpenAlgorithmProvider(void *phAlgorithm, wchar_t const *pszAlgId, wchar_t const *pszImplementation, unsigned long dwFlags);
-    /*NTSTATUS*/  long           __stdcall BCryptGenRandom            (void *hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
-
-    /*BOOLAPI*/   int            __stdcall InternetCrackUrlA          (char const *lpszUrl, unsigned long dwUrlLength, unsigned long dwFlags, URL_COMPONENTSA *lpUrlComponents);
-    /*HANDLE*/    void *         __stdcall InternetOpenA              (char const *lpszAgent, unsigned long dwAccessType, char const *lpszProxy, char const *lpszProxyBypass, unsigned long dwFlags);
-    /*HANDLE*/    void *         __stdcall InternetConnectA           (void *hInternet, char const *lpszServerName, INTERNET_PORT nServerPort, char const *lpszUserName, char const *lpszPassword, unsigned long dwService, unsigned long dwFlags, unsigned long *dwContext);
-    /*BOOLAPI*/   int            __stdcall InternetSetOptionA         (void *hInternet, unsigned long dwOption, void *lpBuffer, unsigned long dwBufferLength);
-    /*BOOLAPI*/   int            __stdcall InternetReadFile           (void *hFile, void *lpBuffer, unsigned long dwNumberOfBytesToRead, unsigned long *lpdwNumberOfBytesRead);
-    /*BOOLAPI*/   int            __stdcall InternetCloseHandle        (void *hInternet);
-    /*HANDLE*/    void *         __stdcall HttpOpenRequestA           (void *hConnect, char const *lpszVerb, char const *lpszObjectName, char const *lpszVersion, char const *lpszReferrer, char const **lplpszAcceptTypes, unsigned long dwFlags, unsigned long *dwContext);
-    /*BOOLAPI*/   int            __stdcall HttpSendRequestA           (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, void *lpOptional, unsigned long dwOptionalLength);
-    /*BOOLAPI*/   int            __stdcall HttpAddRequestHeadersA     (void *hRequest, char const *lpszHeaders, unsigned long dwHeadersLength, unsigned long dwModifiers);
-    /*BOOL*/      int            __stdcall HttpQueryInfoA             (void *hRequest, unsigned long dwInfoLevel, void *lpBuffer, unsigned long *lpdwBufferLength, unsigned long *lpdwIndex);
-
-    /*HINSTANCE*/ void *         __stdcall ShellExecuteA              (void *hwnd, char const *lpOperation, char const *lpFile, char const *lpParameters, char const *lpDirectory, int nShowCmd);
-    /*BOOL*/      int            __stdcall ShowWindow                 (void *hWnd, int nCmdShow);
+    __declspec(dllimport) DWORD __stdcall GetLastError(VOID);
     }
+
+    // NOTE: um/libloaderapi.h =====================================================================
+    extern "C"
+    {
+    __declspec(dllimport) HMODULE __stdcall LoadLibraryA      (const CHAR *lpLibFileName);
+    __declspec(dllimport) BOOL    __stdcall FreeLibrary       (HMODULE hLibModule);
+    __declspec(dllimport) void *  __stdcall GetProcAddress    (HMODULE hModule, const CHAR *lpProcName);
+    __declspec(dllimport) HMODULE __stdcall GetModuleHandleA  (const CHAR *lpModuleName);
+    __declspec(dllimport) DWORD   __stdcall GetModuleFileNameW(HMODULE hModule, WCHAR *lpFilename, DWORD nSize);
+    }
+
+    // NOTE: um/synchapi.h =========================================================================
+    extern "C"
+    {
+    __declspec(dllimport) DWORD __stdcall WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);
+    __declspec(dllimport) BOOL  __stdcall ReleaseSemaphore   (HANDLE hSemaphore, LONG lReleaseCount, LONG *lpPreviousCount);
+    __declspec(dllimport) VOID  __stdcall Sleep              (DWORD dwMilliseconds);
+    }
+
+    // NOTE: um/profileapi.h =======================================================================
+    extern "C"
+    {
+    __declspec(dllimport) BOOL __stdcall QueryPerformanceCounter  (LARGE_INTEGER* lpPerformanceCount);
+    __declspec(dllimport) BOOL __stdcall QueryPerformanceFrequency(LARGE_INTEGER* lpFrequency);
+    }
+
+    // NOTE: um/processthreadsapi.h ================================================================
+    typedef DWORD (__stdcall *PTHREAD_START_ROUTINE)(
+        VOID *lpThreadParameter
+        );
+    typedef PTHREAD_START_ROUTINE LPTHREAD_START_ROUTINE;
+
+    extern "C"
+    {
+    __declspec(dllimport) HANDLE __stdcall CreateThread(SECURITY_ATTRIBUTES *lpThreadAttributes, SIZE_T dwStackSize, PTHREAD_START_ROUTINE lpStartAddress, VOID *lpParameter, DWORD dwCreationFlags, DWORD *lpThreadId);
+    __declspec(dllimport) DWORD  __stdcall GetCurrentThreadId(VOID);
+    }
+
+    // NOTE: um/memoryapi.h ========================================================================
+    extern "C"
+    {
+    __declspec(dllimport) VOID * __stdcall VirtualAlloc  (VOID *lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
+    __declspec(dllimport) BOOL   __stdcall VirtualProtect(VOID *lpAddress, SIZE_T dwSize, DWORD flNewProtect, DWORD *lpflOldProtect);
+    __declspec(dllimport) BOOL   __stdcall VirtualFree   (VOID *lpAddress, SIZE_T dwSize, DWORD dwFreeType);
+    }
+
+    // NOTE: shared/bcrypt.h =======================================================================
+    typedef VOID *BCRYPT_ALG_HANDLE;
+    typedef LONG  NTSTATUS;
+
+    extern "C"
+    {
+    __declspec(dllimport) NTSTATUS __stdcall BCryptOpenAlgorithmProvider(BCRYPT_ALG_HANDLE *phAlgorithm, const WCHAR *pszAlgId, const WCHAR *pszImplementation, ULONG dwFlags);
+    __declspec(dllimport) NTSTATUS __stdcall BCryptGenRandom            (BCRYPT_ALG_HANDLE hAlgorithm, UCHAR *pbBuffer, ULONG cbBuffer, ULONG dwFlags);
+    }
+
+    // NOTE: um/shellapi.h =========================================================================
+    extern "C"
+    {
+    __declspec(dllimport) HINSTANCE __stdcall ShellExecuteA(HWND hwnd, CHAR const *lpOperation, CHAR const *lpFile, CHAR const *lpParameters, CHAR const *lpDirectory, INT nShowCmd);
+    }
+
     DQN_MSVC_WARNING_POP
 #endif // !defined(_INC_WINDOWS)
 #endif /// defined(DQN_OS_WIN32)

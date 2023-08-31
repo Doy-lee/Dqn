@@ -14,6 +14,20 @@
 #endif
 
 // NOTE: [$STBS] stb_sprintf =======================================================================
+
+#if defined(DQN_COMPILER_MSVC)
+    // NOTE: stb_sprintf assumes c-string literals are 4 byte aligned which is
+    // always true, however, reading past the end of a string whose size is not
+    // a multiple of 4 is UB causing ASAN to complain. This is practically safe
+    // and guaranteed by all compilers so we mute this.
+    //
+    // ==12072==ERROR: AddressSanitizer: global-buffer-overflow on address
+    // READ of size 4 at 0x7ff6f442a0d8 thread T0
+    //     #0 0x7ff6f42d3be8 in stbsp_vsprintfcb C:\Home\Code\dqn\dqn_external.cpp:199
+
+    #define STBSP__ASAN __declspec(no_sanitize_address)
+#endif
+
 // stb_sprintf - v1.10 - public domain snprintf() implementation
 // originally by Jeff Roberts / RAD Game Tools, 2015/10/20
 // http://github.com/nothings/stb
