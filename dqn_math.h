@@ -10,8 +10,9 @@ union Dqn_V2I
     int32_t data[2];
 };
 
-#define Dqn_V2I_InitNx1(x)    DQN_LITERAL(Dqn_V2I){{(int32_t)(x),  (int32_t)(x)}}
-#define Dqn_V2I_InitNx2(x, y) DQN_LITERAL(Dqn_V2I){{(int32_t)(x),  (int32_t)(y)}}
+#define Dqn_V2I_InitNx1(x)    DQN_LITERAL(Dqn_V2I){{(int32_t)(x),    (int32_t)(x)}}
+#define Dqn_V2I_InitNx2(x, y) DQN_LITERAL(Dqn_V2I){{(int32_t)(x),    (int32_t)(y)}}
+#define Dqn_V2I_InitV2(xy)    DQN_LITERAL(Dqn_V2I){{(int32_t)(xy).x, (int32_t)(xy).y}}
 
 DQN_API bool     operator!=(Dqn_V2I  lhs, Dqn_V2I rhs);
 DQN_API bool     operator==(Dqn_V2I  lhs, Dqn_V2I rhs);
@@ -20,6 +21,7 @@ DQN_API bool     operator<=(Dqn_V2I  lhs, Dqn_V2I rhs);
 DQN_API bool     operator< (Dqn_V2I  lhs, Dqn_V2I rhs);
 DQN_API bool     operator> (Dqn_V2I  lhs, Dqn_V2I rhs);
 DQN_API Dqn_V2I  operator- (Dqn_V2I  lhs, Dqn_V2I rhs);
+DQN_API Dqn_V2I  operator- (Dqn_V2I  lhs);
 DQN_API Dqn_V2I  operator+ (Dqn_V2I  lhs, Dqn_V2I rhs);
 DQN_API Dqn_V2I  operator* (Dqn_V2I  lhs, Dqn_V2I rhs);
 DQN_API Dqn_V2I  operator* (Dqn_V2I  lhs, Dqn_f32 rhs);
@@ -76,8 +78,11 @@ union Dqn_V2
     Dqn_f32 data[2];
 };
 
-#define Dqn_V2_InitNx1(x)    DQN_LITERAL(Dqn_V2){{(Dqn_f32)(x), (Dqn_f32)(x)}}
-#define Dqn_V2_InitNx2(x, y) DQN_LITERAL(Dqn_V2){{(Dqn_f32)(x), (Dqn_f32)(y)}}
+#define Dqn_V2_Zero          DQN_LITERAL(Dqn_V2){{(Dqn_f32)(0),    (Dqn_f32)(0)}}
+#define Dqn_V2_One           DQN_LITERAL(Dqn_V2){{(Dqn_f32)(1),    (Dqn_f32)(1)}}
+#define Dqn_V2_InitNx1(x)    DQN_LITERAL(Dqn_V2){{(Dqn_f32)(x),    (Dqn_f32)(x)}}
+#define Dqn_V2_InitNx2(x, y) DQN_LITERAL(Dqn_V2){{(Dqn_f32)(x),    (Dqn_f32)(y)}}
+#define Dqn_V2_InitV2I(xy)   DQN_LITERAL(Dqn_V2){{(Dqn_f32)(xy).x, (Dqn_f32)(xy).y}}
 
 DQN_API bool    operator!=(Dqn_V2  lhs, Dqn_V2  rhs);
 DQN_API bool    operator==(Dqn_V2  lhs, Dqn_V2  rhs);
@@ -87,6 +92,7 @@ DQN_API bool    operator< (Dqn_V2  lhs, Dqn_V2  rhs);
 DQN_API bool    operator> (Dqn_V2  lhs, Dqn_V2  rhs);
 DQN_API Dqn_V2  operator- (Dqn_V2  lhs, Dqn_V2  rhs);
 DQN_API Dqn_V2  operator- (Dqn_V2  lhs, Dqn_f32 rhs);
+DQN_API Dqn_V2  operator- (Dqn_V2  lhs);
 DQN_API Dqn_V2  operator+ (Dqn_V2  lhs, Dqn_V2  rhs);
 DQN_API Dqn_V2  operator+ (Dqn_V2  lhs, Dqn_f32 rhs);
 DQN_API Dqn_V2  operator* (Dqn_V2  lhs, Dqn_V2  rhs);
@@ -102,16 +108,23 @@ DQN_API Dqn_V2 &operator/=(Dqn_V2& lhs, Dqn_V2  rhs);
 DQN_API Dqn_V2 &operator/=(Dqn_V2& lhs, Dqn_f32 rhs);
 DQN_API Dqn_V2 &operator/=(Dqn_V2& lhs, int32_t rhs);
 DQN_API Dqn_V2 &operator-=(Dqn_V2& lhs, Dqn_V2  rhs);
+DQN_API Dqn_V2 &operator-=(Dqn_V2& lhs, Dqn_f32 rhs);
 DQN_API Dqn_V2 &operator+=(Dqn_V2& lhs, Dqn_V2  rhs);
+DQN_API Dqn_V2 &operator+=(Dqn_V2& lhs, Dqn_f32 rhs);
 
-DQN_API Dqn_V2I Dqn_V2_ToV2I(Dqn_V2 a);
-DQN_API Dqn_V2  Dqn_V2_Min(Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2_Max(Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2_Abs(Dqn_V2 a);
-DQN_API Dqn_f32 Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_f32 Dqn_V2_LengthSq(Dqn_V2 a, Dqn_V2 b);
-DQN_API Dqn_V2  Dqn_V2_Normalise(Dqn_V2 a);
+DQN_API Dqn_V2I Dqn_V2_ToV2I        (Dqn_V2 a);
+DQN_API Dqn_V2  Dqn_V2_Min          (Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_V2  Dqn_V2_Max          (Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_V2  Dqn_V2_Abs          (Dqn_V2 a);
+DQN_API Dqn_f32 Dqn_V2_Dot          (Dqn_V2 a, Dqn_V2 b);
+DQN_API Dqn_f32 Dqn_V2_LengthSq_V2x2(Dqn_V2 lhs, Dqn_V2 rhs);
+DQN_API Dqn_f32 Dqn_V2_Length_V2x2  (Dqn_V2 lhs, Dqn_V2 rhs);
+DQN_API Dqn_f32 Dqn_V2_LengthSq     (Dqn_V2 lhs);
+DQN_API Dqn_f32 Dqn_V2_Length       (Dqn_V2 lhs);
+DQN_API Dqn_V2  Dqn_V2_Normalise    (Dqn_V2 a);
 DQN_API Dqn_V2  Dqn_V2_Perpendicular(Dqn_V2 a);
+DQN_API Dqn_V2  Dqn_V2_Reflect      (Dqn_V2 in, Dqn_V2 surface);
+DQN_API Dqn_f32 Dqn_V2_Area         (Dqn_V2 a);
 #endif // !defined(DQN_NO_V2)
 
 #if !defined(DQN_NO_V3)
@@ -134,6 +147,7 @@ DQN_API bool    operator<=(Dqn_V3  lhs, Dqn_V3  rhs);
 DQN_API bool    operator< (Dqn_V3  lhs, Dqn_V3  rhs);
 DQN_API bool    operator> (Dqn_V3  lhs, Dqn_V3  rhs);
 DQN_API Dqn_V3  operator- (Dqn_V3  lhs, Dqn_V3  rhs);
+DQN_API Dqn_V3  operator- (Dqn_V3  lhs);
 DQN_API Dqn_V3  operator+ (Dqn_V3  lhs, Dqn_V3  rhs);
 DQN_API Dqn_V3  operator* (Dqn_V3  lhs, Dqn_V3  rhs);
 DQN_API Dqn_V3  operator* (Dqn_V3  lhs, Dqn_f32 rhs);
@@ -163,30 +177,33 @@ union Dqn_V4
     struct { Dqn_f32 r, g, b, a; };
     #if !defined(DQN_NO_V3)
     Dqn_V3  rgb;
+    Dqn_V3  xyz;
     #endif
     Dqn_f32 data[4];
 };
 
-#define Dqn_V4_InitNx1(x)          DQN_LITERAL(Dqn_V4){{(Dqn_f32)(x), (Dqn_f32)(x), (Dqn_f32)(x), (Dqn_f32)(x)}}
-#define Dqn_V4_InitNx4(x, y, z, w) DQN_LITERAL(Dqn_V4){{(Dqn_f32)(x), (Dqn_f32)(y), (Dqn_f32)(z), (Dqn_f32)(w)}}
+#define Dqn_V4_InitNx1(x)            DQN_LITERAL(Dqn_V4){{(Dqn_f32)(x), (Dqn_f32)(x), (Dqn_f32)(x), (Dqn_f32)(x)}}
+#define Dqn_V4_InitNx4(x, y, z, w)   DQN_LITERAL(Dqn_V4){{(Dqn_f32)(x), (Dqn_f32)(y), (Dqn_f32)(z), (Dqn_f32)(w)}}
+#define Dqn_V4_Init_V3x1_Nx1(xyz, w) DQN_LITERAL(Dqn_V4){{xyz.x,        xyz.y,        xyz.z,        w}}
 
-bool    operator!=(Dqn_V4  lhs, Dqn_V4  rhs);
-bool    operator==(Dqn_V4  lhs, Dqn_V4  rhs);
-bool    operator>=(Dqn_V4  lhs, Dqn_V4  rhs);
-bool    operator<=(Dqn_V4  lhs, Dqn_V4  rhs);
-bool    operator< (Dqn_V4  lhs, Dqn_V4  rhs);
-bool    operator> (Dqn_V4  lhs, Dqn_V4  rhs);
-Dqn_V4  operator- (Dqn_V4  lhs, Dqn_V4  rhs);
-Dqn_V4  operator+ (Dqn_V4  lhs, Dqn_V4  rhs);
-Dqn_V4  operator* (Dqn_V4  lhs, Dqn_V4  rhs);
-Dqn_V4  operator* (Dqn_V4  lhs, Dqn_f32 rhs);
-Dqn_V4  operator* (Dqn_V4  lhs, int32_t rhs);
-Dqn_V4  operator/ (Dqn_V4  lhs, Dqn_f32 rhs);
-Dqn_V4 &operator*=(Dqn_V4 &lhs, Dqn_V4  rhs);
-Dqn_V4 &operator*=(Dqn_V4 &lhs, Dqn_f32 rhs);
-Dqn_V4 &operator*=(Dqn_V4 &lhs, int32_t rhs);
-Dqn_V4 &operator-=(Dqn_V4 &lhs, Dqn_V4  rhs);
-Dqn_V4 &operator+=(Dqn_V4 &lhs, Dqn_V4  rhs);
+DQN_API bool    operator!=(Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API bool    operator==(Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API bool    operator>=(Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API bool    operator<=(Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API bool    operator< (Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API bool    operator> (Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API Dqn_V4  operator- (Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API Dqn_V4  operator- (Dqn_V4  lhs);
+DQN_API Dqn_V4  operator+ (Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API Dqn_V4  operator* (Dqn_V4  lhs, Dqn_V4  rhs);
+DQN_API Dqn_V4  operator* (Dqn_V4  lhs, Dqn_f32 rhs);
+DQN_API Dqn_V4  operator* (Dqn_V4  lhs, int32_t rhs);
+DQN_API Dqn_V4  operator/ (Dqn_V4  lhs, Dqn_f32 rhs);
+DQN_API Dqn_V4 &operator*=(Dqn_V4 &lhs, Dqn_V4  rhs);
+DQN_API Dqn_V4 &operator*=(Dqn_V4 &lhs, Dqn_f32 rhs);
+DQN_API Dqn_V4 &operator*=(Dqn_V4 &lhs, int32_t rhs);
+DQN_API Dqn_V4 &operator-=(Dqn_V4 &lhs, Dqn_V4  rhs);
+DQN_API Dqn_V4 &operator+=(Dqn_V4 &lhs, Dqn_V4  rhs);
 #endif // !defined(DQN_NO_V4)
 
 #if !defined(DQN_NO_M4)
@@ -217,10 +234,25 @@ DQN_API Dqn_M4  Dqn_M4_SubF(Dqn_M4 lhs, Dqn_f32 rhs);
 DQN_API Dqn_M4  Dqn_M4_MulF(Dqn_M4 lhs, Dqn_f32 rhs);
 DQN_API Dqn_M4  Dqn_M4_DivF(Dqn_M4 lhs, Dqn_f32 rhs);
 
-#if !defined(DQN_NO_FSTRING8)
-DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat);
+#if !defined(DQN_NO_FSTR8)
+DQN_API Dqn_FStr8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat);
 #endif
 #endif // !defined(DQN_M4)
+
+union Dqn_M2x3
+{
+    Dqn_f32 e[6];
+    Dqn_f32 row[2][3];
+};
+
+DQN_API bool     operator==(Dqn_M2x3 const &lhs, Dqn_M2x3 const &rhs);
+DQN_API bool     operator!=(Dqn_M2x3 const &lhs, Dqn_M2x3 const &rhs);
+DQN_API Dqn_M2x3 Dqn_M2x3_Identity ();
+DQN_API Dqn_M2x3 Dqn_M2x3_Translate(Dqn_V2 offset);
+DQN_API Dqn_M2x3 Dqn_M2x3_Scale    (Dqn_V2 scale);
+DQN_API Dqn_M2x3 Dqn_M2x3_Rotate   (Dqn_f32 radians);
+DQN_API Dqn_M2x3 Dqn_M2x3_Mul      (Dqn_M2x3 m1, Dqn_M2x3 m2);
+DQN_API Dqn_V2   Dqn_M2x3_MulV2    (Dqn_M2x3 m1, Dqn_V2 v2);
 
 // NOTE: [$RECT] Dqn_Rect ==========================================================================
 #if !defined(DQN_NO_RECT)
@@ -241,14 +273,22 @@ struct Dqn_RectMinMax
 #define Dqn_Rect_InitV2x2(pos, size)                   DQN_LITERAL(Dqn_Rect){(pos), (size)}
 #define Dqn_Rect_InitNx4(pos_x, pos_y, size_w, size_h) DQN_LITERAL(Dqn_Rect){DQN_LITERAL(Dqn_V2){{pos_x, pos_y}}, DQN_LITERAL(Dqn_V2){{size_w, size_h}}}
 
-DQN_API bool           operator==            (const Dqn_Rect& lhs, const Dqn_Rect& rhs);
-DQN_API Dqn_V2         Dqn_Rect_Center       (Dqn_Rect rect);
-DQN_API bool           Dqn_Rect_ContainsPoint(Dqn_Rect rect, Dqn_V2 p);
-DQN_API bool           Dqn_Rect_ContainsRect (Dqn_Rect a, Dqn_Rect b);
-DQN_API bool           Dqn_Rect_Intersects   (Dqn_Rect a, Dqn_Rect b);
-DQN_API Dqn_Rect       Dqn_Rect_Intersection (Dqn_Rect a, Dqn_Rect b);
-DQN_API Dqn_Rect       Dqn_Rect_Union        (Dqn_Rect a, Dqn_Rect b);
-DQN_API Dqn_RectMinMax Dqn_Rect_MinMax       (Dqn_Rect a);
+DQN_API bool           operator==                (const Dqn_Rect& lhs, const Dqn_Rect& rhs);
+DQN_API Dqn_V2         Dqn_Rect_Center           (Dqn_Rect rect);
+DQN_API bool           Dqn_Rect_ContainsPoint    (Dqn_Rect rect, Dqn_V2 p);
+DQN_API bool           Dqn_Rect_ContainsRect     (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_Rect       Dqn_Rect_Expand           (Dqn_Rect a, Dqn_f32 amount);
+DQN_API Dqn_Rect       Dqn_Rect_ExpandV2         (Dqn_Rect a, Dqn_V2 amount);
+DQN_API bool           Dqn_Rect_Intersects       (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_Rect       Dqn_Rect_Intersection     (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_Rect       Dqn_Rect_Union            (Dqn_Rect a, Dqn_Rect b);
+DQN_API Dqn_RectMinMax Dqn_Rect_MinMax           (Dqn_Rect a);
+DQN_API Dqn_f32        Dqn_Rect_Area             (Dqn_Rect a);
+DQN_API Dqn_V2         Dqn_Rect_InterpolatedPoint(Dqn_Rect rect, Dqn_V2 t01);
+DQN_API Dqn_V2         Dqn_Rect_TopLeft          (Dqn_Rect rect);
+DQN_API Dqn_V2         Dqn_Rect_TopRight         (Dqn_Rect rect);
+DQN_API Dqn_V2         Dqn_Rect_BottomLeft       (Dqn_Rect rect);
+DQN_API Dqn_V2         Dqn_Rect_BottomRight      (Dqn_Rect rect);
 
 enum Dqn_RectCutClip
 {
@@ -293,6 +333,26 @@ struct Dqn_RectCut
 
 DQN_API Dqn_Rect Dqn_RectCut_Cut(Dqn_RectCut rect_cut, Dqn_V2 size, Dqn_RectCutClip clip);
 #endif // !defined(DQN_NO_RECT)
+
+// NOTE: [$MATH] Raycast ===========================================================================
+//
+// NOTE: API
+// @proc Dqn_Raycast_LineIntersectV2
+//   @desc Calculate the intersection point of 2 rays returning a `t` value
+//   which is how much along the direction of the 'ray' did the intersection
+//   occur.
+//
+//   The arguments passed in do not need to be normalised for the function to
+//   work.
+
+struct Dqn_RaycastLineIntersectV2Result
+{
+    bool    hit; // True if there was an intersection, false if the lines are parallel
+    Dqn_f32 t_a; // Distance along `dir_a` that the intersection occurred, e.g. `origin_a + (dir_a * t_a)`
+    Dqn_f32 t_b; // Distance along `dir_b` that the intersection occurred, e.g. `origin_b + (dir_b * t_b)`
+};
+
+DQN_API Dqn_RaycastLineIntersectV2Result Dqn_Raycast_LineIntersectV2(Dqn_V2 origin_a, Dqn_V2 dir_a, Dqn_V2 origin_b, Dqn_V2 dir_b);
 
 // NOTE: [$MATH] Other =============================================================================
 DQN_API Dqn_V2  Dqn_Lerp_V2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b);

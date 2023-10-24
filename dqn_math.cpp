@@ -43,6 +43,12 @@ DQN_API Dqn_V2I operator-(Dqn_V2I lhs, Dqn_V2I rhs)
     return result;
 }
 
+DQN_API Dqn_V2I operator-(Dqn_V2I lhs)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(-lhs.x, -lhs.y);
+    return result;
+}
+
 DQN_API Dqn_V2I operator+(Dqn_V2I lhs, Dqn_V2I rhs)
 {
     Dqn_V2I result = Dqn_V2I_InitNx2(lhs.x + rhs.x, lhs.y + rhs.y);
@@ -315,6 +321,12 @@ DQN_API Dqn_V2 operator-(Dqn_V2 lhs, Dqn_f32 rhs)
     return result;
 }
 
+DQN_API Dqn_V2 operator-(Dqn_V2 lhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(-lhs.x, -lhs.y);
+    return result;
+}
+
 DQN_API Dqn_V2 operator+(Dqn_V2 lhs, Dqn_V2 rhs)
 {
     Dqn_V2 result = Dqn_V2_InitNx2(lhs.x + rhs.x, lhs.y + rhs.y);
@@ -405,7 +417,19 @@ DQN_API Dqn_V2 &operator-=(Dqn_V2 &lhs, Dqn_V2 rhs)
     return lhs;
 }
 
+DQN_API Dqn_V2 &operator-=(Dqn_V2 &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs - rhs;
+    return lhs;
+}
+
 DQN_API Dqn_V2 &operator+=(Dqn_V2 &lhs, Dqn_V2 rhs)
+{
+    lhs = lhs + rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator+=(Dqn_V2 &lhs, Dqn_f32 rhs)
 {
     lhs = lhs + rhs;
     return lhs;
@@ -431,29 +455,124 @@ DQN_API Dqn_V2 Dqn_V2_Abs(Dqn_V2 a)
 
 DQN_API Dqn_f32 Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b)
 {
+    // NOTE: Scalar projection of B onto A =========================================================
+    //
+    // Scalar projection calculates the signed distance between `b` and `a`
+    // where `a` is a unit vector then, the dot product calculates the projection
+    // of `b` onto the infinite line that the direction of `a` represents. This
+    // calculation is the signed distance.
+    //
+    // signed_distance = dot_product(a, b) = (a.x * b.x) + (a.y * b.y)
+    //
+    // Y
+    // ^      b
+    // |     /|
+    // |    / |
+    // |   /  |
+    // |  /   | Projection
+    // | /    |
+    // |/     V
+    // +--->--------> X
+    // .   a  .
+    // .      .
+    // |------| <- Calculated signed distance
+    //
+    // The signed-ness of the result indicates the relationship:
+    //
+    // Distance <0  means `b` is behind           `a`
+    // Distance >0  means `b` is in-front of      `a`
+    // Distance ==0 means `b` is perpendicular to `a`
+    //
+    // If `a` is not normalized then the signed-ness of the result still holds
+    // however result no longer represents the actual distance between the
+    // 2 objects. One of the vectors must be normalised (e.g. turned into a unit
+    // vector).
+    //
+    // NOTE: Vector projection =====================================================================
+    //
+    // Vector projection calculates the exact X,Y coordinates of where `b` meets
+    // `a` when it was projected. This is calculated by multipying the
+    // 'scalar projection' result by the unit vector of `a`
+    //
+    // vector_projection = a * signed_distance = a * dot_product(a, b)
+
     Dqn_f32 result = (a.x * b.x) + (a.y * b.y);
     return result;
 }
 
-DQN_API Dqn_f32 Dqn_V2_LengthSq(Dqn_V2 a, Dqn_V2 b)
+DQN_API Dqn_f32 Dqn_V2_LengthSq_V2x2(Dqn_V2 lhs, Dqn_V2 rhs)
 {
-    Dqn_f32 x_side = b.x - a.x;
-    Dqn_f32 y_side = b.y - a.y;
-    Dqn_f32 result = DQN_SQUARED(x_side) + DQN_SQUARED(y_side);
+    // NOTE: Pythagoras's theorem (a^2 + b^2 = c^2) without the square root
+    Dqn_f32 a         = rhs.x - lhs.x;
+    Dqn_f32 b         = rhs.y - lhs.y;
+    Dqn_f32 c_squared = DQN_SQUARED(a) + DQN_SQUARED(b);
+    Dqn_f32 result    = c_squared;
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_V2_Length_V2x2(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    Dqn_f32 result_squared = Dqn_V2_LengthSq_V2x2(lhs, rhs);
+    Dqn_f32 result         = DQN_SQRTF(result_squared);
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_V2_LengthSq(Dqn_V2 lhs)
+{
+    // NOTE: Pythagoras's theorem without the square root
+    Dqn_f32 c_squared = DQN_SQUARED(lhs.x) + DQN_SQUARED(lhs.y);
+    Dqn_f32 result    = c_squared;
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_V2_Length(Dqn_V2 lhs)
+{
+    Dqn_f32 c_squared = Dqn_V2_LengthSq(lhs);
+    Dqn_f32 result    = DQN_SQRTF(c_squared);
     return result;
 }
 
 DQN_API Dqn_V2 Dqn_V2_Normalise(Dqn_V2 a)
 {
-    Dqn_f32 length_sq = DQN_SQUARED(a.x) + DQN_SQUARED(a.y);
-    Dqn_f32 length    = DQN_SQRTF(length_sq);
-    Dqn_V2 result     = a / length;
+    Dqn_f32 length = Dqn_V2_Length(a);
+    Dqn_V2 result  = a / length;
     return result;
 }
 
 DQN_API Dqn_V2 Dqn_V2_Perpendicular(Dqn_V2 a)
 {
+    // NOTE: Matrix form of a 2D vector can be defined as
+    //
+    // x' = x cos(t) - y sin(t)
+    // y' = x sin(t) + y cos(t)
+    //
+    // Calculate a line perpendicular to a vector means rotating the vector by
+    // 90 degrees
+    //
+    // x' = x cos(90) - y sin(90)
+    // y' = x sin(90) + y cos(90)
+    //
+    // Where `cos(90) = 0` and `sin(90) = 1` then,
+    //
+    // x' = -y
+    // y' = +x
+
     Dqn_V2 result = Dqn_V2_InitNx2(-a.y, a.x);
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_V2_Reflect(Dqn_V2 in, Dqn_V2 surface)
+{
+    Dqn_V2 normal       = Dqn_V2_Perpendicular(surface);
+    Dqn_V2 normal_norm  = Dqn_V2_Normalise(normal);
+    Dqn_f32 signed_dist = Dqn_V2_Dot(in, normal_norm);
+    Dqn_V2 result       = Dqn_V2_InitNx2(in.x, in.y + (-signed_dist * 2.f));
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_V2_Area(Dqn_V2 a)
+{
+    Dqn_f32 result = a.w * a.h;
     return result;
 }
 #endif // !defined(DQN_NO_V2)
@@ -499,6 +618,12 @@ DQN_API bool operator>(Dqn_V3 lhs, Dqn_V3 rhs)
 DQN_API Dqn_V3 operator-(Dqn_V3 lhs, Dqn_V3 rhs)
 {
     Dqn_V3 result = Dqn_V3_InitNx3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+    return result;
+}
+
+DQN_API Dqn_V3 operator-(Dqn_V3 lhs)
+{
+    Dqn_V3 result = Dqn_V3_InitNx3(-lhs.x, -lhs.y, -lhs.z);
     return result;
 }
 
@@ -654,6 +779,12 @@ DQN_API bool operator>(Dqn_V4 lhs, Dqn_V4 rhs)
 DQN_API Dqn_V4 operator-(Dqn_V4 lhs, Dqn_V4 rhs)
 {
     Dqn_V4 result = Dqn_V4_InitNx4(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
+    return result;
+}
+
+DQN_API Dqn_V4 operator-(Dqn_V4 lhs)
+{
+    Dqn_V4 result = Dqn_V4_InitNx4(-lhs.x, -lhs.y, -lhs.z, -lhs.w);
     return result;
 }
 
@@ -957,16 +1088,16 @@ DQN_API Dqn_M4 Dqn_M4_DivF(Dqn_M4 lhs, Dqn_f32 rhs)
     return result;
 }
 
-#if !defined(DQN_NO_FSTRING8)
-DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
+#if !defined(DQN_NO_FSTR8)
+DQN_API Dqn_FStr8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
 {
-    Dqn_FString8<256> result = {};
+    Dqn_FStr8<256> result = {};
     for (int row = 0; row < 4; row++) {
         for (int it = 0; it < 4; it++) {
-            if (it == 0) Dqn_FString8_Append(&result, DQN_STRING8("|"));
-            Dqn_FString8_AppendF(&result, "%.5f", mat.columns[it][row]);
-            if (it != 3) Dqn_FString8_Append(&result, DQN_STRING8(", "));
-            else         Dqn_FString8_Append(&result, DQN_STRING8("|\n"));
+            if (it == 0) Dqn_FStr8_Append(&result, DQN_STR8("|"));
+            Dqn_FStr8_AppendF(&result, "%.5f", mat.columns[it][row]);
+            if (it != 3) Dqn_FStr8_Append(&result, DQN_STR8(", "));
+            else         Dqn_FStr8_Append(&result, DQN_STR8("|\n"));
         }
     }
 
@@ -974,6 +1105,94 @@ DQN_API Dqn_FString8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
 }
 #endif
 #endif // !defined(DQN_M4)
+
+// NOTE: [$M2x3] Dqn_M2x3 ==========================================================================
+DQN_API bool operator==(Dqn_M2x3 const &lhs, Dqn_M2x3 const &rhs)
+{
+    bool result = DQN_MEMCMP(lhs.e, rhs.e, sizeof(lhs.e[0]) * DQN_ARRAY_UCOUNT(lhs.e)) == 0;
+    return result;
+}
+
+DQN_API bool operator!=(Dqn_M2x3 const &lhs, Dqn_M2x3 const &rhs)
+{
+    bool result = !(lhs == rhs);
+    return result;
+}
+
+DQN_API Dqn_M2x3 Dqn_M2x3_Identity()
+{
+    Dqn_M2x3 result = {{
+        1, 0, 0,
+        0, 1, 0,
+    }};
+    return result;
+}
+
+DQN_API Dqn_M2x3 Dqn_M2x3_Translate(Dqn_V2 offset)
+{
+    Dqn_M2x3 result = {{
+        1, 0, offset.x,
+        0, 1, offset.y,
+    }};
+    return result;
+}
+
+DQN_API Dqn_M2x3 Dqn_M2x3_Scale(Dqn_V2 scale)
+{
+    Dqn_M2x3 result = {{
+        scale.x, 0,       0,
+        0,       scale.y, 0,
+    }};
+    return result;
+}
+
+DQN_API Dqn_M2x3 Dqn_M2x3_Rotate(Dqn_f32 radians)
+{
+    Dqn_M2x3 result = {{
+         DQN_COSF(radians), DQN_SINF(radians), 0,
+        -DQN_SINF(radians), DQN_COSF(radians), 0,
+    }};
+    return result;
+}
+
+DQN_API Dqn_M2x3 Dqn_M2x3_Mul(Dqn_M2x3 m1, Dqn_M2x3 m2)
+{
+    // NOTE: Ordinarily you can't multiply M2x3 with M2x3 because column count
+    // (3) != row count (2). We pretend we have two 3x3 matrices with the last
+    // row set to [0 0 1] and perform a 3x3 matrix multiply.
+    //
+    // | (0)a (1)b (2)c |   | (0)g (1)h (2)i |
+    // | (3)d (4)e (5)f | x | (3)j (4)k (5)l |
+    // | (6)0 (7)0 (8)1 |   | (6)0 (7)0 (8)1 |
+
+    Dqn_M2x3 result = {{
+        m1.e[0]*m2.e[0] + m1.e[1]*m2.e[3],           // a*g + b*j + c*0[omitted],
+        m1.e[0]*m2.e[1] + m1.e[1]*m2.e[4],           // a*h + b*k + c*0[omitted],
+        m1.e[0]*m2.e[2] + m1.e[1]*m2.e[5] + m1.e[2], // a*i + b*l + c*1,
+
+        m1.e[3]*m2.e[0] + m1.e[4]*m2.e[3],           // d*g + e*j + f*0[omitted],
+        m1.e[3]*m2.e[1] + m1.e[4]*m2.e[4],           // d*h + e*k + f*0[omitted],
+        m1.e[3]*m2.e[2] + m1.e[4]*m2.e[5] + m1.e[5], // d*i + e*l + f*1,
+    }};
+
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_M2x3_MulV2(Dqn_M2x3 m1, Dqn_V2 v2)
+{
+    // NOTE: Ordinarily you can't multiply M2x3 with V2 because column count (3)
+    // != row count (2). We pretend we have a V3 with `z` set to `1`.
+    //
+    // | (0)a (1)b (2)c |   | x |
+    // | (3)d (4)e (5)f | x | y |
+    //                      | 1 |
+
+    Dqn_V2 result = {{
+        m1.e[0]*v2.x + m1.e[1]*v2.y + m1.e[2], // a*x + b*y + c*1
+        m1.e[3]*v2.x + m1.e[4]*v2.y + m1.e[5], // d*x + e*y + f*1
+    }};
+    return result;
+}
 
 #if !defined(DQN_NO_RECT)
 // NOTE: [$RECT] Dqn_Rect ==========================================================================
@@ -1004,6 +1223,22 @@ DQN_API bool Dqn_Rect_ContainsRect(Dqn_Rect a, Dqn_Rect b)
     Dqn_V2 b_min = b.pos;
     Dqn_V2 b_max = b.pos + b.size;
     bool result = (b_min >= a_min && b_max <= a_max);
+    return result;
+}
+
+DQN_API Dqn_Rect Dqn_Rect_Expand(Dqn_Rect a, Dqn_f32 amount)
+{
+    Dqn_Rect result = a;
+    result.pos  -= amount;
+    result.size += (amount * 2.f);
+    return result;
+}
+
+DQN_API Dqn_Rect Dqn_Rect_ExpandV2(Dqn_Rect a, Dqn_V2 amount)
+{
+    Dqn_Rect result = a;
+    result.pos  -= amount;
+    result.size += (amount * 2.f);
     return result;
 }
 
@@ -1059,6 +1294,12 @@ DQN_API Dqn_RectMinMax Dqn_Rect_MinMax(Dqn_Rect a)
     Dqn_RectMinMax result = {};
     result.min            = a.pos;
     result.max            = a.pos + a.size;
+    return result;
+}
+
+DQN_API Dqn_f32 Dqn_Rect_Area(Dqn_Rect a)
+{
+    Dqn_f32 result = a.size.w * a.size.h;
     return result;
 }
 
@@ -1126,7 +1367,70 @@ DQN_API Dqn_Rect Dqn_RectCut_Cut(Dqn_RectCut rect_cut, Dqn_V2 size, Dqn_RectCutC
     return result;
 }
 
+DQN_API Dqn_V2 Dqn_Rect_InterpolatedPoint(Dqn_Rect rect, Dqn_V2 t01)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(rect.pos.w + (rect.size.w * t01.x),
+                                   rect.pos.h + (rect.size.h * t01.y));
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_Rect_TopLeft(Dqn_Rect rect)
+{
+    Dqn_V2 result = Dqn_Rect_InterpolatedPoint(rect, Dqn_V2_InitNx2(0, 0));
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_Rect_TopRight(Dqn_Rect rect)
+{
+    Dqn_V2 result = Dqn_Rect_InterpolatedPoint(rect, Dqn_V2_InitNx2(1, 0));
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_Rect_BottomLeft(Dqn_Rect rect)
+{
+    Dqn_V2 result = Dqn_Rect_InterpolatedPoint(rect, Dqn_V2_InitNx2(0, 1));
+    return result;
+}
+
+DQN_API Dqn_V2 Dqn_Rect_BottomRight(Dqn_Rect rect)
+{
+    Dqn_V2 result = Dqn_Rect_InterpolatedPoint(rect, Dqn_V2_InitNx2(1, 1));
+    return result;
+}
 #endif // !defined(DQN_NO_RECT)
+
+// NOTE: [$MATH] Raycast ===========================================================================
+
+DQN_API Dqn_RaycastLineIntersectV2Result Dqn_Raycast_LineIntersectV2(Dqn_V2 origin_a, Dqn_V2 dir_a, Dqn_V2 origin_b, Dqn_V2 dir_b)
+{
+    // NOTE: Parametric equation of a line
+    //
+    // p = o + (t*d)
+    //
+    // - o is the starting 2d point
+    // - d is the direction of the line
+    // - t is a scalar that scales along the direction of the point
+    //
+    // To determine if a ray intersections a ray, we want to solve
+    //
+    // (o_a + (t_a * d_a)) = (o_b + (t_b * d_b))
+    //
+    // Where '_a' and '_b' represent the 1st and 2nd point's origin, direction
+    // and 't' components respectively. This is 2 equations with 2 unknowns
+    // (`t_a` and `t_b`) which we can solve for by expressing the equation in
+    // terms of `t_a` and `t_b`.
+    //
+    // Working that math out produces the formula below for 't'.
+
+    Dqn_RaycastLineIntersectV2Result result = {};
+    Dqn_f32 denominator                     = ((dir_b.y * dir_a.x) - (dir_b.x * dir_a.y));
+    if (denominator != 0.0f) {
+        result.t_a = (((origin_a.y - origin_b.y) * dir_b.x) + ((origin_b.x - origin_a.x) * dir_b.y)) / denominator;
+        result.t_b = (((origin_a.y - origin_b.y) * dir_a.x) + ((origin_b.x - origin_a.x) * dir_a.y)) / denominator;
+        result.hit = true;
+    }
+    return result;
+}
 
 // NOTE: [$MATH] Other =============================================================================
 DQN_API Dqn_V2 Dqn_Lerp_V2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b)

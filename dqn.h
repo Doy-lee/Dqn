@@ -41,7 +41,7 @@
     defined(DQN_ONLY_SLICE)        || \
     defined(DQN_ONLY_DSMAP)        || \
     defined(DQN_ONLY_LIST)         || \
-    defined(DQN_ONLY_FSTRING8)     || \
+    defined(DQN_ONLY_FSTR8)        || \
     defined(DQN_ONLY_FS)           || \
     defined(DQN_ONLY_WINNET)       || \
     defined(DQN_ONLY_WIN)          || \
@@ -72,8 +72,8 @@
     #if !defined(DQN_ONLY_LIST)
     #define DQN_NO_LIST
     #endif
-    #if !defined(DQN_ONLY_FSTRING8)
-    #define DQN_NO_FSTRING8
+    #if !defined(DQN_ONLY_FSTR8)
+    #define DQN_NO_FSTR8
     #endif
     #if !defined(DQN_ONLY_FS)
     #define DQN_NO_FS
@@ -202,11 +202,18 @@
 // [$ACAT] Dqn_ArenaCatalog   |                             | Collate, create & manage arenas in a catalog
 #include "dqn_memory.h"
 
+// NOTE: Dqn_Debug =================================================================================
+// [$DEBM] Debug Macros       |                             |
+// [$ASAN] Dqn_Asan           |                             | Helpers to manually poison memory using ASAN
+// [$STKT] Dqn_StackTrace     |                             | Create stack traces
+// [$DEBG] Dqn_Debug          |                             | Debugging tools/helpers
+#include "dqn_debug.h"
+
 // NOTE: Dqn_Strings ===============================================================================
-// [$CSTR] Dqn_CString8       |                             | C-string helpers
-// [$STR8] Dqn_String8        |                             | Pointer and length strings
-// [$FSTR] Dqn_FString8       | DQN_FSTRING8                | Fixed-size strings
-// [$STRB] Dqn_String8Builder |                             |
+// [$CSTR] Dqn_CStr8          |                             | C-string helpers
+// [$STR8] Dqn_Str8           |                             | Pointer and length strings
+// [$FSTR] Dqn_FStr8          | DQN_FSTr8                   | Fixed-size strings
+// [$STRB] Dqn_Str8Builder    |                             |
 // [$CHAR] Dqn_Char           |                             | Character ascii/digit.. helpers
 // [$UTFX] Dqn_UTF            |                             | Unicode helpers
 #include "dqn_strings.h"
@@ -220,13 +227,6 @@
 // [$DMAP] Dqn_DSMap          | DQN_DSMAP                   | Hashtable, 70% max load, PoT size, linear probe, chain repair
 // [$LIST] Dqn_List           | DQN_LIST                    | Chunked linked lists, append only
 #include "dqn_containers.h"
-
-// NOTE: Dqn_Debug =================================================================================
-// [$DEBM] Debug Macros       |                             |
-// [$ASAN] Dqn_Asan           |                             | Helpers to manually poison memory using ASAN
-// [$STKT] Dqn_StackTrace     |                             | Create stack traces
-// [$DEBG] Dqn_Debug          |                             | Debugging tools/helpers
-#include "dqn_debug.h"
 
 // NOTE: Additional Configuration
 // - Override the default break into the active debugger function. By default
@@ -285,6 +285,10 @@
 // [$TCTX] Dqn_ThreadContext  |                             | Per-thread data structure e.g. temp arenas
 #include "dqn_platform.h"
 
+// NOTE: Dqn_OS ====================================================================================
+// [$EXEC] Dqn_OSExec         |                             | Execute programs programatically
+#include "dqn_os.h"
+
 // NOTE: Dqn_Math ==================================================================================
 // [$VEC2] Dqn_V2, V2i        | DQN_V2                      |
 // [$VEC3] Dqn_V3, V3i        | DQN_V3                      |
@@ -300,6 +304,7 @@
 #include "dqn_hash.h"
 
 // NOTE: Dqn_Helpers ===============================================================================
+// [$PCG3] Dqn_PCG32          |                             | RNG from the PCG family
 // [$JSON] Dqn_JSONBuilder    | DQN_JSON_BUILDER            | Construct json output
 // [$BHEX] Dqn_Bin            | DQN_BIN                     | Binary <-> hex helpers
 // [$BSEA] Dqn_BinarySearch   |                             | Binary search
@@ -319,6 +324,7 @@
 #include "dqn_strings.cpp"
 #include "dqn_containers.cpp"
 #include "dqn_platform.cpp"
+#include "dqn_os.cpp"
 #include "dqn_math.cpp"
 #include "dqn_hash.cpp"
 #include "dqn_helpers.cpp"

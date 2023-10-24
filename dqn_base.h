@@ -39,10 +39,14 @@
 
 #if defined(_WIN32)
     #define DQN_OS_WIN32
-#elif defined(__aarch64__) || defined(_M_ARM64)
-    #define DQN_OS_ARM64
 #elif defined(__linux__)
     #define DQN_OS_UNIX
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+    #define DQN_PLATFORM_ARM64
+#elif defined(__EMSCRIPTEN__)
+    #define DQN_PLATFORM_EMSCRIPTEN
 #endif
 
 #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
@@ -54,12 +58,12 @@
 #endif
 
 #if defined(DQN_COMPILER_MSVC)
-    #define DQN_FMT_STRING_ANNOTATE _Printf_format_string_
+    #define DQN_FMT_ATTRIB _Printf_format_string_
     #define DQN_MSVC_WARNING_PUSH __pragma(warning(push))
     #define DQN_MSVC_WARNING_DISABLE(...) __pragma(warning(disable: ##__VA_ARGS__))
     #define DQN_MSVC_WARNING_POP __pragma(warning(pop))
 #else
-    #define DQN_FMT_STRING_ANNOTATE
+    #define DQN_FMT_ATTRIB
     #define DQN_MSVC_WARNING_PUSH
     #define DQN_MSVC_WARNING_DISABLE(...)
     #define DQN_MSVC_WARNING_POP
@@ -67,8 +71,9 @@
 
 #if defined(DQN_COMPILER_CLANG) || defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG_CL)
     #define DQN_GCC_WARNING_PUSH _Pragma("GCC diagnostic push")
-    #define DQN_GCC_WARNING_DISABLE(warning) DQN_GCC_WARNING_DISABLE_HELPER(GCC diagnostic ignored warning)
-    #define DQN_GCC_WARNING_DISABLE_HELPER(warning) _Pragma(#warning)
+    #define DQN_GCC_WARNING_DISABLE_HELPER_0(x) #x
+    #define DQN_GCC_WARNING_DISABLE_HELPER_1(y) DQN_GCC_WARNING_DISABLE_HELPER_0(GCC diagnostic ignored #y)
+    #define DQN_GCC_WARNING_DISABLE(warning) _Pragma(DQN_GCC_WARNING_DISABLE_HELPER_1(warning))
     #define DQN_GCC_WARNING_POP _Pragma("GCC diagnostic pop")
 #else
     #define DQN_GCC_WARNING_PUSH
@@ -87,11 +92,19 @@
 
 // NOTE: Alloc Macros ==============================================================================
 #if !defined(DQN_ALLOC)
-    #define DQN_ALLOC(size) Dqn_VMem_Reserve(size, Dqn_VMemCommit_Yes, Dqn_VMemPage_ReadWrite)
+    #if defined(DQN_PLATFORM_EMSCRIPTEN)
+        #define DQN_ALLOC(size) malloc(size)
+    #else
+        #define DQN_ALLOC(size) Dqn_VMem_Reserve(size, Dqn_VMemCommit_Yes, Dqn_VMemPage_ReadWrite)
+    #endif
 #endif
 
 #if !defined(DQN_DEALLOC)
-    #define DQN_DEALLOC(ptr, size) Dqn_VMem_Release(ptr, size)
+    #if defined(DQN_PLATFORM_EMSCRIPTEN)
+        #define DQN_DEALLOC(ptr, size) free(ptr)
+    #else
+        #define DQN_DEALLOC(ptr, size) Dqn_VMem_Release(ptr, size)
+    #endif
 #endif
 
 // NOTE: String.h Dependencies =====================================================================
@@ -124,6 +137,10 @@
     #if !defined(DQN_TANF)
         #define DQN_TANF(val) tanf(val)
     #endif
+#endif
+
+#if !defined(DQN_OS_WIN32)
+#include <stdlib.h> // exit()
 #endif
 
 // NOTE: Math Macros ===============================================================================
@@ -206,11 +223,11 @@
 
 // NOTE: Assert Macros =============================================================================
 #define DQN_HARD_ASSERT(expr) DQN_HARD_ASSERTF(expr, "")
-#define DQN_HARD_ASSERTF(expr, fmt, ...)                                         \
-    if (!(expr)) {                                                               \
-        Dqn_Log_ErrorF("Hard assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
-        Dqn_StackTrace_Print(128 /*limit*/);                                     \
-        DQN_DEBUG_BREAK;                                                         \
+#define DQN_HARD_ASSERTF(expr, fmt, ...)                                           \
+    if (!(expr)) {                                                                 \
+        Dqn_Log_ErrorF("Hard assert triggered [" #expr "]. " fmt, ##__VA_ARGS__);  \
+        Dqn_StackTrace_Print(128 /*limit*/);                                       \
+        DQN_DEBUG_BREAK;                                                           \
     }
 
 #if defined(DQN_NO_ASSERT)
@@ -218,11 +235,11 @@
     #define DQN_ASSERT(...)
 #else
     #define DQN_ASSERT(expr) DQN_ASSERTF(expr, "")
-    #define DQN_ASSERTF(expr, fmt, ...)                                         \
-        if (!(expr)) {                                                          \
-            Dqn_Log_ErrorF("Assert triggered " #expr ". " fmt, ##__VA_ARGS__);  \
-            Dqn_StackTrace_Print(128 /*limit*/);                                \
-            DQN_DEBUG_BREAK;                                                    \
+    #define DQN_ASSERTF(expr, fmt, ...)                                           \
+        if (!(expr)) {                                                            \
+            Dqn_Log_ErrorF("Assert triggered [" #expr "]. " fmt, ##__VA_ARGS__);  \
+            Dqn_StackTrace_Print(128 /*limit*/);                                  \
+            DQN_DEBUG_BREAK;                                                      \
         }
 #endif
 
@@ -308,6 +325,10 @@ typedef double       Dqn_f64;
 typedef unsigned int Dqn_uint;
 typedef int32_t      Dqn_b32;
 
+#define DQN_F32_MAX   3.402823466e+38F
+#define DQN_F32_MIN   1.175494351e-38F
+#define DQN_F64_MAX   1.7976931348623158e+308
+#define DQN_F64_MIN   2.2250738585072014e-308
 #define DQN_USIZE_MAX UINTPTR_MAX
 #define DQN_ISIZE_MAX INTPTR_MAX
 #define DQN_ISIZE_MIN INTPTR_MIN
@@ -318,7 +339,7 @@ enum Dqn_ZeroMem
     Dqn_ZeroMem_Yes, // Memory should be zero-ed out before giving to the callee
 };
 
-struct Dqn_String8
+struct Dqn_Str8
 {
     char      *data; // The bytes of the string
     Dqn_usize  size; // The number of bytes in the string
@@ -329,14 +350,27 @@ struct Dqn_String8
     char       *end  ()       { return data + size; }
 };
 
+#if !defined(DQN_NO_SLICE)
+template <typename T> struct Dqn_Slice // A pointer and length container of data
+{
+    T         *data;
+    Dqn_usize  size;
+
+    T       *begin()       { return data; }
+    T       *end  ()       { return data + size; }
+    T const *begin() const { return data; }
+    T const *end  () const { return data + size; }
+};
+#endif
+
 // NOTE: [$CALL] Dqn_CallSite ======================================================================
 struct Dqn_CallSite
 {
-    Dqn_String8  file;
-    Dqn_String8  function;
+    Dqn_Str8     file;
+    Dqn_Str8     function;
     unsigned int line;
 };
-#define DQN_CALL_SITE Dqn_CallSite{DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__}
+#define DQN_CALL_SITE Dqn_CallSite{DQN_STR8(__FILE__), DQN_STR8(__func__), __LINE__}
 
 // NOTE: [$INTR] Intrinsics ========================================================================
 // Platform agnostic functions for CPU level instructions like atomics, barriers
@@ -367,9 +401,12 @@ struct Dqn_CallSite
     #define Dqn_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
 #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
     #if defined(__ANDROID__)
+    #elif defined(DQN_PLATFORM_EMSCRIPTEN)
+        #include <emmintrin.h>
     #else
         #include <x86intrin.h>
     #endif
+
     #define Dqn_Atomic_AddU32(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_AddU64(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_SubU32(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
@@ -417,14 +454,14 @@ DQN_FORCE_INLINE long Dqn_Atomic_SetValue32(long volatile *target, long value)
     #endif
 }
 
-#if !defined(DQN_OS_ARM64)
+#if !defined(DQN_PLATFORM_ARM64)
 struct Dqn_CPUIDRegisters
 {
     Dqn_uint array[4]; ///< Values from 'CPUID' instruction for each register (EAX, EBX, ECX, EDX)
 };
 
 Dqn_CPUIDRegisters Dqn_CPUID(int function_id);
-#endif // DQN_OS_ARM64
+#endif // DQN_PLATFORM_ARM64
 
 // NOTE: [$TMUT] Dqn_TicketMutex ===================================================================
 //
@@ -562,40 +599,40 @@ DQN_API Dqn_PrintStyle Dqn_Print_StyleBold         ();
 
 
 // NOTE: Print =====================================================================================
-DQN_API void           Dqn_Print_Std               (Dqn_PrintStd std_handle, Dqn_String8 string);
-DQN_API void           Dqn_Print_StdF              (Dqn_PrintStd std_handle, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
-DQN_API void           Dqn_Print_StdFV             (Dqn_PrintStd std_handle, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
+DQN_API void           Dqn_Print_Std               (Dqn_PrintStd std_handle, Dqn_Str8 string);
+DQN_API void           Dqn_Print_StdF              (Dqn_PrintStd std_handle, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API void           Dqn_Print_StdFV             (Dqn_PrintStd std_handle, DQN_FMT_ATTRIB char const *fmt, va_list args);
 
-DQN_API void           Dqn_Print_StdStyle          (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_String8 string);
-DQN_API void           Dqn_Print_StdFStyle         (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
-DQN_API void           Dqn_Print_StdFVStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
+DQN_API void           Dqn_Print_StdStyle          (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_Str8 string);
+DQN_API void           Dqn_Print_StdFStyle         (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API void           Dqn_Print_StdFVStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_ATTRIB char const *fmt, va_list args);
 
-DQN_API void           Dqn_Print_StdLn             (Dqn_PrintStd std_handle, Dqn_String8 string);
-DQN_API void           Dqn_Print_StdLnF            (Dqn_PrintStd std_handle, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
-DQN_API void           Dqn_Print_StdLnFV           (Dqn_PrintStd std_handle, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
+DQN_API void           Dqn_Print_StdLn             (Dqn_PrintStd std_handle, Dqn_Str8 string);
+DQN_API void           Dqn_Print_StdLnF            (Dqn_PrintStd std_handle, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API void           Dqn_Print_StdLnFV           (Dqn_PrintStd std_handle, DQN_FMT_ATTRIB char const *fmt, va_list args);
 
-DQN_API void           Dqn_Print_StdLnStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_String8 string);
-DQN_API void           Dqn_Print_StdLnFStyle       (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
-DQN_API void           Dqn_Print_StdLnFVStyle      (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
+DQN_API void           Dqn_Print_StdLnStyle        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_Str8 string);
+DQN_API void           Dqn_Print_StdLnFStyle       (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API void           Dqn_Print_StdLnFVStyle      (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_ATTRIB char const *fmt, va_list args);
 
 // NOTE: ANSI Formatting Codes =====================================================================
-Dqn_String8            Dqn_Print_ESCColourString   (Dqn_PrintESCColour colour, uint8_t r, uint8_t g, uint8_t b);
-Dqn_String8            Dqn_Print_ESCColourU32String(Dqn_PrintESCColour colour, uint32_t value);
+Dqn_Str8               Dqn_Print_ESCColourStr8   (Dqn_PrintESCColour colour, uint8_t r, uint8_t g, uint8_t b);
+Dqn_Str8               Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour colour, uint32_t value);
 
-#define                Dqn_Print_ESCColourFgString(r, g, b)  Dqn_Print_ESCColourString(Dqn_PrintESCColour_Fg, r, g, b)
-#define                Dqn_Print_ESCColourBgString(r, g, b)  Dqn_Print_ESCColourString(Dqn_PrintESCColour_Bg, r, g, b)
-#define                Dqn_Print_ESCColourFg(r, g, b)        Dqn_Print_ESCColourString(Dqn_PrintESCColour_Fg, r, g, b).data
-#define                Dqn_Print_ESCColourBg(r, g, b)        Dqn_Print_ESCColourString(Dqn_PrintESCColour_Bg, r, g, b).data
+#define                Dqn_Print_ESCColourFgStr8(r, g, b)  Dqn_Print_ESCColourStr8(Dqn_PrintESCColour_Fg, r, g, b)
+#define                Dqn_Print_ESCColourBgStr8(r, g, b)  Dqn_Print_ESCColourStr8(Dqn_PrintESCColour_Bg, r, g, b)
+#define                Dqn_Print_ESCColourFg(r, g, b)      Dqn_Print_ESCColourStr8(Dqn_PrintESCColour_Fg, r, g, b).data
+#define                Dqn_Print_ESCColourBg(r, g, b)      Dqn_Print_ESCColourStr8(Dqn_PrintESCColour_Bg, r, g, b).data
 
-#define                Dqn_Print_ESCColourFgU32String(value) Dqn_Print_ESCColourU32String(Dqn_PrintESCColour_Fg, value)
-#define                Dqn_Print_ESCColourBgU32String(value) Dqn_Print_ESCColourU32String(Dqn_PrintESCColour_Bg, value)
-#define                Dqn_Print_ESCColourFgU32(value)       Dqn_Print_ESCColourU32String(Dqn_PrintESCColour_Fg, value).data
-#define                Dqn_Print_ESCColourBgU32(value)       Dqn_Print_ESCColourU32String(Dqn_PrintESCColour_Bg, value).data
+#define                Dqn_Print_ESCColourFgU32Str8(value) Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour_Fg, value)
+#define                Dqn_Print_ESCColourBgU32Str8(value) Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour_Bg, value)
+#define                Dqn_Print_ESCColourFgU32(value)     Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour_Fg, value).data
+#define                Dqn_Print_ESCColourBgU32(value)     Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour_Bg, value).data
 
-#define                Dqn_Print_ESCReset                    "\x1b[0m"
-#define                Dqn_Print_ESCBold                     "\x1b[1m"
-#define                Dqn_Print_ESCResetString              DQN_STRING8(Dqn_Print_ESCReset)
-#define                Dqn_Print_ESCBoldString               DQN_STRING8(Dqn_Print_ESCBold)
+#define                Dqn_Print_ESCReset                  "\x1b[0m"
+#define                Dqn_Print_ESCBold                   "\x1b[1m"
+#define                Dqn_Print_ESCResetStr8              DQN_STR8(Dqn_Print_ESCReset)
+#define                Dqn_Print_ESCBoldStr8               DQN_STR8(Dqn_Print_ESCBold)
 
 // NOTE: [$LLOG] Dqn_Log  ==========================================================================
 // NOTE: API
@@ -623,7 +660,7 @@ enum Dqn_LogType
 #define Dqn_LogTypeColourU32_Warning 0xff'ff'00'ff // Yellow
 #define Dqn_LogTypeColourU32_Error   0xff'00'00'ff // Red
 
-typedef void Dqn_LogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list va);
+typedef void Dqn_LogProc(Dqn_Str8 type, int log_type, void *user_data, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, va_list va);
 
 #define Dqn_Log_DebugF(fmt, ...)        Dqn_Log_TypeFCallSite(Dqn_LogType_Debug, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
 #define Dqn_Log_InfoF(fmt, ...)         Dqn_Log_TypeFCallSite(Dqn_LogType_Info, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
@@ -641,8 +678,8 @@ typedef void Dqn_LogProc(Dqn_String8 type, int log_type, void *user_data, Dqn_Ca
 #define Dqn_Log_FV(type, fmt, args)     Dqn_Log_FVCallSite(type, DQN_CALL_SITE, fmt, args)
 #define Dqn_Log_F(type, fmt, ...)       Dqn_Log_FCallSite(type, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
 
-DQN_API Dqn_String8 Dqn_Log_MakeString    (Dqn_Allocator allocator, bool colour, Dqn_String8 type, int log_type, Dqn_CallSite call_site, char const *fmt, va_list args);
-DQN_API void        Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list va);
-DQN_API void        Dqn_Log_TypeFCallSite (Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
-DQN_API void        Dqn_Log_FVCallSite    (Dqn_String8 type, Dqn_CallSite call_site, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list va);
-DQN_API void        Dqn_Log_FCallSite     (Dqn_String8 type, Dqn_CallSite call_site, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API Dqn_Str8 Dqn_Log_MakeStr8      (Dqn_Allocator allocator, bool colour, Dqn_Str8 type, int log_type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DQN_API void     Dqn_Log_TypeFVCallSite(Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, va_list va);
+DQN_API void     Dqn_Log_TypeFCallSite (Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API void     Dqn_Log_FVCallSite    (Dqn_Str8 type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, va_list va);
+DQN_API void     Dqn_Log_FCallSite     (Dqn_Str8 type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, ...);

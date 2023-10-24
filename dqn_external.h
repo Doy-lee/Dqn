@@ -1,16 +1,21 @@
 // NOTE: [$OS_H] OS Headers ========================================================================
-#if defined(DQN_OS_UNIX)
+#if defined(DQN_OS_UNIX) || defined(DQN_PLATFORM_EMSCRIPTEN)
     #include <errno.h>        // errno
     #include <fcntl.h>        // O_RDONLY ... etc
-    #include <linux/fs.h>     // FICLONE
     #include <sys/ioctl.h>    // ioctl
     #include <sys/types.h>    // pid_t
+    #include <sys/wait.h>     // waitpid
     #include <sys/random.h>   // getrandom
     #include <sys/stat.h>     // stat
-    #include <sys/sendfile.h> // sendfile
     #include <sys/mman.h>     // mmap
     #include <time.h>         // clock_gettime, nanosleep
-    #include <unistd.h>       // access, gettid
+    #include <unistd.h>       // access, gettid, write
+
+    #if defined(DQN_PLATFORM_EMSCRIPTEN)
+    #else
+    #include <sys/sendfile.h> // sendfile
+    #include <linux/fs.h>     // FICLONE
+    #endif
 #endif
 
 // NOTE: [$STBS] stb_sprintf =======================================================================

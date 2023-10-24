@@ -1,3 +1,79 @@
+// NOTE: [$PCGX] Dqn_PCG32 =========================================================================
+#define DQN_PCG_DEFAULT_MULTIPLIER_64 6364136223846793005ULL
+#define DQN_PCG_DEFAULT_INCREMENT_64  1442695040888963407ULL
+
+DQN_API uint32_t Dqn_PCG32_Next(Dqn_PCG32 *rng)
+{
+    uint64_t state = rng->state;
+    rng->state     = state * DQN_PCG_DEFAULT_MULTIPLIER_64 + DQN_PCG_DEFAULT_INCREMENT_64;
+
+    // XSH-RR
+    uint32_t value = (uint32_t)((state ^ (state >> 18)) >> 27);
+    int      rot   = state >> 59;
+    return rot ? (value >> rot) | (value << (32 - rot)) : value;
+}
+
+DQN_API uint64_t Dqn_PCG32_Next64(Dqn_PCG32 *rng)
+{
+    uint64_t value = Dqn_PCG32_Next(rng);
+    value <<= 32;
+    value |= Dqn_PCG32_Next(rng);
+    return value;
+}
+
+DQN_API uint32_t Dqn_PCG32_Range(Dqn_PCG32 *rng, uint32_t low, uint32_t high)
+{
+    uint32_t bound     = high - low;
+    uint32_t threshold = -(int32_t)bound % bound;
+
+    for (;;) {
+        uint32_t r = Dqn_PCG32_Next(rng);
+        if (r >= threshold)
+            return low + (r % bound);
+    }
+}
+
+DQN_API float Dqn_PCG32_NextF32(Dqn_PCG32 *rng)
+{
+    uint32_t x = Dqn_PCG32_Next(rng);
+    return (float)(int32_t)(x >> 8) * 0x1.0p-24f;
+}
+
+DQN_API double Dqn_PCG32_NextF64(Dqn_PCG32 *rng)
+{
+    uint64_t x = Dqn_PCG32_Next64(rng);
+    return (double)(int64_t)(x >> 11) * 0x1.0p-53;
+}
+
+DQN_API void Dqn_PCG32_Seed(Dqn_PCG32 *rng, uint64_t seed)
+{
+    rng->state = 0ULL;
+    Dqn_PCG32_Next(rng);
+    rng->state += seed;
+    Dqn_PCG32_Next(rng);
+}
+
+DQN_API void Dqn_PCG32_Advance(Dqn_PCG32 *rng, uint64_t delta)
+{
+    uint64_t cur_mult = DQN_PCG_DEFAULT_MULTIPLIER_64;
+    uint64_t cur_plus = DQN_PCG_DEFAULT_INCREMENT_64;
+
+    uint64_t acc_mult = 1;
+    uint64_t acc_plus = 0;
+
+    while (delta != 0) {
+        if (delta & 1) {
+            acc_mult *= cur_mult;
+            acc_plus = acc_plus * cur_mult + cur_plus;
+        }
+        cur_plus = (cur_mult + 1) * cur_plus;
+        cur_mult *= cur_mult;
+        delta >>= 1;
+    }
+
+    rng->state = acc_mult * rng->state + acc_plus;
+}
+
 #if !defined(DQN_NO_JSON_BUILDER)
 // NOTE: [$JSON] Dqn_JSONBuilder ===================================================================
 DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces_per_indent)
@@ -8,13 +84,13 @@ DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init(Dqn_Allocator allocator, int spaces
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder const *builder, Dqn_Allocator allocator)
+DQN_API Dqn_Str8 Dqn_JSONBuilder_Build(Dqn_JSONBuilder const *builder, Dqn_Allocator allocator)
 {
-    Dqn_String8 result = Dqn_String8Builder_Build(&builder->string_builder, allocator);
+    Dqn_Str8 result = Dqn_Str8Builder_Build(&builder->string_builder, allocator);
     return result;
 }
 
-DQN_API void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
+DQN_API void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value)
 {
     if (key.size == 0 && value.size == 0)
         return;
@@ -47,18 +123,18 @@ DQN_API void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key,
     int spaces            = builder->indent_level * spaces_per_indent;
 
     if (key.size) {
-        Dqn_String8Builder_AppendF(&builder->string_builder,
+        Dqn_Str8Builder_AppendF(&builder->string_builder,
                                    "%.*s%*c\"%.*s\": %.*s",
                                    prefix_size, prefix,
                                    spaces, ' ',
-                                   DQN_STRING_FMT(key),
-                                   DQN_STRING_FMT(value));
+                                   DQN_STR_FMT(key),
+                                   DQN_STR_FMT(value));
     } else {
-        Dqn_String8Builder_AppendF(&builder->string_builder,
+        Dqn_Str8Builder_AppendF(&builder->string_builder,
                                    "%.*s%*c%.*s",
                                    prefix_size, prefix,
                                    spaces, ' ',
-                                   DQN_STRING_FMT(value));
+                                   DQN_STR_FMT(value));
     }
 
     if (item == Dqn_JSONBuilderItem_OpenContainer)
@@ -67,14 +143,14 @@ DQN_API void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_String8 key,
     builder->last_item = item;
 }
 
-DQN_API void Dqn_JSONBuilder_KeyValueFV(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, va_list args)
+DQN_API void Dqn_JSONBuilder_KeyValueFV(Dqn_JSONBuilder *builder, Dqn_Str8 key, char const *value_fmt, va_list args)
 {
     Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(builder->string_builder.allocator.user_context);
-    Dqn_String8 value         = Dqn_String8_InitFV(scratch.allocator, value_fmt, args);
+    Dqn_Str8          value   = Dqn_Str8_InitFV(scratch.allocator, value_fmt, args);
     Dqn_JSONBuilder_KeyValue(builder, key, value);
 }
 
-DQN_API void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_String8 key, char const *value_fmt, ...)
+DQN_API void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_Str8 key, char const *value_fmt, ...)
 {
     va_list args;
     va_start(args, value_fmt);
@@ -82,47 +158,47 @@ DQN_API void Dqn_JSONBuilder_KeyValueF(Dqn_JSONBuilder *builder, Dqn_String8 key
     va_end(args);
 }
 
-DQN_API void Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
+DQN_API void Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_Str8 name)
 {
-    Dqn_JSONBuilder_KeyValue(builder, name, DQN_STRING8("{"));
+    Dqn_JSONBuilder_KeyValue(builder, name, DQN_STR8("{"));
 }
 
 DQN_API void Dqn_JSONBuilder_ObjectEnd(Dqn_JSONBuilder *builder)
 {
-    Dqn_JSONBuilder_KeyValue(builder, DQN_STRING8(""), DQN_STRING8("}"));
+    Dqn_JSONBuilder_KeyValue(builder, DQN_STR8(""), DQN_STR8("}"));
 }
 
-DQN_API void Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_String8 name)
+DQN_API void Dqn_JSONBuilder_ArrayBeginNamed(Dqn_JSONBuilder *builder, Dqn_Str8 name)
 {
-    Dqn_JSONBuilder_KeyValue(builder, name, DQN_STRING8("["));
+    Dqn_JSONBuilder_KeyValue(builder, name, DQN_STR8("["));
 }
 
 DQN_API void Dqn_JSONBuilder_ArrayEnd(Dqn_JSONBuilder *builder)
 {
-    Dqn_JSONBuilder_KeyValue(builder, DQN_STRING8(""), DQN_STRING8("]"));
+    Dqn_JSONBuilder_KeyValue(builder, DQN_STR8(""), DQN_STR8("]"));
 }
 
-DQN_API void Dqn_JSONBuilder_StringNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
+DQN_API void Dqn_JSONBuilder_StrNamed(Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value)
 {
     Dqn_JSONBuilder_KeyValueF(builder, key, "\"%.*s\"", value.size, value.data);
 }
 
-DQN_API void Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, Dqn_String8 value)
+DQN_API void Dqn_JSONBuilder_LiteralNamed(Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value)
 {
     Dqn_JSONBuilder_KeyValueF(builder, key, "%.*s", value.size, value.data);
 }
 
-DQN_API void Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, uint64_t value)
+DQN_API void Dqn_JSONBuilder_U64Named(Dqn_JSONBuilder *builder, Dqn_Str8 key, uint64_t value)
 {
     Dqn_JSONBuilder_KeyValueF(builder, key, "%I64u", value);
 }
 
-DQN_API void Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, int64_t value)
+DQN_API void Dqn_JSONBuilder_I64Named(Dqn_JSONBuilder *builder, Dqn_Str8 key, int64_t value)
 {
     Dqn_JSONBuilder_KeyValueF(builder, key, "%I64d", value);
 }
 
-DQN_API void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key, double value, int decimal_places)
+DQN_API void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_Str8 key, double value, int decimal_places)
 {
     if (!builder)
         return;
@@ -150,9 +226,9 @@ DQN_API void Dqn_JSONBuilder_F64Named(Dqn_JSONBuilder *builder, Dqn_String8 key,
     Dqn_JSONBuilder_KeyValueF(builder, key, fmt, value);
 }
 
-DQN_API void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key, bool value)
+DQN_API void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_Str8 key, bool value)
 {
-    Dqn_String8 value_string = value ? DQN_STRING8("true") : DQN_STRING8("false");
+    Dqn_Str8 value_string = value ? DQN_STR8("true") : DQN_STR8("false");
     Dqn_JSONBuilder_KeyValueF(builder, key, "%.*s", value_string.size, value_string.data);
 }
 #endif // !defined(DQN_NO_JSON_BUILDER)
@@ -161,32 +237,32 @@ DQN_API void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_String8 key
 // NOTE: [$BHEX] Dqn_Bin ===========================================================================
 DQN_API char const *Dqn_Bin_HexBufferTrim0x(char const *hex, Dqn_usize size, Dqn_usize *real_size)
 {
-    Dqn_String8 result = Dqn_String8_TrimWhitespaceAround(Dqn_String8_Init(hex, size));
-    result             = Dqn_String8_TrimPrefix(result, DQN_STRING8("0x"), Dqn_String8EqCase_Insensitive);
+    Dqn_Str8 result = Dqn_Str8_TrimWhitespaceAround(Dqn_Str8_Init(hex, size));
+    result          = Dqn_Str8_TrimPrefix(result, DQN_STR8("0x"), Dqn_Str8EqCase_Insensitive);
     if (real_size)
         *real_size = result.size;
     return result.data;
 }
 
-DQN_API Dqn_String8 Dqn_Bin_HexTrim0x(Dqn_String8 string)
+DQN_API Dqn_Str8 Dqn_Bin_HexTrim0x(Dqn_Str8 string)
 {
-    Dqn_usize trimmed_size = 0;
-    char const *trimmed    = Dqn_Bin_HexBufferTrim0x(string.data, string.size, &trimmed_size);
-    Dqn_String8 result     = Dqn_String8_Init(trimmed, trimmed_size);
+    Dqn_usize   trimmed_size = 0;
+    char const *trimmed      = Dqn_Bin_HexBufferTrim0x(string.data, string.size, &trimmed_size);
+    Dqn_Str8    result       = Dqn_Str8_Init(trimmed, trimmed_size);
     return result;
 }
 
-DQN_API Dqn_BinHexU64String Dqn_Bin_U64ToHexU64String(uint64_t number, uint32_t flags)
+DQN_API Dqn_BinHexU64Str8 Dqn_Bin_U64ToHexU64Str8(uint64_t number, uint32_t flags)
 {
-    Dqn_String8 prefix = {};
-    if (!(flags & Dqn_BinHexU64StringFlags_No0xPrefix))
-        prefix = DQN_STRING8("0x");
+    Dqn_Str8 prefix = {};
+    if (!(flags & Dqn_BinHexU64Str8Flags_No0xPrefix))
+        prefix = DQN_STR8("0x");
 
-    Dqn_BinHexU64String result = {};
+    Dqn_BinHexU64Str8 result = {};
     DQN_MEMCPY(result.data, prefix.data, prefix.size);
     result.size += DQN_CAST(int8_t)prefix.size;
 
-    char const *fmt = (flags & Dqn_BinHexU64StringFlags_UppercaseHex) ? "%I64X" : "%I64x";
+    char const *fmt = (flags & Dqn_BinHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
     int size        = STB_SPRINTF_DECORATE(snprintf)(result.data + result.size, DQN_ARRAY_UCOUNT(result.data) - result.size, fmt, number);
     result.size    += DQN_CAST(uint8_t)size;
     DQN_ASSERT(result.size < DQN_ARRAY_UCOUNT(result.data));
@@ -198,17 +274,17 @@ DQN_API Dqn_BinHexU64String Dqn_Bin_U64ToHexU64String(uint64_t number, uint32_t 
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Bin_U64ToHex(Dqn_Allocator allocator, uint64_t number, uint32_t flags)
+DQN_API Dqn_Str8 Dqn_Bin_U64ToHex(Dqn_Allocator allocator, uint64_t number, uint32_t flags)
 {
-    Dqn_String8 prefix = {};
-    if (!(flags & Dqn_BinHexU64StringFlags_No0xPrefix))
-        prefix = DQN_STRING8("0x");
+    Dqn_Str8 prefix = {};
+    if (!(flags & Dqn_BinHexU64Str8Flags_No0xPrefix))
+        prefix = DQN_STR8("0x");
 
-    char const *fmt         = (flags & Dqn_BinHexU64StringFlags_UppercaseHex) ? "%I64X" : "%I64x";
-    Dqn_usize required_size = Dqn_CString8_FSize(fmt, number) + prefix.size;
-    Dqn_String8 result      = Dqn_String8_Allocate(allocator, required_size, Dqn_ZeroMem_No);
+    char const *fmt         = (flags & Dqn_BinHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
+    Dqn_usize required_size = Dqn_CStr8_FSize(fmt, number) + prefix.size;
+    Dqn_Str8 result         = Dqn_Str8_Allocate(allocator, required_size, Dqn_ZeroMem_No);
 
-    if (Dqn_String8_IsValid(result)) {
+    if (Dqn_Str8_IsValid(result)) {
         DQN_MEMCPY(result.data, prefix.data, prefix.size);
         int space = DQN_CAST(int)DQN_MAX((result.size - prefix.size) + 1, 0); /*null-terminator*/
         STB_SPRINTF_DECORATE(snprintf)(result.data + prefix.size, space, fmt, number);
@@ -241,7 +317,7 @@ DQN_API uint64_t Dqn_Bin_HexBufferToU64(char const *hex, Dqn_usize size)
     return result;
 }
 
-DQN_API uint64_t Dqn_Bin_HexToU64(Dqn_String8 hex)
+DQN_API uint64_t Dqn_Bin_HexToU64(Dqn_Str8 hex)
 {
     uint64_t result = Dqn_Bin_HexBufferToU64(hex.data, hex.size);
     return result;
@@ -279,9 +355,9 @@ DQN_API char *Dqn_Bin_BytesToHexBufferArena(Dqn_Arena *arena, void const *src, D
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Bin_BytesToHexArena(Dqn_Arena *arena, void const *src, Dqn_usize size)
+DQN_API Dqn_Str8 Dqn_Bin_BytesToHexArena(Dqn_Arena *arena, void const *src, Dqn_usize size)
 {
-    Dqn_String8 result = {};
+    Dqn_Str8 result = {};
     result.data        = Dqn_Bin_BytesToHexBufferArena(arena, src, size);
     if (result.data)
         result.size = size * 2;
@@ -346,13 +422,13 @@ DQN_API Dqn_usize Dqn_Bin_HexBufferToBytesUnchecked(char const *hex, Dqn_usize h
     return result;
 }
 
-DQN_API Dqn_usize Dqn_Bin_HexToBytesUnchecked(Dqn_String8 hex, void *dest, Dqn_usize dest_size)
+DQN_API Dqn_usize Dqn_Bin_HexToBytesUnchecked(Dqn_Str8 hex, void *dest, Dqn_usize dest_size)
 {
     Dqn_usize result = Dqn_Bin_HexBufferToBytesUnchecked(hex.data, hex.size, dest, dest_size);
     return result;
 }
 
-DQN_API Dqn_usize Dqn_Bin_HexToBytes(Dqn_String8 hex, void *dest, Dqn_usize dest_size)
+DQN_API Dqn_usize Dqn_Bin_HexToBytes(Dqn_Str8 hex, void *dest, Dqn_usize dest_size)
 {
     Dqn_usize result = Dqn_Bin_HexBufferToBytes(hex.data, hex.size, dest, dest_size);
     return result;
@@ -364,13 +440,10 @@ DQN_API char *Dqn_Bin_HexBufferToBytesArena(Dqn_Arena *arena, char const *hex, D
     if (!arena || !hex || size <= 0)
         return result;
 
-    Dqn_usize trim_size  = 0;
-    char const *trim_hex = Dqn_Bin_HexBufferTrim0x(hex,
-                                                                size,
-                                                                &trim_size);
-
-    Dqn_usize binary_size = trim_size / 2;
-    result                = Dqn_Arena_NewArray(arena, char, binary_size, Dqn_ZeroMem_No);
+    Dqn_usize   trim_size   = 0;
+    char const *trim_hex    = Dqn_Bin_HexBufferTrim0x(hex, size, &trim_size);
+    Dqn_usize   binary_size = trim_size / 2;
+    result                  = Dqn_Arena_NewArray(arena, char, binary_size, Dqn_ZeroMem_No);
     if (result) {
         Dqn_usize convert_size = Dqn_Bin_HexBufferToBytesUnchecked(trim_hex, trim_size, result, binary_size);
         if (real_size)
@@ -379,10 +452,10 @@ DQN_API char *Dqn_Bin_HexBufferToBytesArena(Dqn_Arena *arena, char const *hex, D
     return result;
 }
 
-DQN_API Dqn_String8 Dqn_Bin_HexToBytesArena(Dqn_Arena *arena, Dqn_String8 hex)
+DQN_API Dqn_Str8 Dqn_Bin_HexToBytesArena(Dqn_Arena *arena, Dqn_Str8 hex)
 {
-    Dqn_String8 result = {};
-    result.data        = Dqn_Bin_HexBufferToBytesArena(arena, hex.data, hex.size, &result.size);
+    Dqn_Str8 result = {};
+    result.data     = Dqn_Bin_HexBufferToBytesArena(arena, hex.data, hex.size, &result.size);
     return result;
 }
 #endif // !defined(DQN_NO_BIN)
@@ -505,7 +578,7 @@ DQN_API uint32_t Dqn_Safe_SaturateCastUSizeToU32(Dqn_usize val)
 
 DQN_API uint64_t Dqn_Safe_SaturateCastUSizeToU64(Dqn_usize val)
 {
-    uint64_t result = DQN_CHECK(val <= UINT64_MAX) ? DQN_CAST(uint64_t)val : UINT64_MAX;
+    uint64_t result = DQN_CHECK(DQN_CAST(uint64_t)val <= UINT64_MAX) ? DQN_CAST(uint64_t)val : UINT64_MAX;
     return result;
 }
 
@@ -572,8 +645,8 @@ DQN_API int32_t Dqn_Safe_SaturateCastISizeToI32(Dqn_isize val)
 
 DQN_API int64_t Dqn_Safe_SaturateCastISizeToI64(Dqn_isize val)
 {
-    DQN_ASSERT(val >= INT64_MIN && val <= INT64_MAX);
-    int64_t result = DQN_CAST(int64_t)DQN_CLAMP(val, INT64_MIN, INT64_MAX);
+    DQN_ASSERT(DQN_CAST(int64_t)val >= INT64_MIN && DQN_CAST(int64_t)val <= INT64_MAX);
+    int64_t result = DQN_CAST(int64_t)DQN_CLAMP(DQN_CAST(int64_t)val, INT64_MIN, INT64_MAX);
     return result;
 }
 
@@ -733,7 +806,7 @@ DQN_API uint64_t Dqn_Safe_SaturateCastIntToU64(int val)
 }
 
 // NOTE: [$MISC] Misc ==============================================================================
-DQN_API int Dqn_SNPrintFDotTruncate(char *buffer, int size, char const *fmt, ...)
+DQN_API int Dqn_SNPrintFDotTruncate(char *buffer, int size, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -747,16 +820,16 @@ DQN_API int Dqn_SNPrintFDotTruncate(char *buffer, int size, char const *fmt, ...
     return result;
 }
 
-DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator)
+DQN_API Dqn_U64Str8 Dqn_U64ToStr8(uint64_t val, char separator)
 {
-    Dqn_U64String result = {};
+    Dqn_U64Str8 result = {};
     if (val == 0) {
         result.data[result.size++] = '0';
     } else {
         // NOTE: The number is written in reverse because we form the string by
         // dividing by 10, so we write it in, then reverse it out after all is
         // done.
-        Dqn_U64String temp = {};
+        Dqn_U64Str8 temp = {};
         for (Dqn_usize digit_count = 0; val > 0; digit_count++) {
             if (separator && (digit_count != 0) && (digit_count % 3 == 0))
                 temp.data[temp.size++] = separator;
@@ -783,7 +856,7 @@ DQN_API Dqn_U64String Dqn_U64ToString(uint64_t val, char separator)
 // NOTE: [$DLIB] Dqn_Library =======================================================================
 Dqn_Library *g_dqn_library;
 
-DQN_API Dqn_Library *Dqn_Library_Init()
+DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
 {
     if (!g_dqn_library) {
         static Dqn_Library default_instance = {};
@@ -801,8 +874,8 @@ DQN_API Dqn_Library *Dqn_Library_Init()
     // NOTE: Query OS page size ====================================================================
 
     {
-        SYSTEM_INFO system_info = {};
         #if defined(DQN_OS_WIN32)
+        SYSTEM_INFO system_info = {};
         GetSystemInfo(&system_info);
         result->os_page_size         = system_info.dwPageSize;
         result->os_alloc_granularity = system_info.dwAllocationGranularity;
@@ -829,8 +902,8 @@ DQN_API Dqn_Library *Dqn_Library_Init()
     {
         result->alloc_tracking_disabled = true; // TODO(doyle): @robust Does this need to be atomic?
 
-        Dqn_String8 sample_backtrace = Dqn_String8_InitCString8(b_stacktrace_get_string());
-        Dqn_String8 clean_backtrace  = Dqn_Debug_CleanStackTrace(sample_backtrace);
+        Dqn_Str8 sample_backtrace                    = Dqn_Str8_InitCStr8(b_stacktrace_get_string());
+        Dqn_Str8 clean_backtrace                     = Dqn_Debug_CleanStackTrace(sample_backtrace);
         result->stack_trace_offset_to_our_call_stack = DQN_CAST(uint16_t)(sample_backtrace.size - clean_backtrace.size);
         free(sample_backtrace.data);
 
@@ -840,28 +913,34 @@ DQN_API Dqn_Library *Dqn_Library_Init()
     #endif
 
     // NOTE: Print out init features ===============================================================
+    if (on_init == Dqn_LibraryOnInit_LogFeatures) {
+        Dqn_Log_DebugF("Dqn Library initialised:\n");
 
-    Dqn_Log_DebugF("Dqn Library initialised:\n");
-    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  OS Page Size/Alloc Granularity: %$$_I32u/%$$_I32u", result->os_page_size, result->os_alloc_granularity);
+        // NOTE: %$$_I32u is a stb_sprintf format specifier, non-standard
+        DQN_MSVC_WARNING_PUSH
+        DQN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'Dqn_Print_StdLnF'.
+        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  OS Page Size/Alloc Granularity: %$$_I32u/%$$_I32u", result->os_page_size, result->os_alloc_granularity);
+        DQN_MSVC_WARNING_POP
 
-    #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
-    if (DQN_ASAN_POISON) {
-        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  ASAN manual poisoning%s", DQN_ASAN_VET_POISON ? " (+vet sanity checks)" : "");
-        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  ASAN poison guard size: %$$_I32u", DQN_ASAN_POISON_GUARD_SIZE);
+        #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+        if (DQN_ASAN_POISON) {
+            Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  ASAN manual poisoning%s", DQN_ASAN_VET_POISON ? " (+vet sanity checks)" : "");
+            Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  ASAN poison guard size: %$$_I32u", DQN_ASAN_POISON_GUARD_SIZE);
+        }
+        #endif
+
+        #if defined(DQN_LEAK_TRACING)
+        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  Allocation leak tracing");
+        #endif
+
+        #if !defined(DQN_NO_PROFILER)
+        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  TSC profiler available");
+        #endif
+
+        // TODO(doyle): Add stacktrace feature log
+
+        Dqn_Print_StdLnF(Dqn_PrintStd_Err, "");
     }
-    #endif
-
-    #if defined(DQN_LEAK_TRACING)
-    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  Allocation leak tracing");
-    #endif
-
-    #if !defined(DQN_NO_PROFILER)
-    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "  TSC profiler available");
-    #endif
-
-    // TODO(doyle): Add stacktrace feature log
-
-    Dqn_Print_StdLnF(Dqn_PrintStd_Err, "");
     return result;
 }
 
@@ -885,14 +964,14 @@ DQN_API void Dqn_Library_SetLogCallback(Dqn_LogProc *proc, void *user_data)
     g_dqn_library->log_user_data = user_data;
 }
 
-DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
+DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_Str8 file_path)
 {
     #if defined(DQN_DEBUG_THREAD_CONTEXT)
     // NOTE: Open a file to write the arena stats to
     FILE *file = nullptr;
     fopen_s(&file, file_path.data, "a+b");
     if (file) {
-        Dqn_Log_ErrorF("Failed to dump thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
+        Dqn_Log_ErrorF("Failed to dump thread context arenas [file=%.*s]", DQN_STR_FMT(file_path));
         return;
     }
 
@@ -908,7 +987,7 @@ DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
     Dqn_TicketMutex_End(&g_dqn_library->thread_context_mutex);
 
     // NOTE: Print the cumulative stat
-    Dqn_DateHMSTimeString now = Dqn_Date_HMSLocalTimeStringNow();
+    Dqn_DateHMSTimeStr now = Dqn_Date_HMSLocalTimeStrNow();
     fprintf(file,
             "Time=%.*s %.*s | Thread Context Arenas | Count=%d\n",
             now.date_size, now.date,
@@ -931,19 +1010,19 @@ DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
             stat.blocks_hwm   = DQN_MAX(stat.blocks_hwm, current->blocks_hwm);
         }
 
-        Dqn_ArenaStatString stats_string = Dqn_Arena_StatString(&stat);
+        Dqn_ArenaStatStr stats_string = Dqn_Arena_StatStr(&stat);
         fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.data);
     }
 
     // NOTE: Print individual thread arena data
     for (Dqn_usize index = 0; index < stats_size; index++) {
         Dqn_ArenaStat const *current = stats + index;
-        Dqn_ArenaStatString current_string = Dqn_Arena_StatString(current);
+        Dqn_ArenaStatStr current_string = Dqn_Arena_StatStr(current);
         fprintf(file, "  [%03d] CURR %.*s\n", DQN_CAST(int)index, current_string.size, current_string.data);
     }
 
     fclose(file);
-    Dqn_Log_InfoF("Dumped thread context arenas [file=%.*s]", DQN_STRING_FMT(file_path));
+    Dqn_Log_InfoF("Dumped thread context arenas [file=%.*s]", DQN_STR_FMT(file_path));
     #else
     (void)file_path;
     #endif // #if defined(DQN_DEBUG_THREAD_CONTEXT)
@@ -952,7 +1031,7 @@ DQN_API void Dqn_Library_DumpThreadContextArenaStat(Dqn_String8 file_path)
 
 #if !defined(DQN_NO_PROFILER)
 // NOTE: [$PROF] Dqn_Profiler ======================================================================
-Dqn_ProfilerZoneScope::Dqn_ProfilerZoneScope(Dqn_String8 name, uint16_t anchor_index)
+Dqn_ProfilerZoneScope::Dqn_ProfilerZoneScope(Dqn_Str8 name, uint16_t anchor_index)
 {
     zone = Dqn_Profiler_BeginZoneWithIndex(name, anchor_index);
 }
@@ -962,7 +1041,7 @@ Dqn_ProfilerZoneScope::~Dqn_ProfilerZoneScope()
     Dqn_Profiler_EndZone(zone);
 }
 
-Dqn_ProfilerZone Dqn_Profiler_BeginZoneWithIndex(Dqn_String8 name, uint16_t anchor_index)
+Dqn_ProfilerZone Dqn_Profiler_BeginZoneWithIndex(Dqn_Str8 name, uint16_t anchor_index)
 {
     Dqn_ProfilerAnchor *anchor           = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back) + anchor_index;
     anchor->name                         = name;
@@ -998,11 +1077,11 @@ Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer buffer)
     return result;
 }
 
-void Dqn_Profiler_SwapAnchorBuffer(uint32_t anchor_count)
+void Dqn_Profiler_SwapAnchorBuffer()
 {
     g_dqn_library->profiler->active_anchor_buffer++;
     Dqn_ProfilerAnchor *anchors = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back);
-    DQN_MEMSET(anchors, 0, anchor_count * sizeof(g_dqn_library->profiler->anchors[0][0]));
+    DQN_MEMSET(anchors, 0, DQN_ARRAY_UCOUNT(g_dqn_library->profiler->anchors[0]) * sizeof(g_dqn_library->profiler->anchors[0][0]));
 }
 
 void Dqn_Profiler_Dump(uint64_t tsc_per_second)
@@ -1018,13 +1097,13 @@ void Dqn_Profiler_Dump(uint64_t tsc_per_second)
         Dqn_f64 tsc_exclusive_milliseconds = tsc_exclusive * 1000 / DQN_CAST(Dqn_f64)tsc_per_second;
         if (tsc_exclusive == tsc_inclusive) {
             Dqn_Print_LnF("%.*s[%u]: %.1fms",
-                          DQN_STRING_FMT(anchor->name),
+                          DQN_STR_FMT(anchor->name),
                           anchor->hit_count,
                           tsc_exclusive_milliseconds);
         } else {
             Dqn_f64 tsc_inclusive_milliseconds        = tsc_inclusive * 1000 / DQN_CAST(Dqn_f64)tsc_per_second;
             Dqn_Print_LnF("%.*s[%u]: %.1f/%.1fms",
-                          DQN_STRING_FMT(anchor->name),
+                          DQN_STR_FMT(anchor->name),
                           anchor->hit_count,
                           tsc_exclusive_milliseconds,
                           tsc_inclusive_milliseconds);

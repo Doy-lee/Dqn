@@ -330,6 +330,9 @@
     } OVERLAPPED, *LPOVERLAPPED;
 
     // NOTE: um/winbase.h ==========================================================================
+    #define WAIT_FAILED   ((DWORD)0xFFFFFFFF)
+    #define WAIT_OBJECT_0 ((STATUS_WAIT_0 ) + 0 )
+
     #define INFINITE 0xFFFFFFFF // Wait/Synchronisation: Infinite timeout
 
     #define STD_INPUT_HANDLE  ((DWORD)-10)
@@ -344,6 +347,9 @@
     #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
     #define FORMAT_MESSAGE_FROM_HMODULE   0x00000800
     #define FORMAT_MESSAGE_FROM_SYSTEM    0x00001000
+
+    // NOTE: CreateProcessW
+    #define STARTF_USESTDHANDLES       0x00000100
 
     extern "C"
     {
@@ -708,6 +714,34 @@
     }
 
     // NOTE: um/processthreadsapi.h ================================================================
+    typedef struct _PROCESS_INFORMATION {
+        HANDLE hProcess;
+        HANDLE hThread;
+        DWORD dwProcessId;
+        DWORD dwThreadId;
+    } PROCESS_INFORMATION, *PPROCESS_INFORMATION, *LPPROCESS_INFORMATION;
+
+    typedef struct _STARTUPINFOW {
+        DWORD   cb;
+        WCHAR  *lpReserved;
+        WCHAR  *lpDesktop;
+        WCHAR  *lpTitle;
+        DWORD   dwX;
+        DWORD   dwY;
+        DWORD   dwXSize;
+        DWORD   dwYSize;
+        DWORD   dwXCountChars;
+        DWORD   dwYCountChars;
+        DWORD   dwFillAttribute;
+        DWORD   dwFlags;
+        WORD    wShowWindow;
+        WORD    cbReserved2;
+        BYTE   *lpReserved2;
+        HANDLE  hStdInput;
+        HANDLE  hStdOutput;
+        HANDLE  hStdError;
+    } STARTUPINFOW, *LPSTARTUPINFOW;
+
     typedef DWORD (__stdcall *PTHREAD_START_ROUTINE)(
         VOID *lpThreadParameter
         );
@@ -715,8 +749,12 @@
 
     extern "C"
     {
+    __declspec(dllimport) BOOL   __stdcall CreateProcessW(WCHAR const *lpApplicationName, WCHAR *lpCommandLine, SECURITY_ATTRIBUTES *lpProcessAttributes, SECURITY_ATTRIBUTES *lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, VOID *lpEnvironment, WCHAR const *lpCurrentDirectory, STARTUPINFOW *lpStartupInfo, PROCESS_INFORMATION *lpProcessInformation);
     __declspec(dllimport) HANDLE __stdcall CreateThread(SECURITY_ATTRIBUTES *lpThreadAttributes, SIZE_T dwStackSize, PTHREAD_START_ROUTINE lpStartAddress, VOID *lpParameter, DWORD dwCreationFlags, DWORD *lpThreadId);
     __declspec(dllimport) DWORD  __stdcall GetCurrentThreadId(VOID);
+    __declspec(dllimport) BOOL   __stdcall GetExitCodeProcess(HANDLE hProcess, DWORD *lpExitCode);
+    __declspec(dllimport) void   __stdcall ExitProcess(UINT uExitCode);
+
     }
 
     // NOTE: um/memoryapi.h ========================================================================

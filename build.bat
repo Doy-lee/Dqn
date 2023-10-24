@@ -19,7 +19,7 @@ pushd Build
 
     REM Optionally pass `-analyze` to `msvc_compile_flags` for more checks, but,
     REM it slows down compilation by around 5s on my old laptop.
-    set msvc_compile_flags=%msvc_driver_flags%  -fsanitize=address /Fe:dqn_unit_tests_msvc
+    set msvc_compile_flags=%msvc_driver_flags%  -analyze -fsanitize=address /Fe:dqn_unit_tests_msvc
     set clang_compile_flags=%msvc_driver_flags% -fsanitize=address -fsanitize=undefined /Fe:dqn_unit_tests_clang
     set zig_compile_flags=%common_flags%        -fsanitize=address -fsanitize=undefined -o dqn_unit_tests_zig
 

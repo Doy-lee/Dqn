@@ -63,10 +63,10 @@ DQN_API void Dqn_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, Dqn_usize s
 
 struct Dqn_StackTraceFrame
 {
-    uint64_t    address;
-    uint64_t    line_number;
-    Dqn_String8 file_name;
-    Dqn_String8 function_name;
+    uint64_t address;
+    uint64_t line_number;
+    Dqn_Str8 file_name;
+    Dqn_Str8 function_name;
 };
 
 struct Dqn_StackTraceRawFrame
@@ -113,17 +113,17 @@ struct Dqn_AllocRecord
     uint16_t      flags;                  // Bit flags from `Dqn_AllocRecordFlag`
     char          padding[2];
 };
-static_assert(sizeof(Dqn_AllocRecord) == 48,
+static_assert(sizeof(Dqn_AllocRecord) == 48 || sizeof(Dqn_AllocRecord) == 28, // NOTE: 64 bit vs 32 bit pointers respectively
               "We aim to keep the allocation record as light as possible as "
               "memory tracking can get expensive. Enforce that there is no "
               "unexpected padding.");
 
 #if defined(DQN_LEAK_TRACING)
-#define Dqn_Debug_TrackAlloc(ptr, size, leak_permitted) Dqn_Debug_TrackAlloc_  (Dqn_String8_InitCString8(b_stacktrace_get_string()), ptr, size, leak_permitted)
-#define Dqn_Debug_TrackDealloc(ptr)                     Dqn_Debug_TrackDealloc_(Dqn_String8_InitCString8(b_stacktrace_get_string()), ptr)
+#define Dqn_Debug_TrackAlloc(ptr, size, leak_permitted) Dqn_Debug_TrackAlloc_  (Dqn_Str8_InitCString8(b_stacktrace_get_string()), ptr, size, leak_permitted)
+#define Dqn_Debug_TrackDealloc(ptr)                     Dqn_Debug_TrackDealloc_(Dqn_Str8_InitCString8(b_stacktrace_get_string()), ptr)
 
-DQN_API void Dqn_Debug_TrackAlloc_(Dqn_String8 stack_trace, void *ptr, Dqn_usize size, bool leak_permitted);
-DQN_API void Dqn_Debug_TrackDealloc_(Dqn_String8 stack_trace, void *ptr);
+DQN_API void Dqn_Debug_TrackAlloc_(Dqn_Str8 stack_trace, void *ptr, Dqn_usize size, bool leak_permitted);
+DQN_API void Dqn_Debug_TrackDealloc_(Dqn_Str8 stack_trace, void *ptr);
 DQN_API void Dqn_Debug_DumpLeaks();
 #else
 #define      Dqn_Debug_TrackAlloc(...)

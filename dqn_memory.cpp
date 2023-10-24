@@ -1,3 +1,4 @@
+#if !defined(DQN_PLATFORM_EMSCRIPTEN)
 // NOTE: [$VMEM] Dqn_VMem ==========================================================================
 DQN_FILE_SCOPE uint32_t Dqn_VMem_ConvertPageToOSFlags_(uint32_t protect)
 {
@@ -115,9 +116,9 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
     if (!ptr || size == 0)
         return 0;
 
-    static Dqn_String8 const ALIGNMENT_ERROR_MSG =
-        DQN_STRING8("Page protection requires pointers to be page aligned because we "
-                    "can only guard memory at a multiple of the page boundary.");
+    static Dqn_Str8 const ALIGNMENT_ERROR_MSG =
+        DQN_STR8("Page protection requires pointers to be page aligned because we "
+                 "can only guard memory at a multiple of the page boundary.");
     DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(DQN_CAST(uintptr_t)ptr, g_dqn_library->os_page_size), "%s", ALIGNMENT_ERROR_MSG.data);
     DQN_ASSERTF(Dqn_IsPowerOfTwoAligned(size,                   g_dqn_library->os_page_size), "%s", ALIGNMENT_ERROR_MSG.data);
 
@@ -132,7 +133,7 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
         #else
         Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
         Dqn_WinError error        = Dqn_Win_LastError(scratch.arena);
-        DQN_ASSERTF(result, "VirtualProtect failed (%d): %.*s", error.code, DQN_STRING_FMT(error.msg));
+        DQN_ASSERTF(result, "VirtualProtect failed (%u): %.*s", error.code, DQN_STR_FMT(error.msg));
         #endif
     }
     #else
@@ -140,6 +141,48 @@ DQN_API int Dqn_VMem_Protect(void *ptr, Dqn_usize size, uint32_t page_flags)
     DQN_ASSERTF(result == 0, "mprotect failed (%d)", errno);
     #endif
 
+    return result;
+}
+#endif // !defined(DQN_PLATFORM_EMSCRIPTEN)
+
+// NOTE: [$MEMF] Dqn_MemAPI ==================================================================
+#if !defined(DQN_PLATFORM_EMSCRIPTEN)
+DQN_API Dqn_MemAPI Dqn_MemAPI_InitOSVirtual()
+{
+    Dqn_MemAPI result = {};
+    result.reserve          = Dqn_VMem_Reserve;
+    result.commit           = Dqn_VMem_Commit;
+    result.release          = Dqn_VMem_Release;
+    return result;
+}
+#endif // !defined(DQN_PLATFORM_EMSCRIPTEN)
+
+void *Dqn_MemAPI_CRTReserve(Dqn_usize size, Dqn_VMemCommit commit, uint32_t page_flags)
+{
+    (void)page_flags;
+    (void)commit;
+    void *result = calloc(1, size);
+    return result;
+}
+
+bool Dqn_MemAPI_CRTCommit(void *ptr, Dqn_usize size, uint32_t page_flags)
+{
+    (void)ptr; (void)size; (void)page_flags;
+    return true;
+}
+
+void Dqn_MemAPI_CRTRelease(void *ptr, Dqn_usize size)
+{
+    (void)size;
+    free(ptr);
+}
+
+DQN_API Dqn_MemAPI Dqn_MemAPI_InitCRT()
+{
+    Dqn_MemAPI result = {};
+    result.reserve          = Dqn_MemAPI_CRTReserve;
+    result.commit           = Dqn_MemAPI_CRTCommit;
+    result.release          = Dqn_MemAPI_CRTRelease;
     return result;
 }
 
@@ -176,7 +219,7 @@ DQN_API Dqn_MemBlockSizeRequiredResult Dqn_MemBlock_SizeRequired(Dqn_MemBlock co
     return result;
 }
 
-Dqn_usize Dqn_MemBlock_MetadataSize()
+DQN_API Dqn_usize Dqn_MemBlock_MetadataSize()
 {
     Dqn_usize init_poison_page = DQN_ASAN_POISON ? DQN_ASAN_POISON_GUARD_SIZE : 0;
     Dqn_usize alignment        = DQN_ASAN_POISON ? DQN_ASAN_POISON_ALIGNMENT  : alignof(Dqn_MemBlock);
@@ -184,7 +227,7 @@ Dqn_usize Dqn_MemBlock_MetadataSize()
     return result;
 }
 
-DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uint32_t flags)
+DQN_API Dqn_MemBlock *Dqn_MemBlock_InitMemAPI(Dqn_usize reserve, Dqn_usize commit, uint32_t flags, Dqn_MemAPI mem_api)
 {
     DQN_ASSERTF(g_dqn_library->os_page_size,                   "Library needs to be initialised by calling Dqn_Library_Init()");
     DQN_ASSERTF(Dqn_IsPowerOfTwo(g_dqn_library->os_page_size), "Invalid page size");
@@ -200,16 +243,17 @@ DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uin
 
     // NOTE: Avoid 1 syscall by committing on reserve if amounts are equal
     Dqn_VMemCommit commit_on_reserve = commit_aligned == reserve_aligned ? Dqn_VMemCommit_Yes : Dqn_VMemCommit_No;
-    auto *result                     = DQN_CAST(Dqn_MemBlock *)Dqn_VMem_Reserve(reserve_aligned, commit_on_reserve, Dqn_VMemPage_ReadWrite);
+    auto *result                     = DQN_CAST(Dqn_MemBlock *)mem_api.reserve(reserve_aligned, commit_on_reserve, Dqn_VMemPage_ReadWrite);
     if (result) {
         // NOTE: Commit pages if we did not commit on the initial range.
         if (!commit_on_reserve)
-            Dqn_VMem_Commit(result, commit_aligned, Dqn_VMemPage_ReadWrite);
+            mem_api.commit(result, commit_aligned, Dqn_VMemPage_ReadWrite);
 
-        result->data   = DQN_CAST(uint8_t *)result + metadata_size;
-        result->size   = reserve_aligned           - metadata_size;
-        result->commit = commit_aligned            - metadata_size;
-        result->flags  = DQN_CAST(uint8_t)flags;
+        result->mem_api = mem_api;
+        result->data    = DQN_CAST(uint8_t *)result + metadata_size;
+        result->size    = reserve_aligned           - metadata_size;
+        result->commit  = commit_aligned            - metadata_size;
+        result->flags   = DQN_CAST(uint8_t)flags;
 
         // NOTE: Poison (guard page + commit). We do *not* poison the entire
         // block, only the commit pages. Since we may reserve large amounts of
@@ -226,6 +270,12 @@ DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uin
     return result;
 }
 
+DQN_API Dqn_MemBlock *Dqn_MemBlock_Init(Dqn_usize reserve, Dqn_usize commit, uint32_t flags, Dqn_MemAPI mem_api)
+{
+    Dqn_MemBlock *result = Dqn_MemBlock_InitMemAPI(reserve, commit, flags, mem_api);
+    return result;
+}
+
 DQN_API void *Dqn_MemBlock_Alloc(Dqn_MemBlock *block, Dqn_usize size, uint8_t alignment, Dqn_ZeroMem zero_mem)
 {
     DQN_ASSERT(zero_mem == Dqn_ZeroMem_Yes || zero_mem == Dqn_ZeroMem_No);
@@ -239,8 +289,9 @@ DQN_API void *Dqn_MemBlock_Alloc(Dqn_MemBlock *block, Dqn_usize size, uint8_t al
     if (new_used > block->size)
         return result;
 
-    result      = DQN_CAST(char *)block->data + size_required.data_offset;
-    block->used = new_used;
+    result          = DQN_CAST(char *)block->data + size_required.data_offset;
+    block->used     = new_used;
+    block->used_hwm = DQN_MAX(block->used_hwm, new_used);
     DQN_ASSERT(Dqn_IsPowerOfTwoAligned(result, alignment));
 
     if (DQN_ASAN_POISON)
@@ -255,7 +306,7 @@ DQN_API void *Dqn_MemBlock_Alloc(Dqn_MemBlock *block, Dqn_usize size, uint8_t al
         Dqn_usize commit_size = Dqn_AlignUpPowerOfTwo(block->used - block->commit, g_dqn_library->os_page_size);
         void *commit_ptr      = (void *)Dqn_AlignUpPowerOfTwo((char *)block->data + block->commit, g_dqn_library->os_page_size);
         block->commit        += commit_size;
-        Dqn_VMem_Commit(commit_ptr, commit_size, Dqn_VMemPage_ReadWrite);
+        block->mem_api.commit(commit_ptr, commit_size, Dqn_VMemPage_ReadWrite);
         DQN_ASSERT(block->commit <= block->size);
 
         if (DQN_ASAN_POISON) { // NOTE: Poison newly committed pages that aren't being used.
@@ -275,7 +326,7 @@ DQN_API void Dqn_MemBlock_Free(Dqn_MemBlock *block)
     Dqn_usize release_size = block->size + Dqn_MemBlock_MetadataSize();
     if (DQN_ASAN_POISON)
         Dqn_ASAN_UnpoisonMemoryRegion(block, release_size);
-    Dqn_VMem_Release(block, release_size);
+    block->mem_api.release(block, release_size);
 }
 
 DQN_API void Dqn_MemBlock_Pop(Dqn_MemBlock *block, Dqn_usize size)
@@ -339,7 +390,15 @@ DQN_API Dqn_MemBlock *Dqn_Arena_Grow(Dqn_Arena *arena, Dqn_usize reserve, Dqn_us
     if (arena->allocs_are_allowed_to_leak)
         mem_block_flags |= Dqn_MemBlockFlag_AllocRecordLeakPermitted;
 
-    Dqn_MemBlock *result = Dqn_MemBlock_Init(reserve, commit, mem_block_flags);
+    if (!arena->mem_api.reserve) {
+        #if defined(DQN_PLATFORM_EMSCRIPTEN)
+        arena->mem_api = Dqn_MemAPI_InitCRT();
+        #else
+        arena->mem_api = Dqn_MemAPI_InitOSVirtual();
+        #endif
+    }
+
+    Dqn_MemBlock *result = Dqn_MemBlock_Init(reserve, commit, mem_block_flags, arena->mem_api);
     if (result) {
         if (!arena->head)
             arena->head = result;
@@ -475,29 +534,19 @@ Dqn_ArenaTempMemoryScope::~Dqn_ArenaTempMemoryScope()
     Dqn_Arena_EndTempMemory(temp_memory, cancel);
 }
 
-DQN_API Dqn_ArenaStatString Dqn_Arena_StatString(Dqn_ArenaStat const *stat)
+DQN_API Dqn_ArenaInfo Dqn_Arena_Info(Dqn_Arena const *arena)
 {
-    // NOTE: We use a non-standard format string that is only usable via
-    // stb sprintf that GCC warns about as an error. This pragma mutes that.
-    DQN_GCC_WARNING_PUSH
-    DQN_GCC_WARNING_DISABLE("-Wformat-invalid-specifier")
-    DQN_GCC_WARNING_DISABLE("-Wformat-extra-args")
-    Dqn_ArenaStatString result = {};
-    int size16 = STB_SPRINTF_DECORATE(snprintf)(result.data, DQN_ARRAY_ICOUNT(result.data),
-                                                "ArenaStat{"
-                                                    "used/hwm=%_$$zd/%_$$zd, "
-                                                    "cap/hwm=%_$$zd/%_$$zd, "
-                                                    "wasted/hwm=%_$$zd/%_$$zd, "
-                                                    "blocks/hwm=%_$$u/%_$$u, "
-                                                    "syscalls=%'zd"
-                                                "}",
-                                                stat->used,     stat->used_hwm,
-                                                stat->capacity, stat->capacity_hwm,
-                                                stat->wasted,   stat->wasted_hwm,
-                                                stat->blocks,   stat->blocks_hwm,
-                                                stat->syscalls);
-    result.size = Dqn_Safe_SaturateCastIntToU16(size16);
-    DQN_GCC_WARNING_POP
+    Dqn_ArenaInfo result = {};
+    if (!arena)
+        return result;
+
+    for (Dqn_MemBlock const *block = arena->head; block; block = block->next) {
+        result.capacity += block->size;
+        result.used     += block->used;
+        result.used_hwm += block->used_hwm;
+        result.commit   += block->commit;
+        result.wasted   += block->next ? (block->size - block->used) : 0;
+    }
     return result;
 }
 
@@ -541,14 +590,14 @@ DQN_API Dqn_Arena *Dqn_ArenaCatalog_Alloc(Dqn_ArenaCatalog *catalog, Dqn_usize b
     return result;
 }
 
-DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, va_list args)
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
     Dqn_Arena *result = Dqn_ArenaCatalog_Alloc(catalog, byte_size, commit);
-    result->label     = Dqn_String8_InitFV(Dqn_Arena_Allocator(result), fmt, args);
+    result->label     = Dqn_Str8_InitFV(Dqn_Arena_Allocator(result), fmt, args);
     return result;
 }
 
-DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, ...)
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);

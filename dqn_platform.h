@@ -4,7 +4,7 @@
 #endif
 // NOTE: [$FSYS] Dqn_Fs ============================================================================
 // NOTE: FS Manipulation ===========================================================================
-// TODO(dqn): We should have a Dqn_String8 interface and a CString interface
+// TODO(dqn): We should have a Dqn_Str8 interface and a CStr8 interface
 //
 // NOTE: API =======================================================================================
 // @proc Dqn_FsDelete
@@ -29,26 +29,26 @@ struct Dqn_FsInfo
     uint64_t       size;
 };
 
-DQN_API bool         Dqn_Fs_Exists   (Dqn_String8 path);
-DQN_API bool         Dqn_Fs_DirExists(Dqn_String8 path);
-DQN_API Dqn_FsInfo   Dqn_Fs_GetInfo  (Dqn_String8 path);
-DQN_API bool         Dqn_Fs_Copy     (Dqn_String8 src, Dqn_String8 dest, bool overwrite);
-DQN_API bool         Dqn_Fs_MakeDir  (Dqn_String8 path);
-DQN_API bool         Dqn_Fs_Move     (Dqn_String8 src, Dqn_String8 dest, bool overwrite);
-DQN_API bool         Dqn_Fs_Delete   (Dqn_String8 path);
+DQN_API bool         Dqn_Fs_Exists   (Dqn_Str8 path);
+DQN_API bool         Dqn_Fs_DirExists(Dqn_Str8 path);
+DQN_API Dqn_FsInfo   Dqn_Fs_GetInfo  (Dqn_Str8 path);
+DQN_API bool         Dqn_Fs_Copy     (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite);
+DQN_API bool         Dqn_Fs_MakeDir  (Dqn_Str8 path);
+DQN_API bool         Dqn_Fs_Move     (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite);
+DQN_API bool         Dqn_Fs_Delete   (Dqn_Str8 path);
 
 // NOTE: R/W Entire File ===========================================================================
 // NOTE: API =======================================================================================
-// @proc Dqn_Fs_WriteString8, Dqn_Fs_WriteCString8
+// @proc Dqn_Fs_WriteStr8, Dqn_Fs_WriteCStr8
 //   @desc Write the string to a file at the path overwriting if necessary.
 
-// @proc Dqn_Fs_ReadString8, Dqn_Fs_ReadCString8
+// @proc Dqn_Fs_ReadStr8, Dqn_Fs_ReadCStr8
 //   @desc Read the file at the path to a string.
 
-DQN_API bool         Dqn_Fs_WriteCString8(char const *file_path, Dqn_usize file_path_size, char const *buffer, Dqn_usize buffer_size);
-DQN_API bool         Dqn_Fs_Write        (Dqn_String8 file_path, Dqn_String8 buffer);
-DQN_API char        *Dqn_Fs_ReadCString8 (char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator);
-DQN_API Dqn_String8  Dqn_Fs_Read         (Dqn_String8 path, Dqn_Allocator allocator);
+DQN_API bool      Dqn_Fs_WriteCStr8(char const *file_path, Dqn_usize file_path_size, char const *buffer, Dqn_usize buffer_size);
+DQN_API bool      Dqn_Fs_Write        (Dqn_Str8 file_path, Dqn_Str8 buffer);
+DQN_API char     *Dqn_Fs_ReadCStr8 (char const *path, Dqn_usize path_size, Dqn_usize *file_size, Dqn_Allocator allocator);
+DQN_API Dqn_Str8  Dqn_Fs_Read         (Dqn_Str8 path, Dqn_Allocator allocator);
 
 // NOTE: R/W Stream API ============================================================================
 // NOTE: API =======================================================================================
@@ -85,11 +85,11 @@ enum Dqn_FsFileAccess
     Dqn_FsFileAccess_All        = Dqn_FsFileAccess_ReadWrite | Dqn_FsFileAccess_Execute,
 };
 
-DQN_API Dqn_FsFile Dqn_Fs_OpenFile       (Dqn_String8 path, Dqn_FsFileOpen open_mode, uint32_t access);
+DQN_API Dqn_FsFile Dqn_Fs_OpenFile       (Dqn_Str8 path, Dqn_FsFileOpen open_mode, uint32_t access);
 DQN_API bool       Dqn_Fs_WriteFileBuffer(Dqn_FsFile *file, void const *data, Dqn_usize size);
-DQN_API bool       Dqn_Fs_WriteFile      (Dqn_FsFile *file, Dqn_String8 buffer);
-DQN_API bool       Dqn_Fs_WriteFileFV    (Dqn_FsFile *file, DQN_FMT_STRING_ANNOTATE char const *fmt, va_list args);
-DQN_API bool       Dqn_Fs_WriteFileF     (Dqn_FsFile *file, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
+DQN_API bool       Dqn_Fs_WriteFile      (Dqn_FsFile *file, Dqn_Str8 buffer);
+DQN_API bool       Dqn_Fs_WriteFileFV    (Dqn_FsFile *file, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DQN_API bool       Dqn_Fs_WriteFileF     (Dqn_FsFile *file, DQN_FMT_ATTRIB char const *fmt, ...);
 DQN_API void       Dqn_Fs_CloseFile      (Dqn_FsFile *file);
 #endif // !defined(DQN_NO_FS)
 
@@ -124,15 +124,16 @@ DQN_API void       Dqn_Fs_CloseFile      (Dqn_FsFile *file);
     #else
         #define Dqn_FsPathOSSeperator "/"
     #endif
-    #define Dqn_FsPathOSSeperatorString DQN_STRING8(Dqn_FsPathOSSeperator)
+    #define Dqn_FsPathOSSeperatorString DQN_STR8(Dqn_FsPathOSSeperator)
 #endif
 
 struct Dqn_FsPathLink
 {
-    Dqn_String8     string;
+    Dqn_Str8        string;
     Dqn_FsPathLink *next;
     Dqn_FsPathLink *prev;
 };
+
 
 struct Dqn_FsPath
 {
@@ -142,15 +143,15 @@ struct Dqn_FsPath
     uint16_t        links_size;
 };
 
-DQN_API bool        Dqn_FsPath_AddRef            (Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String8 path);
-DQN_API bool        Dqn_FsPath_Add               (Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_String8 path);
-DQN_API bool        Dqn_FsPath_AddF              (Dqn_Arena *arena, Dqn_FsPath *fs_path, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
-DQN_API bool        Dqn_FsPath_Pop               (Dqn_FsPath *fs_path);
-DQN_API Dqn_String8 Dqn_FsPath_BuildWithSeparator(Dqn_Arena *arena, Dqn_FsPath const *fs_path, Dqn_String8 path_separator);
-DQN_API Dqn_String8 Dqn_FsPath_Convert           (Dqn_Arena *arena, Dqn_String8 path);
-DQN_API Dqn_String8 Dqn_FsPath_ConvertF          (Dqn_Arena *arena, DQN_FMT_STRING_ANNOTATE char const *fmt, ...);
-#define             Dqn_FsPath_BuildFwdSlash(arena, fs_path)  Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STRING8("/"))
-#define             Dqn_FsPath_BuildBackSlash(arena, fs_path) Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STRING8("\\"))
+DQN_API bool     Dqn_FsPath_AddRef            (Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_Str8 path);
+DQN_API bool     Dqn_FsPath_Add               (Dqn_Arena *arena, Dqn_FsPath *fs_path, Dqn_Str8 path);
+DQN_API bool     Dqn_FsPath_AddF              (Dqn_Arena *arena, Dqn_FsPath *fs_path, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API bool     Dqn_FsPath_Pop               (Dqn_FsPath *fs_path);
+DQN_API Dqn_Str8 Dqn_FsPath_BuildWithSeparator(Dqn_Arena *arena, Dqn_FsPath const *fs_path, Dqn_Str8 path_separator);
+DQN_API Dqn_Str8 Dqn_FsPath_Convert           (Dqn_Arena *arena, Dqn_Str8 path);
+DQN_API Dqn_Str8 Dqn_FsPath_ConvertF          (Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...);
+#define          Dqn_FsPath_BuildFwdSlash(arena, fs_path)  Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STR8("/"))
+#define          Dqn_FsPath_BuildBackSlash(arena, fs_path) Dqn_FsPath_BuildWithSeparator(arena, fs_path, DQN_STR8("\\"))
 
 #if !defined(Dqn_FsPath_Build)
     #if defined(DQN_OS_WIN32)
@@ -166,7 +167,7 @@ DQN_API Dqn_String8 Dqn_FsPath_ConvertF          (Dqn_Arena *arena, DQN_FMT_STRI
 //    @desc Produce the time elapsed since the Unix epoch
 //    (e.g. 1970-01-01T00:00:00Z) in seconds
 
-struct Dqn_DateHMSTimeString
+struct Dqn_DateHMSTimeStr8
 {
     char    date[DQN_ARRAY_UCOUNT("YYYY-MM-SS")];
     uint8_t date_size;
@@ -186,10 +187,10 @@ struct Dqn_DateHMSTime
     uint8_t seconds;
 };
 
-DQN_API Dqn_DateHMSTime       Dqn_Date_HMSLocalTimeNow      ();
-DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeStringNow(char date_separator = '-', char hms_separator = ':');
-DQN_API Dqn_DateHMSTimeString Dqn_Date_HMSLocalTimeString   (Dqn_DateHMSTime time, char date_separator = '-', char hms_separator = ':');
-DQN_API uint64_t              Dqn_Date_EpochTime            ();
+DQN_API Dqn_DateHMSTime     Dqn_Date_LocalTimeHMSNow    ();
+DQN_API Dqn_DateHMSTimeStr8 Dqn_Date_LocalTimeHMSStr8Now(char date_separator = '-', char hms_separator = ':');
+DQN_API Dqn_DateHMSTimeStr8 Dqn_Date_LocalTimeHMSStr8   (Dqn_DateHMSTime time, char date_separator = '-', char hms_separator = ':');
+DQN_API uint64_t            Dqn_Date_EpochTime          ();
 
 #if defined(DQN_OS_WIN32)
 #if !defined(DQN_NO_WIN)
@@ -207,12 +208,12 @@ DQN_API uint64_t              Dqn_Date_EpochTime            ();
 struct Dqn_WinError
 {
     unsigned long code;
-    Dqn_String8   msg;
+    Dqn_Str8 msg;
 };
 DQN_API Dqn_WinError Dqn_Win_LastError(Dqn_Arena *arena);
 DQN_API void         Dqn_Win_MakeProcessDPIAware();
 
-// NOTE: Windows String8 <-> String16 ===========================================
+// NOTE: Windows Str8 <-> Str16 ===========================================
 // Convert a UTF8 <-> UTF16 string.
 //
 // The exact size buffer required for this function can be determined by
@@ -225,10 +226,10 @@ DQN_API void         Dqn_Win_MakeProcessDPIAware();
 // written/required for conversion. 0 if there was a conversion error and can be
 // queried using 'Dqn_Win_LastError'
 
-DQN_API Dqn_String16 Dqn_Win_String8ToString16(Dqn_Arena *arena, Dqn_String8 src);
-DQN_API int          Dqn_Win_String8ToString16Buffer(Dqn_String16 src, char *dest, int dest_size);
-DQN_API Dqn_String8  Dqn_Win_String16ToString8(Dqn_Arena *arena, Dqn_String16 src);
-DQN_API int          Dqn_Win_String16ToString8Buffer(Dqn_String16 src, char *dest, int dest_size);
+DQN_API Dqn_Str16 Dqn_Win_Str8ToStr16      (Dqn_Arena *arena, Dqn_Str8 src);
+DQN_API int       Dqn_Win_Str8ToStr16Buffer(Dqn_Str16 src, char *dest, int dest_size);
+DQN_API Dqn_Str8  Dqn_Win_Str16ToStr8      (Dqn_Arena *arena, Dqn_Str16 src);
+DQN_API int       Dqn_Win_Str16ToStr8Buffer(Dqn_Str16 src, char *dest, int dest_size);
 
 // NOTE: Path navigation ===========================================================================
 // NOTE: API =======================================================================================
@@ -256,22 +257,23 @@ DQN_API int          Dqn_Win_String16ToString8Buffer(Dqn_String16 src, char *des
 struct Dqn_Win_FolderIteratorW
 {
     void         *handle;
-    Dqn_String16 file_name;
+    Dqn_Str16 file_name;
     wchar_t      file_name_buf[512];
 };
 
 struct Dqn_Win_FolderIterator
 {
-    void        *handle;
-    Dqn_String8  file_name;
-    char         file_name_buf[512];
+    void     *handle;
+    Dqn_Str8  file_name;
+    char      file_name_buf[512];
 };
 
-DQN_API Dqn_String16    Dqn_Win_EXEDirW       (Dqn_Arena *arena);
-DQN_API Dqn_String8     Dqn_Win_WorkingDir    (Dqn_Allocator allocator, Dqn_String8 suffix);
-DQN_API Dqn_String16    Dqn_Win_WorkingDirW   (Dqn_Allocator allocator, Dqn_String16 suffix);
-DQN_API bool            Dqn_Win_FolderIterate (Dqn_String8 path, Dqn_Win_FolderIterator *it);
-DQN_API bool            Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_FolderIteratorW *it);
+DQN_API Dqn_Str16 Dqn_Win_EXEPathW      (Dqn_Arena *arena);
+DQN_API Dqn_Str16 Dqn_Win_EXEDirW       (Dqn_Arena *arena);
+DQN_API Dqn_Str8  Dqn_Win_WorkingDir    (Dqn_Allocator allocator, Dqn_Str8 suffix);
+DQN_API Dqn_Str16 Dqn_Win_WorkingDirW   (Dqn_Allocator allocator, Dqn_Str16 suffix);
+DQN_API bool      Dqn_Win_FolderIterate (Dqn_Str8 path, Dqn_Win_FolderIterator *it);
+DQN_API bool      Dqn_Win_FolderWIterate(Dqn_Str16 path, Dqn_Win_FolderIteratorW *it);
 #endif // !defined(DQN_NO_WIN)
 
 #if !defined(DQN_NO_WINNET)
@@ -284,7 +286,7 @@ DQN_API bool            Dqn_Win_FolderWIterate(Dqn_String16 path, Dqn_Win_Folder
 // INTERNET_OPTION_SEND_TIMEOUT
 //
 // NOTE: API =======================================================================================
-// @proc Dqn_Win_NetHandleInitHTTPMethod, Dqn_Win_NetHandleInitHTTPMethodCString
+// @proc Dqn_Win_NetHandleInitHTTPMethod, Dqn_Win_NetHandleInitHTTPMethodCStr8
 //   @desc Setup a handle to the URL with the given HTTP verb.
 //
 //   This function is the same as calling Dqn_Win_NetHandleInit() followed by
@@ -354,32 +356,32 @@ enum Dqn_WinNetHandleRequestHeaderFlag
 
 struct Dqn_WinNetHandleResponse
 {
-    Dqn_String8  raw_headers;
-    Dqn_String8 *headers;
-    Dqn_usize    headers_size;
+    Dqn_Str8   raw_headers;
+    Dqn_Str8  *headers;
+    Dqn_usize  headers_size;
 
     // NOTE: Headers pulled from the 'raw_headers' for convenience
-    uint64_t     content_length;
-    Dqn_String8  content_type;
+    uint64_t   content_length;
+    Dqn_Str8   content_type;
 };
 
-DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitCString             (char const *url, int url_size);
-DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInit                    (Dqn_String8 url);
-DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitHTTPMethodCString   (char const *url, int url_size, char const *http_method);
-DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitHTTPMethod          (Dqn_String8 url, Dqn_String8 http_method);
-DQN_API void                     Dqn_Win_NetHandleClose                   (Dqn_WinNetHandle *handle);
-DQN_API bool                     Dqn_Win_NetHandleIsValid                 (Dqn_WinNetHandle const *handle);
-DQN_API void                     Dqn_Win_NetHandleSetUserAgentCString     (Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
-DQN_API bool                     Dqn_Win_NetHandleSetHTTPMethod           (Dqn_WinNetHandle *handle, char const *method);
-DQN_API bool                     Dqn_Win_NetHandleSetRequestHeaderCString8(Dqn_WinNetHandle *handle, char const *header, int header_size, uint32_t mode);
-DQN_API bool                     Dqn_Win_NetHandleSetRequestHeaderString8 (Dqn_WinNetHandle *handle, Dqn_String8 header, uint32_t mode);
-DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest             (Dqn_WinNetHandle *handle, Dqn_Allocator allocator, char const *post_data, unsigned long post_data_size);
-DQN_API bool                     Dqn_Win_NetHandlePump                    (Dqn_WinNetHandle *handle, char *dest, int dest_size, size_t *download_size);
-DQN_API char *                   Dqn_Win_NetHandlePumpCString8            (Dqn_WinNetHandle *handle, Dqn_Arena *arena, size_t *download_size);
-DQN_API Dqn_String8              Dqn_Win_NetHandlePumpString8             (Dqn_WinNetHandle *handle, Dqn_Arena *arena);
-DQN_API void                     Dqn_Win_NetHandlePumpToCRTFile           (Dqn_WinNetHandle *handle, FILE *file);
-DQN_API char *                   Dqn_Win_NetHandlePumpToAllocCString      (Dqn_WinNetHandle *handle, size_t *download_size);
-DQN_API Dqn_String8              Dqn_Win_NetHandlePumpToAllocString       (Dqn_WinNetHandle *handle);
+DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitCStr8            (char const *url, int url_size);
+DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInit                 (Dqn_Str8 url);
+DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitHTTPMethodCStr8  (char const *url, int url_size, char const *http_method);
+DQN_API Dqn_WinNetHandle         Dqn_Win_NetHandleInitHTTPMethod       (Dqn_Str8 url, Dqn_Str8 http_method);
+DQN_API void                     Dqn_Win_NetHandleClose                (Dqn_WinNetHandle *handle);
+DQN_API bool                     Dqn_Win_NetHandleIsValid              (Dqn_WinNetHandle const *handle);
+DQN_API void                     Dqn_Win_NetHandleSetUserAgentCStr8    (Dqn_WinNetHandle *handle, char const *user_agent, int user_agent_size);
+DQN_API bool                     Dqn_Win_NetHandleSetHTTPMethod        (Dqn_WinNetHandle *handle, char const *method);
+DQN_API bool                     Dqn_Win_NetHandleSetRequestHeaderCStr8(Dqn_WinNetHandle *handle, char const *header, int header_size, uint32_t mode);
+DQN_API bool                     Dqn_Win_NetHandleSetRequestHeaderStr8 (Dqn_WinNetHandle *handle, Dqn_Str8 header, uint32_t mode);
+DQN_API Dqn_WinNetHandleResponse Dqn_Win_NetHandleSendRequest          (Dqn_WinNetHandle *handle, Dqn_Allocator allocator, char const *post_data, unsigned long post_data_size);
+DQN_API bool                     Dqn_Win_NetHandlePump                 (Dqn_WinNetHandle *handle, char *dest, int dest_size, size_t *download_size);
+DQN_API char *                   Dqn_Win_NetHandlePumpCStr8            (Dqn_WinNetHandle *handle, Dqn_Arena *arena, size_t *download_size);
+DQN_API Dqn_Str8                 Dqn_Win_NetHandlePumpStr8             (Dqn_WinNetHandle *handle, Dqn_Arena *arena);
+DQN_API void                     Dqn_Win_NetHandlePumpToCRTFile        (Dqn_WinNetHandle *handle, FILE *file);
+DQN_API char *                   Dqn_Win_NetHandlePumpToAllocCStr8     (Dqn_WinNetHandle *handle, size_t *download_size);
+DQN_API Dqn_Str8                 Dqn_Win_NetHandlePumpToAllocStr8      (Dqn_WinNetHandle *handle);
 #endif // !defined(DQN_NO_WINNET)
 #endif // defined(DQN_OS_WIN32)
 
@@ -405,6 +407,9 @@ DQN_API Dqn_String8              Dqn_Win_NetHandlePumpToAllocString       (Dqn_W
 //   @param duration_ms_to_gauge_tsc_frequency How many milliseconds to spend
 //   measuring the TSC rate of the current machine. 100ms is sufficient to
 //   produce a fairly accurate result with minimal blocking in applications.
+//
+//   This may return 0 if querying the CPU timestamp counter is not supported
+//   on the platform (e.g. __rdtsc() or __builtin_readcyclecounter() returns 0).
 
 /// Record time between two time-points using the OS's performance counter.
 struct Dqn_OSTimer
@@ -415,7 +420,8 @@ struct Dqn_OSTimer
 
 DQN_API bool        Dqn_OS_SecureRNGBytes      (void *buffer, uint32_t size);
 #if (defined(DQN_OS_WIN32) && !defined(DQN_NO_WIN)) || !defined(DQN_OS_WIN32)
-DQN_API Dqn_String8 Dqn_OS_EXEDir              (Dqn_Arena* arena);
+DQN_API Dqn_Str8    Dqn_OS_EXEPath             (Dqn_Arena *arena);
+DQN_API Dqn_Str8    Dqn_OS_EXEDir              (Dqn_Arena* arena);
 #endif
 DQN_API void        Dqn_OS_SleepMs             (Dqn_uint milliseconds);
 DQN_API uint64_t    Dqn_OS_PerfCounterNow      ();

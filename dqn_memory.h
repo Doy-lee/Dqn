@@ -33,11 +33,32 @@ enum Dqn_VMemPage
     Dqn_VMemPage_AllocRecordLeakPermitted = 1 << 2,
 };
 
+#if !defined(DQN_PLATFORM_EMSCRIPTEN)
 DQN_API void *Dqn_VMem_Reserve (Dqn_usize size, Dqn_VMemCommit commit, uint32_t page_flags);
 DQN_API bool  Dqn_VMem_Commit  (void *ptr, Dqn_usize size, uint32_t page_flags);
 DQN_API void  Dqn_VMem_Decommit(void *ptr, Dqn_usize size);
 DQN_API void  Dqn_VMem_Release (void *ptr, Dqn_usize size);
 DQN_API int   Dqn_VMem_Protect (void *ptr, Dqn_usize size, uint32_t page_flags);
+#endif
+
+// NOTE: [$MEMF] Dqn_MemAPI ==================================================================
+// Interface for specifying the routines for memory allocation for Dqn_MemBlock
+
+typedef void *(Dqn_MemReserveFunc)(Dqn_usize size, Dqn_VMemCommit commit, uint32_t page_flags);
+typedef bool  (Dqn_MemCommitFunc) (void *ptr, Dqn_usize size, uint32_t page_flags);
+typedef void  (Dqn_MemReleaseFunc)(void *ptr, Dqn_usize size);
+
+struct Dqn_MemAPI
+{
+    Dqn_MemReserveFunc *reserve;
+    Dqn_MemCommitFunc  *commit;
+    Dqn_MemReleaseFunc *release;
+};
+
+#if !defined(DQN_PLATFORM_EMSCRIPTEN)
+DQN_API Dqn_MemAPI Dqn_MemAPI_InitOSVirtual();
+#endif
+DQN_API Dqn_MemAPI Dqn_MemAPI_InitCRT();
 
 // NOTE: [$MEMB] Dqn_MemBlock ======================================================================
 // Encapsulates allocation of objects from a raw block of memory by bumping a
@@ -103,8 +124,10 @@ enum Dqn_MemBlockFlag
 
 struct Dqn_MemBlock
 {
+    Dqn_MemAPI    mem_api;
     void         *data;
     Dqn_usize     used;
+    Dqn_usize     used_hwm;
     Dqn_usize     size;
     Dqn_usize     commit;
     Dqn_MemBlock *next;
@@ -130,13 +153,14 @@ struct Dqn_MemBlockSizeRequiredResult
     Dqn_usize block_size;
 };
 
-DQN_API Dqn_usize                      Dqn_MemBlock_MetadataSize(uint8_t flags);
-DQN_API Dqn_MemBlockSizeRequiredResult Dqn_MemBlock_SizeRequired(Dqn_MemBlock const *block, Dqn_usize size, uint8_t alignment, uint32_t flags);
-DQN_API Dqn_MemBlock *                 Dqn_MemBlock_Init        (Dqn_usize reserve, Dqn_usize commit, uint32_t flags);
-DQN_API void         *                 Dqn_MemBlock_Alloc       (Dqn_MemBlock *block, Dqn_usize size, uint8_t alignment, Dqn_ZeroMem zero_mem);
-DQN_API void                           Dqn_MemBlock_Free        (Dqn_MemBlock *block);
-DQN_API void                           Dqn_MemBlock_Pop         (Dqn_MemBlock *block, Dqn_usize size);
-DQN_API void                           Dqn_MemBlock_PopTo       (Dqn_MemBlock *block, Dqn_usize to);
+DQN_API Dqn_usize                      Dqn_MemBlock_MetadataSize    (uint8_t flags);
+DQN_API Dqn_MemBlockSizeRequiredResult Dqn_MemBlock_SizeRequired    (Dqn_MemBlock const *block, Dqn_usize size, uint8_t alignment, uint32_t flags);
+DQN_API Dqn_MemBlock *                 Dqn_MemBlock_InitMemAPI(Dqn_usize reserve, Dqn_usize commit, uint32_t flags, Dqn_MemAPI mem_functions);
+DQN_API Dqn_MemBlock *                 Dqn_MemBlock_Init            (Dqn_usize reserve, Dqn_usize commit, uint32_t flags);
+DQN_API void         *                 Dqn_MemBlock_Alloc           (Dqn_MemBlock *block, Dqn_usize size, uint8_t alignment, Dqn_ZeroMem zero_mem);
+DQN_API void                           Dqn_MemBlock_Free            (Dqn_MemBlock *block);
+DQN_API void                           Dqn_MemBlock_Pop             (Dqn_MemBlock *block, Dqn_usize size);
+DQN_API void                           Dqn_MemBlock_PopTo           (Dqn_MemBlock *block, Dqn_usize to);
 
 #define               Dqn_MemBlock_New(block, Type, zero_mem)             (Type *)Dqn_MemBlock_Alloc(block, sizeof(Type),         alignof(Type), zero_mem)
 #define               Dqn_MemBlock_NewArray(block, Type, count, zero_mem) (Type *)Dqn_MemBlock_Alloc(block, sizeof(Type) * count, alignof(Type), zero_mem)
@@ -205,27 +229,13 @@ DQN_API void                           Dqn_MemBlock_PopTo       (Dqn_MemBlock *b
 
 // @proc Dqn_Arena_EndTempMemory
 //   @desc End an allocation scope previously begun by calling begin scope.
-
-// @proc Dqn_Arena_StatString
-//   @desc Dump the stats of the given arena to a string
-//   @param[in] arena The arena to dump stats for
-//   @return A stack allocated string containing the stats of the arena
-
-// @proc Dqn_Arena_LogStats
-//   @desc Dump the stats of the given arena to the memory log-stream.
-//   @param[in] arena The arena to dump stats for
-struct Dqn_ArenaStat
+struct Dqn_ArenaInfo
 {
-    Dqn_usize capacity;     // Total allocating capacity of the arena in bytes
-    Dqn_usize used;         // Total amount of bytes used in the arena
-    Dqn_usize wasted;       // Orphaned space in blocks due to allocations requiring more space than available in the active block
-    uint32_t  blocks;       // Number of memory blocks in the arena
-    Dqn_usize syscalls;     // Number of memory allocation syscalls into the OS
-
-    Dqn_usize capacity_hwm; // High-water mark for 'capacity'
-    Dqn_usize used_hwm;     // High-water mark for 'used'
-    Dqn_usize wasted_hwm;   // High-water mark for 'wasted'
-    uint32_t  blocks_hwm;   // High-water mark for 'blocks'
+    Dqn_usize capacity; // Total allocating capacity of the arena in bytes
+    Dqn_usize used;     // Total amount of bytes used in the arena
+    Dqn_usize commit;   // Total amount of bytes committed in the arena
+    Dqn_usize wasted;   // Orphaned space in blocks due to allocations requiring more space than available in the active block
+    Dqn_usize used_hwm; // High-water mark for 'used'
 };
 
 struct Dqn_ArenaBlock
@@ -234,7 +244,7 @@ struct Dqn_ArenaBlock
     void             *memory;  // Backing memory of the block
     Dqn_usize         size;    // Size of the block
     Dqn_usize         used;    // Number of bytes used up in the block. Always less than the commit amount.
-    Dqn_usize         hwm_used;// High-water mark for 'used' bytes in this block
+    Dqn_usize         used_hwm;// High-water mark for 'used' bytes in this block
     Dqn_usize         commit;  // Number of bytes in the block physically backed by pages
     Dqn_ArenaBlock   *prev;    // Previous linked block
     Dqn_ArenaBlock   *next;    // Next linked block
@@ -249,12 +259,13 @@ struct Dqn_ArenaStatString
 
 struct Dqn_Arena
 {
-    bool            allocs_are_allowed_to_leak;
-    Dqn_String8     label; // Optional label to describe the arena
-    Dqn_MemBlock   *head;  // Active block the arena is allocating from
-    Dqn_MemBlock   *curr;  // Active block the arena is allocating from
-    Dqn_MemBlock   *tail;  // Last block in the linked list of blocks
-    uint64_t        blocks;
+    Dqn_MemAPI    mem_api;
+    bool          allocs_are_allowed_to_leak;
+    Dqn_Str8      label; // Optional label to describe the arena
+    Dqn_MemBlock *head;  // Active block the arena is allocating from
+    Dqn_MemBlock *curr;  // Active block the arena is allocating from
+    Dqn_MemBlock *tail;  // Last block in the linked list of blocks
+    uint64_t      blocks;
 };
 
 struct Dqn_ArenaTempMemory
@@ -305,9 +316,8 @@ DQN_API void                Dqn_Arena_Free           (Dqn_Arena *arena, Dqn_Zero
 DQN_API Dqn_ArenaTempMemory Dqn_Arena_BeginTempMemory(Dqn_Arena *arena);
 DQN_API void                Dqn_Arena_EndTempMemory  (Dqn_ArenaTempMemory temp_memory, bool cancel);
 
-// NOTE: Arena Stats ===============================================================================
-DQN_API Dqn_ArenaStatString Dqn_Arena_StatString     (Dqn_ArenaStat const *stat);
-DQN_API void                Dqn_Arena_LogStats       (Dqn_Arena const *arena);
+// NOTE: Arena Info ===============================================================================
+DQN_API Dqn_ArenaInfo       Dqn_Arena_Info           (Dqn_Arena const *arena);
 
 // NOTE: [$ACAT] Dqn_ArenaCatalog ==================================================================
 struct Dqn_ArenaCatalogItem
@@ -328,5 +338,5 @@ struct Dqn_ArenaCatalog
 DQN_API void       Dqn_ArenaCatalog_Init   (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena);
 DQN_API void       Dqn_ArenaCatalog_Add    (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena);
 DQN_API Dqn_Arena *Dqn_ArenaCatalog_Alloc  (Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit);
-DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, va_list args);
-DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF (Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, char const *fmt, ...);
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF (Dqn_ArenaCatalog *catalog, Dqn_usize byte_size, Dqn_usize commit, DQN_FMT_ATTRIB char const *fmt, ...);

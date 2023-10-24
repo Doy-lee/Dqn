@@ -42,7 +42,7 @@ DQN_API Dqn_StackTraceWalkResult Dqn_StackTrace_Walk(Dqn_Arena *arena, uint16_t 
         if (!SymInitialize(result.process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/)) {
             Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
             Dqn_WinError error        = Dqn_Win_LastError(scratch.arena);
-            Dqn_Log_ErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DQN_STRING_FMT(error.msg));
+            Dqn_Log_ErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DQN_STR_FMT(error.msg));
         }
     }
 
@@ -132,16 +132,16 @@ DQN_API Dqn_StackTraceFrame Dqn_StackTrace_RawFrameToFrame(Dqn_Arena *arena, Dqn
 
     // NOTE: Construct result ======================================================================
 
-    Dqn_String16 file_name16     = Dqn_String16{line.FileName, Dqn_CString16_Size(line.FileName)};
-    Dqn_String16 function_name16 = Dqn_String16{symbol->Name, symbol->NameLen};
+    Dqn_Str16 file_name16     = Dqn_Str16{line.FileName, Dqn_CStr16_Size(line.FileName)};
+    Dqn_Str16 function_name16 = Dqn_Str16{symbol->Name, symbol->NameLen};
 
-    Dqn_StackTraceFrame result   = {};
-    result.address               = raw_frame.base_addr;
-    result.line_number           = line.LineNumber;
-    result.file_name             = Dqn_Win_String16ToString8(arena, file_name16);
-    result.function_name         = Dqn_Win_String16ToString8(arena, function_name16);
+    Dqn_StackTraceFrame result = {};
+    result.address             = raw_frame.base_addr;
+    result.line_number         = line.LineNumber;
+    result.file_name           = Dqn_Win_Str16ToStr8(arena, file_name16);
+    result.function_name       = Dqn_Win_Str16ToStr8(arena, function_name16);
     #else
-    Dqn_StackTraceFrame result   = {};
+    Dqn_StackTraceFrame result = {};
     #endif
     return result;
 }
@@ -168,12 +168,12 @@ DQN_API void Dqn_StackTrace_Print(uint16_t limit)
     Dqn_ThreadScratch scratch                  = Dqn_Thread_GetScratch(nullptr);
     Dqn_Slice<Dqn_StackTraceFrame> stack_trace = Dqn_StackTrace_GetFrames(scratch.arena, limit);
     for (Dqn_StackTraceFrame& frame : stack_trace)
-        Dqn_Print_ErrLnF("%.*s(%I64u): %.*s", DQN_STRING_FMT(frame.file_name), frame.line_number, DQN_STRING_FMT(frame.function_name));
+        Dqn_Print_ErrLnF("%.*s(%I64u): %.*s", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name));
 }
 
 // NOTE: [$DEBG] Dqn_Debug =========================================================================
 #if defined(DQN_LEAK_TRACING)
-DQN_API void Dqn_Debug_TrackAlloc_(Dqn_String8 stack_trace, void *ptr, Dqn_usize size, bool leak_permitted)
+DQN_API void Dqn_Debug_TrackAlloc_(Dqn_Str8 stack_trace, void *ptr, Dqn_usize size, bool leak_permitted)
 {
     if (!ptr)
         return;
@@ -202,9 +202,9 @@ DQN_API void Dqn_Debug_TrackAlloc_(Dqn_String8 stack_trace, void *ptr, Dqn_usize
     Dqn_AllocRecord *alloc                  = Dqn_DSMap_Find(alloc_table, key);
     if (alloc) {
         if ((alloc->flags & Dqn_AllocRecordFlag_Freed) == 0) {
-            Dqn_String8 alloc_stack_trace       = Dqn_String8_Init(alloc->stack_trace, alloc->stack_trace_size);
-            Dqn_String8 alloc_clean_stack_trace = Dqn_String8_Slice(alloc_stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, alloc_stack_trace.size);
-            Dqn_String8 clean_stack_trace       = Dqn_String8_Slice(stack_trace,       g_dqn_library->stack_trace_offset_to_our_call_stack, stack_trace.size);
+            Dqn_Str8 alloc_stack_trace       = Dqn_Str8_Init(alloc->stack_trace, alloc->stack_trace_size);
+            Dqn_Str8 alloc_clean_stack_trace = Dqn_Str8_Slice(alloc_stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, alloc_stack_trace.size);
+            Dqn_Str8 clean_stack_trace       = Dqn_Str8_Slice(stack_trace,       g_dqn_library->stack_trace_offset_to_our_call_stack, stack_trace.size);
             DQN_HARD_ASSERTF(
                 alloc->flags & Dqn_AllocRecordFlag_Freed,
                 "\n\nThis pointer is already in the leak tracker, however it has not "
@@ -221,8 +221,8 @@ DQN_API void Dqn_Debug_TrackAlloc_(Dqn_String8 stack_trace, void *ptr, Dqn_usize
                 "%.*s"
                 ,
                 ptr, alloc->size,
-                DQN_STRING_FMT(alloc_clean_stack_trace),
-                DQN_STRING_FMT(clean_stack_trace));
+                DQN_STR_FMT(alloc_clean_stack_trace),
+                DQN_STR_FMT(clean_stack_trace));
         }
 
         // NOTE: Pointer was reused, clean up the prior entry
@@ -243,7 +243,7 @@ DQN_API void Dqn_Debug_TrackAlloc_(Dqn_String8 stack_trace, void *ptr, Dqn_usize
         alloc->flags |= Dqn_AllocRecordFlag_LeakPermitted;
 }
 
-DQN_API void Dqn_Debug_TrackDealloc_(Dqn_String8 stack_trace, void *ptr)
+DQN_API void Dqn_Debug_TrackDealloc_(Dqn_Str8 stack_trace, void *ptr)
 {
     if (!ptr || g_dqn_library->alloc_tracking_disabled)
         return;
@@ -261,13 +261,13 @@ DQN_API void Dqn_Debug_TrackDealloc_(Dqn_String8 stack_trace, void *ptr)
                             ptr);
 
     if (alloc->flags & Dqn_AllocRecordFlag_Freed) {
-        Dqn_String8 alloc_stack_trace       = Dqn_String8_Init(alloc->stack_trace, alloc->stack_trace_size);
-        Dqn_String8 alloc_clean_stack_trace = Dqn_String8_Slice(alloc_stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, alloc_stack_trace.size);
+        Dqn_Str8 alloc_stack_trace       = Dqn_Str8_Init(alloc->stack_trace, alloc->stack_trace_size);
+        Dqn_Str8 alloc_clean_stack_trace = Dqn_Str8_Slice(alloc_stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, alloc_stack_trace.size);
 
-        Dqn_String8 alloc_freed_stack_trace       = Dqn_String8_Init(alloc->freed_stack_trace, alloc->freed_stack_trace_size);
-        Dqn_String8 alloc_freed_clean_stack_trace = Dqn_String8_Slice(alloc_freed_stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, alloc_freed_stack_trace.size);
+        Dqn_Str8 alloc_freed_stack_trace       = Dqn_Str8_Init(alloc->freed_stack_trace, alloc->freed_stack_trace_size);
+        Dqn_Str8 alloc_freed_clean_stack_trace = Dqn_Str8_Slice(alloc_freed_stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, alloc_freed_stack_trace.size);
 
-        Dqn_String8 dealloc_stack_trace           = Dqn_String8_Slice(stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, stack_trace.size);
+        Dqn_Str8 dealloc_stack_trace           = Dqn_Str8_Slice(stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, stack_trace.size);
 
         DQN_HARD_ASSERTF((alloc->flags & Dqn_AllocRecordFlag_Freed) == 0,
                          "\n\nDouble free detected, pointer to free was already marked "
@@ -286,9 +286,9 @@ DQN_API void Dqn_Debug_TrackDealloc_(Dqn_String8 stack_trace, void *ptr)
                          "%.*s"
                          ,
                          ptr, alloc->freed_size,
-                         DQN_STRING_FMT(alloc_clean_stack_trace),
-                         DQN_STRING_FMT(alloc_freed_clean_stack_trace),
-                         DQN_STRING_FMT(dealloc_stack_trace));
+                         DQN_STR_FMT(alloc_clean_stack_trace),
+                         DQN_STR_FMT(alloc_freed_clean_stack_trace),
+                         DQN_STR_FMT(dealloc_stack_trace));
     }
 
     alloc->flags                  |= Dqn_AllocRecordFlag_Freed;
@@ -310,12 +310,12 @@ DQN_API void Dqn_Debug_DumpLeaks()
             leaked_bytes += alloc->size;
             leak_count++;
 
-            Dqn_String8 stack_trace = Dqn_String8_Init(alloc->stack_trace, alloc->stack_trace_size);
-            Dqn_String8 clean_stack_trace = Dqn_String8_Slice(stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, stack_trace.size);
+            Dqn_Str8 stack_trace       = Dqn_Str8_Init(alloc->stack_trace, alloc->stack_trace_size);
+            Dqn_Str8 clean_stack_trace = Dqn_Str8_Slice(stack_trace, g_dqn_library->stack_trace_offset_to_our_call_stack, stack_trace.size);
             Dqn_Log_WarningF("Pointer (0x%p) leaked %_$$zu at:\n"
                              "%.*s",
                              alloc->ptr, alloc->size,
-                             DQN_STRING_FMT(clean_stack_trace));
+                             DQN_STR_FMT(clean_stack_trace));
         }
     }
 
