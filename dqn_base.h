@@ -415,8 +415,13 @@ struct Dqn_CallSite
     #else
         #define Dqn_CPU_TSC() __builtin_readcyclecounter()
     #endif
-    #define Dqn_CompilerReadBarrierAndCPUReadFence   asm volatile("lfence" ::: "memory")
-    #define Dqn_CompilerWriteBarrierAndCPUWriteFence asm volatile("sfence" ::: "memory")
+    #if defined(DQN_PLATFORM_EMSCRIPTEN)
+        #define Dqn_CompilerReadBarrierAndCPUReadFence
+        #define Dqn_CompilerWriteBarrierAndCPUWriteFence
+    #else
+        #define Dqn_CompilerReadBarrierAndCPUReadFence   asm volatile("lfence" ::: "memory")
+        #define Dqn_CompilerWriteBarrierAndCPUWriteFence asm volatile("sfence" ::: "memory")
+    #endif
 #else
     #error "Compiler not supported"
 #endif

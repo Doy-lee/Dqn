@@ -496,7 +496,7 @@ void Dqn_Docs_Demo()
 
             // Print the result like so
             if (0) {
-                printf("%.*s[%u] %zu cycles (%.1fms)\n",
+                printf("%.*s[%u] %llu cycles (%.1fms)\n",
                        DQN_STR_FMT(anchor->name),
                        anchor->hit_count,
                        anchor->tsc_inclusive,
@@ -610,7 +610,7 @@ void Dqn_Docs_Demo()
 
             // You may then print out the frame like so
             if (0)
-                printf("%.*s(%I64u): %.*s\n", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name));
+                printf("%.*s(%llu): %.*s\n", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name));
         }
 
         // If you load new shared-libraries into the address space it maybe
@@ -1044,6 +1044,7 @@ void Dqn_Docs_Demo()
 
     // NOTE: Dqn_Win_LastError         /////////////////////////////////////////////////////////////
     // NOTE: Dqn_Win_ErrorCodeToMsg    /////////////////////////////////////////////////////////////
+    #if defined(DQN_PLATFORM_WIN32)
     if (0) {
         // Generate the error string for the last Win32 API called that return
         // an error value.
@@ -1087,5 +1088,6 @@ void Dqn_Docs_Demo()
             printf("%.*s\n", DQN_STR_FMT(it.file_name));
         }
     }
+    #endif
 }
 DQN_MSVC_WARNING_POP

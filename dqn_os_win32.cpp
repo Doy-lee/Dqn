@@ -627,7 +627,7 @@ DQN_API Dqn_OSSemaphore Dqn_OS_SemaphoreInit(uint32_t initial_count)
     return result;
 }
 
-DQN_API bool Dqn_OS_SemaphoreHasData(Dqn_OSSemaphore *semaphore)
+DQN_API bool Dqn_OS_SemaphoreIsValid(Dqn_OSSemaphore *semaphore)
 {
     bool result = false;
     if (semaphore) {
@@ -638,7 +638,7 @@ DQN_API bool Dqn_OS_SemaphoreHasData(Dqn_OSSemaphore *semaphore)
 
 DQN_API void Dqn_OS_SemaphoreDeinit(Dqn_OSSemaphore *semaphore)
 {
-    if (!Dqn_OS_SemaphoreHasData(semaphore))
+    if (!Dqn_OS_SemaphoreIsValid(semaphore))
         return;
     CloseHandle(semaphore->win32_handle);
     *semaphore = {};
@@ -646,7 +646,7 @@ DQN_API void Dqn_OS_SemaphoreDeinit(Dqn_OSSemaphore *semaphore)
 
 DQN_API void Dqn_OS_SemaphoreIncrement(Dqn_OSSemaphore *semaphore, uint32_t amount)
 {
-    if (!Dqn_OS_SemaphoreHasData(semaphore))
+    if (!Dqn_OS_SemaphoreIsValid(semaphore))
         return;
     LONG prev_count = 0;
     ReleaseSemaphore(DQN_CAST(HANDLE *)semaphore->win32_handle, amount, &prev_count);
@@ -655,7 +655,7 @@ DQN_API void Dqn_OS_SemaphoreIncrement(Dqn_OSSemaphore *semaphore, uint32_t amou
 DQN_API Dqn_OSSemaphoreWaitResult Dqn_OS_SemaphoreWait(Dqn_OSSemaphore *semaphore, uint32_t timeout_ms)
 {
     Dqn_OSSemaphoreWaitResult result = {};
-    if (!Dqn_OS_SemaphoreHasData(semaphore))
+    if (!Dqn_OS_SemaphoreIsValid(semaphore))
         return result;
 
     if (!semaphore->win32_handle)
@@ -965,7 +965,7 @@ DQN_API void Dqn_OS_HttpRequestFree(Dqn_OSHttpResponse *response)
     response->win32_request_connection = nullptr;
     response->win32_request_handle     = nullptr;
     Dqn_Arena_Deinit(&response->tmp_arena);
-    if (Dqn_OS_SemaphoreHasData(&response->on_complete_semaphore))
+    if (Dqn_OS_SemaphoreIsValid(&response->on_complete_semaphore))
         Dqn_OS_SemaphoreDeinit(&response->on_complete_semaphore);
 
     *response = {};

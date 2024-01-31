@@ -119,6 +119,10 @@ DQN_API uint64_t Dqn_OS_DateUnixTime()
 
 DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
 {
+#if defined(DQN_PLATFORM_EMSCRIPTEN)
+    (void)buffer; (void)size;
+    return false;
+#else
     if (!buffer || size < 0)
         return false;
 
@@ -135,6 +139,7 @@ DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
         read_bytes = getrandom(buffer, size, 0); // NOTE: EINTR can not be triggered if size <= 32 bytes
     } while (read_bytes != size || errno == EAGAIN);
     return true;
+#endif
 }
 
 DQN_API Dqn_Str8 Dqn_OS_EXEPath(Dqn_Arena *arena)
@@ -367,7 +372,7 @@ DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
     }
 
     if (access & Dqn_OSFileAccess_Execute) {
-        result.error_size = DQN_CAST(uint16_t) Dqn_SNPrintFDotTruncate(
+        result.error_size = DQN_CAST(uint16_t) Dqn_FmtBuffer3DotTruncate(
             result.error,
             DQN_ARRAY_UCOUNT(result.error),
             "Open file failed: execute access not supported for \"%.*s\"",
@@ -389,7 +394,7 @@ DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
             default: DQN_INVALID_CODE_PATH; break;
         }
         if (!handle) {
-            result.error_size = DQN_CAST(uint16_t)Dqn_SNPrintFDotTruncate(
+            result.error_size = DQN_CAST(uint16_t)Dqn_FmtBuffer3DotTruncate(
                 result.error,
                 DQN_ARRAY_UCOUNT(result.error),
                 "Open file failed: Could not open file in requested mode %d for \"%.*s\"",
@@ -411,7 +416,7 @@ DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
 
     FILE *handle = fopen(path.data, fopen_mode);
     if (!handle) {
-        result.error_size = DQN_CAST(uint16_t) Dqn_SNPrintFDotTruncate(
+        result.error_size = DQN_CAST(uint16_t) Dqn_FmtBuffer3DotTruncate(
             result.error,
             DQN_ARRAY_UCOUNT(result.error),
             "Open file failed: Could not open file in fopen mode \"%s\" for \"%.*s\"",

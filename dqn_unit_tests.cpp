@@ -85,7 +85,7 @@ static Dqn_UTest Dqn_Test_Arena()
             }
             Dqn_Arena_TempMemEnd(temp_memory);
             DQN_UTEST_ASSERT (&test, arena.curr->prev == nullptr);
-            DQN_UTEST_ASSERTF(&test, arena.curr->reserve >= DQN_MEGABYTES(1), "size=%zuMiB (%zuB), expect=%zuB", (arena.curr->reserve / 1024 / 1024), arena.curr->reserve, DQN_MEGABYTES(1));
+            DQN_UTEST_ASSERTF(&test, arena.curr->reserve >= DQN_MEGABYTES(1), "size=%lluMiB (%lluB), expect=%lluB", (arena.curr->reserve / 1024 / 1024), arena.curr->reserve, DQN_MEGABYTES(1));
         }
     }
     return test;
@@ -98,57 +98,57 @@ static Dqn_UTest Dqn_Test_Bin()
     DQN_UTEST_GROUP(test, "Dqn_Bin") {
         DQN_UTEST_TEST("Convert 0x123") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0x123"));
-            DQN_UTEST_ASSERTF(&test, result == 0x123, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0x123, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert 0xFFFF") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0xFFFF"));
-            DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert FFFF") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("FFFF"));
-            DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert abCD") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("abCD"));
-            DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert 0xabCD") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0xabCD"));
-            DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert 0x") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0x"));
-            DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert 0X") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0X"));
-            DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert 3") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("3"));
-            DQN_UTEST_ASSERTF(&test, result == 3, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 3, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert f") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("f"));
-            DQN_UTEST_ASSERTF(&test, result == 0xf, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xf, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert g") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("g"));
-            DQN_UTEST_ASSERTF(&test, result == 0, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0, "result: %llu", result);
         }
 
         DQN_UTEST_TEST("Convert -0x3") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("-0x3"));
-            DQN_UTEST_ASSERTF(&test, result == 0, "result: %zu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0, "result: %llu", result);
         }
 
         uint32_t number = 0xd095f6;
@@ -829,7 +829,7 @@ static Dqn_UTest Dqn_Test_Intrinsics()
         DQN_UTEST_TEST("Dqn_Atomic_AddU64") {
             uint64_t val = 0;
             Dqn_Atomic_AddU64(&val, 1);
-            DQN_UTEST_ASSERTF(&test, val == 1, "val: %zu", val);
+            DQN_UTEST_ASSERTF(&test, val == 1, "val: %llu", val);
         }
 
         DQN_UTEST_TEST("Dqn_Atomic_SubU32") {
@@ -841,7 +841,7 @@ static Dqn_UTest Dqn_Test_Intrinsics()
         DQN_UTEST_TEST("Dqn_Atomic_SubU64") {
             uint64_t val = 1;
             Dqn_Atomic_SubU64(&val, 1);
-            DQN_UTEST_ASSERTF(&test, val == 0, "val: %zu", val);
+            DQN_UTEST_ASSERTF(&test, val == 0, "val: %llu", val);
         }
 
         DQN_UTEST_TEST("Dqn_Atomic_SetValue32") {
@@ -855,7 +855,7 @@ static Dqn_UTest Dqn_Test_Intrinsics()
             int64_t a = 0;
             int64_t b = 111;
             Dqn_Atomic_SetValue64(DQN_CAST(uint64_t *)&a, b);
-            DQN_UTEST_ASSERTF(&test, a == b, "a: %I64i, b: %I64i", a, b);
+            DQN_UTEST_ASSERTF(&test, a == b, "a: %lld, b: %lld", a, b);
         }
 
         Dqn_UTest_Begin(&test, "Dqn_CPU_TSC");
@@ -1154,7 +1154,7 @@ static Dqn_UTest Dqn_Test_OS()
         DQN_UTEST_TEST("Consecutive ticks are ordered") {
             uint64_t a = Dqn_OS_PerfCounterNow();
             uint64_t b = Dqn_OS_PerfCounterNow();
-            DQN_UTEST_ASSERTF(&test, b >= a, "a: %zu, b: %zu", a, b);
+            DQN_UTEST_ASSERTF(&test, b >= a, "a: %llu, b: %llu", a, b);
         }
 
         DQN_UTEST_TEST("Ticks to time are a correct order of magnitude") {
@@ -1307,7 +1307,7 @@ static Dqn_UTest Dqn_Test_Str8()
     DQN_UTEST_GROUP(test, "Dqn_Str8") {
         DQN_UTEST_TEST("Initialise with string literal w/ macro") {
             Dqn_Str8 string = DQN_STR8("AB");
-            DQN_UTEST_ASSERTF(&test, string.size == 2,      "size: %I64u",   string.size);
+            DQN_UTEST_ASSERTF(&test, string.size == 2,      "size: %zu",   string.size);
             DQN_UTEST_ASSERTF(&test, string.data[0] == 'A', "string[0]: %c", string.data[0]);
             DQN_UTEST_ASSERTF(&test, string.data[1] == 'B', "string[1]: %c", string.data[1]);
         }
@@ -1315,7 +1315,7 @@ static Dqn_UTest Dqn_Test_Str8()
         DQN_UTEST_TEST("Initialise with format string") {
             Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
             Dqn_Str8    string  = Dqn_Str8_InitF(scratch.arena, "%s", "AB");
-            DQN_UTEST_ASSERTF(&test, string.size == 2,      "size: %I64u",   string.size);
+            DQN_UTEST_ASSERTF(&test, string.size == 2,      "size: %zu",   string.size);
             DQN_UTEST_ASSERTF(&test, string.data[0] == 'A', "string[0]: %c", string.data[0]);
             DQN_UTEST_ASSERTF(&test, string.data[1] == 'B', "string[1]: %c", string.data[1]);
             DQN_UTEST_ASSERTF(&test, string.data[2] == 0,   "string[2]: %c", string.data[2]);
@@ -1325,7 +1325,7 @@ static Dqn_UTest Dqn_Test_Str8()
             Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
             Dqn_Str8 string        = DQN_STR8("AB");
             Dqn_Str8 copy          = Dqn_Str8_Copy(scratch.arena, string);
-            DQN_UTEST_ASSERTF(&test, copy.size == 2,      "size: %I64u", copy.size);
+            DQN_UTEST_ASSERTF(&test, copy.size == 2,      "size: %zu", copy.size);
             DQN_UTEST_ASSERTF(&test, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
             DQN_UTEST_ASSERTF(&test, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
             DQN_UTEST_ASSERTF(&test, copy.data[2] ==  0,  "copy[2]: %c", copy.data[2]);
@@ -1339,7 +1339,7 @@ static Dqn_UTest Dqn_Test_Str8()
         DQN_UTEST_TEST("Allocate string from arena") {
             Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
             Dqn_Str8 string = Dqn_Str8_Alloc(scratch.arena, 2, Dqn_ZeroMem_No);
-            DQN_UTEST_ASSERTF(&test, string.size == 2, "size: %I64u", string.size);
+            DQN_UTEST_ASSERTF(&test, string.size == 2, "size: %zu", string.size);
         }
 
         // NOTE: Dqn_CStr8_Trim[Prefix/Suffix]
@@ -1499,55 +1499,55 @@ static Dqn_UTest Dqn_Test_Str8()
         DQN_UTEST_TEST("To U64: Convert nullptr") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(Dqn_Str8_Init(nullptr, 5), 0);
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %llu", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert empty string") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8(""), 0);
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %llu", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("1"), 0);
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %llu", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"-0\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("-0"), 0);
             DQN_UTEST_ASSERT(&test, !result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %llu", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"-1\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("-1"), 0);
             DQN_UTEST_ASSERT(&test, !result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %llu", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1.2\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("1.2"), 0);
             DQN_UTEST_ASSERT(&test, !result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %llu", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1,234\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("1,234"), ',');
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 1234, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 1234, "result: %llu", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1,2\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("1,2"), ',');
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %llu", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"12a3\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("12a3"), 0);
             DQN_UTEST_ASSERT(&test, !result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %I64u", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %llu", result.value);
         }
 
         // NOTE: Dqn_Str8_Find
@@ -1776,6 +1776,7 @@ static Dqn_UTest Dqn_Test_VArray()
     return test;
 }
 
+#if defined(DQN_PLATFORM_WIN32)
 static Dqn_UTest Dqn_Test_Win()
 {
     Dqn_UTest test = {};
@@ -1821,6 +1822,7 @@ static Dqn_UTest Dqn_Test_Win()
     }
     return test;
 }
+#endif // DQN_PLATFORM_WIN#@
 
 void Dqn_Test_RunSuite()
 {
@@ -1843,7 +1845,9 @@ void Dqn_Test_RunSuite()
         Dqn_Test_Str8(),
         Dqn_Test_TicketMutex(),
         Dqn_Test_VArray(),
+        #if defined(DQN_PLATFORM_WIN32)
         Dqn_Test_Win(),
+        #endif
     };
 
     int total_tests = 0;

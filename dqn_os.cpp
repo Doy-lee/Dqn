@@ -425,7 +425,7 @@ DQN_API void Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_d
 // NOTE: [$HTTP] Dqn_OSHttp ////////////////////////////////////////////////////////////////////////
 DQN_API void Dqn_OS_HttpRequestWait(Dqn_OSHttpResponse *response)
 {
-    if (response && Dqn_OS_SemaphoreHasData(&response->on_complete_semaphore))
+    if (response && Dqn_OS_SemaphoreIsValid(&response->on_complete_semaphore))
         Dqn_OS_SemaphoreWait(&response->on_complete_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
 }
 
