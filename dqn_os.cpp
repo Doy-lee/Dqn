@@ -1,136 +1,442 @@
-DQN_API void Dqn_OS_Exit(uint32_t exit_code)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//    $$$$$$\   $$$$$$\
+//   $$  __$$\ $$  __$$\
+//   $$ /  $$ |$$ /  \__|
+//   $$ |  $$ |\$$$$$$\
+//   $$ |  $$ | \____$$\
+//   $$ |  $$ |$$\   $$ |
+//    $$$$$$  |\$$$$$$  |
+//    \______/  \______/
+//
+//   dqn_os.cpp
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: [$DATE] Date //////////////////////////////////////////////////////////////////////////////
+DQN_API Dqn_OSDateTimeStr8 Dqn_OS_DateLocalTimeStr8(Dqn_OSDateTime time, char date_separator, char hms_separator)
 {
-    #if defined(DQN_OS_WIN32)
-    ExitProcess(exit_code);
-    #else
-    exit(exit_code);
-    #endif
-}
+    Dqn_OSDateTimeStr8 result = {};
+    result.hms_size           = DQN_CAST(uint8_t) DQN_SNPRINTF(result.hms,
+                                                                DQN_ARRAY_ICOUNT(result.hms),
+                                                                "%02hhu%c%02hhu%c%02hhu",
+                                                                time.hour,
+                                                                hms_separator,
+                                                                time.minutes,
+                                                                hms_separator,
+                                                                time.seconds);
 
-// NOTE: [$EXEC] Dqn_OSExec ========================================================================
-DQN_API Dqn_OSExecResult Dqn_OS_ExecWait(Dqn_OSExecAsyncHandle handle)
-{
-    Dqn_OSExecResult result = {};
-    if (!handle.process || handle.os_error_code) {
-        result.os_error_code = handle.os_error_code;
-        return result;
-    }
+    result.date_size = DQN_CAST(uint8_t) DQN_SNPRINTF(result.date,
+                                                      DQN_ARRAY_ICOUNT(result.date),
+                                                      "%hu%c%02hhu%c%02hhu",
+                                                      time.year,
+                                                      date_separator,
+                                                      time.month,
+                                                      date_separator,
+                                                      time.day);
 
-    #if defined(DQN_OS_WIN32)
-    DWORD exec_result = WaitForSingleObject(handle.process, INFINITE);
-    if (exec_result == WAIT_FAILED) {
-        result.os_error_code = GetLastError();
-        return result;
-    }
-
-    DWORD exit_status;
-    if (!GetExitCodeProcess(handle.process, &exit_status)) {
-        result.os_error_code = GetLastError();
-        return result;
-    }
-
-    result.exit_code = exit_status;
-    CloseHandle(handle.process);
-    #elif defined(DQN_PLATFORM_EMSCRIPTEN)
-    DQN_ASSERTF(false, "Unsupported operation");
-    #else
-    for (;;) {
-        int status = 0;
-        if (waitpid(DQN_CAST(pid_t)handle.process, &status, 0) < 0) {
-            result.os_error_code = errno;
-            break;
-        }
-
-        if (WIFEXITED(status)) {
-            result.exit_code = WEXITSTATUS(status);
-            break;
-        }
-
-        if (WIFSIGNALLED(status)) {
-            result.os_error_code = WTERMSIG(status);
-            break;
-        }
-    }
-    #endif
+    DQN_ASSERT(result.hms_size < DQN_ARRAY_UCOUNT(result.hms));
+    DQN_ASSERT(result.date_size < DQN_ARRAY_UCOUNT(result.date));
     return result;
 }
 
-DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Str8 cmd, Dqn_Str8 working_dir)
+DQN_API Dqn_OSDateTimeStr8 Dqn_OS_DateLocalTimeStr8Now(char date_separator, char hms_separator)
 {
-    Dqn_OSExecAsyncHandle result = {};
-    if (cmd.size == 0)
-        return result;
+    Dqn_OSDateTime time       = Dqn_OS_DateLocalTimeNow();
+    Dqn_OSDateTimeStr8 result = Dqn_OS_DateLocalTimeStr8(time, date_separator, hms_separator);
+    return result;
+}
 
-    #if defined(DQN_OS_WIN32)
-    Dqn_ThreadScratch scratch       = Dqn_Thread_GetScratch(nullptr);
-    Dqn_Str16         cmd16         = Dqn_Win_Str8ToStr16(scratch.arena, cmd);
-    Dqn_Str16         working_dir16 = Dqn_Win_Str8ToStr16(scratch.arena, working_dir);
-
-    PROCESS_INFORMATION proc_info = {};
-    STARTUPINFOW startup_info     = {};
-    startup_info.cb               = sizeof(STARTUPINFOW);
-    startup_info.hStdError        = GetStdHandle(STD_ERROR_HANDLE);
-    startup_info.hStdOutput       = GetStdHandle(STD_OUTPUT_HANDLE);
-    startup_info.hStdInput        = GetStdHandle(STD_INPUT_HANDLE);
-    startup_info.dwFlags         |= STARTF_USESTDHANDLES;
-    BOOL create_result            = CreateProcessW(nullptr, cmd16.data, nullptr, nullptr, true, 0, nullptr, working_dir16.data, &startup_info, &proc_info);
-    if (!create_result) {
-        result.os_error_code = GetLastError();
+DQN_API Dqn_Str8 Dqn_OS_EXEDir(Dqn_Arena *arena)
+{
+    Dqn_Str8 result = {};
+    if (!arena)
         return result;
+    Dqn_Scratch               scratch      = Dqn_Scratch_Get(arena);
+    Dqn_Str8                  exe_path     = Dqn_OS_EXEPath(scratch.arena);
+    Dqn_Str8                  separators[] = {DQN_STR8("/"), DQN_STR8("\\")};
+    Dqn_Str8BinarySplitResult split        = Dqn_Str8_BinarySplitReverseArray(exe_path, separators, DQN_ARRAY_UCOUNT(separators));
+    result                                 = Dqn_Str8_Copy(arena, split.lhs);
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_OS_PerfCounterS(uint64_t begin, uint64_t end)
+{
+    uint64_t frequency = Dqn_OS_PerfCounterFrequency();
+    uint64_t ticks     = end - begin;
+    Dqn_f64  result    = ticks / DQN_CAST(Dqn_f64)frequency;
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_OS_PerfCounterMs(uint64_t begin, uint64_t end)
+{
+    uint64_t frequency = Dqn_OS_PerfCounterFrequency();
+    uint64_t ticks     = end - begin;
+    Dqn_f64  result    = (ticks * 1'000) / DQN_CAST(Dqn_f64)frequency;
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_OS_PerfCounterUs(uint64_t begin, uint64_t end)
+{
+    uint64_t frequency = Dqn_OS_PerfCounterFrequency();
+    uint64_t ticks     = end - begin;
+    Dqn_f64  result    = (ticks * 1'000'000) / DQN_CAST(Dqn_f64)frequency;
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_OS_PerfCounterNs(uint64_t begin, uint64_t end)
+{
+    uint64_t frequency = Dqn_OS_PerfCounterFrequency();
+    uint64_t ticks     = end - begin;
+    Dqn_f64  result    = (ticks * 1'000'000'000) / DQN_CAST(Dqn_f64)frequency;
+    return result;
+}
+
+
+DQN_API Dqn_OSTimer Dqn_OS_TimerBegin()
+{
+    Dqn_OSTimer result = {};
+    result.start       = Dqn_OS_PerfCounterNow();
+    return result;
+}
+
+DQN_API void Dqn_OS_TimerEnd(Dqn_OSTimer *timer)
+{
+    timer->end = Dqn_OS_PerfCounterNow();
+}
+
+DQN_API Dqn_f64 Dqn_OS_TimerS(Dqn_OSTimer timer)
+{
+    Dqn_f64 result = Dqn_OS_PerfCounterS(timer.start, timer.end);
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_OS_TimerMs(Dqn_OSTimer timer)
+{
+    Dqn_f64 result = Dqn_OS_PerfCounterMs(timer.start, timer.end);
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_OS_TimerUs(Dqn_OSTimer timer)
+{
+    Dqn_f64 result = Dqn_OS_PerfCounterUs(timer.start, timer.end);
+    return result;
+}
+
+DQN_API Dqn_f64 Dqn_OS_TimerNs(Dqn_OSTimer timer)
+{
+    Dqn_f64 result = Dqn_OS_PerfCounterNs(timer.start, timer.end);
+    return result;
+}
+
+DQN_API uint64_t Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_frequency)
+{
+    uint64_t os_frequency      = Dqn_OS_PerfCounterFrequency();
+    uint64_t os_target_elapsed = duration_ms_to_gauge_tsc_frequency * os_frequency / 1000ULL;
+    uint64_t tsc_begin         = Dqn_CPU_TSC();
+    uint64_t result            = 0;
+    if (tsc_begin) {
+        uint64_t os_elapsed = 0;
+        for (uint64_t os_begin = Dqn_OS_PerfCounterNow(); os_elapsed < os_target_elapsed; )
+            os_elapsed = Dqn_OS_PerfCounterNow() - os_begin;
+        uint64_t tsc_end     = Dqn_CPU_TSC();
+        uint64_t tsc_elapsed = tsc_end - tsc_begin;
+        result               = tsc_elapsed / os_elapsed * os_frequency;
+    }
+    return result;
+}
+
+#if !defined(DQN_NO_OS_FILE_API)
+// NOTE: [$FILE] Dqn_OSPathInfo/File ///////////////////////////////////////////////////////////////
+DQN_API bool Dqn_OS_WriteFile(Dqn_OSFile *file, Dqn_Str8 buffer)
+{
+    bool result = Dqn_OS_WriteFileBuffer(file, buffer.data, buffer.size);
+    return result;
+}
+
+DQN_API bool Dqn_OS_WriteFileFV(Dqn_OSFile *file, DQN_FMT_ATTRIB char const *fmt, va_list args)
+{
+    bool result = false;
+    if (!file || !fmt)
+        return result;
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    result              = Dqn_OS_WriteFileBuffer(file, buffer.data, buffer.size);
+    return result;
+}
+
+DQN_API bool Dqn_OS_WriteFileF(Dqn_OSFile *file, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    bool result = Dqn_OS_WriteFileFV(file, fmt, args);
+    va_end(args);
+    return result;
+}
+
+// NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
+DQN_API bool Dqn_OS_WriteAll(Dqn_Str8 path, Dqn_Str8 buffer)
+{
+    Dqn_OSFile file = Dqn_OS_OpenFile(path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_Write);
+    bool result     = Dqn_OS_WriteFile(&file, buffer);
+    Dqn_OS_CloseFile(&file);
+    return result;
+}
+
+DQN_API bool Dqn_OS_WriteAllFV(Dqn_Str8 file_path, DQN_FMT_ATTRIB char const *fmt, va_list args)
+{
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_Str8          buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    bool              result  = Dqn_OS_WriteAll(file_path, buffer);
+    return result;
+}
+
+DQN_API bool Dqn_OS_WriteAllF(Dqn_Str8 file_path, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    bool result = Dqn_OS_WriteAllFV(file_path, fmt, args);
+    va_end(args);
+    return result;
+}
+
+DQN_API bool Dqn_OS_WriteAllSafe(Dqn_Str8 path, Dqn_Str8 buffer)
+{
+    Dqn_Scratch scratch  = Dqn_Scratch_Get(nullptr);
+    Dqn_Str8    tmp_path = Dqn_Str8_InitF(scratch.arena, "%.*s.tmp", DQN_STR_FMT(path));
+    if (!Dqn_OS_WriteAll(tmp_path, buffer)) {
+        Dqn_Log_ErrorF("Failed to write to temporary file [path=%.*s]", DQN_STR_FMT(tmp_path));
+        return false;
     }
 
-    CloseHandle(proc_info.hThread);
-    result.process = proc_info.hProcess;
-    #else
-    DQN_ASSERTF(false, "Unsupported operation");
-    // TODO: This API will need to switch to an array of strings for unix
-    #if 0
-    pid_t child_pid = fork();
-    if (child_pid < 0) {
-        result.os_error_code = errno;
-        return result;
+    if (!Dqn_OS_FileCopy(tmp_path, path, true /*overwrite*/)) {
+        Dqn_Log_ErrorF("Failed to overwrite file at '%.*s' with temporary file '%.*s' to complete the safe-write",
+                       DQN_STR_FMT(tmp_path),
+                       DQN_STR_FMT(path));
+        return false;
     }
 
-    if (child_pid == 0) {
-        if (working_dir.size) {
-            if (chdir(working_dir.data) == -1) {
-                result.os_error_code = errno;
-                return result;
+    if (!Dqn_OS_PathDelete(tmp_path)) {
+        Dqn_Log_ErrorF("Failed to delete the temporary file at '%.*s' to clean-up the safe-write", DQN_STR_FMT(tmp_path));
+        return false;
+    }
+
+    return true;
+}
+
+DQN_API bool Dqn_OS_WriteAllSafeFV(Dqn_Str8 path, DQN_FMT_ATTRIB char const *fmt, va_list args)
+{
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    bool        result  = Dqn_OS_WriteAllSafe(path, buffer);
+    return result;
+}
+
+DQN_API bool Dqn_OS_WriteAllSafeF(Dqn_Str8 path, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    bool result = Dqn_OS_WriteAllSafeFV(path, fmt, args);
+    return result;
+}
+#endif // !defined(DQN_NO_OS_FILE_API)
+
+// NOTE: [$PATH] Dqn_OSPath ////////////////////////////////////////////////////////////////////////
+DQN_API bool Dqn_OS_PathAddRef(Dqn_Arena *arena, Dqn_OSPath *fs_path, Dqn_Str8 path)
+{
+    if (!arena || !fs_path || !Dqn_Str8_HasData(path))
+        return false;
+
+    if (path.size <= 0)
+        return true;
+
+    Dqn_Str8 const delimiter_array[] = {
+        DQN_STR8("\\"),
+        DQN_STR8("/")
+    };
+
+    if (fs_path->links_size == 0) {
+        fs_path->has_prefix_path_separator = (path.data[0] == '/');
+    }
+
+    for (;;) {
+        Dqn_Str8BinarySplitResult delimiter  = Dqn_Str8_BinarySplitArray(path, delimiter_array, DQN_ARRAY_UCOUNT(delimiter_array));
+        for (; delimiter.lhs.data; delimiter = Dqn_Str8_BinarySplitArray(delimiter.rhs, delimiter_array, DQN_ARRAY_UCOUNT(delimiter_array))) {
+            if (delimiter.lhs.size <= 0)
+                continue;
+
+            Dqn_OSPathLink *link = Dqn_Arena_New(arena, Dqn_OSPathLink, Dqn_ZeroMem_Yes);
+            if (!link)
+                return false;
+
+            link->string = delimiter.lhs;
+            link->prev   = fs_path->tail;
+            if (fs_path->tail) {
+                fs_path->tail->next = link;
+            } else {
+                fs_path->head = link;
+            }
+            fs_path->tail         = link;
+            fs_path->links_size  += 1;
+            fs_path->string_size += delimiter.lhs.size;
+        }
+
+        if (!delimiter.lhs.data)
+            break;
+    }
+
+    return true;
+}
+
+DQN_API bool Dqn_OS_PathAdd(Dqn_Arena *arena, Dqn_OSPath *fs_path, Dqn_Str8 path)
+{
+    Dqn_Str8 copy = Dqn_Str8_Copy(arena, path);
+    bool result   = Dqn_Str8_HasData(copy) ? true : Dqn_OS_PathAddRef(arena, fs_path, copy);
+    return result;
+}
+
+DQN_API bool Dqn_OS_PathAddF(Dqn_Arena *arena, Dqn_OSPath *fs_path, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Str8 path = Dqn_Str8_InitFV(arena, fmt, args);
+    va_end(args);
+    bool result = Dqn_OS_PathAddRef(arena, fs_path, path);
+    return result;
+}
+
+DQN_API bool Dqn_OS_PathPop(Dqn_OSPath *fs_path)
+{
+    if (!fs_path)
+        return false;
+
+    if (fs_path->tail) {
+        DQN_ASSERT(fs_path->head);
+        fs_path->links_size  -= 1;
+        fs_path->string_size -= fs_path->tail->string.size;
+        fs_path->tail         = fs_path->tail->prev;
+        if (fs_path->tail) {
+            fs_path->tail->next = nullptr;
+        } else {
+            fs_path->head = nullptr;
+        }
+    } else {
+        DQN_ASSERT(!fs_path->head);
+    }
+
+    return true;
+}
+
+DQN_API Dqn_Str8 Dqn_OS_PathConvertTo(Dqn_Arena *arena, Dqn_Str8 path, Dqn_Str8 path_separator)
+{
+    Dqn_OSPath fs_path = {};
+    Dqn_OS_PathAddRef(arena, &fs_path, path);
+    Dqn_Str8 result = Dqn_OS_PathBuildWithSeparator(arena, &fs_path, path_separator);
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_OS_PathConvertToF(Dqn_Arena *arena, Dqn_Str8 path_separator, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    Dqn_Scratch scratch = Dqn_Scratch_Get(arena);
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Str8 path = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    va_end(args);
+    Dqn_Str8 result = Dqn_OS_PathConvertTo(arena, path, path_separator);
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_OS_PathConvert(Dqn_Arena *arena, Dqn_Str8 path)
+{
+    Dqn_Str8 result = Dqn_OS_PathConvertTo(arena, path, Dqn_OSPathSeperatorString);
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_OS_PathConvertF(Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    Dqn_Scratch scratch = Dqn_Scratch_Get(arena);
+    va_list args;
+    va_start(args, fmt);
+    Dqn_Str8 path = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    va_end(args);
+    Dqn_Str8 result = Dqn_OS_PathConvert(arena, path);
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_OS_PathBuildWithSeparator(Dqn_Arena *arena, Dqn_OSPath const *fs_path, Dqn_Str8 path_separator)
+{
+    Dqn_Str8 result = {};
+    if (!fs_path || fs_path->links_size <= 0)
+        return result;
+
+    // NOTE: Each link except the last one needs the path separator appended to it, '/' or '\\'
+    Dqn_usize string_size = (fs_path->has_prefix_path_separator ? path_separator.size : 0) + fs_path->string_size + ((fs_path->links_size - 1) * path_separator.size);
+    result                = Dqn_Str8_Alloc(arena, string_size, Dqn_ZeroMem_No);
+    if (result.data) {
+        char *dest = result.data;
+        if (fs_path->has_prefix_path_separator) {
+            DQN_MEMCPY(dest, path_separator.data, path_separator.size);
+            dest += path_separator.size;
+        }
+
+        for (Dqn_OSPathLink *link = fs_path->head; link; link = link->next) {
+            Dqn_Str8 string = link->string;
+            DQN_MEMCPY(dest, string.data, string.size);
+            dest += string.size;
+
+            if (link != fs_path->tail) {
+                DQN_MEMCPY(dest, path_separator.data, path_separator.size);
+                dest += path_separator.size;
             }
         }
-
-        if (execvp(cmd.items[0], (char * const*) cmd_null.items) < 0) {
-            result.os_error_code = errno;
-            return result;
-        }
-        DQN_INVALID_CODE_PATH;
     }
 
-    result.process = DQN_CAST(void *)child_pid;
-    #endif
-    #endif
+    result.data[string_size] = 0;
     return result;
 }
 
-DQN_API Dqn_OSExecResult Dqn_OS_Exec(Dqn_Str8 cmd, Dqn_Str8 working_dir)
+
+// NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
+DQN_API Dqn_OSExecResult Dqn_OS_Exec(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir)
 {
-    Dqn_OSExecAsyncHandle async_handle = Dqn_OS_ExecAsync(cmd, working_dir);
+    Dqn_OSExecAsyncHandle async_handle = Dqn_OS_ExecAsync(cmd_line, working_dir);
     Dqn_OSExecResult result            = Dqn_OS_ExecWait(async_handle);
     return result;
 }
 
-DQN_API void Dqn_OS_ExecOrAbort(Dqn_Str8 cmd, Dqn_Str8 working_dir)
+DQN_API void Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir)
 {
-    Dqn_OSExecResult result = Dqn_OS_Exec(cmd, working_dir);
+    Dqn_OSExecResult result = Dqn_OS_Exec(cmd_line, working_dir);
     if (result.os_error_code || result.exit_code) {
+        Dqn_Scratch scratch      = Dqn_Scratch_Get(nullptr);
+        Dqn_Str8    cmd_combined = Dqn_Slice_Str8Render(scratch.arena, cmd_line, DQN_STR8(" ") /*separator*/);
         if (result.os_error_code) {
-            Dqn_Log_ErrorF("OS failed to execute the requested command returning the error code %u. The command was\n\n%.*s", result.os_error_code, DQN_STR_FMT(cmd));
+            Dqn_Log_ErrorF("OS failed to execute the requested command returning the error code %u. The command was\n\n%.*s", result.os_error_code, DQN_STR_FMT(cmd_combined));
             Dqn_OS_Exit(result.os_error_code);
         }
 
         if (result.exit_code) {
-            Dqn_Log_ErrorF("OS executed command and returned a non-zero status: %u. The command was\n\n%.*s", result.exit_code, DQN_STR_FMT(cmd));
+            Dqn_Log_ErrorF("OS executed command and returned a non-zero status: %u. The command was\n\n%.*s", result.exit_code, DQN_STR_FMT(cmd_combined));
             Dqn_OS_Exit(result.exit_code);
         }
     }
+}
+
+// NOTE: [$HTTP] Dqn_OSHttp ////////////////////////////////////////////////////////////////////////
+DQN_API void Dqn_OS_HttpRequestWait(Dqn_OSHttpResponse *response)
+{
+    if (response && Dqn_OS_SemaphoreHasData(&response->on_complete_semaphore))
+        Dqn_OS_SemaphoreWait(&response->on_complete_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+}
+
+DQN_API Dqn_OSHttpResponse Dqn_OS_HttpRequest(Dqn_Arena *arena, Dqn_Str8 host, Dqn_Str8 path, Dqn_OSHttpRequestSecure secure, Dqn_Str8 method, Dqn_Str8 body, Dqn_Str8 headers)
+{
+    // TODO(doyle): Revise the memory allocation and its lifetime
+    Dqn_OSHttpResponse result  = {};
+    Dqn_Scratch        scratch = Dqn_Scratch_Get(arena);
+    result.scratch_arena       = scratch.arena;
+
+    Dqn_OS_HttpRequestAsync(&result, arena, host, path, secure, method, body, headers);
+    Dqn_OS_HttpRequestWait(&result);
+    return result;
 }

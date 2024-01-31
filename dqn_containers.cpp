@@ -1,5 +1,58 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//    $$$$$$\   $$$$$$\  $$\   $$\ $$$$$$$$\  $$$$$$\  $$$$$$\ $$\   $$\ $$$$$$$$\ $$$$$$$\   $$$$$$\
+//   $$  __$$\ $$  __$$\ $$$\  $$ |\__$$  __|$$  __$$\ \_$$  _|$$$\  $$ |$$  _____|$$  __$$\ $$  __$$\
+//   $$ /  \__|$$ /  $$ |$$$$\ $$ |   $$ |   $$ /  $$ |  $$ |  $$$$\ $$ |$$ |      $$ |  $$ |$$ /  \__|
+//   $$ |      $$ |  $$ |$$ $$\$$ |   $$ |   $$$$$$$$ |  $$ |  $$ $$\$$ |$$$$$\    $$$$$$$  |\$$$$$$\
+//   $$ |      $$ |  $$ |$$ \$$$$ |   $$ |   $$  __$$ |  $$ |  $$ \$$$$ |$$  __|   $$  __$$<  \____$$\
+//   $$ |  $$\ $$ |  $$ |$$ |\$$$ |   $$ |   $$ |  $$ |  $$ |  $$ |\$$$ |$$ |      $$ |  $$ |$$\   $$ |
+//   \$$$$$$  | $$$$$$  |$$ | \$$ |   $$ |   $$ |  $$ |$$$$$$\ $$ | \$$ |$$$$$$$$\ $$ |  $$ |\$$$$$$  |
+//    \______/  \______/ \__|  \__|   \__|   \__|  \__|\______|\__|  \__|\________|\__|  \__| \______/
+//
+//   dqn_containers.cpp
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: [$SLIC] Dqn_Slice /////////////////////////////////////////////////////////////////////////
+DQN_API Dqn_Str8 Dqn_Slice_Str8Render(Dqn_Arena *arena, Dqn_Slice<Dqn_Str8> array, Dqn_Str8 separator)
+{
+    Dqn_Str8 result = {};
+    if (!arena)
+        return result;
+
+    Dqn_usize total_size = 0;
+    for (Dqn_usize index = 0; index < array.size; index++) {
+        if (index)
+            total_size += separator.size;
+        Dqn_Str8 item  = array.data[index];
+        total_size    += item.size;
+    }
+
+    result = Dqn_Str8_Alloc(arena, total_size, Dqn_ZeroMem_No);
+    if (result.data) {
+        Dqn_usize write_index = 0;
+        for (Dqn_usize index = 0; index < array.size; index++) {
+            if (index) {
+                DQN_MEMCPY(result.data + write_index, separator.data, separator.size);
+                write_index += separator.size;
+            }
+            Dqn_Str8 item = array.data[index];
+            DQN_MEMCPY(result.data + write_index, item.data, item.size);
+            write_index += item.size;
+        }
+    }
+
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_Slice_Str8RenderSpaceSeparated(Dqn_Arena *arena, Dqn_Slice<Dqn_Str8> array)
+{
+    Dqn_Str8 result = Dqn_Slice_Str8Render(arena, array, DQN_STR8(" "));
+    return result;
+}
+
 #if !defined(DQN_NO_DSMAP)
-// NOTE: [$DMAP] Dqn_DSMap =========================================================================
+// NOTE: [$DMAP] Dqn_DSMap /////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64NoHash(uint64_t u64)
 {
     Dqn_DSMapKey result = {};

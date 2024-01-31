@@ -1,23 +1,36 @@
-#if defined(DQN_OS_WIN32)
-#pragma comment(lib, "bcrypt")
-#pragma comment(lib, "wininet")
-#pragma comment(lib, "dbghelp")
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//   $$\      $$\ $$$$$$\ $$\   $$\  $$$$$$\   $$$$$$\
+//   $$ | $\  $$ |\_$$  _|$$$\  $$ |$$ ___$$\ $$  __$$\
+//   $$ |$$$\ $$ |  $$ |  $$$$\ $$ |\_/   $$ |\__/  $$ |
+//   $$ $$ $$\$$ |  $$ |  $$ $$\$$ |  $$$$$ /  $$$$$$  |
+//   $$$$  _$$$$ |  $$ |  $$ \$$$$ |  \___$$\ $$  ____/
+//   $$$  / \$$$ |  $$ |  $$ |\$$$ |$$\   $$ |$$ |
+//   $$  /   \$$ |$$$$$$\ $$ | \$$ |\$$$$$$  |$$$$$$$$\
+//   \__/     \__|\______|\__|  \__| \______/ \________|
+//
+//   dqn_win32.h -- Windows replacement header
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(DQN_NO_WIN32_MIN_HEADER)
+#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
+    #pragma comment(lib, "bcrypt")
+    #pragma comment(lib, "winhttp")
+    #pragma comment(lib, "dbghelp")
+#endif
+
+#if defined(DQN_NO_WIN32_MIN_HEADER) || defined(_INC_WINDOWS)
+    #define WIN32_LEAN_AND_MEAN
+    #include <Windows.h>  // LONG
     #include <bcrypt.h>   // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
     #include <shellapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
+    #include <winhttp.h>  // WinHttp*
     #include <DbgHelp.h>
-    #if !defined(DQN_NO_WINNET)
-        DQN_MSVC_WARNING_PUSH
-        DQN_MSVC_WARNING_DISABLE(6553) // wininet.h|940 warning| The annotation for function 'InternetConnectA' on _Param_(8) does not apply to a value type.
-        #include <wininet.h> // Dqn_Win_Net -> InternetConnect ... etc
-        DQN_MSVC_WARNING_POP
-    #endif // DQN_NO_WINNET
-#elif !defined(_INC_WINDOWS)
+#else
     DQN_MSVC_WARNING_PUSH
     DQN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
 
-    // NOTE: basetsd.h =============================================================================
+    // NOTE: basetsd.h /////////////////////////////////////////////////////////////////////////////
     typedef unsigned __int64 ULONG_PTR, *PULONG_PTR;
     typedef ULONG_PTR        SIZE_T,    *PSIZE_T;
     typedef __int64          LONG_PTR,  *PLONG_PTR;
@@ -25,7 +38,7 @@
     typedef unsigned __int64 ULONG64,   *PULONG64;
     typedef unsigned __int64 DWORD64,   *PDWORD64;
 
-    // NOTE: shared/minwindef.h ====================================================================
+    // NOTE: shared/minwindef.h ////////////////////////////////////////////////////////////////////
     struct HINSTANCE__ {
       int unused;
     };
@@ -40,6 +53,8 @@
     typedef unsigned char  BYTE;
     typedef unsigned char  UCHAR;
     typedef HINSTANCE      HMODULE; /* HMODULEs can be used in place of HINSTANCEs */
+    typedef void *         HANDLE;
+    typedef HANDLE         HLOCAL;
 
     #define MAX_PATH 260
 
@@ -48,15 +63,15 @@
         DWORD dwHighDateTime;
     } FILETIME, *PFILETIME, *LPFILETIME;
 
-    // NOTE: shared/winerror.h =====================================================================
+    // NOTE: shared/winerror.h /////////////////////////////////////////////////////////////////////
     // NOTE: GetModuleFileNameW
     #define ERROR_INSUFFICIENT_BUFFER 122L // dderror
 
-    // NOTE: um/winnls.h ===========================================================================
+    // NOTE: um/winnls.h ///////////////////////////////////////////////////////////////////////////
     // NOTE: MultiByteToWideChar
     #define CP_UTF8 65001 // UTF-8 translation
 
-    // NOTE: um/winnt.h ============================================================================
+    // NOTE: um/winnt.h ////////////////////////////////////////////////////////////////////////////
     typedef void             VOID;
     typedef __int64          LONGLONG;
     typedef unsigned __int64 ULONGLONG;
@@ -66,6 +81,7 @@
     typedef long             LONG;
     typedef wchar_t          WCHAR; // wc, 16-bit UNICODE character
     typedef CHAR *           NPSTR, *LPSTR, *PSTR;
+    typedef WCHAR *          NWPSTR, *LPWSTR, *PWSTR;
 
     // NOTE: VirtualAlloc: Allocation Type
     #define MEM_RESERVE  0x00002000
@@ -93,6 +109,10 @@
     #define FILE_APPEND_DATA (0x0004) // file
 
     // NOTE: CreateFile/FindFirstFile
+    #define FILE_SHARE_READ          0x00000001
+    #define FILE_SHARE_WRITE         0x00000002
+    #define FILE_SHARE_DELETE        0x00000004
+
     #define FILE_ATTRIBUTE_READONLY  0x00000001
     #define FILE_ATTRIBUTE_HIDDEN    0x00000002
     #define FILE_ATTRIBUTE_SYSTEM    0x00000004
@@ -101,6 +121,11 @@
 
     // NOTE: STACKFRAME64
     #define IMAGE_FILE_MACHINE_AMD64 0x8664  // AMD64 (K8)
+
+    // NOTE: WaitForSingleObject
+    #define WAIT_TIMEOUT            258L    // dderror
+    #define STATUS_WAIT_0           ((DWORD   )0x00000000L)
+    #define STATUS_ABANDONED_WAIT_0 ((DWORD   )0x00000080L)
 
     typedef union _ULARGE_INTEGER {
         struct {
@@ -230,16 +255,71 @@
         DWORD64 LastExceptionFromRip;
     } CONTEXT;
 
+    typedef struct _LIST_ENTRY {
+       struct _LIST_ENTRY *Flink;
+       struct _LIST_ENTRY *Blink;
+    } LIST_ENTRY, *PLIST_ENTRY, PRLIST_ENTRY;
+
+    typedef struct _RTL_CRITICAL_SECTION_DEBUG {
+        WORD   Type;
+        WORD   CreatorBackTraceIndex;
+        struct _RTL_CRITICAL_SECTION *CriticalSection;
+        LIST_ENTRY ProcessLocksList;
+        DWORD EntryCount;
+        DWORD ContentionCount;
+        DWORD Flags;
+        WORD   CreatorBackTraceIndexHigh;
+        WORD   Identifier;
+    } RTL_CRITICAL_SECTION_DEBUG, *PRTL_CRITICAL_SECTION_DEBUG, RTL_RESOURCE_DEBUG, *PRTL_RESOURCE_DEBUG;
+
+    #pragma pack(push, 8)
+    typedef struct _RTL_CRITICAL_SECTION {
+        PRTL_CRITICAL_SECTION_DEBUG DebugInfo;
+
+        //
+        //  The following three fields control entering and exiting the critical
+        //  section for the resource
+        //
+
+        LONG LockCount;
+        LONG RecursionCount;
+        HANDLE OwningThread;        // from the thread's ClientId->UniqueThread
+        HANDLE LockSemaphore;
+        ULONG_PTR SpinCount;        // force size on 64-bit systems when packed
+    } RTL_CRITICAL_SECTION, *PRTL_CRITICAL_SECTION;
+    #pragma pack(pop)
+
+    typedef struct _MODLOAD_DATA {
+        DWORD   ssize;                  // size of this struct
+        DWORD   ssig;                   // signature identifying the passed data
+        VOID   *data;                   // pointer to passed data
+        DWORD   size;                   // size of passed data
+        DWORD   flags;                  // options
+    } MODLOAD_DATA, *PMODLOAD_DATA;
+
+    #define SLMFLAG_VIRTUAL     0x1
+    #define SLMFLAG_ALT_INDEX   0x2
+    #define SLMFLAG_NO_SYMBOLS  0x4
+
     extern "C"
     {
-    __declspec(dllimport) VOID   __stdcall RtlCaptureContext(CONTEXT *ContextRecord);
-    __declspec(dllimport) HANDLE __stdcall GetCurrentProcess(void);
-    __declspec(dllimport) HANDLE __stdcall GetCurrentThread(void);
-    __declspec(dllimport) DWORD  __stdcall SymSetOptions(DWORD SymOptions);
-    __declspec(dllimport) BOOL   __stdcall SymInitialize(HANDLE hProcess, const CHAR* UserSearchPath, BOOL fInvadeProcess);
+    __declspec(dllimport) VOID    __stdcall RtlCaptureContext(CONTEXT *ContextRecord);
+    __declspec(dllimport) HANDLE  __stdcall GetCurrentProcess(void);
+    __declspec(dllimport) HANDLE  __stdcall GetCurrentThread(void);
+    __declspec(dllimport) DWORD   __stdcall SymSetOptions(DWORD SymOptions);
+    __declspec(dllimport) BOOL    __stdcall SymInitialize(HANDLE hProcess, const CHAR* UserSearchPath, BOOL fInvadeProcess);
+    __declspec(dllimport) DWORD64 __stdcall SymLoadModuleEx(HANDLE hProcess, HANDLE hFile, CHAR const *ImageName, CHAR const *ModuleName, DWORD64 BaseOfDll, DWORD DllSize, MODLOAD_DATA *Data, DWORD Flags);
+    __declspec(dllimport) BOOL    __stdcall SymUnloadModule64(HANDLE hProcess, DWORD64 BaseOfDll);
     }
 
-    // NOTE: handleapi.h ===========================================================================
+    // NOTE: shared/windef.h ////////////////////////////////////////////////////////////////////
+    typedef struct tagPOINT
+    {
+        LONG  x;
+        LONG  y;
+    } POINT, *PPOINT, *NPPOINT, *LPPOINT;
+
+    // NOTE: handleapi.h ///////////////////////////////////////////////////////////////////////////
     #define INVALID_HANDLE_VALUE ((HANDLE)(LONG_PTR)-1)
 
     extern "C"
@@ -247,7 +327,7 @@
     __declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE hObject);
     }
 
-    // NOTE: consoleapi.h ===========================================================================
+    // NOTE: consoleapi.h ///////////////////////////////////////////////////////////////////////////
     extern "C"
     {
     __declspec(dllimport) BOOL __stdcall WriteConsoleA(HANDLE hConsoleOutput, const VOID* lpBuffer, DWORD nNumberOfCharsToWrite, DWORD *lpNumberOfCharsWritten, VOID *lpReserved);
@@ -257,10 +337,16 @@
     __declspec(dllimport) BOOL __stdcall GetConsoleMode(HANDLE hConsoleHandle, DWORD *lpMode);
     }
 
-    // NOTE: um/minwinbase.h =======================================================================
+    // NOTE: um/minwinbase.h ///////////////////////////////////////////////////////////////////////
     // NOTE: FindFirstFile
     #define FIND_FIRST_EX_CASE_SENSITIVE 0x00000001
     #define FIND_FIRST_EX_LARGE_FETCH    0x00000002
+
+    // NOTE: WaitFor..
+    #define WAIT_FAILED      ((DWORD)0xFFFFFFFF)
+    #define WAIT_OBJECT_0    ((STATUS_WAIT_0 ) + 0 )
+    #define WAIT_ABANDONED   ((STATUS_ABANDONED_WAIT_0 ) + 0 )
+    #define WAIT_ABANDONED_0 ((STATUS_ABANDONED_WAIT_0 ) + 0 )
 
     typedef enum _GET_FILEEX_INFO_LEVELS {
         GetFileExInfoStandard,
@@ -329,7 +415,9 @@
         HANDLE  hEvent;
     } OVERLAPPED, *LPOVERLAPPED;
 
-    // NOTE: um/winbase.h ==========================================================================
+    typedef RTL_CRITICAL_SECTION CRITICAL_SECTION;
+
+    // NOTE: um/winbase.h //////////////////////////////////////////////////////////////////////////
     #define WAIT_FAILED   ((DWORD)0xFFFFFFFF)
     #define WAIT_OBJECT_0 ((STATUS_WAIT_0 ) + 0 )
 
@@ -344,9 +432,10 @@
     #define MOVEFILE_COPY_ALLOWED     0x00000002
 
     // NOTE: FormatMessageA
-    #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
-    #define FORMAT_MESSAGE_FROM_HMODULE   0x00000800
-    #define FORMAT_MESSAGE_FROM_SYSTEM    0x00001000
+    #define FORMAT_MESSAGE_ALLOCATE_BUFFER 0x00000100
+    #define FORMAT_MESSAGE_IGNORE_INSERTS  0x00000200
+    #define FORMAT_MESSAGE_FROM_HMODULE    0x00000800
+    #define FORMAT_MESSAGE_FROM_SYSTEM     0x00001000
 
     // NOTE: CreateProcessW
     #define STARTF_USESTDHANDLES       0x00000100
@@ -356,17 +445,18 @@
     __declspec(dllimport) BOOL   __stdcall MoveFileExW     (const WCHAR *lpExistingFileName, const WCHAR *lpNewFileName, DWORD dwFlags);
     __declspec(dllimport) BOOL   __stdcall CopyFileW       (const WCHAR *lpExistingFileName, const WCHAR *lpNewFileName, BOOL bFailIfExists);
     __declspec(dllimport) HANDLE __stdcall CreateSemaphoreA(SECURITY_ATTRIBUTES *lpSemaphoreAttributes, LONG lInitialCount, LONG lMaximumCount, const CHAR *lpName);
-    __declspec(dllimport) DWORD  __stdcall FormatMessageA  (DWORD dwFlags, const VOID *lpSource, DWORD dwMessageId, DWORD dwLanguageId, LPSTR lpBuffer, DWORD nSize, va_list *Arguments);
+    __declspec(dllimport) DWORD  __stdcall FormatMessageW  (DWORD dwFlags, VOID const *lpSource, DWORD dwMessageId, DWORD dwLanguageId, LPWSTR lpBuffer, DWORD nSize, va_list *Arguments);
+    __declspec(dllimport) HLOCAL __stdcall LocalFree       (HLOCAL hMem);
     }
 
-    // NOTE: um/stringapiset.h =====================================================================
+    // NOTE: um/stringapiset.h /////////////////////////////////////////////////////////////////////
     extern "C"
     {
     __declspec(dllimport) int __stdcall MultiByteToWideChar(UINT CodePage, DWORD dwFlags, const CHAR *lpMultiByteStr, int cbMultiByte, WCHAR *lpWideCharStr, int cchWideChar);
     __declspec(dllimport) int __stdcall WideCharToMultiByte(UINT CodePage, DWORD dwFlags, const WCHAR *lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, const CHAR *lpDefaultChar, BOOL *lpUsedDefaultChar);
     }
 
-    // NOTE: um/fileapi.h ==========================================================================
+    // NOTE: um/fileapi.h //////////////////////////////////////////////////////////////////////////
     #define INVALID_FILE_SIZE ((DWORD)0xFFFFFFFF)
     #define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
 
@@ -401,14 +491,14 @@
 
     }
 
-    // NOTE: um/processenv.h =======================================================================
+    // NOTE: um/processenv.h ///////////////////////////////////////////////////////////////////////
     extern "C"
     {
     __declspec(dllimport) DWORD  __stdcall GetCurrentDirectoryW(DWORD nBufferLength, WCHAR *lpBuffer);
     __declspec(dllimport) HANDLE __stdcall GetStdHandle(DWORD nStdHandle);
     }
 
-    // NOTE: um/sysinfoapi.h =======================================================================
+    // NOTE: um/sysinfoapi.h ///////////////////////////////////////////////////////////////////////
     typedef struct _SYSTEM_INFO {
         union {
             DWORD dwOemId;          // Obsolete field...do not use
@@ -436,7 +526,7 @@
     __declspec(dllimport) VOID __stdcall GetLocalTime(SYSTEMTIME *lpSystemTime);
     }
 
-    // NOTE: shared/windef.h =======================================================================
+    // NOTE: shared/windef.h ///////////////////////////////////////////////////////////////////////
     typedef struct tagRECT {
         LONG left;
         LONG top;
@@ -463,7 +553,20 @@
 
     #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
 
-    // NOTE: um/winuser.h ==========================================================================
+    // NOTE: um/winuser.h //////////////////////////////////////////////////////////////////////////
+    typedef struct tagWINDOWPLACEMENT {
+        UINT  length;
+        UINT  flags;
+        UINT  showCmd;
+        POINT ptMinPosition;
+        POINT ptMaxPosition;
+        RECT  rcNormalPosition;
+    #ifdef _MAC
+        RECT  rcDevice;
+    #endif
+    } WINDOWPLACEMENT;
+    typedef WINDOWPLACEMENT *PWINDOWPLACEMENT, *LPWINDOWPLACEMENT;
+
     #define SW_HIDE           0
     #define SW_NORMAL         1
     #define SW_MAXIMIZE       3
@@ -477,88 +580,262 @@
     __declspec(dllimport) BOOL __stdcall SetWindowPos            (HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags);
     __declspec(dllimport) UINT __stdcall GetWindowModuleFileNameA(HWND hwnd, LPSTR pszFileName, UINT cchFileNameMax);
     __declspec(dllimport) BOOL __stdcall ShowWindow              (HWND hWnd, int nCmdShow);
+    __declspec(dllimport) BOOL __stdcall GetWindowPlacement      (HWND hWnd, WINDOWPLACEMENT *lpwndpl);
+
     }
 
-    // NOTE: um/wininet.h ==========================================================================
+    // NOTE: um/wininet.h //////////////////////////////////////////////////////////////////////////
     typedef WORD INTERNET_PORT;
     typedef VOID *HINTERNET;
 
-    #define INTERNET_OPEN_TYPE_PRECONFIG             0   // use registry configuration
-    #define INTERNET_INVALID_PORT_NUMBER             0   // use the protocol-specific default
-    #define INTERNET_DEFAULT_FTP_PORT                21  // default for FTP servers
-    #define INTERNET_DEFAULT_HTTP_PORT               80  //    "     "  HTTP   "
-    #define INTERNET_DEFAULT_HTTPS_PORT              443 //    "     "  HTTPS  "
-    #define INTERNET_SERVICE_HTTP                    3
+    // NOTE: um/winhttp.h //////////////////////////////////////////////////////////////////////////
+    #define WINHTTP_ACCESS_TYPE_DEFAULT_PROXY   0
+    #define WINHTTP_ACCESS_TYPE_NO_PROXY        1
+    #define WINHTTP_ACCESS_TYPE_NAMED_PROXY     3
+    #define WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY 4
 
-    #define INTERNET_OPTION_USERNAME                 28
-    #define INTERNET_OPTION_PASSWORD                 29
-    #define INTERNET_OPTION_USER_AGENT               41
+    #define INTERNET_DEFAULT_PORT           0           // use the protocol-specific default
+    #define INTERNET_DEFAULT_HTTP_PORT      80          //    "     "  HTTP   "
+    #define INTERNET_DEFAULT_HTTPS_PORT     443         //    "     "  HTTPS  "
 
-    #define INTERNET_FLAG_NO_AUTH                    0x00040000 // no automatic authentication handling
-    #define INTERNET_FLAG_SECURE                     0x00800000 // use PCT/SSL if applicable (HTTP)
+    // NOTE: WinHttpOpen
+    #define WINHTTP_FLAG_ASYNC              0x10000000  // this session is asynchronous (where supported)
+    #define WINHTTP_FLAG_SECURE_DEFAULTS    0x30000000  // note that this flag also forces async
 
-    #define HTTP_QUERY_RAW_HEADERS                   21  // special: all headers as ASCIIZ
-    #define HTTP_QUERY_RAW_HEADERS_CRLF              22  // special: all headers
+    // NOTE: WinHttpOpenRequest
+    #define WINHTTP_FLAG_SECURE                0x00800000  // use SSL if applicable (HTTPS)
+    #define WINHTTP_FLAG_ESCAPE_PERCENT        0x00000004  // if escaping enabled, escape percent as well
+    #define WINHTTP_FLAG_NULL_CODEPAGE         0x00000008  // assume all symbols are ASCII, use fast convertion
+    #define WINHTTP_FLAG_ESCAPE_DISABLE        0x00000040  // disable escaping
+    #define WINHTTP_FLAG_ESCAPE_DISABLE_QUERY  0x00000080  // if escaping enabled escape path part, but do not escape query
+    #define WINHTTP_FLAG_BYPASS_PROXY_CACHE    0x00000100  // add "pragma: no-cache" request header
+    #define WINHTTP_FLAG_REFRESH               WINHTTP_FLAG_BYPASS_PROXY_CACHE
+    #define WINHTTP_FLAG_AUTOMATIC_CHUNKING    0x00000200  // Send request without content-length header or chunked TE
 
-    #define HTTP_ADDREQ_FLAG_ADD_IF_NEW              0x10000000
-    #define HTTP_ADDREQ_FLAG_ADD                     0x20000000
-    #define HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA     0x40000000
-    #define HTTP_ADDREQ_FLAG_COALESCE_WITH_SEMICOLON 0x01000000
-    #define HTTP_ADDREQ_FLAG_COALESCE                HTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA
-    #define HTTP_ADDREQ_FLAG_REPLACE                 0x80000000
+    #define WINHTTP_NO_PROXY_NAME     NULL
+    #define WINHTTP_NO_PROXY_BYPASS   NULL
 
-    typedef enum {
-        INTERNET_SCHEME_PARTIAL = -2,
-        INTERNET_SCHEME_UNKNOWN = -1,
-        INTERNET_SCHEME_DEFAULT = 0,
-        INTERNET_SCHEME_FTP,
-        INTERNET_SCHEME_GOPHER,
-        INTERNET_SCHEME_HTTP,
-        INTERNET_SCHEME_HTTPS,
-        INTERNET_SCHEME_FILE,
-        INTERNET_SCHEME_NEWS,
-        INTERNET_SCHEME_MAILTO,
-        INTERNET_SCHEME_SOCKS,
-        INTERNET_SCHEME_JAVASCRIPT,
-        INTERNET_SCHEME_VBSCRIPT,
-        INTERNET_SCHEME_RES,
-        INTERNET_SCHEME_FIRST = INTERNET_SCHEME_FTP,
-        INTERNET_SCHEME_LAST = INTERNET_SCHEME_RES
-    } INTERNET_SCHEME, * LPINTERNET_SCHEME;
+    //
+    // WINHTTP_QUERY_FLAG_NUMBER - if this bit is set in the dwInfoLevel parameter of
+    // HttpQueryHeader(), then the value of the header will be converted to a number
+    // before being returned to the caller, if applicable
+    //
+    #define WINHTTP_QUERY_FLAG_NUMBER                  0x20000000
 
-    typedef struct {
-        DWORD   dwStructSize;       // size of this structure. Used in version check
-        LPSTR   lpszScheme;         // pointer to scheme name
-        DWORD   dwSchemeLength;     // length of scheme name
-        INTERNET_SCHEME nScheme;    // enumerated scheme type (if known)
-        LPSTR   lpszHostName;       // pointer to host name
-        DWORD   dwHostNameLength;   // length of host name
-        INTERNET_PORT nPort;        // converted port number
-        LPSTR   lpszUserName;       // pointer to user name
-        DWORD   dwUserNameLength;   // length of user name
-        LPSTR   lpszPassword;       // pointer to password
-        DWORD   dwPasswordLength;   // length of password
-        LPSTR   lpszUrlPath;        // pointer to URL-path
-        DWORD   dwUrlPathLength;    // length of URL-path
-        LPSTR   lpszExtraInfo;      // pointer to extra information (e.g. ?foo or #foo)
-        DWORD   dwExtraInfoLength;  // length of extra information
-    } URL_COMPONENTSA, * LPURL_COMPONENTSA;
+    #define WINHTTP_QUERY_MIME_VERSION                 0
+    #define WINHTTP_QUERY_CONTENT_TYPE                 1
+    #define WINHTTP_QUERY_CONTENT_TRANSFER_ENCODING    2
+    #define WINHTTP_QUERY_CONTENT_ID                   3
+    #define WINHTTP_QUERY_CONTENT_DESCRIPTION          4
+    #define WINHTTP_QUERY_CONTENT_LENGTH               5
+    #define WINHTTP_QUERY_CONTENT_LANGUAGE             6
+    #define WINHTTP_QUERY_ALLOW                        7
+    #define WINHTTP_QUERY_PUBLIC                       8
+    #define WINHTTP_QUERY_DATE                         9
+    #define WINHTTP_QUERY_EXPIRES                      10
+    #define WINHTTP_QUERY_LAST_MODIFIED                11
+    #define WINHTTP_QUERY_MESSAGE_ID                   12
+    #define WINHTTP_QUERY_URI                          13
+    #define WINHTTP_QUERY_DERIVED_FROM                 14
+    #define WINHTTP_QUERY_COST                         15
+    #define WINHTTP_QUERY_LINK                         16
+    #define WINHTTP_QUERY_PRAGMA                       17
+    #define WINHTTP_QUERY_VERSION                      18  // special: part of status line
+    #define WINHTTP_QUERY_STATUS_CODE                  19  // special: part of status line
+    #define WINHTTP_QUERY_STATUS_TEXT                  20  // special: part of status line
+    #define WINHTTP_QUERY_RAW_HEADERS                  21  // special: all headers as ASCIIZ
+    #define WINHTTP_QUERY_RAW_HEADERS_CRLF             22  // special: all headers
+    #define WINHTTP_QUERY_CONNECTION                   23
+    #define WINHTTP_QUERY_ACCEPT                       24
+    #define WINHTTP_QUERY_ACCEPT_CHARSET               25
+    #define WINHTTP_QUERY_ACCEPT_ENCODING              26
+    #define WINHTTP_QUERY_ACCEPT_LANGUAGE              27
+    #define WINHTTP_QUERY_AUTHORIZATION                28
+    #define WINHTTP_QUERY_CONTENT_ENCODING             29
+    #define WINHTTP_QUERY_FORWARDED                    30
+    #define WINHTTP_QUERY_FROM                         31
+    #define WINHTTP_QUERY_IF_MODIFIED_SINCE            32
+    #define WINHTTP_QUERY_LOCATION                     33
+    #define WINHTTP_QUERY_ORIG_URI                     34
+    #define WINHTTP_QUERY_REFERER                      35
+    #define WINHTTP_QUERY_RETRY_AFTER                  36
+    #define WINHTTP_QUERY_SERVER                       37
+    #define WINHTTP_QUERY_TITLE                        38
+    #define WINHTTP_QUERY_USER_AGENT                   39
+    #define WINHTTP_QUERY_WWW_AUTHENTICATE             40
+    #define WINHTTP_QUERY_PROXY_AUTHENTICATE           41
+    #define WINHTTP_QUERY_ACCEPT_RANGES                42
+    #define WINHTTP_QUERY_SET_COOKIE                   43
+    #define WINHTTP_QUERY_COOKIE                       44
+    #define WINHTTP_QUERY_REQUEST_METHOD               45  // special: GET/POST etc.
+    #define WINHTTP_QUERY_REFRESH                      46
+    #define WINHTTP_QUERY_CONTENT_DISPOSITION          47
+
+    // NOTE: WinHttpQueryHeaders prettifiers for optional parameters.
+    #define WINHTTP_HEADER_NAME_BY_INDEX           NULL
+    #define WINHTTP_NO_OUTPUT_BUFFER               NULL
+    #define WINHTTP_NO_HEADER_INDEX                NULL
+
+    // NOTE: Http Response Status Codes
+    #define HTTP_STATUS_CONTINUE            100 // OK to continue with request
+    #define HTTP_STATUS_SWITCH_PROTOCOLS    101 // server has switched protocols in upgrade header
+
+    #define HTTP_STATUS_OK                  200 // request completed
+    #define HTTP_STATUS_CREATED             201 // object created, reason = new URI
+    #define HTTP_STATUS_ACCEPTED            202 // async completion (TBS)
+    #define HTTP_STATUS_PARTIAL             203 // partial completion
+    #define HTTP_STATUS_NO_CONTENT          204 // no info to return
+    #define HTTP_STATUS_RESET_CONTENT       205 // request completed, but clear form
+    #define HTTP_STATUS_PARTIAL_CONTENT     206 // partial GET fulfilled
+    #define HTTP_STATUS_WEBDAV_MULTI_STATUS 207 // WebDAV Multi-Status
+
+    #define HTTP_STATUS_AMBIGUOUS           300 // server couldn't decide what to return
+    #define HTTP_STATUS_MOVED               301 // object permanently moved
+    #define HTTP_STATUS_REDIRECT            302 // object temporarily moved
+    #define HTTP_STATUS_REDIRECT_METHOD     303 // redirection w/ new access method
+    #define HTTP_STATUS_NOT_MODIFIED        304 // if-modified-since was not modified
+    #define HTTP_STATUS_USE_PROXY           305 // redirection to proxy, location header specifies proxy to use
+    #define HTTP_STATUS_REDIRECT_KEEP_VERB  307 // HTTP/1.1: keep same verb
+    #define HTTP_STATUS_PERMANENT_REDIRECT  308 // Object permanently moved keep verb
+
+    #define HTTP_STATUS_BAD_REQUEST         400 // invalid syntax
+    #define HTTP_STATUS_DENIED              401 // access denied
+    #define HTTP_STATUS_PAYMENT_REQ         402 // payment required
+    #define HTTP_STATUS_FORBIDDEN           403 // request forbidden
+    #define HTTP_STATUS_NOT_FOUND           404 // object not found
+    #define HTTP_STATUS_BAD_METHOD          405 // method is not allowed
+    #define HTTP_STATUS_NONE_ACCEPTABLE     406 // no response acceptable to client found
+    #define HTTP_STATUS_PROXY_AUTH_REQ      407 // proxy authentication required
+    #define HTTP_STATUS_REQUEST_TIMEOUT     408 // server timed out waiting for request
+    #define HTTP_STATUS_CONFLICT            409 // user should resubmit with more info
+    #define HTTP_STATUS_GONE                410 // the resource is no longer available
+    #define HTTP_STATUS_LENGTH_REQUIRED     411 // the server refused to accept request w/o a length
+    #define HTTP_STATUS_PRECOND_FAILED      412 // precondition given in request failed
+    #define HTTP_STATUS_REQUEST_TOO_LARGE   413 // request entity was too large
+    #define HTTP_STATUS_URI_TOO_LONG        414 // request URI too long
+    #define HTTP_STATUS_UNSUPPORTED_MEDIA   415 // unsupported media type
+    #define HTTP_STATUS_RETRY_WITH          449 // retry after doing the appropriate action.
+
+    #define HTTP_STATUS_SERVER_ERROR        500 // internal server error
+    #define HTTP_STATUS_NOT_SUPPORTED       501 // required not supported
+    #define HTTP_STATUS_BAD_GATEWAY         502 // error response received from gateway
+    #define HTTP_STATUS_SERVICE_UNAVAIL     503 // temporarily overloaded
+    #define HTTP_STATUS_GATEWAY_TIMEOUT     504 // timed out waiting for gateway
+    #define HTTP_STATUS_VERSION_NOT_SUP     505 // HTTP version not supported
+
+    #define HTTP_STATUS_FIRST               HTTP_STATUS_CONTINUE
+    #define HTTP_STATUS_LAST                HTTP_STATUS_VERSION_NOT_SUP
+
+    #define WINHTTP_CALLBACK_STATUS_RESOLVING_NAME              0x00000001
+    #define WINHTTP_CALLBACK_STATUS_NAME_RESOLVED               0x00000002
+    #define WINHTTP_CALLBACK_STATUS_CONNECTING_TO_SERVER        0x00000004
+    #define WINHTTP_CALLBACK_STATUS_CONNECTED_TO_SERVER         0x00000008
+    #define WINHTTP_CALLBACK_STATUS_SENDING_REQUEST             0x00000010
+    #define WINHTTP_CALLBACK_STATUS_REQUEST_SENT                0x00000020
+    #define WINHTTP_CALLBACK_STATUS_RECEIVING_RESPONSE          0x00000040
+    #define WINHTTP_CALLBACK_STATUS_RESPONSE_RECEIVED           0x00000080
+    #define WINHTTP_CALLBACK_STATUS_CLOSING_CONNECTION          0x00000100
+    #define WINHTTP_CALLBACK_STATUS_CONNECTION_CLOSED           0x00000200
+    #define WINHTTP_CALLBACK_STATUS_HANDLE_CREATED              0x00000400
+    #define WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING              0x00000800
+    #define WINHTTP_CALLBACK_STATUS_DETECTING_PROXY             0x00001000
+    #define WINHTTP_CALLBACK_STATUS_REDIRECT                    0x00004000
+    #define WINHTTP_CALLBACK_STATUS_INTERMEDIATE_RESPONSE       0x00008000
+    #define WINHTTP_CALLBACK_STATUS_SECURE_FAILURE              0x00010000
+    #define WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE           0x00020000
+    #define WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE              0x00040000
+    #define WINHTTP_CALLBACK_STATUS_READ_COMPLETE               0x00080000
+    #define WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE              0x00100000
+    #define WINHTTP_CALLBACK_STATUS_REQUEST_ERROR               0x00200000
+    #define WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE        0x00400000
+
+    #define WINHTTP_CALLBACK_STATUS_GETPROXYFORURL_COMPLETE     0x01000000
+    #define WINHTTP_CALLBACK_STATUS_CLOSE_COMPLETE              0x02000000
+    #define WINHTTP_CALLBACK_STATUS_SHUTDOWN_COMPLETE           0x04000000
+    #define WINHTTP_CALLBACK_STATUS_SETTINGS_WRITE_COMPLETE     0x10000000
+    #define WINHTTP_CALLBACK_STATUS_SETTINGS_READ_COMPLETE      0x20000000
+
+    #define WINHTTP_CALLBACK_FLAG_RESOLVE_NAME              (WINHTTP_CALLBACK_STATUS_RESOLVING_NAME       | WINHTTP_CALLBACK_STATUS_NAME_RESOLVED)
+    #define WINHTTP_CALLBACK_FLAG_CONNECT_TO_SERVER         (WINHTTP_CALLBACK_STATUS_CONNECTING_TO_SERVER | WINHTTP_CALLBACK_STATUS_CONNECTED_TO_SERVER)
+    #define WINHTTP_CALLBACK_FLAG_SEND_REQUEST              (WINHTTP_CALLBACK_STATUS_SENDING_REQUEST      | WINHTTP_CALLBACK_STATUS_REQUEST_SENT)
+    #define WINHTTP_CALLBACK_FLAG_RECEIVE_RESPONSE          (WINHTTP_CALLBACK_STATUS_RECEIVING_RESPONSE   | WINHTTP_CALLBACK_STATUS_RESPONSE_RECEIVED)
+    #define WINHTTP_CALLBACK_FLAG_CLOSE_CONNECTION          (WINHTTP_CALLBACK_STATUS_CLOSING_CONNECTION   | WINHTTP_CALLBACK_STATUS_CONNECTION_CLOSED)
+    #define WINHTTP_CALLBACK_FLAG_HANDLES                   (WINHTTP_CALLBACK_STATUS_HANDLE_CREATED       | WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING)
+    #define WINHTTP_CALLBACK_FLAG_DETECTING_PROXY           WINHTTP_CALLBACK_STATUS_DETECTING_PROXY
+    #define WINHTTP_CALLBACK_FLAG_REDIRECT                  WINHTTP_CALLBACK_STATUS_REDIRECT
+    #define WINHTTP_CALLBACK_FLAG_INTERMEDIATE_RESPONSE     WINHTTP_CALLBACK_STATUS_INTERMEDIATE_RESPONSE
+    #define WINHTTP_CALLBACK_FLAG_SECURE_FAILURE            WINHTTP_CALLBACK_STATUS_SECURE_FAILURE
+    #define WINHTTP_CALLBACK_FLAG_SENDREQUEST_COMPLETE      WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE
+    #define WINHTTP_CALLBACK_FLAG_HEADERS_AVAILABLE         WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE
+    #define WINHTTP_CALLBACK_FLAG_DATA_AVAILABLE            WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE
+    #define WINHTTP_CALLBACK_FLAG_READ_COMPLETE             WINHTTP_CALLBACK_STATUS_READ_COMPLETE
+    #define WINHTTP_CALLBACK_FLAG_WRITE_COMPLETE            WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE
+    #define WINHTTP_CALLBACK_FLAG_REQUEST_ERROR             WINHTTP_CALLBACK_STATUS_REQUEST_ERROR
+
+    #define WINHTTP_CALLBACK_FLAG_GETPROXYFORURL_COMPLETE   WINHTTP_CALLBACK_STATUS_GETPROXYFORURL_COMPLETE
+
+    #define WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS           (WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE       \
+                                                            | WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE         \
+                                                            | WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE            \
+                                                            | WINHTTP_CALLBACK_STATUS_READ_COMPLETE             \
+                                                            | WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE            \
+                                                            | WINHTTP_CALLBACK_STATUS_REQUEST_ERROR             \
+                                                            | WINHTTP_CALLBACK_STATUS_GETPROXYFORURL_COMPLETE)
+
+    #define WINHTTP_CALLBACK_FLAG_ALL_NOTIFICATIONS         0xffffffff
+    #define WINHTTP_INVALID_STATUS_CALLBACK                 ((WINHTTP_STATUS_CALLBACK)(-1L))
+
+    typedef struct _WINHTTP_EXTENDED_HEADER
+    {
+        union
+        {
+            CHAR const *pwszName;
+            WCHAR const *pszName;
+        };
+        union
+        {
+            WCHAR const *pwszValue;
+            CHAR const *pszValue;
+        };
+    } WINHTTP_EXTENDED_HEADER, *PWINHTTP_EXTENDED_HEADER;
+
+    typedef struct _WINHTTP_ASYNC_RESULT
+    {
+        DWORD *dwResult;  // indicates which async API has encountered an error
+        DWORD dwError;    // the error code if the API failed
+    } WINHTTP_ASYNC_RESULT, *LPWINHTTP_ASYNC_RESULT, *PWINHTTP_ASYNC_RESULT;
+
+    typedef
+    VOID
+    (*WINHTTP_STATUS_CALLBACK)(
+        HINTERNET hInternet,
+        DWORD *dwContext,
+        DWORD dwInternetStatus,
+        VOID *lpvStatusInformation,
+        DWORD dwStatusInformationLength
+        );
 
     extern "C"
     {
-    __declspec(dllimport) BOOL      __stdcall InternetCrackUrlA     (CHAR const *lpszUrl, DWORD dwUrlLength, DWORD dwFlags, URL_COMPONENTSA *lpUrlComponents);
-    __declspec(dllimport) HINTERNET __stdcall InternetOpenA         (CHAR const *lpszAgent, DWORD dwAccessType, CHAR const *lpszProxy, CHAR const *lpszProxyBypass, DWORD dwFlags);
-    __declspec(dllimport) HINTERNET __stdcall InternetConnectA      (HINTERNET hInternet, CHAR const *lpszServerName, INTERNET_PORT nServerPort, CHAR const *lpszUserName, CHAR const *lpszPassword, DWORD dwService, DWORD dwFlags, DWORD_PTR dwContext);
-    __declspec(dllimport) BOOL      __stdcall InternetSetOptionA    (HINTERNET hInternet, DWORD dwOption, VOID *lpBuffer, DWORD dwBufferLength);
-    __declspec(dllimport) BOOL      __stdcall InternetReadFile      (HINTERNET hFile, VOID *lpBuffer, DWORD dwNumberOfBytesToRead, DWORD *lpdwNumberOfBytesRead);
-    __declspec(dllimport) BOOL      __stdcall InternetCloseHandle   (HINTERNET hInternet);
-    __declspec(dllimport) HINTERNET __stdcall HttpOpenRequestA      (HINTERNET hConnect, CHAR const *lpszVerb, CHAR const *lpszObjectName, CHAR const *lpszVersion, CHAR const *lpszReferrer, CHAR const *lplpszAcceptTypes, DWORD dwFlags, DWORD_PTR dwContext);
-    __declspec(dllimport) BOOL      __stdcall HttpSendRequestA      (HINTERNET hRequest, CHAR const *lpszHeaders, DWORD dwHeadersLength, VOID *lpOptional, DWORD dwOptionalLength);
-    __declspec(dllimport) BOOL      __stdcall HttpAddRequestHeadersA(HINTERNET hRequest, CHAR const *lpszHeaders, DWORD dwHeadersLength, DWORD dwModifiers);
-    __declspec(dllimport) BOOL      __stdcall HttpQueryInfoA        (HINTERNET hRequest, DWORD dwInfoLevel, VOID *lpBuffer, DWORD *lpdwBufferLength, DWORD *lpdwIndex);
+    __declspec(dllimport) HINTERNET               __stdcall WinHttpOpen(WCHAR const *pszAgentW, DWORD dwAccessType, WCHAR const *pszProxyW, WCHAR const *pszProxyBypassW, DWORD dwFlags);
+    __declspec(dllimport) BOOL                    __stdcall WinHttpCloseHandle(HINTERNET hInternet);
+    __declspec(dllimport) HINTERNET               __stdcall WinHttpConnect(HINTERNET hSession, WCHAR const *pswzServerName, INTERNET_PORT nServerPort, DWORD dwReserved);
+    __declspec(dllimport) BOOL                    __stdcall WinHttpReadData(HINTERNET hRequest, VOID *lpBuffer, DWORD dwNumberOfBytesToRead, DWORD *lpdwNumberOfBytesRead);
+    __declspec(dllimport) HINTERNET               __stdcall WinHttpOpenRequest(HINTERNET hConnect, WCHAR const *pwszVerb, WCHAR const *pwszObjectName, WCHAR const *pwszVersion, WCHAR const *pwszReferrer, WCHAR const *ppwszAcceptTypes, DWORD dwFlags);
+    __declspec(dllimport) BOOL                    __stdcall WinHttpSendRequest(HINTERNET hRequest, WCHAR const *lpszHeaders, DWORD dwHeadersLength, VOID *lpOptional, DWORD dwOptionalLength, DWORD dwTotalLength, DWORD_PTR dwContext);
+    __declspec(dllimport) DWORD                   __stdcall WinHttpAddRequestHeadersEx(HINTERNET hRequest, DWORD dwModifiers, ULONGLONG ullFlags, ULONGLONG ullExtra, DWORD cHeaders, WINHTTP_EXTENDED_HEADER *pHeaders);
+    __declspec(dllimport) BOOL                    __stdcall WinHttpSetCredentials(HINTERNET   hRequest,     // HINTERNET handle returned by WinHttpOpenRequest.
+                                                                                  DWORD       AuthTargets,  // Only WINHTTP_AUTH_TARGET_SERVER and WINHTTP_AUTH_TARGET_PROXY are supported in this version and they are mutually exclusive
+                                                                                  DWORD       AuthScheme,   // must be one of the supported Auth Schemes returned from WinHttpQueryAuthSchemes()
+                                                                                  WCHAR *     pwszUserName, // 1) NULL if default creds is to be used, in which case pszPassword will be ignored
+                                                                                  WCHAR *     pwszPassword, // 1) "" == Blank Password; 2)Parameter ignored if pszUserName is NULL; 3) Invalid to pass in NULL if pszUserName is not NULL
+                                                                                  VOID *      pAuthParams);
+    __declspec(dllimport) BOOL                    __stdcall WinHttpQueryHeaders(HINTERNET hRequest, DWORD dwInfoLevel, WCHAR const *pwszName, VOID *lpBuffer, DWORD *lpdwBufferLength, DWORD *lpdwIndex);
+    __declspec(dllimport) BOOL                    __stdcall WinHttpReceiveResponse(HINTERNET hRequest, VOID *lpReserved);
+    __declspec(dllimport) WINHTTP_STATUS_CALLBACK __stdcall WinHttpSetStatusCallback(HINTERNET hInternet, WINHTTP_STATUS_CALLBACK lpfnInternetCallback, DWORD dwNotificationFlags, DWORD_PTR dwReserved);
     }
 
-    // NOTE: um/DbgHelp.h ==========================================================================
+    // NOTE: um/DbgHelp.h //////////////////////////////////////////////////////////////////////////
     #define SYMOPT_CASE_INSENSITIVE           0x00000001
     #define SYMOPT_UNDNAME                    0x00000002
     #define SYMOPT_DEFERRED_LOADS             0x00000004
@@ -680,15 +957,16 @@
     __declspec(dllimport) VOID *  __stdcall SymFunctionTableAccess64(HANDLE hProcess, DWORD64 AddrBase);
     __declspec(dllimport) BOOL    __stdcall SymGetLineFromAddrW64   (HANDLE hProcess, DWORD64 dwAddr, DWORD *pdwDisplacement, IMAGEHLP_LINEW64 *Line);
     __declspec(dllimport) DWORD64 __stdcall SymGetModuleBase64      (HANDLE hProcess, DWORD64 qwAddr);
+    __declspec(dllimport) BOOL    __stdcall SymRefreshModuleList    (HANDLE hProcess);
     };
 
-    // NOTE: um/errhandlingapi.h ===================================================================
+    // NOTE: um/errhandlingapi.h ///////////////////////////////////////////////////////////////////
     extern "C"
     {
     __declspec(dllimport) DWORD __stdcall GetLastError(VOID);
     }
 
-    // NOTE: um/libloaderapi.h =====================================================================
+    // NOTE: um/libloaderapi.h /////////////////////////////////////////////////////////////////////
     extern "C"
     {
     __declspec(dllimport) HMODULE __stdcall LoadLibraryA      (const CHAR *lpLibFileName);
@@ -698,22 +976,30 @@
     __declspec(dllimport) DWORD   __stdcall GetModuleFileNameW(HMODULE hModule, WCHAR *lpFilename, DWORD nSize);
     }
 
-    // NOTE: um/synchapi.h =========================================================================
+    // NOTE: um/synchapi.h /////////////////////////////////////////////////////////////////////////
     extern "C"
     {
-    __declspec(dllimport) DWORD __stdcall WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);
-    __declspec(dllimport) BOOL  __stdcall ReleaseSemaphore   (HANDLE hSemaphore, LONG lReleaseCount, LONG *lpPreviousCount);
-    __declspec(dllimport) VOID  __stdcall Sleep              (DWORD dwMilliseconds);
+    __declspec(dllimport) VOID  __stdcall InitializeCriticalSection            (CRITICAL_SECTION *lpCriticalSection);
+    __declspec(dllimport) VOID  __stdcall EnterCriticalSection                 (CRITICAL_SECTION *lpCriticalSection);
+    __declspec(dllimport) VOID  __stdcall LeaveCriticalSection                 (CRITICAL_SECTION *lpCriticalSection);
+    __declspec(dllimport) BOOL  __stdcall InitializeCriticalSectionAndSpinCount(CRITICAL_SECTION *lpCriticalSection, DWORD dwSpinCount);
+    __declspec(dllimport) BOOL  __stdcall InitializeCriticalSectionEx          (CRITICAL_SECTION *lpCriticalSection, DWORD dwSpinCount, DWORD Flags);
+    __declspec(dllimport) DWORD __stdcall SetCriticalSectionSpinCount          (CRITICAL_SECTION *lpCriticalSection, DWORD dwSpinCount);
+    __declspec(dllimport) BOOL  __stdcall TryEnterCriticalSection              (CRITICAL_SECTION *lpCriticalSection);
+    __declspec(dllimport) VOID  __stdcall DeleteCriticalSection                (CRITICAL_SECTION *lpCriticalSection);
+    __declspec(dllimport) DWORD __stdcall WaitForSingleObject                  (HANDLE hHandle, DWORD dwMilliseconds);
+    __declspec(dllimport) BOOL  __stdcall ReleaseSemaphore                     (HANDLE hSemaphore, LONG lReleaseCount, LONG *lpPreviousCount);
+    __declspec(dllimport) VOID  __stdcall Sleep                                (DWORD dwMilliseconds);
     }
 
-    // NOTE: um/profileapi.h =======================================================================
+    // NOTE: um/profileapi.h ///////////////////////////////////////////////////////////////////////
     extern "C"
     {
     __declspec(dllimport) BOOL __stdcall QueryPerformanceCounter  (LARGE_INTEGER* lpPerformanceCount);
     __declspec(dllimport) BOOL __stdcall QueryPerformanceFrequency(LARGE_INTEGER* lpFrequency);
     }
 
-    // NOTE: um/processthreadsapi.h ================================================================
+    // NOTE: um/processthreadsapi.h ////////////////////////////////////////////////////////////////
     typedef struct _PROCESS_INFORMATION {
         HANDLE hProcess;
         HANDLE hThread;
@@ -757,7 +1043,7 @@
 
     }
 
-    // NOTE: um/memoryapi.h ========================================================================
+    // NOTE: um/memoryapi.h ////////////////////////////////////////////////////////////////////////
     extern "C"
     {
     __declspec(dllimport) VOID * __stdcall VirtualAlloc  (VOID *lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
@@ -765,7 +1051,7 @@
     __declspec(dllimport) BOOL   __stdcall VirtualFree   (VOID *lpAddress, SIZE_T dwSize, DWORD dwFreeType);
     }
 
-    // NOTE: shared/bcrypt.h =======================================================================
+    // NOTE: shared/bcrypt.h ///////////////////////////////////////////////////////////////////////
     typedef VOID *BCRYPT_ALG_HANDLE;
     typedef LONG  NTSTATUS;
 
@@ -775,12 +1061,17 @@
     __declspec(dllimport) NTSTATUS __stdcall BCryptGenRandom            (BCRYPT_ALG_HANDLE hAlgorithm, UCHAR *pbBuffer, ULONG cbBuffer, ULONG dwFlags);
     }
 
-    // NOTE: um/shellapi.h =========================================================================
+    // NOTE: um/shellapi.h /////////////////////////////////////////////////////////////////////////
     extern "C"
     {
     __declspec(dllimport) HINSTANCE __stdcall ShellExecuteA(HWND hwnd, CHAR const *lpOperation, CHAR const *lpFile, CHAR const *lpParameters, CHAR const *lpDirectory, INT nShowCmd);
     }
 
+    // NOTE: um/debugapi.h /////////////////////////////////////////////////////////////////////////
+    extern "C"
+    {
+    __declspec(dllimport) BOOL      __stdcall IsDebuggerPresent();
+    }
+
     DQN_MSVC_WARNING_POP
 #endif // !defined(_INC_WINDOWS)
-#endif /// defined(DQN_OS_WIN32)

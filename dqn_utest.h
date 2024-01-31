@@ -1,11 +1,25 @@
 #if !defined(DQN_UTEST_H)
 #define DQN_UTEST_H
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// NOTE: Overview ==================================================================================
+//   $$\   $$\ $$$$$$$$\ $$$$$$$$\  $$$$$$\ $$$$$$$$\
+//   $$ |  $$ |\__$$  __|$$  _____|$$  __$$\\__$$  __|
+//   $$ |  $$ |   $$ |   $$ |      $$ /  \__|  $$ |
+//   $$ |  $$ |   $$ |   $$$$$\    \$$$$$$\    $$ |
+//   $$ |  $$ |   $$ |   $$  __|    \____$$\   $$ |
+//   $$ |  $$ |   $$ |   $$ |      $$\   $$ |  $$ |
+//   \$$$$$$  |   $$ |   $$$$$$$$\ \$$$$$$  |  $$ |
+//    \______/    \__|   \________| \______/   \__|
+//
+//   dqn_utest.h -- Extremely minimal unit testing framework
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // A super minimal testing framework, most of the logic here is the pretty
 // printing of test results.
-
-// NOTE: Configuration =============================================================================
+//
+// NOTE: Configuration /////////////////////////////////////////////////////////////////////////////
 //
 // #define DQN_UTEST_IMPLEMENTATION
 //     Define this in one and only one C++ file to enable the implementation
@@ -32,11 +46,11 @@
 //     Define this to a terminal color code to specify what color sucess will be
 //     presented as.
 
-// NOTE: Macros ====================================================================================
+// NOTE: Macros ////////////////////////////////////////////////////////////////////////////////////
 #include <stdio.h>
 #include <stdarg.h>
 #include <assert.h>
-#include <string.>
+#include <string.h>
 
 #if !defined(DQN_UTEST_RESULT_LPAD)
     #define DQN_UTEST_RESULT_LPAD 90
@@ -90,7 +104,7 @@
                     "%*sAssertion Triggered\n"                 \
                     "%*sFile: %s:%d\n"                         \
                     "%*sExpression: [" #expr "]\n"             \
-                    "%*sReason: " fmt "\n",                    \
+                    "%*sReason: " fmt "\n\n",                  \
                     DQN_UTEST_SPACING * 2,                     \
                     "",                                        \
                     DQN_UTEST_SPACING * 3,                     \
@@ -111,7 +125,7 @@
             (test)->state = Dqn_UTestState_TestFailed; \
             fprintf(stderr,                            \
                     "%*sFile: %s:%d\n"                 \
-                    "%*sExpression: [" #expr "]\n",    \
+                    "%*sExpression: [" #expr "]\n\n",  \
                     DQN_UTEST_SPACING * 2,             \
                     "",                                \
                     file,                              \
@@ -121,7 +135,7 @@
         }                                              \
     } while (0)
 
-// NOTE: Header ====================================================================================
+// NOTE: Header ////////////////////////////////////////////////////////////////////////////////////
 typedef enum Dqn_UTestState {
     Dqn_UTestState_Nil,
     Dqn_UTestState_TestBegun,
@@ -141,8 +155,9 @@ void Dqn_UTest_PrintStats(Dqn_UTest *test);
 void Dqn_UTest_BeginV(Dqn_UTest *test, char const *fmt, va_list args);
 void Dqn_UTest_Begin(Dqn_UTest *test, char const *fmt, ...);
 void Dqn_UTest_End(Dqn_UTest *test);
+#endif // DQN_UTEST_H
 
-// NOTE: Implementation ============================================================================
+// NOTE: Implementation ////////////////////////////////////////////////////////////////////////////
 #if defined(DQN_UTEST_IMPLEMENTATION)
 void Dqn_UTest_PrintStats(Dqn_UTest *test)
 {
@@ -209,4 +224,3 @@ void Dqn_UTest_End(Dqn_UTest *test)
     test->state = Dqn_UTestState_Nil;
 }
 #endif // DQN_UTEST_IMPLEMENTATION
-#endif // DQN_UTEST_H

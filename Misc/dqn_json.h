@@ -4,103 +4,93 @@
 
 #if !defined(DQN_JSON_H)
 #define DQN_JSON_H
+// NOTE: Dqn_JSON //////////////////////////////////////////////////////////////////////////////////
 
-// NOTE: Dqn_JSON
-// -----------------------------------------------------------------------------
-void *Dqn_JSON_ArenaAllocFunc(void *user_data, size_t count);
+void       *Dqn_JSON_ArenaAllocFunc (void *user_data, size_t count);
 char const *Dqn_JSON_TypeEnumCString(json_type_e type, size_t *size);
-bool Dqn_JSON_String8Cmp(json_string_s const *lhs, Dqn_String8 rhs);
+bool        Dqn_JSON_String8Cmp     (json_string_s const *lhs, Dqn_Str8 rhs);
 
-// NOTE: Dqn_JSON_Iterator
-// -----------------------------------------------------------------------------
-enum Dqn_JSONIteratorEntryType
+// NOTE: Dqn_JSON_It /////////////////////////////////////////////////////////////////////////
+enum Dqn_JSONItEntryType
 {
-    Dqn_JSON_IteratorEntryTypeObjElement,
-    Dqn_JSON_IteratorEntryTypeObj,
-    Dqn_JSON_IteratorEntryTypeArrayElement,
-    Dqn_JSON_IteratorEntryTypeArray,
-    Dqn_JSON_IteratorEntryTypeString,
-    Dqn_JSON_IteratorEntryTypeNumber,
+    Dqn_JSON_ItEntryTypeObjElement,
+    Dqn_JSON_ItEntryTypeObj,
+    Dqn_JSON_ItEntryTypeArrayElement,
+    Dqn_JSON_ItEntryTypeArray,
+    Dqn_JSON_ItEntryTypeString,
+    Dqn_JSON_ItEntryTypeNumber,
 };
 
-struct Dqn_JSONIteratorEntry
+struct Dqn_JSONItEntry
 {
-    Dqn_JSONIteratorEntryType type;
-    void *value;
+    Dqn_JSONItEntryType type;
+    void               *value;
 };
 
-struct Dqn_JSONIterator
+struct Dqn_JSONIt
 {
-    Dqn_JSONIteratorEntry stack[128];
-    int                   stack_count;
-    size_t                flags;
+    Dqn_JSONItEntry stack[128];
+    int             stack_count;
+    size_t          flags;
 };
 
-// NOTE: Dqn_JSON_IteratorPush/Pop
-// -----------------------------------------------------------------------------
-bool Dqn_JSON_IteratorPushObjElement  (Dqn_JSONIterator *it, json_object_element_s *element);
-bool Dqn_JSON_IteratorPushObj         (Dqn_JSONIterator *it, json_object_s *obj);
-bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *it, json_array_element_s *element);
-bool Dqn_JSON_IteratorPushArray       (Dqn_JSONIterator *it, json_value_s *value);
-bool Dqn_JSON_IteratorPushValue       (Dqn_JSONIterator *it, json_value_s *value);
-void Dqn_JSON_IteratorPop             (Dqn_JSONIterator *it);
+Dqn_JSONIt Dqn_JSON_LoadFileToIt(Dqn_Arena *arena, Dqn_Str8 json);
 
-// NOTE: Dqn_JSON_Iterator tree navigation
-// -----------------------------------------------------------------------------
-json_value_s *Dqn_JSON_IteratorPushCurrValue(Dqn_JSONIterator *it);
-bool Dqn_JSON_IteratorNext(Dqn_JSONIterator *it);
+// NOTE: Dqn_JSON_ItPush/Pop /////////////////////////////////////////////////////////////////
+bool Dqn_JSON_ItPushObjElement  (Dqn_JSONIt *it, json_object_element_s *element);
+bool Dqn_JSON_ItPushObj         (Dqn_JSONIt *it, json_object_s *obj);
+bool Dqn_JSON_ItPushArrayElement(Dqn_JSONIt *it, json_array_element_s *element);
+bool Dqn_JSON_ItPushArray       (Dqn_JSONIt *it, json_value_s *value);
+bool Dqn_JSON_ItPushValue       (Dqn_JSONIt *it, json_value_s *value);
+void Dqn_JSON_ItPop             (Dqn_JSONIt *it);
 
-#define Dqn_JSON_IteratorErrorUnrecognisedKey(it) Dqn_JSON_IteratorErrorUnrecognisedKey_(it, DQN_STRING8(__FILE__), DQN_STRING8(__func__), __LINE__)
-void Dqn_JSON_IteratorErrorUnrecognisedKey_(Dqn_JSONIterator *it, Dqn_String8 file, Dqn_String8 func, Dqn_uint line);
+// NOTE: Dqn_JSON_It tree navigation /////////////////////////////////////////////////////////
+json_value_s *Dqn_JSON_ItPushCurrValue(Dqn_JSONIt *it);
+bool          Dqn_JSON_ItNext(Dqn_JSONIt *it);
 
-#define Dqn_JSON_IteratorPushCurrValueIterateThenPop(it) \
-    for(void *DQN_UNIQUE_NAME(ptr) = Dqn_JSON_IteratorPushCurrValue(it); DQN_UNIQUE_NAME(ptr); Dqn_JSON_IteratorPop(it), DQN_UNIQUE_NAME(ptr) = nullptr) \
-        while (Dqn_JSON_IteratorNext(it))
+#define Dqn_JSON_ItPushCurrValueIterateThenPop(it) \
+    for(void *DQN_UNIQUE_NAME(ptr) = Dqn_JSON_ItPushCurrValue(it); DQN_UNIQUE_NAME(ptr); Dqn_JSON_ItPop(it), DQN_UNIQUE_NAME(ptr) = nullptr) \
+        while (Dqn_JSON_ItNext(it))
 
-// NOTE: Dqn_JSON_IteratorCurr
-// -----------------------------------------------------------------------------
-Dqn_JSONIteratorEntry *Dqn_JSON_IteratorCurr(Dqn_JSONIterator *it);
-json_value_s          *Dqn_JSON_IteratorCurrValue(Dqn_JSONIterator *it);
-json_object_element_s *Dqn_JSON_IteratorCurrObjElement(Dqn_JSONIterator *it);
+// NOTE: Dqn_JSON_ItCurr /////////////////////////////////////////////////////////////////////
+Dqn_JSONItEntry       *Dqn_JSON_ItCurr(Dqn_JSONIt *it);
+json_value_s          *Dqn_JSON_ItCurrValue(Dqn_JSONIt *it);
+json_object_element_s *Dqn_JSON_ItCurrObjElement(Dqn_JSONIt *it);
 
-// NOTE: Dqn_JSON_IteratorValueIs
-// -----------------------------------------------------------------------------
-json_value_s  *Dqn_JSON_IteratorValueIs(Dqn_JSONIterator *it, json_type_e type);
-json_object_s *Dqn_JSON_IteratorValueIsObj(Dqn_JSONIterator *it);
-json_array_s  *Dqn_JSON_IteratorValueIsArray(Dqn_JSONIterator *it);
-json_string_s *Dqn_JSON_IteratorValueIsString(Dqn_JSONIterator *it);
-json_number_s *Dqn_JSON_IteratorValueIsNumber(Dqn_JSONIterator *it);
-json_value_s  *Dqn_JSON_IteratorValueIsBool(Dqn_JSONIterator *it);
+// NOTE: Dqn_JSON_ItValueIs //////////////////////////////////////////////////////////////////
+json_value_s  *Dqn_JSON_ItValueIs(Dqn_JSONIt *it, json_type_e type);
+json_object_s *Dqn_JSON_ItValueIsObj(Dqn_JSONIt *it);
+json_array_s  *Dqn_JSON_ItValueIsArray(Dqn_JSONIt *it);
+json_string_s *Dqn_JSON_ItValueIsString(Dqn_JSONIt *it);
+json_number_s *Dqn_JSON_ItValueIsNumber(Dqn_JSONIt *it);
+json_value_s  *Dqn_JSON_ItValueIsBool(Dqn_JSONIt *it);
+json_value_s  *Dqn_JSON_ItValueIsNull(Dqn_JSONIt *it);
 
-size_t Dqn_JSON_IteratorValueArraySize(Dqn_JSONIterator *it);
+size_t         Dqn_JSON_ItValueArraySize(Dqn_JSONIt *it);
 
-// NOTE: Dqn_JSON_IteratorKeyValueIs
-// -----------------------------------------------------------------------------
-Dqn_String8    Dqn_JSON_IteratorKey(Dqn_JSONIterator *it);
-bool           Dqn_JSON_IteratorKeyIs(Dqn_JSONIterator *it, Dqn_String8 key);
-json_object_s *Dqn_JSON_IteratorKeyValueIsObj(Dqn_JSONIterator *it, Dqn_String8 key);
-json_array_s  *Dqn_JSON_IteratorKeyValueIsArray(Dqn_JSONIterator *it, Dqn_String8 key);
-json_string_s *Dqn_JSON_IteratorKeyValueIsString(Dqn_JSONIterator *it, Dqn_String8 key);
-json_number_s *Dqn_JSON_IteratorKeyValueIsNumber(Dqn_JSONIterator *it, Dqn_String8 key);
-json_value_s  *Dqn_JSON_IteratorKeyValueIsBool(Dqn_JSONIterator *it, Dqn_String8 key);
+// NOTE: Dqn_JSON_ItKeyValueIs ///////////////////////////////////////////////////////////////
+Dqn_Str8       Dqn_JSON_ItKey(Dqn_JSONIt *it);
+bool           Dqn_JSON_ItKeyIs(Dqn_JSONIt *it, Dqn_Str8 key);
+json_object_s *Dqn_JSON_ItKeyValueIsObj(Dqn_JSONIt *it, Dqn_Str8 key);
+json_array_s  *Dqn_JSON_ItKeyValueIsArray(Dqn_JSONIt *it, Dqn_Str8 key);
+json_string_s *Dqn_JSON_ItKeyValueIsString(Dqn_JSONIt *it, Dqn_Str8 key);
+json_number_s *Dqn_JSON_ItKeyValueIsNumber(Dqn_JSONIt *it, Dqn_Str8 key);
+json_value_s  *Dqn_JSON_ItKeyValueIsBool(Dqn_JSONIt *it, Dqn_Str8 key);
+json_value_s  *Dqn_JSON_ItKeyValueIsNull(Dqn_JSONIt *it, Dqn_Str8 key);
 
-// NOTE: Dqn_JSON_IteratorValueTo
-// -----------------------------------------------------------------------------
-Dqn_String8 Dqn_JSON_IteratorValueToString(Dqn_JSONIterator *it);
-int64_t     Dqn_JSON_IteratorValueToI64(Dqn_JSONIterator *it);
-uint64_t    Dqn_JSON_IteratorValueToU64(Dqn_JSONIterator *it);
-bool        Dqn_JSON_IteratorValueToBool(Dqn_JSONIterator *it);
+// NOTE: Dqn_JSON_ItValueTo //////////////////////////////////////////////////////////////////
+Dqn_Str8       Dqn_JSON_ItValueToString(Dqn_JSONIt *it);
+int64_t        Dqn_JSON_ItValueToI64(Dqn_JSONIt *it);
+uint64_t       Dqn_JSON_ItValueToU64(Dqn_JSONIt *it);
+bool           Dqn_JSON_ItValueToBool(Dqn_JSONIt *it);
 
-#define Dqn_JSON_IteratorErrorUnknownKeyValue(it) \
-    Dqn_JSON_IteratorErrorUnknownKeyValue_(it, DQN_CALL_SITE)
-
-void Dqn_JSON_IteratorErrorUnknownKeyValue_(Dqn_JSONIterator *it, Dqn_String8 file, Dqn_String8 func, int line);
+#define Dqn_JSON_ItErrorUnknownKeyValue(it) Dqn_JSON_ItErrorUnknownKeyValue_(it, DQN_CALL_SITE)
+void Dqn_JSON_ItErrorUnknownKeyValue_(Dqn_JSONIt *it, Dqn_CallSite call_site);
 
 #endif // DQN_JSON_H
 
 #if defined(DQN_JSON_IMPLEMENTATION)
-// NOTE: Dqn_JSON
-// -----------------------------------------------------------------------------
+// NOTE: Dqn_JSON //////////////////////////////////////////////////////////////////////////////////
 void *Dqn_JSON_ArenaAllocFunc(void *user_data, size_t count)
 {
     void *result = NULL;
@@ -108,7 +98,7 @@ void *Dqn_JSON_ArenaAllocFunc(void *user_data, size_t count)
         return result;
 
     Dqn_Arena *arena = DQN_CAST(Dqn_Arena*)user_data;
-    result = Dqn_Arena_Allocate(arena, count, alignof(json_value_s), Dqn_ZeroMem_No);
+    result = Dqn_Arena_Alloc(arena, count, alignof(json_value_s), Dqn_ZeroMem_No);
     return result;
 }
 
@@ -127,70 +117,86 @@ char const *Dqn_JSON_TypeEnumCString(json_type_e type, size_t *size)
     }
 }
 
-bool Dqn_JSON_String8Cmp(json_string_s const *lhs, Dqn_String8 key)
+bool Dqn_JSON_String8Cmp(json_string_s const *lhs, Dqn_Str8 key)
 {
     bool result = false;
-    if (lhs && Dqn_String8_IsValid(key)) {
-        Dqn_String8 lhs_string = Dqn_String8_Init(lhs->string, lhs->string_size);
-        result                 = Dqn_String8_Eq(lhs_string, key);
+    if (lhs && Dqn_Str8_HasData(key)) {
+        Dqn_Str8 lhs_string = Dqn_Str8_Init(lhs->string, lhs->string_size);
+        result              = Dqn_Str8_Eq(lhs_string, key);
     }
     return result;
 }
 
-// NOTE: Dqn_JSON_Iterator_push/pop
-// -----------------------------------------------------------------------------
-bool Dqn_JSON_IteratorPushObjElement(Dqn_JSONIterator *it, json_object_element_s *element)
+// NOTE: Dqn_JSON_It ///////////////////////////////////////////////////////////////////////////////
+Dqn_JSONIt Dqn_JSON_LoadFileToIt(Dqn_Arena *arena, Dqn_Str8 json)
+{
+    json_parse_result_s parse_result = {};
+    json_value_ex_s    *ex_value     =
+        DQN_CAST(json_value_ex_s *) json_parse_ex(json.data,
+                                                  json.size,
+                                                  json_parse_flags_allow_location_information,
+                                                  Dqn_JSON_ArenaAllocFunc,
+                                                  arena,
+                                                  &parse_result);
+
+    Dqn_JSONIt result = {};
+    Dqn_JSON_ItPushValue(&result, &ex_value->value);
+    return result;
+}
+
+// NOTE: Dqn_JSON_ItPush/Pop ///////////////////////////////////////////////////////////////////////
+bool Dqn_JSON_ItPushObjElement(Dqn_JSONIt *it, json_object_element_s *element)
 {
     if (!it || !element)
         return false;
     DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
-    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeObjElement, element};
+    it->stack[it->stack_count++] = {Dqn_JSON_ItEntryTypeObjElement, element};
     return true;
 }
 
-bool Dqn_JSON_IteratorPushObj(Dqn_JSONIterator *it, json_object_s *obj)
+bool Dqn_JSON_ItPushObj(Dqn_JSONIt *it, json_object_s *obj)
 {
     if (!it || !obj)
         return false;
     DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
-    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeObj, obj};
+    it->stack[it->stack_count++] = {Dqn_JSON_ItEntryTypeObj, obj};
     return true;
 }
 
-bool Dqn_JSON_IteratorPushArrayElement(Dqn_JSONIterator *it, json_array_element_s *element)
+bool Dqn_JSON_ItPushArrayElement(Dqn_JSONIt *it, json_array_element_s *element)
 {
     if (!it || !element)
         return false;
     DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
-    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeArrayElement, element};
+    it->stack[it->stack_count++] = {Dqn_JSON_ItEntryTypeArrayElement, element};
     return true;
 }
 
-bool Dqn_JSON_IteratorPushArray(Dqn_JSONIterator *it, json_value_s *value)
+bool Dqn_JSON_ItPushArray(Dqn_JSONIt *it, json_value_s *value)
 {
     if (!it || !value || json_value_as_array(value) == nullptr)
         return false;
     DQN_ASSERT(it->stack_count < DQN_ARRAY_ICOUNT(it->stack));
-    it->stack[it->stack_count++] = {Dqn_JSON_IteratorEntryTypeArray, value};
+    it->stack[it->stack_count++] = {Dqn_JSON_ItEntryTypeArray, value};
     return true;
 }
 
-bool Dqn_JSON_IteratorPushValue(Dqn_JSONIterator *it, json_value_s *value)
+bool Dqn_JSON_ItPushValue(Dqn_JSONIt *it, json_value_s *value)
 {
     bool result = false;
     if (!it || !value)
         return result;
 
     if (value->type == json_type_object) {
-        result = Dqn_JSON_IteratorPushObj(it, json_value_as_object(value));
+        result = Dqn_JSON_ItPushObj(it, json_value_as_object(value));
     } else if (value->type == json_type_array) {
-        result = Dqn_JSON_IteratorPushArray(it, value);
+        result = Dqn_JSON_ItPushArray(it, value);
     }
 
     return result;
 }
 
-void Dqn_JSON_IteratorPop(Dqn_JSONIterator *it)
+void Dqn_JSON_ItPop(Dqn_JSONIt *it)
 {
     if (!it)
         return;
@@ -199,19 +205,18 @@ void Dqn_JSON_IteratorPop(Dqn_JSONIterator *it)
         it->stack_count--;
 }
 
-// NOTE: Dqn_JSON_Iterator json tree navigation
-// -----------------------------------------------------------------------------
-json_value_s *Dqn_JSON_IteratorPushCurrValue(Dqn_JSONIterator *it)
+// NOTE: Dqn_JSON_It JSON tree navigation //////////////////////////////////////////////////////////
+json_value_s *Dqn_JSON_ItPushCurrValue(Dqn_JSONIt *it)
 {
     json_value_s          *result = nullptr;
-    Dqn_JSONIteratorEntry *curr   = Dqn_JSON_IteratorCurr(it);
+    Dqn_JSONItEntry *curr   = Dqn_JSON_ItCurr(it);
     if (!curr)
         return result;
 
-    if (curr->type == Dqn_JSON_IteratorEntryTypeObjElement) {
+    if (curr->type == Dqn_JSON_ItEntryTypeObjElement) {
         json_object_element_s *element = DQN_CAST(json_object_element_s *) curr->value;
         result                         = element->value;
-    } else if (curr->type == Dqn_JSON_IteratorEntryTypeArrayElement) {
+    } else if (curr->type == Dqn_JSON_ItEntryTypeArrayElement) {
         json_array_element_s *element = DQN_CAST(json_array_element_s *) curr->value;
         result                        = element->value;
     } else {
@@ -221,57 +226,56 @@ json_value_s *Dqn_JSON_IteratorPushCurrValue(Dqn_JSONIterator *it)
     if (result->type == json_type_array) {
         json_array_s *array = json_value_as_array(result);
         DQN_ASSERT(array);
-        Dqn_JSON_IteratorPushArray(it, result);
+        Dqn_JSON_ItPushArray(it, result);
     } else if (result->type == json_type_object) {
         json_object_s *obj = json_value_as_object(result);
         DQN_ASSERT(obj);
-        Dqn_JSON_IteratorPushObj(it, obj);
+        Dqn_JSON_ItPushObj(it, obj);
     }
 
     return result;
 }
 
-bool Dqn_JSON_IteratorNext(Dqn_JSONIterator *it)
+bool Dqn_JSON_ItNext(Dqn_JSONIt *it)
 {
-    Dqn_JSONIteratorEntry *curr = Dqn_JSON_IteratorCurr(it);
+    Dqn_JSONItEntry *curr = Dqn_JSON_ItCurr(it);
     if (!curr)
         return false;
 
     json_object_element_s *obj_element   = nullptr;
     json_array_element_s  *array_element = nullptr;
-    if (curr->type == Dqn_JSON_IteratorEntryTypeObj) {
+    if (curr->type == Dqn_JSON_ItEntryTypeObj) {
         auto *obj   = DQN_CAST(json_object_s *) curr->value;
         obj_element = obj->start;
-    } else if (curr->type == Dqn_JSON_IteratorEntryTypeObjElement) {
+    } else if (curr->type == Dqn_JSON_ItEntryTypeObjElement) {
         auto *element = DQN_CAST(json_object_element_s *) curr->value;
         obj_element   = element->next;
-        Dqn_JSON_IteratorPop(it);
-    } else if (curr->type == Dqn_JSON_IteratorEntryTypeArray) {
+        Dqn_JSON_ItPop(it);
+    } else if (curr->type == Dqn_JSON_ItEntryTypeArray) {
         auto *value   = DQN_CAST(json_value_s *) curr->value;
         auto *array   = json_value_as_array(value);
         array_element = array->start;
-    } else if (curr->type == Dqn_JSON_IteratorEntryTypeArrayElement) {
+    } else if (curr->type == Dqn_JSON_ItEntryTypeArrayElement) {
         auto *element = DQN_CAST(json_array_element_s *) curr->value;
         array_element = element->next;
-        Dqn_JSON_IteratorPop(it);
+        Dqn_JSON_ItPop(it);
     } else {
-        Dqn_JSON_IteratorPop(it);
+        Dqn_JSON_ItPop(it);
     }
 
     if (obj_element)
-        Dqn_JSON_IteratorPushObjElement(it, obj_element);
+        Dqn_JSON_ItPushObjElement(it, obj_element);
     else if (array_element)
-        Dqn_JSON_IteratorPushArrayElement(it, array_element);
+        Dqn_JSON_ItPushArrayElement(it, array_element);
 
     bool result = obj_element || array_element;
     return result;
 }
 
-// NOTE: Dqn_JSON_IteratorCurr
-// -----------------------------------------------------------------------------
-Dqn_JSONIteratorEntry *Dqn_JSON_IteratorCurr(Dqn_JSONIterator *it)
+// NOTE: Dqn_JSON_ItCurr ///////////////////////////////////////////////////////////////////////////
+Dqn_JSONItEntry *Dqn_JSON_ItCurr(Dqn_JSONIt *it)
 {
-    Dqn_JSONIteratorEntry *result = nullptr;
+    Dqn_JSONItEntry *result = nullptr;
     if (!it || it->stack_count <= 0)
         return result;
 
@@ -279,23 +283,23 @@ Dqn_JSONIteratorEntry *Dqn_JSON_IteratorCurr(Dqn_JSONIterator *it)
     return result;
 }
 
-json_value_s *Dqn_JSON_IteratorCurrValue(Dqn_JSONIterator *it)
+json_value_s *Dqn_JSON_ItCurrValue(Dqn_JSONIt *it)
 {
     json_value_s *result = nullptr;
-    Dqn_JSONIteratorEntry *curr = Dqn_JSON_IteratorCurr(it);
+    Dqn_JSONItEntry *curr = Dqn_JSON_ItCurr(it);
     if (!curr)
         return result;
 
-    if (curr->type == Dqn_JSON_IteratorEntryTypeObjElement) {
+    if (curr->type == Dqn_JSON_ItEntryTypeObjElement) {
         auto *element = DQN_CAST(json_object_element_s *)curr->value;
         result = element->value;
-    } else if (curr->type == Dqn_JSON_IteratorEntryTypeArrayElement) {
+    } else if (curr->type == Dqn_JSON_ItEntryTypeArrayElement) {
         auto *element = DQN_CAST(json_array_element_s *)curr->value;
         result = element->value;
-    } else if (curr->type == Dqn_JSON_IteratorEntryTypeString ||
-               curr->type == Dqn_JSON_IteratorEntryTypeNumber ||
-               curr->type == Dqn_JSON_IteratorEntryTypeObj    ||
-               curr->type == Dqn_JSON_IteratorEntryTypeArray)
+    } else if (curr->type == Dqn_JSON_ItEntryTypeString ||
+               curr->type == Dqn_JSON_ItEntryTypeNumber ||
+               curr->type == Dqn_JSON_ItEntryTypeObj    ||
+               curr->type == Dqn_JSON_ItEntryTypeArray)
     {
         result = DQN_CAST(json_value_s *)curr->value;
     }
@@ -303,74 +307,79 @@ json_value_s *Dqn_JSON_IteratorCurrValue(Dqn_JSONIterator *it)
     return result;
 }
 
-json_object_element_s *Dqn_JSON_IteratorCurrObjElement(Dqn_JSONIterator *it)
+json_object_element_s *Dqn_JSON_ItCurrObjElement(Dqn_JSONIt *it)
 {
-    Dqn_JSONIteratorEntry *curr   = Dqn_JSON_IteratorCurr(it);
-    auto                  *result = (curr && curr->type == Dqn_JSON_IteratorEntryTypeObjElement)
+    Dqn_JSONItEntry *curr   = Dqn_JSON_ItCurr(it);
+    auto                  *result = (curr && curr->type == Dqn_JSON_ItEntryTypeObjElement)
                                         ? DQN_CAST(json_object_element_s *) curr->value
                                         : nullptr;
     return result;
 }
 
-// NOTE: Dqn_JSON_IteratorValueIs
-// -----------------------------------------------------------------------------
-json_value_s *Dqn_JSON_IteratorValueIs(Dqn_JSONIterator *it, json_type_e type)
+// NOTE: Dqn_JSON_ItValueIs ////////////////////////////////////////////////////////////////////////
+json_value_s *Dqn_JSON_ItValueIs(Dqn_JSONIt *it, json_type_e type)
 {
-    json_value_s  *curr  = Dqn_JSON_IteratorCurrValue(it);
+    json_value_s  *curr  = Dqn_JSON_ItCurrValue(it);
     json_value_s *result = (curr && type == curr->type) ? curr : nullptr;
     return result;
 }
 
-json_object_s *Dqn_JSON_IteratorValueIsObj(Dqn_JSONIterator *it)
+json_object_s *Dqn_JSON_ItValueIsObj(Dqn_JSONIt *it)
 {
-    json_value_s *curr    = Dqn_JSON_IteratorCurrValue(it);
+    json_value_s *curr    = Dqn_JSON_ItCurrValue(it);
     json_object_s *result = curr ? json_value_as_object(curr) : nullptr;
     return result;
 }
 
-json_array_s *Dqn_JSON_IteratorValueIsArray(Dqn_JSONIterator *it)
+json_array_s *Dqn_JSON_ItValueIsArray(Dqn_JSONIt *it)
 {
-    json_value_s *curr   = Dqn_JSON_IteratorCurrValue(it);
+    json_value_s *curr   = Dqn_JSON_ItCurrValue(it);
     json_array_s *result = curr ? json_value_as_array(curr) : nullptr;
     return result;
 }
 
-json_string_s *Dqn_JSON_IteratorValueIsString(Dqn_JSONIterator *it)
+json_string_s *Dqn_JSON_ItValueIsString(Dqn_JSONIt *it)
 {
-    json_value_s *curr    = Dqn_JSON_IteratorCurrValue(it);
+    json_value_s *curr    = Dqn_JSON_ItCurrValue(it);
     json_string_s *result = curr ? json_value_as_string(curr) : nullptr;
     return result;
 }
 
-json_number_s *Dqn_JSON_IteratorValueIsNumber(Dqn_JSONIterator *it)
+json_number_s *Dqn_JSON_ItValueIsNumber(Dqn_JSONIt *it)
 {
-    json_value_s *curr    = Dqn_JSON_IteratorCurrValue(it);
+    json_value_s *curr    = Dqn_JSON_ItCurrValue(it);
     json_number_s *result = curr ? json_value_as_number(curr) : nullptr;
     return result;
 }
 
-json_value_s *Dqn_JSON_IteratorValueIsBool(Dqn_JSONIterator *it)
+json_value_s *Dqn_JSON_ItValueIsBool(Dqn_JSONIt *it)
 {
-    json_value_s *curr   = Dqn_JSON_IteratorCurrValue(it);
+    json_value_s *curr   = Dqn_JSON_ItCurrValue(it);
     json_value_s *result = (curr && (curr->type == json_type_true || curr->type == json_type_false)) ? curr : nullptr;
     return result;
 }
 
-size_t Dqn_JSON_IteratorValueArraySize(Dqn_JSONIterator *it)
+json_value_s *Dqn_JSON_ItValueIsNull(Dqn_JSONIt *it)
+{
+    json_value_s *curr   = Dqn_JSON_ItCurrValue(it);
+    json_value_s *result = (curr && (curr->type == json_type_null)) ? curr : nullptr;
+    return result;
+}
+
+size_t Dqn_JSON_ItValueArraySize(Dqn_JSONIt *it)
 {
     size_t result = 0;
-    if (json_array_s *curr = Dqn_JSON_IteratorValueIsArray(it))
+    if (json_array_s *curr = Dqn_JSON_ItValueIsArray(it))
         result = curr->length;
     return result;
 }
 
 
-// NOTE: Dqn_JSON_IteratorKeyValueIs
-// -----------------------------------------------------------------------------
-Dqn_String8 Dqn_JSON_IteratorKey(Dqn_JSONIterator *it)
+// NOTE: Dqn_JSON_ItKeyValueIs /////////////////////////////////////////////////////////////////////
+Dqn_Str8 Dqn_JSON_ItKey(Dqn_JSONIt *it)
 {
-    json_object_element_s *curr = Dqn_JSON_IteratorCurrObjElement(it);
-    Dqn_String8 result = {};
+    json_object_element_s *curr = Dqn_JSON_ItCurrObjElement(it);
+    Dqn_Str8 result = {};
     if (curr) {
         result.data = DQN_CAST(char *)curr->name->string;
         result.size = curr->name->string_size;
@@ -378,98 +387,107 @@ Dqn_String8 Dqn_JSON_IteratorKey(Dqn_JSONIterator *it)
     return result;
 }
 
-bool Dqn_JSON_IteratorKeyIs(Dqn_JSONIterator *it, Dqn_String8 key)
+bool Dqn_JSON_ItKeyIs(Dqn_JSONIt *it, Dqn_Str8 key)
 {
-    json_object_element_s *curr = Dqn_JSON_IteratorCurrObjElement(it);
+    json_object_element_s *curr = Dqn_JSON_ItCurrObjElement(it);
     bool result                 = Dqn_JSON_String8Cmp(curr->name, key);
     return result;
 }
 
-json_object_s *Dqn_JSON_IteratorKeyValueIsObj(Dqn_JSONIterator *it, Dqn_String8 key)
+json_object_s *Dqn_JSON_ItKeyValueIsObj(Dqn_JSONIt *it, Dqn_Str8 key)
 {
     json_object_s         *result = nullptr;
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    json_object_element_s *curr   = Dqn_JSON_ItCurrObjElement(it);
     if (curr && Dqn_JSON_String8Cmp(curr->name, key))
         result = json_value_as_object(curr->value);
     return result;
 }
 
-json_array_s *Dqn_JSON_IteratorKeyValueIsArray(Dqn_JSONIterator *it, Dqn_String8 key)
+json_array_s *Dqn_JSON_ItKeyValueIsArray(Dqn_JSONIt *it, Dqn_Str8 key)
 {
     json_array_s          *result = nullptr;
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    json_object_element_s *curr   = Dqn_JSON_ItCurrObjElement(it);
     if (curr && Dqn_JSON_String8Cmp(curr->name, key))
         result = json_value_as_array(curr->value);
     return result;
 }
 
-json_string_s *Dqn_JSON_IteratorKeyValueIsString(Dqn_JSONIterator *it, Dqn_String8 key)
+json_string_s *Dqn_JSON_ItKeyValueIsString(Dqn_JSONIt *it, Dqn_Str8 key)
 {
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    json_object_element_s *curr   = Dqn_JSON_ItCurrObjElement(it);
     json_string_s         *result = nullptr;
     if (curr && Dqn_JSON_String8Cmp(curr->name, key))
         result = json_value_as_string(curr->value);
     return result;
 }
 
-json_number_s *Dqn_JSON_IteratorKeyValueIsNumber(Dqn_JSONIterator *it, Dqn_String8 key)
+json_number_s *Dqn_JSON_ItKeyValueIsNumber(Dqn_JSONIt *it, Dqn_Str8 key)
 {
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    json_object_element_s *curr   = Dqn_JSON_ItCurrObjElement(it);
     json_number_s         *result = nullptr;
     if (curr && Dqn_JSON_String8Cmp(curr->name, key))
         result = json_value_as_number(curr->value);
     return result;
 }
 
-json_value_s *Dqn_JSON_IteratorKeyValueIsBool(Dqn_JSONIterator *it, Dqn_String8 key)
+json_value_s *Dqn_JSON_ItKeyValueIsBool(Dqn_JSONIt *it, Dqn_Str8 key)
 {
-    json_object_element_s *curr   = Dqn_JSON_IteratorCurrObjElement(it);
+    json_object_element_s *curr   = Dqn_JSON_ItCurrObjElement(it);
     json_value_s          *result = nullptr;
     if (curr && Dqn_JSON_String8Cmp(curr->name, key))
         result = curr->value->type == json_type_true || curr->value->type == json_type_false ? curr->value : nullptr;
     return result;
 }
 
-// NOTE: Dqn_JSON_IteratorValueTo
-// -----------------------------------------------------------------------------
-Dqn_String8 Dqn_JSON_IteratorValueToString(Dqn_JSONIterator *it)
+json_value_s *Dqn_JSON_ItKeyValueIsNull(Dqn_JSONIt *it, Dqn_Str8 key)
 {
-    Dqn_String8 result = {};
-    if (json_string_s *curr = Dqn_JSON_IteratorValueIsString(it))
-        result = Dqn_String8_Init(curr->string, curr->string_size);
+    json_object_element_s *curr   = Dqn_JSON_ItCurrObjElement(it);
+    json_value_s          *result = nullptr;
+    if (curr && Dqn_JSON_String8Cmp(curr->name, key))
+        result = curr->value->type == json_type_null ? curr->value : nullptr;
     return result;
 }
 
-int64_t Dqn_JSON_IteratorValueToI64(Dqn_JSONIterator *it)
+
+// NOTE: Dqn_JSON_ItValueTo ////////////////////////////////////////////////////////////////////////
+Dqn_Str8 Dqn_JSON_ItValueToString(Dqn_JSONIt *it)
+{
+    Dqn_Str8 result = {};
+    if (json_string_s *curr = Dqn_JSON_ItValueIsString(it))
+        result = Dqn_Str8_Init(curr->string, curr->string_size);
+    return result;
+}
+
+int64_t Dqn_JSON_ItValueToI64(Dqn_JSONIt *it)
 {
     int64_t result = {};
-    if (json_number_s *curr = Dqn_JSON_IteratorValueIsNumber(it))
-        result = Dqn_String8_ToI64(Dqn_String8_Init(curr->number, curr->number_size), 0 /*separator*/);
+    if (json_number_s *curr = Dqn_JSON_ItValueIsNumber(it))
+        result = Dqn_Str8_ToI64(Dqn_Str8_Init(curr->number, curr->number_size), 0 /*separator*/).value;
     return result;
 }
 
-uint64_t Dqn_JSON_IteratorValueToU64(Dqn_JSONIterator *it)
+uint64_t Dqn_JSON_ItValueToU64(Dqn_JSONIt *it)
 {
     uint64_t result = {};
-    if (json_number_s *curr = Dqn_JSON_IteratorValueIsNumber(it))
-        result = Dqn_String8_ToU64(Dqn_String8_Init(curr->number, curr->number_size), 0 /*separator*/);
+    if (json_number_s *curr = Dqn_JSON_ItValueIsNumber(it))
+        result = Dqn_Str8_ToU64(Dqn_Str8_Init(curr->number, curr->number_size), 0 /*separator*/).value;
     return result;
 }
 
-bool Dqn_JSON_IteratorValueToBool(Dqn_JSONIterator *it)
+bool Dqn_JSON_ItValueToBool(Dqn_JSONIt *it)
 {
     bool result = {};
-    if (json_value_s *curr = Dqn_JSON_IteratorValueIsBool(it))
+    if (json_value_s *curr = Dqn_JSON_ItValueIsBool(it))
         result = curr->type == json_type_true;
     return result;
 }
 
-void Dqn_JSON_IteratorErrorUnknownKeyValue_(Dqn_JSONIterator *it, Dqn_CallSite call_site)
+void Dqn_JSON_ItErrorUnknownKeyValue_(Dqn_JSONIt *it, Dqn_CallSite call_site)
 {
     if (!it)
         return;
 
-    json_object_element_s const *curr = Dqn_JSON_IteratorCurrObjElement(it);
+    json_object_element_s const *curr = Dqn_JSON_ItCurrObjElement(it);
     if (!curr)
         return;
 
@@ -484,19 +502,18 @@ void Dqn_JSON_IteratorErrorUnknownKeyValue_(Dqn_JSONIterator *it, Dqn_CallSite c
                               "Unknown key-value pair in object [loc=%zu:%zu, key=%.*s, value=%.*s]",
                               info->line_no,
                               info->row_no,
-                              key->string_size,
+                              DQN_CAST(int)key->string_size,
                               key->string,
-                              value_type_size,
+                              DQN_CAST(int)value_type_size,
                               value_type);
     } else {
         Dqn_Log_TypeFCallSite(Dqn_LogType_Warning,
                               call_site,
                               "Unknown key-value pair in object [key=%.*s, value=%.*s]",
-                              key->string_size,
+                              DQN_CAST(int)key->string_size,
                               key->string,
-                              value_type_size,
+                              DQN_CAST(int)value_type_size,
                               value_type);
     }
 }
-
 #endif // defined(DQN_JSON_IMPLEMENTATION)

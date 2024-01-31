@@ -1,4 +1,29 @@
-// NOTE: [$CARR] Dqn_CArray ========================================================================
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//    $$$$$$\   $$$$$$\  $$\   $$\ $$$$$$$$\  $$$$$$\  $$$$$$\ $$\   $$\ $$$$$$$$\ $$$$$$$\   $$$$$$\
+//   $$  __$$\ $$  __$$\ $$$\  $$ |\__$$  __|$$  __$$\ \_$$  _|$$$\  $$ |$$  _____|$$  __$$\ $$  __$$\
+//   $$ /  \__|$$ /  $$ |$$$$\ $$ |   $$ |   $$ /  $$ |  $$ |  $$$$\ $$ |$$ |      $$ |  $$ |$$ /  \__|
+//   $$ |      $$ |  $$ |$$ $$\$$ |   $$ |   $$$$$$$$ |  $$ |  $$ $$\$$ |$$$$$\    $$$$$$$  |\$$$$$$\
+//   $$ |      $$ |  $$ |$$ \$$$$ |   $$ |   $$  __$$ |  $$ |  $$ \$$$$ |$$  __|   $$  __$$<  \____$$\
+//   $$ |  $$\ $$ |  $$ |$$ |\$$$ |   $$ |   $$ |  $$ |  $$ |  $$ |\$$$ |$$ |      $$ |  $$ |$$\   $$ |
+//   \$$$$$$  | $$$$$$  |$$ | \$$ |   $$ |   $$ |  $$ |$$$$$$\ $$ | \$$ |$$$$$$$$\ $$ |  $$ |\$$$$$$  |
+//    \______/  \______/ \__|  \__|   \__|   \__|  \__|\______|\__|  \__|\________|\__|  \__| \______/
+//
+//   dqn_containers.h -- Data structures for storing data (e.g. arrays and hash tables)
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// [$CARR] Dqn_CArray --            -- Basic operations on C arrays for VArray/SArray/FArray to reuse
+// [$VARR] Dqn_VArray -- DQN_VARRAY -- Array backed by virtual memory arena
+// [$SARR] Dqn_SArray -- DQN_SARRAY -- Array that are allocated but cannot resize
+// [$FARR] Dqn_FArray -- DQN_FARRAY -- Fixed-size arrays
+// [$SLIC] Dqn_Slice  --            -- Pointe and length container of data
+// [$DMAP] Dqn_DSMap  -- DQN_DSMAP  -- Hashtable, 70% max load, PoT size, linear probe, chain repair
+// [$LIST] Dqn_List   -- DQN_LIST   -- Chunked linked lists, append only
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: [$CARR] Dqn_CArray ////////////////////////////////////////////////////////////////////////
 enum Dqn_ArrayErase
 {
     Dqn_ArrayErase_Unstable,
@@ -18,117 +43,32 @@ struct Dqn_ArrayEraseResult
     Dqn_usize items_erased; // The number of items erased
 };
 
-template <typename T>
-struct Dqn_ArrayFindResult
+template <typename T> struct Dqn_ArrayFindResult
 {
     T        *data;  // Pointer to the value if a match is found, null pointer otherwise
     Dqn_usize index; // Index to the value if a match is found, 0 otherwise
 };
 
-template <typename T> Dqn_ArrayEraseResult   Dqn_CArray_EraseRange (T *data, Dqn_usize *size, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
-template <typename T> T *                    Dqn_CArray_MakeArray  (T *data, Dqn_usize *size, Dqn_usize max, Dqn_usize count, Dqn_ZeroMem zero_mem);
-template <typename T> T *                    Dqn_CArray_InsertArray(T *data, Dqn_usize *size, Dqn_usize max, Dqn_usize index, T const *items, Dqn_usize count);
-template <typename T> T                      Dqn_CArray_PopFront   (T *data, Dqn_usize *size, Dqn_usize count);
-template <typename T> T                      Dqn_CArray_PopBack    (T *data, Dqn_usize *size, Dqn_usize count);
-template <typename T> Dqn_ArrayFindResult<T> Dqn_CArray_Find       (T *data, Dqn_usize size, T const &value);
-
 #if !defined(DQN_NO_VARRAY)
-// NOTE: [$VARR] Dqn_VArray ========================================================================
-// An array that is backed by virtual memory by reserving addressing space and
-// comitting pages as items are allocated in the array. This array never
-// reallocs, instead you should reserve the upper bound of the memory you will
-// possibly ever need (e.g. 16GB) and let the array commit physical pages on
-// demand. On 64 bit operating systems you are given 48 bits of addressable
-// space giving you 256 TB of reservable memory. This gives you practically
-// an unlimited array capacity that avoids reallocs and only consumes memory
-// that is actually occupied by the array.
-//
-// Each page that is committed into the array will be at page/allocation
-// granularity which are always cache aligned. This array essentially retains
-// all the benefits of normal arrays,
-//
-// - contiguous memory
-// - O(1) random access
-// - O(N) iterate
-//
-// In addition to no realloc on expansion or shrinking.
-//
+// NOTE: [$VARR] Dqn_VArray ////////////////////////////////////////////////////////////////////////
 // TODO(doyle): Add an API for shrinking the array by decomitting pages back to 
 // the OS.
-//
-// NOTE: API
-// @proc Dqn_VArray_InitByteSize, Dqn_VArray_Init
-//   @desc Initialise an array with the requested byte size or item capacity
-//   respectively. The returned array may have a higher capacity than the
-//   requested amount since requested memory from the OS may have a certain
-//   alignment requirement (e.g. on Windows reserve/commit are 64k/4k aligned).
-
-// @proc Dqn_VArray_IsValid
-//   @desc Verify if the array has been initialised
-
-// @proc Dqn_VArray_Make, Dqn_VArray_Add
-//   @desc Allocate items into the array
-//     'Make' creates the `count` number of requested items
-//     'Add' adds the array of items into the array
-//   @return The array of items allocated. Null pointer if the array is invalid
-//   or the array has insufficient space for the requested items.
-
-// @proc Dqn_VArray_EraseRange
-//   @desc Erase the next `count` items at `begin_index` in the array. `count`
-//   can be positive or negative which dictates the if we erase forward from the
-//   `begin_index` or in reverse.
-//
-//   This operation will invalidate all pointers to the array!
-//
-//   @param erase The erase method, stable erase will shift all elements after
-//   the erase ranged into the range. Unstable erase will copy the tail elements
-//   into the range to delete.
-
-// @proc Dqn_VArray_Clear
-//   @desc Set the size of the array to 0
-
-// @proc Dqn_VArray_Reserve
-//   @desc Ensure that the requested number of items are backed by physical
-//   pages from the OS. Calling this pre-emptively will minimise syscalls into
-//   the kernel to request memory. The requested items will be rounded up to the
-//   in bytes to the allocation granularity of OS allocation APIs hence the
-//   reserved space may be greater than the requested amount (e.g. this is 4k
-//   on Windows).
-
 template <typename T> struct Dqn_VArray
 {
-    Dqn_MemBlock *block; // Block of memory from the allocator for this array
-    T            *data;  // Pointer to the start of the array items in the block of memory
-    Dqn_usize     size;  // Number of items currently in the array
-    Dqn_usize     max;   // Maximum number of items this array can store
+    Dqn_Arena  arena; // Allocator for the array
+    T         *data;  // Pointer to the start of the array items in the block of memory
+    Dqn_usize  size;  // Number of items currently in the array
+    Dqn_usize  max;   // Maximum number of items this array can store
 
     T       *begin()       { return data; }
     T       *end  ()       { return data + size; }
     T const *begin() const { return data; }
     T const *end  () const { return data + size; }
 };
-
-// NOTE: Setup =====================================================================================
-DQN_API template <typename T> Dqn_VArray<T>        Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size);
-DQN_API template <typename T> Dqn_VArray<T>        Dqn_VArray_Init        (Dqn_Arena *arena, Dqn_usize max);
-DQN_API template <typename T> bool                 Dqn_VArray_IsValid     (Dqn_VArray<T> const *array);
-DQN_API template <typename T> void                 Dqn_VArray_Reserve     (Dqn_VArray<T> *array, Dqn_usize count);
-
-// NOTE: Insert ====================================================================================
-DQN_API template <typename T> T *                  Dqn_VArray_MakeArray   (Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T> T *                  Dqn_VArray_Make        (Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T> T *                  Dqn_VArray_AddArray    (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
-DQN_API template <typename T> T *                  Dqn_VArray_Add         (Dqn_VArray<T> *array, T const &item);
-DQN_API template <typename T> T                    Dqn_VArray_PopFront    (Dqn_VArray<T> *array, Dqn_usize count);
-DQN_API template <typename T> T                    Dqn_VArray_PopBack     (Dqn_VArray<T> *array, Dqn_usize count);
-
-// NOTE: Modify ====================================================================================
-DQN_API template <typename T> Dqn_ArrayEraseResult Dqn_VArray_EraseRange  (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
-DQN_API template <typename T> void                 Dqn_VArray_Clear       (Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem);
 #endif // !defined(DQN_NO_VARRAY)
 
 #if !defined(DQN_NO_SARRAY)
-// NOTE: [$SARR] Dqn_SArray ========================================================================
+// NOTE: [$SARR] Dqn_SArray ////////////////////////////////////////////////////////////////////////
 template <typename T> struct Dqn_SArray
 {
     T        *data; // Pointer to the start of the array items in the block of memory
@@ -140,27 +80,10 @@ template <typename T> struct Dqn_SArray
     T const *begin() const { return data; }
     T const *end  () const { return data + size; }
 };
-
-// NOTE: Setup =====================================================================================
-DQN_API template <typename T> Dqn_SArray<T>           Dqn_SArray_Init       (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T, size_t N> Dqn_SArray<T> Dqn_SArray_InitCArrayCopy   (Dqn_Arena *arena, T const (&array)[N]);
-DQN_API template <typename T> bool                    Dqn_SArray_IsValid    (Dqn_SArray<T> const *array);
-
-// NOTE: API =======================================================================================
-DQN_API template <typename T> T *                     Dqn_SArray_MakeArray  (Dqn_SArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T> T *                     Dqn_SArray_Make       (Dqn_SArray<T> *array, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T> T *                     Dqn_SArray_AddArray   (Dqn_SArray<T> *array, T const *items, Dqn_usize count);
-DQN_API template <typename T> T *                     Dqn_SArray_Add        (Dqn_SArray<T> *array, T const &item);
-DQN_API template <typename T> T *                     Dqn_SArray_InsertArray(Dqn_SArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count);
-DQN_API template <typename T> T *                     Dqn_SArray_Insert     (Dqn_SArray<T> *array, Dqn_usize index, T const &item);
-DQN_API template <typename T> T                       Dqn_SArray_PopFront   (Dqn_SArray<T> *array, Dqn_usize count);
-DQN_API template <typename T> T                       Dqn_SArray_PopBack    (Dqn_SArray<T> *array, Dqn_usize count);
-DQN_API template <typename T> Dqn_ArrayEraseResult    Dqn_SArray_EraseRange (Dqn_SArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
-DQN_API template <typename T> void                    Dqn_SArray_Clear      (Dqn_SArray<T> *array);
 #endif // !defined(DQN_NO_SARRAY)
 
 #if !defined(DQN_NO_FARRAY)
-// NOTE: [$FARR] Dqn_FArray ========================================================================
+// NOTE: [$FARR] Dqn_FArray ////////////////////////////////////////////////////////////////////////
 template <typename T, Dqn_usize N> struct Dqn_FArray
 {
     T         data[N]; // Pointer to the start of the array items in the block of memory
@@ -172,160 +95,14 @@ template <typename T, Dqn_usize N> struct Dqn_FArray
     T const *end  () const { return data + size; }
 };
 
-// NOTE: Setup =====================================================================================
-DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N>       Dqn_FArray_Init      (T const *array, Dqn_usize count);
-DQN_API template <typename T, Dqn_usize N> bool                   Dqn_FArray_IsValid   (Dqn_FArray<T, N> const *array);
-DQN_API template <typename T, Dqn_usize N> Dqn_usize              Dqn_FArray_Max       (Dqn_FArray<T, N> const *) { return N; }
-
-// NOTE: API =======================================================================================
-DQN_API template <typename T, Dqn_usize N> T *                    Dqn_FArray_MakeArray  (Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T, Dqn_usize N> T *                    Dqn_FArray_Make       (Dqn_FArray<T, N> *array, Dqn_ZeroMem zero_mem);
-DQN_API template <typename T, Dqn_usize N> T *                    Dqn_FArray_AddArray   (Dqn_FArray<T, N> *array, T const *items, Dqn_usize count);
-DQN_API template <typename T, Dqn_usize N> T *                    Dqn_FArray_Add        (Dqn_FArray<T, N> *array, T const &item);
-DQN_API template <typename T, Dqn_usize N> T *                    Dqn_FArray_InsertArray(Dqn_FArray<T, N> *array, T const &item, Dqn_usize index);
-DQN_API template <typename T, Dqn_usize N> T *                    Dqn_FArray_Insert     (Dqn_FArray<T, N> *array, Dqn_usize index, T const &item);
-DQN_API template <typename T, Dqn_usize N> T                      Dqn_FArray_PopFront   (Dqn_FArray<T, N> *array, Dqn_usize count);
-DQN_API template <typename T, Dqn_usize N> T                      Dqn_FArray_PopBack    (Dqn_FArray<T, N> *array, Dqn_usize count);
-DQN_API template <typename T, Dqn_usize N> Dqn_ArrayFindResult<T> Dqn_FArray_Find       (Dqn_FArray<T, N> *array, T const &find);
-DQN_API template <typename T, Dqn_usize N> Dqn_ArrayEraseResult   Dqn_FArray_EraseRange (Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
-DQN_API template <typename T, Dqn_usize N> void                   Dqn_FArray_Clear      (Dqn_FArray<T, N> *array);
+template <typename T> using Dqn_FArray8  = Dqn_FArray<T, 8>;
+template <typename T> using Dqn_FArray16 = Dqn_FArray<T, 16>;
+template <typename T> using Dqn_FArray32 = Dqn_FArray<T, 32>;
+template <typename T> using Dqn_FArray64 = Dqn_FArray<T, 64>;
 #endif // !defined(DQN_NO_FARRAY)
 
-#if !defined(DQN_NO_SLICE)
-// NOTE: [$SLIC] Dqn_Slice =========================================================================
-template <typename T>              Dqn_Slice<T> Dqn_Slice_Init    (T* const data, Dqn_usize size);
-template <typename T, Dqn_usize N> Dqn_Slice<T> Dqn_Slice_InitCArrayCopy(Dqn_Arena *arena, T const *(&array)[N]);
-template <typename T>              Dqn_Slice<T> Dqn_Slice_Alloc   (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
-
-#endif // !defined(DQN_NO_SLICE)
-
 #if !defined(DQN_NO_DSMAP)
-// NOTE: [$DMAP] Dqn_DSMap =========================================================================
-// A hash table configured using the presets recommended by Demitri Spanos
-// from the Handmade Network (HMN),
-//
-// - power of two capacity
-// - grow by 2x on load >= 75%
-// - open-addressing with linear probing
-// - separate large values (esp. variable length values) into a separate table
-// - use a well-known hash function: MurmurHash3 (or xxhash, city, spooky ...)
-// - chain-repair on delete (rehash items in the probe chain after delete)
-// - shrink by 1/2 on load < 25% (suggested by Martins Mmozeiko of HMN)
-//
-// Source: discord.com/channels/239737791225790464/600063880533770251/941835678424129597
-//
-// This hash-table stores slots (values) separate from the hash mapping. Hashes
-// are mapped to slots using the hash-to-slot array which is an array of slot
-// indexes. This array intentionally only stores indexes to maximise usage
-// of the cache line. Linear probing on collision will only cost a couple of
-// cycles to fetch from L1 cache the next slot index to attempt.
-//
-// The slots array stores values contiguously, non-sorted allowing iteration of
-// the map. On element erase, the last element is swapped into the deleted
-// element causing the non-sorted property of this table.
-//
-// The 0th slot (DQN_DS_MAP_SENTINEL_SLOT) in the slots array is reserved for a
-// sentinel value, e.g. all zeros value. After map initialisation the 'occupied'
-// value of the array will be set to 1 to exclude the sentinel from the
-// capacity of the table. Skip the first value if you are iterating the hash
-// table!
-//
-// This hash-table accept either a U64 or a buffer (ptr + len) as the key. In
-// practice this covers a majority of use cases (with string, buffer and number
-// keys). It also allows us to minimise our C++ templates to only require 1
-// variable which is the Value part of the hash-table simplifying interface
-// complexity and cruft brought by C++.
-//
-// Keys are value-copied into the hash-table. If the key uses a pointer to a
-// buffer, this buffer must be valid throughout the lifetime of the hash table!
-//
-// NOTE: API
-//
-// - All maps must be created by calling `DSMap_Init()` with the desired size
-// and the memory allocated for the table can be freed by called
-// `DSMap_Deinit()`.
-//
-// - Functions that return a pointer or boolean will always return null or false
-// if the passed in map is invalid e.g. `DSMap_IsValid()` returns false.
-
-// @proc Dqn_DSMap_Init
-//   @param size[in] The number of slots in the table. This size must be a
-//   power-of-two or otherwise an assert will be triggered.
-//   @return The hash table. On memory allocation failure, the table will be
-//   zero initialised whereby calling Dqn_DSMap_IsValid() will return false.
-
-// @proc Dqn_DSMap_Deinit
-//   @desc Free the memory allocated by the table
-
-// @proc Dqn_DSMap_IsValid
-//   @desc Verify that the table is in a valid state (e.g. initialised 
-//   correctly).
-
-// @proc Dqn_DSMap_Hash
-//   @desc Hash the input key using the custom hash function if it's set on the
-//   map, otherwise uses the default hashing function (32bit Murmur3).
-//
-// @proc Dqn_DSMap_HashToSlotIndex
-//   @desc Calculate the index into the map's `slots` array from the given hash.
-
-// @proc Dqn_DSMap_Find
-//   @desc Find the slot in the map's `slots` array corresponding to the given
-//   key and hash. If the map does not contain the key `found` is set to false
-//   and `slot` and `value` are null.
-//
-//   `Find`     returns the value.
-//   `FindSlot` returns the map's hash table slot.
-
-// @proc Dqn_DSMap_Make, Dqn_DSMap_Set
-//   @desc Same as `DSMap_Find*` except if the key does not exist in the table,
-//   a hash-table slot will be made.
-//
-//   `Make` assigns the key       to the table and returns the hash table slot's value.
-//   `Set`  assigns the key-value to the table and returns the hash table slot's value.
-//
-//   If by adding the key-value pair to the table puts the table over 75% load,
-//   the table will be grown to 2x the current the size before insertion
-//   completes.
-//
-//   `found` will be set to true if the item already existed in the map before, 
-//   or false if the item was just created by this call.
-
-// @proc Dqn_DSMap_Resize
-//   @desc Resize the table and move all elements to the new map.
-//   the elements currently set in the
-//   @param size[in] New size of the table, must be a power of two.
-//   @return False if memory allocation fails, or the requested size is smaller
-//   than the current number of elements in the map to resize. True otherwise.
-
-// @proc Dqn_DSMap_Erase
-//   @desc Remove the key-value pair from the table. If by erasing the key-value
-//   pair from the table puts the table under 25% load, the table will be shrunk
-//   by 1/2 the current size after erasing. The table will not shrink below the
-//   initial size that the table was initialised as.
-
-// @proc Dqn_DSMap_KeyCStringLit, Dqn_DSMap_KeyU64, Dqn_DSMap_KeyBuffer,
-// Dqn_DSMap_KeyStr8 Dqn_DSMap_KeyStr8Copy
-//   @desc Create a hash-table key given
-//
-//   `KeyCStringLit`  a cstring literal
-//   `KeyU64`         a u64
-//   `KeyBuffer`      a (ptr+len) slice of bytes
-//   `KeyStr8`     a Dqn_Str8 string
-//   `KeyStr8Copy` a Dqn_Str8 string that is copied first using the allocator
-//
-//   If the key points to an array of bytes, the lifetime of those bytes *must*
-//   remain valid throughout the lifetime of the map as the pointers are value
-//   copied into the hash table!
-
-// @proc Dqn_DSMap_KeyU64NoHash
-//   @desc Create a hash-table key given the uint64. This u64 is *not* hashed to
-//   map values into the table. This is useful if you already have a source of
-//   data that is already sufficiently uniformly distributed already (e.g.
-//   using 8 bytes taken from a SHA256 hash as the key).
-//
-//   This value will be used directly but truncated to 32 bits as the table uses
-//   32 bit hashes for mapping keys to values.
-
+// NOTE: [$DMAP] Dqn_DSMap /////////////////////////////////////////////////////////////////////////
 enum Dqn_DSMapKeyType
 {
     Dqn_DSMapKeyType_Invalid,
@@ -347,7 +124,8 @@ struct Dqn_DSMapKey
     } payload;
 };
 
-template <typename T> struct Dqn_DSMapSlot
+template <typename T>
+struct Dqn_DSMapSlot
 {
     Dqn_DSMapKey key;   ///< Hash table lookup key
     T            value; ///< Hash table value
@@ -360,81 +138,22 @@ template <typename T> struct Dqn_DSMap
     Dqn_DSMapSlot<T>      *slots;         // Values of the array stored contiguously, non-sorted order
     uint32_t               size;          // Total capacity of the map and is a power of two
     uint32_t               occupied;      // Number of slots used in the hash table
-    Dqn_Allocator          allocator;     // Backing allocator for the hash table
+    Dqn_Arena             *arena;         // Backing arena for the hash table
     uint32_t               initial_size;  // Initial map size, map cannot shrink on erase below this size
     Dqn_DSMapHashFunction *hash_function; // Custom hashing function to use if field is set
     uint32_t               hash_seed;     // Seed for the hashing function, when 0, DQN_DS_MAP_DEFAULT_HASH_SEED is used
 };
 
-// NOTE: Setup =====================================================================================
-DQN_API template <typename T> Dqn_DSMap<T>    Dqn_DSMap_Init           (uint32_t size);
-DQN_API template <typename T> void            Dqn_DSMap_Deinit         (Dqn_DSMap<T> *map);
-DQN_API template <typename T> bool            Dqn_DSMap_IsValid        (Dqn_DSMap<T> const *map);
-
-// NOTE: Hash ======================================================================================
-DQN_API template <typename T> uint32_t        Dqn_DSMap_Hash           (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
-DQN_API template <typename T> uint32_t        Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
-
-// NOTE: Insert ====================================================================================
-template <typename T>
-struct Dqn_DSMapResult
+template <typename T> struct Dqn_DSMapResult
 {
     bool              found;
     Dqn_DSMapSlot<T> *slot;
     T                *value;
 };
-
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_Find           (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_Make           (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_Set            (Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value);
-
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_FindKeyU64     (Dqn_DSMap<T> const *map, uint64_t key);
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_MakeKeyU64     (Dqn_DSMap<T> *map,       uint64_t key);
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_SetKeyU64      (Dqn_DSMap<T> *map,       uint64_t key, T const &value);
-
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_FindKeyStr8    (Dqn_DSMap<T> const *map, Dqn_Str8 key);
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_MakeKeyStr8    (Dqn_DSMap<T> *map,       Dqn_Str8 key);
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_SetKeyStr8     (Dqn_DSMap<T> *map,       Dqn_Str8 key, T const &value);
-
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_MakeKeyStr8Copy(Dqn_DSMap<T> *map,       Dqn_Allocator allocator, Dqn_Str8 key);
-DQN_API template <typename T> Dqn_DSMapResult<T> Dqn_DSMap_SetKeyStr8Copy (Dqn_DSMap<T> *map,       Dqn_Allocator allocator, Dqn_Str8 key, T const &value);
-
-DQN_API template <typename T> bool               Dqn_DSMap_Resize         (Dqn_DSMap<T> *map, uint32_t size);
-DQN_API template <typename T> bool               Dqn_DSMap_Erase          (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
-
-// NOTE: Table Keys ================================================================================
-DQN_API template <typename T> Dqn_DSMapKey       Dqn_DSMap_KeyBuffer      (Dqn_DSMap<T> const *map, void const *data, uint32_t size);
-DQN_API template <typename T> Dqn_DSMapKey       Dqn_DSMap_KeyU64         (Dqn_DSMap<T> const *map, uint64_t u64);
-DQN_API template <typename T> Dqn_DSMapKey       Dqn_DSMap_KeyStr8        (Dqn_DSMap<T> const *map, Dqn_Str8 string);
-DQN_API template <typename T> Dqn_DSMapKey       Dqn_DSMap_KeyStr8Copy    (Dqn_DSMap<T> const *map, Dqn_Allocator allocator, Dqn_Str8 string);
-#define                                          Dqn_DSMap_KeyCStr8(map, string) Dqn_DSMap_KeyBuffer(map, string, sizeof((string))/sizeof((string)[0]) - 1)
-DQN_API Dqn_DSMapKey                             Dqn_DSMap_KeyU64NoHash   (uint64_t u64);
-DQN_API bool                                     Dqn_DSMap_KeyEquals      (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
-DQN_API bool                                     operator==               (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
 #endif // !defined(DQN_NO_DSMAP)
 
 #if !defined(DQN_NO_LIST)
-// NOTE: [$LIST] Dqn_List ==========================================================================
-//
-// NOTE: API
-// @proc Dqn_List_At
-//   @param at_chunk[out] (Optional) The chunk that the index belongs to will 
-//   be set in this parameter if given
-//   @return The element, or null pointer if it is not a valid index.
-
-// @proc Dqn_List_Iterate
-//   @desc Produce an iterator for the data in the list
-//
-//   @param[in] start_index The index to start iterating from
-//
-#if 0
-    Dqn_List<int> list = {};
-    for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);)
-    {
-        int *item = it.data;
-    }
-#endif
-
+// NOTE: [$LIST] Dqn_List //////////////////////////////////////////////////////////////////////////
 template <typename T> struct Dqn_ListChunk
 {
     T                *data;
@@ -461,25 +180,149 @@ template <typename T> struct Dqn_List
     Dqn_ListChunk<T> *head;
     Dqn_ListChunk<T> *tail;
 };
-
-// NOTE: API =======================================================================================
-template <typename T>           Dqn_List<T>  Dqn_List_Init       (Dqn_Arena *arena, Dqn_usize chunk_size);
-template <typename T, size_t N> Dqn_List<T>  Dqn_List_InitCArrayCopy   (Dqn_Arena *arena, Dqn_usize chunk_size, T const (&array)[N]);
-template <typename T> T *                    Dqn_List_At         (Dqn_List<T> *list, Dqn_usize index, Dqn_ListChunk<T> *at_chunk);
-template <typename T> bool                   Dqn_List_Iterate    (Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index);
-
-template <typename T> T *                    Dqn_List_Make       (Dqn_List<T> *list, Dqn_usize count);
-template <typename T> T *                    Dqn_List_Add        (Dqn_List<T> *list, T const &value);
-template <typename T> void                   Dqn_List_AddList    (Dqn_List<T> *list, Dqn_List<T> other);
-template <typename T> Dqn_Slice<T>           Dqn_List_ToSliceCopy(Dqn_List<T> const *list, Dqn_Arena* arena);
 #endif // !defined(DQN_NO_LIST)
 
-// NOTE: [$CARR] Dqn_CArray ========================================================================
+template <typename T>                           Dqn_ArrayEraseResult   Dqn_CArray_EraseRange              (T *data, Dqn_usize *size, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
+template <typename T>                           T *                    Dqn_CArray_MakeArray               (T *data, Dqn_usize *size, Dqn_usize max, Dqn_usize count, Dqn_ZeroMem zero_mem);
+template <typename T>                           T *                    Dqn_CArray_InsertArray             (T *data, Dqn_usize *size, Dqn_usize max, Dqn_usize index, T const *items, Dqn_usize count);
+template <typename T>                           T                      Dqn_CArray_PopFront                (T *data, Dqn_usize *size, Dqn_usize count);
+template <typename T>                           T                      Dqn_CArray_PopBack                 (T *data, Dqn_usize *size, Dqn_usize count);
+template <typename T>                           Dqn_ArrayFindResult<T> Dqn_CArray_Find                    (T *data, Dqn_usize size, T const &value);
+
+#if !defined(DQN_NO_VARRAY)
+template <typename T>                           Dqn_VArray<T>          Dqn_VArray_InitByteSize            (Dqn_usize byte_size, uint8_t arena_flags);
+template <typename T>                           Dqn_VArray<T>          Dqn_VArray_Init                    (Dqn_usize max, uint8_t arena_flags);
+template <typename T>                           void                   Dqn_VArray_Deinit                  (Dqn_VArray<T> *array);
+template <typename T>                           bool                   Dqn_VArray_IsValid                 (Dqn_VArray<T> const *array);
+template <typename T>                           bool                   Dqn_VArray_Reserve                 (Dqn_VArray<T> *array, Dqn_usize count);
+template <typename T>                           T *                    Dqn_VArray_AddArray                (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
+template <typename T, Dqn_usize N>              T *                    Dqn_VArray_AddCArray               (Dqn_VArray<T> *array, T const (&items)[N]);
+template <typename T>                           T *                    Dqn_VArray_Add                     (Dqn_VArray<T> *array, T const &item);
+#define                                                                Dqn_VArray_AddArrayAssert(...)     DQN_HARD_ASSERT(Dqn_VArray_AddArray(__VA_ARGS__))
+#define                                                                Dqn_VArray_AddCArrayAssert(...)    DQN_HARD_ASSERT(Dqn_VArray_AddCArray(__VA_ARGS__))
+#define                                                                Dqn_VArray_AddAssert(...)          DQN_HARD_ASSERT(Dqn_VArray_Add(__VA_ARGS__))
+template <typename T>                           T *                    Dqn_VArray_MakeArray               (Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
+template <typename T>                           T *                    Dqn_VArray_Make                    (Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem);
+#define                                                                Dqn_VArray_MakeArrayAssert(...)    DQN_HARD_ASSERT(Dqn_VArray_MakeArray(__VA_ARGS__))
+#define                                                                Dqn_VArray_MakeAssert(...)         DQN_HARD_ASSERT(Dqn_VArray_Make(__VA_ARGS__))
+template <typename T>                           T *                    Dqn_VArray_InsertArray             (Dqn_VArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count);
+template <typename T, Dqn_usize N>              T *                    Dqn_VArray_InsertCArray            (Dqn_VArray<T> *array, Dqn_usize index, T const (&items)[N]);
+template <typename T>                           T *                    Dqn_VArray_Insert                  (Dqn_VArray<T> *array, Dqn_usize index, T const &item);
+#define                                                                Dqn_VArray_InsertArrayAssert(...)  DQN_HARD_ASSERT(Dqn_VArray_InsertArray(__VA_ARGS__))
+#define                                                                Dqn_VArray_InsertCArrayAssert(...) DQN_HARD_ASSERT(Dqn_VArray_InsertCArray(__VA_ARGS__))
+#define                                                                Dqn_VArray_InsertAssert(...)       DQN_HARD_ASSERT(Dqn_VArray_Insert(__VA_ARGS__))
+template <typename T>                           T                      Dqn_VArray_PopFront                (Dqn_VArray<T> *array, Dqn_usize count);
+template <typename T>                           T                      Dqn_VArray_PopBack                 (Dqn_VArray<T> *array, Dqn_usize count);
+template <typename T>                           Dqn_ArrayEraseResult   Dqn_VArray_EraseRange              (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
+template <typename T>                           void                   Dqn_VArray_Clear                   (Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem);
+#endif // !defined(DQN_NO_VARRAY)
+#if !defined(DQN_NO_SARRAY)
+template <typename T>                           Dqn_SArray<T>          Dqn_SArray_Init                    (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
+template <typename T, size_t N>                 Dqn_SArray<T>          Dqn_SArray_InitCArray              (Dqn_Arena *arena, T const (&array)[N]);
+template <typename T>                           bool                   Dqn_SArray_IsValid                 (Dqn_SArray<T> const *array);
+template <typename T>                           Dqn_Slice<T>           Dqn_SArray_Slice                   (Dqn_SArray<T> const *array);
+template <typename T>                           T *                    Dqn_SArray_AddArray                (Dqn_SArray<T> *array, T const *items, Dqn_usize count);
+template <typename T, Dqn_usize N>              T *                    Dqn_SArray_AddCArray               (Dqn_SArray<T> *array, T const (&items)[N]);
+template <typename T>                           T *                    Dqn_SArray_Add                     (Dqn_SArray<T> *array, T const &item);
+#define                                                                Dqn_SArray_AddArrayAssert(...)     DQN_HARD_ASSERT(Dqn_SArray_AddArray(__VA_ARGS__))
+#define                                                                Dqn_SArray_AddCArrayAssert(...)    DQN_HARD_ASSERT(Dqn_SArray_AddCArray(__VA_ARGS__))
+#define                                                                Dqn_SArray_AddAssert(...)          DQN_HARD_ASSERT(Dqn_SArray_Add(__VA_ARGS__))
+template <typename T>                           T *                    Dqn_SArray_MakeArray               (Dqn_SArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
+template <typename T>                           T *                    Dqn_SArray_Make                    (Dqn_SArray<T> *array, Dqn_ZeroMem zero_mem);
+#define                                                                Dqn_SArray_MakeArrayAssert(...)    DQN_HARD_ASSERT(Dqn_SArray_MakeArray(__VA_ARGS__))
+#define                                                                Dqn_SArray_MakeAssert(...)         DQN_HARD_ASSERT(Dqn_SArray_Make(__VA_ARGS__))
+template <typename T>                           T *                    Dqn_SArray_InsertArray             (Dqn_SArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count);
+template <typename T, Dqn_usize N>              T *                    Dqn_SArray_InsertCArray            (Dqn_SArray<T> *array, Dqn_usize index, T const (&items)[N]);
+template <typename T>                           T *                    Dqn_SArray_Insert                  (Dqn_SArray<T> *array, Dqn_usize index, T const &item);
+#define                                                                Dqn_SArray_InsertArrayAssert(...)  DQN_HARD_ASSERT(Dqn_SArray_InsertArray(__VA_ARGS__))
+#define                                                                Dqn_SArray_InsertCArrayAssert(...) DQN_HARD_ASSERT(Dqn_SArray_InsertCArray(__VA_ARGS__))
+#define                                                                Dqn_SArray_InsertAssert(...)       DQN_HARD_ASSERT(Dqn_SArray_Insert(__VA_ARGS__))
+template <typename T>                           T                      Dqn_SArray_PopFront                (Dqn_SArray<T> *array, Dqn_usize count);
+template <typename T>                           T                      Dqn_SArray_PopBack                 (Dqn_SArray<T> *array, Dqn_usize count);
+template <typename T>                           Dqn_ArrayEraseResult   Dqn_SArray_EraseRange              (Dqn_SArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
+template <typename T>                           void                   Dqn_SArray_Clear                   (Dqn_SArray<T> *array);
+#endif // !defined(DQN_NO_SARRAY)
+#if !defined(DQN_NO_FARRAY)
+template <typename T, Dqn_usize N>              Dqn_FArray<T, N>       Dqn_FArray_Init                    (T const *array, Dqn_usize count);
+template <typename T, Dqn_usize N, Dqn_usize K> Dqn_FArray<T, N>       Dqn_FArray_InitCArray              (T const (&items)[K]);
+template <typename T, Dqn_usize N>              bool                   Dqn_FArray_IsValid                 (Dqn_FArray<T, N> const *array);
+template <typename T, Dqn_usize N>              Dqn_usize              Dqn_FArray_Max                     (Dqn_FArray<T, N> const *) { return N; }
+template <typename T, Dqn_usize N>              Dqn_Slice<T>           Dqn_FArray_Slice                   (Dqn_FArray<T, N> const *array);
+template <typename T, Dqn_usize N>              T *                    Dqn_FArray_AddArray                (Dqn_FArray<T, N> *array, T const *items, Dqn_usize count);
+template <typename T, Dqn_usize N, Dqn_usize K> T *                    Dqn_FArray_AddCArray               (Dqn_FArray<T, N> *array, T const (&items)[K]);
+template <typename T, Dqn_usize N>              T *                    Dqn_FArray_Add                     (Dqn_FArray<T, N> *array, T const &item);
+#define                                                                Dqn_FArray_AddArrayAssert(...)     DQN_HARD_ASSERT(Dqn_FArray_AddArray(__VA_ARGS__))
+#define                                                                Dqn_FArray_AddCArrayAssert(...)    DQN_HARD_ASSERT(Dqn_FArray_AddCArray(__VA_ARGS__))
+#define                                                                Dqn_FArray_AddAssert(...)          DQN_HARD_ASSERT(Dqn_FArray_Add(__VA_ARGS__))
+template <typename T, Dqn_usize N>              T *                    Dqn_FArray_MakeArray               (Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem);
+template <typename T, Dqn_usize N>              T *                    Dqn_FArray_Make                    (Dqn_FArray<T, N> *array, Dqn_ZeroMem zero_mem);
+#define                                                                Dqn_FArray_MakeArrayAssert(...)    DQN_HARD_ASSERT(Dqn_FArray_MakeArray(__VA_ARGS__))
+#define                                                                Dqn_FArray_MakeAssert(...)         DQN_HARD_ASSERT(Dqn_FArray_Make(__VA_ARGS__))
+template <typename T, Dqn_usize N>              T *                    Dqn_FArray_InsertArray             (Dqn_FArray<T, N> *array, T const &item, Dqn_usize index);
+template <typename T, Dqn_usize N, Dqn_usize K> T *                    Dqn_FArray_InsertCArray            (Dqn_FArray<T, N> *array, Dqn_usize index, T const (&items)[K]);
+template <typename T, Dqn_usize N>              T *                    Dqn_FArray_Insert                  (Dqn_FArray<T, N> *array, Dqn_usize index, T const &item);
+#define                                                                Dqn_FArray_InsertArrayAssert(...)  DQN_HARD_ASSERT(Dqn_FArray_InsertArray(__VA_ARGS__))
+#define                                                                Dqn_FArray_InsertAssert(...)       DQN_HARD_ASSERT(Dqn_FArray_Insert(__VA_ARGS__))
+template <typename T, Dqn_usize N>              T                      Dqn_FArray_PopFront                (Dqn_FArray<T, N> *array, Dqn_usize count);
+template <typename T, Dqn_usize N>              T                      Dqn_FArray_PopBack                 (Dqn_FArray<T, N> *array, Dqn_usize count);
+template <typename T, Dqn_usize N>              Dqn_ArrayFindResult<T> Dqn_FArray_Find                    (Dqn_FArray<T, N> *array, T const &find);
+template <typename T, Dqn_usize N>              Dqn_ArrayEraseResult   Dqn_FArray_EraseRange              (Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
+template <typename T, Dqn_usize N>              void                   Dqn_FArray_Clear                   (Dqn_FArray<T, N> *array);
+#endif // !defined(DQN_NO_FARRAY)
+#if !defined(DQN_NO_SLICE)
+template <typename T>                           Dqn_Slice<T>           Dqn_Slice_Init                     (T* const data, Dqn_usize size);
+template <typename T, Dqn_usize N>              Dqn_Slice<T>           Dqn_Slice_InitCArray               (Dqn_Arena *arena, T const (&array)[N]);
+template <typename T>                           Dqn_Slice<T>           Dqn_Slice_Alloc                    (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
+                                                Dqn_Str8               Dqn_Slice_Str8Render               (Dqn_Arena *arena, Dqn_Slice<Dqn_Str8> array, Dqn_Str8 separator);
+                                                Dqn_Str8               Dqn_Slice_Str8RenderSpaceSeparated (Dqn_Arena *arena, Dqn_Slice<Dqn_Str8> array);
+#endif // !defined(DQN_NO_SLICE)
+#if !defined(DQN_NO_DSMAP)
+template <typename T>                           Dqn_DSMap<T>           Dqn_DSMap_Init                     (Dqn_Arena *arena, uint32_t size);
+template <typename T>                           void                   Dqn_DSMap_Deinit                   (Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem);
+template <typename T>                           bool                   Dqn_DSMap_IsValid                  (Dqn_DSMap<T> const *map);
+template <typename T>                           uint32_t               Dqn_DSMap_Hash                     (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
+template <typename T>                           uint32_t               Dqn_DSMap_HashToSlotIndex          (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_Find                     (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_Make                     (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_Set                      (Dqn_DSMap<T> *map, Dqn_DSMapKey key, T const &value);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_FindKeyU64               (Dqn_DSMap<T> const *map, uint64_t key);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_MakeKeyU64               (Dqn_DSMap<T> *map,       uint64_t key);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_SetKeyU64                (Dqn_DSMap<T> *map,       uint64_t key, T const &value);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_FindKeyStr8              (Dqn_DSMap<T> const *map, Dqn_Str8 key);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_MakeKeyStr8              (Dqn_DSMap<T> *map,       Dqn_Str8 key);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_SetKeyStr8               (Dqn_DSMap<T> *map,       Dqn_Str8 key, T const &value);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_MakeKeyStr8Copy          (Dqn_DSMap<T> *map,       Dqn_Arena *arena, Dqn_Str8 key);
+template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_SetKeyStr8Copy           (Dqn_DSMap<T> *map,       Dqn_Arena *arena, Dqn_Str8 key, T const &value);
+template <typename T>                           bool                   Dqn_DSMap_Resize                   (Dqn_DSMap<T> *map, uint32_t size);
+template <typename T>                           bool                   Dqn_DSMap_Erase                    (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
+template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyBuffer                (Dqn_DSMap<T> const *map, void const *data, uint32_t size);
+template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyU64                   (Dqn_DSMap<T> const *map, uint64_t u64);
+template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyStr8                  (Dqn_DSMap<T> const *map, Dqn_Str8 string);
+template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyStr8Copy              (Dqn_DSMap<T> const *map, Dqn_Arena *arena, Dqn_Str8 string);
+#define                                                                Dqn_DSMap_KeyCStr8(map, string)    Dqn_DSMap_KeyBuffer(map, string, sizeof((string))/sizeof((string)[0]) - 1)
+DQN_API                                         Dqn_DSMapKey           Dqn_DSMap_KeyU64NoHash             (uint64_t u64);
+DQN_API                                         bool                   Dqn_DSMap_KeyEquals                (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
+DQN_API                                         bool                   operator==                         (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
+#endif // !defined(DQN_NO_DSMAP)
+#if !defined(DQN_NO_LIST)
+template <typename T>                           Dqn_List<T>            Dqn_List_Init                      (Dqn_Arena *arena, Dqn_usize chunk_size);
+template <typename T, size_t N>                 Dqn_List<T>            Dqn_List_InitCArray                (Dqn_Arena *arena, Dqn_usize chunk_size, T const (&array)[N]);
+template <typename T>                           T *                    Dqn_List_At                        (Dqn_List<T> *list, Dqn_usize index, Dqn_ListChunk<T> *at_chunk);
+template <typename T>                           bool                   Dqn_List_Iterate                   (Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index);
+template <typename T>                           T *                    Dqn_List_Make                      (Dqn_List<T> *list, Dqn_usize count);
+template <typename T>                           T *                    Dqn_List_Add                       (Dqn_List<T> *list, T const &value);
+template <typename T>                           void                   Dqn_List_AddList                   (Dqn_List<T> *list, Dqn_List<T> other);
+template <typename T>                           Dqn_Slice<T>           Dqn_List_ToSliceCopy               (Dqn_List<T> const *list, Dqn_Arena* arena);
+#endif // !defined(DQN_NO_LIST)
+
+// NOTE: [$CARR] Dqn_CArray ////////////////////////////////////////////////////////////////////////
 template <typename T> Dqn_ArrayEraseResult Dqn_CArray_EraseRange(T* data, Dqn_usize *size, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
 {
     Dqn_ArrayEraseResult result = {};
     if (!data || !size || *size == 0 || count == 0)
         return result;
+
+    DQN_ASSERTF(count != -1, "There's a bug with negative element erases, see the Dqn_VArray section in dqn_docs.cpp");
 
     // NOTE: Caculate the end index of the erase range
     Dqn_isize abs_count = DQN_ABS(count);
@@ -531,24 +374,24 @@ template <typename T> T *Dqn_CArray_MakeArray(T* data, Dqn_usize *size, Dqn_usiz
     if (!data || !size || count == 0)
         return nullptr;
 
-    if (!DQN_CHECKF((*size + count) <= max, "Array is out of memory"))
+    if (!DQN_CHECKF((*size + count) <= max, "Array is out of space (user requested +%zu items, array has %zu/%zu items)", count, *size, max))
         return nullptr;
 
     // TODO: Use placement new? Why doesn't this work?
     T *result  = data + *size;
     *size     += count;
     if (zero_mem == Dqn_ZeroMem_Yes)
-        DQN_MEMSET(result, DQN_MEMSET_BYTE, sizeof(*result) * count);
+        DQN_MEMSET(result, 0, sizeof(*result) * count);
     return result;
 }
 
-DQN_API template <typename T> T *Dqn_CArray_InsertArray(T *data, Dqn_usize *size, Dqn_usize max, Dqn_usize index, T const *items, Dqn_usize count)
+template <typename T> T *Dqn_CArray_InsertArray(T *data, Dqn_usize *size, Dqn_usize max, Dqn_usize index, T const *items, Dqn_usize count)
 {
     T *result = nullptr;
     if (!data || !size || !items || count <= 0 || ((*size + count) > max))
         return result;
 
-    Dqn_usize clamped_index = *size ? DQN_MIN(index, *size) : 0;
+    Dqn_usize clamped_index = DQN_MIN(index, *size);
     if (clamped_index != *size) {
         char const *src         = DQN_CAST(char *)(data + clamped_index);
         char const *dest        = DQN_CAST(char *)(data + (clamped_index + count));
@@ -606,51 +449,36 @@ template <typename T> Dqn_ArrayFindResult<T> Dqn_CArray_Find(T *data, Dqn_usize 
 }
 
 #if !defined(DQN_NO_VARRAY)
-// NOTE: [$VARR] Dqn_VArray ========================================================================
-DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_Arena *arena, Dqn_usize byte_size)
+// NOTE: [$VARR] Dqn_VArray ////////////////////////////////////////////////////////////////////////
+template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_usize byte_size, uint8_t arena_flags)
 {
     Dqn_VArray<T> result = {};
-    result.block         = Dqn_Arena_Grow(arena, byte_size, 0 /*commit*/, Dqn_MemBlockFlag_ArenaPrivate | Dqn_MemBlockFlag_AllocsAreContiguous);
-    result.data          = DQN_CAST(T *)Dqn_MemBlock_Alloc(result.block, /*size*/ 0, alignof(T), Dqn_ZeroMem_No);
-    result.max           = (result.block->size - result.block->used) / sizeof(T);
+    result.arena         = Dqn_Arena_InitSize(DQN_ARENA_HEADER_SIZE + byte_size, 0 /*commit*/, arena_flags | Dqn_ArenaFlag_NoGrow | Dqn_ArenaFlag_NoPoison);
+    result.data          = DQN_CAST(T *)(DQN_CAST(char *)result.arena.curr + result.arena.curr->used);
+    result.max           = (result.arena.curr->reserve - result.arena.curr->used) / sizeof(T);
     return result;
 }
 
-DQN_API template <typename T> Dqn_VArray<T> Dqn_VArray_Init(Dqn_Arena *arena, Dqn_usize max)
+template <typename T> Dqn_VArray<T> Dqn_VArray_Init(Dqn_usize max, uint8_t arena_flags)
 {
-    Dqn_VArray<T> result = Dqn_VArray_InitByteSize<T>(arena, max * sizeof(T));
+    Dqn_VArray<T> result = Dqn_VArray_InitByteSize<T>(max * sizeof(T), arena_flags);
     DQN_ASSERT(result.max >= max);
     return result;
 }
 
-DQN_API template <typename T> bool Dqn_VArray_IsValid(Dqn_VArray<T> const *array)
+template <typename T> void Dqn_VArray_Deinit(Dqn_VArray<T> *array)
 {
-    bool result = array && array->data && array->size <= array->max && array->block;
+    Dqn_Arena_Deinit(&array->arena);
+    *array = {};
+}
+
+template <typename T> bool Dqn_VArray_IsValid(Dqn_VArray<T> const *array)
+{
+    bool result = array && array->data && array->size <= array->max && array->arena.curr;
     return result;
 }
 
-DQN_API template <typename T> T *Dqn_VArray_MakeArray(Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
-{
-    if (!Dqn_VArray_IsValid(array))
-        return nullptr;
-
-    if (!DQN_CHECKF((array->size + count) < array->max, "Array is out of virtual memory"))
-        return nullptr;
-
-    // TODO: Use placement new? Why doesn't this work?
-    T *result = Dqn_MemBlock_NewArray(array->block, T, count, zero_mem);
-    if (result)
-        array->size += count;
-    return result;
-}
-
-DQN_API template <typename T> T *Dqn_VArray_Make(Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem)
-{
-    T *result = Dqn_VArray_MakeArray(array, 1, zero_mem);
-    return result;
-}
-
-DQN_API template <typename T> T *Dqn_VArray_AddArray(Dqn_VArray<T> *array, T const *items, Dqn_usize count)
+template <typename T> T *Dqn_VArray_AddArray(Dqn_VArray<T> *array, T const *items, Dqn_usize count)
 {
     T *result = Dqn_VArray_MakeArray(array, count, Dqn_ZeroMem_No);
     if (result)
@@ -658,72 +486,109 @@ DQN_API template <typename T> T *Dqn_VArray_AddArray(Dqn_VArray<T> *array, T con
     return result;
 }
 
-DQN_API template <typename T> T *Dqn_VArray_Add(Dqn_VArray<T> *array, T const &item)
+template <typename T, Dqn_usize N> T *Dqn_VArray_AddCArray(Dqn_VArray<T> *array, T const (&items)[N])
+{
+    T *result = Dqn_VArray_AddArray(array, items, N);
+    return result;
+}
+
+template <typename T> T *Dqn_VArray_Add(Dqn_VArray<T> *array, T const &item)
 {
     T *result = Dqn_VArray_AddArray(array, &item, 1);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_VArray_InsertArray(Dqn_VArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count)
+template <typename T> T *Dqn_VArray_MakeArray(Dqn_VArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
+{
+    if (!Dqn_VArray_IsValid(array))
+        return nullptr;
+
+    if (!DQN_CHECKF((array->size + count) < array->max, "Array is out of space (user requested +%zu items, array has %zu/%zu items)", count, array->size, array->max))
+        return nullptr;
+
+    // TODO: Use placement new? Why doesn't this work?
+
+    uint8_t prev_flags  = array->arena.flags;
+    array->arena.flags |= (Dqn_ArenaFlag_NoGrow | Dqn_ArenaFlag_NoPoison);
+    T *result           = Dqn_Arena_NewArray(&array->arena, T, count, zero_mem);
+    array->arena.flags  = prev_flags;
+    if (result)
+        array->size += count;
+    return result;
+}
+
+template <typename T> T *Dqn_VArray_Make(Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem)
+{
+    T *result = Dqn_VArray_MakeArray(array, 1, zero_mem);
+    return result;
+}
+
+template <typename T> T *Dqn_VArray_InsertArray(Dqn_VArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count)
 {
     T *result = nullptr;
     if (!Dqn_VArray_IsValid(array))
         return result;
-    Dqn_VArray_Reserve(array, array->size + count);
-    result = Dqn_CArray_InsertArray(array->data, &array->size, array->max, index, items, count);
+    if (Dqn_VArray_Reserve(array, count))
+        result = Dqn_CArray_InsertArray(array->data, &array->size, array->max, index, items, count);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_VArray_Insert(Dqn_VArray<T> *array, Dqn_usize index, T const &item)
+template <typename T, Dqn_usize N> T *Dqn_VArray_InsertCArray(Dqn_VArray<T> *array, Dqn_usize index, T const (&items)[N])
+{
+    T *result = Dqn_VArray_InsertArray(array, index, items, N);
+    return result;
+}
+
+template <typename T> T *Dqn_VArray_Insert(Dqn_VArray<T> *array, Dqn_usize index, T const &item)
 {
     T *result = Dqn_VArray_InsertArray(array, index, &item, 1);
     return result;
 }
 
-DQN_API template <typename T> T *Dqn_VArray_PopFront(Dqn_VArray<T> *array, Dqn_usize count)
+template <typename T> T *Dqn_VArray_PopFront(Dqn_VArray<T> *array, Dqn_usize count)
 {
     T *result = Dqn_CArray_PopFront(array->data, &array->size, count);
     return result;
 }
 
-DQN_API template <typename T> T *Dqn_VArray_PopBack(Dqn_VArray<T> *array, Dqn_usize count)
+template <typename T> T *Dqn_VArray_PopBack(Dqn_VArray<T> *array, Dqn_usize count)
 {
     T *result = Dqn_CArray_PopBack(array->data, &array->size, count);
     return result;
 }
 
-DQN_API template <typename T> Dqn_ArrayEraseResult Dqn_VArray_EraseRange(Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
+template <typename T> Dqn_ArrayEraseResult Dqn_VArray_EraseRange(Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
 {
     Dqn_ArrayEraseResult result = {};
     if (!Dqn_VArray_IsValid(array))
         return result;
     result = Dqn_CArray_EraseRange<T>(array->data, &array->size, begin_index, count, erase);
-    Dqn_MemBlock_Pop(array->block, result.items_erased * sizeof(T));
+    Dqn_Arena_Pop(&array->arena, result.items_erased * sizeof(T));
     return result;
 }
 
-DQN_API template <typename T> void Dqn_VArray_Clear(Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem)
+template <typename T> void Dqn_VArray_Clear(Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem)
 {
     if (array) {
         if (zero_mem == Dqn_ZeroMem_Yes)
             DQN_MEMSET(array->data, 0, array->size * sizeof(T));
-        Dqn_MemBlock_PopTo(array->block, 0);
+        Dqn_Arena_PopTo(&array->arena, 0);
         array->size = 0;
     }
 }
 
-DQN_API template <typename T> void Dqn_VArray_Reserve(Dqn_VArray<T> *array, Dqn_usize count)
+template <typename T> bool Dqn_VArray_Reserve(Dqn_VArray<T> *array, Dqn_usize count)
 {
     if (!Dqn_VArray_IsValid(array) || count == 0)
-        return;
-
-    Dqn_Arena_CommitFromBlock(array->block, count * sizeof(T), Dqn_ArenaCommit_EnsureSpace);
+        return false;
+    bool result = Dqn_Arena_CommitTo(&array->arena, DQN_ARENA_HEADER_SIZE + (count * sizeof(T)));
+    return result;
 }
 #endif // !defined(DQN_NO_VARRAY)
 
 #if !defined(DQN_NO_SARRAY)
-// NOTE: [$FARR] Dqn_SArray ========================================================================
-DQN_API template <typename T> Dqn_SArray<T> Dqn_SArray_Init(Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem)
+// NOTE: [$FARR] Dqn_SArray ////////////////////////////////////////////////////////////////////////
+template <typename T> Dqn_SArray<T> Dqn_SArray_Init(Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem)
 {
     Dqn_SArray<T> result = {};
     if (!arena || !size)
@@ -734,7 +599,7 @@ DQN_API template <typename T> Dqn_SArray<T> Dqn_SArray_Init(Dqn_Arena *arena, Dq
     return result;
 }
 
-template <typename T, size_t N> Dqn_SArray<T> Dqn_SArray_InitCArrayCopy(Dqn_Arena *arena, T const (&array)[N])
+template <typename T, size_t N> Dqn_SArray<T> Dqn_SArray_InitCArray(Dqn_Arena *arena, T const (&array)[N])
 {
     Dqn_SArray<T> result = {};
     if (!arena || !N)
@@ -742,19 +607,27 @@ template <typename T, size_t N> Dqn_SArray<T> Dqn_SArray_InitCArrayCopy(Dqn_Aren
     result.data = Dqn_Arena_NewArray(arena, T, N, Dqn_ZeroMem_No);
     if (result.data) {
         DQN_MEMCOPY(result.data, array, sizeof(T) * N);
-        result.size = size;
-        result.max  = size;
+        result.size = N;
+        result.max  = N;
     }
     return result;
 }
 
-DQN_API template <typename T> bool Dqn_SArray_IsValid(Dqn_SArray<T> const *array)
+template <typename T> bool Dqn_SArray_IsValid(Dqn_SArray<T> const *array)
 {
     bool result = array && array->data && array->size <= array->max;
     return result;
 }
 
-DQN_API template <typename T> T *Dqn_SArray_MakeArray(Dqn_SArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
+template <typename T, Dqn_usize N> Dqn_Slice<T> Dqn_SArray_Slice(Dqn_SArray<T> const *array)
+{
+    Dqn_Slice<T> result = {};
+    if (array)
+        Dqn_Slice_Init<T>(DQN_CAST(T *)array->data, array->size);
+    return result;
+}
+
+template <typename T> T *Dqn_SArray_MakeArray(Dqn_SArray<T> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
 {
     if (!Dqn_SArray_IsValid(array))
         return nullptr;
@@ -762,60 +635,74 @@ DQN_API template <typename T> T *Dqn_SArray_MakeArray(Dqn_SArray<T> *array, Dqn_
     return result;
 }
 
-DQN_API template <typename T> T *Dqn_SArray_Make(Dqn_SArray<T> *array, Dqn_ZeroMem zero_mem)
+template <typename T> T *Dqn_SArray_Make(Dqn_SArray<T> *array, Dqn_ZeroMem zero_mem)
 {
     T *result = Dqn_SArray_MakeArray(array, 1, zero_mem);
     return result;
 }
 
-DQN_API template <typename T> T *Dqn_SArray_AddArray(Dqn_SArray<T> *array, T const *items, Dqn_usize count)
+template <typename T> T *Dqn_SArray_AddArray(Dqn_SArray<T> *array, T const *items, Dqn_usize count)
 {
     T *result = Dqn_SArray_Make(array, count, Dqn_ZeroMem_No);
     if (result)
         DQN_MEMCPY(result, items, count * sizeof(T));
 }
 
-DQN_API template <typename T> T *Dqn_SArray_Add(Dqn_SArray<T> *array, T const &item)
+template <typename T, Dqn_usize N> T *Dqn_SArray_AddCArray(Dqn_SArray<T> *array, T const (&items)[N])
+{
+    T *result = Dqn_SArray_AddArray(array, items, N);
+    return result;
+}
+
+template <typename T> T *Dqn_SArray_Add(Dqn_SArray<T> *array, T const &item)
 {
     T *result = Dqn_SArray_AddArray(array, &item, 1);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_SArray_InsertArray(Dqn_SArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count)
+template <typename T, Dqn_usize N> T *Dqn_SArray_InsertArray(Dqn_SArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count)
 {
+    T *result = nullptr;
     if (!Dqn_SArray_IsValid(array))
         return result;
-    T *result = Dqn_CArray_InsertArray(array->data, &array->size, array->max, index, items, count);
+    result = Dqn_CArray_InsertArray(array->data, &array->size, array->max, index, items, count);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_SArray_Insert(Dqn_SArray<T> *array, Dqn_usize index, T const &item)
+template <typename T, Dqn_usize N> T *Dqn_SArray_InsertCArray(Dqn_SArray<T> *array, Dqn_usize index, T const (&items)[N])
+{
+    T *result = Dqn_SArray_InsertArray(array, index, items, N);
+    return result;
+}
+
+template <typename T, Dqn_usize N> T *Dqn_SArray_Insert(Dqn_SArray<T> *array, Dqn_usize index, T const &item)
 {
     T *result = Dqn_SArray_InsertArray(array, index, &item, 1);
     return result;
 }
 
-DQN_API template <typename T> T Dqn_SArray_PopFront(Dqn_SArray<T> *array, Dqn_usize count)
+template <typename T> T Dqn_SArray_PopFront(Dqn_SArray<T> *array, Dqn_usize count)
 {
     T result = Dqn_CArray_PopFront(array->data, &array->size, count);
     return result;
 }
 
-DQN_API template <typename T> T Dqn_SArray_PopBack(Dqn_SArray<T> *array, Dqn_usize count)
+template <typename T> T Dqn_SArray_PopBack(Dqn_SArray<T> *array, Dqn_usize count)
 {
     T result = Dqn_CArray_PopBack(array->data, &array->size, count);
     return result;
 }
 
-DQN_API template <typename T> Dqn_ArrayEraseResult Dqn_SArray_EraseRange(Dqn_SArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
+template <typename T> Dqn_ArrayEraseResult Dqn_SArray_EraseRange(Dqn_SArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
 {
+    Dqn_ArrayEraseResult result = {};
     if (!Dqn_SArray_IsValid(array) || array->size == 0 || count == 0)
-        return;
-    Dqn_ArrayEraseResult result = Dqn_CArray_EraseRange(array->data, &array->size, being_index, count, erase);
+        return result;
+    result = Dqn_CArray_EraseRange(array->data, &array->size, begin_index, count, erase);
     return result;
 }
 
-DQN_API template <typename T> void Dqn_SArray_Clear(Dqn_SArray<T> *array)
+template <typename T> void Dqn_SArray_Clear(Dqn_SArray<T> *array)
 {
     if (array)
         array->size = 0;
@@ -823,35 +710,38 @@ DQN_API template <typename T> void Dqn_SArray_Clear(Dqn_SArray<T> *array)
 #endif // !defined(DQN_NO_SARRAY)
 
 #if !defined(DQN_NO_FARRAY)
-// NOTE: [$FARR] Dqn_FArray ========================================================================
-DQN_API template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init(T const *array, Dqn_usize count)
+// NOTE: [$FARR] Dqn_FArray ////////////////////////////////////////////////////////////////////////
+template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init(T const *array, Dqn_usize count)
 {
     Dqn_FArray<T, N> result = {};
     bool added              = Dqn_FArray_AddArray(&result, array, count);
     DQN_ASSERT(added);
     return result;
 }
-DQN_API template <typename T, Dqn_usize N> bool Dqn_FArray_IsValid(Dqn_FArray<T, N> const *array)
+
+template <typename T, Dqn_usize N, Dqn_usize K> Dqn_FArray<T, N> Dqn_FArray_InitCArray(T const (&items)[K])
+{
+    Dqn_FArray<T, N> result = {};
+    bool added              = Dqn_FArray_AddArray(&result, items, K);
+    DQN_ASSERT(added);
+    return result;
+}
+
+template <typename T, Dqn_usize N> bool Dqn_FArray_IsValid(Dqn_FArray<T, N> const *array)
 {
     bool result = array && array->size <= DQN_ARRAY_UCOUNT(array->data);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_MakeArray(Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
+template <typename T, Dqn_usize N> Dqn_Slice<T> Dqn_FArray_Slice(Dqn_FArray<T, N> const *array)
 {
-    if (!Dqn_FArray_IsValid(array))
-        return nullptr;
-    T *result = Dqn_CArray_MakeArray(array->data, &array->size, N, count, zero_mem);
+    Dqn_Slice<T> result = {};
+    if (array)
+        result = Dqn_Slice_Init<T>(DQN_CAST(T *)array->data, array->size);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Make(Dqn_FArray<T, N> *array, Dqn_ZeroMem zero_mem)
-{
-    T *result = Dqn_FArray_MakeArray(array, 1, zero_mem);
-    return result;
-}
-
-DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_AddArray(Dqn_FArray<T, N> *array, T const *items, Dqn_usize count)
+template <typename T, Dqn_usize N> T *Dqn_FArray_AddArray(Dqn_FArray<T, N> *array, T const *items, Dqn_usize count)
 {
     T *result = Dqn_FArray_MakeArray(array, count, Dqn_ZeroMem_No);
     if (result)
@@ -859,13 +749,35 @@ DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_AddArray(Dqn_FArray<T, 
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Add(Dqn_FArray<T, N> *array, T const &item)
+template <typename T, Dqn_usize N, Dqn_usize K> T *Dqn_FArray_AddCArray(Dqn_FArray<T, N> *array, T const (&items)[K])
+{
+    T *result = Dqn_FArray_MakeArray(array, K, Dqn_ZeroMem_No);
+    if (result)
+        DQN_MEMCPY(result, items, K * sizeof(T));
+    return result;
+}
+
+template <typename T, Dqn_usize N> T *Dqn_FArray_Add(Dqn_FArray<T, N> *array, T const &item)
 {
     T *result = Dqn_FArray_AddArray(array, &item, 1);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_InsertArray(Dqn_FArray<T, N> *array, Dqn_usize index, T const *items, Dqn_usize count)
+template <typename T, Dqn_usize N> T *Dqn_FArray_MakeArray(Dqn_FArray<T, N> *array, Dqn_usize count, Dqn_ZeroMem zero_mem)
+{
+    if (!Dqn_FArray_IsValid(array))
+        return nullptr;
+    T *result = Dqn_CArray_MakeArray(array->data, &array->size, N, count, zero_mem);
+    return result;
+}
+
+template <typename T, Dqn_usize N> T *Dqn_FArray_Make(Dqn_FArray<T, N> *array, Dqn_ZeroMem zero_mem)
+{
+    T *result = Dqn_FArray_MakeArray(array, 1, zero_mem);
+    return result;
+}
+
+template <typename T, Dqn_usize N> T *Dqn_FArray_InsertArray(Dqn_FArray<T, N> *array, Dqn_usize index, T const *items, Dqn_usize count)
 {
     T *result = nullptr;
     if (!Dqn_FArray_IsValid(array))
@@ -874,31 +786,37 @@ DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_InsertArray(Dqn_FArray<
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T *Dqn_FArray_Insert(Dqn_FArray<T, N> *array, Dqn_usize index, T const &item)
+template <typename T, Dqn_usize N, Dqn_usize K> T *Dqn_FArray_InsertCArray(Dqn_FArray<T, N> *array, Dqn_usize index, T const (&items)[K])
+{
+    T *result = Dqn_FArray_InsertArray(array, index, items, K);
+    return result;
+}
+
+template <typename T, Dqn_usize N> T *Dqn_FArray_Insert(Dqn_FArray<T, N> *array, Dqn_usize index, T const &item)
 {
     T *result = Dqn_FArray_InsertArray(array, index, &item, 1);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T Dqn_FArray_PopFront(Dqn_FArray<T, N> *array, Dqn_usize count)
+template <typename T, Dqn_usize N> T Dqn_FArray_PopFront(Dqn_FArray<T, N> *array, Dqn_usize count)
 {
     T result = Dqn_CArray_PopFront(array->data, &array->size, count);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> T Dqn_FArray_PopBack(Dqn_FArray<T, N> *array, Dqn_usize count)
+template <typename T, Dqn_usize N> T Dqn_FArray_PopBack(Dqn_FArray<T, N> *array, Dqn_usize count)
 {
     T result = Dqn_CArray_PopBack(array->data, &array->size, count);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> Dqn_ArrayFindResult<T> Dqn_FArray_Find(Dqn_FArray<T, N> *array, T const &find)
+template <typename T, Dqn_usize N> Dqn_ArrayFindResult<T> Dqn_FArray_Find(Dqn_FArray<T, N> *array, T const &find)
 {
     Dqn_ArrayFindResult<T> result = Dqn_CArray_Find<T>(array->data, array->size, find);
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> Dqn_ArrayEraseResult Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
+template <typename T, Dqn_usize N> Dqn_ArrayEraseResult Dqn_FArray_EraseRange(Dqn_FArray<T, N> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase)
 {
     Dqn_ArrayEraseResult result = {};
     if (!Dqn_FArray_IsValid(array) || array->size == 0 || count == 0)
@@ -907,7 +825,7 @@ DQN_API template <typename T, Dqn_usize N> Dqn_ArrayEraseResult Dqn_FArray_Erase
     return result;
 }
 
-DQN_API template <typename T, Dqn_usize N> void Dqn_FArray_Clear(Dqn_FArray<T, N> *array)
+template <typename T, Dqn_usize N> void Dqn_FArray_Clear(Dqn_FArray<T, N> *array)
 {
     if (array)
         array->size = 0;
@@ -926,7 +844,7 @@ template <typename T> Dqn_Slice<T> Dqn_Slice_Init(T* const data, Dqn_usize size)
 }
 
 template <typename T, Dqn_usize N>
-Dqn_Slice<T> Dqn_Slice_InitCArrayCopy(Dqn_Arena *arena, T const (&array)[N])
+Dqn_Slice<T> Dqn_Slice_InitCArray(Dqn_Arena *arena, T const (&array)[N])
 {
     Dqn_Slice<T> result = Dqn_Slice_Alloc<T>(arena, N, Dqn_ZeroMem_No);
     if (result.data)
@@ -948,39 +866,35 @@ template <typename T> Dqn_Slice<T> Dqn_Slice_Alloc(Dqn_Arena *arena, Dqn_usize s
 #endif // !defined(DQN_NO_SLICE)
 
 #if !defined(DQN_NO_DSMAP)
-// NOTE: [$DMAP] Dqn_DSMap =========================================================================
+// NOTE: [$DMAP] Dqn_DSMap /////////////////////////////////////////////////////////////////////////
 uint32_t const DQN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
-uint32_t const DQN_DS_MAP_SENTINEL_SLOT = 0;
+uint32_t const DQN_DS_MAP_SENTINEL_SLOT     = 0;
 
-template <typename T>
-Dqn_DSMap<T> Dqn_DSMap_Init(uint32_t size)
+template <typename T> Dqn_DSMap<T> Dqn_DSMap_Init(Dqn_Arena *arena, uint32_t size)
 {
     Dqn_DSMap<T> result = {};
-    if (DQN_CHECKF((size & (size - 1)) == 0, "Power-of-two size required")) {
-        result.hash_to_slot = Dqn_Allocator_NewArray(result.allocator, uint32_t, size, Dqn_ZeroMem_Yes);
-        if (result.hash_to_slot) {
-            result.slots = Dqn_Allocator_NewArray(result.allocator, Dqn_DSMapSlot<T>, size, Dqn_ZeroMem_Yes);
-            if (result.slots) {
-                result.occupied     = 1; // For sentinel
-                result.size         = size;
-                result.initial_size = size;
-            } else {
-                Dqn_Allocator_Dealloc(result.allocator, result.hash_to_slot, size * sizeof(*result.hash_to_slot));
-            }
-        }
-    }
+    if (!DQN_CHECKF(Dqn_IsPowerOfTwo(size), "Power-of-two size required, given size was '%u'", size))
+        return result;
+    if (!arena)
+        return result;
+    result.arena        = arena;
+    result.hash_to_slot = Dqn_Arena_NewArray(result.arena, uint32_t,         size, Dqn_ZeroMem_No);
+    result.slots        = Dqn_Arena_NewArray(result.arena, Dqn_DSMapSlot<T>, size, Dqn_ZeroMem_No);
+    result.occupied     = 1; // For sentinel
+    result.size         = size;
+    result.initial_size = size;
+    DQN_ASSERTF(result.hash_to_slot && result.slots, "We pre-allocated a block of memory sufficient in size for the 2 arrays. Maybe the pointers needed extra space because of natural alignment?");
     return result;
 }
 
 template <typename T>
-void Dqn_DSMap_Deinit(Dqn_DSMap<T> *map)
+void Dqn_DSMap_Deinit(Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem)
 {
     if (!map)
         return;
-    if (map->slots)
-        Dqn_Allocator_Dealloc(map->allocator, map->slots, sizeof(*map->slots) * map->size);
-    if (map->hash_to_slot)
-        Dqn_Allocator_Dealloc(map->allocator, map->hash_to_slot, sizeof(*map->hash_to_slot) * map->size);
+    // TODO(doyle): Use zero_mem
+    (void)zero_mem;
+    Dqn_Arena_Deinit(map->arena);
     *map = {};
 }
 
@@ -988,6 +902,7 @@ template <typename T>
 bool Dqn_DSMap_IsValid(Dqn_DSMap<T> const *map)
 {
     bool result = map &&
+                  map->arena &&
                   map->hash_to_slot &&                  // Hash to slot mapping array must be allocated
                   map->slots &&                         // Slots array must be allocated
                   (map->size & (map->size - 1)) == 0 && // Must be power of two size
@@ -1195,18 +1110,26 @@ Dqn_DSMapResult<T> Dqn_DSMap_SetKeyStr8(Dqn_DSMap<T> *map, Dqn_Str8 key, T const
 }
 
 template <typename T>
-Dqn_DSMapResult<T> Dqn_DSMap_MakeKeyStr8Copy(Dqn_DSMap<T> *map, Dqn_Allocator allocator, Dqn_Str8 key)
+Dqn_DSMapResult<T> Dqn_DSMap_MakeKeyStr8Copy(Dqn_DSMap<T> *map, Dqn_Arena *arena, Dqn_Str8 key)
 {
-    Dqn_DSMapKey map_key      = Dqn_DSMap_KeyStr8Copy(map, allocator, key);
-    Dqn_DSMapResult<T> result = Dqn_DSMap_Make(map, map_key);
+    Dqn_ArenaTempMem   temp_mem = Dqn_Arena_TempMemBegin(arena);
+    Dqn_DSMapKey       map_key  = Dqn_DSMap_KeyStr8Copy(map, arena, key);
+    Dqn_DSMapResult<T> result   = Dqn_DSMap_Make(map, map_key);
+    // NOTE: If it already exists then we already have the key, we can deallocate
+    if (result.found)
+        Dqn_Arena_TempMemEnd(temp_mem);
     return result;
 }
 
 template <typename T>
-Dqn_DSMapResult<T> Dqn_DSMap_SetKeyStr8Copy(Dqn_DSMap<T> *map, Dqn_Allocator allocator, Dqn_Str8 key, T const &value)
+Dqn_DSMapResult<T> Dqn_DSMap_SetKeyStr8Copy(Dqn_DSMap<T> *map, Dqn_Arena *arena, Dqn_Str8 key, T const &value)
 {
-    Dqn_DSMapKey map_key      = Dqn_DSMap_KeyStr8Copy(map, allocator, key);
-    Dqn_DSMapResult<T> result = Dqn_DSMap_Set(map, map_key);
+    Dqn_ArenaTempMem   temp_mem = Dqn_Arena_TempMemBegin(arena);
+    Dqn_DSMapKey       map_key  = Dqn_DSMap_KeyStr8Copy(map, arena, key);
+    Dqn_DSMapResult<T> result   = Dqn_DSMap_Set(map, map_key);
+    // NOTE: If it already exists then we already have the key, we can deallocate
+    if (result.found)
+        Dqn_Arena_TempMemEnd(temp_mem);
     return result;
 }
 
@@ -1216,7 +1139,11 @@ bool Dqn_DSMap_Resize(Dqn_DSMap<T> *map, uint32_t size)
     if (!Dqn_DSMap_IsValid(map) || size < map->occupied || size < map->initial_size)
         return false;
 
-    Dqn_DSMap<T> new_map = Dqn_DSMap_Init<T>(size);
+    Dqn_Arena *prev_arena = map->arena;
+    Dqn_Arena  new_arena  = {};
+    new_arena.flags       = prev_arena->flags;
+
+    Dqn_DSMap<T> new_map = Dqn_DSMap_Init<T>(&new_arena, size);
     if (!Dqn_DSMap_IsValid(&new_map))
         return false;
 
@@ -1229,8 +1156,10 @@ bool Dqn_DSMap_Resize(Dqn_DSMap<T> *map, uint32_t size)
     }
 
     DQN_MEMCPY(new_map.slots, map->slots, sizeof(*map->slots) * map->occupied);
-    Dqn_DSMap_Deinit(map);
-    *map = new_map;
+    Dqn_DSMap_Deinit(map, Dqn_ZeroMem_No);
+    *map        = new_map;    // Update the map inplace
+    map->arena  = prev_arena; // Restore the previous arena pointer, it's been de-init-ed
+    *map->arena = new_arena;  // Re-init the old arena with the new data
     return true;
 }
 
@@ -1331,17 +1260,17 @@ DQN_API Dqn_DSMapKey Dqn_DSMap_KeyStr8(Dqn_DSMap<T> const *map, Dqn_Str8 string)
 }
 
 template <typename T>
-DQN_API Dqn_DSMapKey Dqn_DSMap_KeyStr8Copy(Dqn_DSMap<T> const *map, Dqn_Allocator allocator, Dqn_Str8 string)
+DQN_API Dqn_DSMapKey Dqn_DSMap_KeyStr8Copy(Dqn_DSMap<T> const *map, Dqn_Arena *arena, Dqn_Str8 string)
 {
-    Dqn_Str8     copy   = Dqn_Str8_Copy(allocator, string);
+    Dqn_Str8     copy   = Dqn_Str8_Copy(arena, string);
     Dqn_DSMapKey result = Dqn_DSMap_KeyStr8(map, copy);
     return result;
 }
 #endif // !defined(DQN_NO_DSMAP)
 
 #if !defined(DQN_NO_LIST)
-// NOTE: [$LIST] Dqn_List ==========================================================================
-template <typename T> DQN_API Dqn_List<T> Dqn_List_Init(Dqn_Arena *arena, Dqn_usize chunk_size)
+// NOTE: [$LIST] Dqn_List //////////////////////////////////////////////////////////////////////////
+template <typename T> Dqn_List<T> Dqn_List_Init(Dqn_Arena *arena, Dqn_usize chunk_size)
 {
     Dqn_List<T> result = {};
     result.arena       = arena;
@@ -1349,7 +1278,7 @@ template <typename T> DQN_API Dqn_List<T> Dqn_List_Init(Dqn_Arena *arena, Dqn_us
     return result;
 }
 
-template <typename T, size_t N> Dqn_List<T> Dqn_List_InitCArrayCopy(Dqn_Arena *arena, Dqn_usize chunk_size, T const (&array)[N])
+template <typename T, size_t N> Dqn_List<T> Dqn_List_InitCArray(Dqn_Arena *arena, Dqn_usize chunk_size, T const (&array)[N])
 {
     Dqn_List<T> result = Dqn_List_Init<T>(arena, chunk_size);
     DQN_FOR_UINDEX (index, N)
@@ -1403,6 +1332,17 @@ template <typename T> DQN_API T *Dqn_List_Add(Dqn_List<T> *list, T const &value)
     T *result = Dqn_List_Make(list, 1);
     *result   = value;
     return result;
+}
+
+template <typename T, size_t N> DQN_API bool Dqn_List_AddCArray(Dqn_List<T> *list, T const (&array)[N])
+{
+    if (!list || list->chunk_size <= 0)
+        return false;
+    for (T const &item : array) {
+        if (!Dqn_List_Add(list, item))
+            return false;
+    }
+    return true;
 }
 
 template <typename T> DQN_API void Dqn_List_AddList(Dqn_List<T> *list, Dqn_List<T> other)

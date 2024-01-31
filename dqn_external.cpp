@@ -1,5 +1,20 @@
-// NOTE: [$STBS] stb_sprintf =======================================================================
-#if !defined(DQN_STB_SPRINTF_HEADER_ONLY)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//   $$$$$$$$\ $$\   $$\ $$$$$$$$\ $$$$$$$$\ $$$$$$$\  $$\   $$\  $$$$$$\  $$\
+//   $$  _____|$$ |  $$ |\__$$  __|$$  _____|$$  __$$\ $$$\  $$ |$$  __$$\ $$ |
+//   $$ |      \$$\ $$  |   $$ |   $$ |      $$ |  $$ |$$$$\ $$ |$$ /  $$ |$$ |
+//   $$$$$\     \$$$$  /    $$ |   $$$$$\    $$$$$$$  |$$ $$\$$ |$$$$$$$$ |$$ |
+//   $$  __|    $$  $$<     $$ |   $$  __|   $$  __$$< $$ \$$$$ |$$  __$$ |$$ |
+//   $$ |      $$  /\$$\    $$ |   $$ |      $$ |  $$ |$$ |\$$$ |$$ |  $$ |$$ |
+//   $$$$$$$$\ $$ /  $$ |   $$ |   $$$$$$$$\ $$ |  $$ |$$ | \$$ |$$ |  $$ |$$$$$$$$\
+//   \________|\__|  \__|   \__|   \________|\__|  \__|\__|  \__|\__|  \__|\________|
+//
+//   dqn_external.cpp
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if !defined(DQN_USE_STD_PRINTF) && !defined(DQN_STB_SPRINTF_HEADER_ONLY)
+// NOTE: [$STBS] stb_sprintf ///////////////////////////////////////////////////////////////////////
 #define STB_SPRINTF_IMPLEMENTATION
 #ifdef STB_SPRINTF_IMPLEMENTATION
 
@@ -131,7 +146,6 @@ static STBSP__ASAN stbsp__uint32 stbsp__strlen_limited(char const *s, stbsp__uin
 
    return (stbsp__uint32)(sn - s);
 }
-
 
 #if defined(__clang__)
  __attribute__((no_sanitize("undefined")))
@@ -1160,7 +1174,7 @@ done:
 #undef stbsp__flush_cb
 #undef stbsp__cb_buf_clamp
 
-// ============================================================================
+// ////////////////////////////////////////////////////////////////////////////
 //   wrapper functions
 
 STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(sprintf)(char *buf, char const *fmt, ...)
@@ -1264,7 +1278,7 @@ STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintf)(char *buf, char const *fmt, 
    return STB_SPRINTF_DECORATE(vsprintfcb)(0, 0, buf, fmt, va);
 }
 
-// =======================================================================
+// ///////////////////////////////////////////////////////////////////////
 //   low level float utility functions
 
 #ifndef STB_SPRINTF_NOFLOAT
@@ -1694,4 +1708,4 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
-#endif // DQN_STB_SPRINTF_HEADER_ONLY
+#endif // !defined(DQN_USE_STD_PRINTF) && !defined(DQN_STB_SPRINTF_HEADER_ONLY)

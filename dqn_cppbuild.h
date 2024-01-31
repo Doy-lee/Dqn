@@ -1,9 +1,27 @@
 #if !defined(DQN_CPP_BUILD_H)
 #define DQN_CPP_BUILD_H
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//    $$$$$$\  $$$$$$$\  $$$$$$$\        $$$$$$$\  $$\   $$\ $$$$$$\ $$\       $$$$$$$\
+//   $$  __$$\ $$  __$$\ $$  __$$\       $$  __$$\ $$ |  $$ |\_$$  _|$$ |      $$  __$$\
+//   $$ /  \__|$$ |  $$ |$$ |  $$ |      $$ |  $$ |$$ |  $$ |  $$ |  $$ |      $$ |  $$ |
+//   $$ |      $$$$$$$  |$$$$$$$  |      $$$$$$$\ |$$ |  $$ |  $$ |  $$ |      $$ |  $$ |
+//   $$ |      $$  ____/ $$  ____/       $$  __$$\ $$ |  $$ |  $$ |  $$ |      $$ |  $$ |
+//   $$ |  $$\ $$ |      $$ |            $$ |  $$ |$$ |  $$ |  $$ |  $$ |      $$ |  $$ |
+//   \$$$$$$  |$$ |      $$ |            $$$$$$$  |\$$$$$$  |$$$$$$\ $$$$$$$$\ $$$$$$$  |
+//    \______/ \__|      \__|            \_______/  \______/ \______|\________|\_______/
+//
+//   dqn_cppbuild.h -- Helper functions to make build scripts in C++
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <stdlib.h> // exit
+
 struct Dqn_CPPBuildCompileFile
 {
-    Dqn_Slice<Dqn_Str8> flags;
+    Dqn_Slice<Dqn_Str8> prefix_flags;
+    Dqn_Slice<Dqn_Str8> suffix_flags;
     Dqn_Str8            input_file_path;
     Dqn_Str8            output_file_path;
 };
@@ -11,15 +29,25 @@ struct Dqn_CPPBuildCompileFile
 Dqn_Str8 const DQN_CPP_BUILD_OBJ_SUFFIX_OBJ = DQN_STR8(".obj");
 Dqn_Str8 const DQN_CPP_BUILD_OBJ_SUFFIX_O   = DQN_STR8(".o");
 
-enum Dqn_CPPBuildCompiler
+enum Dqn_CPPBuildFlagsStyle
 {
-    Dqn_CPPBuildCompiler_MSVC,
-    Dqn_CPPBuildCompiler_GCC,
+    Dqn_CPPBuildFlagsStyle_MSVC,
+    Dqn_CPPBuildFlagsStyle_GCC,
+    Dqn_CPPBuildFlagsStyle_CLANG,
+};
+
+enum Dqn_CPPBuildAppendCompilerToCommand
+{
+    Dqn_CPPBuildAppendCompilerToCommand_No,
+    Dqn_CPPBuildAppendCompilerToCommand_Yes,
 };
 
 struct Dqn_CPPBuildContext
 {
-    Dqn_CPPBuildCompiler               compiler;
+    // Dictates the type of compiler flags the functions may append to the
+    // build command line
+    Dqn_CPPBuildFlagsStyle             flags_style;
+
     Dqn_Str8                           compile_file_obj_suffix;
     Dqn_Slice<Dqn_CPPBuildCompileFile> compile_files;
     Dqn_Slice<Dqn_Str8>                compile_flags;
@@ -46,17 +74,18 @@ enum Dqn_CPPBuildMode
     Dqn_CPPBuildMode_CacheBuild,
 };
 
-DQN_API Dqn_Str8                Dqn_CPPBuild_ToCommandLine(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode, Dqn_Allocator allocator);
-DQN_API Dqn_CPPBuildAsyncResult Dqn_CPPBuild_Async        (Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode);
-DQN_API void                    Dqn_CPPBuild_ExecOrAbort  (Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode);
+DQN_API Dqn_Slice<Dqn_Str8>     Dqn_CPPBuild_ToCommandLine    (Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode, Dqn_Arena *arena);
+DQN_API Dqn_Str8                Dqn_CPPBuild_ToCommandLineStr8(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode, Dqn_Arena *arena);
+DQN_API Dqn_CPPBuildAsyncResult Dqn_CPPBuild_Async            (Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode);
+DQN_API void                    Dqn_CPPBuild_ExecOrAbort      (Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode);
 #endif // DQN_CPP_BUILD_H
 
 #if defined(DQN_CPP_BUILD_IMPLEMENTATION)
-DQN_API Dqn_Str8 Dqn_CPPBuild_ToCommandLine(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode, Dqn_Allocator allocator)
+DQN_API Dqn_Slice<Dqn_Str8> Dqn_CPPBuild_ToCommandLine(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode, Dqn_Arena *arena)
 {
-    // NOTE: Check if object files are newer than the source files =================================
-    Dqn_ThreadScratch scratch                                = Dqn_Thread_GetScratch(allocator.user_context);
-    Dqn_Str8 result                                       = {};
+    // NOTE: Check if object files are newer than the source files /////////////////////////////////
+    Dqn_Scratch scratch  = Dqn_Scratch_Get(arena);
+    Dqn_Slice<Dqn_Str8> result = {};
 
     Dqn_Slice<Dqn_CPPBuildCompileFile> dirtied_compile_files = build_context.compile_files;
     if (mode == Dqn_CPPBuildMode_CacheBuild) {
@@ -77,15 +106,15 @@ DQN_API Dqn_Str8 Dqn_CPPBuild_ToCommandLine(Dqn_CPPBuildContext build_context, D
 
                 // NOTE: Create the object file path
                 Dqn_Str8 file_stem = Dqn_Str8_FileNameNoExtension(file.input_file_path);
-                obj_file_name      = Dqn_Str8_InitF(scratch.allocator, "%.*s%.*s", DQN_STR_FMT(file_stem), DQN_STR_FMT(compile_file_obj_suffix));
+                obj_file_name      = Dqn_Str8_InitF(scratch.arena, "%.*s%.*s", DQN_STR_FMT(file_stem), DQN_STR_FMT(compile_file_obj_suffix));
             }
 
             Dqn_Str8 obj_file_path = obj_file_name;
             if (build_context.build_dir.size)
-                obj_file_path = Dqn_FsPath_ConvertF(scratch.arena, "%.*s/%.*s", DQN_STR_FMT(build_context.build_dir), DQN_STR_FMT(obj_file_name));
+                obj_file_path = Dqn_OS_PathConvertF(scratch.arena, "%.*s/%.*s", DQN_STR_FMT(build_context.build_dir), DQN_STR_FMT(obj_file_name));
 
-            Dqn_FsInfo file_info     = Dqn_Fs_GetInfo(file.input_file_path);
-            Dqn_FsInfo obj_file_info = Dqn_Fs_GetInfo(obj_file_path);
+            Dqn_OSPathInfo file_info     = Dqn_OS_PathInfo(file.input_file_path);
+            Dqn_OSPathInfo obj_file_info = Dqn_OS_PathInfo(obj_file_path);
             if (obj_file_info.last_write_time_in_s >= file_info.last_write_time_in_s)
                 continue;
 
@@ -96,88 +125,77 @@ DQN_API Dqn_Str8 Dqn_CPPBuild_ToCommandLine(Dqn_CPPBuildContext build_context, D
             return result;
     }
 
-    // NOTE: Build the command line invocation =====================================================
+    // NOTE: Build the command line invocation /////////////////////////////////////////////////////
     Dqn_Str8Builder builder = {};
-    builder.allocator          = allocator;
-    DQN_FOR_UINDEX (index, build_context.compile_flags.size) {
-        Dqn_Str8 flag = build_context.compile_flags.data[index];
-        if (index)
-            Dqn_Str8Builder_AppendF(&builder, " ");
-        Dqn_Str8Builder_AppendRef(&builder, flag);
-    }
+    builder.arena       = scratch.arena;
+    Dqn_Str8Builder_AppendRefArray(&builder, build_context.compile_flags);
 
-    DQN_FOR_UINDEX (index, build_context.include_dirs.size) {
+    DQN_FOR_UINDEX(index, build_context.include_dirs.size) {
         Dqn_Str8 include_dir = build_context.include_dirs.data[index];
-        if (builder.count)
-            Dqn_Str8Builder_AppendF(&builder, " ");
-        Dqn_Str8Builder_AppendF(&builder, "/I %.*s", DQN_STR_FMT(include_dir));
+        Dqn_Str8Builder_AppendRef(&builder, DQN_STR8("-I"));
+        Dqn_Str8Builder_AppendRef(&builder, include_dir);
     }
 
-    DQN_FOR_UINDEX (index, dirtied_compile_files.size) {
+    DQN_FOR_UINDEX(index, dirtied_compile_files.size) {
         Dqn_CPPBuildCompileFile file = dirtied_compile_files.data[index];
-        Dqn_Str8 obj_file            = {};
-        if (builder.count)
-            Dqn_Str8Builder_AppendF(&builder, " ");
-
-        if (file.output_file_path.size) {
-            switch (build_context.compiler) {
-                case Dqn_CPPBuildCompiler_MSVC: {
-                    Dqn_Str8Builder_AppendF(&builder, "/Fo%.*s ", DQN_STR_FMT(file.output_file_path));
+        if (Dqn_Str8_HasData(file.output_file_path)) {
+            switch (build_context.flags_style) {
+                case Dqn_CPPBuildFlagsStyle_MSVC: {
+                    Dqn_Str8Builder_AppendF(&builder, "-Fo%.*s", DQN_STR_FMT(file.output_file_path));
                 } break;
 
-                case Dqn_CPPBuildCompiler_GCC: {
-                    Dqn_Str8Builder_AppendF(&builder, "-o %.*s ", DQN_STR_FMT(file.output_file_path));
+                case Dqn_CPPBuildFlagsStyle_GCC: /*FALLTHRU*/
+                case Dqn_CPPBuildFlagsStyle_CLANG: {
+                    Dqn_Str8Builder_AppendF  (&builder, "-o");
+                    Dqn_Str8Builder_AppendRef(&builder, file.output_file_path);
                 } break;
             }
         }
 
-        DQN_FOR_UINDEX (flag_index, file.flags.size) {
-            Dqn_Str8 flag = file.flags.data[flag_index];
-            Dqn_Str8Builder_AppendF(&builder, "%s%.*s", flag_index ? " " : "", DQN_STR_FMT(flag));
-        }
+        // TODO(doyle): Check if the file exists, error if it doesn't
 
-        if (file.flags.size)
-            Dqn_Str8Builder_AppendF(&builder, " ");
+        Dqn_Str8Builder_AppendRefArray(&builder, file.prefix_flags);
         Dqn_Str8Builder_AppendRef(&builder, file.input_file_path);
+        Dqn_Str8Builder_AppendRefArray(&builder, file.suffix_flags);
     }
 
-    DQN_FOR_UINDEX (index, build_context.link_flags.size) {
-        Dqn_Str8 file = build_context.link_flags.data[index];
-        if (builder.count)
-            Dqn_Str8Builder_AppendF(&builder, " ");
-        Dqn_Str8Builder_AppendRef(&builder, file);
-    }
-
-    result = Dqn_Str8Builder_Build(&builder, allocator);
+    Dqn_Str8Builder_AppendRefArray(&builder, build_context.link_flags);
+    result = Dqn_Str8Builder_BuildSlice(&builder, arena);
     return result;
 }
 
+DQN_API Dqn_Str8 Dqn_CPPBuild_ToCommandLineStr8(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode, Dqn_Arena *arena)
+{
+    Dqn_Slice<Dqn_Str8> cmd_line = Dqn_CPPBuild_ToCommandLine(build_context, mode, arena);
+    Dqn_Str8 result              = Dqn_Slice_Str8Render(arena, cmd_line, DQN_STR8(" ") /*separator*/);
+    return result;
+}
 
 DQN_API Dqn_CPPBuildAsyncResult Dqn_CPPBuild_Async(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode)
 {
-    Dqn_ThreadScratch       scratch = Dqn_Thread_GetScratch(nullptr);
-    Dqn_Str8                cmd     = Dqn_CPPBuild_ToCommandLine(build_context, mode, scratch.allocator);
-    Dqn_CPPBuildAsyncResult result  = {};
-    if (!cmd.size)
+    Dqn_Scratch             scratch  = Dqn_Scratch_Get(nullptr);
+    Dqn_Slice<Dqn_Str8>     cmd_line = Dqn_CPPBuild_ToCommandLine(build_context, mode, scratch.arena);
+    Dqn_CPPBuildAsyncResult result   = {};
+    if (!cmd_line.size)
         return result;
 
-    if (!Dqn_Fs_MakeDir(build_context.build_dir)) {
+    if (!Dqn_OS_DirMake(build_context.build_dir)) {
         result.status = Dqn_CPPBuildStatus_BuildDirectoryFailedToBeMade;
         return result;
     }
 
-    result.async_handle = Dqn_OS_ExecAsync(cmd, build_context.build_dir);
+    result.async_handle = Dqn_OS_ExecAsync(cmd_line, build_context.build_dir);
     return result;
 }
 
 void Dqn_CPPBuild_ExecOrAbort(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode)
 {
-    if (!Dqn_Fs_MakeDir(build_context.build_dir)) {
+    if (!Dqn_OS_DirMake(build_context.build_dir)) {
         Dqn_Log_ErrorF("Failed to make build dir '%.*s'", DQN_STR_FMT(build_context.build_dir));
         exit(-1);
     }
-    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-    Dqn_Str8 cmd              = Dqn_CPPBuild_ToCommandLine(build_context, mode, scratch.allocator);
-    Dqn_OS_ExecOrAbort(cmd, build_context.build_dir);
+    Dqn_Scratch         scratch  = Dqn_Scratch_Get(nullptr);
+    Dqn_Slice<Dqn_Str8> cmd_line = Dqn_CPPBuild_ToCommandLine(build_context, mode, scratch.arena);
+    Dqn_OS_ExecOrAbort(cmd_line, build_context.build_dir);
 }
 #endif // DQN_CPP_BUILD_IMPLEMENTATION

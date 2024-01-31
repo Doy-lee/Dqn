@@ -1,5 +1,20 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//   $$\      $$\  $$$$$$\ $$$$$$$$\ $$\   $$\
+//   $$$\    $$$ |$$  __$$\\__$$  __|$$ |  $$ |
+//   $$$$\  $$$$ |$$ /  $$ |  $$ |   $$ |  $$ |
+//   $$\$$\$$ $$ |$$$$$$$$ |  $$ |   $$$$$$$$ |
+//   $$ \$$$  $$ |$$  __$$ |  $$ |   $$  __$$ |
+//   $$ |\$  /$$ |$$ |  $$ |  $$ |   $$ |  $$ |
+//   $$ | \_/ $$ |$$ |  $$ |  $$ |   $$ |  $$ |
+//   \__|     \__|\__|  \__|  \__|   \__|  \__|
+//
+//   dqn_math.cpp
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #if !defined(DQN_NO_V2)
-// NOTE: [$VEC2] Vector2 ===========================================================================
+// NOTE: [$VEC2] Vector2 ///////////////////////////////////////////////////////////////////////////
 // NOTE: Dqn_V2I
 DQN_API bool operator!=(Dqn_V2I lhs, Dqn_V2I rhs)
 {
@@ -137,6 +152,24 @@ DQN_API Dqn_V2I &operator+=(Dqn_V2I &lhs, Dqn_V2I rhs)
 {
     lhs = lhs + rhs;
     return lhs;
+}
+
+DQN_API Dqn_V2I Dqn_V2I_Min(Dqn_V2I a, Dqn_V2I b)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(DQN_MIN(a.x, b.x), DQN_MIN(a.y, b.y));
+    return result;
+}
+
+DQN_API Dqn_V2I Dqn_V2I_Max(Dqn_V2I a, Dqn_V2I b)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(DQN_MAX(a.x, b.x), DQN_MAX(a.y, b.y));
+    return result;
+}
+
+DQN_API Dqn_V2I Dqn_V2I_Abs(Dqn_V2I a)
+{
+    Dqn_V2I result = Dqn_V2I_InitNx2(DQN_ABS(a.x), DQN_ABS(a.y));
+    return result;
 }
 
 // NOTE: Dqn_V2U16
@@ -309,7 +342,20 @@ DQN_API bool operator>(Dqn_V2 lhs, Dqn_V2 rhs)
     return result;
 }
 
+// NOTE: Dqn_V2 operator- //////////////////////////////////////////////////////////////////////////
+DQN_API Dqn_V2 operator-(Dqn_V2 lhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(-lhs.x, -lhs.y);
+    return result;
+}
+
 DQN_API Dqn_V2 operator-(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x - rhs.x, lhs.y - rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator-(Dqn_V2 lhs, Dqn_V2I rhs)
 {
     Dqn_V2 result = Dqn_V2_InitNx2(lhs.x - rhs.x, lhs.y - rhs.y);
     return result;
@@ -321,13 +367,20 @@ DQN_API Dqn_V2 operator-(Dqn_V2 lhs, Dqn_f32 rhs)
     return result;
 }
 
-DQN_API Dqn_V2 operator-(Dqn_V2 lhs)
+DQN_API Dqn_V2 operator-(Dqn_V2 lhs, int32_t rhs)
 {
-    Dqn_V2 result = Dqn_V2_InitNx2(-lhs.x, -lhs.y);
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x - rhs, lhs.y - rhs);
     return result;
 }
 
+// NOTE: Dqn_V2 operator+ //////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_V2 operator+(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x + rhs.x, lhs.y + rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator+(Dqn_V2 lhs, Dqn_V2I rhs)
 {
     Dqn_V2 result = Dqn_V2_InitNx2(lhs.x + rhs.x, lhs.y + rhs.y);
     return result;
@@ -339,7 +392,20 @@ DQN_API Dqn_V2 operator+(Dqn_V2 lhs, Dqn_f32 rhs)
     return result;
 }
 
+DQN_API Dqn_V2 operator+(Dqn_V2 lhs, int32_t rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x + rhs, lhs.y + rhs);
+    return result;
+}
+
+// NOTE: Dqn_V2 operator* //////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_V2 operator*(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x * rhs.x, lhs.y * rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator*(Dqn_V2 lhs, Dqn_V2I rhs)
 {
     Dqn_V2 result = Dqn_V2_InitNx2(lhs.x * rhs.x, lhs.y * rhs.y);
     return result;
@@ -357,7 +423,14 @@ DQN_API Dqn_V2 operator*(Dqn_V2 lhs, int32_t rhs)
     return result;
 }
 
-DQN_API Dqn_V2 operator/(Dqn_V2 lhs, Dqn_V2  rhs)
+// NOTE: Dqn_V2 operator/ //////////////////////////////////////////////////////////////////////////
+DQN_API Dqn_V2 operator/(Dqn_V2 lhs, Dqn_V2 rhs)
+{
+    Dqn_V2 result = Dqn_V2_InitNx2(lhs.x / rhs.x, lhs.y / rhs.y);
+    return result;
+}
+
+DQN_API Dqn_V2 operator/(Dqn_V2 lhs, Dqn_V2I rhs)
 {
     Dqn_V2 result = Dqn_V2_InitNx2(lhs.x / rhs.x, lhs.y / rhs.y);
     return result;
@@ -375,7 +448,14 @@ DQN_API Dqn_V2 operator/(Dqn_V2 lhs, int32_t rhs)
     return result;
 }
 
+// NOTE: Dqn_V2 operator*/ /////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_V2 &operator*=(Dqn_V2 &lhs, Dqn_V2 rhs)
+{
+    lhs = lhs * rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator*=(Dqn_V2 &lhs, Dqn_V2I rhs)
 {
     lhs = lhs * rhs;
     return lhs;
@@ -393,7 +473,14 @@ DQN_API Dqn_V2 &operator*=(Dqn_V2 &lhs, int32_t rhs)
     return lhs;
 }
 
+// NOTE: Dqn_V2 operator// /////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_V2 &operator/=(Dqn_V2 &lhs, Dqn_V2 rhs)
+{
+    lhs = lhs / rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator/=(Dqn_V2 &lhs, Dqn_V2I rhs)
 {
     lhs = lhs / rhs;
     return lhs;
@@ -411,7 +498,14 @@ DQN_API Dqn_V2 &operator/=(Dqn_V2 &lhs, int32_t rhs)
     return lhs;
 }
 
+// NOTE: Dqn_V2 operator-/ /////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_V2 &operator-=(Dqn_V2 &lhs, Dqn_V2 rhs)
+{
+    lhs = lhs - rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator-=(Dqn_V2 &lhs, Dqn_V2I rhs)
 {
     lhs = lhs - rhs;
     return lhs;
@@ -423,13 +517,32 @@ DQN_API Dqn_V2 &operator-=(Dqn_V2 &lhs, Dqn_f32 rhs)
     return lhs;
 }
 
+DQN_API Dqn_V2 &operator-=(Dqn_V2 &lhs, int32_t rhs)
+{
+    lhs = lhs - rhs;
+    return lhs;
+}
+
+// NOTE: Dqn_V2 operator+/ /////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_V2 &operator+=(Dqn_V2 &lhs, Dqn_V2 rhs)
 {
     lhs = lhs + rhs;
     return lhs;
 }
 
+DQN_API Dqn_V2 &operator+=(Dqn_V2 &lhs, Dqn_V2I rhs)
+{
+    lhs = lhs + rhs;
+    return lhs;
+}
+
 DQN_API Dqn_V2 &operator+=(Dqn_V2 &lhs, Dqn_f32 rhs)
+{
+    lhs = lhs + rhs;
+    return lhs;
+}
+
+DQN_API Dqn_V2 &operator+=(Dqn_V2 &lhs, int32_t rhs)
 {
     lhs = lhs + rhs;
     return lhs;
@@ -455,7 +568,7 @@ DQN_API Dqn_V2 Dqn_V2_Abs(Dqn_V2 a)
 
 DQN_API Dqn_f32 Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b)
 {
-    // NOTE: Scalar projection of B onto A =========================================================
+    // NOTE: Scalar projection of B onto A /////////////////////////////////////////////////////////
     //
     // Scalar projection calculates the signed distance between `b` and `a`
     // where `a` is a unit vector then, the dot product calculates the projection
@@ -488,7 +601,7 @@ DQN_API Dqn_f32 Dqn_V2_Dot(Dqn_V2 a, Dqn_V2 b)
     // 2 objects. One of the vectors must be normalised (e.g. turned into a unit
     // vector).
     //
-    // NOTE: Vector projection =====================================================================
+    // NOTE: Vector projection /////////////////////////////////////////////////////////////////////
     //
     // Vector projection calculates the exact X,Y coordinates of where `b` meets
     // `a` when it was projected. This is calculated by multipying the
@@ -578,7 +691,7 @@ DQN_API Dqn_f32 Dqn_V2_Area(Dqn_V2 a)
 #endif // !defined(DQN_NO_V2)
 
 #if !defined(DQN_NO_V3)
-// NOTE: [$VEC3] Vector3 ===========================================================================
+// NOTE: [$VEC3] Vector3 ///////////////////////////////////////////////////////////////////////////
 DQN_API bool operator!=(Dqn_V3 lhs, Dqn_V3  rhs)
 {
     bool result = !(lhs == rhs);
@@ -739,7 +852,7 @@ DQN_API Dqn_V3 Dqn_V3_Normalise(Dqn_V3 a)
 #endif // !defined(DQN_NO_V3)
 
 #if !defined(DQN_NO_V4)
-// NOTE: [$VEC4] Vector4 ===========================================================================
+// NOTE: [$VEC4] Vector4 ///////////////////////////////////////////////////////////////////////////
 DQN_API bool operator!=(Dqn_V4 lhs, Dqn_V4 rhs)
 {
     bool result = !(lhs == rhs);
@@ -856,7 +969,7 @@ DQN_API Dqn_f32 Dqn_V4Dot(Dqn_V4 a, Dqn_V4 b)
 #endif // !defined(DQN_NO_V4)
 
 #if !defined(DQN_NO_M4)
-// NOTE: [$MAT4] Dqn_M4 ============================================================================
+// NOTE: [$MAT4] Dqn_M4 ////////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_M4 Dqn_M4_Identity()
 {
     Dqn_M4 result =
@@ -924,7 +1037,7 @@ DQN_API Dqn_M4 Dqn_M4_Translate(Dqn_V3 xyz)
 
 DQN_API Dqn_M4 Dqn_M4_Transpose(Dqn_M4 mat)
 {
-    Dqn_M4 result;
+    Dqn_M4 result = {};
     for (int col = 0; col < 4; col++)
         for (int row = 0; row < 4; row++)
             result.columns[col][row] = mat.columns[row][col];
@@ -1106,7 +1219,7 @@ DQN_API Dqn_FStr8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
 #endif
 #endif // !defined(DQN_M4)
 
-// NOTE: [$M2x3] Dqn_M2x3 ==========================================================================
+// NOTE: [$M2x3] Dqn_M2x3 //////////////////////////////////////////////////////////////////////////
 DQN_API bool operator==(Dqn_M2x3 const &lhs, Dqn_M2x3 const &rhs)
 {
     bool result = DQN_MEMCMP(lhs.e, rhs.e, sizeof(lhs.e[0]) * DQN_ARRAY_UCOUNT(lhs.e)) == 0;
@@ -1178,7 +1291,7 @@ DQN_API Dqn_M2x3 Dqn_M2x3_Mul(Dqn_M2x3 m1, Dqn_M2x3 m2)
     return result;
 }
 
-DQN_API Dqn_V2 Dqn_M2x3_MulV2(Dqn_M2x3 m1, Dqn_V2 v2)
+DQN_API Dqn_V2 Dqn_M2x3_Mul2F32(Dqn_M2x3 m1, Dqn_f32 x, Dqn_f32 y)
 {
     // NOTE: Ordinarily you can't multiply M2x3 with V2 because column count (3)
     // != row count (2). We pretend we have a V3 with `z` set to `1`.
@@ -1188,14 +1301,20 @@ DQN_API Dqn_V2 Dqn_M2x3_MulV2(Dqn_M2x3 m1, Dqn_V2 v2)
     //                      | 1 |
 
     Dqn_V2 result = {{
-        m1.e[0]*v2.x + m1.e[1]*v2.y + m1.e[2], // a*x + b*y + c*1
-        m1.e[3]*v2.x + m1.e[4]*v2.y + m1.e[5], // d*x + e*y + f*1
+        m1.e[0]*x + m1.e[1]*y + m1.e[2], // a*x + b*y + c*1
+        m1.e[3]*x + m1.e[4]*y + m1.e[5], // d*x + e*y + f*1
     }};
     return result;
 }
 
+DQN_API Dqn_V2 Dqn_M2x3_MulV2(Dqn_M2x3 m1, Dqn_V2 v2)
+{
+    Dqn_V2 result = Dqn_M2x3_Mul2F32(m1, v2.x, v2.y);
+    return result;
+}
+
 #if !defined(DQN_NO_RECT)
-// NOTE: [$RECT] Dqn_Rect ==========================================================================
+// NOTE: [$RECT] Dqn_Rect //////////////////////////////////////////////////////////////////////////
 DQN_API bool operator==(const Dqn_Rect& lhs, const Dqn_Rect& rhs)
 {
     bool result = (lhs.pos == rhs.pos) && (lhs.size == rhs.size);
@@ -1399,7 +1518,7 @@ DQN_API Dqn_V2 Dqn_Rect_BottomRight(Dqn_Rect rect)
 }
 #endif // !defined(DQN_NO_RECT)
 
-// NOTE: [$MATH] Raycast ===========================================================================
+// NOTE: [$MATH] Raycast ///////////////////////////////////////////////////////////////////////////
 
 DQN_API Dqn_RaycastLineIntersectV2Result Dqn_Raycast_LineIntersectV2(Dqn_V2 origin_a, Dqn_V2 dir_a, Dqn_V2 origin_b, Dqn_V2 dir_b)
 {
@@ -1432,7 +1551,7 @@ DQN_API Dqn_RaycastLineIntersectV2Result Dqn_Raycast_LineIntersectV2(Dqn_V2 orig
     return result;
 }
 
-// NOTE: [$MATH] Other =============================================================================
+// NOTE: [$MATH] Other /////////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_V2 Dqn_Lerp_V2(Dqn_V2 a, Dqn_f32 t, Dqn_V2 b)
 {
     Dqn_V2 result = {};

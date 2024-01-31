@@ -1,23 +1,3 @@
-// NOTE: Preprocessor Config =======================================================================
-// #define DQN_TEST_WITH_MAIN   Define this to enable the main function and allow standalone compiling
-//                              and running of the file.
-// #define DQN_TEST_WITH_KECCAK Define this to enable the main function and allow standalone compiling
-//                              and running of the file.
-
-#if defined(DQN_TEST_WITH_MAIN)
-    #define DQN_ASAN_POISON 1
-    #define DQN_ASAN_VET_POISON 1
-    #define DQN_NO_CHECK_BREAK
-    #define DQN_IMPLEMENTATION
-    #include "dqn.h"
-#endif
-
-#if defined(DQN_TEST_WITH_KECCAK)
-    #define DQN_KECCAK_IMPLEMENTATION
-    #include "dqn_keccak.h"
-    #include "dqn_tests_helpers.cpp"
-#endif
-
 #define DQN_UTEST_IMPLEMENTATION
 #include "dqn_utest.h"
 
@@ -25,28 +5,22 @@ static Dqn_UTest Dqn_Test_Arena()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Arena") {
-        DQN_UTEST_TEST("Grow arena, reserve 4k, commit 1k (e.g. different sizes)") {
-            Dqn_Arena arena = {};
-            Dqn_Arena_Grow(&arena, DQN_KILOBYTES(4), DQN_KILOBYTES(1), /*flags*/ 0);
-            Dqn_Arena_Free(&arena);
-        }
-
         DQN_UTEST_TEST("Reused memory is zeroed out") {
-
-            uint8_t alignment                            = 1;
-            Dqn_usize alloc_size                         = DQN_KILOBYTES(128);
-            Dqn_MemBlockSizeRequiredResult size_required = Dqn_MemBlock_SizeRequired(nullptr, alloc_size, alignment, Dqn_MemBlockFlag_Nil);
-            Dqn_Arena arena                              = {};
-            Dqn_Arena_Grow(&arena, size_required.block_size, /*commit*/ size_required.block_size, /*flags*/ 0);
+            uint8_t   alignment  = 1;
+            Dqn_usize alloc_size = DQN_KILOBYTES(128);
+            Dqn_Arena arena      = {};
+            DQN_DEFER {
+                Dqn_Arena_Deinit(&arena);
+            };
 
             // NOTE: Allocate 128 kilobytes, fill it with garbage, then reset the arena
             uintptr_t first_ptr_address = 0;
             {
-                Dqn_ArenaTempMemory temp_mem = Dqn_Arena_BeginTempMemory(&arena);
+                Dqn_ArenaTempMem temp_mem = Dqn_Arena_TempMemBegin(&arena);
                 void *ptr         = Dqn_Arena_Alloc(&arena, alloc_size, alignment, Dqn_ZeroMem_Yes);
                 first_ptr_address = DQN_CAST(uintptr_t)ptr;
                 DQN_MEMSET(ptr, 'z', alloc_size);
-                Dqn_Arena_EndTempMemory(temp_mem, false /*cancel*/);
+                Dqn_Arena_TempMemEnd(temp_mem);
             }
 
             // NOTE: Reallocate 128 kilobytes
@@ -58,99 +32,60 @@ static Dqn_UTest Dqn_Test_Arena()
             // NOTE: Check that the bytes are set to 0
             for (Dqn_usize i = 0; i < alloc_size; i++)
                 DQN_UTEST_ASSERT(&test, ptr[i] == 0);
-            Dqn_Arena_Free(&arena);
         }
 
         DQN_UTEST_TEST("Test arena grows naturally, 1mb + 4mb") {
-            Dqn_Arena arena = {};
-
             // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
-            char *ptr_1mb = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
-            char *ptr_4mb = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(4), 1 /*align*/, Dqn_ZeroMem_Yes);
+            Dqn_Arena arena   = Dqn_Arena_InitSize(DQN_MEGABYTES(2), DQN_MEGABYTES(2), Dqn_ArenaFlag_Nil);
+            DQN_DEFER {
+                Dqn_Arena_Deinit(&arena);
+            };
+
+            char     *ptr_1mb = Dqn_Arena_NewArray(&arena, char, DQN_MEGABYTES(1), Dqn_ZeroMem_Yes);
+            char     *ptr_4mb = Dqn_Arena_NewArray(&arena, char, DQN_MEGABYTES(4), Dqn_ZeroMem_Yes);
             DQN_UTEST_ASSERT(&test, ptr_1mb);
             DQN_UTEST_ASSERT(&test, ptr_4mb);
 
-            Dqn_MemBlock const *block_1mb       = arena.head;
-            char         const *block_1mb_begin = DQN_CAST(char *)block_1mb->data;
-            char         const *block_1mb_end   = DQN_CAST(char *)block_1mb->data + block_1mb->size;
+            Dqn_ArenaBlock const *block_4mb_begin = arena.curr;
+            char const           *block_4mb_end   = DQN_CAST(char *)block_4mb_begin + block_4mb_begin->reserve;
 
-            Dqn_MemBlock const *block_4mb       = arena.curr;
-            char         const *block_4mb_begin = DQN_CAST(char *)block_4mb->data;
-            char         const *block_4mb_end   = DQN_CAST(char *)block_4mb->data + block_4mb->size;
+            Dqn_ArenaBlock const *block_1mb_begin = block_4mb_begin->prev;
+            DQN_UTEST_ASSERTF(&test, block_1mb_begin, "New block should have been allocated");
+            char const           *block_1mb_end   = DQN_CAST(char *)block_1mb_begin + block_1mb_begin->reserve;
 
-            DQN_UTEST_ASSERTF(&test, block_1mb != block_4mb,                                 "New block should have been allocated and linked");
-            DQN_UTEST_ASSERTF(&test, ptr_1mb >= block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
-            DQN_UTEST_ASSERTF(&test, ptr_4mb >= block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
-            DQN_UTEST_ASSERT (&test, arena.curr == arena.tail);
-            DQN_UTEST_ASSERT (&test, arena.curr != arena.head);
-
-            Dqn_Arena_Free(&arena);
+            DQN_UTEST_ASSERTF(&test, block_1mb_begin != block_4mb_begin,                                     "New block should have been allocated and linked");
+            DQN_UTEST_ASSERTF(&test, ptr_1mb >= DQN_CAST(char *)block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
+            DQN_UTEST_ASSERTF(&test, ptr_4mb >= DQN_CAST(char *)block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
         }
 
         DQN_UTEST_TEST("Test arena grows naturally, 1mb, temp memory 4mb") {
-            Dqn_Arena arena = {};
+            Dqn_Arena arena = Dqn_Arena_InitSize(DQN_MEGABYTES(2), DQN_MEGABYTES(2), Dqn_ArenaFlag_Nil);
+            DQN_DEFER {
+                Dqn_Arena_Deinit(&arena);
+            };
 
             // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
             char *ptr_1mb = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
             DQN_UTEST_ASSERT(&test, ptr_1mb);
 
-            Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
+            Dqn_ArenaTempMem temp_memory = Dqn_Arena_TempMemBegin(&arena);
             {
-                char *ptr_4mb = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(4), 1 /*align*/, Dqn_ZeroMem_Yes);
+                char *ptr_4mb = Dqn_Arena_NewArray(&arena, char, DQN_MEGABYTES(4), Dqn_ZeroMem_Yes);
                 DQN_UTEST_ASSERT(&test, ptr_4mb);
 
-                Dqn_MemBlock const *block_1mb       = arena.head;
-                char         const *block_1mb_begin = DQN_CAST(char *)block_1mb->data;
-                char         const *block_1mb_end   = DQN_CAST(char *)block_1mb->data + block_1mb->size;
+                Dqn_ArenaBlock const *block_4mb_begin = arena.curr;
+                char const           *block_4mb_end   = DQN_CAST(char *) block_4mb_begin + block_4mb_begin->reserve;
 
-                Dqn_MemBlock const *block_4mb       = arena.curr;
-                char         const *block_4mb_begin = DQN_CAST(char *)block_4mb->data;
-                char         const *block_4mb_end   = DQN_CAST(char *)block_4mb->data + block_4mb->size;
+                Dqn_ArenaBlock const *block_1mb_begin = block_4mb_begin->prev;
+                char const           *block_1mb_end   = DQN_CAST(char *) block_1mb_begin + block_1mb_begin->reserve;
 
-                DQN_UTEST_ASSERTF(&test, block_1mb != block_4mb,                                 "New block should have been allocated and linked");
-                DQN_UTEST_ASSERTF(&test, ptr_1mb >= block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
-                DQN_UTEST_ASSERTF(&test, ptr_4mb >= block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
-                DQN_UTEST_ASSERT (&test, arena.curr == arena.tail);
-                DQN_UTEST_ASSERT (&test, arena.curr != arena.head);
+                DQN_UTEST_ASSERTF(&test, block_1mb_begin != block_4mb_begin,                     "New block should have been allocated and linked");
+                DQN_UTEST_ASSERTF(&test, ptr_1mb >= DQN_CAST(char *)block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
+                DQN_UTEST_ASSERTF(&test, ptr_4mb >= DQN_CAST(char *)block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
             }
-            Dqn_Arena_EndTempMemory(temp_memory, false /*cancel*/);
-
-            DQN_UTEST_ASSERT (&test, arena.curr       == arena.head);
-            DQN_UTEST_ASSERT (&test, arena.curr       == arena.tail);
-            DQN_UTEST_ASSERT (&test, arena.curr->next == nullptr);
-            DQN_UTEST_ASSERTF(&test, arena.curr->size >= DQN_MEGABYTES(1),
-                               "size=%zuMiB (%zuB), expect=%zuB", (arena.curr->size / 1024 / 1024), arena.curr->size, DQN_MEGABYTES(1));
-
-            Dqn_Arena_Free(&arena);
-        }
-
-        DQN_UTEST_TEST("Init arena, temp region then free inside regions") {
-            Dqn_Arena arena = {};
-            Dqn_Arena_Grow(&arena, DQN_KILOBYTES(1), 0, Dqn_ZeroMem_No);
-
-            Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
-            {
-                char *ptr = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
-                DQN_UTEST_ASSERT(&test, ptr);
-                Dqn_Arena_Free(&arena);
-            }
-            Dqn_Arena_EndTempMemory(temp_memory, false /*cancel*/);
-            Dqn_Arena_Free(&arena);
-        }
-
-        DQN_UTEST_TEST("Init arena, allocate, temp region then free inside region") {
-            Dqn_Arena arena = {};
-            char *outside   = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(1), 1 /*align*/, Dqn_ZeroMem_Yes);
-            DQN_UTEST_ASSERT(&test, outside);
-
-            Dqn_ArenaTempMemory temp_memory = Dqn_Arena_BeginTempMemory(&arena);
-            {
-                char *inside = DQN_CAST(char *)Dqn_Arena_Alloc(&arena, DQN_MEGABYTES(2), 1 /*align*/, Dqn_ZeroMem_Yes);
-                DQN_UTEST_ASSERT(&test, inside);
-                Dqn_Arena_Free(&arena);
-            }
-            Dqn_Arena_EndTempMemory(temp_memory, false /*cancel*/);
-            Dqn_Arena_Free(&arena);
+            Dqn_Arena_TempMemEnd(temp_memory);
+            DQN_UTEST_ASSERT (&test, arena.curr->prev == nullptr);
+            DQN_UTEST_ASSERTF(&test, arena.curr->reserve >= DQN_MEGABYTES(1), "size=%zuMiB (%zuB), expect=%zuB", (arena.curr->reserve / 1024 / 1024), arena.curr->reserve, DQN_MEGABYTES(1));
         }
     }
     return test;
@@ -158,7 +93,7 @@ static Dqn_UTest Dqn_Test_Arena()
 
 static Dqn_UTest Dqn_Test_Bin()
 {
-    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
     Dqn_UTest test           = {};
     DQN_UTEST_GROUP(test, "Dqn_Bin") {
         DQN_UTEST_TEST("Convert 0x123") {
@@ -553,11 +488,12 @@ static Dqn_UTest Dqn_Test_DSMap()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_DSMap") {
-        Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
         {
-            uint32_t const MAP_SIZE = 64;
-            Dqn_DSMap<uint64_t> map = Dqn_DSMap_Init<uint64_t>(MAP_SIZE);
-            DQN_DEFER { Dqn_DSMap_Deinit(&map); };
+            Dqn_Arena           arena    = {};
+            uint32_t const      MAP_SIZE = 64;
+            Dqn_DSMap<uint64_t> map      = Dqn_DSMap_Init<uint64_t>(&arena, MAP_SIZE);
+            DQN_DEFER { Dqn_DSMap_Deinit(&map, Dqn_ZeroMem_Yes); };
 
             DQN_UTEST_TEST("Find non-existent value") {
                 uint64_t *value = Dqn_DSMap_FindKeyStr8(&map, DQN_STR8("Foo")).value;
@@ -597,10 +533,11 @@ static Dqn_UTest Dqn_Test_DSMap()
                 case DSMapTestType_MakeSlot: prefix = DQN_STR8("Make slot"); break;
             }
 
-            Dqn_Arena_TempMemoryScope(scratch.arena);
-            uint32_t const MAP_SIZE = 64;
-            Dqn_DSMap<uint64_t>  map      = Dqn_DSMap_Init<uint64_t>(MAP_SIZE);
-            DQN_DEFER { Dqn_DSMap_Deinit(&map); };
+            Dqn_ArenaTempMemScope temp_mem_scope = Dqn_ArenaTempMemScope(scratch.arena);
+            Dqn_Arena             arena          = {};
+            uint32_t const        MAP_SIZE       = 64;
+            Dqn_DSMap<uint64_t>   map            = Dqn_DSMap_Init<uint64_t>(&arena, MAP_SIZE);
+            DQN_DEFER { Dqn_DSMap_Deinit(&map, Dqn_ZeroMem_Yes); };
 
             DQN_UTEST_TEST("%.*s: Test growing", DQN_STR_FMT(prefix)) {
                 uint64_t map_start_size  = map.size;
@@ -761,51 +698,51 @@ static Dqn_UTest Dqn_Test_Fs()
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Fs") {
         DQN_UTEST_TEST("Make directory recursive \"abcd/efgh\"") {
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_MakeDir(DQN_STR8("abcd/efgh")), "Failed to make directory");
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_DirExists(DQN_STR8("abcd")), "Directory was not made");
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_DirExists(DQN_STR8("abcd/efgh")), "Subdirectory was not made");
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_Exists(DQN_STR8("abcd")) == false, "This function should only return true for files");
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_Exists(DQN_STR8("abcd/efgh")) == false, "This function should only return true for files");
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_Delete(DQN_STR8("abcd/efgh")), "Failed to delete directory");
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_Delete(DQN_STR8("abcd")), "Failed to cleanup directory");
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_DirMake(DQN_STR8("abcd/efgh")), "Failed to make directory");
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_DirExists(DQN_STR8("abcd")), "Directory was not made");
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_DirExists(DQN_STR8("abcd/efgh")), "Subdirectory was not made");
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_FileExists(DQN_STR8("abcd")) == false, "This function should only return true for files");
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_FileExists(DQN_STR8("abcd/efgh")) == false, "This function should only return true for files");
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_PathDelete(DQN_STR8("abcd/efgh")), "Failed to delete directory");
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_PathDelete(DQN_STR8("abcd")), "Failed to cleanup directory");
         }
 
-        DQN_UTEST_TEST("Write file, read it, copy it, move it and delete it") {
+        DQN_UTEST_TEST("File write, read, copy, move and delete") {
             // NOTE: Write step
-            Dqn_Str8 const SRC_FILE = DQN_STR8("dqn_test_file");
-            Dqn_b32 write_result = Dqn_Fs_WriteCStr8(SRC_FILE.data, SRC_FILE.size, "test", 4);
+            Dqn_Str8 const SRC_FILE     = DQN_STR8("dqn_test_file");
+            Dqn_b32        write_result = Dqn_OS_WriteAll(SRC_FILE, DQN_STR8("test"));
             DQN_UTEST_ASSERT(&test, write_result);
-            DQN_UTEST_ASSERT(&test, Dqn_Fs_Exists(SRC_FILE));
+            DQN_UTEST_ASSERT(&test, Dqn_OS_FileExists(SRC_FILE));
 
             // NOTE: Read step
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Str8 read_file = Dqn_Fs_Read(SRC_FILE, scratch.allocator);
-            DQN_UTEST_ASSERTF(&test, Dqn_Str8_IsValid(read_file), "Failed to load file");
+            Dqn_Scratch scratch   = Dqn_Scratch_Get(nullptr);
+            Dqn_Str8    read_file = Dqn_OS_ReadAll(SRC_FILE, scratch.arena);
+            DQN_UTEST_ASSERTF(&test, Dqn_Str8_HasData(read_file), "Failed to load file");
             DQN_UTEST_ASSERTF(&test, read_file.size == 4, "File read wrong amount of bytes");
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_Eq(read_file, DQN_STR8("test")), "read(%zu): %.*s", read_file.size, DQN_STR_FMT(read_file));
 
             // NOTE: Copy step
-            Dqn_Str8 const COPY_FILE = DQN_STR8("dqn_test_file_copy");
-            Dqn_b32 copy_result = Dqn_Fs_Copy(SRC_FILE, COPY_FILE, true /*overwrite*/);
+            Dqn_Str8 const COPY_FILE   = DQN_STR8("dqn_test_file_copy");
+            Dqn_b32        copy_result = Dqn_OS_FileCopy(SRC_FILE, COPY_FILE, true /*overwrite*/);
             DQN_UTEST_ASSERT(&test, copy_result);
-            DQN_UTEST_ASSERT(&test, Dqn_Fs_Exists(COPY_FILE));
+            DQN_UTEST_ASSERT(&test, Dqn_OS_FileExists(COPY_FILE));
 
             // NOTE: Move step
-            Dqn_Str8 const MOVE_FILE = DQN_STR8("dqn_test_file_move");
-            Dqn_b32 move_result = Dqn_Fs_Move(COPY_FILE, MOVE_FILE, true /*overwrite*/);
+            Dqn_Str8 const MOVE_FILE   = DQN_STR8("dqn_test_file_move");
+            Dqn_b32        move_result = Dqn_OS_FileMove(COPY_FILE, MOVE_FILE, true /*overwrite*/);
             DQN_UTEST_ASSERT(&test, move_result);
-            DQN_UTEST_ASSERT(&test, Dqn_Fs_Exists(MOVE_FILE));
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_Exists(COPY_FILE) == false, "Moving a file should remove the original");
+            DQN_UTEST_ASSERT(&test, Dqn_OS_FileExists(MOVE_FILE));
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_FileExists(COPY_FILE) == false, "Moving a file should remove the original");
 
             // NOTE: Delete step
-            Dqn_b32 delete_src_file   = Dqn_Fs_Delete(SRC_FILE);
-            Dqn_b32 delete_moved_file = Dqn_Fs_Delete(MOVE_FILE);
+            Dqn_b32 delete_src_file   = Dqn_OS_PathDelete(SRC_FILE);
+            Dqn_b32 delete_moved_file = Dqn_OS_PathDelete(MOVE_FILE);
             DQN_UTEST_ASSERT(&test, delete_src_file);
             DQN_UTEST_ASSERT(&test, delete_moved_file);
 
             // NOTE: Deleting non-existent file fails
-            Dqn_b32 delete_non_existent_src_file   = Dqn_Fs_Delete(SRC_FILE);
-            Dqn_b32 delete_non_existent_moved_file = Dqn_Fs_Delete(MOVE_FILE);
+            Dqn_b32 delete_non_existent_src_file   = Dqn_OS_PathDelete(SRC_FILE);
+            Dqn_b32 delete_non_existent_moved_file = Dqn_OS_PathDelete(MOVE_FILE);
             DQN_UTEST_ASSERT(&test, delete_non_existent_moved_file == false);
             DQN_UTEST_ASSERT(&test, delete_non_existent_src_file == false);
         }
@@ -966,7 +903,7 @@ Dqn_Str8 const DQN_UTEST_HASH_STRING_[] =
 
 void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
 {
-    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
     Dqn_Str8 input_hex     = Dqn_Hex_BytesToStr8Arena(scratch.arena, input.data, input.size);
 
     switch(hash_type)
@@ -1203,10 +1140,10 @@ static Dqn_UTest Dqn_Test_OS()
         }
 
         DQN_UTEST_TEST("Query executable directory") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+            Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
             Dqn_Str8 result = Dqn_OS_EXEDir(scratch.arena);
-            DQN_UTEST_ASSERT(&test, Dqn_Str8_IsValid(result));
-            DQN_UTEST_ASSERTF(&test, Dqn_Fs_DirExists(result), "result(%zu): %.*s", result.size, DQN_STR_FMT(result));
+            DQN_UTEST_ASSERT(&test, Dqn_Str8_HasData(result));
+            DQN_UTEST_ASSERTF(&test, Dqn_OS_DirExists(result), "result(%zu): %.*s", result.size, DQN_STR_FMT(result));
         }
 
         DQN_UTEST_TEST("Dqn_OS_PerfCounterNow") {
@@ -1221,15 +1158,15 @@ static Dqn_UTest Dqn_Test_OS()
         }
 
         DQN_UTEST_TEST("Ticks to time are a correct order of magnitude") {
-            uint64_t a      = Dqn_OS_PerfCounterNow();
-            uint64_t b      = Dqn_OS_PerfCounterNow();
-            Dqn_f64 s       = Dqn_OS_PerfCounterS(a, b);
-            Dqn_f64 ms      = Dqn_OS_PerfCounterMs(a, b);
-            Dqn_f64 micro_s = Dqn_OS_PerfCounterMicroS(a, b);
-            Dqn_f64 ns      = Dqn_OS_PerfCounterNs(a, b);
-            DQN_UTEST_ASSERTF(&test, s <= ms, "s: %f, ms: %f", s, ms);
-            DQN_UTEST_ASSERTF(&test, ms <= micro_s, "ms: %f, micro_s: %f", ms, micro_s);
-            DQN_UTEST_ASSERTF(&test, micro_s <= ns, "micro_s: %f, ns: %f", micro_s, ns);
+            uint64_t a  = Dqn_OS_PerfCounterNow();
+            uint64_t b  = Dqn_OS_PerfCounterNow();
+            Dqn_f64  s  = Dqn_OS_PerfCounterS(a, b);
+            Dqn_f64  ms = Dqn_OS_PerfCounterMs(a, b);
+            Dqn_f64  us = Dqn_OS_PerfCounterUs(a, b);
+            Dqn_f64  ns = Dqn_OS_PerfCounterNs(a, b);
+            DQN_UTEST_ASSERTF(&test, s  <= ms, "s:  %f, ms: %f", s,  ms);
+            DQN_UTEST_ASSERTF(&test, ms <= us, "ms: %f, us: %f", ms, us);
+            DQN_UTEST_ASSERTF(&test, us <= ns, "us: %f, ns: %f", us, ns);
         }
     }
 
@@ -1376,8 +1313,8 @@ static Dqn_UTest Dqn_Test_Str8()
         }
 
         DQN_UTEST_TEST("Initialise with format string") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Str8 string = Dqn_Str8_InitF(scratch.allocator, "%s", "AB");
+            Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+            Dqn_Str8    string  = Dqn_Str8_InitF(scratch.arena, "%s", "AB");
             DQN_UTEST_ASSERTF(&test, string.size == 2,      "size: %I64u",   string.size);
             DQN_UTEST_ASSERTF(&test, string.data[0] == 'A', "string[0]: %c", string.data[0]);
             DQN_UTEST_ASSERTF(&test, string.data[1] == 'B', "string[1]: %c", string.data[1]);
@@ -1385,9 +1322,9 @@ static Dqn_UTest Dqn_Test_Str8()
         }
 
         DQN_UTEST_TEST("Copy string") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
+            Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
             Dqn_Str8 string        = DQN_STR8("AB");
-            Dqn_Str8 copy          = Dqn_Str8_Copy(scratch.allocator, string);
+            Dqn_Str8 copy          = Dqn_Str8_Copy(scratch.arena, string);
             DQN_UTEST_ASSERTF(&test, copy.size == 2,      "size: %I64u", copy.size);
             DQN_UTEST_ASSERTF(&test, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
             DQN_UTEST_ASSERTF(&test, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
@@ -1400,8 +1337,8 @@ static Dqn_UTest Dqn_Test_Str8()
         }
 
         DQN_UTEST_TEST("Allocate string from arena") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Str8 string = Dqn_Str8_Allocate(scratch.allocator, 2, Dqn_ZeroMem_No);
+            Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+            Dqn_Str8 string = Dqn_Str8_Alloc(scratch.arena, 2, Dqn_ZeroMem_No);
             DQN_UTEST_ASSERTF(&test, string.size == 2, "size: %I64u", string.size);
         }
 
@@ -1431,8 +1368,7 @@ static Dqn_UTest Dqn_Test_Str8()
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_Eq(result, input), "%.*s", DQN_STR_FMT(result));
         }
 
-        // NOTE: Dqn_Str8_IsAllDigits
-        // ---------------------------------------------------------------------------------------------
+        // NOTE: Dqn_Str8_IsAllDigits //////////////////////////////////////////////////////////////
         DQN_UTEST_TEST("Is all digits fails on non-digit string") {
             Dqn_b32 result = Dqn_Str8_IsAll(DQN_STR8("@123string"), Dqn_Str8IsAll_Digits);
             DQN_UTEST_ASSERT(&test, result == false);
@@ -1448,10 +1384,10 @@ static Dqn_UTest Dqn_Test_Str8()
             DQN_UTEST_ASSERT(&test, result == false);
         }
 
-        DQN_UTEST_TEST("Is all digits succeeds on string w/ 0 size") {
+        DQN_UTEST_TEST("Is all digits fails on string w/ 0 size") {
             char const buf[]  = "@123string";
             Dqn_b32    result = Dqn_Str8_IsAll(Dqn_Str8_Init(buf, 0), Dqn_Str8IsAll_Digits);
-            DQN_UTEST_ASSERT(&test, result);
+            DQN_UTEST_ASSERT(&test, !result);
         }
 
         DQN_UTEST_TEST("Is all digits success") {
@@ -1503,17 +1439,16 @@ static Dqn_UTest Dqn_Test_Str8()
             }
         }
 
-        // NOTE: Dqn_Str8_ToI64
-        // =========================================================================================
+        // NOTE: Dqn_Str8_ToI64 ////////////////////////////////////////////////////////////////////
         DQN_UTEST_TEST("To I64: Convert null string") {
             Dqn_Str8ToI64Result result = Dqn_Str8_ToI64(Dqn_Str8_Init(nullptr, 5), 0);
-            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERT(&test, result.success);
             DQN_UTEST_ASSERT(&test, result.value == 0);
         }
 
         DQN_UTEST_TEST("To I64: Convert empty string") {
             Dqn_Str8ToI64Result result = Dqn_Str8_ToI64(DQN_STR8(""), 0);
-            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERT(&test, result.success);
             DQN_UTEST_ASSERT(&test, result.value == 0);
         }
 
@@ -1563,13 +1498,13 @@ static Dqn_UTest Dqn_Test_Str8()
         // ---------------------------------------------------------------------------------------------
         DQN_UTEST_TEST("To U64: Convert nullptr") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(Dqn_Str8_Init(nullptr, 5), 0);
-            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERT(&test, result.success);
             DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert empty string") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8(""), 0);
-            DQN_UTEST_ASSERT(&test, !result.success);
+            DQN_UTEST_ASSERT(&test, result.success);
             DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %I64u", result.value);
         }
 
@@ -1700,8 +1635,10 @@ static Dqn_UTest Dqn_Test_VArray()
     Dqn_UTest test            = {};
     DQN_UTEST_GROUP(test, "Dqn_VArray") {
         {
-            Dqn_ThreadScratch scratch  = Dqn_Thread_GetScratch(nullptr);
-            Dqn_VArray<uint32_t> array = Dqn_VArray_InitByteSize<uint32_t>(scratch.arena, DQN_KILOBYTES(64));
+            Dqn_VArray<uint32_t> array = Dqn_VArray_InitByteSize<uint32_t>(DQN_KILOBYTES(64), 0);
+            DQN_DEFER {
+                Dqn_VArray_Deinit(&array);
+            };
 
             DQN_UTEST_TEST("Test adding an array of items to the array") {
                 uint32_t array_literal[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
@@ -1805,8 +1742,10 @@ static Dqn_UTest Dqn_Test_VArray()
             };
             DQN_MSVC_WARNING_POP
 
-            Dqn_ThreadScratch scratch         = Dqn_Thread_GetScratch(nullptr);
-            Dqn_VArray<UnalignedObject> array = Dqn_VArray_InitByteSize<UnalignedObject>(scratch.arena, DQN_KILOBYTES(64));
+            Dqn_VArray<UnalignedObject> array = Dqn_VArray_InitByteSize<UnalignedObject>(DQN_KILOBYTES(64), 0);
+            DQN_DEFER {
+                Dqn_VArray_Deinit(&array);
+            };
 
             // NOTE: Verify that the items returned from the data array are 
             // contiguous in memory.
@@ -1840,54 +1779,29 @@ static Dqn_UTest Dqn_Test_VArray()
 static Dqn_UTest Dqn_Test_Win()
 {
     Dqn_UTest test = {};
-    DQN_UTEST_GROUP(test, "Dqn_Win") {
-        DQN_UTEST_TEST("Str8 to Str16 size required") {
-            int result = Dqn_Win_Str8ToStr16Buffer(DQN_STR8("a"), nullptr, 0);
-            DQN_UTEST_ASSERTF(&test, result == 1, "Size returned: %d. This size should not include the null-terminator", result);
-        }
-
-        DQN_UTEST_TEST("Str16 to Str8 size required") {
-            int result = Dqn_Win_Str16ToStr8Buffer(DQN_STR16(L"a"), nullptr, 0);
-            DQN_UTEST_ASSERTF(&test, result == 1, "Size returned: %d. This size should not include the null-terminator", result);
-        }
-
-        DQN_UTEST_TEST("Str8 to Str16 size required") {
-            int result = Dqn_Win_Str8ToStr16Buffer(DQN_STR8("String"), nullptr, 0);
-            DQN_UTEST_ASSERTF(&test, result == 6, "Size returned: %d. This size should not include the null-terminator", result);
-        }
-
-        DQN_UTEST_TEST("Str16 to Str8 size required") {
-            int result = Dqn_Win_Str16ToStr8Buffer(DQN_STR16(L"String"), nullptr, 0);
-            DQN_UTEST_ASSERTF(&test, result == 6, "Size returned: %d. This size should not include the null-terminator", result);
-        }
+    DQN_UTEST_GROUP(test, "OS Win32") {
+        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_Str8    input8  = DQN_STR8("String");
+        Dqn_Str16   input16 = Dqn_Str16{(wchar_t *)(L"String"), sizeof(L"String") / sizeof(L"String"[0]) - 1};
 
         DQN_UTEST_TEST("Str8 to Str16") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Str8 const INPUT      = DQN_STR8("String");
-            int size_required         = Dqn_Win_Str8ToStr16Buffer(INPUT, nullptr, 0);
-            wchar_t *string           = Dqn_Arena_NewArray(scratch.arena, wchar_t, size_required + 1, Dqn_ZeroMem_No);
-
-            // Fill the string with error sentinels, which ensures the string is zero terminated
-            DQN_MEMSET(string, 'Z', size_required + 1);
-
-            int size_returned = Dqn_Win_Str8ToStr16Buffer(INPUT, string, size_required + 1);
-            wchar_t const EXPECTED[] = {L'S', L't', L'r', L'i', L'n', L'g', 0};
-
-            DQN_UTEST_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
-            DQN_UTEST_ASSERTF(&test, size_returned == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", size_returned, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
-            DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
+            Dqn_Str16 result = Dqn_Win_Str8ToStr16(scratch.arena, input8);
+            DQN_UTEST_ASSERT(&test, result == input16);
         }
 
-        DQN_UTEST_TEST("Str16 to Str8: No null-terminate") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Str16 INPUT           = DQN_STR16(L"String");
-            int size_required         = Dqn_Win_Str16ToStr8Buffer(INPUT, nullptr, 0);
-            char *string              = Dqn_Arena_NewArray(scratch.arena, char, size_required + 1, Dqn_ZeroMem_No);
+        DQN_UTEST_TEST("Str16 to Str8") {
+            Dqn_Str8 result = Dqn_Win_Str16ToStr8(scratch.arena, input16);
+            DQN_UTEST_ASSERT(&test, result == input8);
+        }
 
-            // Fill the string with error sentinels, which ensures the string is zero terminated
+        DQN_UTEST_TEST("Str16 to Str8: Null terminates string") {
+            int   size_required = Dqn_Win_Str16ToStr8Buffer(input16, nullptr, 0);
+            char *string        = Dqn_Arena_NewArray(scratch.arena, char, size_required + 1, Dqn_ZeroMem_No);
+
+            // Fill the string with error sentinels
             DQN_MEMSET(string, 'Z', size_required + 1);
 
-            int size_returned = Dqn_Win_Str16ToStr8Buffer(INPUT, string, size_required + 1);
+            int size_returned = Dqn_Win_Str16ToStr8Buffer(input16, string, size_required + 1);
             char const EXPECTED[] = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
             DQN_UTEST_ASSERTF(&test, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
@@ -1895,49 +1809,21 @@ static Dqn_UTest Dqn_Test_Win()
             DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string, sizeof(EXPECTED)) == 0);
         }
 
-        DQN_UTEST_TEST("Str8 to Str16 arena") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Str8 const INPUT      = DQN_STR8("String");
-            Dqn_Str16 string16        = Dqn_Win_Str8ToStr16(scratch.arena, INPUT);
-
-            int size_returned = Dqn_Win_Str8ToStr16Buffer(INPUT, nullptr, 0);
-            wchar_t const EXPECTED[] = {L'S', L't', L'r', L'i', L'n', L'g', 0};
-
-            DQN_UTEST_ASSERTF(&test, DQN_CAST(int)string16.size == size_returned, "string_size: %d, result: %d", DQN_CAST(int)string16.size, size_returned);
-            DQN_UTEST_ASSERTF(&test, DQN_CAST(int)string16.size == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", DQN_CAST(int)string16.size, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
-            DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string16.data, sizeof(EXPECTED)) == 0);
-        }
-
-        DQN_UTEST_TEST("Str16 to Str8: No null-terminate arena") {
-            Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-            Dqn_Str16 INPUT        = DQN_STR16(L"String");
-            Dqn_Str8 string8       = Dqn_Win_Str16ToStr8(scratch.arena, INPUT);
-
-            int size_returned         = Dqn_Win_Str16ToStr8Buffer(INPUT, nullptr, 0);
-            char const EXPECTED[]     = {'S', 't', 'r', 'i', 'n', 'g', 0};
+        DQN_UTEST_TEST("Str16 to Str8: Arena null terminates string") {
+            Dqn_Str8   string8       = Dqn_Win_Str16ToStr8(scratch.arena, input16);
+            int        size_returned = Dqn_Win_Str16ToStr8Buffer(input16, nullptr, 0);
+            char const EXPECTED[]    = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
             DQN_UTEST_ASSERTF(&test, DQN_CAST(int)string8.size == size_returned, "string_size: %d, result: %d", DQN_CAST(int)string8.size, size_returned);
             DQN_UTEST_ASSERTF(&test, DQN_CAST(int)string8.size == DQN_ARRAY_UCOUNT(EXPECTED) - 1, "string_size: %d, expected: %zu", DQN_CAST(int)string8.size, DQN_ARRAY_UCOUNT(EXPECTED) - 1);
-            DQN_UTEST_ASSERT(&test, DQN_MEMCMP(EXPECTED, string8.data, sizeof(EXPECTED)) == 0);
+            DQN_UTEST_ASSERT (&test, DQN_MEMCMP(EXPECTED, string8.data, sizeof(EXPECTED)) == 0);
         }
     }
     return test;
 }
 
-static void Dqn_Test_CustomLogProc(Dqn_Str8 type, int log_type, void *user_data, Dqn_CallSite call_site, char const *fmt, va_list args)
+void Dqn_Test_RunSuite()
 {
-    (void)user_data;
-    Dqn_ThreadScratch scratch = Dqn_Thread_GetScratch(nullptr);
-    Dqn_Str8 log              = Dqn_Log_MakeStr8(scratch.allocator, true /*colour*/, type, log_type, call_site, fmt, args);
-    DQN_UTEST_LOG("%.*s", DQN_STR_FMT(log));
-}
-
-static void Dqn_Test_RunSuite()
-{
-    Dqn_Library *dqn_library = Dqn_Library_Init(Dqn_LibraryOnInit_LogFeatures);
-    auto *prev_log_callback   = dqn_library->log_callback;
-    dqn_library->log_callback = Dqn_Test_CustomLogProc;
-
     Dqn_UTest tests[] =
     {
         Dqn_Test_Arena(),
@@ -1968,7 +1854,6 @@ static void Dqn_Test_RunSuite()
     }
 
     fprintf(stdout, "Summary: %d/%d tests succeeded\n", total_good_tests, total_tests);
-    dqn_library->log_callback = prev_log_callback;
 }
 
 #if defined(DQN_TEST_WITH_MAIN)

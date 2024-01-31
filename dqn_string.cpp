@@ -1,9 +1,24 @@
-// NOTE: [$CSTR] Dqn_CStr8 ======================================================================
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//    $$$$$$\ $$$$$$$$\ $$$$$$$\  $$$$$$\ $$\   $$\  $$$$$$\
+//   $$  __$$\\__$$  __|$$  __$$\ \_$$  _|$$$\  $$ |$$  __$$\
+//   $$ /  \__|  $$ |   $$ |  $$ |  $$ |  $$$$\ $$ |$$ /  \__|
+//   \$$$$$$\    $$ |   $$$$$$$  |  $$ |  $$ $$\$$ |$$ |$$$$\
+//    \____$$\   $$ |   $$  __$$<   $$ |  $$ \$$$$ |$$ |\_$$ |
+//   $$\   $$ |  $$ |   $$ |  $$ |  $$ |  $$ |\$$$ |$$ |  $$ |
+//   \$$$$$$  |  $$ |   $$ |  $$ |$$$$$$\ $$ | \$$ |\$$$$$$  |
+//    \______/   \__|   \__|  \__|\______|\__|  \__| \______/
+//
+//   dqn_string.cpp
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: [$CSTR] Dqn_CStr8 /////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_usize Dqn_CStr8_FSize(DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    Dqn_usize result = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, args);
+    Dqn_usize result = DQN_VSNPRINTF(nullptr, 0, fmt, args);
     va_end(args);
     return result;
 }
@@ -12,7 +27,7 @@ DQN_API Dqn_usize Dqn_CStr8_FVSize(DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
     va_list args_copy;
     va_copy(args_copy, args);
-    Dqn_usize result = STB_SPRINTF_DECORATE(vsnprintf)(nullptr, 0, fmt, args_copy);
+    Dqn_usize result = DQN_VSNPRINTF(nullptr, 0, fmt, args_copy);
     va_end(args_copy);
     return result;
 }
@@ -38,17 +53,32 @@ DQN_API Dqn_usize Dqn_CStr16_Size(wchar_t const *src)
     return result;
 }
 
-// NOTE: [$STR8] Dqn_Str8 =======================================================================
+// NOTE: [$STR6] Dqn_Str16 /////////////////////////////////////////////////////////////////////////
+DQN_API bool operator==(Dqn_Str16 const &lhs, Dqn_Str16 const &rhs)
+{
+    bool result = false;
+    if (lhs.size == rhs.size)
+        result = DQN_MEMCMP(lhs.data, rhs.data, lhs.size * sizeof(*lhs.data)) == 0;
+    return result;
+}
+
+DQN_API bool operator!=(Dqn_Str16 const &lhs, Dqn_Str16 const &rhs)
+{
+    bool result = !(lhs == rhs);
+    return result;
+}
+
+// NOTE: [$STR8] Dqn_Str8 //////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_Str8 Dqn_Str8_InitCStr8(char const *src)
 {
-    Dqn_usize size     = Dqn_CStr8_Size(src);
-    Dqn_Str8 result = Dqn_Str8_Init(src, size);
+    Dqn_usize size   = Dqn_CStr8_Size(src);
+    Dqn_Str8  result = Dqn_Str8_Init(src, size);
     return result;
 }
 
 DQN_API bool Dqn_Str8_IsAll(Dqn_Str8 string, Dqn_Str8IsAll is_all)
 {
-    bool result = Dqn_Str8_IsValid(string);
+    bool result = Dqn_Str8_HasData(string);
     if (!result)
         return result;
 
@@ -73,7 +103,7 @@ DQN_API bool Dqn_Str8_IsAll(Dqn_Str8 string, Dqn_Str8IsAll is_all)
 DQN_API Dqn_Str8 Dqn_Str8_Slice(Dqn_Str8 string, Dqn_usize offset, Dqn_usize size)
 {
     Dqn_Str8 result = Dqn_Str8_Init(string.data, 0);
-    if (!Dqn_Str8_IsValid(result))
+    if (!Dqn_Str8_HasData(string))
         return result;
 
     Dqn_usize capped_offset = DQN_MIN(offset, string.size);
@@ -92,7 +122,7 @@ DQN_API Dqn_Str8 Dqn_Str8_Advance(Dqn_Str8 string, Dqn_usize amount)
 DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
 {
     Dqn_Str8BinarySplitResult result = {};
-    if (!Dqn_Str8_IsValid(string) || !find || find_size == 0)
+    if (!Dqn_Str8_HasData(string) || !find || find_size == 0)
         return result;
 
     result.lhs = string;
@@ -121,7 +151,7 @@ DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplit(Dqn_Str8 string, Dqn_Str8
 DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitReverseArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
 {
     Dqn_Str8BinarySplitResult result = {};
-    if (!Dqn_Str8_IsValid(string) || !find || find_size == 0)
+    if (!Dqn_Str8_HasData(string) || !find || find_size == 0)
         return result;
 
     result.lhs = string;
@@ -147,17 +177,17 @@ DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitReverse(Dqn_Str8 string, D
     return result;
 }
 
-DQN_API Dqn_usize Dqn_Str8_Split(Dqn_Str8 string, Dqn_Str8 delimiter, Dqn_Str8 *splits, Dqn_usize splits_count)
+DQN_API Dqn_usize Dqn_Str8_Split(Dqn_Str8 string, Dqn_Str8 delimiter, Dqn_Str8 *splits, Dqn_usize splits_count, Dqn_Str8SplitIncludeEmptyStrings mode)
 {
     Dqn_usize result = 0; // The number of splits in the actual string.
-    if (!Dqn_Str8_IsValid(string) || !Dqn_Str8_IsValid(delimiter) || delimiter.size <= 0)
+    if (!Dqn_Str8_HasData(string) || !Dqn_Str8_HasData(delimiter) || delimiter.size <= 0)
         return result;
 
     Dqn_Str8BinarySplitResult split = {};
     Dqn_Str8 first                  = string;
     do {
         split = Dqn_Str8_BinarySplit(first, delimiter);
-        if (split.lhs.size) {
+        if (split.lhs.size || mode == Dqn_Str8SplitIncludeEmptyStrings_Yes) {
             if (splits && result < splits_count)
                 splits[result] = split.lhs;
             result++;
@@ -168,15 +198,13 @@ DQN_API Dqn_usize Dqn_Str8_Split(Dqn_Str8 string, Dqn_Str8 delimiter, Dqn_Str8 *
     return result;
 }
 
-DQN_API Dqn_Str8SplitAllocResult Dqn_Str8_SplitAlloc(Dqn_Allocator allocator,
-                                                     Dqn_Str8   string,
-                                                     Dqn_Str8   delimiter)
+DQN_API Dqn_Slice<Dqn_Str8> Dqn_Str8_SplitAlloc(Dqn_Arena *arena, Dqn_Str8 string, Dqn_Str8 delimiter, Dqn_Str8SplitIncludeEmptyStrings mode)
 {
-    Dqn_Str8SplitAllocResult result          = {};
-    Dqn_usize                splits_required = Dqn_Str8_Split(string, delimiter, /*splits*/ nullptr, /*count*/ 0);
-    result.data                              = Dqn_Allocator_NewArray(allocator, Dqn_Str8, splits_required, Dqn_ZeroMem_No);
+    Dqn_Slice<Dqn_Str8> result          = {};
+    Dqn_usize           splits_required = Dqn_Str8_Split(string, delimiter, /*splits*/ nullptr, /*count*/ 0, mode);
+    result.data                         = Dqn_Arena_NewArray(arena, Dqn_Str8, splits_required, Dqn_ZeroMem_No);
     if (result.data) {
-        result.size = Dqn_Str8_Split(string, delimiter, result.data, splits_required);
+        result.size = Dqn_Str8_Split(string, delimiter, result.data, splits_required, mode);
         DQN_ASSERT(splits_required == result.size);
     }
     return result;
@@ -185,7 +213,7 @@ DQN_API Dqn_Str8SplitAllocResult Dqn_Str8_SplitAlloc(Dqn_Allocator allocator,
 DQN_API Dqn_Str8FindResult Dqn_Str8_FindFirstStringArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
 {
     Dqn_Str8FindResult result = {};
-    if (!Dqn_Str8_IsValid(string) || !find || find_size == 0)
+    if (!Dqn_Str8_HasData(string) || !find || find_size == 0)
         return result;
 
     for (Dqn_usize index = 0; !result.found && index < string.size; index++) {
@@ -229,22 +257,62 @@ DQN_API Dqn_Str8FindResult Dqn_Str8_FindFirst(Dqn_Str8 string, uint32_t flags)
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_Str8_Segment(Dqn_Allocator allocator, Dqn_Str8 src, Dqn_usize segment_size, char segment_char)
+DQN_API Dqn_Str8 Dqn_Str8_Segment(Dqn_Arena *arena, Dqn_Str8 src, Dqn_usize segment_size, char segment_char)
 {
-    Dqn_usize result_size = src.size;
-    if (result_size > segment_size)
-        result_size += (src.size / segment_size) - 1; // NOTE: No segment on the first chunk.
+    if (!segment_size || !Dqn_Str8_HasData(src)) {
+        Dqn_Str8 result = Dqn_Str8_Copy(arena, src);
+        return result;
+    }
 
-    Dqn_Str8 result    = Dqn_Str8_Allocate(allocator, result_size, Dqn_ZeroMem_Yes);
-    Dqn_usize write_index = 0;
+    Dqn_usize segments = src.size / segment_size;
+    if (src.size % segment_size == 0)
+        segments--;
+
+    Dqn_usize segment_counter = 0;
+    Dqn_Str8  result          = Dqn_Str8_Alloc(arena, src.size + segments, Dqn_ZeroMem_Yes);
+    Dqn_usize write_index     = 0;
     DQN_FOR_UINDEX(src_index, src.size) {
         result.data[write_index++] = src.data[src_index];
-        if ((src_index + 1) % segment_size == 0 && (src_index + 1) < src.size)
+        if ((src_index + 1) % segment_size == 0 && segment_counter < segments) {
             result.data[write_index++] = segment_char;
+            segment_counter++;
+        }
         DQN_ASSERTF(write_index <= result.size, "result.size=%zu, write_index=%zu", result.size, write_index);
     }
 
     DQN_ASSERTF(write_index == result.size, "result.size=%zu, write_index=%zu", result.size, write_index);
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_Str8_ReverseSegment(Dqn_Arena *arena, Dqn_Str8 src, Dqn_usize segment_size, char segment_char)
+{
+    if (!segment_size || !Dqn_Str8_HasData(src)) {
+        Dqn_Str8 result = Dqn_Str8_Copy(arena, src);
+        return result;
+    }
+
+    Dqn_usize segments = src.size / segment_size;
+    if (src.size % segment_size == 0)
+        segments--;
+
+    Dqn_usize write_counter   = 0;
+    Dqn_usize segment_counter = 0;
+    Dqn_Str8  result      = Dqn_Str8_Alloc(arena, src.size + segments, Dqn_ZeroMem_Yes);
+    Dqn_usize write_index = result.size - 1;
+
+
+    DQN_MSVC_WARNING_PUSH
+    DQN_MSVC_WARNING_DISABLE(6293) // NOTE: Ill-defined loop
+    for (size_t src_index = src.size - 1; src_index < src.size; src_index--) {
+    DQN_MSVC_WARNING_POP
+        result.data[write_index--] = src.data[src_index];
+        if (++write_counter % segment_size == 0 && segment_counter < segments) {
+            result.data[write_index--] = segment_char;
+            segment_counter++;
+        }
+    }
+
+    DQN_ASSERT(write_index == SIZE_MAX);
     return result;
 }
 
@@ -342,7 +410,7 @@ DQN_API Dqn_Str8 Dqn_Str8_TrimAround(Dqn_Str8 string, Dqn_Str8 trim_string)
 DQN_API Dqn_Str8 Dqn_Str8_TrimWhitespaceAround(Dqn_Str8 string)
 {
     Dqn_Str8 result = string;
-    if (!Dqn_Str8_IsValid(string))
+    if (!Dqn_Str8_HasData(string))
         return result;
 
     char const *start = string.data;
@@ -360,7 +428,7 @@ DQN_API Dqn_Str8 Dqn_Str8_TrimWhitespaceAround(Dqn_Str8 string)
 DQN_API Dqn_Str8 Dqn_Str8_TrimByteOrderMark(Dqn_Str8 string)
 {
     Dqn_Str8 result = string;
-    if (!Dqn_Str8_IsValid(result))
+    if (!Dqn_Str8_HasData(result))
         return result;
 
     // TODO(dqn): This is little endian
@@ -382,7 +450,7 @@ DQN_API Dqn_Str8 Dqn_Str8_FileNameFromPath(Dqn_Str8 path)
 {
     Dqn_Str8 separators[]           = {DQN_STR8("/"), DQN_STR8("\\")};
     Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplitReverseArray(path, separators, DQN_ARRAY_UCOUNT(separators));
-    Dqn_Str8 result                 = split.rhs;
+    Dqn_Str8 result                 = Dqn_Str8_HasData(split.rhs) ? split.rhs : split.lhs;
     return result;
 }
 
@@ -400,17 +468,26 @@ DQN_API Dqn_Str8 Dqn_Str8_FilePathNoExtension(Dqn_Str8 path)
     return result;
 }
 
+DQN_API Dqn_Str8 Dqn_Str8_FileExtension(Dqn_Str8 path)
+{
+    Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplitReverse(path, DQN_STR8("."));
+    Dqn_Str8 result                 = split.rhs;
+    return result;
+}
+
 DQN_API Dqn_Str8ToU64Result Dqn_Str8_ToU64(Dqn_Str8 string, char separator)
 {
     // NOTE: Argument check
     Dqn_Str8ToU64Result result = {};
-    if (!Dqn_Str8_IsValid(string))
+    if (!Dqn_Str8_HasData(string)) {
+        result.success = true;
         return result;
+    }
 
     // NOTE: Sanitize input/output
     Dqn_Str8 trim_string = Dqn_Str8_TrimWhitespaceAround(string);
     if (trim_string.size == 0) {
-        result.success = false;
+        result.success = true;
         return result;
     }
 
@@ -446,13 +523,15 @@ DQN_API Dqn_Str8ToI64Result Dqn_Str8_ToI64(Dqn_Str8 string, char separator)
 {
     // NOTE: Argument check
     Dqn_Str8ToI64Result result = {};
-    if (!Dqn_Str8_IsValid(string))
+    if (!Dqn_Str8_HasData(string)) {
+        result.success = true;
         return result;
+    }
 
     // NOTE: Sanitize input/output
     Dqn_Str8 trim_string = Dqn_Str8_TrimWhitespaceAround(string);
     if (trim_string.size == 0) {
-        result.success = false;
+        result.success = true;
         return result;
     }
 
@@ -492,20 +571,20 @@ DQN_API Dqn_Str8 Dqn_Str8_Replace(Dqn_Str8       string,
                                   Dqn_Str8       find,
                                   Dqn_Str8       replace,
                                   Dqn_usize      start_index,
-                                  Dqn_Allocator  allocator,
+                                  Dqn_Arena     *arena,
                                   Dqn_Str8EqCase eq_case)
 {
     Dqn_Str8 result = {};
-    if (!Dqn_Str8_IsValid(string) || !Dqn_Str8_IsValid(find) || find.size > string.size || find.size == 0 || string.size == 0) {
-        result = Dqn_Str8_Copy(allocator, string);
+    if (!Dqn_Str8_HasData(string) || !Dqn_Str8_HasData(find) || find.size > string.size || find.size == 0 || string.size == 0) {
+        result = Dqn_Str8_Copy(arena, string);
         return result;
     }
 
-    Dqn_ThreadScratch scratch        = Dqn_Thread_GetScratch(allocator.user_context);
-    Dqn_Str8Builder   string_builder = {};
-    string_builder.allocator         = scratch.allocator;
-    Dqn_usize max                    = string.size - find.size;
-    Dqn_usize head                   = start_index;
+    Dqn_Scratch     scratch        = Dqn_Scratch_Get(arena);
+    Dqn_Str8Builder string_builder = {};
+    string_builder.arena           = scratch.arena;
+    Dqn_usize max                  = string.size - find.size;
+    Dqn_usize head                 = start_index;
 
     for (Dqn_usize tail = head; tail <= max; tail++) {
         Dqn_Str8 check = Dqn_Str8_Slice(string, tail, find.size);
@@ -530,25 +609,25 @@ DQN_API Dqn_Str8 Dqn_Str8_Replace(Dqn_Str8       string,
 
     if (string_builder.string_size == 0) {
         // NOTE: No replacement possible, so we just do a full-copy
-        result = Dqn_Str8_Copy(allocator, string);
+        result = Dqn_Str8_Copy(arena, string);
     } else {
         Dqn_Str8 remainder = Dqn_Str8_Init(string.data + head, string.size - head);
         Dqn_Str8Builder_AppendRef(&string_builder, remainder);
-        result = Dqn_Str8Builder_Build(&string_builder, allocator);
+        result = Dqn_Str8Builder_Build(&string_builder, arena);
     }
 
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_Str8_ReplaceInsensitive(Dqn_Str8 string, Dqn_Str8 find, Dqn_Str8 replace, Dqn_usize start_index, Dqn_Allocator allocator)
+DQN_API Dqn_Str8 Dqn_Str8_ReplaceInsensitive(Dqn_Str8 string, Dqn_Str8 find, Dqn_Str8 replace, Dqn_usize start_index, Dqn_Arena *arena)
 {
-    Dqn_Str8 result = Dqn_Str8_Replace(string, find, replace, start_index, allocator, Dqn_Str8EqCase_Insensitive);
+    Dqn_Str8 result = Dqn_Str8_Replace(string, find, replace, start_index, arena, Dqn_Str8EqCase_Insensitive);
     return result;
 }
 
 DQN_API void Dqn_Str8_Remove(Dqn_Str8 *string, Dqn_usize offset, Dqn_usize size)
 {
-    if (!string || !Dqn_Str8_IsValid(*string))
+    if (!string || !Dqn_Str8_HasData(*string))
         return;
 
     char *end               = string->data + string->size;
@@ -573,16 +652,16 @@ DQN_API bool operator!=(Dqn_Str8 const &lhs, Dqn_Str8 const &rhs)
 }
 #endif
 
-DQN_API Dqn_Str8 Dqn_Str8_InitF(Dqn_Allocator allocator, DQN_FMT_ATTRIB char const *fmt, ...)
+DQN_API Dqn_Str8 Dqn_Str8_InitF(Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    Dqn_Str8 result = Dqn_Str8_InitFV(allocator, fmt, va);
+    Dqn_Str8 result = Dqn_Str8_InitFV(arena, fmt, va);
     va_end(va);
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_Str8_InitFV(Dqn_Allocator allocator, DQN_FMT_ATTRIB char const *fmt, va_list args)
+DQN_API Dqn_Str8 Dqn_Str8_InitFV(Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
     Dqn_Str8 result = {};
     if (!fmt)
@@ -590,82 +669,92 @@ DQN_API Dqn_Str8 Dqn_Str8_InitFV(Dqn_Allocator allocator, DQN_FMT_ATTRIB char co
 
     Dqn_usize size = Dqn_CStr8_FVSize(fmt, args);
     if (size) {
-        result = Dqn_Str8_Allocate(allocator, size, Dqn_ZeroMem_No);
-        if (Dqn_Str8_IsValid(result))
-            STB_SPRINTF_DECORATE(vsnprintf)(result.data, Dqn_Safe_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
+        result = Dqn_Str8_Alloc(arena, size, Dqn_ZeroMem_No);
+        if (Dqn_Str8_HasData(result))
+            DQN_VSNPRINTF(result.data, Dqn_Safe_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
     }
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_Str8_Allocate(Dqn_Allocator allocator, Dqn_usize size, Dqn_ZeroMem zero_mem)
+DQN_API Dqn_Str8 Dqn_Str8_Alloc(Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem)
 {
     Dqn_Str8 result = {};
-    result.data     = (char *)Dqn_Allocator_Alloc(allocator, size + 1, alignof(char), zero_mem);
+    result.data     = Dqn_Arena_NewArray(arena, char, size + 1, zero_mem);
     if (result.data)
         result.size = size;
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_Str8_CopyCString(Dqn_Allocator allocator, char const *string, Dqn_usize size)
+DQN_API Dqn_Str8 Dqn_Str8_CopyCString(Dqn_Arena *arena, char const *string, Dqn_usize size)
 {
     Dqn_Str8 result = {};
     if (!string)
         return result;
 
-    result = Dqn_Str8_Allocate(allocator, size, Dqn_ZeroMem_No);
-    if (Dqn_Str8_IsValid(result)) {
+    result = Dqn_Str8_Alloc(arena, size, Dqn_ZeroMem_No);
+    if (Dqn_Str8_HasData(result)) {
         DQN_MEMCPY(result.data, string, size);
         result.data[size] = 0;
     }
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_Str8_Copy(Dqn_Allocator allocator, Dqn_Str8 string)
+DQN_API Dqn_Str8 Dqn_Str8_Copy(Dqn_Arena *arena, Dqn_Str8 string)
 {
-    Dqn_Str8 result = Dqn_Str8_CopyCString(allocator, string.data, string.size);
+    Dqn_Str8 result = Dqn_Str8_CopyCString(arena, string.data, string.size);
     return result;
 }
 
-// NOTE: [$STRB] Dqn_Str8Builder ================================================================
-DQN_API bool Dqn_Str8Builder_AppendRef(Dqn_Str8Builder *builder, Dqn_Str8 string)
+// NOTE: [$STRB] Dqn_Str8Builder ////////////////////////////////////////////////////////////////
+DQN_API bool Dqn_Str8Builder_AppendRefArray(Dqn_Str8Builder *builder, Dqn_Slice<Dqn_Str8> array)
 {
-    if (!builder || !string.data || string.size <= 0)
+    if (!builder)
         return false;
 
-    Dqn_Str8Link *link = Dqn_Allocator_New(builder->allocator, Dqn_Str8Link, Dqn_ZeroMem_No);
-    if (!link)
-        return false;
+    for (Dqn_Str8 string : array) {
+        if (!builder || !string.data || string.size <= 0)
+            return false;
 
-    link->string = string;
-    link->next   = NULL;
+        Dqn_Str8Link *link = Dqn_Arena_New(builder->arena, Dqn_Str8Link, Dqn_ZeroMem_No);
+        if (!link)
+            return false;
 
-    if (builder->head)
-        builder->tail->next = link;
-    else
-        builder->head = link;
+        link->string = string;
+        link->next   = NULL;
 
-    builder->tail = link;
-    builder->count++;
-    builder->string_size += string.size;
+        if (builder->head)
+            builder->tail->next = link;
+        else
+            builder->head = link;
+
+        builder->tail = link;
+        builder->count++;
+        builder->string_size += string.size;
+    }
+
     return true;
 }
 
-DQN_API bool Dqn_Str8Builder_AppendCopy(Dqn_Str8Builder *builder, Dqn_Str8 string)
+DQN_API bool Dqn_Str8Builder_AppendCopyArray(Dqn_Str8Builder *builder, Dqn_Slice<Dqn_Str8> array)
 {
-    Dqn_Str8 copy = Dqn_Str8_Copy(builder->allocator, string);
-    bool result   = Dqn_Str8Builder_AppendRef(builder, copy);
-    return result;
+    for (Dqn_Str8 string : array) {
+        Dqn_Str8 copy = Dqn_Str8_Copy(builder->arena, string);
+        if (!Dqn_Str8Builder_AppendRef(builder, copy))
+            return false;
+    }
+    return true;
 }
 
 DQN_API bool Dqn_Str8Builder_AppendFV(Dqn_Str8Builder *builder, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
-    Dqn_Str8 string = Dqn_Str8_InitFV(builder->allocator, fmt, args);
+    Dqn_Str8 string = Dqn_Str8_InitFV(builder->arena, fmt, args);
     if (string.size == 0)
         return true;
 
+    Dqn_ArenaTempMem temp_mem = Dqn_Arena_TempMemBegin(builder->arena);
     bool result = Dqn_Str8Builder_AppendRef(builder, string);
     if (!result)
-        Dqn_Allocator_Dealloc(builder->allocator, string.data, string.size + 1);
+        Dqn_Arena_TempMemEnd(temp_mem);
     return result;
 }
 
@@ -678,13 +767,27 @@ DQN_API bool Dqn_Str8Builder_AppendF(Dqn_Str8Builder *builder, DQN_FMT_ATTRIB ch
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_Str8Builder_Build(Dqn_Str8Builder const *builder, Dqn_Allocator allocator)
+DQN_API bool Dqn_Str8Builder_AppendRef(Dqn_Str8Builder *builder, Dqn_Str8 string)
+{
+    Dqn_Slice<Dqn_Str8> array = Dqn_Slice_Init(&string, 1);
+    bool result               = Dqn_Str8Builder_AppendRefArray(builder, array);
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_AppendCopy(Dqn_Str8Builder *builder, Dqn_Str8 string)
+{
+    Dqn_Slice<Dqn_Str8> array = Dqn_Slice_Init(&string, 1);
+    bool result               = Dqn_Str8Builder_AppendCopyArray(builder, array);
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_Str8Builder_Build(Dqn_Str8Builder const *builder, Dqn_Arena *arena)
 {
     Dqn_Str8 result = DQN_ZERO_INIT;
     if (!builder || builder->string_size <= 0 || builder->count <= 0)
         return result;
 
-    result.data = Dqn_Allocator_NewArray(allocator, char, builder->string_size + 1, Dqn_ZeroMem_No);
+    result.data = Dqn_Arena_NewArray(arena, char, builder->string_size + 1, Dqn_ZeroMem_No);
     if (!result.data)
         return result;
 
@@ -698,7 +801,46 @@ DQN_API Dqn_Str8 Dqn_Str8Builder_Build(Dqn_Str8Builder const *builder, Dqn_Alloc
     return result;
 }
 
-// NOTE: [$CHAR] Dqn_Char ==========================================================================
+DQN_API Dqn_Str8 Dqn_Str8Builder_BuildCRT(Dqn_Str8Builder const *builder)
+{
+    Dqn_Str8 result = DQN_ZERO_INIT;
+    if (!builder || builder->string_size <= 0 || builder->count <= 0)
+        return result;
+
+    result.data = DQN_CAST(char *)malloc(builder->string_size + 1);
+    if (!result.data)
+        return result;
+
+    for (Dqn_Str8Link *link = builder->head; link; link = link->next) {
+        DQN_MEMCPY(result.data + result.size, link->string.data, link->string.size);
+        result.size += link->string.size;
+    }
+
+    result.data[result.size] = 0;
+    DQN_ASSERT(result.size == builder->string_size);
+    return result;
+}
+
+DQN_API Dqn_Slice<Dqn_Str8> Dqn_Str8Builder_BuildSlice(Dqn_Str8Builder const *builder, Dqn_Arena *arena)
+{
+    Dqn_Slice<Dqn_Str8> result = DQN_ZERO_INIT;
+    if (!builder || builder->string_size <= 0 || builder->count <= 0)
+        return result;
+
+    result = Dqn_Slice_Alloc<Dqn_Str8>(arena, builder->count, Dqn_ZeroMem_No);
+    if (!result.data)
+        return result;
+
+    Dqn_usize slice_index   = 0;
+    for (Dqn_Str8Link *link = builder->head; link; link = link->next)
+        result.data[slice_index++] = Dqn_Str8_Copy(arena, link->string);
+
+    DQN_ASSERT(slice_index == builder->count);
+    return result;
+}
+
+
+// NOTE: [$CHAR] Dqn_Char //////////////////////////////////////////////////////////////////////////
 DQN_API bool Dqn_Char_IsAlphabet(char ch)
 {
     bool result = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
@@ -766,7 +908,7 @@ DQN_API char Dqn_Char_ToLower(char ch)
     return result;
 }
 
-// NOTE: [$UTFX] Dqn_UTF ===========================================================================
+// NOTE: [$UTFX] Dqn_UTF ///////////////////////////////////////////////////////////////////////////
 DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
 {
     // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
@@ -779,33 +921,29 @@ DQN_API int Dqn_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
     // 1111'0xxx 10yy'yyyy 10zz'zzzz 10ww'wwww | x'xxyy'yyyy'zzzz'zzww'wwww | U+10000 - U+10FFFF |
     // ----------------------------------------+----------------------------+--------------------+
 
-    if (codepoint <= 0b0111'1111)
-    {
-        utf8[0] = DQN_CAST(uint8_t)codepoint;
+    if (codepoint <= 0b0111'1111) {
+        utf8[0] = DQN_CAST(uint8_t) codepoint;
         return 1;
     }
 
-    if (codepoint <= 0b0111'1111'1111)
-    {
+    if (codepoint <= 0b0111'1111'1111) {
         utf8[0] = (0b1100'0000 | ((codepoint >> 6) & 0b01'1111)); // x
         utf8[1] = (0b1000'0000 | ((codepoint >> 0) & 0b11'1111)); // y
         return 2;
     }
 
-    if (codepoint <= 0b1111'1111'1111'1111)
-    {
+    if (codepoint <= 0b1111'1111'1111'1111) {
         utf8[0] = (0b1110'0000 | ((codepoint >> 12) & 0b00'1111)); // x
-        utf8[1] = (0b1000'0000 | ((codepoint >> 6)  & 0b11'1111)); // y
-        utf8[2] = (0b1000'0000 | ((codepoint >> 0)  & 0b11'1111)); // z
+        utf8[1] = (0b1000'0000 | ((codepoint >> 6) & 0b11'1111));  // y
+        utf8[2] = (0b1000'0000 | ((codepoint >> 0) & 0b11'1111));  // z
         return 3;
     }
 
-    if (codepoint <= 0b1'1111'1111'1111'1111'1111)
-    {
+    if (codepoint <= 0b1'1111'1111'1111'1111'1111) {
         utf8[0] = (0b1111'0000 | ((codepoint >> 18) & 0b00'0111)); // x
         utf8[1] = (0b1000'0000 | ((codepoint >> 12) & 0b11'1111)); // y
-        utf8[2] = (0b1000'0000 | ((codepoint >> 6)  & 0b11'1111)); // z
-        utf8[3] = (0b1000'0000 | ((codepoint >> 0)  & 0b11'1111)); // w
+        utf8[2] = (0b1000'0000 | ((codepoint >> 6) & 0b11'1111));  // z
+        utf8[3] = (0b1000'0000 | ((codepoint >> 0) & 0b11'1111));  // w
         return 4;
     }
 
@@ -822,17 +960,15 @@ DQN_API int Dqn_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
     // 1101'10xx'xxxx'xxxx 1101'11yy'yyyy'yyyy | xxxx'xxxx'xxyy'yyyy'yyyy + 0x10000 | U+10000–U+10FFFF |
     // ----------------------------------------+------------------------------------+------------------+
 
-    if (codepoint <= 0b1111'1111'1111'1111)
-    {
-        utf16[0] = DQN_CAST(uint16_t)codepoint;
+    if (codepoint <= 0b1111'1111'1111'1111) {
+        utf16[0] = DQN_CAST(uint16_t) codepoint;
         return 1;
     }
 
-    if (codepoint <= 0b1111'1111'1111'1111'1111)
-    {
+    if (codepoint <= 0b1111'1111'1111'1111'1111) {
         uint32_t surrogate_codepoint = codepoint + 0x10000;
-        utf16[0] = 0b1101'1000'0000'0000 | ((surrogate_codepoint >> 10) & 0b11'1111'1111); // x
-        utf16[1] = 0b1101'1100'0000'0000 | ((surrogate_codepoint >>  0) & 0b11'1111'1111); // y
+        utf16[0]                     = 0b1101'1000'0000'0000 | ((surrogate_codepoint >> 10) & 0b11'1111'1111); // x
+        utf16[1]                     = 0b1101'1100'0000'0000 | ((surrogate_codepoint >> 0) & 0b11'1111'1111);  // y
         return 2;
     }
 

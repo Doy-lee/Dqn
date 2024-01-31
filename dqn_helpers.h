@@ -1,60 +1,35 @@
-// NOTE: [$PCGX] Dqn_PCG32 =========================================================================
-// Random number generator of the PCG family. Implementation taken from Martins
-// Mmozeiko from Handmade Network.
-// https://gist.github.com/mmozeiko/1561361cd4105749f80bb0b9223e9db8
+////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// NOTE: API =======================================================================================
-// @proc Dqn_PCG32_Range
-//   @desc Returns a value in the [low; high) interval
+//   $$\   $$\ $$$$$$$$\ $$\       $$$$$$$\  $$$$$$$$\ $$$$$$$\   $$$$$$\
+//   $$ |  $$ |$$  _____|$$ |      $$  __$$\ $$  _____|$$  __$$\ $$  __$$\
+//   $$ |  $$ |$$ |      $$ |      $$ |  $$ |$$ |      $$ |  $$ |$$ /  \__|
+//   $$$$$$$$ |$$$$$\    $$ |      $$$$$$$  |$$$$$\    $$$$$$$  |\$$$$$$\
+//   $$  __$$ |$$  __|   $$ |      $$  ____/ $$  __|   $$  __$$<  \____$$\
+//   $$ |  $$ |$$ |      $$ |      $$ |      $$ |      $$ |  $$ |$$\   $$ |
+//   $$ |  $$ |$$$$$$$$\ $$$$$$$$\ $$ |      $$$$$$$$\ $$ |  $$ |\$$$$$$  |
+//   \__|  \__|\________|\________|\__|      \________|\__|  \__| \______/
+//
+//   dqn_helpers.h -- Helper functions/data structures
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// [$PCG3] Dqn_PCG32        --                  -- RNG from the PCG family
+// [$JSON] Dqn_JSONBuilder  -- DQN_JSON_BUILDER -- Construct json output
+// [$BHEX] Dqn_Bin          -- DQN_BIN          -- Binary <-> hex helpers
+// [$BSEA] Dqn_BinarySearch --                  -- Binary search
+// [$BITS] Dqn_Bit          --                  -- Bitset manipulation
+// [$SAFE] Dqn_Safe         --                  -- Safe arithmetic, casts, asserts
+// [$MISC] Misc             --                  -- Uncategorised helper functions
+// [$DLIB] Dqn_Library      --                  -- Globally shared runtime data for this library
+// [$PROF] Dqn_Profiler     -- DQN_PROFILER     -- Profiler that measures using a timestamp counter
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// @proc Dqn_PCG32_NextF
-//   @desc Returns a float & double in [0; 1) interval;
-
+// NOTE: [$PCGX] Dqn_PCG32 /////////////////////////////////////////////////////////////////////////
 struct Dqn_PCG32 { uint64_t state; };
 
-DQN_API uint32_t Dqn_PCG32_Next   (Dqn_PCG32 *rng);
-DQN_API uint64_t Dqn_PCG32_Next64 (Dqn_PCG32 *rng);
-DQN_API uint32_t Dqn_PCG32_Range  (Dqn_PCG32 *rng, uint32_t low, uint32_t high);
-DQN_API Dqn_f32  Dqn_PCG32_NextF32(Dqn_PCG32 *rng);
-DQN_API Dqn_f64  Dqn_PCG32_NextF64(Dqn_PCG32 *rng);
-DQN_API void     Dqn_PCG32_Seed   (Dqn_PCG32 *rng, uint64_t seed);
-DQN_API void     Dqn_PCG32_Advance(Dqn_PCG32 *rng, uint64_t delta);
-
 #if !defined(DQN_NO_JSON_BUILDER)
-// NOTE: [$JSON] Dqn_JSONBuilder ===================================================================
-// Basic helper class to construct JSON output to a string
-// TODO(dqn): We need to write tests for this
-//
-// NOTE: API =======================================================================================
-// @proc Dqn_JSONBuilder_Build
-//   @desc Convert the internal JSON buffer in the builder into a string.
-//   @param[in] arena The allocator to use to build the string
-
-// @proc Dqn_JSONBuilder_KeyValue, Dqn_JSONBuilder_KeyValueF
-//   @desc Add a JSON key value pair untyped. The value is emitted directly 
-//   without checking the contents of value.
-//
-//   All other functions internally call into this function which is the main
-//   workhorse of the builder.
-
-// @proc Dqn_JSON_Builder_ObjectEnd
-//   @desc End a JSON object in the builder, generates internally a '}' string
-
-// @proc Dqn_JSON_Builder_ArrayEnd
-//   @desc End a JSON array in the builder, generates internally a ']' string
-
-// @proc Dqn_JSONBuilder_LiteralNamed
-//   @desc Add a named JSON key-value object whose value is directly written to
-//   the following '"<key>": <value>' (e.g. useful for emitting the 'null'
-//   value)
-
-// @proc Dqn_JSONBuilder_U64Named,  Dqn_JSONBuilder_U64,
-//       Dqn_JSONBuilder_I64Named,  Dqn_JSONBuilder_I64,
-//       Dqn_JSONBuilder_F64Named,  Dqn_JSONBuilder_F64,
-//       Dqn_JSONBuilder_BoolNamed, Dqn_JSONBuilder_Bool,
-//   @desc Add the named JSON data type as a key-value object. Generates 
-//   internally the string '"<key>": <value>'
-
+// NOTE: [$JSON] Dqn_JSONBuilder ///////////////////////////////////////////////////////////////////
 enum Dqn_JSONBuilderItem
 {
     Dqn_JSONBuilderItem_Empty,
@@ -71,138 +46,10 @@ struct Dqn_JSONBuilder
     int                 spaces_per_indent; // The number of spaces per indent level
     Dqn_JSONBuilderItem last_item;
 };
-
-#define Dqn_JSONBuilder_Object(builder)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBegin(builder), \
-                   Dqn_JSONBuilder_ObjectEnd(builder))
-
-#define Dqn_JSONBuilder_ObjectNamed(builder, name)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBeginNamed(builder, name), \
-                   Dqn_JSONBuilder_ObjectEnd(builder))
-
-#define Dqn_JSONBuilder_Array(builder)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBegin(builder), \
-                   Dqn_JSONBuilder_ArrayEnd(builder))
-
-#define Dqn_JSONBuilder_ArrayNamed(builder, name)                  \
-    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBeginNamed(builder, name), \
-                   Dqn_JSONBuilder_ArrayEnd(builder))
-
-
-DQN_API Dqn_JSONBuilder Dqn_JSONBuilder_Init            (Dqn_Allocator allocator, int spaces_per_indent);
-DQN_API Dqn_Str8        Dqn_JSONBuilder_Build           (Dqn_JSONBuilder const *builder, Dqn_Allocator allocator);
-DQN_API void            Dqn_JSONBuilder_KeyValue        (Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value);
-DQN_API void            Dqn_JSONBuilder_KeyValueF       (Dqn_JSONBuilder *builder, Dqn_Str8 key, char const *value_fmt, ...);
-DQN_API void            Dqn_JSONBuilder_ObjectBeginNamed(Dqn_JSONBuilder *builder, Dqn_Str8 name);
-DQN_API void            Dqn_JSONBuilder_ObjectEnd       (Dqn_JSONBuilder *builder);
-DQN_API void            Dqn_JSONBuilder_ArrayBeginNamed (Dqn_JSONBuilder *builder, Dqn_Str8 name);
-DQN_API void            Dqn_JSONBuilder_ArrayEnd        (Dqn_JSONBuilder *builder);
-DQN_API void            Dqn_JSONBuilder_Str8Named       (Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value);
-DQN_API void            Dqn_JSONBuilder_LiteralNamed    (Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value);
-DQN_API void            Dqn_JSONBuilder_U64Named        (Dqn_JSONBuilder *builder, Dqn_Str8 key, uint64_t value);
-DQN_API void            Dqn_JSONBuilder_I64Named        (Dqn_JSONBuilder *builder, Dqn_Str8 key, int64_t value);
-DQN_API void            Dqn_JSONBuilder_F64Named        (Dqn_JSONBuilder *builder, Dqn_Str8 key, double value, int decimal_places);
-DQN_API void            Dqn_JSONBuilder_BoolNamed       (Dqn_JSONBuilder *builder, Dqn_Str8 key, bool value);
-
-#define                 Dqn_JSONBuilder_ObjectBegin(builder) Dqn_JSONBuilder_ObjectBeginNamed(builder, DQN_STRING8(""))
-#define                 Dqn_JSONBuilder_ArrayBegin(builder) Dqn_JSONBuilder_ArrayBeginNamed(builder, DQN_STRING8(""))
-#define                 Dqn_JSONBuilder_Str8(builder, value) Dqn_JSONBuilder_Str8Named(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_Literal(builder, value) Dqn_JSONBuilder_LiteralNamed(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_U64(builder, value) Dqn_JSONBuilder_U64Named(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_I64(builder, value) Dqn_JSONBuilder_I64Named(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_F64(builder, value) Dqn_JSONBuilder_F64Named(builder, DQN_STRING8(""), value)
-#define                 Dqn_JSONBuilder_Bool(builder, value) Dqn_JSONBuilder_BoolNamed(builder, DQN_STRING8(""), value)
 #endif // !defined(DQN_NO_JSON_BUIDLER)
 
 #if !defined(DQN_NO_BIN)
-// NOTE: [$BHEX] Dqn_Bin ===========================================================================
-// NOTE: API =======================================================================================
-// @proc Dqn_Bin_U64ToHexU64Str8
-//   @desc Convert a 64 bit number to a hex string
-//   @param[in] number Number to convert to hexadecimal representation
-//   @param[in] flags Bit flags from Dqn_BinHexU64Str8Flags to customise the
-//   output of the hexadecimal string.
-//   @return The hexadecimal representation of the number. This string is always
-//   null-terminated.
-
-// @proc Dqn_Bin_U64ToHex
-//   @copybrief Dqn_Bin_U64ToHexU64Str8
-
-//   @param[in] allocator The memory allocator to use for the memory of the
-//   hexadecimal string.
-//   @copyparams Dqn_Bin_U64ToHexU64Str8
-
-// @proc Dqn_Bin_HexBufferToU64
-//   @desc Convert a hexadecimal string a 64 bit value.
-//   Asserts if the hex string is too big to be converted into a 64 bit number.
-
-// @proc Dqn_Bin_HexToU64
-//   @copydoc Dqn_Bin_HexToU64
-
-// @proc Dqn_Bin_BytesToHexBuffer
-//   @desc Convert a binary buffer into its hex representation into dest.
-//
-//   The dest buffer must be large enough to contain the hex representation, i.e.
-//   atleast (src_size * 2).
-//
-//   @return True if the conversion into the dest buffer was successful, false
-//   otherwise (e.g. invalid arguments).
-
-// @proc Dqn_Bin_BytesToHexBufferArena
-//   @desc Convert a series of bytes into a string
-//   @return A null-terminated hex string, null pointer if allocation failed
-
-// @proc Dqn_Bin_BytesToHexArena
-//   @copydoc Dqn_Bin_BytesToHexBufferArena
-//   @return A hex string, the string is invalid if conversion failed.
-
-// @proc Dqn_Bin_HexBufferToBytes
-//   @desc Convert a hex string into binary at `dest`.
-//
-//   The dest buffer must be large enough to contain the binary representation,
-//   i.e. atleast ceil(hex_size / 2). This function will strip whitespace,
-//   leading 0x/0X prefix from the string before conversion.
-//
-//   @param[in] hex The hexadecimal string to convert
-//   @param[in] hex_size Size of the hex buffer. This function can handle an odd
-//   size hex string i.e. "fff" produces 0xfff0.
-//   @param[out] dest Buffer to write the bytes to
-//   @param[out] dest_size Maximum number of bytes to write to dest
-//
-//   @return The number of bytes written to `dest_size`, this value will *never*
-//   be greater than `dest_size`.
-
-// @proc Dqn_Bin_HexToBytes
-//   @desc Str8 variant of @see Dqn_Bin_HexBufferToBytes
-
-// @proc Dqn_Bin_Str8HexBufferToBytesUnchecked
-//   @desc Unchecked variant of @see Dqn_Bin_HexBufferToBytes
-//
-//   This function skips some string checks, it assumes the hex is a valid hex
-//   stream and that the arguments are valid e.g. no trimming or 0x prefix
-//   stripping is performed
-
-// @proc Dqn_Bin_Str8
-//   @desc Str8 variant of @see Dqn_Bin_HexBufferToBytesUnchecked
-
-// @proc Dqn_Bin_HexBufferToBytesArena
-//   Dynamic allocating variant of @see Dqn_Bin_HexBufferToBytesUnchecked
-//
-//   @param[in] arena The arena to allocate the bytes from
-//   @param[in] hex Hex string to convert into bytes
-//   @param[in] size Size of the hex string
-//   @param[out] real_size The size of the buffer returned by the function
-//
-//   @return The byte representation of the hex string.
-
-// @proc Dqn_Bin_HexToBytesArena
-//   @copybrief Dqn_Bin_HexBufferToBytesArena
-//
-//   @param[in] arena The arena to allocate the bytes from
-//   @param[in] hex Hex string to convert into bytes
-//
-//   @return The byte representation of the hex string.
-
+// NOTE: [$BHEX] Dqn_Bin ///////////////////////////////////////////////////////////////////////////
 struct Dqn_BinHexU64Str8
 {
     char    data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
@@ -214,37 +61,15 @@ enum Dqn_BinHexU64Str8Flags
     Dqn_BinHexU64Str8Flags_No0xPrefix   = 1 << 0, /// Remove the 0x prefix from the string
     Dqn_BinHexU64Str8Flags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
 };
-
-DQN_API char const *         Dqn_Bin_HexBufferTrim0x          (char const *hex, Dqn_usize size, Dqn_usize *real_size);
-DQN_API Dqn_Str8             Dqn_Bin_HexTrim0x                (Dqn_Str8 string);
-
-DQN_API Dqn_BinHexU64Str8    Dqn_Bin_U64ToHexU64Str8          (uint64_t number, uint32_t flags);
-DQN_API Dqn_Str8             Dqn_Bin_U64ToHex                 (Dqn_Allocator allocator, uint64_t number, uint32_t flags);
-
-DQN_API uint64_t             Dqn_Bin_HexBufferToU64           (char const *hex, Dqn_usize size);
-DQN_API uint64_t             Dqn_Bin_HexToU64                 (Dqn_Str8 hex);
-
-DQN_API Dqn_Str8             Dqn_Bin_BytesToHexArena          (Dqn_Arena *arena, void const *src, Dqn_usize size);
-DQN_API char *               Dqn_Bin_BytesToHexBufferArena    (Dqn_Arena *arena, void const *src, Dqn_usize size);
-DQN_API bool                 Dqn_Bin_BytesToHexBuffer         (void const *src, Dqn_usize src_size, char *dest, Dqn_usize dest_size);
-
-DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytesUnchecked(char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytes         (char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
-DQN_API char *               Dqn_Bin_HexBufferToBytesArena    (Dqn_Arena *arena, char const *hex, Dqn_usize hex_size, Dqn_usize *real_size);
-
-DQN_API Dqn_usize            Dqn_Bin_HexToBytesUnchecked      (Dqn_Str8 hex, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_usize            Dqn_Bin_HexToBytes               (Dqn_Str8 hex, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_Str8             Dqn_Bin_HexToBytesArena          (Dqn_Arena *arena, Dqn_Str8 hex);
 #endif // !defined(DQN_NO_BIN)
 
-// NOTE: [$BSEA] Dqn_BinarySearch ==================================================================
+// NOTE: [$BSEA] Dqn_BinarySearch //////////////////////////////////////////////////////////////////
 template <typename T>
 using Dqn_BinarySearchLessThanProc = bool(T const &lhs, T const &rhs);
 
 template <typename T>
 bool Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
 
-// TODO(doyle): Implement lower/upper bound searching
 enum Dqn_BinarySearchType
 {
     // Index of the match. If no match is found, found is set to false and the
@@ -253,14 +78,26 @@ enum Dqn_BinarySearchType
     // [last index + 1] of the array).
     Dqn_BinarySearchType_Match,
 
-    // Index of the first element in the array that is `<= find`. If no such
+    // Index of the first element in the array that is `element >= find`. If no such
     // item is found or the array is empty, then, the index is set to the array
     // size and found is set to `false`.
+    //
+    // For example:
+    //   int array[] = {0, 1, 2, 3, 4, 5};
+    //   Dqn_BinarySearchResult result = Dqn_BinarySearch(array, DQN_ARRAY_UCOUNT(array), 4, Dqn_BinarySearchType_LowerBound);
+    //   printf("%zu\n", result.index); // Prints index '4'
+
     Dqn_BinarySearchType_LowerBound,
 
-    // Index of the first element in the array that is `> find`. If no such
+    // Index of the first element in the array that is `element > find`. If no such
     // item is found or the array is empty, then, the index is set to the array
     // size and found is set to `false`.
+    //
+    // For example:
+    //   int array[] = {0, 1, 2, 3, 4, 5};
+    //   Dqn_BinarySearchResult result = Dqn_BinarySearch(array, DQN_ARRAY_UCOUNT(array), 4, Dqn_BinarySearchType_UpperBound);
+    //   printf("%zu\n", result.index); // Prints index '5'
+
     Dqn_BinarySearchType_UpperBound,
 };
 
@@ -270,287 +107,45 @@ struct Dqn_BinarySearchResult
     Dqn_usize index;
 };
 
-template <typename T>
-Dqn_BinarySearchResult Dqn_BinarySearch(T const                         *array,
-                                        Dqn_usize                        array_size,
-                                        T const                         &find,
-                                        Dqn_BinarySearchType             type         = Dqn_BinarySearchType_Match,
-                                        Dqn_BinarySearchLessThanProc<T>  less_than    = Dqn_BinarySearch_DefaultLessThan);
-
-template <typename T>
-bool Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
-{
-    bool result = lhs < rhs;
-    return result;
-}
-
-template <typename T>
-Dqn_BinarySearchResult
-Dqn_BinarySearch(T const                         *array,
-                 Dqn_usize                        array_size,
-                 T const                         &find,
-                 Dqn_BinarySearchType             type,
-                 Dqn_BinarySearchLessThanProc<T>  less_than)
-{
-    Dqn_BinarySearchResult result = {};
-    if (!array || array_size <= 0)
-        return result;
-
-    T const *end   = array + array_size;
-    T const *first = array;
-    T const *last  = end;
-    while (first != last) {
-        Dqn_usize count = last - first;
-        T const *it     = first + (count / 2);
-
-        bool advance_first = false;
-        if (type == Dqn_BinarySearchType_UpperBound)
-            advance_first = !less_than(find, it[0]);
-        else
-            advance_first = less_than(it[0], find);
-
-        if (advance_first)
-            first = it + 1;
-        else
-            last  = it;
-    }
-
-    switch (type) {
-        case Dqn_BinarySearchType_Match: {
-            result.found = first != end && !less_than(find, *first);
-        } break;
-
-        case Dqn_BinarySearchType_LowerBound: /*FALLTHRU*/
-        case Dqn_BinarySearchType_UpperBound: {
-            result.found = first != end;
-        } break;
-    }
-
-    result.index = first - array;
-    return result;
-}
-
-// NOTE: [$BITS] Dqn_Bit ===========================================================================
-DQN_API void Dqn_Bit_UnsetInplace(uint32_t *flags, uint32_t bitfield);
-DQN_API void Dqn_Bit_SetInplace  (uint32_t *flags, uint32_t bitfield);
-DQN_API bool Dqn_Bit_IsSet       (uint32_t bits, uint32_t bits_to_set);
-DQN_API bool Dqn_Bit_IsNotSet    (uint32_t bits, uint32_t bits_to_check);
-
-// NOTE: [$SAFE] Dqn_Safe ==========================================================================
-// @proc Dqn_Safe_AddI64, Dqn_Safe_MulI64
-//   @desc Add/multiply 2 I64's together, safe asserting that the operation does 
-//   not overflow.
-//   @return The result of operation, INT64_MAX if it overflowed.
-
-// @proc Dqn_Safe_AddU64, Dqn_Safe_MulU64
-//   @desc Add/multiply 2 U64's together, safe asserting that the operation does 
-//   not overflow.
-//   @return The result of operation, UINT64_MAX if it overflowed.
-
-// @proc Dqn_Safe_SubU64, Dqn_Safe_SubU32
-//   @desc Subtract 2xU64 or 2xU32's together, safe asserting that the operation
-//   does not overflow.
-//   @return The result of operation, 0 if it overflowed.
-
-// @proc Dqn_Safe_SaturateCastUSizeToInt,
-//       Dqn_Safe_SaturateCastUSizeToI8,
-//       Dqn_Safe_SaturateCastUSizeToI16,
-//       Dqn_Safe_SaturateCastUSizeToI32,
-//       Dqn_Safe_SaturateCastUSizeToI64
-//
-//       Dqn_Safe_SaturateCastU64ToUInt,
-//       Dqn_Safe_SaturateCastU64ToU8,
-//       Dqn_Safe_SaturateCastU64ToU16,
-//       Dqn_Safe_SaturateCastU64ToU32,
-//
-//       Dqn_Safe_SaturateCastUSizeToU8,
-//       Dqn_Safe_SaturateCastUSizeToU16,
-//       Dqn_Safe_SaturateCastUSizeToU32,
-//       Dqn_Safe_SaturateCastUSizeToU64
-//
-//       Dqn_Safe_SaturateCastISizeToInt,
-//       Dqn_Safe_SaturateCastISizeToI8,
-//       Dqn_Safe_SaturateCastISizeToI16,
-//       Dqn_Safe_SaturateCastISizeToI32,
-//       Dqn_Safe_SaturateCastISizeToI64,
-//
-//       int Dqn_Safe_SaturateCastISizeToUInt,
-//       Dqn_Safe_SaturateCastISizeToU8,
-//       Dqn_Safe_SaturateCastISizeToU16,
-//       Dqn_Safe_SaturateCastISizeToU32,
-//       Dqn_Safe_SaturateCastISizeToU64,
-//
-//       Dqn_Safe_SaturateCastI64ToISize,
-//       Dqn_Safe_SaturateCastI64ToI8,
-//       Dqn_Safe_SaturateCastI64ToI16,
-//       Dqn_Safe_SaturateCastI64ToI32,
-//
-//       Dqn_Safe_SaturateCastIntToI8,
-//       Dqn_Safe_SaturateCastIntToU8,
-//       Dqn_Safe_SaturateCastIntToU16,
-//       Dqn_Safe_SaturateCastIntToU32,
-//       Dqn_Safe_SaturateCastIntToU64,
-//
-//   @desc Truncate the lhs operand to the right clamping the result to the max
-//   value of the desired data type. Safe asserts if clamping occurs.
-//
-//   The following sentinel values are returned when saturated,
-//   USize -> Int:  INT_MAX
-//   USize -> I8:   INT8_MAX
-//   USize -> I16:  INT16_MAX
-//   USize -> I32:  INT32_MAX
-//   USize -> I64:  INT64_MAX
-//
-//   U64   -> UInt: UINT_MAX
-//   U64   -> U8:   UINT8_MAX
-//   U64   -> U16:  UINT16_MAX
-//   U64   -> U32:  UINT32_MAX
-//
-//   USize -> U8:   UINT8_MAX
-//   USize -> U16:  UINT16_MAX
-//   USize -> U32:  UINT32_MAX
-//   USize -> U64:  UINT64_MAX
-//
-//   ISize -> Int:  INT_MIN   or INT_MAX
-//   ISize -> I8:   INT8_MIN  or INT8_MAX
-//   ISize -> I16:  INT16_MIN or INT16_MAX
-//   ISize -> I32:  INT32_MIN or INT32_MAX
-//   ISize -> I64:  INT64_MIN or INT64_MAX
-//
-//   ISize -> UInt: 0 or UINT_MAX
-//   ISize -> U8:   0 or UINT8_MAX
-//   ISize -> U16:  0 or UINT16_MAX
-//   ISize -> U32:  0 or UINT32_MAX
-//   ISize -> U64:  0 or UINT64_MAX
-//
-//   I64 -> ISize:  DQN_ISIZE_MIN or DQN_ISIZE_MAX
-//   I64 -> I8:     INT8_MIN      or INT8_MAX
-//   I64 -> I16:    INT16_MIN     or INT16_MAX
-//   I64 -> I32:    INT32_MIN     or INT32_MAX
-//
-//   Int -> I8:     INT8_MIN  or INT8_MAX
-//   Int -> I16:    INT16_MIN or INT16_MAX
-//   Int -> U8:     0         or UINT8_MAX
-//   Int -> U16:    0         or UINT16_MAX
-//   Int -> U32:    0         or UINT32_MAX
-//   Int -> U64:    0         or UINT64_MAX
-
-DQN_API int64_t      Dqn_Safe_AddI64                 (int64_t a,  int64_t b);
-DQN_API int64_t      Dqn_Safe_MulI64                 (int64_t a,  int64_t b);
-
-DQN_API uint64_t     Dqn_Safe_AddU64                 (uint64_t a, uint64_t b);
-DQN_API uint64_t     Dqn_Safe_MulU64                 (uint64_t a, uint64_t b);
-
-DQN_API uint64_t     Dqn_Safe_SubU64                 (uint64_t a, uint64_t b);
-DQN_API uint32_t     Dqn_Safe_SubU32                 (uint32_t a, uint32_t b);
-
-DQN_API int          Dqn_Safe_SaturateCastUSizeToInt (Dqn_usize val);
-DQN_API int8_t       Dqn_Safe_SaturateCastUSizeToI8  (Dqn_usize val);
-DQN_API int16_t      Dqn_Safe_SaturateCastUSizeToI16 (Dqn_usize val);
-DQN_API int32_t      Dqn_Safe_SaturateCastUSizeToI32 (Dqn_usize val);
-DQN_API int64_t      Dqn_Safe_SaturateCastUSizeToI64 (Dqn_usize val);
-
-DQN_API unsigned int Dqn_Safe_SaturateCastU64ToUInt  (uint64_t val);
-DQN_API uint8_t      Dqn_Safe_SaturateCastU64ToU8    (uint64_t val);
-DQN_API uint16_t     Dqn_Safe_SaturateCastU64ToU16   (uint64_t val);
-DQN_API uint32_t     Dqn_Safe_SaturateCastU64ToU32   (uint64_t val);
-
-DQN_API uint8_t      Dqn_Safe_SaturateCastUSizeToU8  (Dqn_usize val);
-DQN_API uint16_t     Dqn_Safe_SaturateCastUSizeToU16 (Dqn_usize val);
-DQN_API uint32_t     Dqn_Safe_SaturateCastUSizeToU32 (Dqn_usize val);
-DQN_API uint64_t     Dqn_Safe_SaturateCastUSizeToU64 (Dqn_usize val);
-
-DQN_API int          Dqn_Safe_SaturateCastISizeToInt (Dqn_isize val);
-DQN_API int8_t       Dqn_Safe_SaturateCastISizeToI8  (Dqn_isize val);
-DQN_API int16_t      Dqn_Safe_SaturateCastISizeToI16 (Dqn_isize val);
-DQN_API int32_t      Dqn_Safe_SaturateCastISizeToI32 (Dqn_isize val);
-DQN_API int64_t      Dqn_Safe_SaturateCastISizeToI64 (Dqn_isize val);
-
-DQN_API unsigned int Dqn_Safe_SaturateCastISizeToUInt(Dqn_isize val);
-DQN_API uint8_t      Dqn_Safe_SaturateCastISizeToU8  (Dqn_isize val);
-DQN_API uint16_t     Dqn_Safe_SaturateCastISizeToU16 (Dqn_isize val);
-DQN_API uint32_t     Dqn_Safe_SaturateCastISizeToU32 (Dqn_isize val);
-DQN_API uint64_t     Dqn_Safe_SaturateCastISizeToU64 (Dqn_isize val);
-
-DQN_API Dqn_isize    Dqn_Safe_SaturateCastI64ToISize (int64_t val);
-DQN_API int8_t       Dqn_Safe_SaturateCastI64ToI8    (int64_t val);
-DQN_API int16_t      Dqn_Safe_SaturateCastI64ToI16   (int64_t val);
-DQN_API int32_t      Dqn_Safe_SaturateCastI64ToI32   (int64_t val);
-
-DQN_API int8_t       Dqn_Safe_SaturateCastIntToI8    (int val);
-DQN_API int16_t      Dqn_Safe_SaturateCastIntToI16   (int val);
-DQN_API uint8_t      Dqn_Safe_SaturateCastIntToU8    (int val);
-DQN_API uint16_t     Dqn_Safe_SaturateCastIntToU16   (int val);
-DQN_API uint32_t     Dqn_Safe_SaturateCastIntToU32   (int val);
-DQN_API uint64_t     Dqn_Safe_SaturateCastIntToU64   (int val);
-
-// NOTE: [$MISC] Misc ==============================================================================
-// NOTE: API =======================================================================================
-// @proc Dqn_SNPrintFDotTruncate
-//   @desc Write the format string to the buffer truncating with a trailing ".."
-//   if there is insufficient space in the buffer followed by null-terminating
-//   the buffer (uses stb_sprintf underneath).
-//   @return The size of the string written to the buffer *not* including the
-//   null-terminator.
-//
-// @proc Dqn_U64ToStr8
-//   @desc Convert a 64 bit unsigned value to its string representation.
-//   @param[in] val Value to convert into a string
-//   @param[in] separator The separator to insert every 3 digits. Set this to
-//   0 if no separator is desired.
-
+// NOTE: [$MISC] Misc //////////////////////////////////////////////////////////////////////////////
 struct Dqn_U64Str8
 {
     char    data[27+1]; // NOTE(dqn): 27 is the maximum size of uint64_t including a separtor
     uint8_t size;
 };
 
-DQN_API int         Dqn_SNPrintFDotTruncate(char *buffer, int size, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API Dqn_U64Str8 Dqn_U64ToStr8          (uint64_t val, char separator);
+enum Dqn_U64ByteSizeType
+{
+    Dqn_U64ByteSizeType_B,
+    Dqn_U64ByteSizeType_KiB,
+    Dqn_U64ByteSizeType_MiB,
+    Dqn_U64ByteSizeType_GiB,
+    Dqn_U64ByteSizeType_TiB,
+    Dqn_U64ByteSizeType_Count,
+    Dqn_U64ByteSizeType_Auto,
+};
+
+struct Dqn_U64ByteSize
+{
+    Dqn_U64ByteSizeType type;
+    Dqn_Str8            suffix; // "KiB", "MiB", "GiB" .. e.t.c
+    Dqn_f64             bytes;
+};
+
+enum Dqn_U64AgeUnit
+{
+    Dqn_U64AgeUnit_Sec  = 1 << 0,
+    Dqn_U64AgeUnit_Min  = 1 << 1,
+    Dqn_U64AgeUnit_Hr   = 1 << 2,
+    Dqn_U64AgeUnit_Day  = 1 << 3,
+    Dqn_U64AgeUnit_Week = 1 << 4,
+    Dqn_U64AgeUnit_Year = 1 << 5,
+    Dqn_U64AgeUnit_HMS  = Dqn_U64AgeUnit_Sec | Dqn_U64AgeUnit_Min | Dqn_U64AgeUnit_Hr,
+    Dqn_U64AgeUnit_All  = Dqn_U64AgeUnit_HMS | Dqn_U64AgeUnit_Day | Dqn_U64AgeUnit_Week | Dqn_U64AgeUnit_Year,
+};
 
 #if !defined(DQN_NO_PROFILER)
-// NOTE: [$PROF] Dqn_Profiler ======================================================================
-// A profiler based off Casey Muratori's Computer Enhance course, Performance
-// Aware Programming. This profiler measures function elapsed time using the
-// CPU's time stamp counter (e.g. rdtsc) providing a rough cycle count
-// that can be converted into a duration.
-//
-// This profiler uses a double buffer scheme for storing profiling markers.
-// After an application's typical update/frame cycle you can swap the profiler's
-// buffer whereby the front buffer contains the previous frames profiling
-// metrics and the back buffer will be populated with the new frame's profiling
-// metrics.
-#if 0
-    uint64_t tsc_per_seconds = Dqn_EstimateTSCPerSecond(/*duration_ms_to_gauge_tsc_frequency*/ 100);
-    for (;;) { // Main update loop
-        enum Zone { Zone_MainLoop, Zone_Count };
-        Dqn_ProfilerZone profiler_zone_main_update = Dqn_Profiler_BeginZone(Zone_MainLoop);
-        Dqn_ProfilerAnchor *anchors = Dqn_ProfilerAnchorBuffer(Dqn_ProfilerAnchorBuffer_Front);
-        for (size_t index = 0; index < Zone_Count; index++) {
-            Dqn_ProfilerAnchor *anchor = anchors + index;
-            printf("%.*s[%u] %zu cycles (%.1fms)\n",
-                   DQN_STRING_FMT(anchor->anchor_index),
-                   anchor->hit_count,
-                   anchor->tsc_inclusive,
-                   anchor->tsc_inclusive * tsc_per_seconds * 1000.f);
-        }
-        Dqn_Profiler_EndZone(&profiler_zone_main_update);
-        Dqn_Profiler_SwapAnchorBuffer(Zone_Count); // Should occur after all profiling zones are ended!
-    }
-#endif
-
-// @proc Dqn_Profiler_AnchorBuffer
-//   Retrieve the requested buffer from the profiler for writing/reading
-//   profiling metrics.
-//
-//   @param buffer Enum that lets you specify which buffer to grab from the
-//   profiler. The front buffer contains the previous frame's profiling metrics 
-//   and the back buffer is where the profiler is current writing to.
-//
-//   For end user intents and purposes, you likely only need to read the front
-//   buffer which contain the metrics that you can visualise regarding the most
-//   profiling metrics recorded.
-
+// NOTE: [$PROF] Dqn_Profiler //////////////////////////////////////////////////////////////////////
 #if !defined(DQN_PROFILER_ANCHOR_BUFFER_SIZE)
     #define DQN_PROFILER_ANCHOR_BUFFER_SIZE 128
 #endif
@@ -601,81 +196,68 @@ struct Dqn_Profiler
     uint8_t            active_anchor_buffer;
     uint16_t           parent_zone;
 };
-
-// NOTE: Macros ====================================================================================
-#define             Dqn_Profiler_BeginZone(name) Dqn_Profiler_BeginZoneWithIndex(DQN_STRING8(name), __COUNTER__ + 1)
-
-// NOTE: API =======================================================================================
-Dqn_ProfilerZone    Dqn_Profiler_BeginZoneWithIndex(Dqn_Str8 name, uint16_t anchor_index);
-void                Dqn_Profiler_EndZone           (Dqn_ProfilerZone zone);
-Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer      (Dqn_ProfilerAnchorBuffer buffer);
-void                Dqn_Profiler_SwapAnchorBuffer  ();
-void                Dqn_Profiler_Dump              (uint64_t tsc_per_second);
 #endif // !defined(DQN_NO_PROFILER)
 
-// NOTE: [$DLIB] Dqn_Library =======================================================================
+// NOTE: [$JOBQ] Dqn_JobQueue ///////////////////////////////////////////////////////////////////////
+typedef void (Dqn_JobQueueFunc)(void *user_context);
+struct Dqn_Job
+{
+    Dqn_Arena        *arena;
+    Dqn_JobQueueFunc *func;
+    void             *user_context;
+};
+
+struct Dqn_JobQueueSPMC
+{
+    Dqn_OSMutex       mutex;
+    Dqn_OSSemaphore   thread_wait_for_job_semaphore;
+    Dqn_OSSemaphore   wait_for_completion_semaphore;
+    uint32_t          threads_waiting_for_completion;
+
+    Dqn_Job           jobs[32];
+    Dqn_b32           quit;
+    uint32_t          quit_exit_code;
+    uint32_t volatile read_index;
+    uint32_t volatile complete_index;
+    uint32_t volatile write_index;
+};
+
+// NOTE: [$DLIB] Dqn_Library ///////////////////////////////////////////////////////////////////////
 // Book-keeping data for the library and allow customisation of certain features
 // provided.
-//
-// NOTE: API =======================================================================================
-// @proc Dqn_Library_SetLogCallback
-//   @desc Update the default logging function, all logging functions will run through
-//   this callback
-//   @param[in] proc The new logging function, set to nullptr to revert back to
-//   the default logger.
-//   @param[in] user_data A user defined parameter to pass to the callback
-
-// @proc Dqn_Library_SetLogFile
-//   @param[in] file Pass in nullptr to turn off writing logs to disk, otherwise
-//   point it to the FILE that you wish to write to.
-
-// @proc Dqn_Library_DumpThreadContextArenaStat
-//   @desc Dump the per-thread arena statistics to the specified file
-
 struct Dqn_Library
 {
-    bool                     lib_init;       // True if the library has been initialised via `Dqn_Library_Init`
-    Dqn_TicketMutex          lib_mutex;
-    Dqn_Str8                 exe_dir;        // The directory of the current executable
-
-    Dqn_Arena                arena;
-    Dqn_ArenaCatalog         arena_catalog;
-
-    Dqn_LogProc             *log_callback;   // Set this pointer to override the logging routine
-    void *                   log_user_data;
-    bool                     log_to_file;    // Output logs to file as well as standard out
-    Dqn_FsFile               log_file;       // TODO(dqn): Hmmm, how should we do this... ?
-    Dqn_TicketMutex          log_file_mutex; // Is locked when instantiating the log_file for the first time
-    bool                     log_no_colour;  // Disable colours in the logging output
-
-    // NOTE: Leak Tracing ==========================================================================
-
-    bool                     allocs_are_allowed_to_leak;
-    bool                     alloc_tracking_disabled;
-    #if defined(DQN_LEAK_TRACING)
-    #if defined(DQN_NO_DSMAP)
-        #error "DSMap is required for allocation tracing"
-    #endif
-
-    // TODO(doyle): @robust Setting some of these flags is not multi-thread safe
-    uint16_t                   stack_trace_offset_to_our_call_stack;
+    bool                       lib_init;                 // True if the library has been initialised via `Dqn_Library_Init`
+    Dqn_TicketMutex            lib_mutex;
+    Dqn_Str8                   exe_dir;                  // The directory of the current executable
+    Dqn_Arena                  arena;
+    Dqn_ChunkPool              pool;                     // Uses 'arena' for malloc-like allocations
+    Dqn_ArenaCatalog           arena_catalog;
+    bool                       slow_verification_checks; // Enable expensive library verification checks
+    // NOTE: Logging ///////////////////////////////////////////////////////////////////////////////
+    Dqn_LogProc *              log_callback;             // Set this pointer to override the logging routine
+    void *                     log_user_data;
+    bool                       log_to_file;              // Output logs to file as well as standard out
+    Dqn_OSFile                 log_file;                 // TODO(dqn): Hmmm, how should we do this... ?
+    Dqn_TicketMutex            log_file_mutex;           // Is locked when instantiating the log_file for the first time
+    bool                       log_no_colour;            // Disable colours in the logging output
+    // NOTE: Leak Tracing //////////////////////////////////////////////////////////////////////////
+    #if defined(DQN_LEAK_TRACKING)
+    Dqn_DSMap<Dqn_DebugAlloc>  alloc_table;
     Dqn_TicketMutex            alloc_table_mutex;
-    Dqn_DSMap<Dqn_AllocRecord> alloc_table;
+    Dqn_Arena                  alloc_table_arena;
     #endif
-
-    // NOTE: OS ====================================================================================
-
+    // NOTE: Win32 /////////////////////////////////////////////////////////////////////////////////
     #if defined(DQN_OS_WIN32)
-    LARGE_INTEGER            win32_qpc_frequency;
-    Dqn_TicketMutex          win32_bcrypt_rng_mutex;
-    void                    *win32_bcrypt_rng_handle;
+    LARGE_INTEGER              win32_qpc_frequency;
+    Dqn_TicketMutex            win32_bcrypt_rng_mutex;
+    void *                     win32_bcrypt_rng_handle;
     #endif
-
-    uint32_t                 os_page_size;
-    uint32_t                 os_alloc_granularity;
-
-    // NOTE: Profiler ==============================================================================
-
+    bool                       win32_sym_initialised;
+    // NOTE: OS ////////////////////////////////////////////////////////////////////////////////////
+    uint32_t                   os_page_size;
+    uint32_t                   os_alloc_granularity;
+    // NOTE: Profiler //////////////////////////////////////////////////////////////////////////////
     #if !defined(DQN_NO_PROFILER)
     Dqn_Profiler *profiler;
     Dqn_Profiler  profiler_default_instance;
@@ -688,12 +270,233 @@ enum Dqn_LibraryOnInit
     Dqn_LibraryOnInit_LogFeatures,
 };
 
-// NOTE: API =======================================================================================
-DQN_API Dqn_Library *Dqn_Library_Init                      (Dqn_LibraryOnInit on_init);
-DQN_API void         Dqn_Library_SetPointer                (Dqn_Library *library);
+// NOTE: [$PCGX] Dqn_PCG32 /////////////////////////////////////////////////////////////////////////
+DQN_API Dqn_PCG32            Dqn_PCG32_Init                          (uint64_t seed);
+DQN_API uint32_t             Dqn_PCG32_Next                          (Dqn_PCG32 *rng);
+DQN_API uint64_t             Dqn_PCG32_Next64                        (Dqn_PCG32 *rng);
+DQN_API uint32_t             Dqn_PCG32_Range                         (Dqn_PCG32 *rng, uint32_t low, uint32_t high);
+DQN_API Dqn_f32              Dqn_PCG32_NextF32                       (Dqn_PCG32 *rng);
+DQN_API Dqn_f64              Dqn_PCG32_NextF64                       (Dqn_PCG32 *rng);
+DQN_API void                 Dqn_PCG32_Advance                       (Dqn_PCG32 *rng, uint64_t delta);
+
+#if !defined(DQN_NO_JSON_BUILDER)
+// NOTE: [$JSON] Dqn_JSONBuilder ///////////////////////////////////////////////////////////////////
+#define Dqn_JSONBuilder_Object(builder)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBegin(builder), \
+                   Dqn_JSONBuilder_ObjectEnd(builder))
+
+#define Dqn_JSONBuilder_ObjectNamed(builder, name)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ObjectBeginNamed(builder, name), \
+                   Dqn_JSONBuilder_ObjectEnd(builder))
+
+#define Dqn_JSONBuilder_Array(builder)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBegin(builder), \
+                   Dqn_JSONBuilder_ArrayEnd(builder))
+
+#define Dqn_JSONBuilder_ArrayNamed(builder, name)                  \
+    DQN_DEFER_LOOP(Dqn_JSONBuilder_ArrayBeginNamed(builder, name), \
+                   Dqn_JSONBuilder_ArrayEnd(builder))
+
+
+DQN_API Dqn_JSONBuilder      Dqn_JSONBuilder_Init                    (Dqn_Arena *arena, int spaces_per_indent);
+DQN_API Dqn_Str8             Dqn_JSONBuilder_Build                   (Dqn_JSONBuilder const *builder, Dqn_Arena *arena);
+DQN_API void                 Dqn_JSONBuilder_KeyValue                (Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value);
+DQN_API void                 Dqn_JSONBuilder_KeyValueF               (Dqn_JSONBuilder *builder, Dqn_Str8 key, char const *value_fmt, ...);
+DQN_API void                 Dqn_JSONBuilder_ObjectBeginNamed        (Dqn_JSONBuilder *builder, Dqn_Str8 name);
+DQN_API void                 Dqn_JSONBuilder_ObjectEnd               (Dqn_JSONBuilder *builder);
+DQN_API void                 Dqn_JSONBuilder_ArrayBeginNamed         (Dqn_JSONBuilder *builder, Dqn_Str8 name);
+DQN_API void                 Dqn_JSONBuilder_ArrayEnd                (Dqn_JSONBuilder *builder);
+DQN_API void                 Dqn_JSONBuilder_Str8Named               (Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value);
+DQN_API void                 Dqn_JSONBuilder_LiteralNamed            (Dqn_JSONBuilder *builder, Dqn_Str8 key, Dqn_Str8 value);
+DQN_API void                 Dqn_JSONBuilder_U64Named                (Dqn_JSONBuilder *builder, Dqn_Str8 key, uint64_t value);
+DQN_API void                 Dqn_JSONBuilder_I64Named                (Dqn_JSONBuilder *builder, Dqn_Str8 key, int64_t value);
+DQN_API void                 Dqn_JSONBuilder_F64Named                (Dqn_JSONBuilder *builder, Dqn_Str8 key, double value, int decimal_places);
+DQN_API void                 Dqn_JSONBuilder_BoolNamed               (Dqn_JSONBuilder *builder, Dqn_Str8 key, bool value);
+
+#define                      Dqn_JSONBuilder_ObjectBegin(builder)    Dqn_JSONBuilder_ObjectBeginNamed(builder, DQN_STR8(""))
+#define                      Dqn_JSONBuilder_ArrayBegin(builder)     Dqn_JSONBuilder_ArrayBeginNamed(builder, DQN_STR8(""))
+#define                      Dqn_JSONBuilder_Str8(builder, value)    Dqn_JSONBuilder_Str8Named(builder, DQN_STR8(""), value)
+#define                      Dqn_JSONBuilder_Literal(builder, value) Dqn_JSONBuilder_LiteralNamed(builder, DQN_STR8(""), value)
+#define                      Dqn_JSONBuilder_U64(builder, value)     Dqn_JSONBuilder_U64Named(builder, DQN_STR8(""), value)
+#define                      Dqn_JSONBuilder_I64(builder, value)     Dqn_JSONBuilder_I64Named(builder, DQN_STR8(""), value)
+#define                      Dqn_JSONBuilder_F64(builder, value)     Dqn_JSONBuilder_F64Named(builder, DQN_STR8(""), value)
+#define                      Dqn_JSONBuilder_Bool(builder, value)    Dqn_JSONBuilder_BoolNamed(builder, DQN_STR8(""), value)
+#endif // !defined(DQN_NO_JSON_BUILDER)
+#if !defined(DQN_NO_BIN)
+// NOTE: [$BHEX] Dqn_Bin ///////////////////////////////////////////////////////////////////////////
+// TODO(doyle): I'm not happy with this API. Its ugly and feels complicated
+// because I designed it as a C-API first (e.g. ptr + length) vs just accepting
+// that Dqn_Str8/Dqn_Slice is a superior API to design for first.
+DQN_API char const *         Dqn_Bin_HexBufferTrim0x                 (char const *hex, Dqn_usize size, Dqn_usize *real_size);
+DQN_API Dqn_Str8             Dqn_Bin_HexTrim0x                       (Dqn_Str8 string);
+
+DQN_API Dqn_BinHexU64Str8    Dqn_Bin_U64ToHexU64Str8                 (uint64_t number, uint32_t flags);
+DQN_API Dqn_Str8             Dqn_Bin_U64ToHex                        (Dqn_Arena *arena, uint64_t number, uint32_t flags);
+
+DQN_API uint64_t             Dqn_Bin_HexToU64                        (Dqn_Str8 hex);
+DQN_API uint64_t             Dqn_Bin_HexPtrToU64                     (char const *hex, Dqn_usize size);
+
+DQN_API Dqn_Str8             Dqn_Bin_BytesToHexArena                 (Dqn_Arena *arena, void const *src, Dqn_usize size);
+DQN_API char *               Dqn_Bin_BytesToHexBufferArena           (Dqn_Arena *arena, void const *src, Dqn_usize size);
+DQN_API bool                 Dqn_Bin_BytesToHexBuffer                (void const *src, Dqn_usize src_size, char *dest, Dqn_usize dest_size);
+
+DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytesUnchecked       (char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
+DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytes                (char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
+DQN_API char *               Dqn_Bin_HexBufferToBytesArena           (Dqn_Arena *arena, char const *hex, Dqn_usize hex_size, Dqn_usize *real_size);
+
+DQN_API Dqn_usize            Dqn_Bin_HexToBytesUnchecked             (Dqn_Str8 hex, void *dest, Dqn_usize dest_size);
+DQN_API Dqn_usize            Dqn_Bin_HexToBytes                      (Dqn_Str8 hex, void *dest, Dqn_usize dest_size);
+DQN_API Dqn_Str8             Dqn_Bin_HexToBytesArena                 (Dqn_Arena *arena, Dqn_Str8 hex);
+#endif // !defined(DQN_NO_BIN)
+
+// NOTE: [$BSEA] Dqn_BinarySearch //////////////////////////////////////////////////////////////////
+template <typename T> bool                   Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
+template <typename T> Dqn_BinarySearchResult Dqn_BinarySearch                (T const *array,
+                                                                              Dqn_usize array_size,
+                                                                              T const &find,
+                                                                              Dqn_BinarySearchType type = Dqn_BinarySearchType_Match,
+                                                                              Dqn_BinarySearchLessThanProc<T> less_than = Dqn_BinarySearch_DefaultLessThan);
+
+// NOTE: [$BITS] Dqn_Bit ///////////////////////////////////////////////////////////////////////////
+DQN_API void                Dqn_Bit_UnsetInplace                     (Dqn_usize *flags, Dqn_usize bitfield);
+DQN_API void                Dqn_Bit_SetInplace                       (Dqn_usize *flags, Dqn_usize bitfield);
+DQN_API bool                Dqn_Bit_IsSet                            (Dqn_usize bits, Dqn_usize bits_to_set);
+DQN_API bool                Dqn_Bit_IsNotSet                         (Dqn_usize bits, Dqn_usize bits_to_check);
+
+// NOTE: [$SAFE] Dqn_Safe //////////////////////////////////////////////////////////////////////////
+DQN_API int64_t             Dqn_Safe_AddI64                          (int64_t a,  int64_t b);
+DQN_API int64_t             Dqn_Safe_MulI64                          (int64_t a,  int64_t b);
+
+DQN_API uint64_t            Dqn_Safe_AddU64                          (uint64_t a, uint64_t b);
+DQN_API uint64_t            Dqn_Safe_MulU64                          (uint64_t a, uint64_t b);
+
+DQN_API uint64_t            Dqn_Safe_SubU64                          (uint64_t a, uint64_t b);
+DQN_API uint32_t            Dqn_Safe_SubU32                          (uint32_t a, uint32_t b);
+
+DQN_API int                 Dqn_Safe_SaturateCastUSizeToInt          (Dqn_usize val);
+DQN_API int8_t              Dqn_Safe_SaturateCastUSizeToI8           (Dqn_usize val);
+DQN_API int16_t             Dqn_Safe_SaturateCastUSizeToI16          (Dqn_usize val);
+DQN_API int32_t             Dqn_Safe_SaturateCastUSizeToI32          (Dqn_usize val);
+DQN_API int64_t             Dqn_Safe_SaturateCastUSizeToI64          (Dqn_usize val);
+
+DQN_API int                 Dqn_Safe_SaturateCastU64ToInt            (uint64_t val);
+DQN_API unsigned int        Dqn_Safe_SaturateCastU64ToUInt           (uint64_t val);
+DQN_API uint8_t             Dqn_Safe_SaturateCastU64ToU8             (uint64_t val);
+DQN_API uint16_t            Dqn_Safe_SaturateCastU64ToU16            (uint64_t val);
+DQN_API uint32_t            Dqn_Safe_SaturateCastU64ToU32            (uint64_t val);
+
+DQN_API uint8_t             Dqn_Safe_SaturateCastUSizeToU8           (Dqn_usize val);
+DQN_API uint16_t            Dqn_Safe_SaturateCastUSizeToU16          (Dqn_usize val);
+DQN_API uint32_t            Dqn_Safe_SaturateCastUSizeToU32          (Dqn_usize val);
+DQN_API uint64_t            Dqn_Safe_SaturateCastUSizeToU64          (Dqn_usize val);
+
+DQN_API int                 Dqn_Safe_SaturateCastISizeToInt          (Dqn_isize val);
+DQN_API int8_t              Dqn_Safe_SaturateCastISizeToI8           (Dqn_isize val);
+DQN_API int16_t             Dqn_Safe_SaturateCastISizeToI16          (Dqn_isize val);
+DQN_API int32_t             Dqn_Safe_SaturateCastISizeToI32          (Dqn_isize val);
+DQN_API int64_t             Dqn_Safe_SaturateCastISizeToI64          (Dqn_isize val);
+
+DQN_API unsigned int        Dqn_Safe_SaturateCastISizeToUInt         (Dqn_isize val);
+DQN_API uint8_t             Dqn_Safe_SaturateCastISizeToU8           (Dqn_isize val);
+DQN_API uint16_t            Dqn_Safe_SaturateCastISizeToU16          (Dqn_isize val);
+DQN_API uint32_t            Dqn_Safe_SaturateCastISizeToU32          (Dqn_isize val);
+DQN_API uint64_t            Dqn_Safe_SaturateCastISizeToU64          (Dqn_isize val);
+
+DQN_API Dqn_isize           Dqn_Safe_SaturateCastI64ToISize          (int64_t val);
+DQN_API int8_t              Dqn_Safe_SaturateCastI64ToI8             (int64_t val);
+DQN_API int16_t             Dqn_Safe_SaturateCastI64ToI16            (int64_t val);
+DQN_API int32_t             Dqn_Safe_SaturateCastI64ToI32            (int64_t val);
+
+DQN_API int8_t              Dqn_Safe_SaturateCastIntToI8             (int val);
+DQN_API int16_t             Dqn_Safe_SaturateCastIntToI16            (int val);
+DQN_API uint8_t             Dqn_Safe_SaturateCastIntToU8             (int val);
+DQN_API uint16_t            Dqn_Safe_SaturateCastIntToU16            (int val);
+DQN_API uint32_t            Dqn_Safe_SaturateCastIntToU32            (int val);
+DQN_API uint64_t            Dqn_Safe_SaturateCastIntToU64            (int val);
+
+// NOTE: [$MISC] Misc //////////////////////////////////////////////////////////////////////////////
+DQN_API int                 Dqn_FmtBuffer3DotTruncate                (char *buffer, int size, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API Dqn_U64Str8         Dqn_U64ToStr8                            (uint64_t val, char separator);
+DQN_API Dqn_U64ByteSize     Dqn_U64ToByteSize                        (uint64_t bytes, Dqn_U64ByteSizeType type);
+DQN_API Dqn_Str8            Dqn_U64ToByteSizeStr8                    (Dqn_Arena *arena, uint64_t bytes, Dqn_U64ByteSizeType desired_type);
+DQN_API Dqn_Str8            Dqn_U64ByteSizeTypeString                (Dqn_U64ByteSizeType type);
+DQN_API Dqn_Str8            Dqn_U64ToAge                             (Dqn_Arena *arena, uint64_t age_s, Dqn_usize type);
+
+// NOTE: [$PROF] Dqn_Profiler //////////////////////////////////////////////////////////////////////
+#define                     Dqn_Profiler_BeginZone(name)             Dqn_Profiler_BeginZoneWithIndex(DQN_STR8(name), __COUNTER__ + 1)
+DQN_API Dqn_ProfilerZone    Dqn_Profiler_BeginZoneWithIndex          (Dqn_Str8 name, uint16_t anchor_index);
+DQN_API void                Dqn_Profiler_EndZone                     (Dqn_ProfilerZone zone);
+DQN_API Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer                (Dqn_ProfilerAnchorBuffer buffer);
+DQN_API void                Dqn_Profiler_SwapAnchorBuffer            ();
+DQN_API void                Dqn_Profiler_Dump                        (uint64_t tsc_per_second);
+
+// NOTE: [$JOBQ] Dqn_JobQueue ///////////////////////////////////////////////////////////////////////
+DQN_API Dqn_JobQueueSPMC    Dqn_OS_JobQueueSPMCInit                  ();
+DQN_API bool                Dqn_OS_JobQueueSPMCAddArray              (Dqn_JobQueueSPMC *job_queue, Dqn_Job *jobs, uint32_t count);
+DQN_API bool                Dqn_OS_JobQueueSPMCAdd                   (Dqn_JobQueueSPMC *job_queue, Dqn_Job job);
+DQN_API void                Dqn_OS_JobQueueSPMCWaitForCompletion     (Dqn_JobQueueSPMC *job_queue);
+DQN_API int32_t             Dqn_OS_JobQueueSPMCThread                (Dqn_OSThread *thread);
+
+// NOTE: Dqn_Library ///////////////////////////////////////////////////////////////////////////////
+DQN_API Dqn_Library *       Dqn_Library_Init                         (Dqn_LibraryOnInit on_init);
+DQN_API void                Dqn_Library_SetPointer                   (Dqn_Library *library);
 #if !defined(DQN_NO_PROFILER)
-DQN_API void         Dqn_Library_SetProfiler               (Dqn_Profiler *profiler);
+DQN_API void                Dqn_Library_SetProfiler                  (Dqn_Profiler *profiler);
 #endif
-DQN_API void         Dqn_Library_SetLogCallback            (Dqn_LogProc *proc, void *user_data);
-DQN_API void         Dqn_Library_DumpThreadContextArenaStat(Dqn_Str8 file_path);
+DQN_API void                Dqn_Library_SetLogCallback               (Dqn_LogProc *proc, void *user_data);
+DQN_API void                Dqn_Library_DumpThreadContextArenaStat   (Dqn_Str8 file_path);
+DQN_API Dqn_Arena *         Dqn_Library_AllocArenaF                  (Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, char const *fmt, ...);
+
+// NOTE: [$BSEA] Dqn_BinarySearch //////////////////////////////////////////////////////////////////
+template <typename T>
+bool Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
+{
+    bool result = lhs < rhs;
+    return result;
+}
+
+template <typename T>
+Dqn_BinarySearchResult Dqn_BinarySearch(T const                         *array,
+                                        Dqn_usize                        array_size,
+                                        T const                         &find,
+                                        Dqn_BinarySearchType             type,
+                                        Dqn_BinarySearchLessThanProc<T>  less_than)
+{
+    Dqn_BinarySearchResult result = {};
+    if (!array || array_size <= 0)
+        return result;
+
+    T const *end   = array + array_size;
+    T const *first = array;
+    T const *last  = end;
+    while (first != last) {
+        Dqn_usize count = last - first;
+        T const *it     = first + (count / 2);
+
+        bool advance_first = false;
+        if (type == Dqn_BinarySearchType_UpperBound)
+            advance_first = !less_than(find, it[0]);
+        else
+            advance_first = less_than(it[0], find);
+
+        if (advance_first)
+            first = it + 1;
+        else
+            last  = it;
+    }
+
+    switch (type) {
+        case Dqn_BinarySearchType_Match: {
+            result.found = first != end && !less_than(find, *first);
+        } break;
+
+        case Dqn_BinarySearchType_LowerBound: /*FALLTHRU*/
+        case Dqn_BinarySearchType_UpperBound: {
+            result.found = first != end;
+        } break;
+    }
+
+    result.index = first - array;
+    return result;
+}
 

@@ -1,4 +1,24 @@
-// NOTE: [$OS_H] OS Headers ========================================================================
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//   $$$$$$$$\ $$\   $$\ $$$$$$$$\ $$$$$$$$\ $$$$$$$\  $$\   $$\  $$$$$$\  $$\
+//   $$  _____|$$ |  $$ |\__$$  __|$$  _____|$$  __$$\ $$$\  $$ |$$  __$$\ $$ |
+//   $$ |      \$$\ $$  |   $$ |   $$ |      $$ |  $$ |$$$$\ $$ |$$ /  $$ |$$ |
+//   $$$$$\     \$$$$  /    $$ |   $$$$$\    $$$$$$$  |$$ $$\$$ |$$$$$$$$ |$$ |
+//   $$  __|    $$  $$<     $$ |   $$  __|   $$  __$$< $$ \$$$$ |$$  __$$ |$$ |
+//   $$ |      $$  /\$$\    $$ |   $$ |      $$ |  $$ |$$ |\$$$ |$$ |  $$ |$$ |
+//   $$$$$$$$\ $$ /  $$ |   $$ |   $$$$$$$$\ $$ |  $$ |$$ | \$$ |$$ |  $$ |$$$$$$$$\
+//   \________|\__|  \__|   \__|   \________|\__|  \__|\__|  \__|\__|  \__|\________|
+//
+//   dqn_external.h -- Third party dependencies
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: [$OS_H] OS Headers ////////////////////////////////////////////////////////////////////////
+#if !defined(DQN_OS_WIN32) || defined(DQN_OS_WIN32_USE_PTHREADS)
+    #include <pthread.h>
+    #include <semaphore.h>
+#endif
+
 #if defined(DQN_OS_UNIX) || defined(DQN_PLATFORM_EMSCRIPTEN)
     #include <errno.h>        // errno
     #include <fcntl.h>        // O_RDONLY ... etc
@@ -18,20 +38,37 @@
     #endif
 #endif
 
-// NOTE: [$STBS] stb_sprintf =======================================================================
-
-#if defined(DQN_COMPILER_MSVC)
-    // NOTE: stb_sprintf assumes c-string literals are 4 byte aligned which is
-    // always true, however, reading past the end of a string whose size is not
-    // a multiple of 4 is UB causing ASAN to complain. This is practically safe
-    // and guaranteed by all compilers so we mute this.
-    //
-    // ==12072==ERROR: AddressSanitizer: global-buffer-overflow on address
-    // READ of size 4 at 0x7ff6f442a0d8 thread T0
-    //     #0 0x7ff6f42d3be8 in stbsp_vsprintfcb C:\Home\Code\dqn\dqn_external.cpp:199
-
-    #define STBSP__ASAN __declspec(no_sanitize_address)
+#if defined(DQN_PLATFORM_EMSCRIPTEN)
+    #include <emscripten/fetch.h> // emscripten_fetch (for Dqn_OSHttpResponse)
 #endif
+
+// NOTE: [$STBS] stb_sprintf ///////////////////////////////////////////////////////////////////////
+#if defined(DQN_USE_STD_PRINTF)
+    #include <stdio.h>
+    #define DQN_SPRINTF(...) sprintf(__VA_ARGS__)
+    #define DQN_SNPRINTF(...) snprintf(__VA_ARGS__)
+    #define DQN_VSPRINTF(...) vsprintf(__VA_ARGS__)
+    #define DQN_VSNPRINTF(...) vsnprintf(__VA_ARGS__)
+#else
+    #define DQN_SPRINTF(...) STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
+    #define DQN_SNPRINTF(...) STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
+    #define DQN_VSPRINTF(...) STB_SPRINTF_DECORATE(vsprintf)(__VA_ARGS__)
+    #define DQN_VSNPRINTF(...) STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
+
+    #if (DQN_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && defined(DQN_COMPILER_MSVC)
+        #error The STB implementation of sprintf triggers MSVC's implementation of ASAN. Compiling ASAN with STB sprintf is not supported.
+
+        // NOTE: stb_sprintf assumes c-string literals are 4 byte aligned which is
+        // always true, however, reading past the end of a string whose size is not
+        // a multiple of 4 is UB causing ASAN to complain. This is practically safe
+        // and guaranteed by all compilers so we mute this.
+        //
+        // ==12072==ERROR: AddressSanitizer: global-buffer-overflow on address
+        // READ of size 4 at 0x7ff6f442a0d8 thread T0
+        //     #0 0x7ff6f42d3be8 in stbsp_vsprintfcb C:\Home\Code\dqn\dqn_external.cpp:199
+
+        #define STBSP__ASAN __declspec(no_sanitize_address)
+    #endif
 
 // stb_sprintf - v1.10 - public domain snprintf() implementation
 // originally by Jeff Roberts / RAD Game Tools, 2015/10/20
@@ -96,7 +133,7 @@ As a comparison, when using MSVC static libs, calling sprintf drags
 in 16K.
 
 API:
-====
+////
 int stbsp_sprintf( char * buf, char const * fmt, ... )
 int stbsp_snprintf( char * buf, int count, char const * fmt, ... )
   Convert an arg list into a buffer.  stbsp_snprintf always returns
@@ -119,7 +156,7 @@ void stbsp_set_separators( char comma, char period )
   Set the comma and period characters to use.
 
 FLOATS/DOUBLES:
-===============
+///////////////
 This code uses a internal float->ascii conversion method that uses
 doubles with error correction (double-doubles, for ~105 bits of
 precision).  This conversion is round-trip perfect - that is, an atof
@@ -134,13 +171,13 @@ If you don't need float or doubles at all, define STB_SPRINTF_NOFLOAT
 and you'll save 4K of code space.
 
 64-BIT INTS:
-============
+////////////
 This library also supports 64-bit integers and you can use MSVC style or
 GCC style indicators (%I64d or %lld).  It supports the C99 specifiers
 for size_t and ptr_diff_t (%jd %zd) as well.
 
 EXTRAS:
-=======
+///////
 Like some GCCs, for integers and floats, you can use a ' (single quote)
 specifier and commas will be inserted on the thousands: "%'d" on 12345
 would print 12,345.
@@ -157,7 +194,7 @@ In addition to octal and hexadecimal conversions, you can print
 integers in binary: "%b" for 256 would print 100.
 
 PERFORMANCE vs MSVC 2008 32-/64-bit (GCC is even slower than MSVC):
-===================================================================
+///////////////////////////////////////////////////////////////////
 "%d" across all 32-bit ints (4.8x/4.0x faster than 32-/64-bit MSVC)
 "%24d" across all 32-bit ints (4.5x/4.2x faster)
 "%x" across all 32-bit ints (4.5x/3.8x faster)
@@ -248,5 +285,4 @@ STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char c
 STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va);
 STBSP__PUBLICDEC void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
 #endif // STB_SPRINTF_H_INCLUDE
-
-
+#endif // !defined(DQN_USE_STD_PRINTF)

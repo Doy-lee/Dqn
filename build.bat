@@ -13,7 +13,7 @@ pushd Build
     REM O2   Optimisation Level 2
     REM Oi   Use CPU Intrinsics
     REM Z7   Combine multi-debug files to one debug file
-    set common_flags=-D DQN_TEST_WITH_MAIN -I %script_dir% %script_dir%\Misc\dqn_unit_tests.cpp
+    set common_flags=-D DQN_TEST_WITH_MAIN -D DQN_IMPLEMENTATION -D DQN_USE_STD_PRINTF /Tp %script_dir%\dqn.h
 
     set msvc_driver_flags=%common_flags%        -MT -EHa -GR- -Od -Oi -Z7 -wd4201 -W4 -nologo
 

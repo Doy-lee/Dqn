@@ -1,4 +1,19 @@
-// NOTE: [$FNV1] Dqn_FNV1A =========================================================================
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//   $$\   $$\  $$$$$$\   $$$$$$\  $$\   $$\
+//   $$ |  $$ |$$  __$$\ $$  __$$\ $$ |  $$ |
+//   $$ |  $$ |$$ /  $$ |$$ /  \__|$$ |  $$ |
+//   $$$$$$$$ |$$$$$$$$ |\$$$$$$\  $$$$$$$$ |
+//   $$  __$$ |$$  __$$ | \____$$\ $$  __$$ |
+//   $$ |  $$ |$$ |  $$ |$$\   $$ |$$ |  $$ |
+//   $$ |  $$ |$$ |  $$ |\$$$$$$  |$$ |  $$ |
+//   \__|  \__|\__|  \__| \______/ \__|  \__|
+//
+//   dqn_hash.cpp
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: [$FNV1] Dqn_FNV1A /////////////////////////////////////////////////////////////////////////
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
 DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_usize size, uint32_t hash)
 {
@@ -28,7 +43,7 @@ DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_usize size)
     return result;
 }
 
-// NOTE: [$MMUR] Dqn_MurmurHash3 ===================================================================
+// NOTE: [$MMUR] Dqn_MurmurHash3 ///////////////////////////////////////////////////////////////////
 #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
     #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)
@@ -244,4 +259,3 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
     result.e[1]            = h2;
     return result;
 }
-

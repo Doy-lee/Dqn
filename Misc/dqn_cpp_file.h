@@ -2,7 +2,7 @@
 #define DQN_CPP_FILE_H
 
 // NOTE: Dqn_CppFile: Helper functions to generate C++ files
-// =============================================================================
+// /////////////////////////////////////////////////////////////////////////////
 #include <stdio.h>  /// printf, fputc
 #include <stdarg.h> /// va_list...
 #include <assert.h> /// assert
@@ -51,21 +51,21 @@ void Dqn_CppPrint(Dqn_CppFile *cpp, char const *fmt, ...);
 
 #define Dqn_CppEnumBlock(cpp, fmt, ...)                          \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
-             (Dqn_CppBeginBlock(cpp, false /*append*/, fmt, ##__VA_ARGS__), true); \
+             (Dqn_CppBeginEnumBlock(cpp, fmt, ##__VA_ARGS__), true); \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__);                  \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndEnumBlock(cpp), false))
 
 #define Dqn_CppForBlock(cpp, fmt, ...)                           \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
-             (Dqn_CppBeginBlock(cpp, false /*append*/, "for (" fmt ")", ##__VA_ARGS__), true); \
+             (Dqn_CppBeginForBLock(cpp, fmt, ##__VA_ARGS__), true); \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__);                  \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndForBlock(cpp), false))
 
 #define Dqn_CppWhileBlock(cpp, fmt, ...)                           \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
-             (Dqn_CppBeginBlock(cpp, false /*append*/, "while (" fmt ")", ##__VA_ARGS__), true); \
+             (Dqn_CppBeginWhileBlock(cpp, fmt, ##__VA_ARGS__), true); \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__);                  \
-         DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndForBlock(cpp), false))
+         DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndWhileBlock(cpp), false))
 
 #define Dqn_CppIfOrElseIfBlock(cpp, fmt, ...)             \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
@@ -81,21 +81,27 @@ void Dqn_CppPrint(Dqn_CppFile *cpp, char const *fmt, ...);
 
 #define Dqn_CppFuncBlock(cpp, fmt, ...)                          \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
-             (Dqn_CppBeginBlock(cpp, false /*append*/, fmt, ##__VA_ARGS__), true); \
+             (Dqn_CppBeginFuncBlock(cpp, fmt, ##__VA_ARGS__), true); \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__);                  \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndFuncBlock(cpp), false))
 
 #define Dqn_CppStructBlock(cpp, fmt, ...)                        \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
-             (Dqn_CppBeginBlock(cpp, false /*append*/, "struct " fmt, ##__VA_ARGS__), true); \
+             (Dqn_CppBeginStructBlock(cpp, fmt, ##__VA_ARGS__), true); \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__);                  \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndStructBlock(cpp), false))
 
 #define Dqn_CppSwitchBlock(cpp, fmt, ...)                        \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
-             (Dqn_CppBeginBlock(cpp, false /*append*/, "switch (" fmt ")", ##__VA_ARGS__), true); \
+             (Dqn_CppBeginSwitchBlock(cpp, fmt, ##__VA_ARGS__), true); \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__);                  \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndSwitchBlock(cpp), false))
+
+#define Dqn_CppBlock(cpp, ending, fmt, ...)                      \
+    for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
+             (Dqn_CppBeginBlock(cpp, false /*append*/, fmt, ##__VA_ARGS__), true); \
+         DQN_CPP_TOKEN_PASTE_(once_, __LINE__);                  \
+         DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndBlock(cpp, ending), false))
 
 #define Dqn_CppIfChain(cpp)                                                             \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppBeginIfChain(cpp), true); \
@@ -106,29 +112,32 @@ void Dqn_CppPrint(Dqn_CppFile *cpp, char const *fmt, ...);
 /// increasing the indent level after the brace.
 void Dqn_CppBeginBlock (Dqn_CppFile *cpp, bool append, char const *fmt, ...);
 void Dqn_CppBeginBlockV(Dqn_CppFile *cpp, bool append, char const *fmt, va_list args);
-void Dqn_CppEndBlock   (Dqn_CppFile *cpp);
+void Dqn_CppEndBlock   (Dqn_CppFile *cpp, char const *ending);
 
 /// Begin/End a block, specifically for the following language constructs.
-#define Dqn_CppBeginEnumBlock(cpp, fmt, ...)   Dqn_CppBeginBlock(cpp, false /*append*/, fmt, ##__VA_ARGS__)
-#define Dqn_CppEndEnumBlock(cpp)               Dqn_CppEndBlock(cpp), Dqn_CppAppend(cpp, ";\n")
+#define Dqn_CppBeginEnumBlock(cpp, fmt, ...)   Dqn_CppBeginBlock(cpp, false /*append*/, "enum " fmt, ##__VA_ARGS__)
+#define Dqn_CppEndEnumBlock(cpp)               Dqn_CppEndBlock(cpp, ";\n")
 
-#define Dqn_CppBeginForBlock(cpp, fmt, ...)    Dqn_CppBeginBlock(cpp, false /*append*/, fmt, ##__VA_ARGS__)
-#define Dqn_CppEndForBlock(cpp)                Dqn_CppEndBlock(cpp), Dqn_CppAppend(cpp, "\n")
+#define Dqn_CppBeginWhileBlock(cpp, fmt, ...)  Dqn_CppBeginBlock(cpp, false /*append*/, "while (" fmt ")", ##__VA_ARGS__)
+#define Dqn_CppEndWhileBlock(cpp)              Dqn_CppEndBlock(cpp, "\n")
+
+#define Dqn_CppBeginForBlock(cpp, fmt, ...)    Dqn_CppBeginBlock(cpp, false /*append*/, "for (" fmt ")", ##__VA_ARGS__)
+#define Dqn_CppEndForBlock(cpp)                Dqn_CppEndBlock(cpp, "\n")
 
 #define Dqn_CppBeginFuncBlock(cpp, fmt, ...)   Dqn_CppBeginBlock(cpp, false /*append*/, fmt, ##__VA_ARGS__)
-#define Dqn_CppEndFuncBlock(cpp)               Dqn_CppEndBlock(cpp), Dqn_CppAppend(cpp, "\n")
+#define Dqn_CppEndFuncBlock(cpp)               Dqn_CppEndBlock(cpp, "\n")
 
-#define Dqn_CppBeginStructBlock(cpp, fmt, ...) Dqn_CppBeginBlock(cpp, false /*append*/, fmt, ##__VA_ARGS__)
-#define Dqn_CppEndStructBlock(cpp)             Dqn_CppEndBlock(cpp), Dqn_CppAppend(cpp, ";\n")
+#define Dqn_CppBeginStructBlock(cpp, fmt, ...) Dqn_CppBeginBlock(cpp, false /*append*/, "struct " fmt, ##__VA_ARGS__)
+#define Dqn_CppEndStructBlock(cpp)             Dqn_CppEndBlock(cpp, ";\n")
 
-#define Dqn_CppBeginSwitchBlock(cpp, fmt, ...) Dqn_CppBeginBlock(cpp, false /*append*/, fmt, ##__VA_ARGS__)
-#define Dqn_CppEndSwitchBlock(cpp)             Dqn_CppEndBlock(cpp), Dqn_CppAppend(cpp, "\n")
+#define Dqn_CppBeginSwitchBlock(cpp, fmt, ...) Dqn_CppBeginBlock(cpp, false /*append*/, "switch (" fmt ")", ##__VA_ARGS__)
+#define Dqn_CppEndSwitchBlock(cpp)             Dqn_CppEndBlock(cpp, "\n")
 
 void    Dqn_CppBeginIfOrElseIfBlock            (Dqn_CppFile *cpp, char const *fmt, ...);
-#define Dqn_CppEndIfOrElseIfBlock(cpp)         Dqn_CppEndBlock(cpp)
+#define Dqn_CppEndIfOrElseIfBlock(cpp)         Dqn_CppEndBlock(cpp, "")
 
 void    Dqn_CppBeginElseBlock                  (Dqn_CppFile *cpp);
-#define Dqn_CppEndElseBlock(cpp)               Dqn_CppEndBlock(cpp)
+void    Dqn_CppEndElseBlock                    (Dqn_CppFile *cpp);
 
 #define DQN_CPP_TOKEN_PASTE2_(x, y) x ## y
 #define DQN_CPP_TOKEN_PASTE_(x, y) DQN_CPP_TOKEN_PASTE2_(x, y)
@@ -179,20 +188,23 @@ void Dqn_CppBeginBlockV(Dqn_CppFile *cpp, bool append, char const *fmt, va_list 
         Dqn_CppAppendV(cpp, fmt, args);
     else
         Dqn_CppPrintV(cpp, fmt, args);
-    Dqn_CppAppend(cpp, " {\n");
+
+    bool empty_fmt = fmt == nullptr || strlen(fmt) == 0;
+    Dqn_CppAppend(cpp, "%s{\n", empty_fmt ? "" : " ");
     Dqn_CppIndent(cpp);
 }
 
-void Dqn_CppEndBlock(Dqn_CppFile *cpp)
+void Dqn_CppEndBlock(Dqn_CppFile *cpp, char const *ending)
 {
     Dqn_CppUnindent(cpp);
-    Dqn_CppPrint(cpp, "}");
+    Dqn_CppPrint(cpp, "}%s", ending);
 }
 
 void Dqn_CppBeginIfOrElseIfBlock(Dqn_CppFile *cpp, char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+    assert(cpp->if_chain_size);
     if (cpp->if_chain[cpp->if_chain_size - 1] == 0)
         Dqn_CppPrint(cpp, "if");
     else
@@ -208,8 +220,15 @@ void Dqn_CppBeginIfOrElseIfBlock(Dqn_CppFile *cpp, char const *fmt, ...)
 
 void Dqn_CppBeginElseBlock(Dqn_CppFile *cpp)
 {
+    assert(cpp->if_chain_size);
     if (cpp->if_chain[cpp->if_chain_size - 1] >= 1)
         Dqn_CppBeginBlock(cpp, true /*append*/, " else");
+}
+
+void Dqn_CppEndElseBlock(Dqn_CppFile *cpp)
+{
+    if (cpp->if_chain[cpp->if_chain_size - 1] >= 1)
+        Dqn_CppEndBlock(cpp, "");
 }
 
 void Dqn_CppBeginIfChain(Dqn_CppFile *cpp)
@@ -220,8 +239,12 @@ void Dqn_CppBeginIfChain(Dqn_CppFile *cpp)
 
 void Dqn_CppEndIfChain(Dqn_CppFile *cpp)
 {
-    if (cpp->if_chain[cpp->if_chain_size - 1] >= 1)
+    assert(cpp->if_chain_size);
+    if (cpp->if_chain[cpp->if_chain_size - 1] >= 1) {
         Dqn_CppNewLine(cpp);
+    }
+    cpp->if_chain[cpp->if_chain_size - 1] = 0;
+    cpp->if_chain_size--;
 }
 
 #endif // DQN_CPP_FILE_IMPLEMENTATION
