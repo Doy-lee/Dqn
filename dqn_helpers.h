@@ -380,6 +380,7 @@ DQN_API int32_t             Dqn_Safe_SaturateCastUSizeToI32          (Dqn_usize 
 DQN_API int64_t             Dqn_Safe_SaturateCastUSizeToI64          (Dqn_usize val);
 
 DQN_API int                 Dqn_Safe_SaturateCastU64ToInt            (uint64_t val);
+DQN_API int64_t             Dqn_Safe_SaturateCastU64ToI64            (uint64_t val);
 DQN_API unsigned int        Dqn_Safe_SaturateCastU64ToUInt           (uint64_t val);
 DQN_API uint8_t             Dqn_Safe_SaturateCastU64ToU8             (uint64_t val);
 DQN_API uint16_t            Dqn_Safe_SaturateCastU64ToU16            (uint64_t val);

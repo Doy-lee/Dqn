@@ -585,13 +585,16 @@ DQN_API uint64_t Dqn_Safe_SaturateCastUSizeToU64(Dqn_usize val)
     return result;
 }
 
-// NOTE: Dqn_Safe_SaturateCastU64To*
-// -----------------------------------------------------------------------------
-// INT*_MAX literals will be promoted to the type of val as val is
-// the highest possible rank (unsigned > signed).
+// NOTE: Dqn_Safe_SaturateCastU64To* ///////////////////////////////////////////////////////////////
 DQN_API int Dqn_Safe_SaturateCastU64ToInt(uint64_t val)
 {
     int result = DQN_CHECK(val <= INT_MAX) ? DQN_CAST(int)val : INT_MAX;
+    return result;
+}
+
+DQN_API int64_t Dqn_Safe_SaturateCastU64ToI64(uint64_t val)
+{
+    int64_t result = DQN_CHECK(val <= INT64_MAX) ? DQN_CAST(int64_t)val : INT64_MAX;
     return result;
 }
 

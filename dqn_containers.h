@@ -192,8 +192,11 @@ template <typename T>                           Dqn_ArrayFindResult<T> Dqn_CArra
 #if !defined(DQN_NO_VARRAY)
 template <typename T>                           Dqn_VArray<T>          Dqn_VArray_InitByteSize            (Dqn_usize byte_size, uint8_t arena_flags);
 template <typename T>                           Dqn_VArray<T>          Dqn_VArray_Init                    (Dqn_usize max, uint8_t arena_flags);
+template <typename T>                           Dqn_VArray<T>          Dqn_VArray_InitSlice               (Dqn_Slice<T> slice, Dqn_usize max, uint8_t arena_flags);
+template <typename T, Dqn_usize N>              Dqn_VArray<T>          Dqn_VArray_InitCArray              (T const (&items)[N], Dqn_usize max, uint8_t arena_flags);
 template <typename T>                           void                   Dqn_VArray_Deinit                  (Dqn_VArray<T> *array);
 template <typename T>                           bool                   Dqn_VArray_IsValid                 (Dqn_VArray<T> const *array);
+template <typename T>                           Dqn_Slice<T>           Dqn_VArray_Slice                   (Dqn_VArray<T> const *array);
 template <typename T>                           bool                   Dqn_VArray_Reserve                 (Dqn_VArray<T> *array, Dqn_usize count);
 template <typename T>                           T *                    Dqn_VArray_AddArray                (Dqn_VArray<T> *array, T const *items, Dqn_usize count);
 template <typename T, Dqn_usize N>              T *                    Dqn_VArray_AddCArray               (Dqn_VArray<T> *array, T const (&items)[N]);
@@ -216,9 +219,11 @@ template <typename T>                           T                      Dqn_VArra
 template <typename T>                           Dqn_ArrayEraseResult   Dqn_VArray_EraseRange              (Dqn_VArray<T> *array, Dqn_usize begin_index, Dqn_isize count, Dqn_ArrayErase erase);
 template <typename T>                           void                   Dqn_VArray_Clear                   (Dqn_VArray<T> *array, Dqn_ZeroMem zero_mem);
 #endif // !defined(DQN_NO_VARRAY)
+// NOTE: [$SARR] Dqn_SArray ////////////////////////////////////////////////////////////////////////
 #if !defined(DQN_NO_SARRAY)
 template <typename T>                           Dqn_SArray<T>          Dqn_SArray_Init                    (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
-template <typename T, size_t N>                 Dqn_SArray<T>          Dqn_SArray_InitCArray              (Dqn_Arena *arena, T const (&array)[N]);
+template <typename T>                           Dqn_SArray<T>          Dqn_SArray_InitSlice               (Dqn_Arena *arena, Dqn_Slice<T> slice, Dqn_usize size, Dqn_ZeroMem zero_mem);
+template <typename T, size_t N>                 Dqn_SArray<T>          Dqn_SArray_InitCArray              (Dqn_Arena *arena, T const (&array)[N], Dqn_usize size);
 template <typename T>                           bool                   Dqn_SArray_IsValid                 (Dqn_SArray<T> const *array);
 template <typename T>                           Dqn_Slice<T>           Dqn_SArray_Slice                   (Dqn_SArray<T> const *array);
 template <typename T>                           T *                    Dqn_SArray_AddArray                (Dqn_SArray<T> *array, T const *items, Dqn_usize count);
@@ -244,6 +249,7 @@ template <typename T>                           void                   Dqn_SArra
 #endif // !defined(DQN_NO_SARRAY)
 #if !defined(DQN_NO_FARRAY)
 template <typename T, Dqn_usize N>              Dqn_FArray<T, N>       Dqn_FArray_Init                    (T const *array, Dqn_usize count);
+template <typename T, Dqn_usize N>              Dqn_FArray<T, N>       Dqn_FArray_InitSlice               (Dqn_Slice<T> slice);
 template <typename T, Dqn_usize N, Dqn_usize K> Dqn_FArray<T, N>       Dqn_FArray_InitCArray              (T const (&items)[K]);
 template <typename T, Dqn_usize N>              bool                   Dqn_FArray_IsValid                 (Dqn_FArray<T, N> const *array);
 template <typename T, Dqn_usize N>              Dqn_usize              Dqn_FArray_Max                     (Dqn_FArray<T, N> const *) { return N; }
@@ -270,6 +276,7 @@ template <typename T, Dqn_usize N>              Dqn_ArrayEraseResult   Dqn_FArra
 template <typename T, Dqn_usize N>              void                   Dqn_FArray_Clear                   (Dqn_FArray<T, N> *array);
 #endif // !defined(DQN_NO_FARRAY)
 #if !defined(DQN_NO_SLICE)
+#define                                                                DQN_TO_SLICE(val)                  Dqn_Slice_Init((val)->data, (val)->size)
 template <typename T>                           Dqn_Slice<T>           Dqn_Slice_Init                     (T* const data, Dqn_usize size);
 template <typename T, Dqn_usize N>              Dqn_Slice<T>           Dqn_Slice_InitCArray               (Dqn_Arena *arena, T const (&array)[N]);
 template <typename T>                           Dqn_Slice<T>           Dqn_Slice_Alloc                    (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
@@ -454,8 +461,10 @@ template <typename T> Dqn_VArray<T> Dqn_VArray_InitByteSize(Dqn_usize byte_size,
 {
     Dqn_VArray<T> result = {};
     result.arena         = Dqn_Arena_InitSize(DQN_ARENA_HEADER_SIZE + byte_size, 0 /*commit*/, arena_flags | Dqn_ArenaFlag_NoGrow | Dqn_ArenaFlag_NoPoison);
-    result.data          = DQN_CAST(T *)(DQN_CAST(char *)result.arena.curr + result.arena.curr->used);
-    result.max           = (result.arena.curr->reserve - result.arena.curr->used) / sizeof(T);
+    if (result.arena.curr) {
+        result.data = DQN_CAST(T *)(DQN_CAST(char *)result.arena.curr + result.arena.curr->used);
+        result.max  = (result.arena.curr->reserve - result.arena.curr->used) / sizeof(T);
+    }
     return result;
 }
 
@@ -463,6 +472,22 @@ template <typename T> Dqn_VArray<T> Dqn_VArray_Init(Dqn_usize max, uint8_t arena
 {
     Dqn_VArray<T> result = Dqn_VArray_InitByteSize<T>(max * sizeof(T), arena_flags);
     DQN_ASSERT(result.max >= max);
+    return result;
+}
+
+template <typename T> Dqn_VArray<T> Dqn_VArray_InitSlice(Dqn_Slice<T> slice, Dqn_usize max, uint8_t arena_flags)
+{
+    Dqn_usize     real_max = DQN_MAX(slice.size, max);
+    Dqn_VArray<T> result   = Dqn_VArray_Init(real_max, arena_flags);
+    if (Dqn_VArray_IsValid(&result))
+        Dqn_VArray_AddArray(&result, slice.data, slice.size);
+    return result;
+}
+
+template <typename T, Dqn_usize N> Dqn_VArray<T> Dqn_VArray_InitCArray(T const (&items)[N], Dqn_usize max, uint8_t arena_flags)
+{
+    Dqn_usize     real_max = DQN_MAX(N, max);
+    Dqn_VArray<T> result   = Dqn_VArray_InitSlice(Dqn_Slice_Init(items, N), real_max, arena_flags);
     return result;
 }
 
@@ -475,6 +500,14 @@ template <typename T> void Dqn_VArray_Deinit(Dqn_VArray<T> *array)
 template <typename T> bool Dqn_VArray_IsValid(Dqn_VArray<T> const *array)
 {
     bool result = array && array->data && array->size <= array->max && array->arena.curr;
+    return result;
+}
+
+template <typename T> Dqn_Slice<T> Dqn_VArray_Slice(Dqn_VArray<T> const *array)
+{
+    Dqn_Slice<T> result = {};
+    if (array)
+        result = Dqn_Slice_Init<T>(array->data, array->size);
     return result;
 }
 
@@ -599,17 +632,21 @@ template <typename T> Dqn_SArray<T> Dqn_SArray_Init(Dqn_Arena *arena, Dqn_usize 
     return result;
 }
 
-template <typename T, size_t N> Dqn_SArray<T> Dqn_SArray_InitCArray(Dqn_Arena *arena, T const (&array)[N])
+template <typename T> Dqn_SArray<T> Dqn_SArray_InitSlice(Dqn_Arena *arena, Dqn_Slice<T> slice, Dqn_usize size, Dqn_ZeroMem zero_mem)
 {
-    Dqn_SArray<T> result = {};
-    if (!arena || !N)
-        return result;
-    result.data = Dqn_Arena_NewArray(arena, T, N, Dqn_ZeroMem_No);
-    if (result.data) {
-        DQN_MEMCOPY(result.data, array, sizeof(T) * N);
-        result.size = N;
-        result.max  = N;
+    Dqn_usize     max    = DQN_MAX(slice.size, size);
+    Dqn_SArray<T> result = Dqn_SArray_Init<T>(arena, max, Dqn_ZeroMem_No);
+    if (Dqn_SArray_IsValid(&result)) {
+        Dqn_SArray_AddArray(&result, slice.data, slice.size);
+        if (zero_mem == Dqn_ZeroMem_Yes)
+            DQN_MEMSET(result.data + result.size, 0, (result.max - result.size) * sizeof(T));
     }
+    return result;
+}
+
+template <typename T, size_t N> Dqn_SArray<T> Dqn_SArray_InitCArray(Dqn_Arena *arena, T const (&array)[N], Dqn_usize size, Dqn_ZeroMem zero_mem)
+{
+    Dqn_SArray<T> result = Dqn_SArray_InitSlice(arena, Dqn_Slice_Init(array, N), size, zero_mem);
     return result;
 }
 
@@ -619,11 +656,11 @@ template <typename T> bool Dqn_SArray_IsValid(Dqn_SArray<T> const *array)
     return result;
 }
 
-template <typename T, Dqn_usize N> Dqn_Slice<T> Dqn_SArray_Slice(Dqn_SArray<T> const *array)
+template <typename T> Dqn_Slice<T> Dqn_SArray_Slice(Dqn_SArray<T> const *array)
 {
     Dqn_Slice<T> result = {};
     if (array)
-        Dqn_Slice_Init<T>(DQN_CAST(T *)array->data, array->size);
+        result = Dqn_Slice_Init<T>(DQN_CAST(T *)array->data, array->size);
     return result;
 }
 
@@ -643,9 +680,10 @@ template <typename T> T *Dqn_SArray_Make(Dqn_SArray<T> *array, Dqn_ZeroMem zero_
 
 template <typename T> T *Dqn_SArray_AddArray(Dqn_SArray<T> *array, T const *items, Dqn_usize count)
 {
-    T *result = Dqn_SArray_Make(array, count, Dqn_ZeroMem_No);
+    T *result = Dqn_SArray_MakeArray(array, count, Dqn_ZeroMem_No);
     if (result)
         DQN_MEMCPY(result, items, count * sizeof(T));
+    return result;
 }
 
 template <typename T, Dqn_usize N> T *Dqn_SArray_AddCArray(Dqn_SArray<T> *array, T const (&items)[N])
@@ -719,11 +757,15 @@ template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_Init(T const *arr
     return result;
 }
 
+template <typename T, Dqn_usize N> Dqn_FArray<T, N> Dqn_FArray_InitSlice(Dqn_Slice<T> slice)
+{
+    Dqn_FArray<T, N> result = Dqn_FArray_Init(slice.data, slice.size);
+    return result;
+}
+
 template <typename T, Dqn_usize N, Dqn_usize K> Dqn_FArray<T, N> Dqn_FArray_InitCArray(T const (&items)[K])
 {
-    Dqn_FArray<T, N> result = {};
-    bool added              = Dqn_FArray_AddArray(&result, items, K);
-    DQN_ASSERT(added);
+    Dqn_FArray<T, N> result = Dqn_FArray_Init<T, N>(items, K);
     return result;
 }
 
