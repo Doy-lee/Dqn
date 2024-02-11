@@ -145,6 +145,7 @@ DQN_API void *                Dqn_Arena_AllocContiguous      (Dqn_Arena *arena, 
 DQN_API void *                Dqn_Arena_Copy                 (Dqn_Arena *arena, void const *data, uint64_t size, uint8_t align);
 DQN_API void                  Dqn_Arena_PopTo                (Dqn_Arena *arena, uint64_t init_used);
 DQN_API void                  Dqn_Arena_Pop                  (Dqn_Arena *arena, uint64_t amount);
+DQN_API uint64_t              Dqn_Arena_Pos                  (Dqn_Arena *arena);
 DQN_API void                  Dqn_Arena_Clear                (Dqn_Arena *arena);
 DQN_API Dqn_ArenaTempMem      Dqn_Arena_TempMemBegin         (Dqn_Arena *arena);
 DQN_API void                  Dqn_Arena_TempMemEnd           (Dqn_ArenaTempMem mem);

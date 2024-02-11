@@ -236,6 +236,52 @@ void Dqn_Docs_Demo()
     // failure, or the requested size is smaller than the current number of
     // elements in the map to resize.
 
+    // NOTE: Dqn_ErrorSink /////////////////////////////////////////////////////////////////////////
+    //
+    // A thread-local data structure that collects all errors emitted by APIs
+    // into one unified structure. This library has 2 core tenets when handling
+    // errors
+    //
+    // 1. Pipelining of errors
+    //    Errors emitted over the course of several API calls are accumulated
+    //    into a thread-local sink which save the error code and message
+    //    of the first error encountered.
+    //
+    // 2. Error proof APIs
+    //    Functions that produce errors must return objects/handles that are
+    //    marked to trigger no-ops used in subsequent functions dependent on it.
+    //
+    // Together this allows end-users of APIs to chain calls and defer error
+    // checking until the end of a sequence of actions. Consider the following
+    // example demonstrating the 2 approaches.
+
+    // (A) Conventional error checking patterns using return/sentinel values
+    #if 0
+    FileHandle *file = OpenFile("/path/to/file");
+    if (!file)
+        // Error handling!
+    if (!WriteFile(file, "abc"))
+        // Error handling!
+    CloseFile(file);
+    #endif
+
+    // (B) Error handling using pipelining and and error proof APIs
+    if (0) {
+        Dqn_Scratch    scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_ErrorSink *error   = Dqn_ErrorSink_Begin();
+        Dqn_OSFile     file    = Dqn_OS_OpenFile(DQN_STR8("/path/to/file"), Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_ReadWrite, error);
+        Dqn_OS_WriteFile(&file, DQN_STR8("abc"), error);
+        Dqn_OS_CloseFile(&file);
+
+        Dqn_ErrorSinkNode error_node = Dqn_ErrorSink_End(scratch.arena, error);
+        if (error_node.error) {
+            // Do error handling!
+            Dqn_Log_ErrorF("%.*s", DQN_STR_FMT(error_node.msg));
+        }
+    }
+
+    // TODO(doyle): Integrate more into the codebase and provide a concrete example.
+
     // NOTE: Dqn_FStr8_Max /////////////////////////////////////////////////////////////////////////
     //
     // Return the maximum capacity of the string, e.g. the 'N' template
@@ -370,7 +416,10 @@ void Dqn_Docs_Demo()
     // If 'tmp_path' is written to successfuly, the file will be copied over into
     // 'path'.
     if (0) {
-        Dqn_OS_WriteAllSafe(/*path*/ DQN_STR8("C:/Home/my.txt"), /*buffer*/ DQN_STR8("Hello world"));
+        Dqn_Scratch    scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_ErrorSink *error   = Dqn_ErrorSink_Begin();
+        Dqn_OS_WriteAllSafe(/*path*/ DQN_STR8("C:/Home/my.txt"), /*buffer*/ DQN_STR8("Hello world"), error);
+        Dqn_ErrorSink_EndAndLogErrorF(error, "");
     }
 
     // NOTE: Dqn_OS_EstimateTSCPerSecond ///////////////////////////////////////////////////////////

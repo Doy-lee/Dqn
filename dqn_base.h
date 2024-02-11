@@ -385,6 +385,23 @@ struct Dqn_CallSite
 };
 #define DQN_CALL_SITE Dqn_CallSite{DQN_STR8(__FILE__), DQN_STR8(__func__), __LINE__}
 
+// NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
+struct Dqn_ErrorSinkNode
+{
+    bool               error;
+    int32_t            error_code;
+    Dqn_Str8           msg;
+    Dqn_CallSite       call_site;
+    Dqn_ErrorSinkNode *next;
+    uint64_t           arena_pos;
+};
+
+struct Dqn_ErrorSink
+{
+    struct Dqn_Arena  *arena;
+    Dqn_ErrorSinkNode *stack;
+};
+
 // NOTE: [$INTR] Intrinsics ////////////////////////////////////////////////////////////////////////
 // NOTE: Dqn_Atomic_Add/Exchange return the previous value store in the target
 #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
@@ -594,6 +611,19 @@ DQN_API          void               Dqn_Log_TypeFVCallSite                      
 DQN_API          void               Dqn_Log_TypeFCallSite                       (Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, ...);
 DQN_API          void               Dqn_Log_FVCallSite                          (Dqn_Str8 type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, va_list va);
 DQN_API          void               Dqn_Log_FCallSite                           (Dqn_Str8 type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, ...);
+
+// NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
+DQN_API          Dqn_ErrorSink *    Dqn_ErrorSink_Begin                         ();
+DQN_API          Dqn_ErrorSinkNode  Dqn_ErrorSink_End                           (Dqn_Arena *arena, Dqn_ErrorSink *error);
+DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorFV              (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorF               (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API          void               Dqn_ErrorSink_EndAndExitIfErrorF            (Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API          void               Dqn_ErrorSink_EndAndExitIfErrorFV           (Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, va_list args);
+
+#define                             Dqn_ErrorSink_MakeFV(error, error_code, fmt, args) do { Dqn_ThreadContext_SaveCallSite; Dqn_ErrorSink_MakeFV_(error, error_code, fmt, args); } while (0)
+#define                             Dqn_ErrorSink_MakeF(error, error_code, fmt, ...)   do { Dqn_ThreadContext_SaveCallSite; Dqn_ErrorSink_MakeF_(error, error_code, fmt, ## __VA_ARGS__); } while (0)
+DQN_API          void               Dqn_ErrorSink_MakeFV_                       (Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DQN_API          void               Dqn_ErrorSink_MakeF_                        (Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, ...);
 
 // NOTE: [$INTR] Intrinsics ////////////////////////////////////////////////////////////////////////
 DQN_FORCE_INLINE uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint64_t value)

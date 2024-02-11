@@ -24,6 +24,23 @@
 // first-class APIs, a 64bit MMU and in general non-pessimized APIs that aren't
 // constrained by the language specification and operate closer to the OS).
 //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//    $$$$$$\  $$$$$$$$\ $$$$$$$$\ $$$$$$$$\ $$$$$$\ $$\   $$\  $$$$$$\
+//   $$  __$$\ $$  _____|\__$$  __|\__$$  __|\_$$  _|$$$\  $$ |$$  __$$\
+//   $$ /  \__|$$ |         $$ |      $$ |     $$ |  $$$$\ $$ |$$ /  \__|
+//   $$ |$$$$\ $$$$$\       $$ |      $$ |     $$ |  $$ $$\$$ |$$ |$$$$\
+//   $$ |\_$$ |$$  __|      $$ |      $$ |     $$ |  $$ \$$$$ |$$ |\_$$ |
+//   $$ |  $$ |$$ |         $$ |      $$ |     $$ |  $$ |\$$$ |$$ |  $$ |
+//   \$$$$$$  |$$$$$$$$\    $$ |      $$ |   $$$$$$\ $$ | \$$ |\$$$$$$  |
+//    \______/ \________|   \__|      \__|   \______|\__|  \__| \______/
+//
+//   Getting started -- Compiling with the library and library documentation
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// -- Compiling --
+//
 // Define DQN_IMPLEMENTATION macro in one and only one translation unit to
 // enable the implementation of this library, for example:
 //
@@ -47,9 +64,16 @@
 // Compiles the library with all optional APIs turned on except the previously
 // mentioned APIs.
 //
-// Below is a table of contents that describes what you can find in each header
-// of this library and additional macros that can be defined to customise the
-// behaviour of this library.
+// -- Library documentation --
+//
+// The header files in this library are intentionally extremely minimal and
+// concise as to provide a dense reference of the APIs available without
+// drowning out the library interface with code comments like many other
+// documentation systems.
+//
+// Instead, documentation is laid out in dqn_docs.cpp in alphabetical order
+// which provides self-contained examples in one contiguous top-down block of
+// source code with comments.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //

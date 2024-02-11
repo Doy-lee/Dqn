@@ -55,7 +55,7 @@ DQN_API Dqn_ThreadContext *Dqn_ThreadContext_Get()
     Dqn_ArenaCatalog *catalog = &g_dqn_library->arena_catalog;
     DQN_HARD_ASSERTF(g_dqn_library && g_dqn_library->lib_init, "Library must be initialised by calling Dqn_Library_Init()");
 
-    // NOTE: Setup scratch arenas
+    // NOTE: Setup scratch arenas //////////////////////////////////////////////////////////////////
     DQN_FOR_UINDEX (index, DQN_ARRAY_UCOUNT(result->scratch_arenas)) {
 
         // NOTE: We allocate arenas so that they all come from the memory
@@ -85,6 +85,20 @@ DQN_API Dqn_ThreadContext *Dqn_ThreadContext_Get()
             result->scratch_arenas[index] = catalog_item->arena;
         }
     }
+
+    // NOTE: Setup error sink //////////////////////////////////////////////////////////////////////
+    {
+        Dqn_FStr8<128>        label        = Dqn_FStr8_InitF<128>("T%05u Error Sink", Dqn_OS_ThreadID());
+        Dqn_ArenaCatalogItem *catalog_item = Dqn_ArenaCatalog_Find(catalog, Dqn_FStr8_ToStr8(&label));
+        if (catalog_item == &catalog->sentinel) {
+            result->error_sink_arena = Dqn_ArenaCatalog_AllocLabelCopy(catalog, 0, 0, Dqn_ArenaFlag_AllocCanLeak, Dqn_FStr8_ToStr8(&label));
+        } else {
+            // NOTE: Reuse the arena
+            result->error_sink_arena = catalog_item->arena;
+        }
+        result->error_sink.arena = result->error_sink_arena;
+    }
+
     return result;
 }
 

@@ -148,95 +148,84 @@ DQN_API uint64_t Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_f
 
 #if !defined(DQN_NO_OS_FILE_API)
 // NOTE: [$FILE] Dqn_OSPathInfo/File ///////////////////////////////////////////////////////////////
-DQN_API bool Dqn_OS_WriteFile(Dqn_OSFile *file, Dqn_Str8 buffer)
+DQN_API bool Dqn_OS_WriteFile(Dqn_OSFile *file, Dqn_Str8 buffer, Dqn_ErrorSink *error)
 {
-    bool result = Dqn_OS_WriteFileBuffer(file, buffer.data, buffer.size);
+    bool result = Dqn_OS_WriteFileBuffer(file, buffer.data, buffer.size, error);
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteFileFV(Dqn_OSFile *file, DQN_FMT_ATTRIB char const *fmt, va_list args)
+DQN_API bool Dqn_OS_WriteFileFV(Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
     bool result = false;
     if (!file || !fmt)
         return result;
     Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
     Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
-    result              = Dqn_OS_WriteFileBuffer(file, buffer.data, buffer.size);
+    result              = Dqn_OS_WriteFileBuffer(file, buffer.data, buffer.size, error);
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteFileF(Dqn_OSFile *file, DQN_FMT_ATTRIB char const *fmt, ...)
+DQN_API bool Dqn_OS_WriteFileF(Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    bool result = Dqn_OS_WriteFileFV(file, fmt, args);
+    bool result = Dqn_OS_WriteFileFV(file, error, fmt, args);
     va_end(args);
     return result;
 }
 
 // NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
-DQN_API bool Dqn_OS_WriteAll(Dqn_Str8 path, Dqn_Str8 buffer)
+DQN_API bool Dqn_OS_WriteAll(Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error)
 {
-    Dqn_OSFile file = Dqn_OS_OpenFile(path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_Write);
-    bool result     = Dqn_OS_WriteFile(&file, buffer);
+    Dqn_OSFile file = Dqn_OS_OpenFile(path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_Write, error);
+    bool result     = Dqn_OS_WriteFile(&file, buffer, error);
     Dqn_OS_CloseFile(&file);
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteAllFV(Dqn_Str8 file_path, DQN_FMT_ATTRIB char const *fmt, va_list args)
+DQN_API bool Dqn_OS_WriteAllFV(Dqn_Str8 file_path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
     Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8          buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
-    bool              result  = Dqn_OS_WriteAll(file_path, buffer);
+    Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    bool        result  = Dqn_OS_WriteAll(file_path, buffer, error);
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteAllF(Dqn_Str8 file_path, DQN_FMT_ATTRIB char const *fmt, ...)
+DQN_API bool Dqn_OS_WriteAllF(Dqn_Str8 file_path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    bool result = Dqn_OS_WriteAllFV(file_path, fmt, args);
+    bool result = Dqn_OS_WriteAllFV(file_path, error, fmt, args);
     va_end(args);
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteAllSafe(Dqn_Str8 path, Dqn_Str8 buffer)
+DQN_API bool Dqn_OS_WriteAllSafe(Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error)
 {
     Dqn_Scratch scratch  = Dqn_Scratch_Get(nullptr);
     Dqn_Str8    tmp_path = Dqn_Str8_InitF(scratch.arena, "%.*s.tmp", DQN_STR_FMT(path));
-    if (!Dqn_OS_WriteAll(tmp_path, buffer)) {
-        Dqn_Log_ErrorF("Failed to write to temporary file [path=%.*s]", DQN_STR_FMT(tmp_path));
+    if (!Dqn_OS_WriteAll(tmp_path, buffer, error))
         return false;
-    }
-
-    if (!Dqn_OS_FileCopy(tmp_path, path, true /*overwrite*/)) {
-        Dqn_Log_ErrorF("Failed to overwrite file at '%.*s' with temporary file '%.*s' to complete the safe-write",
-                       DQN_STR_FMT(tmp_path),
-                       DQN_STR_FMT(path));
+    if (!Dqn_OS_FileCopy(tmp_path, path, true /*overwrite*/, error))
         return false;
-    }
-
-    if (!Dqn_OS_PathDelete(tmp_path)) {
-        Dqn_Log_ErrorF("Failed to delete the temporary file at '%.*s' to clean-up the safe-write", DQN_STR_FMT(tmp_path));
+    if (!Dqn_OS_PathDelete(tmp_path))
         return false;
-    }
-
     return true;
 }
 
-DQN_API bool Dqn_OS_WriteAllSafeFV(Dqn_Str8 path, DQN_FMT_ATTRIB char const *fmt, va_list args)
+DQN_API bool Dqn_OS_WriteAllSafeFV(Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
     Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
     Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
-    bool        result  = Dqn_OS_WriteAllSafe(path, buffer);
+    bool        result  = Dqn_OS_WriteAllSafe(path, buffer, error);
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteAllSafeF(Dqn_Str8 path, DQN_FMT_ATTRIB char const *fmt, ...)
+DQN_API bool Dqn_OS_WriteAllSafeF(Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    bool result = Dqn_OS_WriteAllSafeFV(path, fmt, args);
+    bool result = Dqn_OS_WriteAllSafeFV(path, error, fmt, args);
     return result;
 }
 #endif // !defined(DQN_NO_OS_FILE_API)

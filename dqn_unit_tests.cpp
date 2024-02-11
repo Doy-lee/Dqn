@@ -710,28 +710,28 @@ static Dqn_UTest Dqn_Test_Fs()
         DQN_UTEST_TEST("File write, read, copy, move and delete") {
             // NOTE: Write step
             Dqn_Str8 const SRC_FILE     = DQN_STR8("dqn_test_file");
-            Dqn_b32        write_result = Dqn_OS_WriteAll(SRC_FILE, DQN_STR8("test"));
+            Dqn_b32        write_result = Dqn_OS_WriteAll(SRC_FILE, DQN_STR8("test"), nullptr);
             DQN_UTEST_ASSERT(&test, write_result);
             DQN_UTEST_ASSERT(&test, Dqn_OS_FileExists(SRC_FILE));
 
             // NOTE: Read step
             Dqn_Scratch scratch   = Dqn_Scratch_Get(nullptr);
-            Dqn_Str8    read_file = Dqn_OS_ReadAll(SRC_FILE, scratch.arena);
+            Dqn_Str8    read_file = Dqn_OS_ReadAll(SRC_FILE, scratch.arena, nullptr);
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_HasData(read_file), "Failed to load file");
             DQN_UTEST_ASSERTF(&test, read_file.size == 4, "File read wrong amount of bytes");
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_Eq(read_file, DQN_STR8("test")), "read(%zu): %.*s", read_file.size, DQN_STR_FMT(read_file));
 
             // NOTE: Copy step
             Dqn_Str8 const COPY_FILE   = DQN_STR8("dqn_test_file_copy");
-            Dqn_b32        copy_result = Dqn_OS_FileCopy(SRC_FILE, COPY_FILE, true /*overwrite*/);
+            Dqn_b32        copy_result = Dqn_OS_FileCopy(SRC_FILE, COPY_FILE, true /*overwrite*/, nullptr);
             DQN_UTEST_ASSERT(&test, copy_result);
             DQN_UTEST_ASSERT(&test, Dqn_OS_FileExists(COPY_FILE));
 
             // NOTE: Move step
             Dqn_Str8 const MOVE_FILE   = DQN_STR8("dqn_test_file_move");
-            Dqn_b32        move_result = Dqn_OS_FileMove(COPY_FILE, MOVE_FILE, true /*overwrite*/);
+            Dqn_b32        move_result = Dqn_OS_FileMove(COPY_FILE, MOVE_FILE, true /*overwrite*/, nullptr);
             DQN_UTEST_ASSERT(&test, move_result);
-            DQN_UTEST_ASSERT(&test, Dqn_OS_FileExists(MOVE_FILE));
+            DQN_UTEST_ASSERT(&test,  Dqn_OS_FileExists(MOVE_FILE));
             DQN_UTEST_ASSERTF(&test, Dqn_OS_FileExists(COPY_FILE) == false, "Moving a file should remove the original");
 
             // NOTE: Delete step

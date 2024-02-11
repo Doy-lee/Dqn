@@ -24,8 +24,11 @@
 
 struct Dqn_ThreadContext
 {
-    Dqn_b32    init;
-    Dqn_Arena *scratch_arenas[2];
+    Dqn_b32       init;
+    Dqn_Arena    *scratch_arenas[2];
+    Dqn_Arena    *error_sink_arena;
+    Dqn_CallSite  call_site;
+    Dqn_ErrorSink error_sink;
 };
 
 struct Dqn_Scratch
@@ -40,4 +43,5 @@ struct Dqn_Scratch
 
 DQN_API bool               Dqn_ThreadContext_IsInit();
 DQN_API Dqn_ThreadContext *Dqn_ThreadContext_Get();
+#define                    Dqn_ThreadContext_SaveCallSite do { Dqn_ThreadContext_Get()->call_site = DQN_CALL_SITE; } while (0)
 DQN_API Dqn_Scratch        Dqn_Scratch_Get(void const *conflict_arena);

@@ -220,6 +220,12 @@ DQN_API void Dqn_Arena_Pop(Dqn_Arena *arena, uint64_t amount)
     Dqn_Arena_PopTo(arena, pop_to);
 }
 
+DQN_API uint64_t Dqn_Arena_Pos(Dqn_Arena *arena)
+{
+    uint64_t result = (arena && arena->curr) ? arena->curr->reserve_sum + arena->curr->used : 0;
+    return result;
+}
+
 DQN_API void Dqn_Arena_Clear(Dqn_Arena *arena)
 {
     Dqn_Arena_PopTo(arena, 0);

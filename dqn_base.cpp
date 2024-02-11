@@ -346,10 +346,10 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_Str8 type, int log_type, void *user_d
 
     // NOTE: Open log file for appending if requested //////////////////////////
     Dqn_TicketMutex_Begin(&lib->log_file_mutex);
-    if (lib->log_to_file && !lib->log_file.handle && lib->log_file.error_size == 0) {
+    if (lib->log_to_file && !lib->log_file.handle && !lib->log_file.error) {
         Dqn_Scratch scratch  = Dqn_Scratch_Get(nullptr);
         Dqn_Str8    log_path = Dqn_OS_PathConvertF(scratch.arena, "%.*s/dqn.log", DQN_STR_FMT(lib->exe_dir));
-        lib->log_file        = Dqn_OS_OpenFile(log_path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_AppendOnly);
+        lib->log_file        = Dqn_OS_OpenFile(log_path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_AppendOnly, nullptr);
     }
     Dqn_TicketMutex_End(&lib->log_file_mutex);
 
@@ -361,8 +361,8 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_Str8 type, int log_type, void *user_d
     Dqn_Print_StdLn(Dqn_PrintStd_Out, log_line);
 
     Dqn_TicketMutex_Begin(&lib->log_file_mutex);
-    Dqn_OS_WriteFile(&lib->log_file, log_line);
-    Dqn_OS_WriteFile(&lib->log_file, DQN_STR8("\n"));
+    Dqn_OS_WriteFile(&lib->log_file, log_line, nullptr);
+    Dqn_OS_WriteFile(&lib->log_file, DQN_STR8("\n"), nullptr);
     Dqn_TicketMutex_End(&lib->log_file_mutex);
 }
 
@@ -405,3 +405,97 @@ DQN_API void Dqn_Log_TypeFCallSite(Dqn_LogType type, Dqn_CallSite call_site, DQN
     Dqn_Log_TypeFVCallSite(type, call_site, fmt, args);
     va_end(args);
 }
+
+// NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
+DQN_API Dqn_ErrorSink *Dqn_ErrorSink_Begin()
+{
+    Dqn_ThreadContext *thread_context = Dqn_ThreadContext_Get();
+    Dqn_ErrorSink     *result         = &thread_context->error_sink;
+    Dqn_ErrorSinkNode *node           = Dqn_Arena_New(result->arena, Dqn_ErrorSinkNode, Dqn_ZeroMem_Yes);
+    node->next                        = result->stack;
+    node->arena_pos                   = Dqn_Arena_Pos(result->arena);
+    result->stack                     = node;
+    return result;
+}
+
+DQN_API Dqn_ErrorSinkNode Dqn_ErrorSink_End(Dqn_Arena *arena, Dqn_ErrorSink *error)
+{
+    Dqn_ErrorSinkNode  result = {};
+    if (!error)
+        return result;
+
+    Dqn_ErrorSinkNode *node = error->stack;
+    if (!node)
+        return result;
+
+    DQN_ASSERTF(arena != error->arena,
+                "You are not allowed to reuse the arena for ending the error sink because the memory would get popped and lost");
+    result       = *error->stack;
+    result.next  = nullptr;
+    result.msg   = Dqn_Str8_Copy(arena, result.msg);
+    error->stack = error->stack->next;
+    Dqn_Arena_PopTo(error->arena, result.arena_pos);
+    return result;
+}
+
+DQN_API bool Dqn_ErrorSink_EndAndLogErrorFV(Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
+{
+    Dqn_Scratch       scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_ErrorSinkNode node    = Dqn_ErrorSink_End(scratch.arena, error);
+    if (node.error) {
+        Dqn_Str8 line = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+        if (Dqn_Str8_HasData(line)) {
+            Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s. %.*s", DQN_STR_FMT(line), DQN_STR_FMT(node.msg));
+        } else {
+            Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s", DQN_STR_FMT(node.msg));
+        }
+    }
+    bool result = node.error;
+    return result;
+}
+
+DQN_API bool Dqn_ErrorSink_EndAndLogErrorF(Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    bool result = Dqn_ErrorSink_EndAndLogErrorFV(error, fmt, args);
+    va_end(args);
+    return result;
+}
+
+DQN_API void Dqn_ErrorSink_EndAndExitIfErrorFV(Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, va_list args)
+{
+    if (Dqn_ErrorSink_EndAndLogErrorFV(error, fmt, args))
+        Dqn_OS_Exit(exit_code);
+}
+
+DQN_API void Dqn_ErrorSink_EndAndExitIfErrorF(Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_ErrorSink_EndAndExitIfErrorFV(error, exit_code, fmt, args);
+    va_end(args);
+}
+
+DQN_API void Dqn_ErrorSink_MakeFV_(Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, va_list args)
+{
+    if (error) {
+        Dqn_ErrorSinkNode *node = error->stack;
+        DQN_ASSERTF(node, "Error sink must be begun by calling 'Begin' before using this function.");
+        if (!node->error) { // NOTE: Only preserve the first error
+            node->msg        = Dqn_Str8_InitFV(error->arena, fmt, args);
+            node->error_code = error_code;
+            node->error      = true;
+            node->call_site  = Dqn_ThreadContext_Get()->call_site;
+        }
+    }
+}
+
+DQN_API void Dqn_ErrorSink_MakeF_(Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Dqn_ErrorSink_MakeFV_(error, error_code, fmt, args);
+    va_end(args);
+}
+
