@@ -478,7 +478,7 @@ template <typename T> Dqn_VArray<T> Dqn_VArray_Init(Dqn_usize max, uint8_t arena
 template <typename T> Dqn_VArray<T> Dqn_VArray_InitSlice(Dqn_Slice<T> slice, Dqn_usize max, uint8_t arena_flags)
 {
     Dqn_usize     real_max = DQN_MAX(slice.size, max);
-    Dqn_VArray<T> result   = Dqn_VArray_Init(real_max, arena_flags);
+    Dqn_VArray<T> result   = Dqn_VArray_Init<T>(real_max, arena_flags);
     if (Dqn_VArray_IsValid(&result))
         Dqn_VArray_AddArray(&result, slice.data, slice.size);
     return result;

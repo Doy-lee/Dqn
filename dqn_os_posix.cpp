@@ -230,6 +230,14 @@ DQN_API Dqn_OSPathInfo Dqn_OS_PathInfo(Dqn_Str8 path)
     return result;
 }
 
+DQN_API bool Dqn_OS_PathDelete(Dqn_Str8 path)
+{
+    bool result = false;
+    if (Dqn_Str8_HasData(path))
+        result = remove(path.data) == 0;
+    return result;
+}
+
 DQN_API bool Dqn_OS_FileExists(Dqn_Str8 path)
 {
     bool result = false;
@@ -242,32 +250,78 @@ DQN_API bool Dqn_OS_FileExists(Dqn_Str8 path)
     return result;
 }
 
-DQN_API bool Dqn_OS_FileCopy(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite)
+DQN_API bool Dqn_OS_CopyFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error)
 {
     bool result = false;
     #if defined(DQN_PLATFORM_EMSCRIPTEN)
-    DQN_ASSERTF(false, "Unsupported on Emscripten because of their VFS model");
+    Dqn_ErrorSink_MakeF(error, 1, "Unsupported on Emscripten because of their VFS model");
     #else
-    int src_fd  = open(src.data, O_RDONLY);
-    int dest_fd = open(dest.data, O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : 0));
+    int src_fd = open(src.data, O_RDONLY);
+    if (src_fd == -1) {
+        int error_code = errno;
+        Dqn_ErrorSink_MakeF(error,
+                            error_code,
+                            "Failed to open file '%.*s' for copying: (%d) %s",
+                            DQN_STR_FMT(src),
+                            error_code,
+                            strerror(error_code));
+        return result;
+    }
+    DQN_DEFER {
+        close(src_fd);
+    };
 
-    if (src_fd != -1 && dest_fd != -1) {
-        struct stat stat_existing;
-        fstat(src_fd, &stat_existing);
-        ssize_t bytes_written = sendfile64(dest_fd, src_fd, 0, stat_existing.st_size);
-        result = (bytes_written == stat_existing.st_size);
+    int dest_fd = open(dest.data, O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : 0));
+    if (dest_fd == -1) {
+        int error_code = errno;
+        Dqn_ErrorSink_MakeF(error,
+                            error_code,
+                            "Failed to open file destination '%.*s' for copying to: (%d) %s",
+                            DQN_STR_FMT(src),
+                            error_code,
+                            strerror(error_code));
+        return result;
+    }
+    DQN_DEFER {
+        close(dest_fd);
+    };
+
+    struct stat stat_existing;
+    int fstat_result = fstat(src_fd, &stat_existing);
+    if (fstat_result == -1) {
+        int error_code = errno;
+        Dqn_ErrorSink_MakeF(error,
+                            error_code,
+                            "Failed to query file size of '%.*s' for copying: (%d) %s",
+                            DQN_STR_FMT(src),
+                            error_code,
+                            strerror(error_code));
+        return result;
     }
 
-    if (src_fd != -1)
-        close(src_fd);
+    ssize_t bytes_written = sendfile64(dest_fd, src_fd, 0, stat_existing.st_size);
+    result                = (bytes_written == stat_existing.st_size);
+    if (!result) {
+        int         error_code         = errno;
+        Dqn_Scratch scratch            = Dqn_Scratch_Get(nullptr);
+        Dqn_Str8    file_size_str8     = Dqn_U64ToByteSizeStr8(scratch.arena, stat_existing.st_size, Dqn_U64ByteSizeType_Auto);
+        Dqn_Str8    bytes_written_str8 = Dqn_U64ToByteSizeStr8(scratch.arena, bytes_written, Dqn_U64ByteSizeType_Auto);
+        Dqn_ErrorSink_MakeF(error,
+                            error_code,
+                            "Failed to copy file '%.*s' to '%.*s', we copied %.*s but the file size is %.*s: (%d) %s",
+                            DQN_STR_FMT(src),
+                            DQN_STR_FMT(dest),
+                            DQN_STR_FMT(bytes_written_str8),
+                            DQN_STR_FMT(file_size_str8),
+                            error_code,
+                            strerror(error_code));
+    }
 
-    if (dest_fd != -1)
-        close(dest_fd);
     #endif
     return result;
 }
 
-DQN_API bool Dqn_OS_FileMove(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite)
+DQN_API bool Dqn_OS_MoveFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error)
 {
     // See: https://github.com/gingerBill/gb/blob/master/gb.h
     bool result     = false;
@@ -275,11 +329,21 @@ DQN_API bool Dqn_OS_FileMove(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite)
     if (link(src.data, dest.data) == -1) {
         // NOTE: Link can fail if we're trying to link across different volumes
         // so we fall back to a binary directory.
-        file_moved |= Dqn_OS_FileCopy(src, dest, overwrite);
+        file_moved |= Dqn_OS_CopyFile(src, dest, overwrite, error);
     }
 
-    if (file_moved)
-        result = (unlink(src.data) != -1); // Remove original file
+    if (file_moved) {
+        int unlink_result = unlink(src.data);
+        if (unlink_result == -1) {
+            int error_code = errno;
+            Dqn_ErrorSink_MakeF(error,
+                                error_code,
+                                "File '%.*s' was moved but failed to be unlinked from old location: (%d) %s",
+                                DQN_STR_FMT(src),
+                                error_code,
+                                strerror(error_code));
+        }
+    }
     return result;
 }
 
@@ -295,7 +359,7 @@ DQN_API bool Dqn_OS_DirExists(Dqn_Str8 path)
     return result;
 }
 
-DQN_API bool Dqn_OS_DirMake(Dqn_Str8 path)
+DQN_API bool Dqn_OS_MakeDir(Dqn_Str8 path)
 {
     Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
     bool        result  = true;
@@ -351,16 +415,8 @@ DQN_API bool Dqn_OS_DirMake(Dqn_Str8 path)
     return result;
 }
 
-DQN_API bool Dqn_OS_PathDelete(Dqn_Str8 path)
-{
-    bool result = false;
-    if (Dqn_Str8_HasData(path))
-        result = remove(path.data) == 0;
-    return result;
-}
-
 // NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint32_t access)
+DQN_API Dqn_OSFile Dqn_OS_FileOpen(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint32_t access, Dqn_ErrorSink *error)
 {
     Dqn_OSFile result = {};
     if (!Dqn_Str8_HasData(path) || path.size <= 0)
@@ -372,18 +428,15 @@ DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
     }
 
     if (access & Dqn_OSFileAccess_Execute) {
-        result.error_size = DQN_CAST(uint16_t) Dqn_FmtBuffer3DotTruncate(
-            result.error,
-            DQN_ARRAY_UCOUNT(result.error),
-            "Open file failed: execute access not supported for \"%.*s\"",
-            DQN_STR_FMT(path));
+        result.error = true;
+        Dqn_ErrorSink_MakeF(error, 1, "Failed to open file '%.*s': File access flag 'execute' is not supported", DQN_STR_FMT(path));
         DQN_INVALID_CODE_PATH; // TODO: Not supported via fopen
         return result;
     }
 
     // NOTE: fopen interface is not as expressive as the Win32
     // We will fopen the file beforehand to setup the state/check for validity
-    // before closing and reopening it if valid with the correct request access
+    // before closing and reopening it with the correct request access
     // permissions.
     {
         FILE *handle = nullptr;
@@ -393,13 +446,10 @@ DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
             case Dqn_OSFileOpen_OpenAlways:   handle = fopen(path.data, "a"); break;
             default: DQN_INVALID_CODE_PATH; break;
         }
-        if (!handle) {
-            result.error_size = DQN_CAST(uint16_t)Dqn_FmtBuffer3DotTruncate(
-                result.error,
-                DQN_ARRAY_UCOUNT(result.error),
-                "Open file failed: Could not open file in requested mode %d for \"%.*s\"",
-                open_mode,
-                DQN_STR_FMT(path));
+
+        if (!handle) { // TODO(doyle): FileOpen flag to string
+            result.error = true;
+            Dqn_ErrorSink_MakeF(error, 1, "Failed to open file '%.*s': File could not be opened in requested mode 'Dqn_OSFileOpen' flag %d", DQN_STR_FMT(path), open_mode);
             return result;
         }
         fclose(handle);
@@ -416,73 +466,48 @@ DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
 
     FILE *handle = fopen(path.data, fopen_mode);
     if (!handle) {
-        result.error_size = DQN_CAST(uint16_t) Dqn_FmtBuffer3DotTruncate(
-            result.error,
-            DQN_ARRAY_UCOUNT(result.error),
-            "Open file failed: Could not open file in fopen mode \"%s\" for \"%.*s\"",
-            fopen_mode,
-            DQN_STR_FMT(path));
+        result.error = true;
+        Dqn_ErrorSink_MakeF(error, 1, "Failed to open file '%.*s': File could not be opened with requested access mode 'Dqn_OSFileAccess' %d", DQN_STR_FMT(path), fopen_mode);
         return result;
     }
     result.handle = handle;
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteFileBuffer(Dqn_OSFile *file, void const *buffer, Dqn_usize size)
+DQN_API bool Dqn_OS_FileRead(Dqn_OSFile *file, void *buffer, Dqn_usize size, Dqn_ErrorSink *error)
 {
-    if (!file || !file->handle || !buffer || size <= 0 || file->error_size)
+    if (!file || !file->handle || file->error || !buffer || size <= 0)
+        return false;
+
+    if (fread(buffer, size, 1, DQN_CAST(FILE *)file->handle) != 1) {
+        Dqn_Scratch scratch          = Dqn_Scratch_Get(nullptr);
+        Dqn_Str8    buffer_size_str8 = Dqn_U64ToByteSizeStr8(scratch.arena, size, Dqn_U64ByteSizeType_Auto);
+        Dqn_ErrorSink_MakeF(error, 1, "Failed to read %.*s from file", DQN_STR_FMT(buffer_size_str8));
+        return false;
+    }
+
+    return true;
+}
+
+DQN_API bool Dqn_OS_FileWritePtr(Dqn_OSFile *file, void const *buffer, Dqn_usize size, Dqn_ErrorSink *error)
+{
+    if (!file || !file->handle || file->error || !buffer || size <= 0)
         return false;
     bool result = fwrite(buffer, DQN_CAST(Dqn_usize)size, 1 /*count*/, DQN_CAST(FILE *)file->handle) == 1 /*count*/;
+    if (!result) {
+        Dqn_Scratch scratch          = Dqn_Scratch_Get(nullptr);
+        Dqn_Str8    buffer_size_str8 = Dqn_U64ToByteSizeStr8(scratch.arena, size, Dqn_U64ByteSizeType_Auto);
+        Dqn_ErrorSink_MakeF(error, 1, "Failed to write buffer (%s) to file handle", DQN_STR_FMT(buffer_size_str8));
+    }
     return result;
 }
 
-DQN_API void Dqn_OS_CloseFile(Dqn_OSFile *file)
+DQN_API void Dqn_OS_FileClose(Dqn_OSFile *file)
 {
-    if (!file || !file->handle || file->error_size)
+    if (!file || !file->handle || file->error)
         return;
     fclose(DQN_CAST(FILE *)file->handle);
     *file = {};
-}
-
-// NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_Str8 Dqn_OS_ReadAll(Dqn_Str8 path, Dqn_Arena *arena)
-{
-    Dqn_Str8 result = {};
-    if (!arena)
-        return result;
-
-    Dqn_ArenaTempMemScope temp_mem = Dqn_ArenaTempMemScope(arena);
-    FILE *file_handle = fopen(path.data, "rb");
-    if (!file_handle) {
-        Dqn_Log_ErrorF("Failed to open file '%.*s' using fopen", DQN_STR_FMT(path));
-        return result;
-    }
-    DQN_DEFER { fclose(file_handle); };
-
-    fseek(file_handle, 0, SEEK_END);
-    Dqn_usize file_size = ftell(file_handle);
-
-    if (DQN_CAST(long)(file_size) == -1L) {
-        Dqn_Log_ErrorF("Failed to determine '%.*s' file size using ftell", DQN_STR_FMT(path));
-        return result;
-    }
-
-    rewind(file_handle);
-    Dqn_Str8 buffer = Dqn_Str8_Alloc(arena, file_size, Dqn_ZeroMem_No);
-    if (!buffer.data) {
-        Dqn_Log_ErrorF("Failed to allocate %zu bytes to read file '%.*s'", file_size + 1, DQN_STR_FMT(path));
-        return result;
-    }
-
-    if (fread(buffer.data, file_size, 1, file_handle) != 1) {
-        Dqn_Log_ErrorF("Failed to read %zu bytes into buffer from '%.*s'", file_size, DQN_STR_FMT(path));
-        return result;
-    }
-
-    buffer.data[file_size] = 0;
-    result                 = buffer;
-    temp_mem.mem           = {};
-    return result;
 }
 #endif // !defined(DQN_NO_OS_FILE_API)
 

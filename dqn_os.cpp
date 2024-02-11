@@ -148,38 +148,74 @@ DQN_API uint64_t Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_f
 
 #if !defined(DQN_NO_OS_FILE_API)
 // NOTE: [$FILE] Dqn_OSPathInfo/File ///////////////////////////////////////////////////////////////
-DQN_API bool Dqn_OS_WriteFile(Dqn_OSFile *file, Dqn_Str8 buffer, Dqn_ErrorSink *error)
+DQN_API bool Dqn_OS_FileWrite(Dqn_OSFile *file, Dqn_Str8 buffer, Dqn_ErrorSink *error)
 {
-    bool result = Dqn_OS_WriteFileBuffer(file, buffer.data, buffer.size, error);
+    bool result = Dqn_OS_FileWritePtr(file, buffer.data, buffer.size, error);
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteFileFV(Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
+DQN_API bool Dqn_OS_FileWriteFV(Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
     bool result = false;
     if (!file || !fmt)
         return result;
     Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
     Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
-    result              = Dqn_OS_WriteFileBuffer(file, buffer.data, buffer.size, error);
+    result              = Dqn_OS_FileWritePtr(file, buffer.data, buffer.size, error);
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteFileF(Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...)
+DQN_API bool Dqn_OS_FileWriteF(Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    bool result = Dqn_OS_WriteFileFV(file, error, fmt, args);
+    bool result = Dqn_OS_FileWriteFV(file, error, fmt, args);
     va_end(args);
     return result;
 }
 
 // NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
+DQN_API Dqn_Str8 Dqn_OS_ReadAll(Dqn_Str8 path, Dqn_Arena *arena, Dqn_ErrorSink *error)
+{
+    Dqn_Str8 result = {};
+    if (!arena)
+        return result;
+
+    // NOTE: Query file size + allocate buffer /////////////////////////////////////////////////////
+    Dqn_OSPathInfo path_info = Dqn_OS_PathInfo(path);
+    if (!path_info.exists) {
+        Dqn_ErrorSink_MakeF(error, 1, "File does not exist/could not be queried for reading '%.*s'", DQN_STR_FMT(path));
+        return result;
+    }
+
+    Dqn_ArenaTempMem temp_mem = Dqn_Arena_TempMemBegin(arena);
+    result                    = Dqn_Str8_Alloc(arena, path_info.size, Dqn_ZeroMem_No);
+    if (!Dqn_Str8_HasData(result)) {
+        Dqn_Scratch scratch          = Dqn_Scratch_Get(nullptr);
+        Dqn_Str8    buffer_size_str8 = Dqn_U64ToByteSizeStr8(scratch.arena, path_info.size, Dqn_U64ByteSizeType_Auto);
+        Dqn_ErrorSink_MakeF(error, 1 /*error_code*/, "Failed to allocate %.*s for reading file '%.*s'", DQN_STR_FMT(buffer_size_str8), DQN_STR_FMT(path));
+        Dqn_Arena_TempMemEnd(temp_mem);
+        result = {};
+        return result;
+    }
+
+    // NOTE: Read the file from disk ///////////////////////////////////////////////////////////////
+    Dqn_OSFile file = Dqn_OS_FileOpen(path, Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_Read, error);
+    Dqn_OS_FileRead(&file, result.data, result.size, error);
+    Dqn_OS_FileClose(&file);
+
+    if (error->stack->error) {
+        Dqn_Arena_TempMemEnd(temp_mem);
+        result = {};
+    }
+
+    return result;
+}
 DQN_API bool Dqn_OS_WriteAll(Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error)
 {
-    Dqn_OSFile file = Dqn_OS_OpenFile(path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_Write, error);
-    bool result     = Dqn_OS_WriteFile(&file, buffer, error);
-    Dqn_OS_CloseFile(&file);
+    Dqn_OSFile file = Dqn_OS_FileOpen(path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_Write, error);
+    bool result     = Dqn_OS_FileWrite(&file, buffer, error);
+    Dqn_OS_FileClose(&file);
     return result;
 }
 
@@ -206,7 +242,7 @@ DQN_API bool Dqn_OS_WriteAllSafe(Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *
     Dqn_Str8    tmp_path = Dqn_Str8_InitF(scratch.arena, "%.*s.tmp", DQN_STR_FMT(path));
     if (!Dqn_OS_WriteAll(tmp_path, buffer, error))
         return false;
-    if (!Dqn_OS_FileCopy(tmp_path, path, true /*overwrite*/, error))
+    if (!Dqn_OS_CopyFile(tmp_path, path, true /*overwrite*/, error))
         return false;
     if (!Dqn_OS_PathDelete(tmp_path))
         return false;

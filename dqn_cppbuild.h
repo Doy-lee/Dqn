@@ -179,7 +179,7 @@ DQN_API Dqn_CPPBuildAsyncResult Dqn_CPPBuild_Async(Dqn_CPPBuildContext build_con
     if (!cmd_line.size)
         return result;
 
-    if (!Dqn_OS_DirMake(build_context.build_dir)) {
+    if (!Dqn_OS_MakeDir(build_context.build_dir)) {
         result.status = Dqn_CPPBuildStatus_BuildDirectoryFailedToBeMade;
         return result;
     }
@@ -190,7 +190,7 @@ DQN_API Dqn_CPPBuildAsyncResult Dqn_CPPBuild_Async(Dqn_CPPBuildContext build_con
 
 void Dqn_CPPBuild_ExecOrAbort(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode)
 {
-    if (!Dqn_OS_DirMake(build_context.build_dir)) {
+    if (!Dqn_OS_MakeDir(build_context.build_dir)) {
         Dqn_Log_ErrorF("Failed to make build dir '%.*s'", DQN_STR_FMT(build_context.build_dir));
         exit(-1);
     }

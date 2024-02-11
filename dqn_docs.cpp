@@ -238,49 +238,81 @@ void Dqn_Docs_Demo()
 
     // NOTE: Dqn_ErrorSink /////////////////////////////////////////////////////////////////////////
     //
-    // A thread-local data structure that collects all errors emitted by APIs
-    // into one unified structure. This library has 2 core tenets when handling
-    // errors
+    // Error sinks are a way of accumulating errors from API calls related or
+    // unrelated into 1 unified error handling pattern. The implemenation of a
+    // sink requires 2 fundamental design constraints on the APIs supporting
+    // this pattern.
     //
     // 1. Pipelining of errors
     //    Errors emitted over the course of several API calls are accumulated
-    //    into a thread-local sink which save the error code and message
-    //    of the first error encountered.
+    //    into a sink which save the error code and message of the first error
+    //    encountered and can be checked later.
     //
     // 2. Error proof APIs
     //    Functions that produce errors must return objects/handles that are
     //    marked to trigger no-ops used in subsequent functions dependent on it.
     //
-    // Together this allows end-users of APIs to chain calls and defer error
-    // checking until the end of a sequence of actions. Consider the following
-    // example demonstrating the 2 approaches.
+    // Consider the following example demonstrating a conventional error
+    // handling approach (error values by return/sentinel values) and error
+    // handling using error-proof and pipelining.
 
     // (A) Conventional error checking patterns using return/sentinel values
     #if 0
-    FileHandle *file = OpenFile("/path/to/file");
-    if (!file)
-        // Error handling!
-    if (!WriteFile(file, "abc"))
-        // Error handling!
-    CloseFile(file);
+        Dqn_OSFile *file = Dqn_OS_FileOpen("/path/to/file", ...);
+        if (file) {
+            if (!Dqn_OS_FileWrite(file, "abc")) {
+                // Error handling!
+            }
+            Dnq_OS_FileClose(file);
+        } else {
+            // Error handling!
+        }
     #endif
 
-    // (B) Error handling using pipelining and and error proof APIs
+    // (B) Error handling using pipelining and and error proof APIs. APIs that
+    // produce errors take in the error sink as a parameter.
     if (0) {
-        Dqn_Scratch    scratch = Dqn_Scratch_Get(nullptr);
-        Dqn_ErrorSink *error   = Dqn_ErrorSink_Begin();
-        Dqn_OSFile     file    = Dqn_OS_OpenFile(DQN_STR8("/path/to/file"), Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_ReadWrite, error);
-        Dqn_OS_WriteFile(&file, DQN_STR8("abc"), error);
-        Dqn_OS_CloseFile(&file);
-
-        Dqn_ErrorSinkNode error_node = Dqn_ErrorSink_End(scratch.arena, error);
-        if (error_node.error) {
+        Dqn_ErrorSink *error = Dqn_ErrorSink_Begin();
+        Dqn_OSFile     file  = Dqn_OS_FileOpen(DQN_STR8("/path/to/file"), Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_ReadWrite, error);
+        Dqn_OS_FileWrite(&file, DQN_STR8("abc"), error);
+        Dqn_OS_FileClose(&file);
+        if (Dqn_ErrorSink_EndAndLogErrorF(error, "Failed to write to file")) {
             // Do error handling!
-            Dqn_Log_ErrorF("%.*s", DQN_STR_FMT(error_node.msg));
         }
     }
 
-    // TODO(doyle): Integrate more into the codebase and provide a concrete example.
+    // Pipeling and error-proof APIs lets you write sequence of instructions and
+    // defer error checking until it is convenient or necessary. Functions are
+    // *guaranteed* to return an object that is usable. There are no hidden
+    // exceptions to be thrown. Functions may opt to still return error values
+    // by way of return values thereby *not* precluding the ability to check
+    // every API call either.
+    //
+    // Ultimately, this error handling approach gives more flexibility on the
+    // manner in how errors are handled with less code.
+    //
+    // Error sinks can nest begin and end statements. This will open a new scope
+    // whereby the current captured error pushed onto a stack and the sink will
+    // be populated by the first error encountered in that scope.
+
+    if (0) {
+        Dqn_ErrorSink *error = Dqn_ErrorSink_Begin();
+        Dqn_OSFile     file  = Dqn_OS_FileOpen(DQN_STR8("/path/to/file"), Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_ReadWrite, error);
+        Dqn_OS_FileWrite(&file, DQN_STR8("abc"), error);
+        Dqn_OS_FileClose(&file);
+
+        {
+            // NOTE: My error sinks are thread-local, so the returned 'error' is
+            // the same as the 'error' value above.
+            Dqn_ErrorSink_Begin();
+            Dqn_OS_WriteAll(DQN_STR8("/path/to/another/file"), DQN_STR8("123"), error);
+            Dqn_ErrorSink_EndAndLogErrorF(error, "Failed to write to another file");
+        }
+
+        if (Dqn_ErrorSink_EndAndLogErrorF(error, "Failed to write to file")) {
+            // Do error handling!
+        }
+    }
 
     // NOTE: Dqn_FStr8_Max /////////////////////////////////////////////////////////////////////////
     //

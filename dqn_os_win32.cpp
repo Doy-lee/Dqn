@@ -236,6 +236,22 @@ DQN_API Dqn_OSPathInfo Dqn_OS_PathInfo(Dqn_Str8 path)
     return result;
 }
 
+DQN_API bool Dqn_OS_PathDelete(Dqn_Str8 path)
+{
+    bool result = false;
+    if (!Dqn_Str8_HasData(path))
+        return result;
+
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
+    if (path16.size) {
+        result = DeleteFileW(path16.data);
+        if (!result)
+            result = RemoveDirectoryW(path16.data);
+    }
+    return result;
+}
+
 DQN_API bool Dqn_OS_FileExists(Dqn_Str8 path)
 {
     bool result = false;
@@ -254,7 +270,7 @@ DQN_API bool Dqn_OS_FileExists(Dqn_Str8 path)
     return result;
 }
 
-DQN_API bool Dqn_OS_FileCopy(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error)
+DQN_API bool Dqn_OS_CopyFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error)
 {
     bool         result  = false;
     Dqn_Scratch  scratch = Dqn_Scratch_Get(nullptr);
@@ -277,7 +293,7 @@ DQN_API bool Dqn_OS_FileCopy(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_Er
     return result;
 }
 
-DQN_API bool Dqn_OS_FileMove(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error)
+DQN_API bool Dqn_OS_MoveFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error)
 {
     bool        result  = false;
     Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
@@ -303,27 +319,7 @@ DQN_API bool Dqn_OS_FileMove(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_Er
     return result;
 }
 
-
-DQN_API bool Dqn_OS_DirExists(Dqn_Str8 path)
-{
-    bool result = false;
-    if (!Dqn_Str8_HasData(path))
-        return result;
-
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
-    if (path16.size) {
-        WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-        if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data)) {
-            result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
-                     (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-        }
-    }
-
-    return result;
-}
-
-DQN_API bool Dqn_OS_DirMake(Dqn_Str8 path)
+DQN_API bool Dqn_OS_MakeDir(Dqn_Str8 path)
 {
     bool        result  = true;
     Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
@@ -374,7 +370,8 @@ DQN_API bool Dqn_OS_DirMake(Dqn_Str8 path)
     return result;
 }
 
-DQN_API bool Dqn_OS_PathDelete(Dqn_Str8 path)
+
+DQN_API bool Dqn_OS_DirExists(Dqn_Str8 path)
 {
     bool result = false;
     if (!Dqn_Str8_HasData(path))
@@ -383,15 +380,18 @@ DQN_API bool Dqn_OS_PathDelete(Dqn_Str8 path)
     Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
     Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
     if (path16.size) {
-        result = DeleteFileW(path16.data);
-        if (!result)
-            result = RemoveDirectoryW(path16.data);
+        WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+        if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data)) {
+            result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
+                     (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+        }
     }
+
     return result;
 }
 
 // NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint32_t access, Dqn_ErrorSink *error)
+DQN_API Dqn_OSFile Dqn_OS_FileOpen(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint32_t access, Dqn_ErrorSink *error)
 {
     Dqn_OSFile result = {};
     if (!Dqn_Str8_HasData(path) || path.size <= 0)
@@ -445,7 +445,51 @@ DQN_API Dqn_OSFile Dqn_OS_OpenFile(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
     return result;
 }
 
-DQN_API bool Dqn_OS_WriteFileBuffer(Dqn_OSFile *file, void const *buffer, Dqn_usize size, Dqn_ErrorSink *error)
+DQN_API bool Dqn_OS_FileRead(Dqn_OSFile *file, void *buffer, Dqn_usize size, Dqn_ErrorSink *error)
+{
+    if (!file || !file->handle || file->error || !buffer || size <= 0)
+        return false;
+
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    if (!DQN_CHECK(size <= (unsigned long)-1)) {
+        Dqn_Str8    buffer_size_str8 = Dqn_U64ToByteSizeStr8(scratch.arena, size, Dqn_U64ByteSizeType_Auto);
+        Dqn_ErrorSink_MakeF(
+            error,
+            1 /*error_code*/,
+            "Current implementation doesn't support reading >4GiB file (requested %.*s), implement Win32 overlapped IO",
+            DQN_STR_FMT(buffer_size_str8));
+        return false;
+    }
+
+    unsigned long bytes_read  = 0;
+    unsigned long read_result = ReadFile(/*HANDLE       hFile*/                 file->handle,
+                                         /*LPVOID       lpBuffer*/              buffer,
+                                         /*DWORD        nNumberOfBytesToRead*/  DQN_CAST(unsigned long)size,
+                                         /*LPDWORD      lpNumberOfByesRead*/   &bytes_read,
+                                         /*LPOVERLAPPED lpOverlapped*/          nullptr);
+    if (read_result == 0) {
+        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_ErrorSink_MakeF(error, win_error.code, "Failed to read data from file: (%u) %.*s", win_error.code, DQN_STR_FMT(win_error.msg));
+        return false;
+    }
+
+    if (bytes_read != size) {
+        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_ErrorSink_MakeF(
+            error,
+            win_error.code,
+            "Failed to read the desired number of bytes from file, we read %uB but we expected %uB: (%u) %.*s",
+            bytes_read,
+            DQN_CAST(unsigned long)size,
+            win_error.code,
+            DQN_STR_FMT(win_error.msg));
+        return false;
+    }
+
+    return true;
+}
+
+DQN_API bool Dqn_OS_FileWritePtr(Dqn_OSFile *file, void const *buffer, Dqn_usize size, Dqn_ErrorSink *error)
 {
     if (!file || !file->handle || file->error || !buffer || size <= 0)
         return false;
@@ -468,88 +512,12 @@ DQN_API bool Dqn_OS_WriteFileBuffer(Dqn_OSFile *file, void const *buffer, Dqn_us
     return result;
 }
 
-DQN_API void Dqn_OS_CloseFile(Dqn_OSFile *file)
+DQN_API void Dqn_OS_FileClose(Dqn_OSFile *file)
 {
     if (!file || !file->handle || file->error)
         return;
     CloseHandle(file->handle);
     *file = {};
-}
-
-// NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_Str8 Dqn_OS_ReadAll(Dqn_Str8 path, Dqn_Arena *arena, Dqn_ErrorSink *error)
-{
-    Dqn_Str8 result = {};
-    if (!arena)
-        return result;
-
-    Dqn_ArenaTempMemScope temp_mem = Dqn_ArenaTempMemScope(arena);
-    // NOTE: Convert to UTF16 //////////////////////////////////////////////////////////////////////
-    Dqn_Scratch scratch = Dqn_Scratch_Get(arena);
-    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
-
-    // NOTE: Get the file handle ///////////////////////////////////////////////////////////////////
-    void *file_handle = CreateFileW(/*LPCWSTR               lpFileName*/            path16.data,
-                                    /*DWORD                 dwDesiredAccess*/       GENERIC_READ,
-                                    /*DWORD                 dwShareMode*/           FILE_SHARE_READ,
-                                    /*LPSECURITY_ATTRIBUTES lpSecurityAttributes*/  nullptr,
-                                    /*DWORD                 dwCreationDisposition*/ OPEN_EXISTING,
-                                    /*DWORD                 dwFlagsAndAttributes*/  FILE_ATTRIBUTE_READONLY,
-                                    /*HANDLE                hTemplateFile*/         nullptr);
-    if (file_handle == INVALID_HANDLE_VALUE) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
-        Dqn_ErrorSink_MakeF(error, win_error.code, "Failed to open file at '%.*s' for reading: %.*s", DQN_STR_FMT(path), DQN_STR_FMT(win_error.msg));
-        return result;
-    }
-    DQN_DEFER { CloseHandle(file_handle); };
-
-    // NOTE: Query the file size ///////////////////////////////////////////////////////////////////
-    LARGE_INTEGER win_file_size;
-    if (!GetFileSizeEx(file_handle, &win_file_size)) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
-        Dqn_ErrorSink_MakeF(error, win_error.code, "Failed to query file size for reading '%.*s': %.*s", DQN_STR_FMT(path), DQN_STR_FMT(win_error.msg));
-        return result;
-    }
-
-    unsigned long const bytes_desired = DQN_CAST(unsigned long)win_file_size.QuadPart;
-    if (!DQN_CHECK(bytes_desired == win_file_size.QuadPart)) {
-        Dqn_ErrorSink_MakeF(error, 1 /*error_code*/, "Current implementation doesn't support reading >4GiB file at '%.*s', implement Win32 overlapped IO", DQN_STR_FMT(path));
-        return result;
-    }
-
-    // NOTE: Read the file from disk ///////////////////////////////////////////////////////////////
-    Dqn_Str8 buffer           = Dqn_Str8_Alloc(arena, bytes_desired, Dqn_ZeroMem_No);
-    unsigned long bytes_read  = 0;
-    unsigned long read_result = ReadFile(/*HANDLE       hFile*/                 file_handle,
-                                         /*LPVOID       lpBuffer*/              buffer.data,
-                                         /*DWORD        nNumberOfBytesToRead*/  bytes_desired,
-                                         /*LPDWORD      lpNumberOfByesRead*/   &bytes_read,
-                                         /*LPOVERLAPPED lpOverlapped*/          nullptr);
-
-    if (read_result == 0) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
-        Dqn_ErrorSink_MakeF(error, win_error.code, "Failed to read bytes from file '%.*s': (%u) %.*s", DQN_STR_FMT(path), win_error.code, DQN_STR_FMT(win_error.msg));
-        return result;
-    }
-
-    if (bytes_read != bytes_desired) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
-        Dqn_ErrorSink_MakeF(
-            error,
-            win_error.code,
-            "Failed to read the desired number of bytes from file '%.*s', we read %uB but we expected %uB: (%u) %.*s",
-            DQN_STR_FMT(path),
-            bytes_read,
-            bytes_desired,
-            win_error.code,
-            DQN_STR_FMT(win_error.msg));
-        return result;
-    }
-
-    buffer.data[bytes_desired] = 0;
-    result                     = buffer;
-    temp_mem.mem               = {};
-    return result;
 }
 #endif // !defined(DQN_NO_OS_FILE_API)
 

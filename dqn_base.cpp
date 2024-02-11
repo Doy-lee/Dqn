@@ -349,7 +349,7 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_Str8 type, int log_type, void *user_d
     if (lib->log_to_file && !lib->log_file.handle && !lib->log_file.error) {
         Dqn_Scratch scratch  = Dqn_Scratch_Get(nullptr);
         Dqn_Str8    log_path = Dqn_OS_PathConvertF(scratch.arena, "%.*s/dqn.log", DQN_STR_FMT(lib->exe_dir));
-        lib->log_file        = Dqn_OS_OpenFile(log_path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_AppendOnly, nullptr);
+        lib->log_file        = Dqn_OS_FileOpen(log_path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_AppendOnly, nullptr);
     }
     Dqn_TicketMutex_End(&lib->log_file_mutex);
 
@@ -361,8 +361,8 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_Str8 type, int log_type, void *user_d
     Dqn_Print_StdLn(Dqn_PrintStd_Out, log_line);
 
     Dqn_TicketMutex_Begin(&lib->log_file_mutex);
-    Dqn_OS_WriteFile(&lib->log_file, log_line, nullptr);
-    Dqn_OS_WriteFile(&lib->log_file, DQN_STR8("\n"), nullptr);
+    Dqn_OS_FileWrite(&lib->log_file, log_line, nullptr);
+    Dqn_OS_FileWrite(&lib->log_file, DQN_STR8("\n"), nullptr);
     Dqn_TicketMutex_End(&lib->log_file_mutex);
 }
 

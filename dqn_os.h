@@ -304,18 +304,19 @@ DQN_API uint64_t                  Dqn_OS_EstimateTSCPerSecond(uint64_t duration_
 DQN_API Dqn_OSPathInfo            Dqn_OS_PathInfo  (Dqn_Str8 path);
 DQN_API bool                      Dqn_OS_PathDelete(Dqn_Str8 path);
 DQN_API bool                      Dqn_OS_FileExists(Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_FileCopy  (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_FileMove  (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_CopyFile  (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_MoveFile  (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_MakeDir   (Dqn_Str8 path, Dqn_ErrorSink *error);
 DQN_API bool                      Dqn_OS_DirExists (Dqn_Str8 path, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_DirMake   (Dqn_Str8 path, Dqn_ErrorSink *error);
 
 // NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSFile                Dqn_OS_OpenFile       (Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint32_t access, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_WriteFileBuffer(Dqn_OSFile *file, void const *data, Dqn_usize size, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_WriteFile      (Dqn_OSFile *file, Dqn_Str8 buffer, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_WriteFileFV    (Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API bool                      Dqn_OS_WriteFileF     (Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API void                      Dqn_OS_CloseFile      (Dqn_OSFile *file);
+DQN_API Dqn_OSFile                Dqn_OS_FileOpen    (Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint32_t access, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_FileRead    (Dqn_OSFile *file, void *buffer, Dqn_usize size, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_FileWritePtr(Dqn_OSFile *file, void const *data, Dqn_usize size, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_FileWrite   (Dqn_OSFile *file, Dqn_Str8 buffer, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_FileWriteFV (Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DQN_API bool                      Dqn_OS_FileWriteF  (Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API void                      Dqn_OS_FileClose   (Dqn_OSFile *file);
 
 // NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_Str8                  Dqn_OS_ReadAll       (Dqn_Str8 path, Dqn_Arena *arena, Dqn_ErrorSink *error);
