@@ -277,6 +277,8 @@ DQN_API Dqn_OSDateTime            Dqn_OS_DateLocalTimeNow    ();
 DQN_API Dqn_OSDateTimeStr8        Dqn_OS_DateLocalTimeStr8Now(char date_separator = '-', char hms_separator = ':');
 DQN_API Dqn_OSDateTimeStr8        Dqn_OS_DateLocalTimeStr8   (Dqn_OSDateTime time, char date_separator = '-', char hms_separator = ':');
 DQN_API uint64_t                  Dqn_OS_DateUnixTime        ();
+DQN_API uint64_t                  Dqn_OS_DateToUnixTime      (Dqn_OSDateTime date);
+DQN_API bool                      Dqn_OS_DateIsValid         (Dqn_OSDateTime date);
 
 // NOTE: Other /////////////////////////////////////////////////////////////////////////////////////
 DQN_API bool                      Dqn_OS_SecureRNGBytes      (void *buffer, uint32_t size);
@@ -340,11 +342,7 @@ DQN_API Dqn_Str8                  Dqn_OS_PathConvert           (Dqn_Arena *arena
 DQN_API Dqn_Str8                  Dqn_OS_PathConvertF          (Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...);
 #define                           Dqn_OS_PathBuildFwdSlash(allocator, fs_path)  Dqn_OS_PathBuildWithSeparator(allocator, fs_path, DQN_STR8("/"))
 #define                           Dqn_OS_PathBuildBackSlash(allocator, fs_path) Dqn_OS_PathBuildWithSeparator(allocator, fs_path, DQN_STR8("\\"))
-#if defined(DQN_OS_WIN32)
-    #define                       Dqn_OS_PathBuild(allocator, fs_path) Dqn_OS_PathBuildBackSlash(allocator, fs_path)
-#else
-    #define                       Dqn_OS_PathBuild(allocator, fs_path) Dqn_OS_PathBuildFwdSlash(allocator, fs_path)
-#endif
+#define                           Dqn_OS_PathBuild(allocator, fs_path)          Dqn_OS_PathBuildWithSeparator(allocator, fs_path, Dqn_OSPathSeparatorString)
 
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
 DQN_API void                      Dqn_OS_Exit       (uint32_t exit_code);

@@ -150,9 +150,9 @@ DQN_API void                  Dqn_Arena_Clear                (Dqn_Arena *arena);
 DQN_API Dqn_ArenaTempMem      Dqn_Arena_TempMemBegin         (Dqn_Arena *arena);
 DQN_API void                  Dqn_Arena_TempMemEnd           (Dqn_ArenaTempMem mem);
 #define                       Dqn_Arena_New(arena, T, zero_mem)             (T *)Dqn_Arena_Alloc(arena,        sizeof(T),              alignof(T), zero_mem)
-#define                       Dqn_Arena_NewArray(arena, T, count, zero_mem) (T *)Dqn_Arena_Alloc(arena,        sizeof(T)    * (count), alignof(T), zero_mem)
-#define                       Dqn_Arena_NewCopy(arena, T, src)              (T *)Dqn_Arena_Copy (arena, (src), sizeof(*src),           alignof(T))
-#define                       Dqn_Arena_NewArrayCopy(arena, T, src, count)  (T *)Dqn_Arena_Copy (arena, (src), sizeof(*src) * (count), alignof(T))
+#define                       Dqn_Arena_NewArray(arena, T, count, zero_mem) (T *)Dqn_Arena_Alloc(arena,        sizeof(T)  * (count), alignof(T), zero_mem)
+#define                       Dqn_Arena_NewCopy(arena, T, src)              (T *)Dqn_Arena_Copy (arena, (src), sizeof(T),           alignof(T))
+#define                       Dqn_Arena_NewArrayCopy(arena, T, src, count)  (T *)Dqn_Arena_Copy (arena, (src), sizeof(T)  * (count), alignof(T))
 
 // NOTE: [$CHUN] Dqn_ChunkPool /////////////////////////////////////////////////////////////////////
 #define                       Dqn_ChunkPool_New(pool, T)     (T *)Dqn_ChunkPool_Alloc(pool, sizeof(T))

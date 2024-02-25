@@ -22,9 +22,9 @@ struct Dqn_WinError
 // NOTE: Windows Str8 <-> Str16 ///////////////////////////////////////////
 struct Dqn_Win_FolderIteratorW
 {
-    void         *handle;
-    Dqn_Str16 file_name;
-    wchar_t      file_name_buf[512];
+    void      *handle;
+    Dqn_Str16  file_name;
+    wchar_t    file_name_buf[512];
 };
 
 struct Dqn_Win_FolderIterator

@@ -112,18 +112,41 @@ DQN_API Dqn_OSDateTime Dqn_OS_DateLocalTimeNow()
     return result;
 }
 
+const uint64_t DQN_OS_WIN32_UNIX_TIME_START            = 0x019DB1DED53E8000; // January 1, 1970 (start of Unix epoch) in "ticks"
+const uint64_t DQN_OS_WIN32_FILE_TIME_TICKS_PER_SECOND = 10'000'000;         // Filetime returned is in intervals of 100 nanoseconds
+
 DQN_API uint64_t Dqn_OS_DateUnixTime()
 {
-    const uint64_t UNIX_TIME_START  = 0x019DB1DED53E8000; // January 1, 1970 (start of Unix epoch) in "ticks"
-    const uint64_t TICKS_PER_SECOND = 10'000'000;         // Filetime returned is in intervals of 100 nanoseconds
-
     FILETIME file_time;
     GetSystemTimeAsFileTime(&file_time);
 
     LARGE_INTEGER date_time;
     date_time.u.LowPart  = file_time.dwLowDateTime;
     date_time.u.HighPart = file_time.dwHighDateTime;
-    uint64_t result      = (date_time.QuadPart - UNIX_TIME_START) / TICKS_PER_SECOND;
+    uint64_t result      = (date_time.QuadPart - DQN_OS_WIN32_UNIX_TIME_START) / DQN_OS_WIN32_FILE_TIME_TICKS_PER_SECOND;
+    return result;
+}
+
+DQN_API uint64_t Dqn_OS_DateToUnixTime(Dqn_OSDateTime date)
+{
+    DQN_ASSERT(Dqn_OS_DateIsValid(date));
+
+    SYSTEMTIME sys_time = {};
+    sys_time.wYear      = date.year;
+    sys_time.wMonth     = date.month;
+    sys_time.wDay       = date.day;
+    sys_time.wHour      = date.hour;
+    sys_time.wMinute    = date.minutes;
+    sys_time.wSecond    = date.seconds;
+
+    FILETIME file_time = {};
+    SystemTimeToFileTime(&sys_time, &file_time);
+
+    LARGE_INTEGER date_time;
+    date_time.u.LowPart  = file_time.dwLowDateTime;
+    date_time.u.HighPart = file_time.dwHighDateTime;
+
+    uint64_t result = (date_time.QuadPart - DQN_OS_WIN32_UNIX_TIME_START) / DQN_OS_WIN32_FILE_TIME_TICKS_PER_SECOND;
     return result;
 }
 

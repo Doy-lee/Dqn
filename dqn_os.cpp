@@ -47,6 +47,24 @@ DQN_API Dqn_OSDateTimeStr8 Dqn_OS_DateLocalTimeStr8Now(char date_separator, char
     return result;
 }
 
+DQN_API bool Dqn_OS_DateIsValid(Dqn_OSDateTime date)
+{
+    if (date.year < 1970)
+        return false;
+    if (date.month <= 0 || date.month >= 13)
+        return false;
+    if (date.day <= 0 || date.day >= 32)
+        return false;
+    if (date.hour >= 24)
+        return false;
+    if (date.minutes >= 60)
+        return false;
+    if (date.seconds >= 60)
+        return false;
+    return true;
+}
+
+// NOTE: Other /////////////////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_Str8 Dqn_OS_EXEDir(Dqn_Arena *arena)
 {
     Dqn_Str8 result = {};
@@ -60,6 +78,7 @@ DQN_API Dqn_Str8 Dqn_OS_EXEDir(Dqn_Arena *arena)
     return result;
 }
 
+// NOTE: Counters //////////////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_f64 Dqn_OS_PerfCounterS(uint64_t begin, uint64_t end)
 {
     uint64_t frequency = Dqn_OS_PerfCounterFrequency();
@@ -200,14 +219,13 @@ DQN_API Dqn_Str8 Dqn_OS_ReadAll(Dqn_Str8 path, Dqn_Arena *arena, Dqn_ErrorSink *
     }
 
     // NOTE: Read the file from disk ///////////////////////////////////////////////////////////////
-    Dqn_OSFile file = Dqn_OS_FileOpen(path, Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_Read, error);
-    Dqn_OS_FileRead(&file, result.data, result.size, error);
-    Dqn_OS_FileClose(&file);
-
-    if (error->stack->error) {
+    Dqn_OSFile file        = Dqn_OS_FileOpen(path, Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_Read, error);
+    bool       read_failed = !Dqn_OS_FileRead(&file, result.data, result.size, error);
+    if (file.error || read_failed) {
         Dqn_Arena_TempMemEnd(temp_mem);
         result = {};
     }
+    Dqn_OS_FileClose(&file);
 
     return result;
 }

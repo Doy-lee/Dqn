@@ -526,6 +526,13 @@
     __declspec(dllimport) VOID __stdcall GetLocalTime(SYSTEMTIME *lpSystemTime);
     }
 
+    // NOTE: um/timezoneapi.h //////////////////////////////////////////////////////////////////////
+    extern "C"
+    {
+    __declspec(dllimport) BOOL __stdcall FileTimeToSystemTime(const FILETIME* lpFileTime, SYSTEMTIME *lpSystemTime);
+    __declspec(dllimport) BOOL __stdcall SystemTimeToFileTime(const SYSTEMTIME* lpSystemTime, FILETIME *lpFileTime);
+    }
+
     // NOTE: shared/windef.h ///////////////////////////////////////////////////////////////////////
     typedef struct tagRECT {
         LONG left;

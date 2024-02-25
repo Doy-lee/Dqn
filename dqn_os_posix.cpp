@@ -117,6 +117,20 @@ DQN_API uint64_t Dqn_OS_DateUnixTime()
     return result;
 }
 
+DQN_API uint64_t Dqn_OS_DateToUnixTime(Dqn_OSDateTime date)
+{
+    DQN_ASSERT(Dqn_OS_DateIsValid(date));
+    struct tm timeinfo = {};
+    timeinfo.tm_year   = date.year - 1900;
+    timeinfo.tm_mon    = date.month - 1;
+    timeinfo.tm_mday   = date.day;
+    timeinfo.tm_hour   = date.hour;
+    timeinfo.tm_min    = date.minutes;
+    timeinfo.tm_sec    = date.seconds;
+    uint64_t result    = mktime(&timeinfo);
+    return result;
+}
+
 DQN_API bool Dqn_OS_SecureRNGBytes(void *buffer, uint32_t size)
 {
 #if defined(DQN_PLATFORM_EMSCRIPTEN)

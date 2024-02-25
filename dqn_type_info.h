@@ -13,38 +13,54 @@
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Dqn_TypeEnumField
+enum Dqn_TypeKind
 {
-    uint16_t  index;
-    Dqn_Str8  name;
-    Dqn_isize value;
+    Dqn_TypeKind_Nil,
+    Dqn_TypeKind_Basic,
+    Dqn_TypeKind_Enum,
+    Dqn_TypeKind_Struct,
 };
 
-struct Dqn_TypeStructField
+struct Dqn_TypeField
 {
     uint16_t                   index;
     Dqn_Str8                   name;
-    struct Dqn_TypeInfo const *type;
+    Dqn_isize                  value;
+    Dqn_usize                  offset_of;
+    Dqn_usize                  size_of;
+    Dqn_Str8                   type_decl;
+    uint32_t                   type_enum;
     bool                       is_pointer;
-    Dqn_TypeStructField const *array_count;
-    uint16_t                   array_static_count;
-};
-
-enum Dqn_TypeInfoKind
-{
-    Dqn_TypeInfoKind_Basic,
-    Dqn_TypeInfoKind_Enum,
-    Dqn_TypeInfoKind_Struct,
+    uint16_t                   array_size;
+    Dqn_TypeField const *      array_size_field;
 };
 
 struct Dqn_TypeInfo
 {
-    Dqn_Str8                   name;
-    Dqn_TypeInfoKind           kind;
-    Dqn_TypeStructField const *struct_field;
-    uint16_t                   struct_field_count;
-    Dqn_TypeEnumField const   *enum_field;
-    uint16_t                   enum_field_count;
-    Dqn_isize                  enum_min;
-    Dqn_isize                  enum_max;
+    Dqn_Str8             name;
+    Dqn_TypeKind         kind;
+    Dqn_TypeField const *fields;
+    uint16_t             fields_count;
 };
+
+struct Dqn_TypeGetField
+{
+    bool           success;
+    Dqn_usize      index;
+    Dqn_TypeField *field;
+};
+
+Dqn_TypeGetField Dqn_Type_GetField(Dqn_TypeInfo const *type_info, Dqn_Str8 name)
+{
+    Dqn_TypeGetField result = {};
+    for (Dqn_usize index = 0; index < type_info->fields_count; index++) {
+        Dqn_TypeField const *type_field = type_info->fields + index;
+        if (type_field->name == name) {
+            result.success = true;
+            result.index   = index;
+            result.field   = DQN_CAST(Dqn_TypeField *)type_field;
+            break;
+        }
+    }
+    return result;
+}
