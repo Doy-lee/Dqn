@@ -1,5 +1,5 @@
 #define DQN_UTEST_IMPLEMENTATION
-#include "dqn_utest.h"
+#include "Standalone/dqn_utest.h"
 
 static Dqn_UTest Dqn_Test_Arena()
 {
@@ -875,7 +875,71 @@ static Dqn_UTest Dqn_Test_Intrinsics()
     return test;
 }
 
-#if defined(DQN_TEST_WITH_KECCAK)
+#if defined(DQN_UNIT_TESTS_WITH_KECCAK)
+DQN_GCC_WARNING_PUSH
+DQN_GCC_WARNING_DISABLE(-Wunused-parameter)
+DQN_GCC_WARNING_DISABLE(-Wsign-compare)
+
+DQN_MSVC_WARNING_PUSH
+DQN_MSVC_WARNING_DISABLE(4244)
+DQN_MSVC_WARNING_DISABLE(4100)
+DQN_MSVC_WARNING_DISABLE(6385)
+// NOTE: Keccak Reference Implementation ///////////////////////////////////////////////////////////
+// A very compact Keccak implementation taken from the reference implementation
+// repository
+//
+// https://github.com/XKCP/XKCP/blob/master/Standalone/CompactFIPS202/C/Keccak-more-compact.c
+
+#define FOR(i,n) for(i=0; i<n; ++i)
+void Dqn_RefImpl_Keccak_(int r, int c, const uint8_t *in, uint64_t inLen, uint8_t sfx, uint8_t *out, uint64_t outLen);
+void Dqn_RefImpl_FIPS202_SHAKE128_(const uint8_t *in, uint64_t inLen, uint8_t *out, uint64_t outLen) { Dqn_RefImpl_Keccak_(1344, 256,  in, inLen, 0x1F, out, outLen); }
+void Dqn_RefImpl_FIPS202_SHAKE256_(const uint8_t *in, uint64_t inLen, uint8_t *out, uint64_t outLen) { Dqn_RefImpl_Keccak_(1088, 512,  in, inLen, 0x1F, out, outLen); }
+void Dqn_RefImpl_FIPS202_SHA3_224_(const uint8_t *in, uint64_t inLen, uint8_t *out)                  { Dqn_RefImpl_Keccak_(1152, 448,  in, inLen, 0x06, out, 28); }
+void Dqn_RefImpl_FIPS202_SHA3_256_(const uint8_t *in, uint64_t inLen, uint8_t *out)                  { Dqn_RefImpl_Keccak_(1088, 512,  in, inLen, 0x06, out, 32); }
+void Dqn_RefImpl_FIPS202_SHA3_384_(const uint8_t *in, uint64_t inLen, uint8_t *out)                  { Dqn_RefImpl_Keccak_(832,  768,  in, inLen, 0x06, out, 48); }
+void Dqn_RefImpl_FIPS202_SHA3_512_(const uint8_t *in, uint64_t inLen, uint8_t *out)                  { Dqn_RefImpl_Keccak_(576,  1024, in, inLen, 0x06, out, 64); }
+
+int Dqn_RefImpl_LFSR86540_(uint8_t *R) { (*R)=((*R)<<1)^(((*R)&0x80)?0x71:0); return ((*R)&2)>>1; }
+#define ROL(a,o) ((((uint64_t)a)<<o)^(((uint64_t)a)>>(64-o)))
+
+static uint64_t  Dqn_RefImpl_load64_ (const uint8_t *x)  { int i; uint64_t u=0; FOR(i,8) { u<<=8; u|=x[7-i]; } return u; }
+static void Dqn_RefImpl_store64_(uint8_t *x, uint64_t u) { int i; FOR(i,8) { x[i]=u; u>>=8; } }
+static void Dqn_RefImpl_xor64_  (uint8_t *x, uint64_t u) { int i; FOR(i,8) { x[i]^=u; u>>=8; } }
+
+#define rL(x,y)   Dqn_RefImpl_load64_((uint8_t*)s+8*(x+5*y))
+#define wL(x,y,l) Dqn_RefImpl_store64_((uint8_t*)s+8*(x+5*y),l)
+#define XL(x,y,l) Dqn_RefImpl_xor64_((uint8_t*)s+8*(x+5*y),l)
+
+void Dqn_RefImpl_Keccak_F1600(void *s)
+{
+    int r,x,y,i,j,Y; uint8_t R=0x01; uint64_t C[5],D;
+    for(i=0; i<24; i++) {
+        /*θ*/ FOR(x,5) C[x]=rL(x,0)^rL(x,1)^rL(x,2)^rL(x,3)^rL(x,4); FOR(x,5) { D=C[(x+4)%5]^ROL(C[(x+1)%5],1); FOR(y,5) XL(x,y,D); }
+        /*ρπ*/ x=1; y=r=0; D=rL(x,y); FOR(j,24) { r+=j+1; Y=(2*x+3*y)%5; x=y; y=Y; C[0]=rL(x,y); wL(x,y,ROL(D,r%64)); D=C[0]; }
+        /*χ*/ FOR(y,5) { FOR(x,5) C[x]=rL(x,y); FOR(x,5) wL(x,y,C[x]^((~C[(x+1)%5])&C[(x+2)%5])); }
+        /*ι*/ FOR(j,7) if (Dqn_RefImpl_LFSR86540_(&R)) XL(0,0,(uint64_t)1<<((1<<j)-1));
+    }
+}
+
+void Dqn_RefImpl_Keccak_(int r, int c, const uint8_t *in, uint64_t inLen, uint8_t sfx, uint8_t *out, uint64_t outLen)
+{
+    /*initialize*/ uint8_t s[200]; int R=r/8; int i,b=0; FOR(i,200) s[i]=0;
+    /*absorb*/ while(inLen>0) { b=(inLen<R)?inLen:R; FOR(i,b) s[i]^=in[i]; in+=b; inLen-=b; if (b==R) { Dqn_RefImpl_Keccak_F1600(s); b=0; } }
+    /*pad*/ s[b]^=sfx; if((sfx&0x80)&&(b==(R-1))) Dqn_RefImpl_Keccak_F1600(s); s[R-1]^=0x80; Dqn_RefImpl_Keccak_F1600(s);
+    /*squeeze*/ while(outLen>0) { b=(outLen<R)?outLen:R; FOR(i,b) out[i]=s[i]; out+=b; outLen-=b; if(outLen>0) Dqn_RefImpl_Keccak_F1600(s); }
+}
+
+#undef XL
+#undef wL
+#undef rL
+#undef ROL
+#undef FOR
+DQN_MSVC_WARNING_POP
+DQN_GCC_WARNING_POP
+
+#define DQN_KECCAK_IMPLEMENTATION
+#include "Standalone/dqn_keccak.h"
+
 #define DQN_UTEST_HASH_X_MACRO \
     DQN_UTEST_HASH_X_ENTRY(SHA3_224, "SHA3-224") \
     DQN_UTEST_HASH_X_ENTRY(SHA3_256, "SHA3-256") \
@@ -903,8 +967,8 @@ Dqn_Str8 const DQN_UTEST_HASH_STRING_[] =
 
 void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8 input_hex     = Dqn_Hex_BytesToStr8Arena(scratch.arena, input.data, input.size);
+    Dqn_Scratch scratch   = Dqn_Scratch_Get(nullptr);
+    Dqn_Str8    input_hex = Dqn_Bin_BytesToHexArena(scratch.arena, input.data, input.size);
 
     switch(hash_type)
     {
@@ -912,7 +976,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
         {
             Dqn_KeccakBytes28 hash = Dqn_SHA3_224StringToBytes28(input);
             Dqn_KeccakBytes28 expect;
-            FIPS202_SHA3_224(DQN_CAST(u8 *)input.data, input.size, (u8 *)expect.data);
+            Dqn_RefImpl_FIPS202_SHA3_224_(DQN_CAST(uint8_t *)input.data, input.size, (uint8_t *)expect.data);
             DQN_UTEST_ASSERTF(test,
                                 Dqn_KeccakBytes28Equals(&hash, &expect),
                                 "\ninput:  %.*s"
@@ -929,7 +993,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
         {
             Dqn_KeccakBytes32 hash = Dqn_SHA3_256StringToBytes32(input);
             Dqn_KeccakBytes32 expect;
-            FIPS202_SHA3_256(DQN_CAST(u8 *)input.data, input.size, (u8 *)expect.data);
+            Dqn_RefImpl_FIPS202_SHA3_256_(DQN_CAST(uint8_t *)input.data, input.size, (uint8_t *)expect.data);
             DQN_UTEST_ASSERTF(test,
                                 Dqn_KeccakBytes32Equals(&hash, &expect),
                                 "\ninput:  %.*s"
@@ -946,7 +1010,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
         {
             Dqn_KeccakBytes48 hash = Dqn_SHA3_384StringToBytes48(input);
             Dqn_KeccakBytes48 expect;
-            FIPS202_SHA3_384(DQN_CAST(u8 *)input.data, input.size, (u8 *)expect.data);
+            Dqn_RefImpl_FIPS202_SHA3_384_(DQN_CAST(uint8_t *)input.data, input.size, (uint8_t *)expect.data);
             DQN_UTEST_ASSERTF(test,
                                 Dqn_KeccakBytes48Equals(&hash, &expect),
                                 "\ninput:  %.*s"
@@ -963,7 +1027,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
         {
             Dqn_KeccakBytes64 hash = Dqn_SHA3_512StringToBytes64(input);
             Dqn_KeccakBytes64 expect;
-            FIPS202_SHA3_512(DQN_CAST(u8 *)input.data, input.size, (u8 *)expect.data);
+            Dqn_RefImpl_FIPS202_SHA3_512_(DQN_CAST(uint8_t *)input.data, input.size, (uint8_t *)expect.data);
             DQN_UTEST_ASSERTF(test,
                                 Dqn_KeccakBytes64Equals(&hash, &expect),
                                 "\ninput:  %.*s"
@@ -980,7 +1044,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
         {
             Dqn_KeccakBytes28 hash = Dqn_Keccak224StringToBytes28(input);
             Dqn_KeccakBytes28 expect;
-            Keccak(1152, 448, DQN_CAST(u8 *)input.data, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
+            Dqn_RefImpl_Keccak_(1152, 448, DQN_CAST(uint8_t *)input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
             DQN_UTEST_ASSERTF(test,
                                 Dqn_KeccakBytes28Equals(&hash, &expect),
                                 "\ninput:  %.*s"
@@ -997,7 +1061,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
         {
             Dqn_KeccakBytes32 hash = Dqn_Keccak256StringToBytes32(input);
             Dqn_KeccakBytes32 expect;
-            Keccak(1088, 512, DQN_CAST(u8 *)input.data, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
+            Dqn_RefImpl_Keccak_(1088, 512, DQN_CAST(uint8_t *)input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
             DQN_UTEST_ASSERTF(test,
                                 Dqn_KeccakBytes32Equals(&hash, &expect),
                                 "\ninput:  %.*s"
@@ -1014,7 +1078,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
         {
             Dqn_KeccakBytes48 hash = Dqn_Keccak384StringToBytes48(input);
             Dqn_KeccakBytes48 expect;
-            Keccak(832, 768, DQN_CAST(u8 *)input.data, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
+            Dqn_RefImpl_Keccak_(832, 768, DQN_CAST(uint8_t *)input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
             DQN_UTEST_ASSERTF(test,
                                 Dqn_KeccakBytes48Equals(&hash, &expect),
                                 "\ninput:  %.*s"
@@ -1031,7 +1095,7 @@ void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
         {
             Dqn_KeccakBytes64 hash = Dqn_Keccak512StringToBytes64(input);
             Dqn_KeccakBytes64 expect;
-            Keccak(576, 1024, DQN_CAST(u8 *)input.data, input.size, 0x01, (u8 *)expect.data, sizeof(expect));
+            Dqn_RefImpl_Keccak_(576, 1024, DQN_CAST(uint8_t *)input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
             DQN_UTEST_ASSERTF(test,
                                 Dqn_KeccakBytes64Equals(&hash, &expect),
                                 "\ninput:  %.*s"
@@ -1061,9 +1125,7 @@ Dqn_UTest Dqn_Test_Keccak()
     DQN_UTEST_GROUP(test, "Dqn_Keccak")
     {
         for (int hash_type = 0; hash_type < Hash_Count; hash_type++) {
-            pcg32_random_t rng = {};
-            pcg32_srandom_r(&rng, 0xd48e'be21'2af8'733d, 0x3f89'3bd2'd6b0'4eef);
-
+            Dqn_PCG32 rng = Dqn_PCG32_Init(0xd48e'be21'2af8'733d);
             for (Dqn_Str8 input : INPUTS) {
                 Dqn_UTest_Begin(&test, "%.*s - Input: %.*s", DQN_STR_FMT(DQN_UTEST_HASH_STRING_[hash_type]), DQN_CAST(int)DQN_MIN(input.size, 54), input.data);
                 Dqn_Test_KeccakDispatch_(&test, hash_type, input);
@@ -1071,22 +1133,22 @@ Dqn_UTest Dqn_Test_Keccak()
             }
 
             Dqn_UTest_Begin(&test, "%.*s - Deterministic random inputs", DQN_STR_FMT(DQN_UTEST_HASH_STRING_[hash_type]));
-            for (int index = 0; index < 128; index++) {
+            for (Dqn_usize index = 0; index < 128; index++) {
                 char    src[4096] = {};
-                uint32_t src_size  = pcg32_boundedrand_r(&rng, sizeof(src));
+                uint32_t src_size  = Dqn_PCG32_Range(&rng, 0, sizeof(src));
 
-                for (int src_index = 0; src_index < src_size; src_index++)
-                    src[src_index] = pcg32_boundedrand_r(&rng, 255);
+                for (Dqn_usize src_index = 0; src_index < src_size; src_index++)
+                    src[src_index] = DQN_CAST(char)Dqn_PCG32_Range(&rng, 0, 255);
 
                 Dqn_Str8 input = Dqn_Str8_Init(src, src_size);
-                TestKeccakDispatch_(&test, hash_type, input);
+                Dqn_Test_KeccakDispatch_(&test, hash_type, input);
             }
             Dqn_UTest_End(&test);
         }
     }
     return test;
 }
-#endif // defined(DQN_TEST_WITH_KECCAK)
+#endif // defined(DQN_UNIT_TESTS_WITH_KECCAK)
 
 static Dqn_UTest Dqn_Test_M4()
 {
@@ -1836,7 +1898,7 @@ void Dqn_Test_RunSuite()
         Dqn_Test_Fs(),
         Dqn_Test_FixedArray(),
         Dqn_Test_Intrinsics(),
-        #if defined(DQN_TEST_WITH_KECCAK)
+        #if defined(DQN_UNIT_TESTS_WITH_KECCAK)
         Dqn_Test_Keccak(),
         #endif
         Dqn_Test_M4(),
@@ -1860,7 +1922,7 @@ void Dqn_Test_RunSuite()
     fprintf(stdout, "Summary: %d/%d tests succeeded\n", total_good_tests, total_tests);
 }
 
-#if defined(DQN_TEST_WITH_MAIN)
+#if defined(DQN_UNIT_TESTS_WITH_MAIN)
 int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;

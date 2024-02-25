@@ -184,6 +184,36 @@
 //
 //     #define DQN_ASAN_POISON_GUARD_SIZE 128
 //
+// - Enable 'Dqn_CGen' a parser that can emit run-time type information and
+//   allow arbitrary querying of data definitions expressed in Excel-like tables
+//   using text files encoded in Dion-System's Metadesk grammar.
+//
+//   This option requires the standalone 'dqn_cpp_file.h' to be included prior
+//   to 'dqn.h' as well as Metadesk's 'md.h' and similarly the implementation of
+//   these files to be defined before the implementation of 'dqn.h' is defined.
+//
+//     #define DQN_WITH_CGEN
+//
+//   For example in your header file
+//
+//     #include "metadesk/md.h"
+//     #include "dqn/Standalone/dqn_cpp_file.h"
+//     #define DQN_STB_SPRINTF_HEADER_ONLY // Metadesk includes 'stb_sprintf.h' already
+//     #define DQN_WITH_CGEN
+//     #include "dqn.h"
+//
+//   Then in your implementation file
+//
+//     #include "metadesk/md.c"
+//     #define DQN_CPP_FILE_IMPLEMENTATION
+//     #include "dqn/Standalone/dqn_cpp_file.h"
+//     #define DQN_IMPLEMENTATION
+//     #include "dqn.h"
+//
+// - Enable 'Dqn_JSON' a json parser. This option requires Sheredom's 'json.h'
+//   to be included prior to this file.
+//
+//     #define DQN_WITH_JSON
 
 #if defined(DQN_ONLY_VARRAY)       || \
     defined(DQN_ONLY_SARRAY)       || \
@@ -285,6 +315,14 @@
 #include "dqn_hash.h"
 #include "dqn_helpers.h"
 #include "dqn_type_info.h"
+
+#if defined(DQN_WITH_CGEN)
+#include "dqn_cgen.h"
+#endif
+
+#if defined(DQN_WITH_JSON)
+#include "dqn_json.h"
+#endif
 #endif // DQN_H
 
 #if defined(DQN_IMPLEMENTATION)
@@ -323,6 +361,16 @@
 #include "dqn_math.cpp"
 #include "dqn_hash.cpp"
 #include "dqn_helpers.cpp"
+
+#if defined(DQN_WITH_CGEN)
+#include "dqn_cgen.cpp"
+#endif
+
+#if defined(DQN_WITH_JSON)
+#define DQN_JSON_IMPLEMENTATION
+#include "dqn_json.h"
+#endif
+
 #include "dqn_unit_tests.cpp"
 #include "dqn_docs.cpp"
 #endif // DQN_IMPLEMENTATION

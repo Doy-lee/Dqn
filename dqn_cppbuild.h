@@ -16,7 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <stdlib.h> // exit
+#if !defined(DQN_H)
+#error 'dqn.h' must be included before 'dqn_cppbuild.h'
+#endif
 
 struct Dqn_CPPBuildCompileFile
 {

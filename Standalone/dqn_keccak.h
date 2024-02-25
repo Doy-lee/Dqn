@@ -1,17 +1,30 @@
 #if !defined(DQN_KECCAK_H)
 #define DQN_KECCAK_H
-// -----------------------------------------------------------------------------
-// NOTE: Overview
-// -----------------------------------------------------------------------------
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//   $$\   $$\ $$$$$$$$\  $$$$$$\   $$$$$$\   $$$$$$\  $$\   $$\
+//   $$ | $$  |$$  _____|$$  __$$\ $$  __$$\ $$  __$$\ $$ | $$  |
+//   $$ |$$  / $$ |      $$ /  \__|$$ /  \__|$$ /  $$ |$$ |$$  /
+//   $$$$$  /  $$$$$\    $$ |      $$ |      $$$$$$$$ |$$$$$  /
+//   $$  $$<   $$  __|   $$ |      $$ |      $$  __$$ |$$  $$<
+//   $$ |\$$\  $$ |      $$ |  $$\ $$ |  $$\ $$ |  $$ |$$ |\$$\
+//   $$ | \$$\ $$$$$$$$\ \$$$$$$  |\$$$$$$  |$$ |  $$ |$$ | \$$\
+//   \__|  \__|\________| \______/  \______/ \__|  \__|\__|  \__|
+//
+//   dqn_keccak.h -- FIPS202 SHA3 + non-finalized SHA3 (aka. Keccak) hashing algorithms
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Implementation of the Keccak hashing algorithms from the Keccak and SHA3
 // families (including the FIPS202 published algorithms and the non-finalized
 // ones, i.e. the ones used in Ethereum and Monero which adopted SHA3 before it
 // was finalized. The only difference between the 2 is a different delimited
 // suffix).
 //
-// -----------------------------------------------------------------------------
-// NOTE: MIT License
-// -----------------------------------------------------------------------------
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// MIT License
+//
 // Copyright (c) 2021 github.com/doy-lee
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -32,12 +45,25 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// -----------------------------------------------------------------------------
-// NOTE: Macros
-// -----------------------------------------------------------------------------
-// #define DQN_KECCAK_IMPLEMENTATION
-//     Define this in one and only one C++ file to enable the implementation
-//     code of the header file.
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//    $$$$$$\  $$$$$$$\ $$$$$$$$\ $$$$$$\  $$$$$$\  $$\   $$\  $$$$$$\
+//   $$  __$$\ $$  __$$\\__$$  __|\_$$  _|$$  __$$\ $$$\  $$ |$$  __$$\
+//   $$ /  $$ |$$ |  $$ |  $$ |     $$ |  $$ /  $$ |$$$$\ $$ |$$ /  \__|
+//   $$ |  $$ |$$$$$$$  |  $$ |     $$ |  $$ |  $$ |$$ $$\$$ |\$$$$$$\
+//   $$ |  $$ |$$  ____/   $$ |     $$ |  $$ |  $$ |$$ \$$$$ | \____$$\
+//   $$ |  $$ |$$ |        $$ |     $$ |  $$ |  $$ |$$ |\$$$ |$$\   $$ |
+//    $$$$$$  |$$ |        $$ |   $$$$$$\  $$$$$$  |$$ | \$$ |\$$$$$$  |
+//    \______/ \__|        \__|   \______| \______/ \__|  \__| \______/
+//
+//   Options -- Compile time build customisation
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// - Define this in one and only one C++ file to enable the implementation
+//   code of the header file.
+//
+//     #define DQN_KECCAK_IMPLEMENTATION
 
 #if !defined(DQN_KECCAK_MEMCPY)
     #include <string.h>
@@ -53,7 +79,6 @@
     #include <string.h>
     #define DQN_KECCAK_MEMSET(dest, byte, count) memset(dest, byte, count)
 #endif
-
 
 #if !defined(DQN_KECCAK_ASSERT)
     #if defined(NDEBUG)
@@ -80,9 +105,6 @@
 #define DQN_KECCAK_STRING96_FMT(string) 96, string
 #define DQN_KECCAK_STRING128_FMT(string) 128, string
 
-// -----------------------------------------------------------------------------
-// NOTE: API
-// -----------------------------------------------------------------------------
 typedef unsigned char  Dqn_KeccakU8;
 typedef unsigned short Dqn_KeccakU16;
 typedef unsigned int   Dqn_KeccakU32;
@@ -93,9 +115,6 @@ typedef unsigned int   Dqn_KeccakUint;
     typedef unsigned long long Dqn_KeccakU64;
 #endif
 
-// -----------------------------------------------------------------------------
-// NOTE: Data structures
-// -----------------------------------------------------------------------------
 typedef struct Dqn_KeccakBytes28  { char data[28]; } Dqn_KeccakBytes28; // 224 bit
 typedef struct Dqn_KeccakBytes32  { char data[32]; } Dqn_KeccakBytes32; // 256 bit
 typedef struct Dqn_KeccakBytes48  { char data[48]; } Dqn_KeccakBytes48; // 384 bit
@@ -116,9 +135,7 @@ typedef struct Dqn_KeccakState
     char         delimited_suffix; // The delimited suffix of the current hash
 } Dqn_KeccakState;
 
-// -----------------------------------------------------------------------------
-// NOTE: SHA3/Keccak Streaming API
-// -----------------------------------------------------------------------------
+// NOTE: SHA3/Keccak Streaming API /////////////////////////////////////////////////////////////////
 // Setup a hashing state for either
 // - FIPS 202 SHA3
 // - Non-finalized SHA3 (only difference is delimited suffix of 0x1 instead of 0x6 in SHA3)
@@ -140,9 +157,7 @@ Dqn_KeccakState Dqn_KeccakSHA3Init(bool sha3, int hash_size_bits);
 void            Dqn_KeccakUpdate(Dqn_KeccakState *keccak, void const *data, Dqn_KeccakU64 data_size);
 void            Dqn_KeccakFinish(Dqn_KeccakState *keccak, void *dest, int dest_size);
 
-// -----------------------------------------------------------------------------
-// NOTE: Simple API
-// -----------------------------------------------------------------------------
+// NOTE: Simple API ////////////////////////////////////////////////////////////////////////////////
 // Helper function that combines the Init, Update and Finish step in one shot,
 // i.e. hashing a singlular contiguous buffer. Use the streaming API if data
 // is split across different buffers.
@@ -160,43 +175,33 @@ void            Dqn_KeccakSHA3Hash(bool sha3, int hash_size_bits, void const *sr
 #define Dqn_Keccak384(src, src_size, dest, dest_size) Dqn_KeccakHash(384, src, src_size, dest, dest_size)
 #define Dqn_Keccak512(src, src_size, dest, dest_size) Dqn_KeccakHash(512, src, src_size, dest, dest_size)
 
-// -----------------------------------------------------------------------------
-// NOTE: SHA3 Helpers
-// -----------------------------------------------------------------------------
+// NOTE: SHA3 Helpers //////////////////////////////////////////////////////////////////////////////
 Dqn_KeccakBytes28 Dqn_SHA3_224ToBytes28(void *bytes, Dqn_KeccakU64 bytes_size);
 Dqn_KeccakBytes32 Dqn_SHA3_256ToBytes32(void *bytes, Dqn_KeccakU64 bytes_size);
 Dqn_KeccakBytes48 Dqn_SHA3_384ToBytes48(void *bytes, Dqn_KeccakU64 bytes_size);
 Dqn_KeccakBytes64 Dqn_SHA3_512ToBytes64(void *bytes, Dqn_KeccakU64 bytes_size);
 
-// -----------------------------------------------------------------------------
-// NOTE: Keccak Helpers
-// -----------------------------------------------------------------------------
+// NOTE: Keccak Helpers ////////////////////////////////////////////////////////////////////////////
 Dqn_KeccakBytes28 Dqn_Keccak224ToBytes28(void *bytes, Dqn_KeccakU64 bytes_size);
 Dqn_KeccakBytes32 Dqn_Keccak256ToBytes32(void *bytes, Dqn_KeccakU64 bytes_size);
 Dqn_KeccakBytes48 Dqn_Keccak384ToBytes48(void *bytes, Dqn_KeccakU64 bytes_size);
 Dqn_KeccakBytes64 Dqn_Keccak512ToBytes64(void *bytes, Dqn_KeccakU64 bytes_size);
 
 #if defined(DQN_H)
-// -----------------------------------------------------------------------------
-// NOTE: SHA3 - Helpers for Dqn data structures
-// -----------------------------------------------------------------------------
-Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_String8 string);
-Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String8 string);
-Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String8 string);
-Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String8 string);
+// NOTE: SHA3 - Helpers for Dqn data structures ////////////////////////////////////////////////////
+Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_Str8 string);
+Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_Str8 string);
+Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_Str8 string);
+Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_Str8 string);
 
-// -----------------------------------------------------------------------------
-// NOTE: Keccak - Helpers for Dqn data structures
-// -----------------------------------------------------------------------------
-Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String8 string);
-Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String8 string);
-Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String8 string);
-Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String8 string);
+// NOTE: Keccak - Helpers for Dqn data structures //////////////////////////////////////////////////
+Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_Str8 string);
+Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_Str8 string);
+Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_Str8 string);
+Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_Str8 string);
 #endif // DQN_H
 
-// -----------------------------------------------------------------------------
-// NOTE: Helper functions
-// -----------------------------------------------------------------------------
+// NOTE: Helper functions //////////////////////////////////////////////////////////////////////////
 // Convert a binary buffer into its hex representation into dest. The dest
 // buffer must be large enough to contain the hex representation, i.e.
 // atleast src_size * 2). This function does *not* null-terminate the buffer.
@@ -218,13 +223,11 @@ int Dqn_KeccakBytes48Equals(Dqn_KeccakBytes48 const *a, Dqn_KeccakBytes48 const 
 int Dqn_KeccakBytes64Equals(Dqn_KeccakBytes64 const *a, Dqn_KeccakBytes64 const *b);
 
 #if defined(DQN_H) && defined(DQN_WITH_HEX)
-// -----------------------------------------------------------------------------
-// NOTE: Other helper functions for Dqn data structures
-// -----------------------------------------------------------------------------
+// NOTE: Other helper functions for Dqn data structures ////////////////////////////////////////////
 // Converts a 64 character hex string into the 32 byte binary representation.
 // Invalid hex characters in the string will be represented as 0.
 // hex: Must be exactly a 64 character hex string.
-Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_String8 hex);
+Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_Str8 hex);
 #endif // DQN_H && DQN_WITH_HEX
 #endif // DQN_KECCAK_H
 
@@ -257,9 +260,7 @@ static void Dqn_Keccak__Permute(void *state)
     for (int round_index = 0; round_index < 24; round_index++)
     {
         #define LANE_INDEX(x, y) ((x) + ((y) * DQN_KECCAK_LANE_SIZE_U64))
-        // ---------------------------------------------------------------------
-        // θ step
-        // ---------------------------------------------------------------------
+        // θ step //////////////////////////////////////////////////////////////////////////////////
 #if 1
         Dqn_KeccakU64 c[DQN_KECCAK_LANE_SIZE_U64];
         for (int x = 0; x < DQN_KECCAK_LANE_SIZE_U64; x++)
@@ -293,9 +294,7 @@ static void Dqn_Keccak__Permute(void *state)
         d[4] = c[3] ^ DQN_KECCAK_ROL64(c[0], 1);
 #endif
 
-        // ---------------------------------------------------------------------
-        // ρ and π steps
-        // ---------------------------------------------------------------------
+        // ρ and π steps ///////////////////////////////////////////////////////////////////////////
         Dqn_KeccakU64 b[DQN_KECCAK_LANE_SIZE_U64 * DQN_KECCAK_LANE_SIZE_U64];
         for (int y = 0; y < DQN_KECCAK_LANE_SIZE_U64; y++)
         {
@@ -308,9 +307,7 @@ static void Dqn_Keccak__Permute(void *state)
             }
         }
 
-        // ---------------------------------------------------------------------
-        // χ step
-        // ---------------------------------------------------------------------
+        // χ step //////////////////////////////////////////////////////////////////////////////////
         for (int y = 0; y < DQN_KECCAK_LANE_SIZE_U64; y++)
         {
             for (int x = 0; x < DQN_KECCAK_LANE_SIZE_U64; x++)
@@ -322,18 +319,14 @@ static void Dqn_Keccak__Permute(void *state)
             }
         }
 
-        // ---------------------------------------------------------------------
-        // ι step
-        // ---------------------------------------------------------------------
+        // ι step //////////////////////////////////////////////////////////////////////////////////
         lanes_u64[LANE_INDEX(0, 0)] ^= DQN_KECCAK_ROUNDS[round_index];
         #undef LANE_INDEX
         #undef DQN_KECCAK_ROL64
     }
 }
 
-// -----------------------------------------------------------------------------
-// NOTE: Streaming API
-// -----------------------------------------------------------------------------
+// NOTE: Streaming API /////////////////////////////////////////////////////////////////////////////
 Dqn_KeccakState Dqn_KeccakSHA3Init(bool sha3, int hash_size_bits)
 {
     char const SHA3_DELIMITED_SUFFIX   = 0x06;
@@ -382,9 +375,7 @@ void Dqn_KeccakFinish(Dqn_KeccakState *keccak, void *dest, int dest_size)
 {
     DQN_KECCAK_ASSERT(dest_size >= keccak->hash_size_bits / 8);
 
-    // ---------------------------------------------------------------------
-    // Sponge Finalization Step: Final padding bit
-    // ---------------------------------------------------------------------
+    // Sponge Finalization Step: Final padding bit /////////////////////////////////////////////////
     int const INDEX_OF_0X80_BYTE     = keccak->absorb_size - 1;
     int const delimited_suffix_index = keccak->state_size;
     DQN_KECCAK_ASSERT(delimited_suffix_index < keccak->absorb_size);
@@ -404,9 +395,7 @@ void Dqn_KeccakFinish(Dqn_KeccakState *keccak, void *dest, int dest_size)
     state[INDEX_OF_0X80_BYTE] ^= 0x80;
     Dqn_Keccak__Permute(state);
 
-    // ---------------------------------------------------------------------
-    // Squeeze Step: Squeeze bytes from the state into our hash
-    // ---------------------------------------------------------------------
+    // Squeeze Step: Squeeze bytes from the state into our hash ////////////////////////////////////
     Dqn_KeccakU8 *dest_u8       = (Dqn_KeccakU8 *)dest;
     int const     squeeze_count = dest_size / keccak->absorb_size;
     int           squeeze_index = 0;
@@ -417,9 +406,7 @@ void Dqn_KeccakFinish(Dqn_KeccakState *keccak, void *dest, int dest_size)
         dest_u8 += keccak->absorb_size;
     }
 
-    // ---------------------------------------------------------------------
-    // Squeeze Finalisation Step: Remainder bytes in hash
-    // ---------------------------------------------------------------------
+    // Squeeze Finalisation Step: Remainder bytes in hash //////////////////////////////////////////
     int const remainder = dest_size % keccak->absorb_size;
     if (remainder)
     {
@@ -435,9 +422,7 @@ void Dqn_KeccakSHA3Hash(bool sha3, int hash_size_bits, void const *src, Dqn_Kecc
     Dqn_KeccakFinish(&keccak, dest, dest_size);
 }
 
-// -----------------------------------------------------------------------------
-// NOTE: SHA3 Helpers
-// -----------------------------------------------------------------------------
+// NOTE: SHA3 Helpers //////////////////////////////////////////////////////////////////////////////
 Dqn_KeccakBytes28 Dqn_SHA3_224ToBytes28(void *bytes, Dqn_KeccakU64 bytes_size)
 {
     Dqn_KeccakBytes28 result;
@@ -466,9 +451,7 @@ Dqn_KeccakBytes64 Dqn_SHA3_512ToBytes64(void *bytes, Dqn_KeccakU64 bytes_size)
     return result;
 }
 
-// -----------------------------------------------------------------------------
-// NOTE: Keccak Helpers
-// -----------------------------------------------------------------------------
+// NOTE: Keccak Helpers ////////////////////////////////////////////////////////////////////////////
 Dqn_KeccakBytes28 Dqn_Keccak224ToBytes28(void *bytes, Dqn_KeccakU64 bytes_size)
 {
     Dqn_KeccakBytes28 result;
@@ -499,31 +482,29 @@ Dqn_KeccakBytes64 Dqn_Keccak512ToBytes64(void *bytes, Dqn_KeccakU64 bytes_size)
 
 
 #if defined(DQN_H)
-// -----------------------------------------------------------------------------
-// NOTE: SHA3 - Helpers for Dqn data structures
-// -----------------------------------------------------------------------------
-Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_String8 string)
+// NOTE: SHA3 - Helpers for Dqn data structures ////////////////////////////////////////////////////
+Dqn_KeccakBytes28 Dqn_SHA3_224StringToBytes28(Dqn_Str8 string)
 {
     Dqn_KeccakBytes28 result;
     Dqn_SHA3_224(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
-Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_String8 string)
+Dqn_KeccakBytes32 Dqn_SHA3_256StringToBytes32(Dqn_Str8 string)
 {
     Dqn_KeccakBytes32 result;
     Dqn_SHA3_256(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
-Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_String8 string)
+Dqn_KeccakBytes48 Dqn_SHA3_384StringToBytes48(Dqn_Str8 string)
 {
     Dqn_KeccakBytes48 result;
     Dqn_SHA3_384(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
-Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String8 string)
+Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_Str8 string)
 {
     Dqn_KeccakBytes64 result;
     Dqn_SHA3_512(string.data, string.size, result.data, sizeof(result));
@@ -532,31 +513,29 @@ Dqn_KeccakBytes64 Dqn_SHA3_512StringToBytes64(Dqn_String8 string)
 #endif // DQN_H
 
 #if defined(DQN_H)
-// -----------------------------------------------------------------------------
-// NOTE: Keccak - Helpers for Dqn data structures
-// -----------------------------------------------------------------------------
-Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_String8 string)
+// NOTE: Keccak - Helpers for Dqn data structures //////////////////////////////////////////////////
+Dqn_KeccakBytes28 Dqn_Keccak224StringToBytes28(Dqn_Str8 string)
 {
     Dqn_KeccakBytes28 result;
     Dqn_Keccak224(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
-Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_String8 string)
+Dqn_KeccakBytes32 Dqn_Keccak256StringToBytes32(Dqn_Str8 string)
 {
     Dqn_KeccakBytes32 result;
     Dqn_Keccak256(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
-Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_String8 string)
+Dqn_KeccakBytes48 Dqn_Keccak384StringToBytes48(Dqn_Str8 string)
 {
     Dqn_KeccakBytes48 result;
     Dqn_Keccak384(string.data, string.size, result.data, sizeof(result));
     return result;
 }
 
-Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String8 string)
+Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_Str8 string)
 {
     Dqn_KeccakBytes64 result;
     Dqn_Keccak512(string.data, string.size, result.data, sizeof(result));
@@ -564,9 +543,7 @@ Dqn_KeccakBytes64 Dqn_Keccak512StringToBytes64(Dqn_String8 string)
 }
 #endif // DQN_H
 
-// -----------------------------------------------------------------------------
-// NOTE: Helper functions
-// -----------------------------------------------------------------------------
+// NOTE: Helper functions //////////////////////////////////////////////////////////////////////////
 void Dqn_KeccakBytesToHex(void const *src, Dqn_KeccakU64 src_size, char *dest, Dqn_KeccakU64 dest_size)
 {
     (void)src_size; (void)dest_size;
@@ -642,10 +619,8 @@ int Dqn_KeccakBytes64Equals(Dqn_KeccakBytes64 const *a, Dqn_KeccakBytes64 const 
 }
 
 #if defined(DQN_H) && defined(DQN_WITH_HEX)
-// -----------------------------------------------------------------------------
-// NOTE: Other helper functions for Dqn data structures
-// -----------------------------------------------------------------------------
-Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_String8 hex)
+// NOTE: Other helper functions for Dqn data structures ////////////////////////////////////////////
+Dqn_KeccakBytes32 Dqn_KeccakHex64StringToBytes(Dqn_Str8 hex)
 {
     DQN_KECCAK_ASSERT(hex.size == 64);
     Dqn_KeccakBytes32 result;

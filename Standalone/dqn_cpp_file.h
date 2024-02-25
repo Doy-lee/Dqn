@@ -1,19 +1,33 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//    $$$$$$\  $$$$$$$\  $$$$$$$\        $$$$$$$$\ $$$$$$\ $$\       $$$$$$$$\
+//   $$  __$$\ $$  __$$\ $$  __$$\       $$  _____|\_$$  _|$$ |      $$  _____|
+//   $$ /  \__|$$ |  $$ |$$ |  $$ |      $$ |        $$ |  $$ |      $$ |
+//   $$ |      $$$$$$$  |$$$$$$$  |      $$$$$\      $$ |  $$ |      $$$$$\
+//   $$ |      $$  ____/ $$  ____/       $$  __|     $$ |  $$ |      $$  __|
+//   $$ |  $$\ $$ |      $$ |            $$ |        $$ |  $$ |      $$ |
+//   \$$$$$$  |$$ |      $$ |            $$ |      $$$$$$\ $$$$$$$$\ $$$$$$$$\
+//    \______/ \__|      \__|            \__|      \______|\________|\________|
+//
+//   dqn_cpp_file.h -- Functions to emit C++ formatted code
+//
+////////////////////////////////////////////////////////////////////////////////
 #if !defined(DQN_CPP_FILE_H)
 #define DQN_CPP_FILE_H
 
-// NOTE: Dqn_CppFile: Helper functions to generate C++ files
-// /////////////////////////////////////////////////////////////////////////////
 #include <stdio.h>  /// printf, fputc
 #include <stdarg.h> /// va_list...
 #include <assert.h> /// assert
 
 typedef struct Dqn_CppFile { ///< Maintains state for printing C++ style formatted files
-    FILE          *file;                ///< (Write) File to print to
-    int            indent;              ///< Current indent level of the printer
-    int            space_per_indent;    ///< (Write) Number of spaces per indent
-    unsigned char  if_chain[256]; ///
-    unsigned char  if_chain_size; ///
+    FILE          *file;             ///< (Write) File to print to
+    int            indent;           ///< Current indent level of the printer
+    int            space_per_indent; ///< (Write) Number of spaces per indent
+    unsigned char  if_chain[256];    ///
+    unsigned char  if_chain_size;    ///
 } Dqn_CppFile;
+
+#define Dqn_CppSpacePerIndent(cpp) ((cpp) && (cpp)->space_per_indent) ? ((cpp)->space_per_indent) : 4
 
 /// Print the format string indented and terminate the string with a new-line.
 void Dqn_CppLineV(Dqn_CppFile *cpp, char const *fmt, va_list args);
@@ -160,7 +174,7 @@ void Dqn_CppLine(Dqn_CppFile *cpp, char const *fmt, ...)
 
 void Dqn_CppPrintV(Dqn_CppFile *cpp, char const *fmt, va_list args)
 {
-    int space_per_indent = cpp->space_per_indent == 0 ? 4 : cpp->space_per_indent;
+    int space_per_indent = Dqn_CppSpacePerIndent(cpp);
     int spaces           = fmt ? (cpp->indent * space_per_indent) : 0;
     fprintf(cpp->file, "%*s", spaces, "");
     vfprintf(cpp->file, fmt, args);

@@ -147,7 +147,7 @@ typedef struct Dqn_UTest {
     int             num_tests_ok_in_group;
     Dqn_UTestState  state;
     bool            finished;
-    char            name[1024];
+    char            name[256];
     size_t          name_size;
 } Dqn_UTest;
 
