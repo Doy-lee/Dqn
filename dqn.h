@@ -188,32 +188,25 @@
 //   allow arbitrary querying of data definitions expressed in Excel-like tables
 //   using text files encoded in Dion-System's Metadesk grammar.
 //
-//   This option requires the standalone 'dqn_cpp_file.h' to be included prior
-//   to 'dqn.h' as well as Metadesk's 'md.h' and similarly the implementation of
-//   these files to be defined before the implementation of 'dqn.h' is defined.
+//   This option automatically includes 'dqn_cpp_file.h' to assist with code
+//   generation and Metadesk's 'md.h' and its implementation library.
 //
 //     #define DQN_WITH_CGEN
 //
-//   For example in your header file
-//
-//     #include "metadesk/md.h"
-//     #include "dqn/Standalone/dqn_cpp_file.h"
-//     #define DQN_STB_SPRINTF_HEADER_ONLY // Metadesk includes 'stb_sprintf.h' already
-//     #define DQN_WITH_CGEN
-//     #include "dqn.h"
-//
-//   Then in your implementation file
-//
-//     #include "metadesk/md.c"
-//     #define DQN_CPP_FILE_IMPLEMENTATION
-//     #include "dqn/Standalone/dqn_cpp_file.h"
-//     #define DQN_IMPLEMENTATION
-//     #include "dqn.h"
+//   Optionally define 'DQN_NO_METADESK' to disable the inclusion of Metadesk
+//   in the library. This might be useful if you are including the librarin in
+//   your  project yourself. This library must still be defined and visible
+//   before this header.
 //
 // - Enable 'Dqn_JSON' a json parser. This option requires Sheredom's 'json.h'
 //   to be included prior to this file.
 //
 //     #define DQN_WITH_JSON
+//
+//   Optionally define 'DQN_NO_SHEREDOM_JSON' to prevent Sheredom's 'json.h'
+//   library from being included. This might be useful if you are including the
+//   library in your project yourself. The library must still be defined and
+//   visible before this header.
 
 #if defined(DQN_ONLY_VARRAY)       || \
     defined(DQN_ONLY_SARRAY)       || \
@@ -294,6 +287,27 @@
     #endif
 #endif
 
+#if defined(DQN_WITH_CGEN)
+    #if !defined(DQN_NO_METADESK)
+        #if !defined(_CRT_SECURE_NO_WARNINGS)
+            #define _CRT_SECURE_NO_WARNINGS
+            #define DQN_UNDO_CRT_SECURE_NO_WARNINGS
+        #endif
+        #include "External/metadesk/md.h"
+        #if defined(DQN_UNDO_CRT_SECURE_NO_WARNINGS)
+            #undef _CRT_SECURE_NO_WARNINGS
+        #endif
+    #endif
+
+    // Metadesk includes 'stb_sprintf.h' already
+    #if !defined(DQN_STB_SPRINTF_HEADER_ONLY)
+        #define DQN_STB_SPRINTF_HEADER_ONLY
+    #endif
+
+    // Metadesk includes Windows.h
+    #define DQN_NO_WIN32_MIN_HEADER
+#endif
+
 #include "dqn_base.h"
 #include "dqn_external.h"
 #if defined(DQN_PLATFORM_WIN32)
@@ -317,11 +331,15 @@
 #include "dqn_type_info.h"
 
 #if defined(DQN_WITH_CGEN)
-#include "dqn_cgen.h"
+    #include "Standalone/dqn_cpp_file.h"
+    #include "dqn_cgen.h"
 #endif
 
 #if defined(DQN_WITH_JSON)
-#include "dqn_json.h"
+    #if !defined(DQN_NO_SHEREDOM_JSON)
+        #include "External/json.h"
+    #endif
+    #include "dqn_json.h"
 #endif
 #endif // DQN_H
 
@@ -340,6 +358,23 @@
 //   Implementation
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if defined(DQN_WITH_CGEN)
+    #if !defined(DQN_NO_METADESK)
+        DQN_MSVC_WARNING_PUSH
+        DQN_MSVC_WARNING_DISABLE(4505) // warning C4505: '<function>': unreferenced function with internal linkage has been removed
+        #include "External/metadesk/md.c"
+        DQN_MSVC_WARNING_POP
+    #endif
+    #define DQN_CPP_FILE_IMPLEMENTATION
+    #include "Standalone/dqn_cpp_file.h"
+    #include "dqn_cgen.cpp"
+#endif
+
+#if defined(DQN_WITH_JSON)
+    #define DQN_JSON_IMPLEMENTATION
+    #include "dqn_json.h"
+#endif
 
 #include "dqn_base.cpp"
 #include "dqn_thread_context.cpp"
@@ -361,15 +396,6 @@
 #include "dqn_math.cpp"
 #include "dqn_hash.cpp"
 #include "dqn_helpers.cpp"
-
-#if defined(DQN_WITH_CGEN)
-#include "dqn_cgen.cpp"
-#endif
-
-#if defined(DQN_WITH_JSON)
-#define DQN_JSON_IMPLEMENTATION
-#include "dqn_json.h"
-#endif
 
 #include "dqn_unit_tests.cpp"
 #include "dqn_docs.cpp"
