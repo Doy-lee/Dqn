@@ -103,7 +103,7 @@ struct Dqn_CGenTableRow
 struct Dqn_CGenTable
 {
     Dqn_CGenTableType    type;
-    MD_String8           name;
+    Dqn_Str8             name;
     MD_Map               headers_map;
     Dqn_CGenTableHeader *headers;
     Dqn_CGenTableRow    *rows;

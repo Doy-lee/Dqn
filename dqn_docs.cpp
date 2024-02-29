@@ -272,7 +272,7 @@ void Dqn_Docs_Demo()
     // (B) Error handling using pipelining and and error proof APIs. APIs that
     // produce errors take in the error sink as a parameter.
     if (0) {
-        Dqn_ErrorSink *error = Dqn_ErrorSink_Begin();
+        Dqn_ErrorSink *error = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
         Dqn_OSFile     file  = Dqn_OS_FileOpen(DQN_STR8("/path/to/file"), Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_ReadWrite, error);
         Dqn_OS_FileWrite(&file, DQN_STR8("abc"), error);
         Dqn_OS_FileClose(&file);
@@ -296,7 +296,7 @@ void Dqn_Docs_Demo()
     // be populated by the first error encountered in that scope.
 
     if (0) {
-        Dqn_ErrorSink *error = Dqn_ErrorSink_Begin();
+        Dqn_ErrorSink *error = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
         Dqn_OSFile     file  = Dqn_OS_FileOpen(DQN_STR8("/path/to/file"), Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_ReadWrite, error);
         Dqn_OS_FileWrite(&file, DQN_STR8("abc"), error);
         Dqn_OS_FileClose(&file);
@@ -304,7 +304,7 @@ void Dqn_Docs_Demo()
         {
             // NOTE: My error sinks are thread-local, so the returned 'error' is
             // the same as the 'error' value above.
-            Dqn_ErrorSink_Begin();
+            Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
             Dqn_OS_WriteAll(DQN_STR8("/path/to/another/file"), DQN_STR8("123"), error);
             Dqn_ErrorSink_EndAndLogErrorF(error, "Failed to write to another file");
         }
@@ -449,7 +449,7 @@ void Dqn_Docs_Demo()
     // 'path'.
     if (0) {
         Dqn_Scratch    scratch = Dqn_Scratch_Get(nullptr);
-        Dqn_ErrorSink *error   = Dqn_ErrorSink_Begin();
+        Dqn_ErrorSink *error   = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
         Dqn_OS_WriteAllSafe(/*path*/ DQN_STR8("C:/Home/my.txt"), /*buffer*/ DQN_STR8("Hello world"), error);
         Dqn_ErrorSink_EndAndLogErrorF(error, "");
     }

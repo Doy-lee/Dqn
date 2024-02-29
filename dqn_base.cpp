@@ -407,13 +407,14 @@ DQN_API void Dqn_Log_TypeFCallSite(Dqn_LogType type, Dqn_CallSite call_site, DQN
 }
 
 // NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
-DQN_API Dqn_ErrorSink *Dqn_ErrorSink_Begin()
+DQN_API Dqn_ErrorSink *Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode mode)
 {
     Dqn_ThreadContext *thread_context = Dqn_ThreadContext_Get();
     Dqn_ErrorSink     *result         = &thread_context->error_sink;
     Dqn_ErrorSinkNode *node           = Dqn_Arena_New(result->arena, Dqn_ErrorSinkNode, Dqn_ZeroMem_Yes);
     node->next                        = result->stack;
     node->arena_pos                   = Dqn_Arena_Pos(result->arena);
+    node->mode                        = mode;
     result->stack                     = node;
     return result;
 }
@@ -438,14 +439,13 @@ DQN_API Dqn_ErrorSinkNode Dqn_ErrorSink_End(Dqn_Arena *arena, Dqn_ErrorSink *err
     return result;
 }
 
-DQN_API bool Dqn_ErrorSink_EndAndLogErrorFV(Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
+DQN_API bool Dqn_ErrorSink_EndAndLogError(Dqn_ErrorSink *error, Dqn_Str8 error_msg)
 {
     Dqn_Scratch       scratch = Dqn_Scratch_Get(nullptr);
     Dqn_ErrorSinkNode node    = Dqn_ErrorSink_End(scratch.arena, error);
     if (node.error) {
-        Dqn_Str8 line = Dqn_Str8_InitFV(scratch.arena, fmt, args);
-        if (Dqn_Str8_HasData(line)) {
-            Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s. %.*s", DQN_STR_FMT(line), DQN_STR_FMT(node.msg));
+        if (Dqn_Str8_HasData(error_msg)) {
+            Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s. %.*s", DQN_STR_FMT(error_msg), DQN_STR_FMT(node.msg));
         } else {
             Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s", DQN_STR_FMT(node.msg));
         }
@@ -454,11 +454,21 @@ DQN_API bool Dqn_ErrorSink_EndAndLogErrorFV(Dqn_ErrorSink *error, DQN_FMT_ATTRIB
     return result;
 }
 
+DQN_API bool Dqn_ErrorSink_EndAndLogErrorFV(Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
+{
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_Str8    log     = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    bool        result  = Dqn_ErrorSink_EndAndLogError(error, log);
+    return result;
+}
+
 DQN_API bool Dqn_ErrorSink_EndAndLogErrorF(Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    bool result = Dqn_ErrorSink_EndAndLogErrorFV(error, fmt, args);
+    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_Str8    log     = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    bool        result  = Dqn_ErrorSink_EndAndLogError(error, log);
     va_end(args);
     return result;
 }
@@ -479,15 +489,18 @@ DQN_API void Dqn_ErrorSink_EndAndExitIfErrorF(Dqn_ErrorSink *error, uint32_t exi
 
 DQN_API void Dqn_ErrorSink_MakeFV_(Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
-    if (error) {
-        Dqn_ErrorSinkNode *node = error->stack;
-        DQN_ASSERTF(node, "Error sink must be begun by calling 'Begin' before using this function.");
-        if (!node->error) { // NOTE: Only preserve the first error
-            node->msg        = Dqn_Str8_InitFV(error->arena, fmt, args);
-            node->error_code = error_code;
-            node->error      = true;
-            node->call_site  = Dqn_ThreadContext_Get()->call_site;
-        }
+    if (!error)
+        return;
+
+    Dqn_ErrorSinkNode *node = error->stack;
+    DQN_ASSERTF(node, "Error sink must be begun by calling 'Begin' before using this function.");
+    if (!node->error) { // NOTE: Only preserve the first error
+        node->msg        = Dqn_Str8_InitFV(error->arena, fmt, args);
+        node->error_code = error_code;
+        node->error      = true;
+        node->call_site  = Dqn_ThreadContext_Get()->call_site;
+        if (node->mode == Dqn_ErrorSinkMode_ExitOnError)
+            Dqn_ErrorSink_EndAndExitIfErrorF(error, error_code, "Fatal error encountered: (%u) %.*s", error_code, DQN_STR_FMT(node->msg));
     }
 }
 

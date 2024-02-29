@@ -386,8 +386,15 @@ struct Dqn_CallSite
 #define DQN_CALL_SITE Dqn_CallSite{DQN_STR8(__FILE__), DQN_STR8(__func__), __LINE__}
 
 // NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
+enum Dqn_ErrorSinkMode
+{
+    Dqn_ErrorSinkMode_Nil,
+    Dqn_ErrorSinkMode_ExitOnError,
+};
+
 struct Dqn_ErrorSinkNode
 {
+    Dqn_ErrorSinkMode  mode;
     bool               error;
     int32_t            error_code;
     Dqn_Str8           msg;
@@ -613,8 +620,9 @@ DQN_API          void               Dqn_Log_FVCallSite                          
 DQN_API          void               Dqn_Log_FCallSite                           (Dqn_Str8 type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, ...);
 
 // NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
-DQN_API          Dqn_ErrorSink *    Dqn_ErrorSink_Begin                         ();
+DQN_API          Dqn_ErrorSink *    Dqn_ErrorSink_Begin                         (Dqn_ErrorSinkMode mode);
 DQN_API          Dqn_ErrorSinkNode  Dqn_ErrorSink_End                           (Dqn_Arena *arena, Dqn_ErrorSink *error);
+DQN_API          bool               Dqn_ErrorSink_EndAndLogError                (Dqn_ErrorSink *error, Dqn_Str8 error_msg);
 DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorFV              (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
 DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorF               (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
 DQN_API          void               Dqn_ErrorSink_EndAndExitIfErrorF            (Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, ...);

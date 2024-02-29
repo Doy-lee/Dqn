@@ -82,8 +82,8 @@ static bool Dqn_CGen_GatherTables_(Dqn_CGen *cgen, Dqn_ErrorSink *error)
 
             Dqn_CGenTable *table = MD_PushArray(cgen->arena, Dqn_CGenTable, 1);
             table->node          = node;
-            table->name          = table_tag->first_child->first_child->string;
-            MD_MapInsert(cgen->arena, &cgen->table_map, MD_MapKeyStr(table->name), table);
+            table->name          = Dqn_CGen_MDToDqnStr8(table_tag->first_child->first_child->string);
+            MD_MapInsert(cgen->arena, &cgen->table_map, MD_MapKeyStr(Dqn_CGen_DqnToMDStr8(table->name)), table);
             MD_QueuePush(cgen->first_table, cgen->last_table, table);
 
             for (MD_EachNode(key, table_tag->first_child)) {
@@ -95,7 +95,7 @@ static bool Dqn_CGen_GatherTables_(Dqn_CGen *cgen, Dqn_ErrorSink *error)
                     case Dqn_CGenTableKeyType_Nil: DQN_INVALID_CODE_PATH;
 
                     case Dqn_CGenTableKeyType_Name: {
-                        table->name = key->first_child->string;
+                        table->name = Dqn_CGen_MDToDqnStr8(key->first_child->string);
                     } break;
 
                     case Dqn_CGenTableKeyType_Type: {
@@ -270,10 +270,10 @@ static bool Dqn_CGen_GatherTables_(Dqn_CGen *cgen, Dqn_ErrorSink *error)
                                     DQN_STR_FMT(column.string),
                                     DQN_STR_FMT(header_type_str8),
                                     DQN_STR_FMT(column.string),
-                                    MD_S8VArg(it.table->name),
-                                    MD_S8VArg(it.table->name),
+                                    DQN_STR_FMT(it.table->name),
+                                    DQN_STR_FMT(it.table->name),
                                     DQN_STR_FMT(header_type_str8),
-                                    MD_S8VArg(it.table->name),
+                                    DQN_STR_FMT(it.table->name),
                                     DQN_STR_FMT(header_type_str8));
                 }
             }
@@ -403,7 +403,12 @@ DQN_API bool Dqn_CGen_TableHasHeaders(Dqn_CGenTable const *table, Dqn_Str8 const
 
     if (!result) {
         Dqn_Str8 missing_headers = Dqn_Str8Builder_Build(&builder, scratch.arena);
-        Dqn_CGen_LogF(MD_MessageKind_Error, table->headers_node, error, "Table '%.*s' is missing the header(s): %.*s", MD_S8VArg(table->name), DQN_STR_FMT(missing_headers));
+        Dqn_CGen_LogF(MD_MessageKind_Error,
+                      table->headers_node,
+                      error,
+                      "Table '%.*s' is missing the header(s): %.*s",
+                      DQN_STR_FMT(table->name),
+                      DQN_STR_FMT(missing_headers));
     }
 
     return result;
