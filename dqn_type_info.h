@@ -39,6 +39,7 @@ struct Dqn_TypeInfo
 {
     Dqn_Str8             name;
     Dqn_TypeKind         kind;
+    Dqn_usize            size_of;
     Dqn_TypeField const *fields;
     uint16_t             fields_count;
 };

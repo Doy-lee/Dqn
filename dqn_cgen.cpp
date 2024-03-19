@@ -105,6 +105,9 @@ static bool Dqn_CGen_GatherTables_(Dqn_CGen *cgen, Dqn_ErrorSink *error)
                                                                                                   DQN_ARRAY_UCOUNT(DQN_CGEN_TABLE_TYPE_LIST),
                                                                                                   "Table 'type' specified invalid value");
                         table->type                                = DQN_CAST(Dqn_CGenTableType) table_type_validator.enum_val;
+
+                        DQN_ASSERT(table->type <= Dqn_CGenTableType_Count);
+                        cgen->table_counts[table->type]++;
                     } break;
                 }
             }
@@ -454,6 +457,7 @@ DQN_API bool Dqn_CGen_LookupNextTableInCodeGenTable(Dqn_CGen *cgen, Dqn_CGenTabl
     // NOTE: Lookup the table in this row that we will code generate from. Not
     // applicable when we are doing builtin types as the types are just put
     // in-line into the code generation table itself.
+    it->cgen_table     = cgen_table;
     it->cgen_table_row = cgen_table->rows + it->row_index++;
     if (cgen_table->type != Dqn_CGenTableType_CodeGenBuiltinTypes) {
         Dqn_CGenTableColumn cgen_table_column = it->cgen_table_row->columns[cgen_table->column_indexes[Dqn_CGenTableHeaderType_Table]];
@@ -752,7 +756,7 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
         }
 
         Dqn_CppBlock(cpp, ";\n\n", "Dqn_TypeInfo const g_%.*s_types[] =", DQN_STR_FMT(emit_prefix)) {
-            Dqn_CppLine(cpp, "{DQN_STR8(\"\"),%*sDqn_TypeKind_Nil,    /*fields*/ NULL, /*count*/ 0},", 1 + longest_name_across_all_tables, "");
+            Dqn_CppLine(cpp, "{DQN_STR8(\"\"),%*sDqn_TypeKind_Nil,    0, /*fields*/ NULL, /*count*/ 0},", 1 + longest_name_across_all_tables, "");
             for (Dqn_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
                 for (Dqn_CGenLookupTableIterator it = {}; Dqn_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
                     Dqn_Str8    type_name    = it.cgen_table_column[Dqn_CGenTableHeaderType_Name].string;
@@ -794,14 +798,43 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
                     }
 
                     Dqn_CppLine(cpp,
-                                "{DQN_STR8(\"%.*s\"),%*s%.*s, %s/*fields*/ %.*s,%*s/*count*/ %.*s},",
+                                "{DQN_STR8(\"%.*s\"),%*s%.*s, %ssizeof(%.*s),%*s/*fields*/ %.*s,%*s/*count*/ %.*s},",
                                 DQN_STR_FMT(type_name),
                                 name_padding, "",
                                 DQN_STR_FMT(type_info_kind),
                                 type_info_kind_padding,
+                                DQN_STR_FMT(type_name),
+                                name_padding, "",
                                 DQN_STR_FMT(fields),
                                 fields_padding, "",
                                 DQN_STR_FMT(fields_count));
+                }
+            }
+        }
+
+        for (Dqn_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
+            if (table->type != Dqn_CGenTableType_CodeGenEnum)
+                continue;
+
+            for (Dqn_CGenLookupTableIterator it = {}; Dqn_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
+                Dqn_Str8 type_name = it.cgen_table_column[Dqn_CGenTableHeaderType_Name].string;
+                Dqn_CppStructBlock(cpp, "%.*sStr8ToEnumResult", DQN_STR_FMT(type_name)) {
+                    Dqn_CppLine(cpp, "bool success;");
+                    Dqn_CppLine(cpp, "%.*s value;", DQN_STR_FMT(type_name));
+                }
+
+                Dqn_CppFuncBlock(cpp, "%.*sStr8ToEnumResult %.*s_Str8ToEnum(Dqn_Str8 string)", DQN_STR_FMT(type_name), DQN_STR_FMT(type_name)) {
+                    Dqn_CppLine(cpp, "%.*sStr8ToEnumResult result = {};", DQN_STR_FMT(type_name));
+                    Dqn_CppForBlock(cpp, "Dqn_usize index = 0; !result.success && index < DQN_ARRAY_UCOUNT(g_%.*s_type_fields); index++", DQN_STR_FMT(type_name)) {
+                        Dqn_CppIfChain(cpp) {
+                            Dqn_CppLine(cpp, "Dqn_TypeField field = g_%.*s_type_fields[index];", DQN_STR_FMT(type_name));
+                            Dqn_CppIfOrElseIfBlock(cpp, "string == field.name") {
+                                Dqn_CppLine(cpp, "result.success = true;");
+                                Dqn_CppLine(cpp, "result.value = (%.*s)index;", DQN_STR_FMT(type_name));
+                            }
+                        }
+                    }
+                    Dqn_CppLine(cpp, "return result;");
                 }
             }
         }

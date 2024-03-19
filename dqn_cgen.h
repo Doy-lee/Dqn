@@ -43,6 +43,7 @@ enum Dqn_CGenTableType
     Dqn_CGenTableType_CodeGenBuiltinTypes,
     Dqn_CGenTableType_CodeGenStruct,
     Dqn_CGenTableType_CodeGenEnum,
+    Dqn_CGenTableType_Count,
 };
 
 enum Dqn_CGenTableRowTagType
@@ -123,6 +124,7 @@ struct Dqn_CGen
     MD_Map         table_map;
     Dqn_CGenTable *first_table;
     Dqn_CGenTable *last_table;
+    Dqn_usize      table_counts[Dqn_CGenTableType_Count];
 };
 
 struct Dqn_CGenMapNodeToEnum
@@ -133,6 +135,7 @@ struct Dqn_CGenMapNodeToEnum
 
 struct Dqn_CGenLookupTableIterator
 {
+    Dqn_CGenTable      *cgen_table;
     Dqn_CGenTableRow   *cgen_table_row;
     Dqn_CGenTableColumn cgen_table_column[Dqn_CGenTableHeaderType_Count];
     Dqn_CGenTable      *table;

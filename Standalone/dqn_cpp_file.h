@@ -71,7 +71,7 @@ void Dqn_CppPrint(Dqn_CppFile *cpp, char const *fmt, ...);
 
 #define Dqn_CppForBlock(cpp, fmt, ...)                           \
     for (bool DQN_CPP_TOKEN_PASTE_(once_, __LINE__) =            \
-             (Dqn_CppBeginForBLock(cpp, fmt, ##__VA_ARGS__), true); \
+             (Dqn_CppBeginForBlock(cpp, fmt, ##__VA_ARGS__), true); \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__);                  \
          DQN_CPP_TOKEN_PASTE_(once_, __LINE__) = (Dqn_CppEndForBlock(cpp), false))
 

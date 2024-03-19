@@ -285,7 +285,6 @@ DQN_API bool                      Dqn_OS_SecureRNGBytes      (void *buffer, uint
 DQN_API Dqn_Str8                  Dqn_OS_EXEPath             (Dqn_Arena *arena);
 DQN_API Dqn_Str8                  Dqn_OS_EXEDir              (Dqn_Arena *arena);
 DQN_API void                      Dqn_OS_SleepMs             (Dqn_uint milliseconds);
-
 // NOTE: Counters //////////////////////////////////////////////////////////////////////////////////
 DQN_API uint64_t                  Dqn_OS_PerfCounterNow      ();
 DQN_API uint64_t                  Dqn_OS_PerfCounterFrequency();
@@ -345,7 +344,7 @@ DQN_API Dqn_Str8                  Dqn_OS_PathConvertF          (Dqn_Arena *arena
 #define                           Dqn_OS_PathBuild(allocator, fs_path)          Dqn_OS_PathBuildWithSeparator(allocator, fs_path, Dqn_OSPathSeparatorString)
 
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
-DQN_API void                      Dqn_OS_Exit       (uint32_t exit_code);
+DQN_API void                      Dqn_OS_Exit       (int32_t exit_code);
 DQN_API Dqn_OSExecResult          Dqn_OS_ExecWait   (Dqn_OSExecAsyncHandle handle);
 DQN_API Dqn_OSExecAsyncHandle     Dqn_OS_ExecAsync  (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir);
 DQN_API Dqn_OSExecResult          Dqn_OS_Exec       (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir);

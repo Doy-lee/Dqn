@@ -285,8 +285,8 @@
         } while (0)
 #endif
 
-#define DQN_INVALID_CODE_PATHF(fmt, ...) DQN_ASSERTF(0, fmt, ##__VA_ARGS__)
-#define DQN_INVALID_CODE_PATH DQN_INVALID_CODE_PATHF("Invalid code path triggered")
+#define DQN_INVALID_CODE_PATHF(fmt, ...) DQN_HARD_ASSERTF(0, fmt, ##__VA_ARGS__)
+#define DQN_INVALID_CODE_PATH            DQN_INVALID_CODE_PATHF("Invalid code path triggered")
 
 // NOTE: Check macro ///////////////////////////////////////////////////////////////////////////////
 #define DQN_CHECK(expr) DQN_CHECKF(expr, "")
@@ -621,6 +621,7 @@ DQN_API          void               Dqn_Log_FCallSite                           
 
 // NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
 DQN_API          Dqn_ErrorSink *    Dqn_ErrorSink_Begin                         (Dqn_ErrorSinkMode mode);
+DQN_API          bool               Dqn_ErrorSink_HasError                      (Dqn_ErrorSink *error);
 DQN_API          Dqn_ErrorSinkNode  Dqn_ErrorSink_End                           (Dqn_Arena *arena, Dqn_ErrorSink *error);
 DQN_API          bool               Dqn_ErrorSink_EndAndLogError                (Dqn_ErrorSink *error, Dqn_Str8 error_msg);
 DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorFV              (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);

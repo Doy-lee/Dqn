@@ -119,6 +119,12 @@ DQN_API Dqn_Str8 Dqn_Str8_Advance(Dqn_Str8 string, Dqn_usize amount)
     return result;
 }
 
+DQN_API Dqn_Str8 Dqn_Str8_NextLine(Dqn_Str8 string)
+{
+    Dqn_Str8 result = Dqn_Str8_BinarySplit(string, DQN_STR8("\n")).rhs;
+    return result;
+}
+
 DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
 {
     Dqn_Str8BinarySplitResult result = {};
@@ -839,6 +845,22 @@ DQN_API Dqn_Slice<Dqn_Str8> Dqn_Str8Builder_BuildSlice(Dqn_Str8Builder const *bu
     return result;
 }
 
+DQN_API void Dqn_Str8Builder_PrintF(Dqn_Str8Builder const *builder)
+{
+    for (Dqn_Str8Link *link = builder ? builder->head : nullptr; link; link = link->next)
+        Dqn_Print(link->string);
+}
+
+DQN_API void Dqn_Str8Builder_PrintLnF(Dqn_Str8Builder const *builder)
+{
+    for (Dqn_Str8Link *link = builder ? builder->head : nullptr; link; link = link->next) {
+        if (link->next) {
+            Dqn_Print(link->string);
+        } else {
+            Dqn_Print_Ln(link->string);
+        }
+    }
+}
 
 // NOTE: [$CHAR] Dqn_Char //////////////////////////////////////////////////////////////////////////
 DQN_API bool Dqn_Char_IsAlphabet(char ch)

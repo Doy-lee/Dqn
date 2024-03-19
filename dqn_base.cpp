@@ -419,6 +419,12 @@ DQN_API Dqn_ErrorSink *Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode mode)
     return result;
 }
 
+DQN_API bool Dqn_ErrorSink_HasError(Dqn_ErrorSink *error)
+{
+    bool result = error && error->stack->error;
+    return result;
+}
+
 DQN_API Dqn_ErrorSinkNode Dqn_ErrorSink_End(Dqn_Arena *arena, Dqn_ErrorSink *error)
 {
     Dqn_ErrorSinkNode  result = {};
@@ -445,7 +451,7 @@ DQN_API bool Dqn_ErrorSink_EndAndLogError(Dqn_ErrorSink *error, Dqn_Str8 error_m
     Dqn_ErrorSinkNode node    = Dqn_ErrorSink_End(scratch.arena, error);
     if (node.error) {
         if (Dqn_Str8_HasData(error_msg)) {
-            Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s. %.*s", DQN_STR_FMT(error_msg), DQN_STR_FMT(node.msg));
+            Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s: %.*s", DQN_STR_FMT(error_msg), DQN_STR_FMT(node.msg));
         } else {
             Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s", DQN_STR_FMT(node.msg));
         }
@@ -475,8 +481,10 @@ DQN_API bool Dqn_ErrorSink_EndAndLogErrorF(Dqn_ErrorSink *error, DQN_FMT_ATTRIB 
 
 DQN_API void Dqn_ErrorSink_EndAndExitIfErrorFV(Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
-    if (Dqn_ErrorSink_EndAndLogErrorFV(error, fmt, args))
+    if (Dqn_ErrorSink_EndAndLogErrorFV(error, fmt, args)) {
+        DQN_DEBUG_BREAK;
         Dqn_OS_Exit(exit_code);
+    }
 }
 
 DQN_API void Dqn_ErrorSink_EndAndExitIfErrorF(Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, ...)
@@ -500,7 +508,7 @@ DQN_API void Dqn_ErrorSink_MakeFV_(Dqn_ErrorSink *error, uint32_t error_code, DQ
         node->error      = true;
         node->call_site  = Dqn_ThreadContext_Get()->call_site;
         if (node->mode == Dqn_ErrorSinkMode_ExitOnError)
-            Dqn_ErrorSink_EndAndExitIfErrorF(error, error_code, "Fatal error encountered: (%u) %.*s", error_code, DQN_STR_FMT(node->msg));
+            Dqn_ErrorSink_EndAndExitIfErrorF(error, error_code, "Fatal error %u", error_code);
     }
 }
 

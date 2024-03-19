@@ -202,8 +202,10 @@ struct Dqn_Profiler
 typedef void (Dqn_JobQueueFunc)(void *user_context);
 struct Dqn_Job
 {
+    bool              add_to_completion_queue;
     Dqn_Arena        *arena;
     Dqn_JobQueueFunc *func;
+    uint32_t          user_tag;
     void             *user_context;
 };
 
@@ -214,12 +216,17 @@ struct Dqn_JobQueueSPMC
     Dqn_OSSemaphore   wait_for_completion_semaphore;
     uint32_t          threads_waiting_for_completion;
 
-    Dqn_Job           jobs[32];
+    Dqn_Job           jobs[64];
     Dqn_b32           quit;
     uint32_t          quit_exit_code;
     uint32_t volatile read_index;
-    uint32_t volatile complete_index;
+    uint32_t volatile finish_index;
     uint32_t volatile write_index;
+
+    Dqn_OSSemaphore   complete_queue_write_semaphore;
+    Dqn_Job           complete_queue[64];
+    uint32_t volatile complete_read_index;
+    uint32_t volatile complete_write_index;
 };
 
 // NOTE: [$DLIB] Dqn_Library ///////////////////////////////////////////////////////////////////////
@@ -408,6 +415,13 @@ DQN_API int8_t              Dqn_Safe_SaturateCastI64ToI8             (int64_t va
 DQN_API int16_t             Dqn_Safe_SaturateCastI64ToI16            (int64_t val);
 DQN_API int32_t             Dqn_Safe_SaturateCastI64ToI32            (int64_t val);
 
+DQN_API unsigned int        Dqn_Safe_SaturateCastI64ToUInt           (int64_t val);
+DQN_API Dqn_isize           Dqn_Safe_SaturateCastI64ToUSize          (int64_t val);
+DQN_API uint8_t             Dqn_Safe_SaturateCastI64ToU8             (int64_t val);
+DQN_API uint16_t            Dqn_Safe_SaturateCastI64ToU16            (int64_t val);
+DQN_API uint32_t            Dqn_Safe_SaturateCastI64ToU32            (int64_t val);
+DQN_API uint64_t            Dqn_Safe_SaturateCastI64ToU64            (int64_t val);
+
 DQN_API int8_t              Dqn_Safe_SaturateCastIntToI8             (int val);
 DQN_API int16_t             Dqn_Safe_SaturateCastIntToI16            (int val);
 DQN_API uint8_t             Dqn_Safe_SaturateCastIntToU8             (int val);
@@ -433,10 +447,11 @@ DQN_API void                Dqn_Profiler_Dump                        (uint64_t t
 
 // NOTE: [$JOBQ] Dqn_JobQueue ///////////////////////////////////////////////////////////////////////
 DQN_API Dqn_JobQueueSPMC    Dqn_OS_JobQueueSPMCInit                  ();
-DQN_API bool                Dqn_OS_JobQueueSPMCAddArray              (Dqn_JobQueueSPMC *job_queue, Dqn_Job *jobs, uint32_t count);
-DQN_API bool                Dqn_OS_JobQueueSPMCAdd                   (Dqn_JobQueueSPMC *job_queue, Dqn_Job job);
-DQN_API void                Dqn_OS_JobQueueSPMCWaitForCompletion     (Dqn_JobQueueSPMC *job_queue);
+DQN_API bool                Dqn_OS_JobQueueSPMCAddArray              (Dqn_JobQueueSPMC *queue, Dqn_Job *jobs, uint32_t count);
+DQN_API bool                Dqn_OS_JobQueueSPMCAdd                   (Dqn_JobQueueSPMC *queue, Dqn_Job job);
+DQN_API void                Dqn_OS_JobQueueSPMCWaitForCompletion     (Dqn_JobQueueSPMC *queue);
 DQN_API int32_t             Dqn_OS_JobQueueSPMCThread                (Dqn_OSThread *thread);
+DQN_API Dqn_usize           Dqn_OS_JobQueueSPMCGetFinishedJobs       (Dqn_JobQueueSPMC *queue, Dqn_Job *jobs, Dqn_usize jobs_size);
 
 // NOTE: Dqn_Library ///////////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_Library *       Dqn_Library_Init                         (Dqn_LibraryOnInit on_init);

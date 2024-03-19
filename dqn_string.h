@@ -152,6 +152,7 @@ DQN_API                             Dqn_Str8                  Dqn_Str8_Copy     
 
 DQN_API                             Dqn_Str8                  Dqn_Str8_Slice                  (Dqn_Str8 string, Dqn_usize offset, Dqn_usize size);
 DQN_API                             Dqn_Str8                  Dqn_Str8_Advance                (Dqn_Str8 string, Dqn_usize amount);
+DQN_API                             Dqn_Str8                  Dqn_Str8_NextLine               (Dqn_Str8 string);
 DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitArray       (Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size);
 DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplit            (Dqn_Str8 string, Dqn_Str8 find);
 DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitReverseArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size);
@@ -206,6 +207,7 @@ DQN_API                             bool                      Dqn_Str8Builder_Ap
 DQN_API                             Dqn_Str8                  Dqn_Str8Builder_Build          (Dqn_Str8Builder const *builder, Dqn_Arena *arena);
 DQN_API                             Dqn_Str8                  Dqn_Str8Builder_BuildCRT       (Dqn_Str8Builder const *builder);
 DQN_API                             Dqn_Slice<Dqn_Str8>       Dqn_Str8Builder_BuildSlice     (Dqn_Str8Builder const *builder, Dqn_Arena *arena);
+DQN_API                             void                      Dqn_Str8Builder_PrintF         (Dqn_Str8Builder const *builder);
 
 // NOTE: [$FSTR] Dqn_FStr8 //////////////////////////////////////////////////////////////////////
 #if !defined(DQN_NO_FSTR8)

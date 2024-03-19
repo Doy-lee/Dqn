@@ -523,8 +523,7 @@ DQN_API uint32_t Dqn_Safe_SubU32(uint32_t a, uint32_t b)
     return result;
 }
 
-// NOTE: Dqn_Safe_SaturateCastUSizeToI*
-// -----------------------------------------------------------------------------
+// NOTE: Dqn_Safe_SaturateCastUSizeToI* ////////////////////////////////////////////////////////////
 // INT*_MAX literals will be promoted to the type of uintmax_t as uintmax_t is
 // the highest possible rank (unsigned > signed).
 DQN_API int Dqn_Safe_SaturateCastUSizeToInt(Dqn_usize val)
@@ -557,8 +556,7 @@ DQN_API int64_t Dqn_Safe_SaturateCastUSizeToI64(Dqn_usize val)
     return result;
 }
 
-// NOTE: Dqn_Safe_SaturateCastUSizeToU*
-// -----------------------------------------------------------------------------
+// NOTE: Dqn_Safe_SaturateCastUSizeToU* ////////////////////////////////////////////////////////////
 // Both operands are unsigned and the lowest rank operand will be promoted to
 // match the highest rank operand.
 DQN_API uint8_t Dqn_Safe_SaturateCastUSizeToU8(Dqn_usize val)
@@ -624,8 +622,7 @@ DQN_API uint32_t Dqn_Safe_SaturateCastU64ToU32(uint64_t val)
     return result;
 }
 
-// NOTE: Dqn_Safe_SaturateCastISizeToI*
-// -----------------------------------------------------------------------------
+// NOTE: Dqn_Safe_SaturateCastISizeToI* ////////////////////////////////////////////////////////////
 // Both operands are signed so the lowest rank operand will be promoted to
 // match the highest rank operand.
 DQN_API int Dqn_Safe_SaturateCastISizeToInt(Dqn_isize val)
@@ -663,8 +660,7 @@ DQN_API int64_t Dqn_Safe_SaturateCastISizeToI64(Dqn_isize val)
     return result;
 }
 
-// NOTE: Dqn_Safe_SaturateCastISizeToU*
-// -----------------------------------------------------------------------------
+// NOTE: Dqn_Safe_SaturateCastISizeToU* ////////////////////////////////////////////////////////////
 // If the value is a negative integer, we clamp to 0. Otherwise, we know that
 // the value is >=0, we can upcast safely to bounds check against the maximum
 // allowed value.
@@ -728,8 +724,7 @@ DQN_API uint64_t Dqn_Safe_SaturateCastISizeToU64(Dqn_isize val)
     return result;
 }
 
-// NOTE: Dqn_Safe_SaturateCastI64To*
-// -----------------------------------------------------------------------------
+// NOTE: Dqn_Safe_SaturateCastI64To* ///////////////////////////////////////////////////////////////
 // Both operands are signed so the lowest rank operand will be promoted to
 // match the highest rank operand.
 DQN_API Dqn_isize Dqn_Safe_SaturateCastI64ToISize(int64_t val)
@@ -760,8 +755,79 @@ DQN_API int32_t Dqn_Safe_SaturateCastI64ToI32(int64_t val)
     return result;
 }
 
-// NOTE: Dqn_Safe_SaturateCastIntTo*
-// -----------------------------------------------------------------------------
+DQN_API unsigned int Dqn_Safe_SaturateCastI64ToUInt(int64_t val)
+{
+    unsigned int result = 0;
+    if (DQN_CHECK(val >= DQN_CAST(int64_t) 0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t) val <= UINT_MAX))
+            result = DQN_CAST(unsigned int) val;
+        else
+            result = UINT_MAX;
+    }
+    return result;
+}
+
+DQN_API Dqn_isize Dqn_Safe_SaturateCastI64ToUSize(int64_t val)
+{
+    Dqn_usize result = 0;
+    if (DQN_CHECK(val >= DQN_CAST(int64_t) 0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t) val <= DQN_USIZE_MAX))
+            result = DQN_CAST(Dqn_usize) val;
+        else
+            result = DQN_USIZE_MAX;
+    }
+    return result;
+}
+
+DQN_API uint8_t Dqn_Safe_SaturateCastI64ToU8(int64_t val)
+{
+    uint8_t result = 0;
+    if (DQN_CHECK(val >= DQN_CAST(int64_t) 0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t) val <= UINT8_MAX))
+            result = DQN_CAST(uint8_t) val;
+        else
+            result = UINT8_MAX;
+    }
+    return result;
+}
+
+DQN_API uint16_t Dqn_Safe_SaturateCastI64ToU16(int64_t val)
+{
+    uint16_t result = 0;
+    if (DQN_CHECK(val >= DQN_CAST(int64_t) 0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t) val <= UINT16_MAX))
+            result = DQN_CAST(uint16_t) val;
+        else
+            result = UINT16_MAX;
+    }
+    return result;
+}
+
+DQN_API uint32_t Dqn_Safe_SaturateCastI64ToU32(int64_t val)
+{
+    uint32_t result = 0;
+    if (DQN_CHECK(val >= DQN_CAST(int64_t) 0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t) val <= UINT32_MAX))
+            result = DQN_CAST(uint32_t) val;
+        else
+            result = UINT32_MAX;
+    }
+    return result;
+}
+
+DQN_API uint64_t Dqn_Safe_SaturateCastI64ToU64(int64_t val)
+{
+    uint64_t result = 0;
+    if (DQN_CHECK(val >= DQN_CAST(int64_t) 0)) {
+        if (DQN_CHECK(DQN_CAST(uintmax_t) val <= UINT64_MAX))
+            result = DQN_CAST(uint64_t) val;
+        else
+            result = UINT64_MAX;
+    }
+    return result;
+}
+
+// NOTE: Dqn_Safe_SaturateCastIntTo* ///////////////////////////////////////////////////////////////
 DQN_API int8_t Dqn_Safe_SaturateCastIntToI8(int val)
 {
     DQN_CHECK(val >= INT8_MIN && val <= INT8_MAX);
@@ -1260,87 +1326,113 @@ void Dqn_Profiler_Dump(uint64_t tsc_per_second)
 // NOTE: [$JOBQ] Dqn_JobQueue ///////////////////////////////////////////////////////////////////////
 DQN_API Dqn_JobQueueSPMC Dqn_OS_JobQueueSPMCInit()
 {
-    Dqn_JobQueueSPMC result              = {};
-    result.thread_wait_for_job_semaphore = Dqn_OS_SemaphoreInit(0 /*initial_count*/);
-    result.wait_for_completion_semaphore = Dqn_OS_SemaphoreInit(0 /*initial_count*/);
-    result.mutex                         = Dqn_OS_MutexInit();
+    Dqn_JobQueueSPMC result               = {};
+    result.thread_wait_for_job_semaphore  = Dqn_OS_SemaphoreInit(0 /*initial_count*/);
+    result.wait_for_completion_semaphore  = Dqn_OS_SemaphoreInit(0 /*initial_count*/);
+    result.complete_queue_write_semaphore = Dqn_OS_SemaphoreInit(DQN_ARRAY_UCOUNT(result.complete_queue));
+    result.mutex                          = Dqn_OS_MutexInit();
     return result;
 }
 
-DQN_API bool Dqn_OS_JobQueueSPMCAddArray(Dqn_JobQueueSPMC *job_queue, Dqn_Job *jobs, uint32_t count)
+DQN_API bool Dqn_OS_JobQueueSPMCAddArray(Dqn_JobQueueSPMC *queue, Dqn_Job *jobs, uint32_t count)
 {
-    if (!job_queue)
+    if (!queue)
         return false;
 
-    uint32_t const pot_mask    = DQN_ARRAY_UCOUNT(job_queue->jobs) - 1;
-    uint32_t       read_index  = job_queue->read_index;
-    uint32_t       write_index = job_queue->write_index;
+    uint32_t const pot_mask    = DQN_ARRAY_UCOUNT(queue->jobs) - 1;
+    uint32_t       read_index  = queue->read_index;
+    uint32_t       write_index = queue->write_index;
     uint32_t       size        = write_index - read_index;
 
-    if ((size + count) > DQN_ARRAY_UCOUNT(job_queue->jobs))
+    if ((size + count) > DQN_ARRAY_UCOUNT(queue->jobs))
         return false;
 
     for (size_t offset = 0; offset < count; offset++) {
         uint32_t wrapped_write_index         = (write_index + offset) & pot_mask;
-        job_queue->jobs[wrapped_write_index] = jobs[offset];
+        queue->jobs[wrapped_write_index] = jobs[offset];
     }
 
-    Dqn_OS_MutexLock(&job_queue->mutex);
-    job_queue->write_index += count;
-    Dqn_OS_SemaphoreIncrement(&job_queue->thread_wait_for_job_semaphore, count);
-    Dqn_OS_MutexUnlock(&job_queue->mutex);
+    Dqn_OS_MutexLock(&queue->mutex);
+    queue->write_index += count;
+    Dqn_OS_SemaphoreIncrement(&queue->thread_wait_for_job_semaphore, count);
+    Dqn_OS_MutexUnlock(&queue->mutex);
     return true;
 }
 
-DQN_API bool Dqn_OS_JobQueueSPMCAdd(Dqn_JobQueueSPMC *job_queue, Dqn_Job job)
+DQN_API bool Dqn_OS_JobQueueSPMCAdd(Dqn_JobQueueSPMC *queue, Dqn_Job job)
 {
-    bool result = Dqn_OS_JobQueueSPMCAddArray(job_queue, &job, 1);
+    bool result = Dqn_OS_JobQueueSPMCAddArray(queue, &job, 1);
     return result;
 }
 
 DQN_API int32_t Dqn_OS_JobQueueSPMCThread(Dqn_OSThread *thread)
 {
-    Dqn_JobQueueSPMC *job_queue = DQN_CAST(Dqn_JobQueueSPMC *) thread->user_context;
-    uint32_t const    pot_mask  = DQN_ARRAY_UCOUNT(job_queue->jobs) - 1;
+    Dqn_JobQueueSPMC *queue = DQN_CAST(Dqn_JobQueueSPMC *) thread->user_context;
+    uint32_t const    pot_mask  = DQN_ARRAY_UCOUNT(queue->jobs) - 1;
+    static_assert(DQN_ARRAY_UCOUNT(queue->jobs) == DQN_ARRAY_UCOUNT(queue->complete_queue), "PoT mask is used to mask access to both arrays");
 
     for (;;) {
-        Dqn_OS_SemaphoreWait(&job_queue->thread_wait_for_job_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
-        if (job_queue->quit)
+        Dqn_OS_SemaphoreWait(&queue->thread_wait_for_job_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+        if (queue->quit)
             break;
 
-        DQN_ASSERT(job_queue->read_index != job_queue->write_index);
+        DQN_ASSERT(queue->read_index != queue->write_index);
 
-        Dqn_OS_MutexLock(&job_queue->mutex);
-        uint32_t wrapped_read_index = job_queue->read_index & pot_mask;
-        Dqn_Job  job                = job_queue->jobs[wrapped_read_index];
-        job_queue->read_index += 1;
-        Dqn_OS_MutexUnlock(&job_queue->mutex);
+        Dqn_OS_MutexLock(&queue->mutex);
+        uint32_t wrapped_read_index = queue->read_index & pot_mask;
+        Dqn_Job  job                = queue->jobs[wrapped_read_index];
+        queue->read_index += 1;
+        Dqn_OS_MutexUnlock(&queue->mutex);
 
         job.func(job.user_context);
         Dqn_Arena_Deinit(job.arena);
 
-        Dqn_OS_MutexLock(&job_queue->mutex);
-        job_queue->complete_index += 1;
-        if (job_queue->complete_index == job_queue->write_index && job_queue->threads_waiting_for_completion) {
-            Dqn_OS_SemaphoreIncrement(&job_queue->wait_for_completion_semaphore,
-                                      job_queue->threads_waiting_for_completion);
-            job_queue->threads_waiting_for_completion = 0;
+        if (job.add_to_completion_queue) {
+            Dqn_OS_SemaphoreWait(&queue->complete_queue_write_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+            Dqn_OS_MutexLock(&queue->mutex);
+            queue->complete_queue[(queue->complete_write_index++ & pot_mask)] = job;
+            Dqn_OS_MutexUnlock(&queue->mutex);
+            Dqn_OS_SemaphoreIncrement(&queue->complete_queue_write_semaphore, 1);
         }
-        Dqn_OS_MutexUnlock(&job_queue->mutex);
+
+        Dqn_OS_MutexLock(&queue->mutex);
+        queue->finish_index += 1;
+        if (queue->finish_index == queue->write_index && queue->threads_waiting_for_completion) {
+            Dqn_OS_SemaphoreIncrement(&queue->wait_for_completion_semaphore,
+                                      queue->threads_waiting_for_completion);
+            queue->threads_waiting_for_completion = 0;
+        }
+        Dqn_OS_MutexUnlock(&queue->mutex);
     }
 
-    return job_queue->quit_exit_code;
+    return queue->quit_exit_code;
 }
 
-DQN_API void Dqn_OS_JobQueueSPMCWaitForCompletion(Dqn_JobQueueSPMC *job_queue)
+DQN_API void Dqn_OS_JobQueueSPMCWaitForCompletion(Dqn_JobQueueSPMC *queue)
 {
-    Dqn_OS_MutexLock(&job_queue->mutex);
-    if (job_queue->read_index == job_queue->write_index) {
-        Dqn_OS_MutexUnlock(&job_queue->mutex);
+    Dqn_OS_MutexLock(&queue->mutex);
+    if (queue->read_index == queue->write_index) {
+        Dqn_OS_MutexUnlock(&queue->mutex);
         return;
     }
-    job_queue->threads_waiting_for_completion++;
-    Dqn_OS_MutexUnlock(&job_queue->mutex);
+    queue->threads_waiting_for_completion++;
+    Dqn_OS_MutexUnlock(&queue->mutex);
 
-    Dqn_OS_SemaphoreWait(&job_queue->wait_for_completion_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+    Dqn_OS_SemaphoreWait(&queue->wait_for_completion_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+}
+
+DQN_API Dqn_usize Dqn_OS_JobQueueSPMCGetFinishedJobs(Dqn_JobQueueSPMC *queue, Dqn_Job *jobs, Dqn_usize jobs_size)
+{
+    Dqn_usize result = 0;
+    if (!queue || !jobs || jobs_size <= 0)
+        return result;
+
+    uint32_t const pot_mask = DQN_ARRAY_UCOUNT(queue->jobs) - 1;
+    Dqn_OS_MutexLock(&queue->mutex);
+    while (queue->complete_read_index < queue->complete_write_index && result < jobs_size) {
+        jobs[result++] = queue->complete_queue[(queue->complete_read_index++ & pot_mask)];
+    }
+    Dqn_OS_MutexUnlock(&queue->mutex);
+
+    return result;
 }

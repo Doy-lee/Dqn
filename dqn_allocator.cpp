@@ -220,7 +220,7 @@ DQN_API void Dqn_Arena_Pop(Dqn_Arena *arena, uint64_t amount)
     Dqn_Arena_PopTo(arena, pop_to);
 }
 
-DQN_API uint64_t Dqn_Arena_Pos(Dqn_Arena *arena)
+DQN_API uint64_t Dqn_Arena_Pos(Dqn_Arena const *arena)
 {
     uint64_t result = (arena && arena->curr) ? arena->curr->reserve_sum + arena->curr->used : 0;
     return result;
@@ -229,6 +229,18 @@ DQN_API uint64_t Dqn_Arena_Pos(Dqn_Arena *arena)
 DQN_API void Dqn_Arena_Clear(Dqn_Arena *arena)
 {
     Dqn_Arena_PopTo(arena, 0);
+}
+
+DQN_API bool Dqn_Arena_OwnsPtr(Dqn_Arena const *arena, void *ptr)
+{
+    bool result = false;
+    uintptr_t uint_ptr = DQN_CAST(uintptr_t)ptr;
+    for (Dqn_ArenaBlock const *block = arena ? arena->curr : nullptr; !result && block; ) {
+        uintptr_t begin = DQN_CAST(uintptr_t) block + DQN_ARENA_HEADER_SIZE;
+        uintptr_t end   = begin + block->reserve;
+        result          = uint_ptr >= begin && uint_ptr <= end;
+    }
+    return result;
 }
 
 DQN_API Dqn_ArenaTempMem Dqn_Arena_TempMemBegin(Dqn_Arena *arena)

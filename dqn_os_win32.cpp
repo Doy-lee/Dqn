@@ -545,9 +545,9 @@ DQN_API void Dqn_OS_FileClose(Dqn_OSFile *file)
 #endif // !defined(DQN_NO_OS_FILE_API)
 
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
-DQN_API void Dqn_OS_Exit(uint32_t exit_code)
+DQN_API void Dqn_OS_Exit(int32_t exit_code)
 {
-    ExitProcess(exit_code);
+    ExitProcess(DQN_CAST(UINT)exit_code);
 }
 
 DQN_API Dqn_OSExecResult Dqn_OS_ExecWait(Dqn_OSExecAsyncHandle handle)

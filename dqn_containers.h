@@ -400,11 +400,11 @@ template <typename T> T *Dqn_CArray_InsertArray(T *data, Dqn_usize *size, Dqn_us
 
     Dqn_usize clamped_index = DQN_MIN(index, *size);
     if (clamped_index != *size) {
-        char const *src         = DQN_CAST(char *)(data + clamped_index);
-        char const *dest        = DQN_CAST(char *)(data + (clamped_index + count));
-        char const *end         = DQN_CAST(char *)(data + (*size));
-        Dqn_usize bytes_to_move = end - src;
-        DQN_MEMMOVE(DQN_CAST(void *)dest, src, bytes_to_move);
+        char const *src           = DQN_CAST(char *)(data + clamped_index);
+        char const *dest          = DQN_CAST(char *)(data + (clamped_index + count));
+        char const *end           = DQN_CAST(char *)(data + (*size));
+        Dqn_usize   bytes_to_move = end - src;
+        DQN_MEMMOVE(DQN_CAST(void *) dest, src, bytes_to_move);
     }
 
     result = data + clamped_index;
@@ -561,7 +561,7 @@ template <typename T> T *Dqn_VArray_InsertArray(Dqn_VArray<T> *array, Dqn_usize 
     T *result = nullptr;
     if (!Dqn_VArray_IsValid(array))
         return result;
-    if (Dqn_VArray_Reserve(array, count))
+    if (Dqn_VArray_Reserve(array, array->size + count))
         result = Dqn_CArray_InsertArray(array->data, &array->size, array->max, index, items, count);
     return result;
 }
