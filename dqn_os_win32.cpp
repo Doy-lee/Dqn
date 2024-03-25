@@ -660,7 +660,7 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
         }
     };
 
-    if (Dqn_Bit_IsSet(exec_flags & Dqn_OSExecFlag_SaveStdout)) {
+    if (Dqn_Bit_IsSet(exec_flags, Dqn_OSExecFlag_SaveStdout)) {
         if (!CreatePipe(&stdout_read, &stdout_write, &save_std_security_attribs, /*nSize*/ 0)) {
             Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
             result.os_error_code   = win_error.code;
