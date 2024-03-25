@@ -366,6 +366,7 @@ DQN_API bool Dqn_OS_MoveFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_Er
     }
 
     if (file_moved) {
+        result = true;
         int unlink_result = unlink(src.data);
         if (unlink_result == -1) {
             int error_code = errno;
