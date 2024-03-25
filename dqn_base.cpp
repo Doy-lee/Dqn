@@ -445,6 +445,11 @@ DQN_API Dqn_ErrorSinkNode Dqn_ErrorSink_End(Dqn_Arena *arena, Dqn_ErrorSink *err
     return result;
 }
 
+DQN_API void Dqn_ErrorSink_EndAndIgnore(Dqn_ErrorSink *error)
+{
+    Dqn_ErrorSink_End(nullptr, error);
+}
+
 DQN_API bool Dqn_ErrorSink_EndAndLogError(Dqn_ErrorSink *error, Dqn_Str8 error_msg)
 {
     Dqn_Scratch       scratch = Dqn_Scratch_Get(nullptr);

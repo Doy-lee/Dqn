@@ -623,6 +623,7 @@ DQN_API          void               Dqn_Log_FCallSite                           
 DQN_API          Dqn_ErrorSink *    Dqn_ErrorSink_Begin                         (Dqn_ErrorSinkMode mode);
 DQN_API          bool               Dqn_ErrorSink_HasError                      (Dqn_ErrorSink *error);
 DQN_API          Dqn_ErrorSinkNode  Dqn_ErrorSink_End                           (Dqn_Arena *arena, Dqn_ErrorSink *error);
+DQN_API          void               Dqn_ErrorSink_EndAndIgnore                  (Dqn_ErrorSink *error);
 DQN_API          bool               Dqn_ErrorSink_EndAndLogError                (Dqn_ErrorSink *error, Dqn_Str8 error_msg);
 DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorFV              (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
 DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorF               (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
