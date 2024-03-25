@@ -169,15 +169,33 @@ struct Dqn_OSPath
 };
 
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
+enum Dqn_OSExecFlag
+{
+    Dqn_OSExecFlag_Nil                 = 0,
+    Dqn_OSExecFlag_SaveStdout          = 1 << 0,
+    Dqn_OSExecFlag_SaveStderr          = 1 << 1,
+    Dqn_OSExecFlag_SaveOutput          = Dqn_OSExecFlag_SaveStdout | Dqn_OSExecFlag_SaveStderr,
+    Dqn_OSExecFlag_MergeStderrToStdout = 1 << 2                    | Dqn_OSExecFlag_SaveOutput,
+};
+
 struct Dqn_OSExecAsyncHandle
 {
+    uint8_t   exec_flags;
     uint32_t  os_error_code;
     uint32_t  exit_code;
     void     *process;
+    #if defined(DQN_OS_WIN32)
+    void     *stdout_read;
+    void     *stdout_write;
+    void     *stderr_read;
+    void     *stderr_write;
+    #endif
 };
 
 struct Dqn_OSExecResult
 {
+    Dqn_Str8 stdout_text;
+    Dqn_Str8 stderr_text;
     uint32_t os_error_code;
     uint32_t exit_code;
 };
@@ -345,10 +363,10 @@ DQN_API Dqn_Str8                  Dqn_OS_PathConvertF          (Dqn_Arena *arena
 
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
 DQN_API void                      Dqn_OS_Exit       (int32_t exit_code);
-DQN_API Dqn_OSExecResult          Dqn_OS_ExecWait   (Dqn_OSExecAsyncHandle handle);
-DQN_API Dqn_OSExecAsyncHandle     Dqn_OS_ExecAsync  (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir);
-DQN_API Dqn_OSExecResult          Dqn_OS_Exec       (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir);
-DQN_API void                      Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir);
+DQN_API Dqn_OSExecResult          Dqn_OS_ExecWait   (Dqn_OSExecAsyncHandle handle, Dqn_Arena *arena, Dqn_ErrorSink *error);
+DQN_API Dqn_OSExecAsyncHandle     Dqn_OS_ExecAsync  (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flag, Dqn_ErrorSink *error);
+DQN_API Dqn_OSExecResult          Dqn_OS_Exec       (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flag, Dqn_Arena *arena, Dqn_ErrorSink *error);
+DQN_API Dqn_OSExecResult          Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flag, Dqn_Arena *arena);
 
 // NOTE: [$SEMA] Dqn_OSSemaphore ///////////////////////////////////////////////////////////////////
 #if !defined(DQN_NO_SEMAPHORE)

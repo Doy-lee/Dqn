@@ -417,7 +417,6 @@
 
     typedef RTL_CRITICAL_SECTION CRITICAL_SECTION;
 
-    // NOTE: um/winbase.h //////////////////////////////////////////////////////////////////////////
     #define WAIT_FAILED   ((DWORD)0xFFFFFFFF)
     #define WAIT_OBJECT_0 ((STATUS_WAIT_0 ) + 0 )
 
@@ -426,6 +425,9 @@
     #define STD_INPUT_HANDLE  ((DWORD)-10)
     #define STD_OUTPUT_HANDLE ((DWORD)-11)
     #define STD_ERROR_HANDLE  ((DWORD)-12)
+
+    #define HANDLE_FLAG_INHERIT             0x00000001
+    #define HANDLE_FLAG_PROTECT_FROM_CLOSE  0x00000002
 
     // NOTE: MoveFile
     #define MOVEFILE_REPLACE_EXISTING 0x00000001
@@ -1078,6 +1080,18 @@
     extern "C"
     {
     __declspec(dllimport) BOOL      __stdcall IsDebuggerPresent();
+    }
+
+    // NOTE: um/namedpipeapi.h /////////////////////////////////////////////////////////////////////
+    extern "C"
+    {
+        __declspec(dllimport) BOOL __stdcall CreatePipe          (HANDLE *hReadPipe, HANDLE *hWritePipe, LPSECURITY_ATTRIBUTES lpPipeAttributes, DWORD nSize);
+    }
+
+    // NOTE: um/handleapi.h /////////////////////////////////////////////////////////////////////
+    extern "C"
+    {
+        __declspec(dllimport) BOOL __stdcall SetHandleInformation(HANDLE hObject, DWORD dwMask, DWORD dwFlags);
     }
 
     DQN_MSVC_WARNING_POP

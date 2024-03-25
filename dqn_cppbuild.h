@@ -173,7 +173,7 @@ DQN_API Dqn_Str8 Dqn_CPPBuild_ToCommandLineStr8(Dqn_CPPBuildContext build_contex
     return result;
 }
 
-DQN_API Dqn_CPPBuildAsyncResult Dqn_CPPBuild_Async(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode)
+DQN_API Dqn_CPPBuildAsyncResult Dqn_CPPBuild_Async(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMode mode, Dqn_ErrorSink *error)
 {
     Dqn_Scratch             scratch  = Dqn_Scratch_Get(nullptr);
     Dqn_Slice<Dqn_Str8>     cmd_line = Dqn_CPPBuild_ToCommandLine(build_context, mode, scratch.arena);
@@ -183,10 +183,11 @@ DQN_API Dqn_CPPBuildAsyncResult Dqn_CPPBuild_Async(Dqn_CPPBuildContext build_con
 
     if (!Dqn_OS_MakeDir(build_context.build_dir)) {
         result.status = Dqn_CPPBuildStatus_BuildDirectoryFailedToBeMade;
+        Dqn_ErrorSink_MakeF(error, result.status, "Failed to make build directory '%.*s'", DQN_STR_FMT(build_context.build_dir));
         return result;
     }
 
-    result.async_handle = Dqn_OS_ExecAsync(cmd_line, build_context.build_dir);
+    result.async_handle = Dqn_OS_ExecAsync(cmd_line, build_context.build_dir, Dqn_OSExecFlag_Nil, error);
     return result;
 }
 
@@ -198,6 +199,6 @@ void Dqn_CPPBuild_ExecOrAbort(Dqn_CPPBuildContext build_context, Dqn_CPPBuildMod
     }
     Dqn_Scratch         scratch  = Dqn_Scratch_Get(nullptr);
     Dqn_Slice<Dqn_Str8> cmd_line = Dqn_CPPBuild_ToCommandLine(build_context, mode, scratch.arena);
-    Dqn_OS_ExecOrAbort(cmd_line, build_context.build_dir);
+    Dqn_OS_ExecOrAbort(cmd_line, build_context.build_dir, Dqn_OSExecFlag_Nil, scratch.arena);
 }
 #endif // DQN_CPP_BUILD_IMPLEMENTATION

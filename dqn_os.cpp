@@ -440,29 +440,39 @@ DQN_API Dqn_Str8 Dqn_OS_PathBuildWithSeparator(Dqn_Arena *arena, Dqn_OSPath cons
 
 
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSExecResult Dqn_OS_Exec(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir)
+DQN_API Dqn_OSExecResult Dqn_OS_Exec(Dqn_Slice<Dqn_Str8> cmd_line,
+                                     Dqn_Str8            working_dir,
+                                     uint8_t             exec_flag,
+                                     Dqn_Arena          *arena,
+                                     Dqn_ErrorSink      *error)
 {
-    Dqn_OSExecAsyncHandle async_handle = Dqn_OS_ExecAsync(cmd_line, working_dir);
-    Dqn_OSExecResult result            = Dqn_OS_ExecWait(async_handle);
+    Dqn_OSExecAsyncHandle async_handle = Dqn_OS_ExecAsync(cmd_line, working_dir, exec_flag, error);
+    Dqn_OSExecResult result            = Dqn_OS_ExecWait(async_handle, arena, error);
     return result;
 }
 
-DQN_API void Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir)
+DQN_API Dqn_OSExecResult Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flag, Dqn_Arena *arena)
 {
-    Dqn_OSExecResult result = Dqn_OS_Exec(cmd_line, working_dir);
-    if (result.os_error_code || result.exit_code) {
-        Dqn_Scratch scratch      = Dqn_Scratch_Get(nullptr);
-        Dqn_Str8    cmd_combined = Dqn_Slice_Str8Render(scratch.arena, cmd_line, DQN_STR8(" ") /*separator*/);
-        if (result.os_error_code) {
-            Dqn_Log_ErrorF("OS failed to execute the requested command returning the error code %u. The command was\n\n%.*s", result.os_error_code, DQN_STR_FMT(cmd_combined));
-            Dqn_OS_Exit(result.os_error_code);
-        }
-
-        if (result.exit_code) {
-            Dqn_Log_ErrorF("OS executed command and returned a non-zero status: %u. The command was\n\n%.*s", result.exit_code, DQN_STR_FMT(cmd_combined));
-            Dqn_OS_Exit(result.exit_code);
-        }
+    Dqn_ErrorSink   *error  = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
+    Dqn_OSExecResult result = Dqn_OS_Exec(cmd_line, working_dir, exec_flag, arena, error);
+    if (result.os_error_code) {
+        Dqn_ErrorSink_EndAndExitIfErrorF(
+            error,
+            result.os_error_code,
+            "OS failed to execute the requested command returning the error code %u",
+            result.os_error_code);
     }
+
+    if (result.exit_code) {
+        Dqn_ErrorSink_EndAndExitIfErrorF(
+            error,
+            result.exit_code,
+            "OS executed command and returned non-zero exit code %u",
+            result.exit_code);
+    }
+
+    Dqn_ErrorSink_EndAndIgnore(error);
+    return result;
 }
 
 // NOTE: [$HTTP] Dqn_OSHttp ////////////////////////////////////////////////////////////////////////

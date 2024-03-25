@@ -550,38 +550,92 @@ DQN_API void Dqn_OS_Exit(int32_t exit_code)
     ExitProcess(DQN_CAST(UINT)exit_code);
 }
 
-DQN_API Dqn_OSExecResult Dqn_OS_ExecWait(Dqn_OSExecAsyncHandle handle)
+DQN_API Dqn_OSExecResult Dqn_OS_ExecWait(Dqn_OSExecAsyncHandle handle, Dqn_Arena *arena, Dqn_ErrorSink *error)
 {
     Dqn_OSExecResult result = {};
-    if (!handle.process || handle.os_error_code) {
-        result.os_error_code = handle.os_error_code;
+    if (!handle.process || handle.os_error_code || handle.exit_code) {
+        if (handle.os_error_code)
+            result.os_error_code = handle.os_error_code;
+        else
+            result.exit_code = handle.exit_code;
+
+        DQN_ASSERT(!handle.stdout_read);
+        DQN_ASSERT(!handle.stdout_write);
+        DQN_ASSERT(!handle.stderr_read);
+        DQN_ASSERT(!handle.stderr_write);
+        DQN_ASSERT(!handle.process);
         return result;
     }
 
-    if (handle.exit_code) {
-        result.exit_code = handle.exit_code;
-        return result;
-    }
+    Dqn_Scratch scratch     = Dqn_Scratch_Get(arena);
+    DWORD       exec_result = WaitForSingleObject(handle.process, INFINITE);
+    CloseHandle(handle.stdout_write);
+    CloseHandle(handle.stderr_write);
 
-    DWORD exec_result = WaitForSingleObject(handle.process, INFINITE);
     if (exec_result == WAIT_FAILED) {
-        result.os_error_code = GetLastError();
-        return result;
+        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        result.os_error_code   = win_error.code;
+        Dqn_ErrorSink_MakeF(error, result.os_error_code, "Executed command failed to terminate: %.*s", DQN_STR_FMT(win_error.msg));
+        CloseHandle(handle.process);
+    } else {
+        // NOTE: Get exit code /////////////////////////////////////////////////////////////////////
+        DWORD exit_status;
+        if (GetExitCodeProcess(handle.process, &exit_status)) {
+            result.exit_code = exit_status;
+        } else {
+            Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+            result.os_error_code   = win_error.code;
+            Dqn_ErrorSink_MakeF(error,
+                                result.os_error_code,
+                                "Failed to retrieve command exit code: %.*s",
+                                DQN_STR_FMT(win_error.msg));
+        }
+
+        CloseHandle(handle.process);
+
+        // NOTE: Read stdout from process //////////////////////////////////////////////////////////
+        if (arena && handle.stdout_write) {
+            char            stdout_buffer[4096];
+            Dqn_Str8Builder builder = {};
+            builder.arena           = scratch.arena;
+            for (;;) {
+                DWORD bytes_read = 0;
+                BOOL  success    = ReadFile(handle.stdout_read, stdout_buffer, sizeof(stdout_buffer), &bytes_read, NULL);
+                if (!success || bytes_read == 0)
+                    break;
+
+                Dqn_Str8Builder_AppendF(&builder, "%.*s", bytes_read, stdout_buffer);
+            }
+
+            result.stdout_text = Dqn_Str8Builder_Build(&builder, arena);
+        }
+
+        // NOTE: Read stderr from process //////////////////////////////////////////////////////////
+        if (arena && handle.stderr_read) {
+            char            stderr_buffer[4096];
+            Dqn_Str8Builder builder = {};
+            builder.arena           = scratch.arena;
+            for (;;) {
+                DWORD bytes_read = 0;
+                BOOL  success    = ReadFile(handle.stderr_read, stderr_buffer, sizeof(stderr_buffer), &bytes_read, NULL);
+                if (!success || bytes_read == 0)
+                    break;
+
+                Dqn_Str8Builder_AppendF(&builder, "%.*s", bytes_read, stderr_buffer);
+            }
+
+            result.stderr_text = Dqn_Str8Builder_Build(&builder, arena);
+        }
     }
 
-    DWORD exit_status;
-    if (!GetExitCodeProcess(handle.process, &exit_status)) {
-        result.os_error_code = GetLastError();
-        return result;
-    }
-
-    result.exit_code = exit_status;
-    CloseHandle(handle.process);
+    CloseHandle(handle.stdout_read);
+    CloseHandle(handle.stderr_read);
     return result;
 }
 
-DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir)
+DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t flags, Dqn_ErrorSink *error)
 {
+    // NOTE: Pre-amble /////////////////////////////////////////////////////////////////////////////
     Dqn_OSExecAsyncHandle result = {};
     if (cmd_line.size == 0)
         return result;
@@ -591,21 +645,118 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
     Dqn_Str16   cmd16         = Dqn_Win_Str8ToStr16(scratch.arena, cmd_rendered);
     Dqn_Str16   working_dir16 = Dqn_Win_Str8ToStr16(scratch.arena, working_dir);
 
+    // NOTE: Stdout/err security attributes ////////////////////////////////////////////////////////
+    SECURITY_ATTRIBUTES save_std_security_attribs = {};
+    save_std_security_attribs.nLength             = sizeof(save_std_security_attribs);
+    save_std_security_attribs.bInheritHandle      = true;
+
+    // NOTE: Redirect stdout ///////////////////////////////////////////////////////////////////////
+    HANDLE stdout_read  = {};
+    HANDLE stdout_write = {};
+    if (flags & Dqn_OSExecFlag_SaveStdout) {
+        if (!CreatePipe(&stdout_read, &stdout_write, &save_std_security_attribs, /*nSize*/ 0)) {
+            Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+            result.os_error_code   = win_error.code;
+            Dqn_ErrorSink_MakeF(
+                error,
+                result.os_error_code,
+                "Failed to create stdout pipe to redirect the output of the command '%.*s': %.*s",
+                DQN_STR_FMT(cmd_rendered),
+                DQN_STR_FMT(win_error.msg));
+            return result;
+        }
+
+        DQN_DEFER {
+            if (result.os_error_code) {
+                CloseHandle(stdout_read);
+                CloseHandle(stdout_write);
+            }
+        };
+
+        if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0)) {
+            Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+            result.os_error_code   = win_error.code;
+            Dqn_ErrorSink_MakeF(error,
+                                result.os_error_code,
+                                "Failed to make stdout 'read' pipe non-inheritable when trying to "
+                                "execute command '%.*s': %.*s",
+                                DQN_STR_FMT(cmd_rendered),
+                                DQN_STR_FMT(win_error.msg));
+            return result;
+        }
+    }
+
+    // NOTE: Redirect stderr ///////////////////////////////////////////////////////////////////////
+    HANDLE stderr_read  = {};
+    HANDLE stderr_write = {};
+    if (flags & Dqn_OSExecFlag_SaveStderr) {
+        if (flags & Dqn_OSExecFlag_MergeStderrToStdout) {
+            stderr_read  = stdout_read;
+            stderr_write = stdout_write;
+        } else {
+            if (!CreatePipe(&stderr_read, &stderr_write, &save_std_security_attribs, /*nSize*/ 0)) {
+                Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+                result.os_error_code   = win_error.code;
+                Dqn_ErrorSink_MakeF(
+                    error,
+                    result.os_error_code,
+                    "Failed to create stderr pipe to redirect the output of the command '%.*s': %.*s",
+                    DQN_STR_FMT(cmd_rendered),
+                    DQN_STR_FMT(win_error.msg));
+                return result;
+            }
+
+            DQN_DEFER {
+                if (result.os_error_code) {
+                    CloseHandle(stderr_read);
+                    CloseHandle(stderr_write);
+                }
+            };
+
+            if (!SetHandleInformation(stderr_read, HANDLE_FLAG_INHERIT, 0)) {
+                Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+                result.os_error_code   = win_error.code;
+                Dqn_ErrorSink_MakeF(error,
+                                    result.os_error_code,
+                                    "Failed to make stderr 'read' pipe non-inheritable when trying to "
+                                    "execute command '%.*s': %.*s",
+                                    DQN_STR_FMT(cmd_rendered),
+                                    DQN_STR_FMT(win_error.msg));
+                return result;
+            }
+        }
+    }
+
+    // NOTE: Execute command ///////////////////////////////////////////////////////////////////////
     PROCESS_INFORMATION proc_info = {};
     STARTUPINFOW startup_info     = {};
     startup_info.cb               = sizeof(STARTUPINFOW);
-    startup_info.hStdError        = GetStdHandle(STD_ERROR_HANDLE);
-    startup_info.hStdOutput       = GetStdHandle(STD_OUTPUT_HANDLE);
+    startup_info.hStdError        = stderr_write ? stderr_write : GetStdHandle(STD_ERROR_HANDLE);
+    startup_info.hStdOutput       = stdout_write ? stdout_write : GetStdHandle(STD_OUTPUT_HANDLE);
     startup_info.hStdInput        = GetStdHandle(STD_INPUT_HANDLE);
     startup_info.dwFlags         |= STARTF_USESTDHANDLES;
     BOOL create_result            = CreateProcessW(nullptr, cmd16.data, nullptr, nullptr, true, 0, nullptr, working_dir16.data, &startup_info, &proc_info);
     if (!create_result) {
-        result.os_error_code = GetLastError();
+        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        result.os_error_code   = win_error.code;
+        Dqn_ErrorSink_MakeF(error,
+                            result.os_error_code,
+                            "Failed to execute command '%.*s': %.*s",
+                            DQN_STR_FMT(cmd_rendered),
+                            DQN_STR_FMT(win_error.msg));
         return result;
     }
 
+    // NOTE: Post-amble ////////////////////////////////////////////////////////////////////////////
     CloseHandle(proc_info.hThread);
-    result.process = proc_info.hProcess;
+    result.process      = proc_info.hProcess;
+    result.stdout_read  = stdout_read;
+    result.stdout_write = stdout_write;
+    if ((flags & Dqn_OSExecFlag_MergeStderrToStdout) == 0) {
+        result.stderr_read  = stderr_read;
+        result.stderr_write = stderr_write;
+    }
+    result.exec_flags   = flags;
     return result;
 }
 
