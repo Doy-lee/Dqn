@@ -1,4 +1,5 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/*
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  $$$$$$$\
 //  $$  __$$\
@@ -21,6 +22,9 @@
 // [$PRIN] Dqn_Print       -- Console printing
 // [$LLOG] Dqn_Log         -- Console logging macros
 //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
+
 // NOTE: [$MACR] Macros ////////////////////////////////////////////////////////////////////////////
 #define DQN_STRINGIFY(x) #x
 #define DQN_TOKEN_COMBINE2(x, y) x ## y
@@ -214,10 +218,10 @@
 #define DQN_CHAR_COUNT(string) (sizeof(string) - 1)
 
 // NOTE: SI Byte ///////////////////////////////////////////////////////////////////////////////////
-#define DQN_BYTES(val)     (val)
-#define DQN_KILOBYTES(val) (1024ULL * DQN_BYTES(val))
-#define DQN_MEGABYTES(val) (1024ULL * DQN_KILOBYTES(val))
-#define DQN_GIGABYTES(val) (1024ULL * DQN_MEGABYTES(val))
+#define DQN_BYTES(val)     ((uint64_t)val)
+#define DQN_KILOBYTES(val) ((uint64_t)1024 * DQN_BYTES(val))
+#define DQN_MEGABYTES(val) ((uint64_t)1024 * DQN_KILOBYTES(val))
+#define DQN_GIGABYTES(val) ((uint64_t)1024 * DQN_MEGABYTES(val))
 
 // NOTE: Time //////////////////////////////////////////////////////////////////////////////////////
 #define DQN_SECONDS_TO_MS(val) ((val) * 1000)

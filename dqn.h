@@ -1,6 +1,7 @@
 #if !defined(DQN_H)
 #define DQN_H
 
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //   $$$$$$$\   $$$$$$\  $$\   $$\
@@ -207,6 +208,7 @@
 //   library from being included. This might be useful if you are including the
 //   library in your project yourself. The library must still be defined and
 //   visible before this header.
+*/
 
 #if defined(DQN_ONLY_VARRAY)       || \
     defined(DQN_ONLY_SARRAY)       || \
@@ -344,6 +346,7 @@
 #endif // DQN_H
 
 #if defined(DQN_IMPLEMENTATION)
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //   /$$$$$$\ $$\      $$\ $$$$$$$\  $$\
@@ -358,6 +361,7 @@
 //   Implementation
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 #if defined(DQN_WITH_CGEN)
     #if !defined(DQN_NO_METADESK)
@@ -383,6 +387,7 @@
 #include "dqn_debug.cpp"
 #include "dqn_string.cpp"
 #include "dqn_containers.cpp"
+#include "dqn_type_info.cpp"
 
 #if defined(DQN_PLATFORM_EMSCRIPTEN) || defined(DQN_PLATFORM_POSIX) || defined(DQN_PLATFORM_ARM64)
     #include "dqn_os_posix.cpp"

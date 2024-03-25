@@ -1,3 +1,4 @@
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //    $$$$$$\  $$\       $$\       $$$$$$\   $$$$$$\   $$$$$$\ $$$$$$$$\  $$$$$$\  $$$$$$$\
@@ -12,6 +13,7 @@
 //   dqn_allocator.cpp
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 // NOTE: [$AREN] Dqn_Arena /////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_ArenaBlock *Dqn_Arena_BlockInit(uint64_t reserve, uint64_t commit, bool track_alloc, bool alloc_can_leak)
@@ -300,7 +302,7 @@ DQN_API void *Dqn_ChunkPool_Alloc(Dqn_ChunkPool *pool, Dqn_usize size)
         #if defined(DQN_OS_WIN32)
         Dqn_usize dist_to_next_msb = __lzcnt64(required_size) + 1;
         #else
-        Dqn_usize dist_to_next_msb = __builtin_clz(required_size) + 1;
+        Dqn_usize dist_to_next_msb = __builtin_clzll(required_size) + 1;
         #endif
 
         // NOTE: Round up if not PoT as the low bits are set.

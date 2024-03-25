@@ -633,7 +633,7 @@ DQN_API Dqn_OSExecResult Dqn_OS_ExecWait(Dqn_OSExecAsyncHandle handle, Dqn_Arena
     return result;
 }
 
-DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t flags, Dqn_ErrorSink *error)
+DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_ErrorSink *error)
 {
     // NOTE: Pre-amble /////////////////////////////////////////////////////////////////////////////
     Dqn_OSExecAsyncHandle result = {};
@@ -653,7 +653,14 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
     // NOTE: Redirect stdout ///////////////////////////////////////////////////////////////////////
     HANDLE stdout_read  = {};
     HANDLE stdout_write = {};
-    if (flags & Dqn_OSExecFlag_SaveStdout) {
+    DQN_DEFER {
+        if (result.os_error_code || result.exit_code) {
+            CloseHandle(stdout_read);
+            CloseHandle(stdout_write);
+        }
+    };
+
+    if (Dqn_Bit_IsSet(exec_flags & Dqn_OSExecFlag_SaveStdout)) {
         if (!CreatePipe(&stdout_read, &stdout_write, &save_std_security_attribs, /*nSize*/ 0)) {
             Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
             result.os_error_code   = win_error.code;
@@ -665,13 +672,6 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
                 DQN_STR_FMT(win_error.msg));
             return result;
         }
-
-        DQN_DEFER {
-            if (result.os_error_code) {
-                CloseHandle(stdout_read);
-                CloseHandle(stdout_write);
-            }
-        };
 
         if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0)) {
             Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
@@ -689,8 +689,15 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
     // NOTE: Redirect stderr ///////////////////////////////////////////////////////////////////////
     HANDLE stderr_read  = {};
     HANDLE stderr_write = {};
-    if (flags & Dqn_OSExecFlag_SaveStderr) {
-        if (flags & Dqn_OSExecFlag_MergeStderrToStdout) {
+    DQN_DEFER {
+        if (result.os_error_code || result.exit_code) {
+            CloseHandle(stderr_read);
+            CloseHandle(stderr_write);
+        }
+    };
+
+    if (Dqn_Bit_IsSet(exec_flags, Dqn_OSExecFlag_SaveStderr)) {
+        if (Dqn_Bit_IsSet(exec_flags, Dqn_OSExecFlag_MergeStderrToStdout)) {
             stderr_read  = stdout_read;
             stderr_write = stdout_write;
         } else {
@@ -705,13 +712,6 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
                     DQN_STR_FMT(win_error.msg));
                 return result;
             }
-
-            DQN_DEFER {
-                if (result.os_error_code) {
-                    CloseHandle(stderr_read);
-                    CloseHandle(stderr_write);
-                }
-            };
 
             if (!SetHandleInformation(stderr_read, HANDLE_FLAG_INHERIT, 0)) {
                 Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
@@ -752,11 +752,11 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
     result.process      = proc_info.hProcess;
     result.stdout_read  = stdout_read;
     result.stdout_write = stdout_write;
-    if ((flags & Dqn_OSExecFlag_MergeStderrToStdout) == 0) {
+    if (Dqn_Bit_IsSet(exec_flags, Dqn_OSExecFlag_SaveStderr) && Dqn_Bit_IsNotSet(exec_flags, Dqn_OSExecFlag_MergeStderrToStdout)) {
         result.stderr_read  = stderr_read;
         result.stderr_write = stderr_write;
     }
-    result.exec_flags   = flags;
+    result.exec_flags = exec_flags;
     return result;
 }
 

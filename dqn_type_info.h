@@ -1,3 +1,4 @@
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //   $$$$$$$$\ $$\     $$\ $$$$$$$\  $$$$$$$$\       $$$$$$\ $$\   $$\ $$$$$$$$\  $$$$$$\
@@ -12,6 +13,7 @@
 //    dqn_type_info.h -- C++ type introspection
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 enum Dqn_TypeKind
 {
@@ -51,17 +53,4 @@ struct Dqn_TypeGetField
     Dqn_TypeField *field;
 };
 
-Dqn_TypeGetField Dqn_Type_GetField(Dqn_TypeInfo const *type_info, Dqn_Str8 name)
-{
-    Dqn_TypeGetField result = {};
-    for (Dqn_usize index = 0; index < type_info->fields_count; index++) {
-        Dqn_TypeField const *type_field = type_info->fields + index;
-        if (type_field->name == name) {
-            result.success = true;
-            result.index   = index;
-            result.field   = DQN_CAST(Dqn_TypeField *)type_field;
-            break;
-        }
-    }
-    return result;
-}
+Dqn_TypeGetField Dqn_Type_GetField(Dqn_TypeInfo const *type_info, Dqn_Str8 name);

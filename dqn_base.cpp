@@ -1,3 +1,4 @@
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  $$$$$$$\
@@ -12,6 +13,7 @@
 //  dqn_base.cpp
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 // NOTE: [$INTR] Intrinsics ////////////////////////////////////////////////////////////////////////
 #if !defined(DQN_PLATFORM_ARM64) && !defined(DQN_PLATFORM_EMSCRIPTEN)
@@ -303,25 +305,25 @@ DQN_API Dqn_Str8 Dqn_Log_MakeStr8(Dqn_Arena                 *arena,
     Dqn_Str8 file_name            = Dqn_Str8_FileNameFromPath(call_site.file);
     Dqn_OSDateTimeStr8 const time = Dqn_OS_DateLocalTimeStr8Now();
     Dqn_Str8 header               = Dqn_Str8_InitF(arena,
-                                                      "%.*s "     // date
-                                                      "%.*s "     // hms
-                                                      "%.*s"      // colour
-                                                      "%.*s"      // bold
-                                                      "%.*s"      // type
-                                                      "%*s"       // type padding
-                                                      "%.*s"      // reset
-                                                      " %.*s"     // file name
-                                                      ":%05I32u " // line number
-                                                      ,
-                                                      DQN_CAST(int)time.date_size - 2, time.date + 2, // date
-                                                      DQN_CAST(int)time.hms_size,      time.hms,      // hms
-                                                      DQN_STR_FMT(colour_esc),                        // colour
-                                                      DQN_STR_FMT(bold_esc),                          // bold
-                                                      DQN_STR_FMT(type),                              // type
-                                                      DQN_CAST(int)type_padding,  "",                 // type padding
-                                                      DQN_STR_FMT(reset_esc),                         // reset
-                                                      DQN_STR_FMT(file_name),                         // file name
-                                                      call_site.line);                                // line number
+                                                   "%.*s "     // date
+                                                   "%.*s "     // hms
+                                                   "%.*s"      // colour
+                                                   "%.*s"      // bold
+                                                   "%.*s"      // type
+                                                   "%*s"       // type padding
+                                                   "%.*s"      // reset
+                                                   " %.*s"     // file name
+                                                   ":%05I32u " // line number
+                                                   ,
+                                                   DQN_CAST(int)time.date_size - 2, time.date + 2, // date
+                                                   DQN_CAST(int)time.hms_size,      time.hms,      // hms
+                                                   DQN_STR_FMT(colour_esc),                        // colour
+                                                   DQN_STR_FMT(bold_esc),                          // bold
+                                                   DQN_STR_FMT(type),                              // type
+                                                   DQN_CAST(int)type_padding,  "",                 // type padding
+                                                   DQN_STR_FMT(reset_esc),                         // reset
+                                                   DQN_STR_FMT(file_name),                         // file name
+                                                   call_site.line);                                // line number
     Dqn_usize header_size_no_ansi_codes = header.size - colour_esc.size - Dqn_Print_ESCResetStr8.size;
 
     // NOTE: Header padding ////////////////////////////////////////////////////////////////////////
@@ -332,9 +334,12 @@ DQN_API Dqn_Str8 Dqn_Log_MakeStr8(Dqn_Arena                 *arena,
     // NOTE: Construct final log ///////////////////////////////////////////////////////////////////
     Dqn_Str8 user_msg = Dqn_Str8_InitFV(arena, fmt, args);
     Dqn_Str8 result   = Dqn_Str8_Alloc(arena, header.size + header_padding + user_msg.size, Dqn_ZeroMem_No);
-    DQN_MEMCPY(result.data,                       header.data, header.size);
-    DQN_MEMSET(result.data + header.size,         ' ',         header_padding);
-    DQN_MEMCPY(result.data + header.size + header_padding, user_msg.data, user_msg.size);
+    if (Dqn_Str8_HasData(result)) {
+        DQN_MEMCPY(result.data,               header.data, header.size);
+        DQN_MEMSET(result.data + header.size, ' ',         header_padding);
+        if (Dqn_Str8_HasData(user_msg))
+            DQN_MEMCPY(result.data + header.size + header_padding, user_msg.data, user_msg.size);
+    }
     return result;
 }
 

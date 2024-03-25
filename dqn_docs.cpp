@@ -1,3 +1,4 @@
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //   $$$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\
@@ -24,6 +25,7 @@
 // and/or conciseness of being able to learn the breadth of the APIs.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 DQN_MSVC_WARNING_PUSH
 DQN_MSVC_WARNING_DISABLE(4702) // unreachable code
@@ -577,7 +579,7 @@ void Dqn_Docs_Demo()
 
             // Print the result like so
             if (0) {
-                printf("%.*s[%u] %llu cycles (%.1fms)\n",
+                printf("%.*s[%u] %" PRIu64 " cycles (%.1fms)\n",
                        DQN_STR_FMT(anchor->name),
                        anchor->hit_count,
                        anchor->tsc_inclusive,
@@ -691,7 +693,7 @@ void Dqn_Docs_Demo()
 
             // You may then print out the frame like so
             if (0)
-                printf("%.*s(%llu): %.*s\n", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name));
+                printf("%.*s(%" PRIu64 "): %.*s\n", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name));
         }
 
         // If you load new shared-libraries into the address space it maybe

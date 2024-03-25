@@ -1,3 +1,4 @@
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //   $$$$$$$$\ $$\   $$\ $$$$$$$$\ $$$$$$$$\ $$$$$$$\  $$\   $$\  $$$$$$\  $$\
@@ -12,6 +13,7 @@
 //   dqn_external.h -- Third party dependencies
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 // NOTE: [$OS_H] OS Headers ////////////////////////////////////////////////////////////////////////
 #if !defined(DQN_OS_WIN32) || defined(DQN_OS_WIN32_USE_PTHREADS)
@@ -56,7 +58,7 @@
     #define DQN_VSNPRINTF(...) STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
 
     #if (DQN_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && defined(DQN_COMPILER_MSVC)
-        #error The STB implementation of sprintf triggers MSVC's implementation of ASAN. Compiling ASAN with STB sprintf is not supported.
+        #error The STB implementation of sprintf triggers MSVCs implementation of ASAN. Compiling ASAN with STB sprintf is not supported.
 
         // NOTE: stb_sprintf assumes c-string literals are 4 byte aligned which is
         // always true, however, reading past the end of a string whose size is not

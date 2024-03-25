@@ -1,3 +1,4 @@
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //    $$$$$$\   $$$$$$\
@@ -12,6 +13,7 @@
 //   dqn_os.cpp
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 // NOTE: [$DATE] Date //////////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_OSDateTimeStr8 Dqn_OS_DateLocalTimeStr8(Dqn_OSDateTime time, char date_separator, char hms_separator)
@@ -442,19 +444,19 @@ DQN_API Dqn_Str8 Dqn_OS_PathBuildWithSeparator(Dqn_Arena *arena, Dqn_OSPath cons
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_OSExecResult Dqn_OS_Exec(Dqn_Slice<Dqn_Str8> cmd_line,
                                      Dqn_Str8            working_dir,
-                                     uint8_t             exec_flag,
+                                     uint8_t             exec_flags,
                                      Dqn_Arena          *arena,
                                      Dqn_ErrorSink      *error)
 {
-    Dqn_OSExecAsyncHandle async_handle = Dqn_OS_ExecAsync(cmd_line, working_dir, exec_flag, error);
+    Dqn_OSExecAsyncHandle async_handle = Dqn_OS_ExecAsync(cmd_line, working_dir, exec_flags, error);
     Dqn_OSExecResult result            = Dqn_OS_ExecWait(async_handle, arena, error);
     return result;
 }
 
-DQN_API Dqn_OSExecResult Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flag, Dqn_Arena *arena)
+DQN_API Dqn_OSExecResult Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena)
 {
     Dqn_ErrorSink   *error  = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
-    Dqn_OSExecResult result = Dqn_OS_Exec(cmd_line, working_dir, exec_flag, arena, error);
+    Dqn_OSExecResult result = Dqn_OS_Exec(cmd_line, working_dir, exec_flags, arena, error);
     if (result.os_error_code) {
         Dqn_ErrorSink_EndAndExitIfErrorF(
             error,

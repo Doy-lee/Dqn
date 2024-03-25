@@ -1,6 +1,8 @@
 #define DQN_UTEST_IMPLEMENTATION
 #include "Standalone/dqn_utest.h"
 
+#include <inttypes.h>
+
 static Dqn_UTest Dqn_Test_Arena()
 {
     Dqn_UTest test = {};
@@ -85,7 +87,12 @@ static Dqn_UTest Dqn_Test_Arena()
             }
             Dqn_Arena_TempMemEnd(temp_memory);
             DQN_UTEST_ASSERT (&test, arena.curr->prev == nullptr);
-            DQN_UTEST_ASSERTF(&test, arena.curr->reserve >= DQN_MEGABYTES(1), "size=%lluMiB (%lluB), expect=%lluB", (arena.curr->reserve / 1024 / 1024), arena.curr->reserve, DQN_MEGABYTES(1));
+            DQN_UTEST_ASSERTF(&test,
+                              arena.curr->reserve >= DQN_MEGABYTES(1),
+                              "size=%" PRIu64 "MiB (%" PRIu64 "B), expect=%" PRIu64 "B",
+                              (arena.curr->reserve / 1024 / 1024),
+                              arena.curr->reserve,
+                              DQN_MEGABYTES(1));
         }
     }
     return test;
@@ -98,57 +105,57 @@ static Dqn_UTest Dqn_Test_Bin()
     DQN_UTEST_GROUP(test, "Dqn_Bin") {
         DQN_UTEST_TEST("Convert 0x123") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0x123"));
-            DQN_UTEST_ASSERTF(&test, result == 0x123, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0x123, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 0xFFFF") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0xFFFF"));
-            DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert FFFF") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("FFFF"));
-            DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert abCD") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("abCD"));
-            DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 0xabCD") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0xabCD"));
-            DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 0x") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0x"));
-            DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 0X") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0X"));
-            DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 3") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("3"));
-            DQN_UTEST_ASSERTF(&test, result == 3, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 3, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert f") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("f"));
-            DQN_UTEST_ASSERTF(&test, result == 0xf, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0xf, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert g") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("g"));
-            DQN_UTEST_ASSERTF(&test, result == 0, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert -0x3") {
             uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("-0x3"));
-            DQN_UTEST_ASSERTF(&test, result == 0, "result: %llu", result);
+            DQN_UTEST_ASSERTF(&test, result == 0, "result: %" PRIu64, result);
         }
 
         uint32_t number = 0xd095f6;
@@ -696,7 +703,7 @@ static Dqn_UTest Dqn_Test_FStr8()
 static Dqn_UTest Dqn_Test_Fs()
 {
     Dqn_UTest test = {};
-    DQN_UTEST_GROUP(test, "Dqn_Fs") {
+    DQN_UTEST_GROUP(test, "Dqn_OS_[Path|File]") {
         DQN_UTEST_TEST("Make directory recursive \"abcd/efgh\"") {
             DQN_UTEST_ASSERTF(&test, Dqn_OS_MakeDir(DQN_STR8("abcd/efgh")), "Failed to make directory");
             DQN_UTEST_ASSERTF(&test, Dqn_OS_DirExists(DQN_STR8("abcd")), "Directory was not made");
@@ -829,7 +836,7 @@ static Dqn_UTest Dqn_Test_Intrinsics()
         DQN_UTEST_TEST("Dqn_Atomic_AddU64") {
             uint64_t val = 0;
             Dqn_Atomic_AddU64(&val, 1);
-            DQN_UTEST_ASSERTF(&test, val == 1, "val: %llu", val);
+            DQN_UTEST_ASSERTF(&test, val == 1, "val: %" PRIu64, val);
         }
 
         DQN_UTEST_TEST("Dqn_Atomic_SubU32") {
@@ -841,7 +848,7 @@ static Dqn_UTest Dqn_Test_Intrinsics()
         DQN_UTEST_TEST("Dqn_Atomic_SubU64") {
             uint64_t val = 1;
             Dqn_Atomic_SubU64(&val, 1);
-            DQN_UTEST_ASSERTF(&test, val == 0, "val: %llu", val);
+            DQN_UTEST_ASSERTF(&test, val == 0, "val: %" PRIu64, val);
         }
 
         DQN_UTEST_TEST("Dqn_Atomic_SetValue32") {
@@ -855,7 +862,7 @@ static Dqn_UTest Dqn_Test_Intrinsics()
             int64_t a = 0;
             int64_t b = 111;
             Dqn_Atomic_SetValue64(DQN_CAST(uint64_t *)&a, b);
-            DQN_UTEST_ASSERTF(&test, a == b, "a: %lld, b: %lld", a, b);
+            DQN_UTEST_ASSERTF(&test, a == b, "a: %" PRId64 ", b: %" PRId64, a, b);
         }
 
         Dqn_UTest_Begin(&test, "Dqn_CPU_TSC");
@@ -1216,7 +1223,7 @@ static Dqn_UTest Dqn_Test_OS()
         DQN_UTEST_TEST("Consecutive ticks are ordered") {
             uint64_t a = Dqn_OS_PerfCounterNow();
             uint64_t b = Dqn_OS_PerfCounterNow();
-            DQN_UTEST_ASSERTF(&test, b >= a, "a: %llu, b: %llu", a, b);
+            DQN_UTEST_ASSERTF(&test, b >= a, "a: %" PRIu64 ", b: %" PRIu64, a, b);
         }
 
         DQN_UTEST_TEST("Ticks to time are a correct order of magnitude") {
@@ -1561,55 +1568,55 @@ static Dqn_UTest Dqn_Test_Str8()
         DQN_UTEST_TEST("To U64: Convert nullptr") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(Dqn_Str8_Init(nullptr, 5), 0);
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %" PRIu64, result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert empty string") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8(""), 0);
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %" PRIu64, result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("1"), 0);
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %" PRIu64, result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"-0\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("-0"), 0);
             DQN_UTEST_ASSERT(&test, !result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %" PRIu64, result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"-1\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("-1"), 0);
             DQN_UTEST_ASSERT(&test, !result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 0, "result: %" PRIu64, result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1.2\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("1.2"), 0);
             DQN_UTEST_ASSERT(&test, !result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 1, "result: %" PRIu64, result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1,234\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("1,234"), ',');
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 1234, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 1234, "result: %" PRIu64, result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"1,2\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("1,2"), ',');
             DQN_UTEST_ASSERT(&test, result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %" PRIu64, result.value);
         }
 
         DQN_UTEST_TEST("To U64: Convert \"12a3\"") {
             Dqn_Str8ToU64Result result = Dqn_Str8_ToU64(DQN_STR8("12a3"), 0);
             DQN_UTEST_ASSERT(&test, !result.success);
-            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %llu", result.value);
+            DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %" PRIu64, result.value);
         }
 
         // NOTE: Dqn_Str8_Find

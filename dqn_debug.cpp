@@ -1,3 +1,4 @@
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //   $$$$$$$\  $$$$$$$$\ $$$$$$$\  $$\   $$\  $$$$$$\
@@ -12,6 +13,7 @@
 //   dqn_debug.cpp
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 // NOTE: [$ASAN] Dqn_Asan ////////////////////////////////////////////////////////////////////////// ///
 DQN_API void Dqn_ASAN_PoisonMemoryRegion(void const volatile *ptr, Dqn_usize size)
@@ -123,7 +125,7 @@ static void Dqn_StackTrace_AddWalkToStr8Builder_(Dqn_StackTraceWalkResult const 
     for (Dqn_usize index = skip; index < walk->size; index++) {
         raw_frame.base_addr       = walk->base_addr[index];
         Dqn_StackTraceFrame frame = Dqn_StackTrace_RawFrameToFrame(builder->arena, raw_frame);
-        Dqn_Str8Builder_AppendF(builder, "%.*s(%I64u): %.*s%s", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name), (index == walk->size - 1) ? "" : "\n");
+        Dqn_Str8Builder_AppendF(builder, "%.*s(%zu): %.*s%s", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name), (DQN_CAST(int)index == walk->size - 1) ? "" : "\n");
     }
 }
 

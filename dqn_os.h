@@ -1,3 +1,4 @@
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //    $$$$$$\   $$$$$$\
@@ -24,6 +25,7 @@
 // [$HTTP] Dqn_OSHttp          --               --
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 // NOTE: [$OMEM] Dqn_OSMem //////////////////////////////////////////////////////////////////////////
 enum Dqn_OSMemCommit
@@ -184,12 +186,10 @@ struct Dqn_OSExecAsyncHandle
     uint32_t  os_error_code;
     uint32_t  exit_code;
     void     *process;
-    #if defined(DQN_OS_WIN32)
     void     *stdout_read;
     void     *stdout_write;
     void     *stderr_read;
     void     *stderr_write;
-    #endif
 };
 
 struct Dqn_OSExecResult
@@ -364,9 +364,9 @@ DQN_API Dqn_Str8                  Dqn_OS_PathConvertF          (Dqn_Arena *arena
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
 DQN_API void                      Dqn_OS_Exit       (int32_t exit_code);
 DQN_API Dqn_OSExecResult          Dqn_OS_ExecWait   (Dqn_OSExecAsyncHandle handle, Dqn_Arena *arena, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecAsyncHandle     Dqn_OS_ExecAsync  (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flag, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecResult          Dqn_OS_Exec       (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flag, Dqn_Arena *arena, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecResult          Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flag, Dqn_Arena *arena);
+DQN_API Dqn_OSExecAsyncHandle     Dqn_OS_ExecAsync  (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_ErrorSink *error);
+DQN_API Dqn_OSExecResult          Dqn_OS_Exec       (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena, Dqn_ErrorSink *error);
+DQN_API Dqn_OSExecResult          Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena);
 
 // NOTE: [$SEMA] Dqn_OSSemaphore ///////////////////////////////////////////////////////////////////
 #if !defined(DQN_NO_SEMAPHORE)
