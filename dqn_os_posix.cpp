@@ -696,7 +696,8 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
     if (cmd_line.size == 0)
         return result;
 
-    Dqn_Scratch scratch                            = Dqn_Scratch_Get(nullptr);
+    Dqn_Scratch scratch      = Dqn_Scratch_Get(nullptr);
+    Dqn_Str8    cmd_rendered = Dqn_Slice_Str8Render(scratch.arena, cmd_line, DQN_STR8(" "));
     int         stdout_pipe[Dqn_OSPipeType__Count] = {};
     int         stderr_pipe[Dqn_OSPipeType__Count] = {};
 
@@ -704,6 +705,12 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
     if (Dqn_Bit_IsSet(exec_flags, Dqn_OSExecFlag_SaveStdout)) {
         if (pipe(stdout_pipe) == -1) {
             result.os_error_code = errno;
+            Dqn_ErrorSink_MakeF(
+                error,
+                result.os_error_code,
+                "Failed to create stdout pipe to redirect the output of the command '%.*s': %s",
+                DQN_STR_FMT(cmd_rendered),
+                strerror(result.os_error_code));
             return result;
         }
         DQN_ASSERT(stdout_pipe[Dqn_OSPipeType__Read] != 0);
@@ -725,14 +732,19 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
             stderr_pipe[Dqn_OSPipeType__Write] = stdout_pipe[Dqn_OSPipeType__Write];
         } else if (pipe(stderr_pipe) == -1) {
             result.os_error_code = errno;
+            Dqn_ErrorSink_MakeF(
+                error,
+                result.os_error_code,
+                "Failed to create stderr pipe to redirect the output of the command '%.*s': %s",
+                DQN_STR_FMT(cmd_rendered),
+                strerror(result.os_error_code));
             return result;
         }
         DQN_ASSERT(stderr_pipe[Dqn_OSPipeType__Read] != 0);
         DQN_ASSERT(stderr_pipe[Dqn_OSPipeType__Write] != 0);
     }
 
-    DQN_DEFER
-    {
+    DQN_DEFER {
         if (result.os_error_code == 0 && result.exit_code == 0)
             return;
         close(stderr_pipe[Dqn_OSPipeType__Read]);
@@ -742,6 +754,12 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
     pid_t child_pid = fork();
     if (child_pid < 0) {
         result.os_error_code = errno;
+        Dqn_ErrorSink_MakeF(
+            error,
+            result.os_error_code,
+            "Failed to fork process to execute the command '%.*s': %s",
+            DQN_STR_FMT(cmd_rendered),
+            strerror(result.os_error_code));
         return result;
     }
 
@@ -749,12 +767,24 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
         if (Dqn_Bit_IsSet(exec_flags, Dqn_OSExecFlag_SaveStdout) &&
             (dup2(stdout_pipe[Dqn_OSPipeType__Write], STDOUT_FILENO) == -1)) {
             result.os_error_code = errno;
+            Dqn_ErrorSink_MakeF(
+                error,
+                result.os_error_code,
+                "Failed to redirect stdout 'write' pipe for output of command '%.*s': %s",
+                DQN_STR_FMT(cmd_rendered),
+                strerror(result.os_error_code));
             return result;
         }
 
         if (Dqn_Bit_IsSet(exec_flags, Dqn_OSExecFlag_SaveStderr) &&
             (dup2(stderr_pipe[Dqn_OSPipeType__Write], STDERR_FILENO) == -1)) {
             result.os_error_code = errno;
+            Dqn_ErrorSink_MakeF(
+                error,
+                result.os_error_code,
+                "Failed to redirect stderr 'read' pipe for output of command '%.*s': %s",
+                DQN_STR_FMT(cmd_rendered),
+                strerror(result.os_error_code));
             return result;
         }
 
@@ -763,19 +793,22 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
             Dqn_Arena_NewArray(scratch.arena, char *, cmd_line.size + 1 /*null*/, Dqn_ZeroMem_Yes);
         if (!argv) {
             result.exit_code = -1;
+            Dqn_ErrorSink_MakeF(
+                error,
+                result.os_error_code,
+                "Failed to create argument values from command line '%.*s': Out of memory",
+                DQN_STR_FMT(cmd_rendered));
             return result;
         }
 
         for (Dqn_usize arg_index = 0; arg_index < cmd_line.size; arg_index++) {
             Dqn_Str8 arg    = cmd_line.data[arg_index];
-            argv[arg_index] = Dqn_Str8_Copy(scratch.arena, arg)
-                                  .data; // NOTE: Copy string to guarantee it is null-terminated
+            argv[arg_index] = Dqn_Str8_Copy(scratch.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
         }
 
         // NOTE: Change the working directory if there is one
         char *prev_working_dir = nullptr;
-        DQN_DEFER
-        {
+        DQN_DEFER {
             if (!prev_working_dir)
                 return;
             if (result.os_error_code == 0) {
@@ -789,6 +822,12 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
             prev_working_dir = get_current_dir_name();
             if (chdir(working_dir.data) == -1) {
                 result.os_error_code = errno;
+                Dqn_ErrorSink_MakeF(
+                    error,
+                    result.os_error_code,
+                    "Failed to create argument values from command line '%.*s': %s",
+                    DQN_STR_FMT(cmd_rendered),
+                    strerror(result.os_error_code));
                 return result;
             }
         }
@@ -797,6 +836,12 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
         // binary to execute is guaranteed to be null-terminated.
         if (execvp(argv[0], argv) < 0) {
             result.os_error_code = errno;
+            Dqn_ErrorSink_MakeF(
+                error,
+                result.os_error_code,
+                "Failed to execute command'%.*s': %s",
+                DQN_STR_FMT(cmd_rendered),
+                strerror(result.os_error_code));
             return result;
         }
     }
