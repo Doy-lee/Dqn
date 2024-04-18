@@ -67,6 +67,7 @@ enum Dqn_CGenTableHeaderType
     Dqn_CGenTableHeaderType_CppName,
     Dqn_CGenTableHeaderType_CppValue,
     Dqn_CGenTableHeaderType_CppIsPtr,
+    Dqn_CGenTableHeaderType_CppOpEquals,
     Dqn_CGenTableHeaderType_CppArraySize,
     Dqn_CGenTableHeaderType_CppArraySizeField,
     Dqn_CGenTableHeaderType_GenTypeInfo,

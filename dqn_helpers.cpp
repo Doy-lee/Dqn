@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -248,222 +251,6 @@ DQN_API void Dqn_JSONBuilder_BoolNamed(Dqn_JSONBuilder *builder, Dqn_Str8 key, b
     Dqn_JSONBuilder_KeyValueF(builder, key, "%.*s", value_string.size, value_string.data);
 }
 #endif // !defined(DQN_NO_JSON_BUILDER)
-
-#if !defined(DQN_NO_BIN)
-// NOTE: [$BHEX] Dqn_Bin ///////////////////////////////////////////////////////////////////////////
-DQN_API char const *Dqn_Bin_HexBufferTrim0x(char const *hex, Dqn_usize size, Dqn_usize *real_size)
-{
-    Dqn_Str8 result = Dqn_Str8_TrimWhitespaceAround(Dqn_Str8_Init(hex, size));
-    result          = Dqn_Str8_TrimPrefix(result, DQN_STR8("0x"), Dqn_Str8EqCase_Insensitive);
-    if (real_size)
-        *real_size = result.size;
-    return result.data;
-}
-
-DQN_API Dqn_Str8 Dqn_Bin_HexTrim0x(Dqn_Str8 string)
-{
-    Dqn_usize   trimmed_size = 0;
-    char const *trimmed      = Dqn_Bin_HexBufferTrim0x(string.data, string.size, &trimmed_size);
-    Dqn_Str8    result       = Dqn_Str8_Init(trimmed, trimmed_size);
-    return result;
-}
-
-DQN_API Dqn_BinHexU64Str8 Dqn_Bin_U64ToHexU64Str8(uint64_t number, uint32_t flags)
-{
-    Dqn_Str8 prefix = {};
-    if (!(flags & Dqn_BinHexU64Str8Flags_No0xPrefix))
-        prefix = DQN_STR8("0x");
-
-    Dqn_BinHexU64Str8 result = {};
-    DQN_MEMCPY(result.data, prefix.data, prefix.size);
-    result.size += DQN_CAST(int8_t) prefix.size;
-
-    char const *fmt = (flags & Dqn_BinHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
-    int size        = DQN_SNPRINTF(result.data + result.size, DQN_ARRAY_UCOUNT(result.data) - result.size, fmt, number);
-    result.size += DQN_CAST(uint8_t) size;
-    DQN_ASSERT(result.size < DQN_ARRAY_UCOUNT(result.data));
-
-    // NOTE: snprintf returns the required size of the format string
-    // irrespective of if there's space or not, but, always null terminates so
-    // the last byte is wasted.
-    result.size = DQN_MIN(result.size, DQN_ARRAY_UCOUNT(result.data) - 1);
-    return result;
-}
-
-DQN_API Dqn_Str8 Dqn_Bin_U64ToHex(Dqn_Arena *arena, uint64_t number, uint32_t flags)
-{
-    Dqn_Str8 prefix = {};
-    if (!(flags & Dqn_BinHexU64Str8Flags_No0xPrefix))
-        prefix = DQN_STR8("0x");
-
-    char const *fmt           = (flags & Dqn_BinHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
-    Dqn_usize   required_size = Dqn_CStr8_FSize(fmt, number) + prefix.size;
-    Dqn_Str8    result        = Dqn_Str8_Alloc(arena, required_size, Dqn_ZeroMem_No);
-
-    if (Dqn_Str8_HasData(result)) {
-        DQN_MEMCPY(result.data, prefix.data, prefix.size);
-        int space = DQN_CAST(int) DQN_MAX((result.size - prefix.size) + 1, 0); /*null-terminator*/
-        DQN_SNPRINTF(result.data + prefix.size, space, fmt, number);
-    }
-    return result;
-}
-
-DQN_API uint64_t Dqn_Bin_HexToU64(Dqn_Str8 hex)
-{
-    Dqn_Str8  real_hex     = Dqn_Str8_TrimPrefix(Dqn_Str8_TrimPrefix(hex, DQN_STR8("0x")), DQN_STR8("0X"));
-    Dqn_usize max_hex_size = sizeof(uint64_t) * 2 /*hex chars per byte*/;
-    DQN_ASSERT(real_hex.size <= max_hex_size);
-
-    Dqn_usize size   = DQN_MIN(max_hex_size, real_hex.size);
-    uint64_t  result = 0;
-    for (Dqn_usize index = 0; index < size; index++) {
-        char ch = real_hex.data[index];
-        if (!Dqn_Char_IsHex(ch))
-            break;
-        uint8_t val = Dqn_Char_HexToU8(ch);
-        result      = (result << 4) | val;
-    }
-    return result;
-}
-
-DQN_API uint64_t Dqn_Bin_HexPtrToU64(char const *hex, Dqn_usize size)
-{
-    uint64_t result = Dqn_Bin_HexToU64(Dqn_Str8_Init(hex, size));
-    return result;
-}
-
-DQN_API bool Dqn_Bin_BytesToHexBuffer(void const *src, Dqn_usize src_size, char *dest, Dqn_usize dest_size)
-{
-    if (!src || !dest)
-        return false;
-
-    if (!DQN_CHECK(dest_size >= src_size * 2))
-        return false;
-
-    char const          *HEX    = "0123456789abcdef";
-    unsigned char const *src_u8 = DQN_CAST(unsigned char const *) src;
-    for (Dqn_usize src_index = 0, dest_index = 0; src_index < src_size; src_index++) {
-        char byte          = src_u8[src_index];
-        char hex01         = (byte >> 4) & 0b1111;
-        char hex02         = (byte >> 0) & 0b1111;
-        dest[dest_index++] = HEX[(int)hex01];
-        dest[dest_index++] = HEX[(int)hex02];
-    }
-
-    return true;
-}
-
-DQN_API char *Dqn_Bin_BytesToHexBufferArena(Dqn_Arena *arena, void const *src, Dqn_usize size)
-{
-    char *result =
-        size > 0 ? Dqn_Arena_NewArray(arena, char, (size * 2) + 1 /*null terminate*/, Dqn_ZeroMem_No) : nullptr;
-    if (result) {
-        bool converted = Dqn_Bin_BytesToHexBuffer(src, size, result, size * 2);
-        DQN_ASSERT(converted);
-        result[size * 2] = 0;
-    }
-    return result;
-}
-
-DQN_API Dqn_Str8 Dqn_Bin_BytesToHexArena(Dqn_Arena *arena, void const *src, Dqn_usize size)
-{
-    Dqn_Str8 result = {};
-    result.data     = Dqn_Bin_BytesToHexBufferArena(arena, src, size);
-    if (result.data)
-        result.size = size * 2;
-    return result;
-}
-
-DQN_API Dqn_usize Dqn_Bin_HexBufferToBytes(char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size)
-{
-    Dqn_usize result = 0;
-    if (!hex || hex_size <= 0)
-        return result;
-
-    Dqn_usize   trim_size = 0;
-    char const *trim_hex  = Dqn_Bin_HexBufferTrim0x(hex, hex_size, &trim_size);
-
-    // NOTE: Trimmed hex can be "0xf" -> "f" or "0xAB" -> "AB"
-    // Either way, the size can be odd or even, hence we round up to the nearest
-    // multiple of two to ensure that we calculate the min buffer size orrectly.
-    Dqn_usize trim_size_rounded_up = trim_size + (trim_size % 2);
-    Dqn_usize min_buffer_size      = trim_size_rounded_up / 2;
-    if (dest_size < min_buffer_size || trim_size <= 0) {
-        DQN_ASSERTF(dest_size >= min_buffer_size, "Insufficient buffer size for converting hex to binary");
-        return result;
-    }
-
-    result = Dqn_Bin_HexBufferToBytesUnchecked(trim_hex, trim_size, dest, dest_size);
-    return result;
-}
-
-DQN_API Dqn_usize Dqn_Bin_HexBufferToBytesUnchecked(char const *hex,
-                                                    Dqn_usize   hex_size,
-                                                    void       *dest,
-                                                    Dqn_usize   dest_size)
-{
-    Dqn_usize      result  = 0;
-    unsigned char *dest_u8 = DQN_CAST(unsigned char *) dest;
-
-    for (Dqn_usize hex_index = 0; hex_index < hex_size; hex_index += 2, result += 1) {
-        char hex01 = hex[hex_index];
-        char hex02 = (hex_index + 1 < hex_size) ? hex[hex_index + 1] : 0;
-
-        char bit4_01 = (hex01 >= '0' && hex01 <= '9')   ? 0 + (hex01 - '0')
-                       : (hex01 >= 'a' && hex01 <= 'f') ? 10 + (hex01 - 'a')
-                       : (hex01 >= 'A' && hex01 <= 'F') ? 10 + (hex01 - 'A')
-                                                        : 0;
-
-        char bit4_02 = (hex02 >= '0' && hex02 <= '9')   ? 0 + (hex02 - '0')
-                       : (hex02 >= 'a' && hex02 <= 'f') ? 10 + (hex02 - 'a')
-                       : (hex02 >= 'A' && hex02 <= 'F') ? 10 + (hex02 - 'A')
-                                                        : 0;
-
-        char byte       = (bit4_01 << 4) | (bit4_02 << 0);
-        dest_u8[result] = byte;
-    }
-
-    DQN_ASSERT(result <= dest_size);
-    return result;
-}
-
-DQN_API Dqn_usize Dqn_Bin_HexToBytesUnchecked(Dqn_Str8 hex, void *dest, Dqn_usize dest_size)
-{
-    Dqn_usize result = Dqn_Bin_HexBufferToBytesUnchecked(hex.data, hex.size, dest, dest_size);
-    return result;
-}
-
-DQN_API Dqn_usize Dqn_Bin_HexToBytes(Dqn_Str8 hex, void *dest, Dqn_usize dest_size)
-{
-    Dqn_usize result = Dqn_Bin_HexBufferToBytes(hex.data, hex.size, dest, dest_size);
-    return result;
-}
-
-DQN_API char *Dqn_Bin_HexBufferToBytesArena(Dqn_Arena *arena, char const *hex, Dqn_usize size, Dqn_usize *real_size)
-{
-    char *result = nullptr;
-    if (!arena || !hex || size <= 0)
-        return result;
-
-    Dqn_usize   trim_size   = 0;
-    char const *trim_hex    = Dqn_Bin_HexBufferTrim0x(hex, size, &trim_size);
-    Dqn_usize   binary_size = trim_size / 2;
-    result                  = Dqn_Arena_NewArray(arena, char, binary_size, Dqn_ZeroMem_No);
-    if (result) {
-        Dqn_usize convert_size = Dqn_Bin_HexBufferToBytesUnchecked(trim_hex, trim_size, result, binary_size);
-        if (real_size)
-            *real_size = convert_size;
-    }
-    return result;
-}
-
-DQN_API Dqn_Str8 Dqn_Bin_HexToBytesArena(Dqn_Arena *arena, Dqn_Str8 hex)
-{
-    Dqn_Str8 result = {};
-    result.data     = Dqn_Bin_HexBufferToBytesArena(arena, hex.data, hex.size, &result.size);
-    return result;
-}
-#endif // !defined(DQN_NO_BIN)
 
 // NOTE: [$BITS] Dqn_Bit ///////////////////////////////////////////////////////////////////////////
 DQN_API void Dqn_Bit_UnsetInplace(Dqn_usize *flags, Dqn_usize bitfield)
@@ -1033,6 +820,162 @@ DQN_API Dqn_Str8 Dqn_U64ToAge(Dqn_Arena *arena, uint64_t age_s, Dqn_usize type)
     return result;
 }
 
+DQN_API uint64_t Dqn_HexToU64(Dqn_Str8 hex)
+{
+    Dqn_Str8  real_hex     = Dqn_Str8_TrimPrefix(Dqn_Str8_TrimPrefix(hex, DQN_STR8("0x")), DQN_STR8("0X"));
+    Dqn_usize max_hex_size = sizeof(uint64_t) * 2 /*hex chars per byte*/;
+    DQN_ASSERT(real_hex.size <= max_hex_size);
+
+    Dqn_usize size   = DQN_MIN(max_hex_size, real_hex.size);
+    uint64_t  result = 0;
+    for (Dqn_usize index = 0; index < size; index++) {
+        char            ch  = real_hex.data[index];
+        Dqn_CharHexToU8 val = Dqn_Char_HexToU8(ch);
+        if (!val.success)
+            break;
+        result = (result << 4) | val.value;
+    }
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_U64ToHex(Dqn_Arena *arena, uint64_t number, uint32_t flags)
+{
+    Dqn_Str8 prefix = {};
+    if (!(flags & Dqn_BinHexU64Str8Flags_No0xPrefix))
+        prefix = DQN_STR8("0x");
+
+    char const *fmt           = (flags & Dqn_BinHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
+    Dqn_usize   required_size = Dqn_CStr8_FSize(fmt, number) + prefix.size;
+    Dqn_Str8    result        = Dqn_Str8_Alloc(arena, required_size, Dqn_ZeroMem_No);
+
+    if (Dqn_Str8_HasData(result)) {
+        DQN_MEMCPY(result.data, prefix.data, prefix.size);
+        int space = DQN_CAST(int) DQN_MAX((result.size - prefix.size) + 1, 0); /*null-terminator*/
+        DQN_SNPRINTF(result.data + prefix.size, space, fmt, number);
+    }
+    return result;
+}
+
+DQN_API Dqn_U64HexStr8 Dqn_U64ToHexStr8(uint64_t number, uint32_t flags)
+{
+    Dqn_Str8 prefix = {};
+    if (!(flags & Dqn_BinHexU64Str8Flags_No0xPrefix))
+        prefix = DQN_STR8("0x");
+
+    Dqn_U64HexStr8 result = {};
+    DQN_MEMCPY(result.data, prefix.data, prefix.size);
+    result.size += DQN_CAST(int8_t) prefix.size;
+
+    char const *fmt = (flags & Dqn_BinHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
+    int size        = DQN_SNPRINTF(result.data + result.size, DQN_ARRAY_UCOUNT(result.data) - result.size, fmt, number);
+    result.size += DQN_CAST(uint8_t) size;
+    DQN_ASSERT(result.size < DQN_ARRAY_UCOUNT(result.data));
+
+    // NOTE: snprintf returns the required size of the format string
+    // irrespective of if there's space or not, but, always null terminates so
+    // the last byte is wasted.
+    result.size = DQN_MIN(result.size, DQN_ARRAY_UCOUNT(result.data) - 1);
+    return result;
+}
+
+DQN_API bool Dqn_BytesToHexPtr(void const *src, Dqn_usize src_size, char *dest, Dqn_usize dest_size)
+{
+    if (!src || !dest)
+        return false;
+
+    if (!DQN_CHECK(dest_size >= src_size * 2))
+        return false;
+
+    char const          *HEX    = "0123456789abcdef";
+    unsigned char const *src_u8 = DQN_CAST(unsigned char const *) src;
+    for (Dqn_usize src_index = 0, dest_index = 0; src_index < src_size; src_index++) {
+        char byte          = src_u8[src_index];
+        char hex01         = (byte >> 4) & 0b1111;
+        char hex02         = (byte >> 0) & 0b1111;
+        dest[dest_index++] = HEX[(int)hex01];
+        dest[dest_index++] = HEX[(int)hex02];
+    }
+
+    return true;
+}
+
+DQN_API Dqn_Str8 Dqn_BytesToHex(Dqn_Arena *arena, void const *src, Dqn_usize size)
+{
+    Dqn_Str8 result = {};
+    if (!src || size <= 0)
+        return result;
+
+    result                       = Dqn_Str8_Alloc(arena, size * 2, Dqn_ZeroMem_No);
+    result.data[result.size - 1] = 0;
+    bool converted               = Dqn_BytesToHexPtr(src, size, result.data, result.size);
+    DQN_ASSERT(converted);
+    return result;
+}
+
+DQN_API Dqn_usize Dqn_HexToBytesPtrUnchecked(Dqn_Str8 hex, void *dest, Dqn_usize dest_size)
+{
+    Dqn_usize      result  = 0;
+    unsigned char *dest_u8 = DQN_CAST(unsigned char *) dest;
+
+    for (Dqn_usize hex_index = 0; hex_index < hex.size; hex_index += 2, result += 1) {
+        char hex01      = hex.data[hex_index];
+        char hex02      = (hex_index + 1 < hex.size) ? hex.data[hex_index + 1] : 0;
+        char bit4_01    = Dqn_Char_HexToU8(hex01).value;
+        char bit4_02    = Dqn_Char_HexToU8(hex02).value;
+        char byte       = (bit4_01 << 4) | (bit4_02 << 0);
+        dest_u8[result] = byte;
+    }
+
+    DQN_ASSERT(result <= dest_size);
+    return result;
+}
+
+DQN_API Dqn_usize Dqn_HexToBytesPtr(Dqn_Str8 hex, void *dest, Dqn_usize dest_size)
+{
+    hex = Dqn_Str8_TrimPrefix(hex, DQN_STR8("0x"));
+    hex = Dqn_Str8_TrimPrefix(hex, DQN_STR8("0X"));
+
+    Dqn_usize result = 0;
+    if (!Dqn_Str8_HasData(hex))
+        return result;
+
+    // NOTE: Trimmed hex can be "0xf" -> "f" or "0xAB" -> "AB"
+    // Either way, the size can be odd or even, hence we round up to the nearest
+    // multiple of two to ensure that we calculate the min buffer size orrectly.
+    Dqn_usize hex_size_rounded_up = hex.size + (hex.size % 2);
+    Dqn_usize min_buffer_size     = hex_size_rounded_up / 2;
+    if (hex.size <= 0 || !DQN_CHECK(dest_size >= min_buffer_size)) {
+        return result;
+    }
+
+    result = Dqn_HexToBytesPtrUnchecked(hex, dest, dest_size);
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_HexToBytesUnchecked(Dqn_Arena *arena, Dqn_Str8 hex)
+{
+    Dqn_Str8 result = Dqn_Str8_Alloc(arena, hex.size / 2, Dqn_ZeroMem_No);
+    if (result.data) {
+        Dqn_usize bytes_written = Dqn_HexToBytesPtr(hex, result.data, result.size);
+        DQN_ASSERT(bytes_written == result.size);
+    }
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_HexToBytes(Dqn_Arena *arena, Dqn_Str8 hex)
+{
+    hex = Dqn_Str8_TrimPrefix(hex, DQN_STR8("0x"));
+    hex = Dqn_Str8_TrimPrefix(hex, DQN_STR8("0X"));
+
+    Dqn_Str8 result = {};
+    if (!DQN_CHECK(Dqn_Str8_IsAll(hex, Dqn_Str8IsAll_Hex)))
+        return result;
+
+    result = Dqn_HexToBytesUnchecked(arena, hex);
+    return result;
+}
+
+
 // NOTE: [$DLIB] Dqn_Library ///////////////////////////////////////////////////////////////////////
 Dqn_Library *g_dqn_library;
 
@@ -1052,7 +995,13 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
 
     if (result->lib_init)
         return result;
-    result->lib_init = true;
+
+    #define DQN_CPU_FEAT_XENTRY(label) g_dqn_cpu_feature_decl[Dqn_CPUFeature_##label] = {Dqn_CPUFeature_##label, DQN_STR8(#label)};
+    DQN_CPU_FEAT_XMACRO
+    #undef DQN_CPU_FEAT_XENTRY
+
+    result->lib_init   = true;
+    result->cpu_report = Dqn_CPU_Report();
 
     // NOTE: Query OS info /////////////////////////////////////////////////////////////////////////
     {
@@ -1069,7 +1018,6 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
         result->os_alloc_granularity = DQN_KILOBYTES(64);
     #endif
     }
-
 
     // NOTE Initialise fields //////////////////////////////////////////////////////////////////////
     #if !defined(DQN_NO_PROFILER)
@@ -1104,10 +1052,9 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
     result->exe_dir = Dqn_OS_EXEDir(&result->arena);
 
     // NOTE: Print out init features ///////////////////////////////////////////////////////////////
-    if (on_init == Dqn_LibraryOnInit_LogFeatures) {
-        Dqn_Str8Builder builder = {};
-        builder.arena           = scratch.arena;
-
+    Dqn_Str8Builder builder = {};
+    builder.arena           = scratch.arena;
+    if (on_init & Dqn_LibraryOnInit_LogLibFeatures) {
         Dqn_Str8Builder_AppendRef(&builder, DQN_STR8("Dqn Library initialised:\n"));
 
         Dqn_f64 page_size_kib         = result->os_page_size / 1024.0;
@@ -1138,10 +1085,37 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
         #endif
 
         // TODO(doyle): Add stacktrace feature log
-
-        Dqn_Str8 info_log = Dqn_Str8Builder_Build(&builder, scratch.arena);
-        Dqn_Log_DebugF("%.*s", DQN_STR_FMT(info_log));
     }
+
+    if (on_init & Dqn_LibraryOnInit_LogCPUFeatures) {
+        Dqn_CPUReport const *report = &result->cpu_report;
+        Dqn_Str8 brand              = Dqn_Str8_TrimWhitespaceAround(Dqn_Str8_Init(report->brand, sizeof(report->brand) - 1));
+        Dqn_Str8Builder_AppendF(&builder,
+                                "  CPU '%.*s' from '%s' detected:\n",
+                                DQN_STR_FMT(brand),
+                                report->vendor);
+
+        Dqn_usize longest_feature_name = 0;
+        DQN_FOR_UINDEX(feature_index, Dqn_CPUFeature_Count) {
+            Dqn_CPUFeatureDecl feature_decl = g_dqn_cpu_feature_decl[feature_index];
+            longest_feature_name = DQN_MAX(longest_feature_name, feature_decl.label.size);
+        }
+
+        DQN_FOR_UINDEX(feature_index, Dqn_CPUFeature_Count) {
+            Dqn_CPUFeatureDecl feature_decl = g_dqn_cpu_feature_decl[feature_index];
+            bool               has_feature  = Dqn_CPU_HasFeature(report, feature_decl.value);
+            Dqn_Str8Builder_AppendF(&builder,
+                                    "    %.*s:%*s%s\n",
+                                    DQN_STR_FMT(feature_decl.label),
+                                    DQN_CAST(int)(longest_feature_name - feature_decl.label.size),
+                                    "",
+                                    has_feature ? "available" : "not available");
+        }
+    }
+
+    Dqn_Str8 info_log = Dqn_Str8Builder_Build(&builder, scratch.arena);
+    if (Dqn_Str8_HasData(info_log))
+        Dqn_Log_DebugF("%.*s", DQN_STR_FMT(info_log));
     return result;
 }
 
@@ -1350,7 +1324,7 @@ DQN_API bool Dqn_OS_JobQueueSPMCAddArray(Dqn_JobQueueSPMC *queue, Dqn_Job *jobs,
         return false;
 
     for (size_t offset = 0; offset < count; offset++) {
-        uint32_t wrapped_write_index         = (write_index + offset) & pot_mask;
+        uint32_t wrapped_write_index     = (write_index + offset) & pot_mask;
         queue->jobs[wrapped_write_index] = jobs[offset];
     }
 
@@ -1413,7 +1387,7 @@ DQN_API int32_t Dqn_OS_JobQueueSPMCThread(Dqn_OSThread *thread)
 DQN_API void Dqn_OS_JobQueueSPMCWaitForCompletion(Dqn_JobQueueSPMC *queue)
 {
     Dqn_OS_MutexLock(&queue->mutex);
-    if (queue->read_index == queue->write_index) {
+    if (queue->finish_index == queue->write_index) {
         Dqn_OS_MutexUnlock(&queue->mutex);
         return;
     }

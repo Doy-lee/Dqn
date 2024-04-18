@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //    $$$$$$\   $$$$$$\        $$\      $$\ $$$$$$\ $$\   $$\  $$$$$$\   $$$$$$\
@@ -124,6 +127,30 @@ DQN_API uint64_t Dqn_OS_DateUnixTime()
     date_time.u.LowPart  = file_time.dwLowDateTime;
     date_time.u.HighPart = file_time.dwHighDateTime;
     uint64_t result      = (date_time.QuadPart - DQN_OS_WIN32_UNIX_TIME_START) / DQN_OS_WIN32_FILE_TIME_TICKS_PER_SECOND;
+    return result;
+}
+
+DQN_API Dqn_OSDateTime Dqn_OS_DateUnixTimeToDate(uint64_t time)
+{
+    // NOTE: Windows epoch time starts from Jan 1, 1601 and counts in
+    // 100-nanoseconds intervals.
+    //
+    // See: https://devblogs.microsoft.com/oldnewthing/20090306-00/?p=18913
+
+    uint64_t   win32_time    = 116'444'736'000'000'000 + (time * 10'000'000);
+    SYSTEMTIME sys_time      = {};
+    FILETIME   file_time     = {};
+    file_time.dwLowDateTime  = (DWORD)win32_time;
+    file_time.dwHighDateTime = win32_time >> 32;
+    FileTimeToSystemTime(&file_time, &sys_time);
+
+    Dqn_OSDateTime result = {};
+    result.year           = DQN_CAST(uint16_t)sys_time.wYear;
+    result.month          = DQN_CAST(uint8_t)sys_time.wMonth;
+    result.day            = DQN_CAST(uint8_t)sys_time.wDay;
+    result.hour           = DQN_CAST(uint8_t)sys_time.wHour;
+    result.minutes        = DQN_CAST(uint8_t)sys_time.wMinute;
+    result.seconds        = DQN_CAST(uint8_t)sys_time.wSecond;
     return result;
 }
 

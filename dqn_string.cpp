@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -156,7 +159,7 @@ DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplit(Dqn_Str8 string, Dqn_Str8
     return result;
 }
 
-DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitReverseArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
+DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitLastArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
 {
     Dqn_Str8BinarySplitResult result = {};
     if (!Dqn_Str8_HasData(string) || !find || find_size == 0)
@@ -179,9 +182,9 @@ DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitReverseArray(Dqn_Str8 stri
     return result;
 }
 
-DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitReverse(Dqn_Str8 string, Dqn_Str8 find)
+DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitLast(Dqn_Str8 string, Dqn_Str8 find)
 {
-    Dqn_Str8BinarySplitResult result = Dqn_Str8_BinarySplitReverseArray(string, &find, 1);
+    Dqn_Str8BinarySplitResult result = Dqn_Str8_BinarySplitLastArray(string, &find, 1);
     return result;
 }
 
@@ -218,7 +221,7 @@ DQN_API Dqn_Slice<Dqn_Str8> Dqn_Str8_SplitAlloc(Dqn_Arena *arena, Dqn_Str8 strin
     return result;
 }
 
-DQN_API Dqn_Str8FindResult Dqn_Str8_FindFirstStringArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
+DQN_API Dqn_Str8FindResult Dqn_Str8_FindStr8Array(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
 {
     Dqn_Str8FindResult result = {};
     if (!Dqn_Str8_HasData(string) || !find || find_size == 0)
@@ -241,13 +244,13 @@ DQN_API Dqn_Str8FindResult Dqn_Str8_FindFirstStringArray(Dqn_Str8 string, Dqn_St
     return result;
 }
 
-DQN_API Dqn_Str8FindResult Dqn_Str8_FindFirstString(Dqn_Str8 string, Dqn_Str8 find)
+DQN_API Dqn_Str8FindResult Dqn_Str8_FindStr8(Dqn_Str8 string, Dqn_Str8 find)
 {
-    Dqn_Str8FindResult result = Dqn_Str8_FindFirstStringArray(string, &find, 1);
+    Dqn_Str8FindResult result = Dqn_Str8_FindStr8Array(string, &find, 1);
     return result;
 }
 
-DQN_API Dqn_Str8FindResult Dqn_Str8_FindFirst(Dqn_Str8 string, uint32_t flags)
+DQN_API Dqn_Str8FindResult Dqn_Str8_Find(Dqn_Str8 string, uint32_t flags)
 {
     Dqn_Str8FindResult result = {};
     for (size_t index = 0; !result.found && index < string.size; index++) {
@@ -457,7 +460,7 @@ DQN_API Dqn_Str8 Dqn_Str8_TrimByteOrderMark(Dqn_Str8 string)
 DQN_API Dqn_Str8 Dqn_Str8_FileNameFromPath(Dqn_Str8 path)
 {
     Dqn_Str8 separators[]           = {DQN_STR8("/"), DQN_STR8("\\")};
-    Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplitReverseArray(path, separators, DQN_ARRAY_UCOUNT(separators));
+    Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplitLastArray(path, separators, DQN_ARRAY_UCOUNT(separators));
     Dqn_Str8 result                 = Dqn_Str8_HasData(split.rhs) ? split.rhs : split.lhs;
     return result;
 }
@@ -471,14 +474,14 @@ DQN_API Dqn_Str8 Dqn_Str8_FileNameNoExtension(Dqn_Str8 path)
 
 DQN_API Dqn_Str8 Dqn_Str8_FilePathNoExtension(Dqn_Str8 path)
 {
-    Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplitReverse(path, DQN_STR8("."));
+    Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplitLast(path, DQN_STR8("."));
     Dqn_Str8 result                 = split.lhs;
     return result;
 }
 
 DQN_API Dqn_Str8 Dqn_Str8_FileExtension(Dqn_Str8 path)
 {
-    Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplitReverse(path, DQN_STR8("."));
+    Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplitLast(path, DQN_STR8("."));
     Dqn_Str8 result                 = split.rhs;
     return result;
 }
@@ -895,17 +898,18 @@ DQN_API bool Dqn_Char_IsHex(char ch)
     return result;
 }
 
-DQN_API uint8_t Dqn_Char_HexToU8(char ch)
+DQN_API Dqn_CharHexToU8 Dqn_Char_HexToU8(char ch)
 {
-    DQN_ASSERTF(Dqn_Char_IsHex(ch), "Hex character not valid '%c'", ch);
-
-    uint8_t result = 0;
+    Dqn_CharHexToU8 result = {};
+    result.success         = true;
     if (ch >= 'a' && ch <= 'f')
-        result = ch - 'a' + 10;
+        result.value = ch - 'a' + 10;
     else if (ch >= 'A' && ch <= 'F')
-        result = ch - 'A' + 10;
+        result.value = ch - 'A' + 10;
+    else if (ch >= '0' && ch <= '9')
+        result.value = ch - '0';
     else
-        result = ch - '0';
+        result.success = false;
     return result;
 }
 

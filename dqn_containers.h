@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -281,6 +284,8 @@ template <typename T, Dqn_usize N>              void                   Dqn_FArra
 #define                                                                DQN_TO_SLICE(val)                  Dqn_Slice_Init((val)->data, (val)->size)
 template <typename T>                           Dqn_Slice<T>           Dqn_Slice_Init                     (T* const data, Dqn_usize size);
 template <typename T, Dqn_usize N>              Dqn_Slice<T>           Dqn_Slice_InitCArray               (Dqn_Arena *arena, T const (&array)[N]);
+template <typename T>                           Dqn_Slice<T>           Dqn_Slice_Copy                     (Dqn_Arena *arena, Dqn_Slice<T> slice);
+template <typename T>                           Dqn_Slice<T>           Dqn_Slice_CopyPtr                  (Dqn_Arena *arena, T* const data, Dqn_usize size);
 template <typename T>                           Dqn_Slice<T>           Dqn_Slice_Alloc                    (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
                                                 Dqn_Str8               Dqn_Slice_Str8Render               (Dqn_Arena *arena, Dqn_Slice<Dqn_Str8> array, Dqn_Str8 separator);
                                                 Dqn_Str8               Dqn_Slice_Str8RenderSpaceSeparated (Dqn_Arena *arena, Dqn_Slice<Dqn_Str8> array);
@@ -622,7 +627,7 @@ template <typename T> bool Dqn_VArray_Reserve(Dqn_VArray<T> *array, Dqn_usize co
 #endif // !defined(DQN_NO_VARRAY)
 
 #if !defined(DQN_NO_SARRAY)
-// NOTE: [$FARR] Dqn_SArray ////////////////////////////////////////////////////////////////////////
+// NOTE: [$SARR] Dqn_SArray ////////////////////////////////////////////////////////////////////////
 template <typename T> Dqn_SArray<T> Dqn_SArray_Init(Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem)
 {
     Dqn_SArray<T> result = {};
@@ -700,7 +705,7 @@ template <typename T> T *Dqn_SArray_Add(Dqn_SArray<T> *array, T const &item)
     return result;
 }
 
-template <typename T, Dqn_usize N> T *Dqn_SArray_InsertArray(Dqn_SArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count)
+template <typename T> T *Dqn_SArray_InsertArray(Dqn_SArray<T> *array, Dqn_usize index, T const *items, Dqn_usize count)
 {
     T *result = nullptr;
     if (!Dqn_SArray_IsValid(array))
@@ -715,7 +720,7 @@ template <typename T, Dqn_usize N> T *Dqn_SArray_InsertCArray(Dqn_SArray<T> *arr
     return result;
 }
 
-template <typename T, Dqn_usize N> T *Dqn_SArray_Insert(Dqn_SArray<T> *array, Dqn_usize index, T const &item)
+template <typename T> T *Dqn_SArray_Insert(Dqn_SArray<T> *array, Dqn_usize index, T const &item)
 {
     T *result = Dqn_SArray_InsertArray(array, index, &item, 1);
     return result;
@@ -893,6 +898,19 @@ Dqn_Slice<T> Dqn_Slice_InitCArray(Dqn_Arena *arena, T const (&array)[N])
     Dqn_Slice<T> result = Dqn_Slice_Alloc<T>(arena, N, Dqn_ZeroMem_No);
     if (result.data)
         DQN_MEMCPY(result.data, array, sizeof(T) * N);
+    return result;
+}
+
+template <typename T> Dqn_Slice<T> Dqn_Slice_CopyPtr(Dqn_Arena *arena, T *const data, Dqn_usize size)
+{
+    T           *copy   = Dqn_Arena_NewArrayCopy(arena, T, data, size);
+    Dqn_Slice<T> result = Dqn_Slice_Init(copy, copy ? size : 0);
+    return result;
+}
+
+template <typename T> Dqn_Slice<T> Dqn_Slice_Copy(Dqn_Arena *arena, Dqn_Slice<T> slice)
+{
+    Dqn_Slice<T> result = Dqn_Slice_CopyPtr(arena, slice.data, slice.size);
     return result;
 }
 
@@ -1442,7 +1460,7 @@ template <typename T> DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_usize index,
     if (!list || !list->chunk_size || index >= list->count)
         return nullptr;
 
-    Dqn_usize total_chunks       = list->count / (list->chunk_size + (list->chunk_size - 1));
+    Dqn_usize total_chunks       = (list->count / list->chunk_size) + ((list->chunk_size % list->count) ? 1 : 0);
     Dqn_usize desired_chunk      = index / list->chunk_size;
     Dqn_usize forward_scan_dist  = desired_chunk;
     Dqn_usize backward_scan_dist = total_chunks - desired_chunk;
@@ -1452,11 +1470,11 @@ template <typename T> DQN_API T *Dqn_List_At(Dqn_List<T> *list, Dqn_usize index,
     Dqn_usize current_chunk = 0;
     Dqn_ListChunk<T> **chunk = nullptr;
     if (forward_scan_dist <= backward_scan_dist) {
-        for (chunk = &list->head; *chunk && current_chunk != desired_chunk; *chunk = (*chunk)->next, current_chunk++) {
+        for (chunk = &list->head; *chunk && current_chunk != desired_chunk; chunk = &((*chunk)->next), current_chunk++) {
         }
     } else {
         current_chunk = total_chunks;
-        for (chunk = &list->tail; *chunk && current_chunk != desired_chunk; *chunk = (*chunk)->prev, current_chunk--) {
+        for (chunk = &list->tail; *chunk && current_chunk != desired_chunk; chunk = &((*chunk)->prev), current_chunk--) {
         }
     }
 

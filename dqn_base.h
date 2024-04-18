@@ -73,6 +73,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <limits.h>
+#include <inttypes.h> // PRIu64...
 
 #if !defined(DQN_OS_WIN32)
 #include <stdlib.h> // exit()
@@ -455,10 +456,110 @@ struct Dqn_ErrorSink
 #endif
 
 #if !defined(DQN_PLATFORM_ARM64)
-struct Dqn_CPUIDRegisters
+struct Dqn_CPURegisters
 {
-    Dqn_uint array[4]; // Values from 'CPUID' instruction for each register (EAX, EBX, ECX, EDX)
+    int eax;
+    int ebx;
+    int ecx;
+    int edx;
 };
+
+union Dqn_CPUIDResult
+{
+    Dqn_CPURegisters reg;
+    int              values[4];
+};
+
+struct Dqn_CPUIDArgs
+{
+    int eax;
+    int ecx;
+};
+
+#define DQN_CPU_FEAT_XMACRO                 \
+    DQN_CPU_FEAT_XENTRY(3DNow)              \
+    DQN_CPU_FEAT_XENTRY(3DNowExt)           \
+    DQN_CPU_FEAT_XENTRY(ABM)                \
+    DQN_CPU_FEAT_XENTRY(AES)                \
+    DQN_CPU_FEAT_XENTRY(AVX)                \
+    DQN_CPU_FEAT_XENTRY(AVX2)               \
+    DQN_CPU_FEAT_XENTRY(AVX512F)            \
+    DQN_CPU_FEAT_XENTRY(AVX512DQ)           \
+    DQN_CPU_FEAT_XENTRY(AVX512IFMA)         \
+    DQN_CPU_FEAT_XENTRY(AVX512PF)           \
+    DQN_CPU_FEAT_XENTRY(AVX512ER)           \
+    DQN_CPU_FEAT_XENTRY(AVX512CD)           \
+    DQN_CPU_FEAT_XENTRY(AVX512BW)           \
+    DQN_CPU_FEAT_XENTRY(AVX512VL)           \
+    DQN_CPU_FEAT_XENTRY(AVX512VBMI)         \
+    DQN_CPU_FEAT_XENTRY(AVX512VBMI2)        \
+    DQN_CPU_FEAT_XENTRY(AVX512VNNI)         \
+    DQN_CPU_FEAT_XENTRY(AVX512BITALG)       \
+    DQN_CPU_FEAT_XENTRY(AVX512VPOPCNTDQ)    \
+    DQN_CPU_FEAT_XENTRY(AVX5124VNNIW)       \
+    DQN_CPU_FEAT_XENTRY(AVX5124FMAPS)       \
+    DQN_CPU_FEAT_XENTRY(AVX512VP2INTERSECT) \
+    DQN_CPU_FEAT_XENTRY(AVX512FP16)         \
+    DQN_CPU_FEAT_XENTRY(CLZERO)             \
+    DQN_CPU_FEAT_XENTRY(CMPXCHG8B)          \
+    DQN_CPU_FEAT_XENTRY(CMPXCHG16B)         \
+    DQN_CPU_FEAT_XENTRY(F16C)               \
+    DQN_CPU_FEAT_XENTRY(FMA)                \
+    DQN_CPU_FEAT_XENTRY(FMA4)               \
+    DQN_CPU_FEAT_XENTRY(FP128)              \
+    DQN_CPU_FEAT_XENTRY(FP256)              \
+    DQN_CPU_FEAT_XENTRY(FPU)                \
+    DQN_CPU_FEAT_XENTRY(MMX)                \
+    DQN_CPU_FEAT_XENTRY(MONITOR)            \
+    DQN_CPU_FEAT_XENTRY(MOVBE)              \
+    DQN_CPU_FEAT_XENTRY(MOVU)               \
+    DQN_CPU_FEAT_XENTRY(MmxExt)             \
+    DQN_CPU_FEAT_XENTRY(PCLMULQDQ)          \
+    DQN_CPU_FEAT_XENTRY(POPCNT)             \
+    DQN_CPU_FEAT_XENTRY(RDRAND)             \
+    DQN_CPU_FEAT_XENTRY(RDSEED)             \
+    DQN_CPU_FEAT_XENTRY(RDTSCP)             \
+    DQN_CPU_FEAT_XENTRY(SHA)                \
+    DQN_CPU_FEAT_XENTRY(SSE)                \
+    DQN_CPU_FEAT_XENTRY(SSE2)               \
+    DQN_CPU_FEAT_XENTRY(SSE3)               \
+    DQN_CPU_FEAT_XENTRY(SSE41)              \
+    DQN_CPU_FEAT_XENTRY(SSE42)              \
+    DQN_CPU_FEAT_XENTRY(SSE4A)              \
+    DQN_CPU_FEAT_XENTRY(SSSE3)              \
+    DQN_CPU_FEAT_XENTRY(TSC)                \
+    DQN_CPU_FEAT_XENTRY(TscInvariant)       \
+    DQN_CPU_FEAT_XENTRY(VAES)               \
+    DQN_CPU_FEAT_XENTRY(VPCMULQDQ)
+
+enum Dqn_CPUFeature
+{
+    #define DQN_CPU_FEAT_XENTRY(label) Dqn_CPUFeature_##label,
+    DQN_CPU_FEAT_XMACRO
+    #undef DQN_CPU_FEAT_XENTRY
+    Dqn_CPUFeature_Count,
+};
+
+struct Dqn_CPUFeatureDecl
+{
+    Dqn_CPUFeature value;
+    Dqn_Str8       label;
+};
+
+struct Dqn_CPUFeatureQuery
+{
+    Dqn_CPUFeature feature;
+    bool           available;
+};
+
+struct Dqn_CPUReport
+{
+    char     vendor  [4 /*bytes*/ * 3 /*EDX, ECX, EBX*/ + 1 /*null*/];
+    char     brand   [48];
+    uint64_t features[(Dqn_CPUFeature_Count / (sizeof(uint64_t) * 8)) + 1];
+};
+
+extern Dqn_CPUFeatureDecl g_dqn_cpu_feature_decl[Dqn_CPUFeature_Count];
 #endif // DQN_PLATFORM_ARM64
 
 // NOTE: [$TMUT] Dqn_TicketMutex ///////////////////////////////////////////////////////////////////
@@ -466,6 +567,17 @@ struct Dqn_TicketMutex
 {
     unsigned int volatile ticket;  // The next ticket to give out to the thread taking the mutex
     unsigned int volatile serving; // The ticket ID to block the mutex on until it is returned
+};
+
+// NOTE: [$MUTX] Dqn_OSMutex ///////////////////////////////////////////////////////////////////////
+struct Dqn_OSMutex
+{
+    #if defined(DQN_OS_WIN32) && !defined(DQN_OS_WIN32_USE_PTHREADS)
+    char                win32_handle[48];
+    #else
+    pthread_mutex_t     posix_handle;
+    pthread_mutexattr_t posix_attribs;
+    #endif
 };
 
 // NOTE: [$PRIN] Dqn_Print /////////////////////////////////////////////////////////////////////////
@@ -516,7 +628,13 @@ typedef void Dqn_LogProc(Dqn_Str8 type,
 DQN_FORCE_INLINE uint64_t           Dqn_Atomic_SetValue64                       (uint64_t volatile *target, uint64_t value);
 DQN_FORCE_INLINE long               Dqn_Atomic_SetValue32                       (long volatile *target, long value);
 #if !defined(DQN_PLATFORM_ARM64)
-DQN_API          Dqn_CPUIDRegisters Dqn_CPUID                                   (int function_id);
+DQN_API          Dqn_CPUIDResult    Dqn_CPU_ID                                  (Dqn_CPUIDArgs args);
+DQN_API          Dqn_usize          Dqn_CPU_HasFeatureArray                     (Dqn_CPUReport const *report, Dqn_CPUFeatureQuery *features, Dqn_usize features_size);
+DQN_API          bool               Dqn_CPU_HasFeature                          (Dqn_CPUReport const *report, Dqn_CPUFeature feature);
+DQN_API          bool               Dqn_CPU_HasAllFeatures                      (Dqn_CPUReport const *report, Dqn_CPUFeature const *features, Dqn_usize features_size);
+template <Dqn_usize N> bool         Dqn_CPU_HasAllFeaturesCArray                (Dqn_CPUReport const *report, Dqn_CPUFeature const (&features)[N]);
+DQN_API          void               Dqn_CPU_SetFeature                          (Dqn_CPUReport *report, Dqn_CPUFeature feature);
+DQN_API          Dqn_CPUReport      Dqn_CPU_Report                              ();
 #endif
 
 // NOTE: [$TMUT] Dqn_TicketMutex ///////////////////////////////////////////////////////////////////
@@ -670,4 +788,10 @@ DQN_FORCE_INLINE long Dqn_Atomic_SetValue32(long volatile *target, long value)
     #else
     #error Unsupported compiler
     #endif
+}
+
+template <Dqn_usize N> bool Dqn_CPU_HasAllFeaturesCArray(Dqn_CPUReport const *report, Dqn_CPUFeature const (&features)[N])
+{
+    bool result = Dqn_CPU_HasAllFeatures(report, features, N);
+    return result;
 }

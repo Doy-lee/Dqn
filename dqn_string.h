@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -159,14 +162,14 @@ DQN_API                             Dqn_Str8                  Dqn_Str8_Advance  
 DQN_API                             Dqn_Str8                  Dqn_Str8_NextLine               (Dqn_Str8 string);
 DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitArray       (Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size);
 DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplit            (Dqn_Str8 string, Dqn_Str8 find);
-DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitReverseArray(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size);
-DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitReverse     (Dqn_Str8 string, Dqn_Str8 find);
+DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitLastArray   (Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size);
+DQN_API                             Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitLast        (Dqn_Str8 string, Dqn_Str8 find);
 DQN_API                             Dqn_usize                 Dqn_Str8_Split                  (Dqn_Str8 string, Dqn_Str8 delimiter, Dqn_Str8 *splits, Dqn_usize splits_count, Dqn_Str8SplitIncludeEmptyStrings mode);
 DQN_API                             Dqn_Slice<Dqn_Str8>       Dqn_Str8_SplitAlloc             (Dqn_Arena *arena, Dqn_Str8 string, Dqn_Str8 delimiter, Dqn_Str8SplitIncludeEmptyStrings mode);
 
-DQN_API                             Dqn_Str8FindResult        Dqn_Str8_FindFirstStringArray   (Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size);
-DQN_API                             Dqn_Str8FindResult        Dqn_Str8_FindFirstString        (Dqn_Str8 string, Dqn_Str8 find);
-DQN_API                             Dqn_Str8FindResult        Dqn_Str8_FindFirst              (Dqn_Str8 string, uint32_t flags);
+DQN_API                             Dqn_Str8FindResult        Dqn_Str8_FindStr8Array          (Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size);
+DQN_API                             Dqn_Str8FindResult        Dqn_Str8_FindStr8               (Dqn_Str8 string, Dqn_Str8 find);
+DQN_API                             Dqn_Str8FindResult        Dqn_Str8_Find                   (Dqn_Str8 string, uint32_t flags);
 DQN_API                             Dqn_Str8                  Dqn_Str8_Segment                (Dqn_Arena *arena, Dqn_Str8 src, Dqn_usize segment_size, char segment_char);
 DQN_API                             Dqn_Str8                  Dqn_Str8_ReverseSegment         (Dqn_Arena *arena, Dqn_Str8 src, Dqn_usize segment_size, char segment_char);
 
@@ -234,12 +237,18 @@ template <Dqn_usize N>              bool                      operator!=        
 #endif // !defined(DQN_NO_FSTR8)
 
 // NOTE: [$CHAR] Dqn_Char //////////////////////////////////////////////////////////////////////////
+struct Dqn_CharHexToU8
+{
+    bool    success;
+    uint8_t value;
+};
+
 DQN_API                             bool                      Dqn_Char_IsAlphabet            (char ch);
 DQN_API                             bool                      Dqn_Char_IsDigit               (char ch);
 DQN_API                             bool                      Dqn_Char_IsAlphaNum            (char ch);
 DQN_API                             bool                      Dqn_Char_IsWhitespace          (char ch);
 DQN_API                             bool                      Dqn_Char_IsHex                 (char ch);
-DQN_API                             uint8_t                   Dqn_Char_HexToU8               (char ch);
+DQN_API                             Dqn_CharHexToU8           Dqn_Char_HexToU8               (char ch);
 DQN_API                             char                      Dqn_Char_ToHex                 (char ch);
 DQN_API                             char                      Dqn_Char_ToHexUnchecked        (char ch);
 DQN_API                             char                      Dqn_Char_ToLower               (char ch);

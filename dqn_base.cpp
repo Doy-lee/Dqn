@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -21,16 +24,196 @@
 #include <cpuid.h>
 #endif
 
-DQN_API Dqn_CPUIDRegisters Dqn_CPUID(int function_id)
+Dqn_CPUFeatureDecl g_dqn_cpu_feature_decl[Dqn_CPUFeature_Count];
+
+DQN_API Dqn_CPUIDResult Dqn_CPU_ID(Dqn_CPUIDArgs args)
 {
-    Dqn_CPUIDRegisters result = {};
-    #if defined(DQN_COMPILER_MSVC)
-    __cpuid(DQN_CAST(int *)result.array, function_id);
-    #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
-    __get_cpuid(function_id, &result.array[0] /*eax*/, &result.array[1] /*ebx*/, &result.array[2] /*ecx*/ , &result.array[3] /*edx*/);
-    #else
-    #error "Compiler not supported"
-    #endif
+    Dqn_CPUIDResult result = {};
+    __cpuidex(result.values, args.eax, args.ecx);
+    return result;
+}
+
+DQN_API Dqn_usize Dqn_CPU_HasFeatureArray(Dqn_CPUReport const *report, Dqn_CPUFeatureQuery *features, Dqn_usize features_size)
+{
+    Dqn_usize       result = 0;
+    Dqn_usize const BITS   = sizeof(report->features[0]) * 8;
+    DQN_FOR_UINDEX(feature_index, features_size) {
+        Dqn_CPUFeatureQuery *query       = features + feature_index;
+        Dqn_usize            chunk_index = query->feature / BITS;
+        Dqn_usize            chunk_bit   = query->feature % BITS;
+        uint64_t             chunk       = report->features[chunk_index];
+        query->available                 = chunk & (1ULL << chunk_bit);
+        result                          += DQN_CAST(int)query->available;
+    }
+
+    return result;
+}
+
+DQN_API bool Dqn_CPU_HasFeature(Dqn_CPUReport const *report, Dqn_CPUFeature feature)
+{
+    Dqn_CPUFeatureQuery query = {};
+    query.feature             = feature;
+    bool result               = Dqn_CPU_HasFeatureArray(report, &query, 1) == 1;
+    return result;
+}
+
+DQN_API bool Dqn_CPU_HasAllFeatures(Dqn_CPUReport const *report, Dqn_CPUFeature const *features, Dqn_usize features_size)
+{
+    bool result = true;
+    for (Dqn_usize index = 0; result && index < features_size; index++)
+        result &= Dqn_CPU_HasFeature(report, features[index]);
+    return result;
+}
+
+DQN_API void Dqn_CPU_SetFeature(Dqn_CPUReport *report, Dqn_CPUFeature feature)
+{
+    DQN_ASSERT(feature < Dqn_CPUFeature_Count);
+    Dqn_usize const BITS        = sizeof(report->features[0]) * 8;
+    Dqn_usize       chunk_index = feature / BITS;
+    Dqn_usize       chunk_bit   = feature % BITS;
+    report->features[chunk_index] |= (1ULL << chunk_bit);
+}
+
+DQN_API Dqn_CPUReport Dqn_CPU_Report()
+{
+    Dqn_CPUReport   result                 = {};
+    Dqn_CPUIDResult fn_0000_[16]           = {};
+    Dqn_CPUIDResult fn_8000_[64]           = {};
+    int const       EXTENDED_FUNC_BASE_EAX = 0x8000'0000;
+    int const       REGISTER_SIZE          = sizeof(fn_0000_[0].reg.eax);
+
+    // NOTE: Query standard/extended numbers ///////////////////////////////////////////////////////
+    {
+        Dqn_CPUIDArgs args = {};
+
+        // NOTE: Query standard function (e.g. eax = 0x0)         for function count + cpu vendor
+        args        = {};
+        fn_0000_[0] = Dqn_CPU_ID(args);
+
+        // NOTE: Query extended function (e.g. eax = 0x8000'0000) for function count + cpu vendor
+        args        = {};
+        args.eax    = DQN_CAST(int) EXTENDED_FUNC_BASE_EAX;
+        fn_8000_[0] = Dqn_CPU_ID(args);
+    }
+
+    // NOTE: Extract function count ////////////////////////////////////////////////////////////////
+    int const STANDARD_FUNC_MAX_EAX = fn_0000_[0x0000].reg.eax;
+    int const EXTENDED_FUNC_MAX_EAX = fn_8000_[0x0000].reg.eax;
+
+    // NOTE: Enumerate all CPUID results for the known function counts /////////////////////////////
+    {
+        DQN_ASSERT((STANDARD_FUNC_MAX_EAX                                             + 1) <= DQN_ARRAY_ICOUNT(fn_0000_));
+        DQN_ASSERT((DQN_CAST(Dqn_isize)EXTENDED_FUNC_MAX_EAX - EXTENDED_FUNC_BASE_EAX + 1) <= DQN_ARRAY_ICOUNT(fn_8000_));
+
+        for (int eax = 1; eax <= STANDARD_FUNC_MAX_EAX; eax++) {
+            Dqn_CPUIDArgs args = {};
+            args.eax           = eax;
+            fn_0000_[eax]      = Dqn_CPU_ID(args);
+        }
+
+        for (int eax = EXTENDED_FUNC_BASE_EAX + 1, index = 1; eax <= EXTENDED_FUNC_MAX_EAX; eax++, index++) {
+            Dqn_CPUIDArgs args = {};
+            args.eax           = eax;
+            fn_8000_[index]    = Dqn_CPU_ID(args);
+        }
+    }
+
+    // NOTE: Query CPU vendor //////////////////////////////////////////////////////////////////////
+    {
+        DQN_MEMCPY(result.vendor + 0, &fn_8000_[0x0000].reg.ebx, REGISTER_SIZE);
+        DQN_MEMCPY(result.vendor + 4, &fn_8000_[0x0000].reg.edx, REGISTER_SIZE);
+        DQN_MEMCPY(result.vendor + 8, &fn_8000_[0x0000].reg.ecx, REGISTER_SIZE);
+    }
+
+    // NOTE: Query CPU brand ///////////////////////////////////////////////////////////////////////
+    if (EXTENDED_FUNC_MAX_EAX >= (EXTENDED_FUNC_BASE_EAX + 4)) {
+        DQN_MEMCPY(result.brand + 0,  &fn_8000_[0x0002].reg.eax, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 4,  &fn_8000_[0x0002].reg.ebx, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 8,  &fn_8000_[0x0002].reg.ecx, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 12, &fn_8000_[0x0002].reg.edx, REGISTER_SIZE);
+
+        DQN_MEMCPY(result.brand + 16, &fn_8000_[0x0003].reg.eax, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 20, &fn_8000_[0x0003].reg.ebx, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 24, &fn_8000_[0x0003].reg.ecx, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 28, &fn_8000_[0x0003].reg.edx, REGISTER_SIZE);
+
+        DQN_MEMCPY(result.brand + 32, &fn_8000_[0x0004].reg.eax, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 36, &fn_8000_[0x0004].reg.ebx, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 40, &fn_8000_[0x0004].reg.ecx, REGISTER_SIZE);
+        DQN_MEMCPY(result.brand + 44, &fn_8000_[0x0004].reg.edx, REGISTER_SIZE);
+
+        DQN_ASSERT(result.brand[sizeof(result.brand) - 1] == 0);
+    }
+
+    // NOTE: Query CPU features //////////////////////////////////////////////////////////////////
+    for (Dqn_usize ext_index = 0; ext_index < Dqn_CPUFeature_Count; ext_index++) {
+        bool available = false;
+
+        // NOTE: Mask bits taken from various manuals
+        //   - AMD64 Architecture Programmer's Manual, Volumes 1-5
+        //   - https://en.wikipedia.org/wiki/CPUID#Calling_CPUID
+        switch (DQN_CAST(Dqn_CPUFeature)ext_index) {
+            case Dqn_CPUFeature_3DNow:              available = (fn_8000_[0x0001].reg.edx & (1 << 31)); break;
+            case Dqn_CPUFeature_3DNowExt:           available = (fn_8000_[0x0001].reg.edx & (1 << 30)); break;
+            case Dqn_CPUFeature_ABM:                available = (fn_8000_[0x0001].reg.ecx & (1 <<  5)); break;
+            case Dqn_CPUFeature_AES:                available = (fn_0000_[0x0001].reg.ecx & (1 << 25)); break;
+            case Dqn_CPUFeature_AVX:                available = (fn_0000_[0x0001].reg.ecx & (1 << 28)); break;
+            case Dqn_CPUFeature_AVX2:               available = (fn_0000_[0x0007].reg.ebx & (1 <<  0)); break;
+            case Dqn_CPUFeature_AVX512F:            available = (fn_0000_[0x0007].reg.ebx & (1 << 16)); break;
+            case Dqn_CPUFeature_AVX512DQ:           available = (fn_0000_[0x0007].reg.ebx & (1 << 17)); break;
+            case Dqn_CPUFeature_AVX512IFMA:         available = (fn_0000_[0x0007].reg.ebx & (1 << 21)); break;
+            case Dqn_CPUFeature_AVX512PF:           available = (fn_0000_[0x0007].reg.ebx & (1 << 26)); break;
+            case Dqn_CPUFeature_AVX512ER:           available = (fn_0000_[0x0007].reg.ebx & (1 << 27)); break;
+            case Dqn_CPUFeature_AVX512CD:           available = (fn_0000_[0x0007].reg.ebx & (1 << 28)); break;
+            case Dqn_CPUFeature_AVX512BW:           available = (fn_0000_[0x0007].reg.ebx & (1 << 30)); break;
+            case Dqn_CPUFeature_AVX512VL:           available = (fn_0000_[0x0007].reg.ebx & (1 << 31)); break;
+            case Dqn_CPUFeature_AVX512VBMI:         available = (fn_0000_[0x0007].reg.ecx & (1 <<  1)); break;
+            case Dqn_CPUFeature_AVX512VBMI2:        available = (fn_0000_[0x0007].reg.ecx & (1 <<  6)); break;
+            case Dqn_CPUFeature_AVX512VNNI:         available = (fn_0000_[0x0007].reg.ecx & (1 << 11)); break;
+            case Dqn_CPUFeature_AVX512BITALG:       available = (fn_0000_[0x0007].reg.ecx & (1 << 12)); break;
+            case Dqn_CPUFeature_AVX512VPOPCNTDQ:    available = (fn_0000_[0x0007].reg.ecx & (1 << 14)); break;
+            case Dqn_CPUFeature_AVX5124VNNIW:       available = (fn_0000_[0x0007].reg.edx & (1 <<  2)); break;
+            case Dqn_CPUFeature_AVX5124FMAPS:       available = (fn_0000_[0x0007].reg.edx & (1 <<  3)); break;
+            case Dqn_CPUFeature_AVX512VP2INTERSECT: available = (fn_0000_[0x0007].reg.edx & (1 <<  8)); break;
+            case Dqn_CPUFeature_AVX512FP16:         available = (fn_0000_[0x0007].reg.edx & (1 << 23)); break;
+            case Dqn_CPUFeature_CLZERO:             available = (fn_8000_[0x0008].reg.ebx & (1 <<  0)); break;
+            case Dqn_CPUFeature_CMPXCHG8B:          available = (fn_0000_[0x0001].reg.edx & (1 <<  8)); break;
+            case Dqn_CPUFeature_CMPXCHG16B:         available = (fn_0000_[0x0001].reg.ecx & (1 << 13)); break;
+            case Dqn_CPUFeature_F16C:               available = (fn_0000_[0x0001].reg.ecx & (1 << 29)); break;
+            case Dqn_CPUFeature_FMA:                available = (fn_0000_[0x0001].reg.ecx & (1 << 12)); break;
+            case Dqn_CPUFeature_FMA4:               available = (fn_8000_[0x0001].reg.ecx & (1 << 16)); break;
+            case Dqn_CPUFeature_FP128:              available = (fn_8000_[0x001A].reg.eax & (1 <<  0)); break;
+            case Dqn_CPUFeature_FP256:              available = (fn_8000_[0x001A].reg.eax & (1 <<  2)); break;
+            case Dqn_CPUFeature_FPU:                available = (fn_0000_[0x0001].reg.edx & (1 <<  0)); break;
+            case Dqn_CPUFeature_MMX:                available = (fn_0000_[0x0001].reg.edx & (1 << 23)); break;
+            case Dqn_CPUFeature_MONITOR:            available = (fn_0000_[0x0001].reg.ecx & (1 <<  3)); break;
+            case Dqn_CPUFeature_MOVBE:              available = (fn_0000_[0x0001].reg.ecx & (1 << 22)); break;
+            case Dqn_CPUFeature_MOVU:               available = (fn_8000_[0x001A].reg.eax & (1 <<  1)); break;
+            case Dqn_CPUFeature_MmxExt:             available = (fn_8000_[0x0001].reg.edx & (1 << 22)); break;
+            case Dqn_CPUFeature_PCLMULQDQ:          available = (fn_0000_[0x0001].reg.ecx & (1 <<  1)); break;
+            case Dqn_CPUFeature_POPCNT:             available = (fn_0000_[0x0001].reg.ecx & (1 << 23)); break;
+            case Dqn_CPUFeature_RDRAND:             available = (fn_0000_[0x0001].reg.ecx & (1 << 30)); break;
+            case Dqn_CPUFeature_RDSEED:             available = (fn_0000_[0x0007].reg.ebx & (1 << 18)); break;
+            case Dqn_CPUFeature_RDTSCP:             available = (fn_8000_[0x0001].reg.edx & (1 << 27)); break;
+            case Dqn_CPUFeature_SHA:                available = (fn_0000_[0x0007].reg.ebx & (1 << 29)); break;
+            case Dqn_CPUFeature_SSE:                available = (fn_0000_[0x0001].reg.edx & (1 << 25)); break;
+            case Dqn_CPUFeature_SSE2:               available = (fn_0000_[0x0001].reg.edx & (1 << 26)); break;
+            case Dqn_CPUFeature_SSE3:               available = (fn_0000_[0x0001].reg.ecx & (1 <<  0)); break;
+            case Dqn_CPUFeature_SSE41:              available = (fn_0000_[0x0001].reg.ecx & (1 << 19)); break;
+            case Dqn_CPUFeature_SSE42:              available = (fn_0000_[0x0001].reg.ecx & (1 << 20)); break;
+            case Dqn_CPUFeature_SSE4A:              available = (fn_8000_[0x0001].reg.ecx & (1 <<  6)); break;
+            case Dqn_CPUFeature_SSSE3:              available = (fn_0000_[0x0001].reg.ecx & (1 <<  9)); break;
+            case Dqn_CPUFeature_TSC:                available = (fn_0000_[0x0001].reg.edx & (1 <<  4)); break;
+            case Dqn_CPUFeature_TscInvariant:       available = (fn_8000_[0x0007].reg.edx & (1 <<  8)); break;
+            case Dqn_CPUFeature_VAES:               available = (fn_0000_[0x0007].reg.ecx & (1 <<  9)); break;
+            case Dqn_CPUFeature_VPCMULQDQ:          available = (fn_0000_[0x0007].reg.ecx & (1 << 10)); break;
+            case Dqn_CPUFeature_Count:              DQN_INVALID_CODE_PATH; break;
+        }
+
+        if (available)
+            Dqn_CPU_SetFeature(&result, DQN_CAST(Dqn_CPUFeature)ext_index);
+    }
+
     return result;
 }
 #endif // !defined(DQN_PLATFORM_ARM64) && !defined(DQN_PLATFORM_EMSCRIPTEN)

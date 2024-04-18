@@ -45,6 +45,7 @@ Dqn_CGenTableHeaderType const DQN_CGEN_TABLE_CODE_GEN_STRUCT_HEADER_LIST[] =
     Dqn_CGenTableHeaderType_CppType,
     Dqn_CGenTableHeaderType_CppName,
     Dqn_CGenTableHeaderType_CppIsPtr,
+    Dqn_CGenTableHeaderType_CppOpEquals,
     Dqn_CGenTableHeaderType_CppArraySize,
     Dqn_CGenTableHeaderType_CppArraySizeField,
     Dqn_CGenTableHeaderType_GenTypeInfo,
@@ -320,6 +321,7 @@ DQN_API Dqn_Str8 Dqn_CGen_TableHeaderTypeToDeclStr8(Dqn_CGenTableHeaderType type
         case Dqn_CGenTableHeaderType_CppName:           result = DQN_STR8("cpp_name"); break;
         case Dqn_CGenTableHeaderType_CppValue:          result = DQN_STR8("cpp_value"); break;
         case Dqn_CGenTableHeaderType_CppIsPtr:          result = DQN_STR8("cpp_is_ptr"); break;
+        case Dqn_CGenTableHeaderType_CppOpEquals:       result = DQN_STR8("cpp_op_equals"); break;
         case Dqn_CGenTableHeaderType_CppArraySize:      result = DQN_STR8("cpp_array_size"); break;
         case Dqn_CGenTableHeaderType_CppArraySizeField: result = DQN_STR8("cpp_array_size_field"); break;
         case Dqn_CGenTableHeaderType_GenTypeInfo:       result = DQN_STR8("gen_type_info"); break;
@@ -626,6 +628,46 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
                 } break;
             }
         }
+
+        // NOTE: Str8 to enum conversion ////////////////////////////////////////////////////////////
+        for (Dqn_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
+            if (table->type != Dqn_CGenTableType_CodeGenEnum)
+                continue;
+
+            for (Dqn_CGenLookupTableIterator it = {}; Dqn_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
+                Dqn_Str8 type_name = it.cgen_table_column[Dqn_CGenTableHeaderType_Name].string;
+                Dqn_CppStructBlock(cpp, "%.*sStr8ToEnumResult", DQN_STR_FMT(type_name)) {
+                    Dqn_CppLine(cpp, "bool success;");
+                    Dqn_CppLine(cpp, "%.*s value;", DQN_STR_FMT(type_name));
+                }
+            }
+        }
+
+        for (Dqn_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
+            if (table->type != Dqn_CGenTableType_CodeGenEnum)
+                continue;
+
+            for (Dqn_CGenLookupTableIterator it = {}; Dqn_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
+                Dqn_Str8 type_name = it.cgen_table_column[Dqn_CGenTableHeaderType_Name].string;
+                Dqn_CppLine(cpp, "%.*sStr8ToEnumResult %.*s_Str8ToEnum(Dqn_Str8 string);", DQN_STR_FMT(type_name), DQN_STR_FMT(type_name));
+            }
+        }
+
+        // NOTE: Operator == and != ////////////////////////////////////////////////////////////////
+        for (Dqn_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
+            if (table->type != Dqn_CGenTableType_CodeGenStruct)
+                continue;
+
+            for (Dqn_CGenLookupTableIterator it = {}; Dqn_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
+                Dqn_Str8 cpp_op_equals = it.cgen_table_column[Dqn_CGenTableHeaderType_CppOpEquals].string;
+                if (cpp_op_equals != DQN_STR8("true"))
+                    continue;
+
+                Dqn_Str8 type_name = it.cgen_table_column[Dqn_CGenTableHeaderType_Name].string;
+                Dqn_CppLine(cpp, "bool operator==(%.*s const &lhs, %.*s const &rhs);", DQN_STR_FMT(type_name), DQN_STR_FMT(type_name));
+                Dqn_CppLine(cpp, "bool operator!=(%.*s const &lhs, %.*s const &rhs);", DQN_STR_FMT(type_name), DQN_STR_FMT(type_name));
+            }
+        }
     }
 
     if (emit & Dqn_CGenEmit_Implementation) {
@@ -685,7 +727,7 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
                             Dqn_usize cpp_type_enum_padding = cpp_type_padding + (orig_cpp_type_info.size - cpp_type_info.size);
 
                             Dqn_CppLine(cpp,
-                                        "{%2d, DQN_STR8(\"%.*s\"),%*s/*value*/ 0, offsetof(%.*s, %.*s),%*ssizeof(((%.*s*)0)->%.*s),%*sDQN_STR8(\"%.*s\"),%*s%.*s,%*s/*is_pointer*/ %s,%s /*array_size*/ %.*s, /*array_size_field*/ %.*s},",
+                                        "{%2d, DQN_STR8(\"%.*s\"),%*s/*value*/ 0, offsetof(%.*s, %.*s),%*ssizeof(((%.*s*)0)->%.*s),%*salignof(%.*s),%*sDQN_STR8(\"%.*s\"),%*s%.*s,%*s/*is_pointer*/ %s,%s /*array_size*/ %.*s, /*array_size_field*/ %.*s},",
                                         row_index,
                                         DQN_STR_FMT(cpp_name.column.string),
                                         cpp_name_padding, "",
@@ -699,6 +741,10 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
                                         DQN_STR_FMT(struct_or_enum_name),
                                         DQN_STR_FMT(cpp_name.column.string),
                                         cpp_name_padding, "",
+
+                                        // NOTE: alignof(a->b)
+                                        DQN_STR_FMT(cpp_type.column.string),
+                                        cpp_type_padding, "",
 
                                         // NOTE: Type string
                                         DQN_STR_FMT(cpp_type.column.string),
@@ -726,7 +772,7 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
                             Dqn_usize   cpp_name_padding = 1 + it.table->headers[cpp_name.index].longest_string - cpp_name.column.string.size;
                             Dqn_Str8    cpp_value_str8   = Dqn_Str8_HasData(cpp_value.column.string) ? cpp_value.column.string : Dqn_Str8_InitF(scratch.arena, "%zu", row_index);
                             Dqn_CppLine(cpp,
-                                        "{%2d, DQN_STR8(\"%.*s\"),%*s/*value*/ %.*s, /*offset_of*/ 0, sizeof(%.*s), DQN_STR8(\"\"), %.*s_Type_%.*s, /*is_pointer*/ false, /*array_size*/ 0, /*array_size_field*/ NULL},",
+                                        "{%2d, DQN_STR8(\"%.*s\"),%*s/*value*/ %.*s, /*offset_of*/ 0, sizeof(%.*s), alignof(%.*s), DQN_STR8(\"\"), %.*s_Type_%.*s, /*is_pointer*/ false, /*array_size*/ 0, /*array_size_field*/ NULL},",
                                         row_index,
 
                                         // NOTE: Name string
@@ -737,6 +783,9 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
                                         DQN_STR_FMT(cpp_value_str8),
 
                                         // NOTE: sizeof(a)
+                                        DQN_STR_FMT(struct_or_enum_name),
+
+                                        // NOTE: alignof(a)
                                         DQN_STR_FMT(struct_or_enum_name),
 
                                         // NOTE: ..._Type_...
@@ -812,17 +861,13 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
             }
         }
 
+        // NOTE: Str8 to enum conversion ////////////////////////////////////////////////////////////
         for (Dqn_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
             if (table->type != Dqn_CGenTableType_CodeGenEnum)
                 continue;
 
             for (Dqn_CGenLookupTableIterator it = {}; Dqn_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
                 Dqn_Str8 type_name = it.cgen_table_column[Dqn_CGenTableHeaderType_Name].string;
-                Dqn_CppStructBlock(cpp, "%.*sStr8ToEnumResult", DQN_STR_FMT(type_name)) {
-                    Dqn_CppLine(cpp, "bool success;");
-                    Dqn_CppLine(cpp, "%.*s value;", DQN_STR_FMT(type_name));
-                }
-
                 Dqn_CppFuncBlock(cpp, "%.*sStr8ToEnumResult %.*s_Str8ToEnum(Dqn_Str8 string)", DQN_STR_FMT(type_name), DQN_STR_FMT(type_name)) {
                     Dqn_CppLine(cpp, "%.*sStr8ToEnumResult result = {};", DQN_STR_FMT(type_name));
                     Dqn_CppForBlock(cpp, "Dqn_usize index = 0; !result.success && index < DQN_ARRAY_UCOUNT(g_%.*s_type_fields); index++", DQN_STR_FMT(type_name)) {
@@ -834,6 +879,85 @@ DQN_API void Dqn_CGen_EmitCodeForTables(Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_C
                             }
                         }
                     }
+                    Dqn_CppLine(cpp, "return result;");
+                }
+            }
+        }
+
+        // NOTE: Operator == and != ////////////////////////////////////////////////////////////////
+        for (Dqn_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
+            if (table->type != Dqn_CGenTableType_CodeGenStruct)
+                continue;
+
+            for (Dqn_CGenLookupTableIterator it = {}; Dqn_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
+                Dqn_Str8 cpp_op_equals = it.cgen_table_column[Dqn_CGenTableHeaderType_CppOpEquals].string;
+                if (cpp_op_equals != DQN_STR8("true"))
+                    continue;
+
+                Dqn_Str8 type_name = it.cgen_table_column[Dqn_CGenTableHeaderType_Name].string;
+                Dqn_CppFuncBlock(cpp, "bool operator==(%.*s const &lhs, %.*s const &rhs)", DQN_STR_FMT(type_name), DQN_STR_FMT(type_name)) {
+                    for (Dqn_usize row_index = 0; row_index < it.table->row_count; row_index++) {
+                        Dqn_CGenTableRow const *row                       = it.table->rows + row_index;
+                        Dqn_CGenLookupColumnAtHeader cpp_name             = Dqn_CGen_LookupColumnAtHeader(it.table, it.cgen_table_column[Dqn_CGenTableHeaderType_CppName].string,           row);
+                        Dqn_CGenLookupColumnAtHeader cpp_is_ptr           = Dqn_CGen_LookupColumnAtHeader(it.table, it.cgen_table_column[Dqn_CGenTableHeaderType_CppIsPtr].string,          row);
+                        Dqn_CGenLookupColumnAtHeader cpp_array_size       = Dqn_CGen_LookupColumnAtHeader(it.table, it.cgen_table_column[Dqn_CGenTableHeaderType_CppArraySize].string,      row);
+                        Dqn_CGenLookupColumnAtHeader cpp_array_size_field = Dqn_CGen_LookupColumnAtHeader(it.table, it.cgen_table_column[Dqn_CGenTableHeaderType_CppArraySizeField].string, row);
+
+                        // TODO(doyle): Check if we're an integral type or not to double check if we
+                        // can use memcmp or operator==
+                        if (Dqn_Str8_HasData(cpp_array_size_field.column.string)) {
+                            Dqn_CppIfChain(cpp) {
+                                Dqn_CppIfOrElseIfBlock(cpp,
+                                                       "lhs.%.*s != rhs.%.*s",
+                                                       DQN_STR_FMT(cpp_array_size_field.column.string),
+                                                       DQN_STR_FMT(cpp_array_size_field.column.string)) {
+                                    Dqn_CppLine(cpp, "return false;");
+                                }
+                            }
+                            Dqn_CppIfChain(cpp) {
+                                Dqn_CppIfOrElseIfBlock(cpp,
+                                                       "DQN_MEMCMP(lhs.%.*s, rhs.%.*s, lhs.%.*s) != 0",
+                                                       DQN_STR_FMT(cpp_name.column.string),
+                                                       DQN_STR_FMT(cpp_name.column.string),
+                                                       DQN_STR_FMT(cpp_array_size_field.column.string)) {
+                                    Dqn_CppLine(cpp, "return false;");
+                                }
+                            }
+                        } else if (Dqn_Str8_HasData(cpp_array_size.column.string)) {
+                            Dqn_CppIfChain(cpp) {
+                                Dqn_CppIfOrElseIfBlock(cpp,
+                                                       "DQN_MEMCMP(lhs.%.*s, rhs.%.*s, %.*s) != 0",
+                                                       DQN_STR_FMT(cpp_name.column.string),
+                                                       DQN_STR_FMT(cpp_name.column.string),
+                                                       DQN_STR_FMT(cpp_array_size.column.string)) {
+                                    Dqn_CppLine(cpp, "return false;");
+                                }
+                            }
+                        } else if (cpp_is_ptr.column.string == DQN_STR8("true")) {
+                            Dqn_CppIfChain(cpp) {
+                                Dqn_CppIfOrElseIfBlock(cpp,
+                                            "*lhs.%.*s != *rhs.%.*s",
+                                            DQN_STR_FMT(cpp_name.column.string),
+                                            DQN_STR_FMT(cpp_name.column.string)) {
+                                    Dqn_CppLine(cpp, "return false;");
+                                }
+                            }
+                        } else {
+                            Dqn_CppIfChain(cpp) {
+                                Dqn_CppIfOrElseIfBlock(cpp,
+                                            "lhs.%.*s != rhs.%.*s",
+                                            DQN_STR_FMT(cpp_name.column.string),
+                                            DQN_STR_FMT(cpp_name.column.string)) {
+                                    Dqn_CppLine(cpp, "return false;");
+                                }
+                            }
+                        }
+                    }
+                    Dqn_CppLine(cpp, "return true;");
+                }
+
+                Dqn_CppFuncBlock(cpp, "bool operator!=(%.*s const &lhs, %.*s const &rhs)", DQN_STR_FMT(type_name), DQN_STR_FMT(type_name)) {
+                    Dqn_CppLine(cpp, "bool result = !(lhs == rhs);");
                     Dqn_CppLine(cpp, "return result;");
                 }
             }

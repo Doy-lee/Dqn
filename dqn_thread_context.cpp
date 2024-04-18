@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -58,6 +61,7 @@ DQN_API Dqn_ThreadContext *Dqn_ThreadContext_Get()
     DQN_HARD_ASSERTF(g_dqn_library && g_dqn_library->lib_init, "Library must be initialised by calling Dqn_Library_Init()");
 
     // NOTE: Setup scratch arenas //////////////////////////////////////////////////////////////////
+    Dqn_TicketMutex_Begin(&g_dqn_library->thread_context_init_mutex);
     DQN_FOR_UINDEX (index, DQN_ARRAY_UCOUNT(result->scratch_arenas)) {
 
         // NOTE: We allocate arenas so that they all come from the memory
@@ -100,7 +104,7 @@ DQN_API Dqn_ThreadContext *Dqn_ThreadContext_Get()
         }
         result->error_sink.arena = result->error_sink_arena;
     }
-
+    Dqn_TicketMutex_End(&g_dqn_library->thread_context_init_mutex);
     return result;
 }
 

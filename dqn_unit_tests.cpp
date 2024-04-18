@@ -3,6 +3,333 @@
 
 #include <inttypes.h>
 
+#if !defined(__clang__)
+// NOTE: Taken from MSDN __cpuid example implementation
+// https://learn.microsoft.com/en-us/cpp/intrinsics/cpuid-cpuidex?view=msvc-170
+#include <bitset>
+#include <string>
+#include <vector>
+#include <array>
+
+class Dqn_RefImplCPUReport
+{
+    // forward declarations
+    class Dqn_RefImplCPUReport_Internal;
+
+public:
+    // getters
+    static std::string Vendor(void) { return CPU_Rep.vendor_; }
+    static std::string Brand(void) { return CPU_Rep.brand_; }
+
+    static bool SSE3(void) { return CPU_Rep.f_1_ECX_[0]; }
+    static bool PCLMULQDQ(void) { return CPU_Rep.f_1_ECX_[1]; }
+    static bool MONITOR(void) { return CPU_Rep.f_1_ECX_[3]; }
+    static bool SSSE3(void) { return CPU_Rep.f_1_ECX_[9]; }
+    static bool FMA(void) { return CPU_Rep.f_1_ECX_[12]; }
+    static bool CMPXCHG16B(void) { return CPU_Rep.f_1_ECX_[13]; }
+    static bool SSE41(void) { return CPU_Rep.f_1_ECX_[19]; }
+    static bool SSE42(void) { return CPU_Rep.f_1_ECX_[20]; }
+    static bool MOVBE(void) { return CPU_Rep.f_1_ECX_[22]; }
+    static bool POPCNT(void) { return CPU_Rep.f_1_ECX_[23]; }
+    static bool AES(void) { return CPU_Rep.f_1_ECX_[25]; }
+    static bool XSAVE(void) { return CPU_Rep.f_1_ECX_[26]; }
+    static bool OSXSAVE(void) { return CPU_Rep.f_1_ECX_[27]; }
+    static bool AVX(void) { return CPU_Rep.f_1_ECX_[28]; }
+    static bool F16C(void) { return CPU_Rep.f_1_ECX_[29]; }
+    static bool RDRAND(void) { return CPU_Rep.f_1_ECX_[30]; }
+
+    static bool MSR(void) { return CPU_Rep.f_1_EDX_[5]; }
+    static bool CX8(void) { return CPU_Rep.f_1_EDX_[8]; }
+    static bool SEP(void) { return CPU_Rep.f_1_EDX_[11]; }
+    static bool CMOV(void) { return CPU_Rep.f_1_EDX_[15]; }
+    static bool CLFSH(void) { return CPU_Rep.f_1_EDX_[19]; }
+    static bool MMX(void) { return CPU_Rep.f_1_EDX_[23]; }
+    static bool FXSR(void) { return CPU_Rep.f_1_EDX_[24]; }
+    static bool SSE(void) { return CPU_Rep.f_1_EDX_[25]; }
+    static bool SSE2(void) { return CPU_Rep.f_1_EDX_[26]; }
+
+    static bool FSGSBASE(void) { return CPU_Rep.f_7_EBX_[0]; }
+    static bool BMI1(void) { return CPU_Rep.f_7_EBX_[3]; }
+    static bool HLE(void) { return CPU_Rep.isIntel_ && CPU_Rep.f_7_EBX_[4]; }
+    static bool AVX2(void) { return CPU_Rep.f_7_EBX_[5]; }
+    static bool BMI2(void) { return CPU_Rep.f_7_EBX_[8]; }
+    static bool ERMS(void) { return CPU_Rep.f_7_EBX_[9]; }
+    static bool INVPCID(void) { return CPU_Rep.f_7_EBX_[10]; }
+    static bool RTM(void) { return CPU_Rep.isIntel_ && CPU_Rep.f_7_EBX_[11]; }
+    static bool AVX512F(void) { return CPU_Rep.f_7_EBX_[16]; }
+    static bool RDSEED(void) { return CPU_Rep.f_7_EBX_[18]; }
+    static bool ADX(void) { return CPU_Rep.f_7_EBX_[19]; }
+    static bool AVX512PF(void) { return CPU_Rep.f_7_EBX_[26]; }
+    static bool AVX512ER(void) { return CPU_Rep.f_7_EBX_[27]; }
+    static bool AVX512CD(void) { return CPU_Rep.f_7_EBX_[28]; }
+    static bool SHA(void) { return CPU_Rep.f_7_EBX_[29]; }
+
+    static bool PREFETCHWT1(void) { return CPU_Rep.f_7_ECX_[0]; }
+
+    static bool LAHF(void) { return CPU_Rep.f_81_ECX_[0]; }
+    static bool LZCNT(void) { return CPU_Rep.isIntel_ && CPU_Rep.f_81_ECX_[5]; }
+    static bool ABM(void) { return CPU_Rep.isAMD_ && CPU_Rep.f_81_ECX_[5]; }
+    static bool SSE4a(void) { return CPU_Rep.isAMD_ && CPU_Rep.f_81_ECX_[6]; }
+    static bool XOP(void) { return CPU_Rep.isAMD_ && CPU_Rep.f_81_ECX_[11]; }
+    static bool TBM(void) { return CPU_Rep.isAMD_ && CPU_Rep.f_81_ECX_[21]; }
+
+    static bool SYSCALL(void) { return CPU_Rep.isIntel_ && CPU_Rep.f_81_EDX_[11]; }
+    static bool MMXEXT(void) { return CPU_Rep.isAMD_ && CPU_Rep.f_81_EDX_[22]; }
+    static bool RDTSCP(void) { return CPU_Rep.f_81_EDX_[27]; }
+    static bool _3DNOWEXT(void) { return CPU_Rep.isAMD_ && CPU_Rep.f_81_EDX_[30]; }
+    static bool _3DNOW(void) { return CPU_Rep.isAMD_ && CPU_Rep.f_81_EDX_[31]; }
+
+private:
+    static const Dqn_RefImplCPUReport_Internal CPU_Rep;
+
+    class Dqn_RefImplCPUReport_Internal
+    {
+    public:
+        Dqn_RefImplCPUReport_Internal()
+            : nIds_{ 0 },
+            nExIds_{ 0 },
+            isIntel_{ false },
+            isAMD_{ false },
+            f_1_ECX_{ 0 },
+            f_1_EDX_{ 0 },
+            f_7_EBX_{ 0 },
+            f_7_ECX_{ 0 },
+            f_81_ECX_{ 0 },
+            f_81_EDX_{ 0 },
+            data_{},
+            extdata_{}
+        {
+            //int cpuInfo[4] = {-1};
+            std::array<int, 4> cpui;
+
+            // Calling __cpuid with 0x0 as the function_id argument
+            // gets the number of the highest valid function ID.
+            __cpuid(cpui.data(), 0);
+            nIds_ = cpui[0];
+
+            for (int i = 0; i <= nIds_; ++i)
+            {
+                __cpuidex(cpui.data(), i, 0);
+                data_.push_back(cpui);
+            }
+
+            // Capture vendor string
+            char vendor[0x20];
+            memset(vendor, 0, sizeof(vendor));
+            *reinterpret_cast<int*>(vendor) = data_[0][1];
+            *reinterpret_cast<int*>(vendor + 4) = data_[0][3];
+            *reinterpret_cast<int*>(vendor + 8) = data_[0][2];
+            vendor_ = vendor;
+            if (vendor_ == "GenuineIntel")
+            {
+                isIntel_ = true;
+            }
+            else if (vendor_ == "AuthenticAMD")
+            {
+                isAMD_ = true;
+            }
+
+            // load bitset with flags for function 0x00000001
+            if (nIds_ >= 1)
+            {
+                f_1_ECX_ = data_[1][2];
+                f_1_EDX_ = data_[1][3];
+            }
+
+            // load bitset with flags for function 0x00000007
+            if (nIds_ >= 7)
+            {
+                f_7_EBX_ = data_[7][1];
+                f_7_ECX_ = data_[7][2];
+            }
+
+            // Calling __cpuid with 0x80000000 as the function_id argument
+            // gets the number of the highest valid extended ID.
+            __cpuid(cpui.data(), 0x80000000);
+            nExIds_ = cpui[0];
+
+            char brand[0x40];
+            memset(brand, 0, sizeof(brand));
+
+            for (int i = 0x80000000; i <= nExIds_; ++i)
+            {
+                __cpuidex(cpui.data(), i, 0);
+                extdata_.push_back(cpui);
+            }
+
+            // load bitset with flags for function 0x80000001
+            if (nExIds_ >= 0x80000001)
+            {
+                f_81_ECX_ = extdata_[1][2];
+                f_81_EDX_ = extdata_[1][3];
+            }
+
+            // Interpret CPU brand string if reported
+            if (nExIds_ >= 0x80000004)
+            {
+                memcpy(brand, extdata_[2].data(), sizeof(cpui));
+                memcpy(brand + 16, extdata_[3].data(), sizeof(cpui));
+                memcpy(brand + 32, extdata_[4].data(), sizeof(cpui));
+                brand_ = brand;
+            }
+        };
+
+        int nIds_;
+        int nExIds_;
+        std::string vendor_;
+        std::string brand_;
+        bool isIntel_;
+        bool isAMD_;
+        std::bitset<32> f_1_ECX_;
+        std::bitset<32> f_1_EDX_;
+        std::bitset<32> f_7_EBX_;
+        std::bitset<32> f_7_ECX_;
+        std::bitset<32> f_81_ECX_;
+        std::bitset<32> f_81_EDX_;
+        std::vector<std::array<int, 4>> data_;
+        std::vector<std::array<int, 4>> extdata_;
+    };
+};
+
+// Initialize static member data
+const Dqn_RefImplCPUReport::Dqn_RefImplCPUReport_Internal Dqn_RefImplCPUReport::CPU_Rep;
+#endif // !defined(__clang__)
+
+#if 0
+static void Dqn_RefImpl_CPUReportDump() // Print out supported instruction set features
+{
+    auto support_message = [](std::string isa_feature, bool is_supported) {
+        printf("%s %s\n", isa_feature.c_str(), is_supported ? "supported" : "not supported");
+    };
+
+    printf("%s\n", Dqn_RefImplCPUReport::Vendor().c_str());
+    printf("%s\n", Dqn_RefImplCPUReport::Brand().c_str());
+
+    support_message("3DNOW",       Dqn_RefImplCPUReport::_3DNOW());
+    support_message("3DNOWEXT",    Dqn_RefImplCPUReport::_3DNOWEXT());
+    support_message("ABM",         Dqn_RefImplCPUReport::ABM());
+    support_message("ADX",         Dqn_RefImplCPUReport::ADX());
+    support_message("AES",         Dqn_RefImplCPUReport::AES());
+    support_message("AVX",         Dqn_RefImplCPUReport::AVX());
+    support_message("AVX2",        Dqn_RefImplCPUReport::AVX2());
+    support_message("AVX512CD",    Dqn_RefImplCPUReport::AVX512CD());
+    support_message("AVX512ER",    Dqn_RefImplCPUReport::AVX512ER());
+    support_message("AVX512F",     Dqn_RefImplCPUReport::AVX512F());
+    support_message("AVX512PF",    Dqn_RefImplCPUReport::AVX512PF());
+    support_message("BMI1",        Dqn_RefImplCPUReport::BMI1());
+    support_message("BMI2",        Dqn_RefImplCPUReport::BMI2());
+    support_message("CLFSH",       Dqn_RefImplCPUReport::CLFSH());
+    support_message("CMPXCHG16B",  Dqn_RefImplCPUReport::CMPXCHG16B());
+    support_message("CX8",         Dqn_RefImplCPUReport::CX8());
+    support_message("ERMS",        Dqn_RefImplCPUReport::ERMS());
+    support_message("F16C",        Dqn_RefImplCPUReport::F16C());
+    support_message("FMA",         Dqn_RefImplCPUReport::FMA());
+    support_message("FSGSBASE",    Dqn_RefImplCPUReport::FSGSBASE());
+    support_message("FXSR",        Dqn_RefImplCPUReport::FXSR());
+    support_message("HLE",         Dqn_RefImplCPUReport::HLE());
+    support_message("INVPCID",     Dqn_RefImplCPUReport::INVPCID());
+    support_message("LAHF",        Dqn_RefImplCPUReport::LAHF());
+    support_message("LZCNT",       Dqn_RefImplCPUReport::LZCNT());
+    support_message("MMX",         Dqn_RefImplCPUReport::MMX());
+    support_message("MMXEXT",      Dqn_RefImplCPUReport::MMXEXT());
+    support_message("MONITOR",     Dqn_RefImplCPUReport::MONITOR());
+    support_message("MOVBE",       Dqn_RefImplCPUReport::MOVBE());
+    support_message("MSR",         Dqn_RefImplCPUReport::MSR());
+    support_message("OSXSAVE",     Dqn_RefImplCPUReport::OSXSAVE());
+    support_message("PCLMULQDQ",   Dqn_RefImplCPUReport::PCLMULQDQ());
+    support_message("POPCNT",      Dqn_RefImplCPUReport::POPCNT());
+    support_message("PREFETCHWT1", Dqn_RefImplCPUReport::PREFETCHWT1());
+    support_message("RDRAND",      Dqn_RefImplCPUReport::RDRAND());
+    support_message("RDSEED",      Dqn_RefImplCPUReport::RDSEED());
+    support_message("RDTSCP",      Dqn_RefImplCPUReport::RDTSCP());
+    support_message("RTM",         Dqn_RefImplCPUReport::RTM());
+    support_message("SEP",         Dqn_RefImplCPUReport::SEP());
+    support_message("SHA",         Dqn_RefImplCPUReport::SHA());
+    support_message("SSE",         Dqn_RefImplCPUReport::SSE());
+    support_message("SSE2",        Dqn_RefImplCPUReport::SSE2());
+    support_message("SSE3",        Dqn_RefImplCPUReport::SSE3());
+    support_message("SSE4.1",      Dqn_RefImplCPUReport::SSE41());
+    support_message("SSE4.2",      Dqn_RefImplCPUReport::SSE42());
+    support_message("SSE4a",       Dqn_RefImplCPUReport::SSE4a());
+    support_message("SSSE3",       Dqn_RefImplCPUReport::SSSE3());
+    support_message("SYSCALL",     Dqn_RefImplCPUReport::SYSCALL());
+    support_message("TBM",         Dqn_RefImplCPUReport::TBM());
+    support_message("XOP",         Dqn_RefImplCPUReport::XOP());
+    support_message("XSAVE",       Dqn_RefImplCPUReport::XSAVE());
+};
+#endif
+
+static Dqn_UTest Dqn_Test_Base()
+{
+    Dqn_UTest test = {};
+    DQN_UTEST_GROUP(test, "Dqn_Base") {
+        // TODO(doyle): cpuid refimpl doesn't work on clang
+        #if !defined(__clang__)
+        DQN_UTEST_TEST("Query CPUID") {
+            Dqn_CPUReport cpu_report = Dqn_CPU_Report();
+
+            // NOTE: Sanity check our report against MSDN's example ////////////////////////////////////////
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_3DNow)       == Dqn_RefImplCPUReport::_3DNOW());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_3DNowExt)    == Dqn_RefImplCPUReport::_3DNOWEXT());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_ABM)         == Dqn_RefImplCPUReport::ABM());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_AES)         == Dqn_RefImplCPUReport::AES());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_AVX)         == Dqn_RefImplCPUReport::AVX());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_AVX2)        == Dqn_RefImplCPUReport::AVX2());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_AVX512CD)    == Dqn_RefImplCPUReport::AVX512CD());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_AVX512ER)    == Dqn_RefImplCPUReport::AVX512ER());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_AVX512F)     == Dqn_RefImplCPUReport::AVX512F());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_AVX512PF)    == Dqn_RefImplCPUReport::AVX512PF());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_CMPXCHG16B)  == Dqn_RefImplCPUReport::CMPXCHG16B());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_F16C)        == Dqn_RefImplCPUReport::F16C());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_FMA)         == Dqn_RefImplCPUReport::FMA());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_MMX)         == Dqn_RefImplCPUReport::MMX());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_MmxExt)      == Dqn_RefImplCPUReport::MMXEXT());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_MONITOR)     == Dqn_RefImplCPUReport::MONITOR());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_MOVBE)       == Dqn_RefImplCPUReport::MOVBE());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_PCLMULQDQ)   == Dqn_RefImplCPUReport::PCLMULQDQ());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_POPCNT)      == Dqn_RefImplCPUReport::POPCNT());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_RDRAND)      == Dqn_RefImplCPUReport::RDRAND());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_RDSEED)      == Dqn_RefImplCPUReport::RDSEED());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_RDTSCP)      == Dqn_RefImplCPUReport::RDTSCP());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SHA)         == Dqn_RefImplCPUReport::SHA());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SSE)         == Dqn_RefImplCPUReport::SSE());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SSE2)        == Dqn_RefImplCPUReport::SSE2());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SSE3)        == Dqn_RefImplCPUReport::SSE3());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SSE41)       == Dqn_RefImplCPUReport::SSE41());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SSE42)       == Dqn_RefImplCPUReport::SSE42());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SSE4A)       == Dqn_RefImplCPUReport::SSE4a());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SSSE3)       == Dqn_RefImplCPUReport::SSSE3());
+
+            // NOTE: Feature flags we haven't bothered detecting yet but are in MSDN's example /////////////
+            #if 0
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_ADX)         == Dqn_RefImplCPUReport::ADX());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_BMI1)        == Dqn_RefImplCPUReport::BMI1());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_BMI2)        == Dqn_RefImplCPUReport::BMI2());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_CLFSH)       == Dqn_RefImplCPUReport::CLFSH());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_CX8)         == Dqn_RefImplCPUReport::CX8());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_ERMS)        == Dqn_RefImplCPUReport::ERMS());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_FSGSBASE)    == Dqn_RefImplCPUReport::FSGSBASE());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_FXSR)        == Dqn_RefImplCPUReport::FXSR());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_HLE)         == Dqn_RefImplCPUReport::HLE());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_INVPCID)     == Dqn_RefImplCPUReport::INVPCID());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_LAHF)        == Dqn_RefImplCPUReport::LAHF());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_LZCNT)       == Dqn_RefImplCPUReport::LZCNT());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_MSR)         == Dqn_RefImplCPUReport::MSR());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_OSXSAVE)     == Dqn_RefImplCPUReport::OSXSAVE());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_PREFETCHWT1) == Dqn_RefImplCPUReport::PREFETCHWT1());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_RTM)         == Dqn_RefImplCPUReport::RTM());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SEP)         == Dqn_RefImplCPUReport::SEP());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_SYSCALL)     == Dqn_RefImplCPUReport::SYSCALL());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_TBM)         == Dqn_RefImplCPUReport::TBM());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_XOP)         == Dqn_RefImplCPUReport::XOP());
+            DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_XSAVE)       == Dqn_RefImplCPUReport::XSAVE());
+            #endif
+        }
+        #endif // !defined(__clang__)
+    }
+    return test;
+}
+
 static Dqn_UTest Dqn_Test_Arena()
 {
     Dqn_UTest test = {};
@@ -104,79 +431,79 @@ static Dqn_UTest Dqn_Test_Bin()
     Dqn_UTest test           = {};
     DQN_UTEST_GROUP(test, "Dqn_Bin") {
         DQN_UTEST_TEST("Convert 0x123") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0x123"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("0x123"));
             DQN_UTEST_ASSERTF(&test, result == 0x123, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 0xFFFF") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0xFFFF"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("0xFFFF"));
             DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert FFFF") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("FFFF"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("FFFF"));
             DQN_UTEST_ASSERTF(&test, result == 0xFFFF, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert abCD") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("abCD"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("abCD"));
             DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 0xabCD") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0xabCD"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("0xabCD"));
             DQN_UTEST_ASSERTF(&test, result == 0xabCD, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 0x") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0x"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("0x"));
             DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 0X") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("0X"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("0X"));
             DQN_UTEST_ASSERTF(&test, result == 0x0, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert 3") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("3"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("3"));
             DQN_UTEST_ASSERTF(&test, result == 3, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert f") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("f"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("f"));
             DQN_UTEST_ASSERTF(&test, result == 0xf, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert g") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("g"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("g"));
             DQN_UTEST_ASSERTF(&test, result == 0, "result: %" PRIu64, result);
         }
 
         DQN_UTEST_TEST("Convert -0x3") {
-            uint64_t result = Dqn_Bin_HexToU64(DQN_STR8("-0x3"));
+            uint64_t result = Dqn_HexToU64(DQN_STR8("-0x3"));
             DQN_UTEST_ASSERTF(&test, result == 0, "result: %" PRIu64, result);
         }
 
         uint32_t number = 0xd095f6;
         DQN_UTEST_TEST("Convert %x to string", number) {
-            Dqn_Str8 number_hex = Dqn_Bin_BytesToHexArena(scratch.arena, &number, sizeof(number));
+            Dqn_Str8 number_hex = Dqn_BytesToHex(scratch.arena, &number, sizeof(number));
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_Eq(number_hex, DQN_STR8("f695d000")), "number_hex=%.*s", DQN_STR_FMT(number_hex));
         }
 
         number = 0xf6ed00;
         DQN_UTEST_TEST("Convert %x to string", number) {
-            Dqn_Str8 number_hex = Dqn_Bin_BytesToHexArena(scratch.arena, &number, sizeof(number));
+            Dqn_Str8 number_hex = Dqn_BytesToHex(scratch.arena, &number, sizeof(number));
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_Eq(number_hex, DQN_STR8("00edf600")), "number_hex=%.*s", DQN_STR_FMT(number_hex));
         }
 
         Dqn_Str8 hex = DQN_STR8("0xf6ed00");
         DQN_UTEST_TEST("Convert %.*s to bytes", DQN_STR_FMT(hex)) {
-            Dqn_Str8 bytes = Dqn_Bin_HexToBytesArena(scratch.arena, hex);
+            Dqn_Str8 bytes = Dqn_HexToBytes(scratch.arena, hex);
             DQN_UTEST_ASSERTF(&test,
                                Dqn_Str8_Eq(bytes, DQN_STR8("\xf6\xed\x00")),
                                "number_hex=%.*s",
-                               DQN_STR_FMT(Dqn_Bin_BytesToHexArena(scratch.arena, bytes.data, bytes.size)));
+                               DQN_STR_FMT(Dqn_BytesToHex(scratch.arena, bytes.data, bytes.size)));
         }
 
     }
@@ -975,7 +1302,7 @@ Dqn_Str8 const DQN_UTEST_HASH_STRING_[] =
 void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
 {
     Dqn_Scratch scratch   = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    input_hex = Dqn_Bin_BytesToHexArena(scratch.arena, input.data, input.size);
+    Dqn_Str8    input_hex = Dqn_BytesToHex(scratch.arena, input.data, input.size);
 
     switch(hash_type)
     {
@@ -1619,12 +1946,11 @@ static Dqn_UTest Dqn_Test_Str8()
             DQN_UTEST_ASSERTF(&test, result.value == 12, "result: %" PRIu64, result.value);
         }
 
-        // NOTE: Dqn_Str8_Find
-        // =========================================================================================
+        // NOTE: Dqn_Str8_Find /////////////////////////////////////////////////////////////////////
         DQN_UTEST_TEST("Find: String (char) is not in buffer") {
             Dqn_Str8 buf              = DQN_STR8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
             Dqn_Str8 find             = DQN_STR8("2");
-            Dqn_Str8FindResult result = Dqn_Str8_FindFirstString(buf, find);
+            Dqn_Str8FindResult result = Dqn_Str8_FindStr8(buf, find);
             DQN_UTEST_ASSERT(&test, !result.found);
             DQN_UTEST_ASSERT(&test, result.index == 0);
             DQN_UTEST_ASSERT(&test, result.match.data == nullptr);
@@ -1634,14 +1960,13 @@ static Dqn_UTest Dqn_Test_Str8()
         DQN_UTEST_TEST("Find: String (char) is in buffer") {
             Dqn_Str8 buf              = DQN_STR8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
             Dqn_Str8 find             = DQN_STR8("6");
-            Dqn_Str8FindResult result = Dqn_Str8_FindFirstString(buf, find);
+            Dqn_Str8FindResult result = Dqn_Str8_FindStr8(buf, find);
             DQN_UTEST_ASSERT(&test, result.found);
             DQN_UTEST_ASSERT(&test, result.index == 2);
             DQN_UTEST_ASSERT(&test, result.match.data[0] == '6');
         }
 
-        // NOTE: Dqn_Str8_FileNameFromPath
-        // =========================================================================================
+        // NOTE: Dqn_Str8_FileNameFromPath /////////////////////////////////////////////////////////
         DQN_UTEST_TEST("File name from Windows path") {
             Dqn_Str8 buf    = DQN_STR8("C:\\ABC\\test.exe");
             Dqn_Str8 result = Dqn_Str8_FileNameFromPath(buf);
@@ -1897,6 +2222,7 @@ void Dqn_Test_RunSuite()
 {
     Dqn_UTest tests[] =
     {
+        Dqn_Test_Base(),
         Dqn_Test_Arena(),
         Dqn_Test_Bin(),
         Dqn_Test_BinarySearch(),
@@ -1933,7 +2259,7 @@ void Dqn_Test_RunSuite()
 int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;
-    Dqn_Library_Init(Dqn_LibraryOnInit_LogFeatures);
+    Dqn_Library_Init(Dqn_LibraryOnInit_LogAllFeatures);
     Dqn_Test_RunSuite();
     return 0;
 }

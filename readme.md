@@ -9,21 +9,8 @@ separated by category into files for organisation. You only need to include
 ## Build
 
 To build with this library, copy all the `*.[h|cpp]` files at the root of the
-repository to your desired location, accessible by your project and in one
-header file include the header.
-
-```cpp
-#include "dqn.h"
-```
-
-`dqn.h` includes all other files and their declaration into your header. In
-*one* `.cpp` file define the macro to enable the implementation of the header in
-that translation unit.
-
-```cpp
-#define DQN_IMPLEMENTATION
-#include "dqn.h"
-```
+repository to your desired location and compile `dqn.cpp` or include it into one
+of your translation units.
 
 Finally ensure that the compiler has in its search paths for the include
 directory where headers are located, e.g. `-I <path/to/dqn/headers>`.

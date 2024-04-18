@@ -345,7 +345,8 @@ DQN_API void *Dqn_ChunkPool_Alloc(Dqn_ChunkPool *pool, Dqn_usize size)
 
         // NOTE: Store the offset to the original pointer behind the user's
         // pointer.
-        DQN_MEMCPY(&(DQN_CAST(char *)slot->data)[-1], &offset_to_original_ptr, 1);
+        char *offset_to_original_storage = DQN_CAST(char *)slot->data - 1;
+        DQN_MEMCPY(offset_to_original_storage, &offset_to_original_ptr, 1);
     }
 
     // NOTE: Smuggle the slot type in the next pointer so that we know, when the
@@ -427,6 +428,7 @@ DQN_API void Dqn_ArenaCatalog_Init(Dqn_ArenaCatalog *catalog, Dqn_ChunkPool *poo
 
 DQN_API Dqn_ArenaCatalogItem *Dqn_ArenaCatalog_Find(Dqn_ArenaCatalog *catalog, Dqn_Str8 label)
 {
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_ArenaCatalogItem *result = &catalog->sentinel;
     for (Dqn_ArenaCatalogItem *item = catalog->sentinel.next; item != &catalog->sentinel; item = item->next) {
         if (item->label == label) {
@@ -434,6 +436,7 @@ DQN_API Dqn_ArenaCatalogItem *Dqn_ArenaCatalog_Find(Dqn_ArenaCatalog *catalog, D
             break;
         }
     }
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
     return result;
 }
 
@@ -462,7 +465,9 @@ DQN_API void Dqn_ArenaCatalog_AddLabelRef(Dqn_ArenaCatalog *catalog, Dqn_Arena *
 
 DQN_API void Dqn_ArenaCatalog_AddLabelCopy(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, Dqn_Str8 label)
 {
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8 label_copy = Dqn_ChunkPool_AllocStr8Copy(catalog->pool, label);
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
     Dqn_ArenaCatalog_AddLabelRef(catalog, arena, label_copy);
 }
 
@@ -470,14 +475,18 @@ DQN_API void Dqn_ArenaCatalog_AddF(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, 
 {
     va_list args;
     va_start(args, fmt);
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8 label = Dqn_ChunkPool_AllocStr8FV(catalog->pool, fmt, args);
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
     va_end(args);
     Dqn_ArenaCatalog_AddLabelRef(catalog, arena, label);
 }
 
 DQN_API void Dqn_ArenaCatalog_AddFV(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8 label = Dqn_ChunkPool_AllocStr8FV(catalog->pool, fmt, args);
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
     Dqn_ArenaCatalog_AddLabelRef(catalog, arena, label);
 }
 
@@ -494,14 +503,18 @@ DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocLabelRef(Dqn_ArenaCatalog *catalog, Dqn
 
 DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocLabelCopy(Dqn_ArenaCatalog *catalog, Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, Dqn_Str8 label)
 {
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8   label_copy = Dqn_ChunkPool_AllocStr8Copy(catalog->pool, label);
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
     Dqn_Arena *result     = Dqn_ArenaCatalog_AllocLabelRef(catalog, reserve, commit, arena_flags, label_copy);
     return result;
 }
 
 DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8   label  = Dqn_ChunkPool_AllocStr8FV(catalog->pool, fmt, args);
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
     Dqn_Arena *result = Dqn_ArenaCatalog_AllocLabelRef(catalog, reserve, commit, arena_flags, label);
     return result;
 }
@@ -510,7 +523,9 @@ DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF(Dqn_ArenaCatalog *catalog, Dqn_usize 
 {
     va_list args;
     va_start(args, fmt);
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8   label  = Dqn_ChunkPool_AllocStr8FV(catalog->pool, fmt, args);
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
     Dqn_Arena *result = Dqn_ArenaCatalog_AllocLabelRef(catalog, reserve, commit, arena_flags, label);
     va_end(args);
     return result;

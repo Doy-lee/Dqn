@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -222,17 +225,6 @@ enum Dqn_OSSemaphoreWaitResult
 };
 #endif // !defined(DQN_NO_SEMAPHORE)
 
-// NOTE: [$MUTX] Dqn_OSMutex ///////////////////////////////////////////////////////////////////////
-struct Dqn_OSMutex
-{
-    #if defined(DQN_OS_WIN32) && !defined(DQN_OS_WIN32_USE_PTHREADS)
-    char                win32_handle[48];
-    #else
-    pthread_mutex_t     posix_handle;
-    pthread_mutexattr_t posix_attribs;
-    #endif
-};
-
 // NOTE: [$THRD] Dqn_OSThread /////////////////////////////////////////////////////////////////////
 #if !defined(DQN_NO_THREAD) && !defined(DQN_NO_SEMAPHORE)
 typedef int32_t (Dqn_OSThreadFunc)(struct Dqn_OSThread*);
@@ -295,6 +287,7 @@ DQN_API Dqn_OSDateTime            Dqn_OS_DateLocalTimeNow    ();
 DQN_API Dqn_OSDateTimeStr8        Dqn_OS_DateLocalTimeStr8Now(char date_separator = '-', char hms_separator = ':');
 DQN_API Dqn_OSDateTimeStr8        Dqn_OS_DateLocalTimeStr8   (Dqn_OSDateTime time, char date_separator = '-', char hms_separator = ':');
 DQN_API uint64_t                  Dqn_OS_DateUnixTime        ();
+DQN_API Dqn_OSDateTime            Dqn_OS_DateUnixTimeToDate  (uint64_t time);
 DQN_API uint64_t                  Dqn_OS_DateToUnixTime      (Dqn_OSDateTime date);
 DQN_API bool                      Dqn_OS_DateIsValid         (Dqn_OSDateTime date);
 
@@ -378,10 +371,10 @@ DQN_API Dqn_OSSemaphoreWaitResult Dqn_OS_SemaphoreWait     (Dqn_OSSemaphore *sem
 #endif // !defined(DQN_NO_SEMAPHORE)
 
 // NOTE: [$MUTX] Dqn_OSMutex ///////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSMutex               Dqn_OS_MutexInit  (uint32_t initial_count, uint32_t max_count);
+DQN_API Dqn_OSMutex               Dqn_OS_MutexInit  ();
 DQN_API void                      Dqn_OS_MutexDeinit(Dqn_OSMutex *mutex);
-DQN_API void                      Dqn_OS_MutexLock  (Dqn_OSMutex mutex);
-DQN_API void                      Dqn_OS_MutexUnlock(Dqn_OSMutex mutex);
+DQN_API void                      Dqn_OS_MutexLock  (Dqn_OSMutex *mutex);
+DQN_API void                      Dqn_OS_MutexUnlock(Dqn_OSMutex *mutex);
 
 // NOTE: [$THRD] Dqn_OSThread /////////////////////////////////////////////////////////////////////
 #if !defined(DQN_NO_THREAD) && !defined(DQN_NO_SEMAPHORE)

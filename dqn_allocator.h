@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -51,6 +54,7 @@ struct Dqn_Arena
 {
     Dqn_ArenaBlock *curr;
     uint8_t         flags;
+    Dqn_TicketMutex mutex; // For user code to lock the arena, the arena itself does not use.
 };
 
 struct Dqn_ArenaTempMem

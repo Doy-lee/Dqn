@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -75,7 +78,7 @@ DQN_API Dqn_Str8 Dqn_OS_EXEDir(Dqn_Arena *arena)
     Dqn_Scratch               scratch      = Dqn_Scratch_Get(arena);
     Dqn_Str8                  exe_path     = Dqn_OS_EXEPath(scratch.arena);
     Dqn_Str8                  separators[] = {DQN_STR8("/"), DQN_STR8("\\")};
-    Dqn_Str8BinarySplitResult split        = Dqn_Str8_BinarySplitReverseArray(exe_path, separators, DQN_ARRAY_UCOUNT(separators));
+    Dqn_Str8BinarySplitResult split        = Dqn_Str8_BinarySplitLastArray(exe_path, separators, DQN_ARRAY_UCOUNT(separators));
     result                                 = Dqn_Str8_Copy(arena, split.lhs);
     return result;
 }

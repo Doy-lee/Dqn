@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -50,21 +53,6 @@ struct Dqn_JSONBuilder
 };
 #endif // !defined(DQN_NO_JSON_BUIDLER)
 
-#if !defined(DQN_NO_BIN)
-// NOTE: [$BHEX] Dqn_Bin ///////////////////////////////////////////////////////////////////////////
-struct Dqn_BinHexU64Str8
-{
-    char    data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
-    uint8_t size;
-};
-
-enum Dqn_BinHexU64Str8Flags
-{
-    Dqn_BinHexU64Str8Flags_No0xPrefix   = 1 << 0, /// Remove the 0x prefix from the string
-    Dqn_BinHexU64Str8Flags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
-};
-#endif // !defined(DQN_NO_BIN)
-
 // NOTE: [$BSEA] Dqn_BinarySearch //////////////////////////////////////////////////////////////////
 template <typename T>
 using Dqn_BinarySearchLessThanProc = bool(T const &lhs, T const &rhs);
@@ -112,7 +100,7 @@ struct Dqn_BinarySearchResult
 // NOTE: [$MISC] Misc //////////////////////////////////////////////////////////////////////////////
 struct Dqn_U64Str8
 {
-    char    data[27+1]; // NOTE(dqn): 27 is the maximum size of uint64_t including a separtor
+    char    data[27+1]; // NOTE(dqn): 27 is the maximum size of uint64_t including a separator
     uint8_t size;
 };
 
@@ -144,6 +132,18 @@ enum Dqn_U64AgeUnit
     Dqn_U64AgeUnit_Year = 1 << 5,
     Dqn_U64AgeUnit_HMS  = Dqn_U64AgeUnit_Sec | Dqn_U64AgeUnit_Min | Dqn_U64AgeUnit_Hr,
     Dqn_U64AgeUnit_All  = Dqn_U64AgeUnit_HMS | Dqn_U64AgeUnit_Day | Dqn_U64AgeUnit_Week | Dqn_U64AgeUnit_Year,
+};
+
+struct Dqn_U64HexStr8
+{
+    char    data[2 /*0x*/ + 16 /*hex*/ + 1 /*null-terminator*/];
+    uint8_t size;
+};
+
+enum Dqn_U64HexStr8Flags
+{
+    Dqn_BinHexU64Str8Flags_No0xPrefix   = 1 << 0, /// Remove the 0x prefix from the string
+    Dqn_BinHexU64Str8Flags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
 };
 
 #if !defined(DQN_NO_PROFILER)
@@ -182,9 +182,16 @@ struct Dqn_ProfilerZoneScope
     ~Dqn_ProfilerZoneScope();
     Dqn_ProfilerZone zone;
 };
-#define Dqn_Profiler_ZoneScope(name) auto DQN_UNIQUE_NAME(profile_zone_) = Dqn_ProfilerZoneScope(DQN_STR8(name), __COUNTER__ + 1)
 #define Dqn_Profiler_ZoneScopeWithIndex(name, anchor_index) auto DQN_UNIQUE_NAME(profile_zone_) = Dqn_ProfilerZoneScope(DQN_STR8(name), anchor_index)
+#define Dqn_Profiler_ZoneScope(name) Dqn_Profiler_ZoneScopeWithIndex(name, __COUNTER__ + 1)
 #endif
+
+#define Dqn_Profiler_ZoneBlockIndex(name, index) \
+    for (Dqn_ProfilerZone DQN_UNIQUE_NAME(profile_zone__) = Dqn_Profiler_BeginZoneWithIndex(name, index), DQN_UNIQUE_NAME(dummy__) = {}; \
+         DQN_UNIQUE_NAME(dummy__).begin_tsc == 0; \
+         Dqn_Profiler_EndZone(DQN_UNIQUE_NAME(profile_zone__)), DQN_UNIQUE_NAME(dummy__).begin_tsc = 1)
+
+#define Dqn_Profiler_ZoneBlock(name) Dqn_Profiler_ZoneBlockIndex(DQN_STR8(name), __COUNTER__ + 1)
 
 enum Dqn_ProfilerAnchorBuffer
 {
@@ -207,9 +214,12 @@ struct Dqn_Job
     bool              add_to_completion_queue;
     Dqn_Arena        *arena;
     Dqn_JobQueueFunc *func;
-    uint32_t          user_tag;
     void             *user_context;
 };
+
+#if !defined(DQN_JOB_QUEUE_SPMC_SIZE)
+    #define DQN_JOB_QUEUE_SPMC_SIZE 128
+#endif
 
 struct Dqn_JobQueueSPMC
 {
@@ -218,7 +228,7 @@ struct Dqn_JobQueueSPMC
     Dqn_OSSemaphore   wait_for_completion_semaphore;
     uint32_t          threads_waiting_for_completion;
 
-    Dqn_Job           jobs[64];
+    Dqn_Job           jobs[DQN_JOB_QUEUE_SPMC_SIZE];
     Dqn_b32           quit;
     uint32_t          quit_exit_code;
     uint32_t volatile read_index;
@@ -226,7 +236,7 @@ struct Dqn_JobQueueSPMC
     uint32_t volatile write_index;
 
     Dqn_OSSemaphore   complete_queue_write_semaphore;
-    Dqn_Job           complete_queue[64];
+    Dqn_Job           complete_queue[DQN_JOB_QUEUE_SPMC_SIZE];
     uint32_t volatile complete_read_index;
     uint32_t volatile complete_write_index;
 };
@@ -238,11 +248,13 @@ struct Dqn_Library
 {
     bool                       lib_init;                 // True if the library has been initialised via `Dqn_Library_Init`
     Dqn_TicketMutex            lib_mutex;
+    Dqn_TicketMutex            thread_context_init_mutex;
     Dqn_Str8                   exe_dir;                  // The directory of the current executable
     Dqn_Arena                  arena;
     Dqn_ChunkPool              pool;                     // Uses 'arena' for malloc-like allocations
     Dqn_ArenaCatalog           arena_catalog;
     bool                       slow_verification_checks; // Enable expensive library verification checks
+    Dqn_CPUReport              cpu_report;
     // NOTE: Logging ///////////////////////////////////////////////////////////////////////////////
     Dqn_LogProc *              log_callback;             // Set this pointer to override the logging routine
     void *                     log_user_data;
@@ -275,8 +287,10 @@ struct Dqn_Library
 
 enum Dqn_LibraryOnInit
 {
-    Dqn_LibraryOnInit_Nil,
-    Dqn_LibraryOnInit_LogFeatures,
+    Dqn_LibraryOnInit_Nil            = 0,
+    Dqn_LibraryOnInit_LogLibFeatures = 1 << 0,
+    Dqn_LibraryOnInit_LogCPUFeatures = 1 << 1,
+    Dqn_LibraryOnInit_LogAllFeatures = Dqn_LibraryOnInit_LogLibFeatures | Dqn_LibraryOnInit_LogCPUFeatures,
 };
 
 // NOTE: [$PCGX] Dqn_PCG32 /////////////////////////////////////////////////////////////////////////
@@ -331,32 +345,6 @@ DQN_API void                 Dqn_JSONBuilder_BoolNamed               (Dqn_JSONBu
 #define                      Dqn_JSONBuilder_F64(builder, value)     Dqn_JSONBuilder_F64Named(builder, DQN_STR8(""), value)
 #define                      Dqn_JSONBuilder_Bool(builder, value)    Dqn_JSONBuilder_BoolNamed(builder, DQN_STR8(""), value)
 #endif // !defined(DQN_NO_JSON_BUILDER)
-#if !defined(DQN_NO_BIN)
-// NOTE: [$BHEX] Dqn_Bin ///////////////////////////////////////////////////////////////////////////
-// TODO(doyle): I'm not happy with this API. Its ugly and feels complicated
-// because I designed it as a C-API first (e.g. ptr + length) vs just accepting
-// that Dqn_Str8/Dqn_Slice is a superior API to design for first.
-DQN_API char const *         Dqn_Bin_HexBufferTrim0x                 (char const *hex, Dqn_usize size, Dqn_usize *real_size);
-DQN_API Dqn_Str8             Dqn_Bin_HexTrim0x                       (Dqn_Str8 string);
-
-DQN_API Dqn_BinHexU64Str8    Dqn_Bin_U64ToHexU64Str8                 (uint64_t number, uint32_t flags);
-DQN_API Dqn_Str8             Dqn_Bin_U64ToHex                        (Dqn_Arena *arena, uint64_t number, uint32_t flags);
-
-DQN_API uint64_t             Dqn_Bin_HexToU64                        (Dqn_Str8 hex);
-DQN_API uint64_t             Dqn_Bin_HexPtrToU64                     (char const *hex, Dqn_usize size);
-
-DQN_API Dqn_Str8             Dqn_Bin_BytesToHexArena                 (Dqn_Arena *arena, void const *src, Dqn_usize size);
-DQN_API char *               Dqn_Bin_BytesToHexBufferArena           (Dqn_Arena *arena, void const *src, Dqn_usize size);
-DQN_API bool                 Dqn_Bin_BytesToHexBuffer                (void const *src, Dqn_usize src_size, char *dest, Dqn_usize dest_size);
-
-DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytesUnchecked       (char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_usize            Dqn_Bin_HexBufferToBytes                (char const *hex, Dqn_usize hex_size, void *dest, Dqn_usize dest_size);
-DQN_API char *               Dqn_Bin_HexBufferToBytesArena           (Dqn_Arena *arena, char const *hex, Dqn_usize hex_size, Dqn_usize *real_size);
-
-DQN_API Dqn_usize            Dqn_Bin_HexToBytesUnchecked             (Dqn_Str8 hex, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_usize            Dqn_Bin_HexToBytes                      (Dqn_Str8 hex, void *dest, Dqn_usize dest_size);
-DQN_API Dqn_Str8             Dqn_Bin_HexToBytesArena                 (Dqn_Arena *arena, Dqn_Str8 hex);
-#endif // !defined(DQN_NO_BIN)
 
 // NOTE: [$BSEA] Dqn_BinarySearch //////////////////////////////////////////////////////////////////
 template <typename T> bool                   Dqn_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
@@ -371,6 +359,7 @@ DQN_API void                Dqn_Bit_UnsetInplace                     (Dqn_usize 
 DQN_API void                Dqn_Bit_SetInplace                       (Dqn_usize *flags, Dqn_usize bitfield);
 DQN_API bool                Dqn_Bit_IsSet                            (Dqn_usize bits, Dqn_usize bits_to_set);
 DQN_API bool                Dqn_Bit_IsNotSet                         (Dqn_usize bits, Dqn_usize bits_to_check);
+#define                     Dqn_Bit_ClearNextLSB(value)              (value) & ((value) - 1)
 
 // NOTE: [$SAFE] Dqn_Safe //////////////////////////////////////////////////////////////////////////
 DQN_API int64_t             Dqn_Safe_AddI64                          (int64_t a,  int64_t b);
@@ -438,6 +427,18 @@ DQN_API Dqn_U64ByteSize     Dqn_U64ToByteSize                        (uint64_t b
 DQN_API Dqn_Str8            Dqn_U64ToByteSizeStr8                    (Dqn_Arena *arena, uint64_t bytes, Dqn_U64ByteSizeType desired_type);
 DQN_API Dqn_Str8            Dqn_U64ByteSizeTypeString                (Dqn_U64ByteSizeType type);
 DQN_API Dqn_Str8            Dqn_U64ToAge                             (Dqn_Arena *arena, uint64_t age_s, Dqn_usize type);
+
+DQN_API uint64_t            Dqn_HexToU64                             (Dqn_Str8 hex);
+DQN_API Dqn_Str8            Dqn_U64ToHex                             (Dqn_Arena *arena, uint64_t number, uint32_t flags);
+DQN_API Dqn_U64HexStr8      Dqn_U64ToHexStr8                         (uint64_t number, uint32_t flags);
+
+DQN_API bool                Dqn_BytesToHexPtr                        (Dqn_Arena *arena, void const *src, Dqn_usize src_size, char *dest);
+DQN_API Dqn_Str8            Dqn_BytesToHex                           (Dqn_Arena *arena, void const *src, Dqn_usize size);
+
+DQN_API Dqn_usize           Dqn_HexToBytesPtrUnchecked               (Dqn_Str8 hex, void *dest, Dqn_usize dest_sizek);
+DQN_API Dqn_usize           Dqn_HexToBytesPtr                        (Dqn_Str8 hex, void *dest, Dqn_usize dest_sizek);
+DQN_API Dqn_Str8            Dqn_HexToBytesUnchecked                  (Dqn_Arena *arena, Dqn_Str8 hex);
+DQN_API Dqn_Str8            Dqn_HexToBytes                           (Dqn_Arena *arena, Dqn_Str8 hex);
 
 // NOTE: [$PROF] Dqn_Profiler //////////////////////////////////////////////////////////////////////
 #define                     Dqn_Profiler_BeginZone(name)             Dqn_Profiler_BeginZoneWithIndex(DQN_STR8(name), __COUNTER__ + 1)

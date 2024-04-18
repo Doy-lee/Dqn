@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -134,6 +137,20 @@ DQN_API uint64_t Dqn_OS_DateToUnixTime(Dqn_OSDateTime date)
     timeinfo.tm_min    = date.minutes;
     timeinfo.tm_sec    = date.seconds;
     uint64_t result    = mktime(&timeinfo);
+    return result;
+}
+
+DQN_API Dqn_OSDateTime Dqn_OS_DateUnixTimeToDate(uint64_t time)
+{
+    time_t         posix_time = DQN_CAST(time_t) time;
+    struct tm      posix_date = *gmtime(&posix_time);
+    Dqn_OSDateTime result     = {};
+    result.year               = posix_date.tm_year + 1900;
+    result.month              = posix_date.tm_mon + 1;
+    result.day                = posix_date.tm_mday;
+    result.hour               = posix_date.tm_hour;
+    result.minutes            = posix_date.tm_min;
+    result.seconds            = posix_date.tm_sec;
     return result;
 }
 

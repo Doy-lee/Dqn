@@ -1,4 +1,4 @@
-#if !defined(DQN_H)
+#pragma once
 #define DQN_H
 
 /*
@@ -15,6 +15,7 @@
 //                  \___|
 //
 //   dqn.h -- Personal standard library -- MIT License -- git.doylet.dev/dqn
+//   ASCII -- BigMoney-NW by Nathan Bloomfild
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -42,11 +43,7 @@
 //
 // -- Compiling --
 //
-// Define DQN_IMPLEMENTATION macro in one and only one translation unit to
-// enable the implementation of this library, for example:
-//
-//     #define DQN_IMEPLEMENTATION
-//     #include "dqn.h"
+// Compile dqn.cpp or include it into one of your translation units.
 //
 // Additionally, this library supports including/excluding specific sections
 // of the library by using #define on the name of the section. These names are
@@ -208,6 +205,14 @@
 //   library from being included. This might be useful if you are including the
 //   library in your project yourself. The library must still be defined and
 //   visible before this header.
+//
+// - Enable compilation of unit tests with the library.
+//
+//     #define DQN_WITH_UNIT_TESTS
+//
+// - Increase the capacity of the job queue, default is 128.
+//
+//     #define DQN_JOB_QUEUE_SPMC_SIZE 128
 */
 
 #if defined(DQN_ONLY_VARRAY)       || \
@@ -343,65 +348,3 @@
     #endif
     #include "dqn_json.h"
 #endif
-#endif // DQN_H
-
-#if defined(DQN_IMPLEMENTATION)
-/*
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//   /$$$$$$\ $$\      $$\ $$$$$$$\  $$\
-//   \_$$  _|$$$\    $$$ |$$  __$$\ $$ |
-//     $$ |  $$$$\  $$$$ |$$ |  $$ |$$ |
-//     $$ |  $$\$$\$$ $$ |$$$$$$$  |$$ |
-//     $$ |  $$ \$$$  $$ |$$  ____/ $$ |
-//     $$ |  $$ |\$  /$$ |$$ |      $$ |
-//   $$$$$$\ $$ | \_/ $$ |$$ |      $$$$$$$$\
-//   \______|\__|     \__|\__|      \________|
-//
-//   Implementation
-//
-////////////////////////////////////////////////////////////////////////////////////////////////////
-*/
-
-#if defined(DQN_WITH_CGEN)
-    #if !defined(DQN_NO_METADESK)
-        DQN_MSVC_WARNING_PUSH
-        DQN_MSVC_WARNING_DISABLE(4505) // warning C4505: '<function>': unreferenced function with internal linkage has been removed
-        #include "External/metadesk/md.c"
-        DQN_MSVC_WARNING_POP
-    #endif
-    #define DQN_CPP_FILE_IMPLEMENTATION
-    #include "Standalone/dqn_cpp_file.h"
-    #include "dqn_cgen.cpp"
-#endif
-
-#if defined(DQN_WITH_JSON)
-    #define DQN_JSON_IMPLEMENTATION
-    #include "dqn_json.h"
-#endif
-
-#include "dqn_base.cpp"
-#include "dqn_thread_context.cpp"
-#include "dqn_external.cpp"
-#include "dqn_allocator.cpp"
-#include "dqn_debug.cpp"
-#include "dqn_string.cpp"
-#include "dqn_containers.cpp"
-#include "dqn_type_info.cpp"
-
-#if defined(DQN_PLATFORM_EMSCRIPTEN) || defined(DQN_PLATFORM_POSIX) || defined(DQN_PLATFORM_ARM64)
-    #include "dqn_os_posix.cpp"
-#elif defined(DQN_PLATFORM_WIN32)
-    #include "dqn_os_win32.cpp"
-#else
-    #error Please define a platform e.g. 'DQN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
-#endif
-
-#include "dqn_os.cpp"
-#include "dqn_math.cpp"
-#include "dqn_hash.cpp"
-#include "dqn_helpers.cpp"
-
-#include "dqn_unit_tests.cpp"
-#include "dqn_docs.cpp"
-#endif // DQN_IMPLEMENTATION

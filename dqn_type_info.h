@@ -1,3 +1,6 @@
+#pragma once
+#include "dqn.h"
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -30,6 +33,7 @@ struct Dqn_TypeField
     Dqn_isize                  value;
     Dqn_usize                  offset_of;
     Dqn_usize                  size_of;
+    Dqn_usize                  align_of;
     Dqn_Str8                   type_decl;
     uint32_t                   type_enum;
     bool                       is_pointer;
